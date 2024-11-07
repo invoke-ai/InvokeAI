@@ -1,8 +1,5 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
-import { containsFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
-import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
@@ -62,20 +59,6 @@ export const useDndMonitor = () => {
           }
 
           log.warn(parseify({ sourceData, targetData }), 'Invalid drop');
-        },
-      }),
-      monitorForExternal({
-        canMonitor: (args) => {
-          if (!containsFiles(args)) {
-            return false;
-          }
-          return true;
-        },
-        onDragStart: () => {
-          preventUnhandled.start();
-        },
-        onDrop: () => {
-          preventUnhandled.stop();
         },
       })
     );

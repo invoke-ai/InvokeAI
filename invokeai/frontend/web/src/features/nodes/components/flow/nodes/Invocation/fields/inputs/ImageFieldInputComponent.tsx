@@ -2,6 +2,7 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { UploadImageButton } from 'common/hooks/useImageUploadButton';
 import type { SetNodeImageFieldImageDndTargetData } from 'features/dnd/dnd';
 import { setNodeImageFieldImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -13,6 +14,7 @@ import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 import type { FieldComponentProps } from './types';
@@ -48,6 +50,19 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
     }
   }, [handleReset, isConnected, isError]);
 
+  const onUpload = useCallback(
+    (imageDTO: ImageDTO) => {
+      dispatch(
+        fieldImageValueChanged({
+          nodeId,
+          fieldName: field.name,
+          value: imageDTO,
+        })
+      );
+    },
+    [dispatch, field.name, nodeId]
+  );
+
   return (
     <Flex
       position="relative"
@@ -55,13 +70,18 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
       w="full"
       h="full"
       minH={16}
-      alignItems="center"
+      alignItems="stretch"
       justifyContent="center"
-      borderColor="error.500"
-      borderStyle="solid"
-      borderWidth={fieldTemplate.required && !field.value ? 1 : 0}
-      borderRadius="base"
     >
+      {!imageDTO && (
+        <UploadImageButton
+          w="full"
+          h="auto"
+          isError={fieldTemplate.required && !field.value}
+          onUpload={onUpload}
+          fontSize={24}
+        />
+      )}
       {imageDTO && (
         <>
           <DndImage imageDTO={imageDTO} minW={8} minH={8} />

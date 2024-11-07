@@ -1,4 +1,5 @@
-import { Flex, Icon, type SystemStyleObject } from '@invoke-ai/ui-library';
+import type { IconButtonProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -8,10 +9,11 @@ import { useCallback } from 'react';
 import type { FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { PiUploadSimpleBold } from 'react-icons/pi';
+import { PiUploadBold } from 'react-icons/pi';
 import { uploadImages, useUploadImageMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
+import type { SetOptional } from 'type-fest';
 
 type UseImageUploadButtonArgs =
   | {
@@ -48,7 +50,7 @@ const log = logger('gallery');
  */
 export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
-  const [uploadImage] = useUploadImageMutation();
+  const [uploadImage, request] = useUploadImageMutation();
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
   const { t } = useTranslation();
 
@@ -128,36 +130,42 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
     maxFiles: maxImageUploadCount,
   });
 
-  return { getUploadButtonProps, getUploadInputProps, openUploader };
+  return { getUploadButtonProps, getUploadInputProps, openUploader, request };
 };
 
 const sx = {
-  w: 'full',
-  h: 'full',
-  alignItems: 'center',
-  justifyContent: 'center',
+  borderColor: 'error.500',
+  borderStyle: 'solid',
+  borderWidth: 0,
   borderRadius: 'base',
-  transitionProperty: 'common',
-  transitionDuration: '0.1s',
-  '&[data-disabled=false]': {
-    color: 'base.500',
-  },
-  '&[data-disabled=true]': {
-    cursor: 'pointer',
-    bg: 'base.700',
-    _hover: {
-      bg: 'base.650',
-      color: 'base.300',
-    },
+  '&[data-error=true]': {
+    borderWidth: 1,
   },
 } satisfies SystemStyleObject;
 
-export const UploadImageButton = (props: UseImageUploadButtonArgs) => {
-  const uploadApi = useImageUploadButton(props);
+export const UploadImageButton = ({
+  isDisabled = false,
+  onUpload,
+  isError = false,
+  ...rest
+}: {
+  onUpload?: (imageDTO: ImageDTO) => void;
+  isError?: boolean;
+} & SetOptional<IconButtonProps, 'aria-label'>) => {
+  const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: false, onUpload });
   return (
-    <Flex sx={sx} {...uploadApi.getUploadButtonProps()}>
-      <Icon as={PiUploadSimpleBold} boxSize={16} />
+    <>
+      <IconButton
+        aria-label="Upload image"
+        variant="ghost"
+        sx={sx}
+        data-error={isError}
+        icon={<PiUploadBold />}
+        isLoading={uploadApi.request.isLoading}
+        {...rest}
+        {...uploadApi.getUploadButtonProps()}
+      />
       <input {...uploadApi.getUploadInputProps()} />
-    </Flex>
+    </>
   );
 };

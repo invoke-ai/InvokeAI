@@ -1,4 +1,3 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
@@ -14,20 +13,6 @@ import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
-
-const sx = {
-  position: 'relative',
-  w: 'full',
-  h: 'full',
-  alignItems: 'center',
-  borderColor: 'error.500',
-  borderStyle: 'solid',
-  borderWidth: 0,
-  borderRadius: 'base',
-  '&[data-error=true]': {
-    borderWidth: 1,
-  },
-} satisfies SystemStyleObject;
 
 type Props<T extends typeof setGlobalReferenceImageDndTarget | typeof setRegionalGuidanceReferenceImageDndTarget> = {
   image: ImageWithDims | null;
@@ -64,8 +49,16 @@ export const IPAdapterImagePreview = memo(
     );
 
     return (
-      <Flex sx={sx} data-error={!imageDTO && !image?.image_name}>
-        {!imageDTO && <UploadImageButton allowMultiple={false} onUpload={onUpload} />}
+      <Flex position="relative" w="full" h="full" alignItems="center" data-error={!imageDTO && !image?.image_name}>
+        {!imageDTO && (
+          <UploadImageButton
+            w="full"
+            h="full"
+            isError={!imageDTO && !image?.image_name}
+            onUpload={onUpload}
+            fontSize={36}
+          />
+        )}
         {imageDTO && (
           <>
             <DndImage imageDTO={imageDTO} />

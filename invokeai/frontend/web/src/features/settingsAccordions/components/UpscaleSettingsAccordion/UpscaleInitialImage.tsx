@@ -1,5 +1,6 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { UploadImageButton } from 'common/hooks/useImageUploadButton';
 import type { SetUpscaleInitialImageDndTargetData } from 'features/dnd/dnd';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -9,6 +10,7 @@ import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
+import type { ImageDTO } from 'services/api/types';
 
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
@@ -22,9 +24,17 @@ export const UpscaleInitialImage = () => {
     dispatch(upscaleInitialImageChanged(null));
   }, [dispatch]);
 
+  const onUpload = useCallback(
+    (imageDTO: ImageDTO) => {
+      dispatch(upscaleInitialImageChanged(imageDTO));
+    },
+    [dispatch]
+  );
+
   return (
     <Flex justifyContent="flex-start">
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
+        {!imageDTO && <UploadImageButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
         {imageDTO && (
           <>
             <DndImage imageDTO={imageDTO} />
