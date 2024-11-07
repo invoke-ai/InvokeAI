@@ -21,8 +21,23 @@ class InpaintExtension:
         self._inpaint_mask = inpaint_mask
         self._noise = noise
 
-    # TODO(ryand): Experiment with mask gradient adjustment strategies such as the one used in FLUX:
-    # `InpaintExtension._apply_mask_gradient_adjustment()`.
+    def _apply_mask_gradient_adjustment(self, t_prev: float) -> torch.Tensor:
+        """Applies inpaint mask gradient adjustment and returns the inpaint mask to be used at the current timestep."""
+        # As we progress through the denoising process, we promote gradient regions of the mask to have a full weight of
+        # 1.0. This helps to produce more coherent seams around the inpainted region. We experimented with a (small)
+        # number of promotion strategies (e.g. gradual promotion based on timestep), but found that a simple cutoff
+        # threshold worked well.
+        # We use a small epsilon to avoid any potential issues with floating point precision.
+        eps = 1e-4
+        mask_gradient_t_cutoff = 0.5
+        if t_prev > mask_gradient_t_cutoff:
+            # Early in the denoising process, use the inpaint mask as-is.
+            return self._inpaint_mask
+        else:
+            # After the cut-off, promote all non-zero mask values to 1.0.
+            mask = self._inpaint_mask.where(self._inpaint_mask <= (0.0 + eps), 1.0)
+
+        return mask
 
     def merge_intermediate_latents_with_init_latents(
         self, intermediate_latents: torch.Tensor, t_prev: float
@@ -34,11 +49,10 @@ class InpaintExtension:
         This function should be called after each denoising step.
         """
 
-        # Noise the init latents for the current timestep.
-        noised_init_latents = self._init_latents
+        mask = self._apply_mask_gradient_adjustment(t_prev)
 
         # Noise the init latents for the current timestep.
         noised_init_latents = self._noise * t_prev + (1.0 - t_prev) * self._init_latents
 
         # Merge the intermediate latents with the noised_init_latents using the inpaint_mask.
-        return intermediate_latents * self._inpaint_mask + noised_init_latents * (1.0 - self._inpaint_mask)
+        return intermediate_latents * mask + noised_init_latents * (1.0 - mask)
