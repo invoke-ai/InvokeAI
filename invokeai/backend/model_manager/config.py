@@ -165,6 +165,8 @@ class SubmodelDefinition(BaseModel):
     model_type: ModelType
     variant: AnyVariant = None
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class MainModelDefaultSettings(BaseModel):
     vae: str | None = Field(default=None, description="Default VAE for this model (model key)")
