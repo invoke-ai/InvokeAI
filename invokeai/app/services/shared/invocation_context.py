@@ -542,12 +542,12 @@ class ModelsInterface(InvocationContextInterface):
 
         try:
             self._services.events.emit_invocation_progress(
-                self._data.queue_item, self._data.invocation, "Loading model..."
+                self._data.queue_item, self._data.invocation, f"Loading model {source}..."
             )
             return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
         finally:
             self._services.events.emit_invocation_progress(
-                self._data.queue_item, self._data.invocation, "Finished loading model."
+                self._data.queue_item, self._data.invocation, f"Finished loading model {source}."
             )
 
 
