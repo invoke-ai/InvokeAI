@@ -11,7 +11,7 @@ import type { DndTargetState } from 'features/dnd/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type UploadImageArg, uploadImages } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
@@ -71,13 +71,46 @@ export const FullscreenDropzone = memo(() => {
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
   const [dndState, setDndState] = useState<DndTargetState>('idle');
 
+  const uploadFilesSchema = useMemo(() => getFilesSchema(maxImageUploadCount), [maxImageUploadCount]);
+
+  const validateAndUploadFiles = useCallback(
+    (files: File[]) => {
+      const { getState } = getStore();
+      const parseResult = uploadFilesSchema.safeParse(files);
+
+      if (!parseResult.success) {
+        const description =
+          maxImageUploadCount === undefined
+            ? t('toast.uploadFailedInvalidUploadDesc')
+            : t('toast.uploadFailedInvalidUploadDesc_withCount', { count: maxImageUploadCount });
+
+        toast({
+          id: 'UPLOAD_FAILED',
+          title: t('toast.uploadFailed'),
+          description,
+          status: 'error',
+        });
+        return;
+      }
+      const autoAddBoardId = selectAutoAddBoardId(getState());
+
+      const uploadArgs: UploadImageArg[] = files.map((file) => ({
+        file,
+        image_category: 'user',
+        is_intermediate: false,
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+      }));
+
+      uploadImages(uploadArgs);
+    },
+    [maxImageUploadCount, t, uploadFilesSchema]
+  );
+
   useEffect(() => {
     const element = ref.current;
     if (!element) {
       return;
     }
-    const { getState } = getStore();
-    const uploadFilesSchema = getFilesSchema(maxImageUploadCount);
 
     return combine(
       dropTargetForExternal({
@@ -85,32 +118,7 @@ export const FullscreenDropzone = memo(() => {
         canDrop: containsFiles,
         onDrop: ({ source }) => {
           const files = getFiles({ source });
-          const parseResult = uploadFilesSchema.safeParse(files);
-
-          if (!parseResult.success) {
-            const description =
-              maxImageUploadCount === undefined
-                ? t('toast.uploadFailedInvalidUploadDesc')
-                : t('toast.uploadFailedInvalidUploadDesc_withCount', { count: maxImageUploadCount });
-
-            toast({
-              id: 'UPLOAD_FAILED',
-              title: t('toast.uploadFailed'),
-              description,
-              status: 'error',
-            });
-            return;
-          }
-          const autoAddBoardId = selectAutoAddBoardId(getState());
-
-          const uploadArgs: UploadImageArg[] = files.map((file) => ({
-            file,
-            image_category: 'user',
-            is_intermediate: false,
-            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          }));
-
-          uploadImages(uploadArgs);
+          validateAndUploadFiles(files);
         },
         onDragEnter: () => {
           setDndState('over');
@@ -131,7 +139,27 @@ export const FullscreenDropzone = memo(() => {
         },
       })
     );
-  }, [maxImageUploadCount, t]);
+  }, [validateAndUploadFiles]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    document.addEventListener(
+      'paste',
+      (e) => {
+        if (!e.clipboardData?.files) {
+          return;
+        }
+        const files = Array.from(e.clipboardData.files);
+        validateAndUploadFiles(files);
+      },
+      { signal: controller.signal }
+    );
+
+    return () => {
+      controller.abort();
+    };
+  }, [validateAndUploadFiles]);
 
   return (
     <Box ref={ref} data-dnd-state={dndState} sx={sx}>
