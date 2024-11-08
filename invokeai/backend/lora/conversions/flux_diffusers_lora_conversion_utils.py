@@ -45,6 +45,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
     # Constants for FLUX.1
     num_double_layers = 19
     num_single_layers = 38
+    hidden_size = 3072
     # inner_dim = 3072
     # mlp_ratio = 4.0
 
@@ -62,30 +63,32 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
             layers[dst_key] = LoRALayer.from_state_dict_values(values=value)
             assert len(src_layer_dict) == 0
 
-    def add_qkv_lora_layer_if_present(src_keys: list[str], dst_qkv_key: str) -> None:
+    def add_qkv_lora_layer_if_present(
+        src_keys: list[str], src_offsets: list[tuple[int, int]], dst_qkv_key: str
+    ) -> None:
         """Handle the Q, K, V matrices for a transformer block. We need special handling because the diffusers format
         stores them in separate matrices, whereas the BFL format used internally by InvokeAI concatenates them.
         """
-        # We expect that either all src keys are present or none of them are. Verify this.
-        keys_present = [key in grouped_state_dict for key in src_keys]
-        assert all(keys_present) or not any(keys_present)
-
         # If none of the keys are present, return early.
+        keys_present = [key in grouped_state_dict for key in src_keys]
         if not any(keys_present):
             return
 
-        src_layer_dicts = [grouped_state_dict.pop(key) for key in src_keys]
+        src_layer_dicts = [grouped_state_dict.pop(key, None) for key in src_keys]
         sub_layers: list[LoRALayer] = []
-        for src_layer_dict in src_layer_dicts:
-            values = {
-                "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
-                "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
-            }
-            if alpha is not None:
-                values["alpha"] = torch.tensor(alpha)
-            sub_layers.append(LoRALayer.from_state_dict_values(values=values))
-            assert len(src_layer_dict) == 0
-        layers[dst_qkv_key] = ConcatenatedLoRALayer(lora_layers=sub_layers, concat_axis=0)
+        sub_layer_offsets: list[tuple[int, int]] = []
+        for src_layer_dict, src_offset in zip(src_layer_dicts, src_offsets, strict=True):
+            if src_layer_dict is not None:
+                values = {
+                    "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
+                    "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
+                }
+                if alpha is not None:
+                    values["alpha"] = torch.tensor(alpha)
+                sub_layers.append(LoRALayer.from_state_dict_values(values=values))
+                sub_layer_offsets.append(src_offset)
+                assert len(src_layer_dict) == 0
+        layers[dst_qkv_key] = ConcatenatedLoRALayer(lora_layers=sub_layers, offsets=sub_layer_offsets)
 
     # time_text_embed.timestep_embedder -> time_in.
     add_lora_layer_if_present("time_text_embed.timestep_embedder.linear_1", "time_in.in_layer")
@@ -118,6 +121,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
                 f"transformer_blocks.{i}.attn.to_k",
                 f"transformer_blocks.{i}.attn.to_v",
             ],
+            [(0, 0), (hidden_size, 0), (hidden_size * 2, 0)],
             f"double_blocks.{i}.img_attn.qkv",
         )
         add_qkv_lora_layer_if_present(
@@ -126,6 +130,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
                 f"transformer_blocks.{i}.attn.add_k_proj",
                 f"transformer_blocks.{i}.attn.add_v_proj",
             ],
+            [(0, 0), (hidden_size, 0), (hidden_size * 2, 0)],
             f"double_blocks.{i}.txt_attn.qkv",
         )
 
@@ -175,6 +180,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
                 f"single_transformer_blocks.{i}.attn.to_v",
                 f"single_transformer_blocks.{i}.proj_mlp",
             ],
+            [(0, 0), (hidden_size, 0), (hidden_size * 2, 0), (hidden_size * 3, 0)],
             f"single_blocks.{i}.linear1",
         )
 
