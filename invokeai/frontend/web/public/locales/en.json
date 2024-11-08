@@ -1675,7 +1675,7 @@
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
-        "outputOnlyMaskedRegions": "Output Only Masked Regions",
+        "outputOnlyMaskedRegions": "Output Only Generated Regions",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
