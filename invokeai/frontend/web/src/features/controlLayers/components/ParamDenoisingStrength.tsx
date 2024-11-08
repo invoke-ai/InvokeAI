@@ -17,12 +17,15 @@ import { selectImg2imgStrengthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectIsEnabled = createSelector(selectActiveRasterLayerEntities, (entities) => entities.length > 0);
+const selectHasRasterLayersWithContent = createSelector(
+  selectActiveRasterLayerEntities,
+  (entities) => entities.length > 0
+);
 
 export const ParamDenoisingStrength = memo(() => {
   const img2imgStrength = useAppSelector(selectImg2imgStrength);
   const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector(selectIsEnabled);
+  const hasRasterLayersWithContent = useAppSelector(selectHasRasterLayersWithContent);
 
   const onChange = useCallback(
     (v: number) => {
@@ -37,16 +40,16 @@ export const ParamDenoisingStrength = memo(() => {
   const [invokeBlue300] = useToken('colors', ['invokeBlue.300']);
 
   return (
-    <FormControl isDisabled={!isEnabled} p={1} justifyContent="space-between" h={8}>
+    <FormControl isDisabled={!hasRasterLayersWithContent} p={1} justifyContent="space-between" h={8}>
       <Flex gap={3} alignItems="center">
         <InformationalPopover feature="paramDenoisingStrength">
           <FormLabel mr={0}>{`${t('parameters.denoisingStrength')}`}</FormLabel>
         </InformationalPopover>
-        {isEnabled && (
+        {hasRasterLayersWithContent && (
           <WavyLine amplitude={img2imgStrength * 10} stroke={invokeBlue300} strokeWidth={1} width={40} height={14} />
         )}
       </Flex>
-      {isEnabled ? (
+      {hasRasterLayersWithContent ? (
         <>
           <CompositeSlider
             step={config.coarseStep}
@@ -70,9 +73,7 @@ export const ParamDenoisingStrength = memo(() => {
         </>
       ) : (
         <Flex alignItems="center">
-          <Badge opacity="0.6">
-            {t('common.disabled')} - {t('parameters.noRasterLayers')}
-          </Badge>
+          <Badge opacity="0.6">{t('parameters.disabledNoRasterContent')}</Badge>
         </Flex>
       )}
     </FormControl>
