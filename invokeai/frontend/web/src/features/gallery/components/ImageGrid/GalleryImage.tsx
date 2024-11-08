@@ -66,7 +66,7 @@ const galleryImageContainerSX = {
     },
     '&:hover::before': {
       boxShadow:
-        'inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-800)',
+        'inset 0px 0px 0px 1px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-800)',
     },
     '&:hover[data-selected=true]::before': {
       boxShadow:
