@@ -90,7 +90,7 @@ const initialState: CanvasSettingsState = {
   invertScrollForToolWidth: false,
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
-  outputOnlyMaskedRegions: false,
+  outputOnlyMaskedRegions: true,
   autoProcess: true,
   snapToGrid: true,
   showProgressOnCanvas: true,
