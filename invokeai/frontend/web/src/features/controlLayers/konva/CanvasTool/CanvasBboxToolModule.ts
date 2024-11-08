@@ -1,13 +1,8 @@
-import {
-  roundDownToMultiple,
-  roundToMultiple,
-  roundToMultipleMin,
-  roundUpToMultiple,
-} from 'common/util/roundDownToMultiple';
+import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
+import { fitRectToGrid, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
@@ -398,18 +393,12 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     }
 
     // Determine the bbox size that fits within the visible rect. The bbox must be at least 64px in width and height,
-    // and its width and height must be multiples of 8px.
+    // and its width and height must be multiples of the bbox grid size.
     const gridSize = this.manager.stateApi.getBboxGridSize();
 
-    // To be conservative, we will round up the x and y to the nearest grid size, and round down the width and height.
-    // This ensures the bbox is never _larger_ than the visible rect. If the bbox is larger than the visible, we
-    // will always trigger the outpainting workflow, which is not what the user wants.
-    const x = roundUpToMultiple(visibleRect.x, gridSize);
-    const y = roundUpToMultiple(visibleRect.y, gridSize);
-    const width = roundDownToMultiple(visibleRect.width, gridSize);
-    const height = roundDownToMultiple(visibleRect.height, gridSize);
+    const rect = fitRectToGrid(visibleRect, gridSize);
 
-    this.manager.stateApi.setGenerationBbox({ x, y, width, height });
+    this.manager.stateApi.setGenerationBbox(rect);
   };
 
   /**

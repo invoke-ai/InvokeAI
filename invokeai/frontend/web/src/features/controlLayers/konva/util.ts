@@ -1,5 +1,6 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
 import { $authToken } from 'app/store/nanostores/authToken';
+import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
 import type {
   CanvasEntityIdentifier,
   CanvasObjectState,
@@ -558,6 +559,33 @@ export const getRectIntersection = (...rects: Rect[]): Rect => {
   }
 
   return rect || getEmptyRect();
+};
+
+/**
+ * Fits a rect to the nearest multiple of the grid size, rounding down. The returned rect will be smaller than or equal
+ * to the input rect, and will be aligned to the grid.
+ *
+ * In other words, shrink the rect inwards on each size until it fits within the visible rect and aligns to the grid.
+ *
+ * @param rect The rect to fit
+ * @param gridSize The size of the grid
+ * @returns The fitted rect
+ */
+export const fitRectToGrid = (rect: Rect, gridSize: number): Rect => {
+  // Rounding x and y up effectively shrinks the left and top edges of the rect, and rounding width and height down
+  // effectively shrinks the right and bottom edges.
+  const x = roundUpToMultiple(rect.x, gridSize);
+  const y = roundUpToMultiple(rect.y, gridSize);
+
+  // Because we've just shifted the rect's x and y, we need to adjust the width and height by the same amount before
+  // we round those values down.
+  const offsetX = x - rect.x;
+  const offsetY = y - rect.y;
+
+  const width = roundDownToMultiple(rect.width - offsetX, gridSize);
+  const height = roundDownToMultiple(rect.height - offsetY, gridSize);
+
+  return { x, y, width, height };
 };
 
 /**
