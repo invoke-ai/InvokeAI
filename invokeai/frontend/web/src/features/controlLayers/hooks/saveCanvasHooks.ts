@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -31,6 +30,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
 import type { ImageDTO } from 'services/api/types';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('canvas');
 
@@ -64,7 +64,7 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
       return;
     }
 
-    let metadata: SerializableObject | undefined = undefined;
+    let metadata: JsonObject | undefined = undefined;
 
     if (withMetadata) {
       metadata = selectCanvasMetadata(store.getState());

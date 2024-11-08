@@ -2,11 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
-import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset } from 'features/controlLayers/store/actions';
 import {
-  bboxChangedFromCanvas,
   controlLayerAdded,
   inpaintMaskAdded,
   rasterLayerAdded,
@@ -17,37 +14,20 @@ import {
   rgPositivePromptChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import {
-  selectBboxModelBase,
-  selectBboxRect,
-  selectCanvasSlice,
-  selectEntityOrThrow,
-} from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasControlLayerState,
   CanvasEntityIdentifier,
-  CanvasInpaintMaskState,
-  CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import {
-  imageDTOToImageObject,
-  initialControlNet,
-  initialIPAdapter,
-  initialT2IAdapter,
-} from 'features/controlLayers/store/util';
-import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
+import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'services/api/types';
-import type { Equals } from 'tsafe';
-import { assert } from 'tsafe';
 
 /** @knipignore */
 export const selectDefaultControlAdapter = createSelector(
@@ -86,6 +66,9 @@ export const selectDefaultIPAdapter = createSelector(
     const ipAdapter = deepClone(initialIPAdapter);
     if (model) {
       ipAdapter.model = zModelIdentifierField.parse(model);
+      if (model.base === 'flux') {
+        ipAdapter.clipVisionModel = 'ViT-L';
+      }
     }
     return ipAdapter;
   }
@@ -106,150 +89,6 @@ export const useAddRasterLayer = () => {
   const func = useCallback(() => {
     dispatch(rasterLayerAdded({ isSelected: true }));
   }, [dispatch]);
-
-  return func;
-};
-
-export const useNewRasterLayerFromImage = () => {
-  const dispatch = useAppDispatch();
-  const bboxRect = useAppSelector(selectBboxRect);
-  const func = useCallback(
-    (imageDTO: ImageDTO) => {
-      const imageObject = imageDTOToImageObject(imageDTO);
-      const overrides: Partial<CanvasRasterLayerState> = {
-        position: { x: bboxRect.x, y: bboxRect.y },
-        objects: [imageObject],
-      };
-      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
-    },
-    [bboxRect.x, bboxRect.y, dispatch]
-  );
-
-  return func;
-};
-
-export const useNewControlLayerFromImage = () => {
-  const dispatch = useAppDispatch();
-  const bboxRect = useAppSelector(selectBboxRect);
-  const func = useCallback(
-    (imageDTO: ImageDTO) => {
-      const imageObject = imageDTOToImageObject(imageDTO);
-      const overrides: Partial<CanvasControlLayerState> = {
-        position: { x: bboxRect.x, y: bboxRect.y },
-        objects: [imageObject],
-      };
-      dispatch(controlLayerAdded({ overrides, isSelected: true }));
-    },
-    [bboxRect.x, bboxRect.y, dispatch]
-  );
-
-  return func;
-};
-
-export const useNewInpaintMaskFromImage = () => {
-  const dispatch = useAppDispatch();
-  const bboxRect = useAppSelector(selectBboxRect);
-  const func = useCallback(
-    (imageDTO: ImageDTO) => {
-      const imageObject = imageDTOToImageObject(imageDTO);
-      const overrides: Partial<CanvasInpaintMaskState> = {
-        position: { x: bboxRect.x, y: bboxRect.y },
-        objects: [imageObject],
-      };
-      dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
-    },
-    [bboxRect.x, bboxRect.y, dispatch]
-  );
-
-  return func;
-};
-
-export const useNewRegionalGuidanceFromImage = () => {
-  const dispatch = useAppDispatch();
-  const bboxRect = useAppSelector(selectBboxRect);
-  const func = useCallback(
-    (imageDTO: ImageDTO) => {
-      const imageObject = imageDTOToImageObject(imageDTO);
-      const overrides: Partial<CanvasRegionalGuidanceState> = {
-        position: { x: bboxRect.x, y: bboxRect.y },
-        objects: [imageObject],
-      };
-      dispatch(rgAdded({ overrides, isSelected: true }));
-    },
-    [bboxRect.x, bboxRect.y, dispatch]
-  );
-
-  return func;
-};
-
-/**
- * Returns a function that adds a new canvas with the given image as the initial image, replicating the img2img flow:
- * - Reset the canvas
- * - Resize the bbox to the image's aspect ratio at the optimal size for the selected model
- * - Add the image as a raster layer
- * - Resizes the layer to fit the bbox using the 'fill' strategy
- *
- * This allows the user to immediately generate a new image from the given image without any additional steps.
- */
-export const useNewCanvasFromImage = () => {
-  const dispatch = useAppDispatch();
-  const bboxRect = useAppSelector(selectBboxRect);
-  const base = useAppSelector(selectBboxModelBase);
-  const func = useCallback(
-    (imageDTO: ImageDTO, type: CanvasRasterLayerState['type'] | CanvasControlLayerState['type']) => {
-      // Calculate the new bbox dimensions to fit the image's aspect ratio at the optimal size
-      const ratio = imageDTO.width / imageDTO.height;
-      const optimalDimension = getOptimalDimension(base);
-      const { width, height } = calculateNewSize(ratio, optimalDimension ** 2, base);
-
-      // The overrides need to include the layer's ID so we can transform the layer it is initialized
-      let overrides: Partial<CanvasRasterLayerState> | Partial<CanvasControlLayerState>;
-
-      if (type === 'raster_layer') {
-        overrides = {
-          id: getPrefixedId('raster_layer'),
-          position: { x: bboxRect.x, y: bboxRect.y },
-          objects: [imageDTOToImageObject(imageDTO)],
-        } satisfies Partial<CanvasRasterLayerState>;
-      } else if (type === 'control_layer') {
-        overrides = {
-          id: getPrefixedId('control_layer'),
-          position: { x: bboxRect.x, y: bboxRect.y },
-          objects: [imageDTOToImageObject(imageDTO)],
-        } satisfies Partial<CanvasControlLayerState>;
-      } else {
-        // Catch unhandled types
-        assert<Equals<typeof type, never>>(false);
-      }
-
-      CanvasEntityAdapterBase.registerInitCallback(async (adapter) => {
-        // Skip the callback if the adapter is not the one we are creating
-        if (adapter.id !== overrides.id) {
-          return false;
-        }
-        // Fit the layer to the bbox w/ fill strategy
-        await adapter.transformer.startTransform({ silent: true });
-        adapter.transformer.fitToBboxFill();
-        await adapter.transformer.applyTransform();
-        return true;
-      });
-
-      dispatch(canvasReset());
-      // The `bboxChangedFromCanvas` reducer does no validation! Careful!
-      dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
-
-      // The type casts are safe because the type is checked above
-      if (type === 'raster_layer') {
-        dispatch(rasterLayerAdded({ overrides: overrides as Partial<CanvasRasterLayerState>, isSelected: true }));
-      } else if (type === 'control_layer') {
-        dispatch(controlLayerAdded({ overrides: overrides as Partial<CanvasControlLayerState>, isSelected: true }));
-      } else {
-        // Catch unhandled types
-        assert<Equals<typeof type, never>>(false);
-      }
-    },
-    [base, bboxRect.x, bboxRect.y, dispatch]
-  );
 
   return func;
 };

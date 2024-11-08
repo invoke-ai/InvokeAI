@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { SerializableObject } from 'common/types';
+import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import type { Result } from 'common/util/result';
 import { withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
@@ -10,10 +10,12 @@ import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGr
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { toast } from 'features/toast/toast';
 import { serializeError } from 'serialize-error';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { Invocation } from 'services/api/types';
-import { assert } from 'tsafe';
+import { assert, AssertionError } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('generation');
 
@@ -57,7 +59,17 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       }
 
       if (buildGraphResult.isErr()) {
-        log.error({ error: serializeError(buildGraphResult.error) }, 'Failed to build graph');
+        let description: string | null = null;
+        if (buildGraphResult.error instanceof AssertionError) {
+          description = extractMessageFromAssertionError(buildGraphResult.error);
+        }
+        const error = serializeError(buildGraphResult.error);
+        log.error({ error }, 'Failed to build graph');
+        toast({
+          status: 'error',
+          title: 'Failed to build graph',
+          description,
+        });
         return;
       }
 
@@ -88,7 +100,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         return;
       }
 
-      log.debug({ batchConfig: prepareBatchResult.value } as SerializableObject, 'Enqueued batch');
+      log.debug({ batchConfig: prepareBatchResult.value } as JsonObject, 'Enqueued batch');
     },
   });
 };

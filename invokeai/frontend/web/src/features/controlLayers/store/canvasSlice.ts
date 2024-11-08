@@ -14,6 +14,8 @@ import {
   selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasEntityStateFromType,
+  CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
   FillStyle,
@@ -1211,7 +1213,7 @@ export const canvasSlice = createSlice({
       }
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, position, replaceObjects } = action.payload;
+      const { entityIdentifier, imageObject, position, replaceObjects, isSelected } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -1222,6 +1224,10 @@ export const canvasSlice = createSlice({
           entity.objects = [imageObject];
           entity.position = position;
         }
+      }
+
+      if (isSelected) {
+        state.selectedEntityIdentifier = entityIdentifier;
       }
     },
     entityBrushLineAdded: (state, action: PayloadAction<EntityBrushLineAddedPayload>) => {
@@ -1344,6 +1350,46 @@ export const canvasSlice = createSlice({
         return;
       }
       moveToStart(selectAllEntitiesOfType(state, entity.type), entity);
+    },
+    entitiesReordered: <T extends CanvasEntityType>(
+      state: CanvasState,
+      action: PayloadAction<{ type: T; entityIdentifiers: CanvasEntityIdentifier<T>[] }>
+    ) => {
+      const { type, entityIdentifiers } = action.payload;
+
+      switch (type) {
+        case 'raster_layer': {
+          state.rasterLayers.entities = reorderEntities(
+            state.rasterLayers.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'raster_layer'>[]
+          );
+          break;
+        }
+        case 'control_layer':
+          state.controlLayers.entities = reorderEntities(
+            state.controlLayers.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'control_layer'>[]
+          );
+          break;
+        case 'inpaint_mask':
+          state.inpaintMasks.entities = reorderEntities(
+            state.inpaintMasks.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'inpaint_mask'>[]
+          );
+          break;
+        case 'regional_guidance':
+          state.regionalGuidance.entities = reorderEntities(
+            state.regionalGuidance.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'regional_guidance'>[]
+          );
+          break;
+        case 'reference_image':
+          state.referenceImages.entities = reorderEntities(
+            state.referenceImages.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'reference_image'>[]
+          );
+          break;
+      }
     },
     entityOpacityChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ opacity: number }>>) => {
       const { entityIdentifier, opacity } = action.payload;
@@ -1471,6 +1517,7 @@ export const {
   entityArrangedBackwardOne,
   entityArrangedToBack,
   entityOpacityChanged,
+  entitiesReordered,
   // allEntitiesDeleted, // currently unused
   allEntitiesOfTypeIsHiddenToggled,
   // bbox
@@ -1604,3 +1651,17 @@ function actionsThrottlingFilter(action: UnknownAction) {
   }, THROTTLE_MS);
   return true;
 }
+
+const reorderEntities = <T extends CanvasEntityType>(
+  entities: CanvasEntityStateFromType<T>[],
+  sortedEntityIdentifiers: CanvasEntityIdentifier<T>[]
+) => {
+  const sortedEntities: CanvasEntityStateFromType<T>[] = [];
+  for (const { id } of sortedEntityIdentifiers.toReversed()) {
+    const entity = entities.find((entity) => entity.id === id);
+    if (entity) {
+      sortedEntities.push(entity);
+    }
+  }
+  return sortedEntities;
+};

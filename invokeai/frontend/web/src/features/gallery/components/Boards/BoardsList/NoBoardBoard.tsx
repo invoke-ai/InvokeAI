@@ -1,8 +1,9 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDroppable from 'common/components/IAIDroppable';
-import type { RemoveFromBoardDropData } from 'features/dnd/types';
+import type { RemoveImageFromBoardDndTargetData } from 'features/dnd/dnd';
+import { removeImageFromBoardDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
@@ -43,13 +44,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }
   }, [dispatch, autoAssignBoardOnClick]);
 
-  const droppableData: RemoveFromBoardDropData = useMemo(
-    () => ({
-      id: 'no_board',
-      actionType: 'REMOVE_FROM_BOARD',
-    }),
-    []
-  );
+  const dndTargetData = useMemo<RemoveImageFromBoardDndTargetData>(() => removeImageFromBoardDndTarget.getData(), []);
 
   const { t } = useTranslation();
 
@@ -102,7 +97,11 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           </Tooltip>
         )}
       </NoBoardBoardContextMenu>
-      <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
+      <DndDropTarget
+        dndTarget={removeImageFromBoardDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.move')}
+      />
     </Box>
   );
 });

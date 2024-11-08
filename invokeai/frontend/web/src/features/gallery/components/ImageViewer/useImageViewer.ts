@@ -56,7 +56,6 @@ export const useImageViewer = () => {
     open: imageViewerState.setTrue,
     close,
     toggle: imageViewerState.toggle,
-    $state: $imageViewer,
     openImageInViewer,
   };
 };

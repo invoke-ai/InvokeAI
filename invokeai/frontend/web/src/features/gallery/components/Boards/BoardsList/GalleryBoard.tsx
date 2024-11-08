@@ -2,8 +2,9 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDroppable from 'common/components/IAIDroppable';
-import type { AddToBoardDropData } from 'features/dnd/types';
+import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
+import { addImageToBoardDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardEditableTitle } from 'features/gallery/components/Boards/BoardsList/BoardEditableTitle';
@@ -35,7 +36,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
-
   const onClick = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
@@ -45,12 +45,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     }
   }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
 
-  const droppableData: AddToBoardDropData = useMemo(
-    () => ({
-      id: board.board_id,
-      actionType: 'ADD_TO_BOARD',
-      context: { boardId: board.board_id },
-    }),
+  const dndTargetData = useMemo<AddImageToBoardDndTargetData>(
+    () => addImageToBoardDndTarget.getData({ boardId: board.board_id }),
     [board.board_id]
   );
 
@@ -85,7 +81,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
           </Tooltip>
         )}
       </BoardContextMenu>
-      <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
+      <DndDropTarget dndTarget={addImageToBoardDndTarget} dndTargetData={dndTargetData} label={t('gallery.move')} />
     </Box>
   );
 };

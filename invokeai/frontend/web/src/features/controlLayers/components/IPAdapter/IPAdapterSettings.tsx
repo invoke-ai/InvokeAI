@@ -19,11 +19,12 @@ import {
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import type { IPAImageDropData } from 'features/dnd/types';
+import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
+import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } from 'services/api/types';
+import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
 import { IPAdapterModel } from './IPAdapterModel';
@@ -80,13 +81,9 @@ export const IPAdapterSettings = memo(() => {
     [dispatch, entityIdentifier]
   );
 
-  const droppableData = useMemo<IPAImageDropData>(
-    () => ({ actionType: 'SET_IPA_IMAGE', context: { id: entityIdentifier.id }, id: entityIdentifier.id }),
-    [entityIdentifier.id]
-  );
-  const postUploadAction = useMemo<IPALayerImagePostUploadAction>(
-    () => ({ type: 'SET_IPA_IMAGE', id: entityIdentifier.id }),
-    [entityIdentifier.id]
+  const dndTargetData = useMemo<SetGlobalReferenceImageDndTargetData>(
+    () => setGlobalReferenceImageDndTarget.getData({ entityIdentifier }, ipAdapter.image?.image_name),
+    [entityIdentifier, ipAdapter.image?.image_name]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
   const isBusy = useCanvasIsBusy();
@@ -122,10 +119,10 @@ export const IPAdapterSettings = memo(() => {
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
             <IPAdapterImagePreview
-              image={ipAdapter.image ?? null}
+              image={ipAdapter.image}
               onChangeImage={onChangeImage}
-              droppableData={droppableData}
-              postUploadAction={postUploadAction}
+              dndTarget={setGlobalReferenceImageDndTarget}
+              dndTargetData={dndTargetData}
             />
           </Flex>
         </Flex>

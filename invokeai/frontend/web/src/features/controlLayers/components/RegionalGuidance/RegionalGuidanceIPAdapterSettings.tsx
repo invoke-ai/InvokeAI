@@ -20,11 +20,12 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import type { RGIPAdapterImageDropData } from 'features/dnd/types';
+import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
+import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
+import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type Props = {
@@ -91,18 +92,15 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
     [dispatch, entityIdentifier, referenceImageId]
   );
 
-  const droppableData = useMemo<RGIPAdapterImageDropData>(
-    () => ({
-      actionType: 'SET_RG_IP_ADAPTER_IMAGE',
-      context: { id: entityIdentifier.id, referenceImageId: referenceImageId },
-      id: entityIdentifier.id,
-    }),
-    [entityIdentifier.id, referenceImageId]
+  const dndTargetData = useMemo<SetRegionalGuidanceReferenceImageDndTargetData>(
+    () =>
+      setRegionalGuidanceReferenceImageDndTarget.getData(
+        { entityIdentifier, referenceImageId },
+        ipAdapter.image?.image_name
+      ),
+    [entityIdentifier, ipAdapter.image?.image_name, referenceImageId]
   );
-  const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(
-    () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, referenceImageId: referenceImageId }),
-    [entityIdentifier.id, referenceImageId]
-  );
+
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
 
@@ -151,10 +149,10 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
             <IPAdapterImagePreview
-              image={ipAdapter.image ?? null}
+              image={ipAdapter.image}
               onChangeImage={onChangeImage}
-              droppableData={droppableData}
-              postUploadAction={postUploadAction}
+              dndTarget={setRegionalGuidanceReferenceImageDndTarget}
+              dndTargetData={dndTargetData}
             />
           </Flex>
         </Flex>

@@ -1,30 +1,22 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import type { TypesafeDroppableData } from 'features/dnd/types';
+import { UploadImageButton } from 'common/hooks/useImageUploadButton';
+import type { SetUpscaleInitialImageDndTargetData } from 'features/dnd/dnd';
+import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { DndImage } from 'features/dnd/DndImage';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
-import type { PostUploadAction } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
   const imageDTO = useAppSelector(selectUpscaleInitialImage);
-
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
-    () => ({
-      actionType: 'SET_UPSCALE_INITIAL_IMAGE',
-      id: 'upscale-intial-image',
-    }),
-    []
-  );
-
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({
-      type: 'SET_UPSCALE_INITIAL_IMAGE',
-    }),
+  const dndTargetData = useMemo<SetUpscaleInitialImageDndTargetData>(
+    () => setUpscaleInitialImageDndTarget.getData(),
     []
   );
 
@@ -32,18 +24,22 @@ export const UpscaleInitialImage = () => {
     dispatch(upscaleInitialImageChanged(null));
   }, [dispatch]);
 
+  const onUpload = useCallback(
+    (imageDTO: ImageDTO) => {
+      dispatch(upscaleInitialImageChanged(imageDTO));
+    },
+    [dispatch]
+  );
+
   return (
     <Flex justifyContent="flex-start">
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
-        <IAIDndImage
-          droppableData={droppableData}
-          imageDTO={imageDTO || undefined}
-          postUploadAction={postUploadAction}
-        />
+        {!imageDTO && <UploadImageButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
         {imageDTO && (
           <>
+            <DndImage imageDTO={imageDTO} />
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
-              <IAIDndImageIcon
+              <DndImageIcon
                 onClick={onReset}
                 icon={<PiArrowCounterClockwiseBold size={16} />}
                 tooltip={t('common.reset')}
@@ -66,6 +62,11 @@ export const UpscaleInitialImage = () => {
             >{`${imageDTO.width}x${imageDTO.height}`}</Text>
           </>
         )}
+        <DndDropTarget
+          dndTarget={setUpscaleInitialImageDndTarget}
+          dndTargetData={dndTargetData}
+          label={t('gallery.drop')}
+        />
       </Flex>
     </Flex>
   );

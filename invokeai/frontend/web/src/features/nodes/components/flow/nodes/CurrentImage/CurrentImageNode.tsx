@@ -1,8 +1,8 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { DndImage } from 'features/dnd/DndImage';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
@@ -30,7 +30,7 @@ const CurrentImageNode = (props: NodeProps) => {
   if (imageDTO) {
     return (
       <Wrapper nodeProps={props}>
-        <IAIDndImage imageDTO={imageDTO} isDragDisabled useThumbailFallback />
+        <DndImage imageDTO={imageDTO} />
       </Wrapper>
     );
   }

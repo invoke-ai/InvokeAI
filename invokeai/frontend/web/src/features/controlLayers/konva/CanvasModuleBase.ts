@@ -1,6 +1,6 @@
-import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { Logger } from 'roarr';
+import type { JsonObject } from 'type-fest';
 
 /**
  * Base class for all canvas modules.
@@ -81,7 +81,7 @@ export abstract class CanvasModuleBase {
    * };
    * ```
    */
-  getLoggingContext: () => SerializableObject = () => {
+  getLoggingContext: () => JsonObject = () => {
     return {
       ...this.parent.getLoggingContext(),
       path: this.path.join(' > '),
@@ -135,7 +135,7 @@ export abstract class CanvasModuleBase {
    * };
    * ```
    */
-  repr: () => SerializableObject = () => {
+  repr: () => JsonObject = () => {
     return {
       id: this.id,
       type: this.type,

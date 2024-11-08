@@ -1,14 +1,14 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
+import { CanvasEntityGroupList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityGroupList';
 import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
-import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasSlice, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 
-const selectEntityIds = createMemoizedSelector(selectCanvasSlice, (canvas) => {
-  return canvas.rasterLayers.entities.map(mapId).reverse();
+const selectEntityIdentifiers = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return canvas.rasterLayers.entities.map(getEntityIdentifier).toReversed();
 });
 const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {
   return selectedEntityIdentifier?.type === 'raster_layer';
@@ -16,17 +16,17 @@ const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selecte
 
 export const RasterLayerEntityList = memo(() => {
   const isSelected = useAppSelector(selectIsSelected);
-  const layerIds = useAppSelector(selectEntityIds);
+  const entityIdentifiers = useAppSelector(selectEntityIdentifiers);
 
-  if (layerIds.length === 0) {
+  if (entityIdentifiers.length === 0) {
     return null;
   }
 
-  if (layerIds.length > 0) {
+  if (entityIdentifiers.length > 0) {
     return (
-      <CanvasEntityGroupList type="raster_layer" isSelected={isSelected}>
-        {layerIds.map((id) => (
-          <RasterLayer key={id} id={id} />
+      <CanvasEntityGroupList type="raster_layer" isSelected={isSelected} entityIdentifiers={entityIdentifiers}>
+        {entityIdentifiers.map((entityIdentifier) => (
+          <RasterLayer key={entityIdentifier.id} id={entityIdentifier.id} />
         ))}
       </CanvasEntityGroupList>
     );

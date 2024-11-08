@@ -1,109 +1,114 @@
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Circle, Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
+import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
 import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
+import { useLinearViewFieldDnd } from 'features/nodes/components/sidePanel/workflow/useLinearViewFieldDnd';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { memo, useCallback } from 'react';
+import type { FieldIdentifier } from 'features/nodes/types/field';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiDotsSixVerticalBold, PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
 
 type Props = {
-  nodeId: string;
-  fieldName: string;
+  fieldIdentifier: FieldIdentifier;
 };
 
-const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
+const sx = {
+  layerStyle: 'second',
+  alignItems: 'center',
+  position: 'relative',
+  borderRadius: 'base',
+  w: 'full',
+  p: 2,
+  '&[data-is-dragging=true]': {
+    opacity: 0.3,
+  },
+  transitionProperty: 'common',
+} satisfies SystemStyleObject;
+
+const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
   const dispatch = useAppDispatch();
-  const { isValueChanged, onReset } = useFieldOriginalValue(nodeId, fieldName);
-  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
+  const { isValueChanged, onReset } = useFieldOriginalValue(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(fieldIdentifier.nodeId);
   const { t } = useTranslation();
 
   const handleRemoveField = useCallback(() => {
-    dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
-  }, [dispatch, fieldName, nodeId]);
+    dispatch(workflowExposedFieldRemoved(fieldIdentifier));
+  }, [dispatch, fieldIdentifier]);
 
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: `${nodeId}.${fieldName}` });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-  };
+  const ref = useRef<HTMLDivElement>(null);
+  const [dndListState, isDragging] = useLinearViewFieldDnd(ref, fieldIdentifier);
 
   return (
-    <Flex
-      onMouseEnter={handleMouseOver}
-      onMouseLeave={handleMouseOut}
-      layerStyle="second"
-      alignItems="center"
-      position="relative"
-      borderRadius="base"
-      w="full"
-      p={4}
-      paddingLeft={0}
-      ref={setNodeRef}
-      style={style}
-    >
-      <IconButton
-        aria-label={t('nodes.reorderLinearView')}
-        variant="ghost"
-        icon={<PiDotsSixVerticalBold />}
-        {...listeners}
-        {...attributes}
-        mx={2}
-        height="full"
-      />
-      <Flex flexDir="column" w="full">
-        <Flex alignItems="center">
-          <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" />
-          <Spacer />
-          {isValueChanged && (
+    <Box position="relative" w="full">
+      <Flex
+        ref={ref}
+        // This is used to trigger the post-move flash animation
+        data-field-name={`${fieldIdentifier.nodeId}-${fieldIdentifier.fieldName}`}
+        data-is-dragging={isDragging}
+        onMouseEnter={handleMouseOver}
+        onMouseLeave={handleMouseOut}
+        sx={sx}
+      >
+        <Flex flexDir="column" w="full">
+          <Flex alignItems="center" gap={2}>
+            <EditableFieldTitle nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} kind="inputs" />
+            <Spacer />
+            {isMouseOverNode && <Circle me={2} size={2} borderRadius="full" bg="invokeBlue.500" />}
+            {isValueChanged && (
+              <IconButton
+                aria-label={t('nodes.resetToDefaultValue')}
+                tooltip={t('nodes.resetToDefaultValue')}
+                variant="ghost"
+                size="sm"
+                onClick={onReset}
+                icon={<PiArrowCounterClockwiseBold />}
+              />
+            )}
+            <Tooltip
+              label={
+                <FieldTooltipContent
+                  nodeId={fieldIdentifier.nodeId}
+                  fieldName={fieldIdentifier.fieldName}
+                  kind="inputs"
+                />
+              }
+              openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
+              placement="top"
+            >
+              <Flex h="full" alignItems="center">
+                <Icon fontSize="sm" color="base.300" as={PiInfoBold} />
+              </Flex>
+            </Tooltip>
             <IconButton
-              aria-label={t('nodes.resetToDefaultValue')}
-              tooltip={t('nodes.resetToDefaultValue')}
+              aria-label={t('nodes.removeLinearView')}
+              tooltip={t('nodes.removeLinearView')}
               variant="ghost"
               size="sm"
-              onClick={onReset}
-              icon={<PiArrowCounterClockwiseBold />}
+              onClick={handleRemoveField}
+              icon={<PiTrashSimpleBold />}
             />
-          )}
-          <Tooltip
-            label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" />}
-            openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-            placement="top"
-          >
-            <Flex h="full" alignItems="center">
-              <Icon fontSize="sm" color="base.300" as={PiInfoBold} />
-            </Flex>
-          </Tooltip>
-          <IconButton
-            aria-label={t('nodes.removeLinearView')}
-            tooltip={t('nodes.removeLinearView')}
-            variant="ghost"
-            size="sm"
-            onClick={handleRemoveField}
-            icon={<PiTrashSimpleBold />}
-          />
+          </Flex>
+          <InputFieldRenderer nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
         </Flex>
-        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
-        <NodeSelectionOverlay isSelected={false} isHovered={isMouseOverNode} />
       </Flex>
-    </Flex>
+      <DndListDropIndicator dndState={dndListState} />
+    </Box>
   );
 };
 
-const LinearViewField = ({ nodeId, fieldName }: Props) => {
+const LinearViewField = ({ fieldIdentifier }: Props) => {
   return (
-    <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
-      <LinearViewFieldInternal nodeId={nodeId} fieldName={fieldName} />
+    <InvocationInputFieldCheck nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
+      <LinearViewFieldInternal fieldIdentifier={fieldIdentifier} />
     </InvocationInputFieldCheck>
   );
 };

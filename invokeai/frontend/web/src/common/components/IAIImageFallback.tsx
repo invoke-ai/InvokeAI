@@ -6,7 +6,7 @@ import type { ImageDTO } from 'services/api/types';
 
 type Props = { image: ImageDTO | undefined };
 
-export const IAILoadingImageFallback = memo((props: Props) => {
+const IAILoadingImageFallback = memo((props: Props) => {
   if (props.image) {
     return (
       <Skeleton
