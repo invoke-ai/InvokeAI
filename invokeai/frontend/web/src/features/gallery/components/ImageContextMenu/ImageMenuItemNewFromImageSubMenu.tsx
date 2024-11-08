@@ -1,5 +1,5 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import {
@@ -10,6 +10,7 @@ import {
   useNewRegionalGuidanceFromImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
@@ -31,6 +32,8 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
   const newInpaintMaskFromImage = useNewInpaintMaskFromImage();
   const newRegionalGuidanceFromImage = useNewRegionalGuidanceFromImage();
   const newCanvasFromImage = useNewCanvasFromImage();
+  const isFLUX = useAppSelector(selectIsFLUX);
+  const isSD3 = useAppSelector(selectIsSD3);
 
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
     newCanvasFromImage(imageDTO, 'raster_layer');
@@ -115,17 +118,25 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
           <MenuItem
             icon={<PiFileBold />}
             onClickCapture={onClickNewCanvasWithControlLayerFromImage}
-            isDisabled={isBusy}
+            isDisabled={isBusy || isSD3}
           >
             {t('controlLayers.canvasAsControlLayer')}
           </MenuItem>
           <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewInpaintMaskFromImage} isDisabled={isBusy}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
-          <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRegionalGuidanceFromImage} isDisabled={isBusy}>
+          <MenuItem
+            icon={<NewLayerIcon />}
+            onClickCapture={onClickNewRegionalGuidanceFromImage}
+            isDisabled={isBusy || isFLUX || isSD3}
+          >
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
-          <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewControlLayerFromImage} isDisabled={isBusy}>
+          <MenuItem
+            icon={<NewLayerIcon />}
+            onClickCapture={onClickNewControlLayerFromImage}
+            isDisabled={isBusy || isSD3}
+          >
             {t('controlLayers.controlLayer')}
           </MenuItem>
           <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRasterLayerFromImage} isDisabled={isBusy}>

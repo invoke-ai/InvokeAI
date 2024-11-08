@@ -2,16 +2,18 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasState, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { addImageToLatents } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 type AddImageToImageArg = {
   g: Graph;
   manager: CanvasManager;
-  l2i: Invocation<'l2i' | 'flux_vae_decode'>;
-  denoise: Invocation<'denoise_latents' | 'flux_denoise'>;
-  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader'>;
+  l2i: Invocation<'l2i' | 'flux_vae_decode' | 'sd3_l2i'>;
+  i2lNodeType: 'i2l' | 'flux_vae_encode' | 'sd3_i2l';
+  denoise: Invocation<'denoise_latents' | 'flux_denoise' | 'sd3_denoise'>;
+  vaeSource: Invocation<
+    'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader' | 'sd3_model_loader'
+  >;
   originalSize: Dimensions;
   scaledSize: Dimensions;
   bbox: CanvasState['bbox'];
@@ -23,6 +25,7 @@ export const addImageToImage = async ({
   g,
   manager,
   l2i,
+  i2lNodeType,
   denoise,
   vaeSource,
   originalSize,
@@ -30,7 +33,7 @@ export const addImageToImage = async ({
   bbox,
   denoising_start,
   fp32,
-}: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'>> => {
+}: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i'>> => {
   denoise.denoising_start = denoising_start;
   const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, { is_intermediate: true });
@@ -44,7 +47,12 @@ export const addImageToImage = async ({
       ...scaledSize,
     });
 
-    const i2l = addImageToLatents(g, l2i.type === 'flux_vae_decode', fp32);
+    const i2l = g.addNode({
+      id: i2lNodeType,
+      type: i2lNodeType,
+      image: image_name ? { image_name } : undefined,
+      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
+    });
 
     const resizeImageToOriginalSize = g.addNode({
       type: 'img_resize',
@@ -61,7 +69,12 @@ export const addImageToImage = async ({
     return resizeImageToOriginalSize;
   } else {
     // No need to resize, just decode
-    const i2l = addImageToLatents(g, l2i.type === 'flux_vae_decode', fp32, image_name);
+    const i2l = g.addNode({
+      id: i2lNodeType,
+      type: i2lNodeType,
+      image: image_name ? { image_name } : undefined,
+      ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
+    });
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     return l2i;

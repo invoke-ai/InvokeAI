@@ -175,7 +175,7 @@ export const buildSDXLGraph = async (
     : 1 - params.img2imgStrength;
 
   let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
   > = l2i;
 
   if (generationMode === 'txt2img') {
