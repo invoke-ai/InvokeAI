@@ -27,6 +27,7 @@ import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/Cl
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
+import { VideosModal } from 'features/system/components/VideosModal/VideosModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
@@ -108,6 +109,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <NewCanvasSessionDialog />
       <ImageContextMenu />
       <FullscreenDropzone />
+      <VideosModal />
     </ErrorBoundary>
   );
 };
