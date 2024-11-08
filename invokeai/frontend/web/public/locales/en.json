@@ -1140,6 +1140,7 @@
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
+        "showDetailedInvocationProgress": "Show Progress Details",
         "showProgressInViewer": "Show Progress Images in Viewer",
         "ui": "User Interface",
         "clearIntermediatesDisabled": "Queue must be empty to clear intermediates",

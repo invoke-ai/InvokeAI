@@ -32,11 +32,13 @@ import {
   selectSystemShouldConfirmOnNewSession,
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
+  selectSystemShouldShowInvocationProgressDetail,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
   setShouldEnableModelDescriptions,
+  setShouldShowInvocationProgressDetail,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
   shouldUseNSFWCheckerChanged,
@@ -56,6 +58,7 @@ type ConfigOptions = {
   shouldShowResetWebUiText?: boolean;
   shouldShowClearIntermediates?: boolean;
   shouldShowLocalizationToggle?: boolean;
+  shouldShowInvocationProgressDetailToggle?: boolean;
 };
 
 const defaultConfig: ConfigOptions = {
@@ -63,6 +66,7 @@ const defaultConfig: ConfigOptions = {
   shouldShowResetWebUiText: true,
   shouldShowClearIntermediates: true,
   shouldShowLocalizationToggle: true,
+  shouldShowInvocationProgressDetailToggle: true,
 };
 
 type SettingsModalProps = {
@@ -103,6 +107,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
   const shouldEnableModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
+  const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
   const onToggleConfirmOnNewSession = useCallback(() => {
     dispatch(shouldConfirmOnNewSessionToggled());
   }, [dispatch]);
@@ -170,6 +175,13 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
     [dispatch]
   );
 
+  const handleChangeShouldShowInvocationProgressDetail = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldShowInvocationProgressDetail(e.target.checked));
+    },
+    [dispatch]
+  );
+
   return (
     <>
       {cloneElement(children, {
@@ -221,6 +233,15 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                         onChange={handleChangeShouldAntialiasProgressImage}
                       />
                     </FormControl>
+                    {Boolean(config?.shouldShowInvocationProgressDetailToggle) && (
+                      <FormControl>
+                        <FormLabel>{t('settings.showDetailedInvocationProgress')}</FormLabel>
+                        <Switch
+                          isChecked={shouldShowInvocationProgressDetail}
+                          onChange={handleChangeShouldShowInvocationProgressDetail}
+                        />
+                      </FormControl>
+                    )}
                     <FormControl>
                       <InformationalPopover feature="noiseUseCPU" inPortal={false}>
                         <FormLabel>{t('parameters.useCpuNoise')}</FormLabel>

@@ -41,4 +41,5 @@ export interface SystemState {
   logIsEnabled: boolean;
   logLevel: LogLevel;
   logNamespaces: LogNamespace[];
+  shouldShowInvocationProgressDetail: boolean;
 }

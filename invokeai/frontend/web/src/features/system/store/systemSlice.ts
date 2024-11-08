@@ -21,6 +21,7 @@ const initialSystemState: SystemState = {
   logIsEnabled: true,
   logLevel: 'debug',
   logNamespaces: [...zLogNamespace.options],
+  shouldShowInvocationProgressDetail: false,
 };
 
 export const systemSlice = createSlice({
@@ -64,6 +65,9 @@ export const systemSlice = createSlice({
     shouldConfirmOnNewSessionToggled(state) {
       state.shouldConfirmOnNewSession = !state.shouldConfirmOnNewSession;
     },
+    setShouldShowInvocationProgressDetail(state, action: PayloadAction<boolean>) {
+      state.shouldShowInvocationProgressDetail = action.payload;
+    },
   },
 });
 
@@ -79,6 +83,7 @@ export const {
   setShouldEnableInformationalPopovers,
   setShouldEnableModelDescriptions,
   shouldConfirmOnNewSessionToggled,
+  setShouldShowInvocationProgressDetail,
 } = systemSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -117,3 +122,6 @@ export const selectSystemShouldEnableModelDescriptions = createSystemSelector(
   (system) => system.shouldEnableModelDescriptions
 );
 export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);
+export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(
+  (system) => system.shouldShowInvocationProgressDetail
+);
