@@ -34,8 +34,15 @@ export const UpscaleWarning = () => {
     dispatch(tileControlnetModelChanged(validModel || null));
   }, [model?.base, modelConfigs, dispatch]);
 
+  const isBaseModelCompatible = useMemo(() => {
+    return model && ['sd-1', 'sdxl'].includes(model.base);
+  }, [model]);
+
   const modelWarnings = useMemo(() => {
     const _warnings: string[] = [];
+    if (!isBaseModelCompatible) {
+      return _warnings;
+    }
     if (!model) {
       _warnings.push(t('upscaling.mainModelDesc'));
     }
@@ -46,7 +53,7 @@ export const UpscaleWarning = () => {
       _warnings.push(t('upscaling.upscaleModelDesc'));
     }
     return _warnings;
-  }, [model, tileControlnetModel, upscaleModel, t]);
+  }, [isBaseModelCompatible, model, tileControlnetModel, upscaleModel, t]);
 
   const otherWarnings = useMemo(() => {
     const _warnings: string[] = [];
@@ -58,22 +65,25 @@ export const UpscaleWarning = () => {
     return _warnings;
   }, [isTooLargeToUpscale, t, maxUpscaleDimension]);
 
+  const allWarnings = useMemo(() => [...modelWarnings, ...otherWarnings], [modelWarnings, otherWarnings]);
+
   const handleGoToModelManager = useCallback(() => {
     dispatch(setActiveTab('models'));
     $installModelsTab.set(3);
   }, [dispatch]);
 
-  if (modelWarnings.length && isModelsTabDisabled) {
+  if (isBaseModelCompatible && modelWarnings.length > 0 && isModelsTabDisabled) {
     return null;
   }
 
-  if ((!modelWarnings.length && !otherWarnings.length) || isLoading) {
+  if ((isBaseModelCompatible && allWarnings.length === 0) || isLoading) {
     return null;
   }
 
   return (
     <Flex bg="error.500" borderRadius="base" padding={4} direction="column" fontSize="sm" gap={2}>
-      {!!modelWarnings.length && (
+      {!isBaseModelCompatible && <Text>{t('upscaling.incompatibleBaseModelDesc')}</Text>}
+      {modelWarnings.length > 0 && (
         <Text>
           <Trans
             i18nKey="upscaling.missingModelsWarning"
@@ -85,11 +95,13 @@ export const UpscaleWarning = () => {
           />
         </Text>
       )}
-      <UnorderedList>
-        {[...modelWarnings, ...otherWarnings].map((warning) => (
-          <ListItem key={warning}>{warning}</ListItem>
-        ))}
-      </UnorderedList>
+      {allWarnings.length > 0 && (
+        <UnorderedList>
+          {allWarnings.map((warning) => (
+            <ListItem key={warning}>{warning}</ListItem>
+          ))}
+        </UnorderedList>
+      )}
     </Flex>
   );
 };
