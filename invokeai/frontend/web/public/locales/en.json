@@ -997,7 +997,7 @@
         "controlNetControlMode": "Control Mode",
         "copyImage": "Copy Image",
         "denoisingStrength": "Denoising Strength",
-        "noRasterLayers": "No Raster Layers",
+        "disabledNoRasterContent": "Disabled (No Raster Content)",
         "downloadImage": "Download Image",
         "general": "General",
         "guidance": "Guidance",
