@@ -111,9 +111,13 @@ export const gallerySlice = createSlice({
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
     },
-    boardIdSelected: (state, action: PayloadAction<{ boardId: BoardId; selectedImageName?: string }>) => {
-      state.selectedBoardId = action.payload.boardId;
-      state.galleryView = 'images';
+    boardIdSelected: (
+      state,
+      action: PayloadAction<{ boardId: BoardId; selectedImageName?: string; galleryView?: GalleryView }>
+    ) => {
+      const { boardId, selectedImageName, galleryView } = action.payload;
+      state.selectedBoardId = boardId;
+      state.galleryView = galleryView ?? 'images';
       state.offset = 0;
     },
     autoAddBoardIdChanged: (state, action: PayloadAction<BoardId>) => {

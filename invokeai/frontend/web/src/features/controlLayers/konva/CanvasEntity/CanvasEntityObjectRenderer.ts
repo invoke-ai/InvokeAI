@@ -494,6 +494,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       image_category: 'other',
       is_intermediate: true,
       withToast: false,
+      switchToBoard: false,
     });
     const imageObject = imageDTOToImageObject(imageDTO);
     if (replaceObjects) {

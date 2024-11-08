@@ -303,6 +303,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         board_id: uploadOptions.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
         metadata: uploadOptions.metadata,
         withToast: false,
+        switchToBoard: false,
       })
     );
     this.$isUploading.set(false);

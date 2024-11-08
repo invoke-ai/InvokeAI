@@ -272,6 +272,7 @@ export const imagesApi = api.injectEndpoints({
         metadata?: JsonObject;
         isFirstUploadOfBatch?: boolean;
         withToast?: boolean;
+        switchToBoard?: boolean;
       }
     >({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
@@ -631,71 +632,35 @@ export type UploadImageArg = {
   crop_visible?: boolean;
   metadata?: JsonObject;
   withToast?: boolean;
+  switchToBoard?: boolean;
+};
+const uploadArgDefaults: Partial<UploadImageArg> = {
+  crop_visible: false,
+  withToast: true,
+  switchToBoard: true,
 };
 
 export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
-  const {
-    file,
-    image_category,
-    is_intermediate,
-    crop_visible = false,
-    board_id,
-    metadata,
-    session_id,
-    withToast = true,
-  } = arg;
-
   const { dispatch } = getStore();
-
-  const req = dispatch(
-    imagesApi.endpoints.uploadImage.initiate(
-      {
-        file,
-        image_category,
-        is_intermediate,
-        crop_visible,
-        board_id,
-        metadata,
-        session_id,
-        withToast,
-      },
-      { track: false }
-    )
-  );
-  return req.unwrap();
+  const req = dispatch(imagesApi.endpoints.uploadImage.initiate({ ...uploadArgDefaults, ...arg }, { track: false }));
+  const imageDTO = req.unwrap();
+  req.reset();
+  return imageDTO;
 };
 
 export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> => {
   const { dispatch } = getStore();
   const results = await Promise.allSettled(
     args.map((arg, i) => {
-      const {
-        file,
-        image_category,
-        is_intermediate,
-        crop_visible = false,
-        board_id,
-        metadata,
-        session_id,
-        withToast = true,
-      } = arg;
       const req = dispatch(
         imagesApi.endpoints.uploadImage.initiate(
-          {
-            file,
-            image_category,
-            is_intermediate,
-            crop_visible,
-            board_id,
-            metadata,
-            session_id,
-            isFirstUploadOfBatch: i === 0,
-            withToast,
-          },
+          { ...uploadArgDefaults, ...arg, isFirstUploadOfBatch: i === 0 },
           { track: false }
         )
       );
-      return req.unwrap();
+      const imageDTO = req.unwrap();
+      req.reset();
+      return imageDTO;
     })
   );
   return results.filter((r): r is PromiseFulfilledResult<ImageDTO> => r.status === 'fulfilled').map((r) => r.value);
