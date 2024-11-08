@@ -1,4 +1,5 @@
 import {
+  ExternalLink,
   Flex,
   Modal,
   ModalBody,
@@ -7,15 +8,41 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Text,
 } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
-import { controlCanvasVideos, gettingStartedVideos } from 'features/system/components/VideosModal/data';
+import {
+  controlCanvasVideos,
+  gettingStartedVideos,
+  studioSessionsPlaylistLink,
+} from 'features/system/components/VideosModal/data';
 import { VideoCardList } from 'features/system/components/VideosModal/VideoCardList';
+import { discordLink } from 'features/system/store/constants';
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 export const [useVideosModal] = buildUseDisclosure(false);
+
+const StudioSessionsPlaylistLink = () => {
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={studioSessionsPlaylistLink}
+      display="inline-flex"
+      label="Studio Sessions playlist"
+    />
+  );
+};
+
+const DiscordLink = () => {
+  return <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label="Discord" />;
+};
+
+const components = {
+  StudioSessionsPlaylistLink: <StudioSessionsPlaylistLink />,
+  DiscordLink: <DiscordLink />,
+};
 
 export const VideosModal = memo(() => {
   const { t } = useTranslation();
@@ -27,9 +54,17 @@ export const VideosModal = memo(() => {
       <ModalContent maxH="80vh" h="80vh">
         <ModalHeader bg="none">{t('supportVideos.supportVideos')}</ModalHeader>
         <ModalCloseButton />
-        <ModalBody display="flex" flexDir="column" gap={4}>
+        <ModalBody>
           <ScrollableContent>
             <Flex flexDir="column" gap={4}>
+              <Flex flexDir="column" gap={2} pb={2}>
+                <Text fontSize="md">
+                  <Trans i18nKey="supportVideos.studioSessionsDesc1" components={components} />
+                </Text>
+                <Text fontSize="md">
+                  <Trans i18nKey="supportVideos.studioSessionsDesc2" components={components} />
+                </Text>
+              </Flex>
               <VideoCardList category={t('supportVideos.gettingStarted')} videos={gettingStartedVideos} />
               <VideoCardList category={t('supportVideos.controlCanvas')} videos={controlCanvasVideos} />
             </Flex>

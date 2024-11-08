@@ -84,3 +84,5 @@ export const controlCanvasVideos: VideoData[] = [
     length: { minutes: 0, seconds: 48 },
   },
 ];
+
+export const studioSessionsPlaylistLink = 'https://www.youtube.com/playlist?list=PLvWK1Kc8iXGq_8tWZqnwDVaf9uhlDC09U';
