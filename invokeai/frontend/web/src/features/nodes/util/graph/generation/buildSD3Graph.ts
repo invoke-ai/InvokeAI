@@ -39,7 +39,18 @@ export const buildSD3Graph = async (
 
   const { bbox } = canvas;
 
-  const { model, cfgScale: cfg_scale, seed, steps, vae, t5EncoderModel, clipLEmbedModel, clipGEmbedModel } = params;
+  const {
+    model,
+    cfgScale: cfg_scale,
+    seed,
+    steps,
+    vae,
+    t5EncoderModel,
+    clipLEmbedModel,
+    clipGEmbedModel,
+    optimizedDenoisingEnabled,
+    img2imgStrength,
+  } = params;
 
   assert(model, 'No model found in state');
 
@@ -113,7 +124,15 @@ export const buildSD3Graph = async (
   });
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
-  const denoising_start = 1 - params.img2imgStrength;
+  let denoising_start: number;
+  if (optimizedDenoisingEnabled) {
+    // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
+    // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
+    // range (>0.9).
+    denoising_start = 1 - img2imgStrength ** 0.2;
+  } else {
+    denoising_start = 1 - img2imgStrength;
+  }
 
   let canvasOutput: Invocation<
     'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
