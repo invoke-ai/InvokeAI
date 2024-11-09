@@ -1,4 +1,3 @@
-import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { components, paths } from 'services/api/schema';
 import type { SetRequired } from 'type-fest';
 
@@ -276,50 +275,6 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
-
-export type IPALayerImagePostUploadAction = {
-  type: 'SET_IPA_IMAGE';
-  id: string;
-};
-
-export type RGIPAdapterImagePostUploadAction = {
-  type: 'SET_RG_IP_ADAPTER_IMAGE';
-  id: string;
-  referenceImageId: string;
-};
-
-type NodesAction = {
-  type: 'SET_NODES_IMAGE';
-  nodeId: string;
-  fieldName: string;
-};
-
-type UpscaleInitialImageAction = {
-  type: 'SET_UPSCALE_INITIAL_IMAGE';
-};
-
-type ToastAction = {
-  type: 'TOAST';
-  title?: string;
-};
-
-type AddToBatchAction = {
-  type: 'ADD_TO_BATCH';
-};
-
-type ReplaceLayerWithImagePostUploadAction = {
-  type: 'REPLACE_LAYER_WITH_IMAGE';
-  entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>;
-};
-
-export type PostUploadAction =
-  | NodesAction
-  | ToastAction
-  | AddToBatchAction
-  | IPALayerImagePostUploadAction
-  | RGIPAdapterImagePostUploadAction
-  | UpscaleInitialImageAction
-  | ReplaceLayerWithImagePostUploadAction;
 
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
 export type StarterModel = S['StarterModel'];

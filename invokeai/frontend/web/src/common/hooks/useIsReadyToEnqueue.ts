@@ -119,11 +119,20 @@ const createSelector = (
             reasons.push({ content: i18n.t('upscaling.exceedsMaxSize') });
           }
         }
-        if (!upscale.upscaleModel) {
-          reasons.push({ content: i18n.t('upscaling.missingUpscaleModel') });
-        }
-        if (!upscale.tileControlnetModel) {
-          reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
+        if (model && !['sd-1', 'sdxl'].includes(model.base)) {
+          // When we are using an upsupported model, do not add the other warnings
+          reasons.push({ content: i18n.t('upscaling.incompatibleBaseModel') });
+        } else {
+          // Using a compatible model, add all warnings
+          if (!model) {
+            reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
+          }
+          if (!upscale.upscaleModel) {
+            reasons.push({ content: i18n.t('upscaling.missingUpscaleModel') });
+          }
+          if (!upscale.tileControlnetModel) {
+            reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
+          }
         }
       } else {
         if (canvasIsFiltering) {

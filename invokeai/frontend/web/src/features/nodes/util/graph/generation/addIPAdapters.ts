@@ -37,7 +37,10 @@ const addIPAdapter = (entity: CanvasReferenceImageState, g: Graph, collector: In
   let ipAdapterNode: Invocation<'flux_ip_adapter' | 'ip_adapter'>;
 
   if (model.base === 'flux') {
-    assert(clipVisionModel === 'ViT-L', 'ViT-L is the only supported CLIP Vision model for FLUX IP adapter');
+    assert(
+      clipVisionModel === 'ViT-L',
+      `ViT-L is the only supported CLIP Vision model for FLUX IP adapter, got ${clipVisionModel}`
+    );
     ipAdapterNode = g.addNode({
       id: `ip_adapter_${id}`,
       type: 'flux_ip_adapter',

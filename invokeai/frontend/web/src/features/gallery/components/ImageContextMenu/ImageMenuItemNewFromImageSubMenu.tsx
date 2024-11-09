@@ -1,19 +1,14 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/nanostores/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
-import {
-  useNewCanvasFromImage,
-  useNewControlLayerFromImage,
-  useNewInpaintMaskFromImage,
-  useNewRasterLayerFromImage,
-  useNewRegionalGuidanceFromImage,
-} from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
+import { createNewCanvasEntityFromImage, newCanvasFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
@@ -23,20 +18,16 @@ import { PiFileBold, PiPlusBold } from 'react-icons/pi';
 export const ImageMenuItemNewFromImageSubMenu = memo(() => {
   const { t } = useTranslation();
   const subMenu = useSubMenu();
-  const dispatch = useAppDispatch();
+  const store = useAppStore();
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusy();
-  const newRasterLayerFromImage = useNewRasterLayerFromImage();
-  const newControlLayerFromImage = useNewControlLayerFromImage();
-  const newInpaintMaskFromImage = useNewInpaintMaskFromImage();
-  const newRegionalGuidanceFromImage = useNewRegionalGuidanceFromImage();
-  const newCanvasFromImage = useNewCanvasFromImage();
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
 
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
-    newCanvasFromImage(imageDTO, 'raster_layer');
+    const { dispatch, getState } = store;
+    newCanvasFromImage({ imageDTO, type: 'raster_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -44,10 +35,11 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newCanvasFromImage, t]);
+  }, [imageDTO, imageViewer, store, t]);
 
   const onClickNewCanvasWithControlLayerFromImage = useCallback(() => {
-    newCanvasFromImage(imageDTO, 'control_layer');
+    const { dispatch, getState } = store;
+    newCanvasFromImage({ imageDTO, type: 'control_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -55,11 +47,12 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newCanvasFromImage, t]);
+  }, [imageDTO, imageViewer, store, t]);
 
   const onClickNewRasterLayerFromImage = useCallback(() => {
+    const { dispatch, getState } = store;
+    createNewCanvasEntityFromImage({ imageDTO, type: 'raster_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    newRasterLayerFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -67,11 +60,12 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newRasterLayerFromImage, t]);
+  }, [imageDTO, imageViewer, store, t]);
 
   const onClickNewControlLayerFromImage = useCallback(() => {
+    const { dispatch, getState } = store;
+    createNewCanvasEntityFromImage({ imageDTO, type: 'control_layer', dispatch, getState });
     dispatch(sentImageToCanvas());
-    newControlLayerFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -79,11 +73,12 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newControlLayerFromImage, t]);
+  }, [imageDTO, imageViewer, store, t]);
 
   const onClickNewInpaintMaskFromImage = useCallback(() => {
+    const { dispatch, getState } = store;
+    createNewCanvasEntityFromImage({ imageDTO, type: 'inpaint_mask', dispatch, getState });
     dispatch(sentImageToCanvas());
-    newInpaintMaskFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -91,11 +86,12 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newInpaintMaskFromImage, t]);
+  }, [imageDTO, imageViewer, store, t]);
 
   const onClickNewRegionalGuidanceFromImage = useCallback(() => {
+    const { dispatch, getState } = store;
+    createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance', dispatch, getState });
     dispatch(sentImageToCanvas());
-    newRegionalGuidanceFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -103,7 +99,7 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newRegionalGuidanceFromImage, t]);
+  }, [imageDTO, imageViewer, store, t]);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiPlusBold />}>

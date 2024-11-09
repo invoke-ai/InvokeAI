@@ -1,14 +1,16 @@
 import { Spacer } from '@invoke-ai/ui-library';
-import IAIDroppable from 'common/components/IAIDroppable';
-import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
+import { CanvasEntityContainer } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityContainer';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { RasterLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import type { ReplaceLayerImageDropData } from 'features/dnd/types';
+import type { ReplaceCanvasEntityObjectsWithImageDndTargetData } from 'features/dnd/dnd';
+import { replaceCanvasEntityObjectsWithImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,10 +20,11 @@ type Props = {
 
 export const RasterLayer = memo(({ id }: Props) => {
   const { t } = useTranslation();
+  const isBusy = useCanvasIsBusy();
   const entityIdentifier = useMemo<CanvasEntityIdentifier<'raster_layer'>>(() => ({ id, type: 'raster_layer' }), [id]);
-  const dropData = useMemo<ReplaceLayerImageDropData>(
-    () => ({ id, actionType: 'REPLACE_LAYER_WITH_IMAGE', context: { entityIdentifier } }),
-    [id, entityIdentifier]
+  const dndTargetData = useMemo<ReplaceCanvasEntityObjectsWithImageDndTargetData>(
+    () => replaceCanvasEntityObjectsWithImageDndTarget.getData({ entityIdentifier }, entityIdentifier.id),
+    [entityIdentifier]
   );
 
   return (
@@ -34,7 +37,12 @@ export const RasterLayer = memo(({ id }: Props) => {
             <Spacer />
             <CanvasEntityHeaderCommonActions />
           </CanvasEntityHeader>
-          <IAIDroppable data={dropData} dropLabel={t('controlLayers.replaceLayer')} />
+          <DndDropTarget
+            dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
+            dndTargetData={dndTargetData}
+            label={t('controlLayers.replaceLayer')}
+            isDisabled={isBusy}
+          />
         </CanvasEntityContainer>
       </RasterLayerAdapterGate>
     </EntityIdentifierContext.Provider>

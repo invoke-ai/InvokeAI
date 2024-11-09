@@ -56,7 +56,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.2.0",
+    version="3.2.1",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -81,6 +81,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.denoising_start,
     )
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
+    add_noise: bool = InputField(default=True, description="Add noise based on denoising start.")
     transformer: TransformerField = InputField(
         description=FieldDescriptions.flux_model,
         input=Input.Connection,
@@ -207,9 +208,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     "to be poor. Consider using a FLUX dev model instead."
                 )
 
-            # Noise the orig_latents by the appropriate amount for the first timestep.
-            t_0 = timesteps[0]
-            x = t_0 * noise + (1.0 - t_0) * init_latents
+            if self.add_noise:
+                # Noise the orig_latents by the appropriate amount for the first timestep.
+                t_0 = timesteps[0]
+                x = t_0 * noise + (1.0 - t_0) * init_latents
+            else:
+                x = init_latents
         else:
             # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
             if self.denoising_start > 1e-5:

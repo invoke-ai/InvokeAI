@@ -6,12 +6,14 @@ import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { ListBoardsArgs, ListImagesArgs } from 'services/api/types';
 
-export const selectLastSelectedImage = createSelector(
+export const selectFirstSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(0));
+export const selectLastSelectedImage = createSelector(selectGallerySlice, (gallery) => gallery.selection.at(-1));
+export const selectLastSelectedImageName = createSelector(
   selectGallerySlice,
-  (gallery) => gallery.selection[gallery.selection.length - 1]
+  (gallery) => gallery.selection.at(-1)?.image_name
 );
-export const selectLastSelectedImageName = createSelector(selectLastSelectedImage, (image) => image?.image_name);
 
+export const selectGalleryLimit = createSelector(selectGallerySlice, (gallery) => gallery.limit);
 export const selectListImagesQueryArgs = createMemoizedSelector(
   selectGallerySlice,
   (gallery): ListImagesArgs | SkipToken =>
@@ -50,7 +52,7 @@ export const selectBoardsListOrderBy = createSelector(selectGallerySlice, (galle
 export const selectBoardsListOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderDir);
 
 export const selectSelectionCount = createSelector(selectGallerySlice, (gallery) => gallery.selection.length);
-export const selectHasMultipleImagesSelected = createSelector(selectSelectionCount, (count) => count > 1);
+export const selectSelection = createSelector(selectGallerySlice, (gallery) => gallery.selection);
 export const selectGalleryImageMinimumWidth = createSelector(
   selectGallerySlice,
   (gallery) => gallery.galleryImageMinimumWidth
@@ -59,6 +61,8 @@ export const selectGalleryImageMinimumWidth = createSelector(
 export const selectComparisonMode = createSelector(selectGallerySlice, (gallery) => gallery.comparisonMode);
 export const selectComparisonFit = createSelector(selectGallerySlice, (gallery) => gallery.comparisonFit);
 export const selectImageToCompare = createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare);
-export const selectHasImageToCompare = createSelector(selectImageToCompare, (imageToCompare) =>
-  Boolean(imageToCompare)
+export const selectHasImageToCompare = createSelector(selectGallerySlice, (gallery) => Boolean(gallery.imageToCompare));
+export const selectAlwaysShouldImageSizeBadge = createSelector(
+  selectGallerySlice,
+  (gallery) => gallery.alwaysShowImageSizeBadge
 );

@@ -1,4 +1,3 @@
-import type { SerializableObject } from 'common/types';
 import { withResultAsync } from 'common/util/result';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
@@ -35,12 +34,13 @@ import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
-import type { UploadOptions } from 'services/api/endpoints/images';
+import type { UploadImageArg } from 'services/api/endpoints/images';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 type CompositingOptions = {
   /**
@@ -173,14 +173,14 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     return adapters as CanvasEntityAdapterFromType<T>[];
   };
 
-  getCompositeHash = (adapters: CanvasEntityAdapter[], extra: SerializableObject): string => {
-    const adapterHashes: SerializableObject[] = [];
+  getCompositeHash = (adapters: CanvasEntityAdapter[], extra: JsonObject): string => {
+    const adapterHashes: JsonObject[] = [];
 
     for (const adapter of adapters) {
       adapterHashes.push(adapter.getHashableState());
     }
 
-    const data: SerializableObject = {
+    const data: JsonObject = {
       extra,
       adapterHashes,
     };
@@ -259,7 +259,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   getCompositeImageDTO = async (
     adapters: CanvasEntityAdapter[],
     rect: Rect,
-    uploadOptions: Pick<UploadOptions, 'is_intermediate' | 'metadata'>,
+    uploadOptions: Pick<UploadImageArg, 'is_intermediate' | 'metadata'>,
     compositingOptions?: CompositingOptions,
     forceUpload?: boolean
   ): Promise<ImageDTO> => {
@@ -297,12 +297,12 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     this.$isUploading.set(true);
     const uploadResult = await withResultAsync(() =>
       uploadImage({
-        blob,
-        fileName: 'canvas-composite.png',
+        file: new File([blob], 'canvas-composite.png', { type: 'image/png' }),
         image_category: 'general',
         is_intermediate: uploadOptions.is_intermediate,
         board_id: uploadOptions.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
         metadata: uploadOptions.metadata,
+        withToast: false,
       })
     );
     this.$isUploading.set(false);

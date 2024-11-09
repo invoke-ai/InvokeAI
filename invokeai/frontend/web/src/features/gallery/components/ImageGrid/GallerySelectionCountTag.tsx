@@ -2,15 +2,19 @@ import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
+import {
+  selectFirstSelectedImage,
+  selectSelection,
+  selectSelectionCount,
+} from 'features/gallery/store/gallerySelectors';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ImageDTO } from 'services/api/types';
 
 export const GallerySelectionCountTag = memo(() => {
   const dispatch = useAppDispatch();
-  const { selection } = useAppSelector((s) => s.gallery);
+  const selection = useAppSelector(selectSelection);
   const { imageDTOs } = useGalleryImages();
   const isGalleryFocused = useIsRegionFocused('gallery');
 
@@ -30,30 +34,29 @@ export const GallerySelectionCountTag = memo(() => {
     return null;
   }
 
-  return <GallerySelectionCountTagContent selection={selection} />;
+  return <GallerySelectionCountTagContent />;
 });
 
 GallerySelectionCountTag.displayName = 'GallerySelectionCountTag';
 
-const GallerySelectionCountTagContent = memo(({ selection }: { selection: ImageDTO[] }) => {
+const GallerySelectionCountTagContent = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-
   const isGalleryFocused = useIsRegionFocused('gallery');
-
+  const firstImage = useAppSelector(selectFirstSelectedImage);
+  const selectionCount = useAppSelector(selectSelectionCount);
   const onClearSelection = useCallback(() => {
-    const firstImage = selection[0];
     if (firstImage) {
       dispatch(selectionChanged([firstImage]));
     }
-  }, [dispatch, selection]);
+  }, [dispatch, firstImage]);
 
   useRegisteredHotkeys({
     id: 'clearSelection',
     category: 'gallery',
     callback: onClearSelection,
-    options: { enabled: selection.length > 0 && isGalleryFocused },
-    dependencies: [onClearSelection, selection, isGalleryFocused],
+    options: { enabled: selectionCount > 0 && isGalleryFocused },
+    dependencies: [onClearSelection, selectionCount, isGalleryFocused],
   });
 
   return (
@@ -71,7 +74,7 @@ const GallerySelectionCountTagContent = memo(({ selection }: { selection: ImageD
       borderColor="whiteAlpha.300"
     >
       <TagLabel>
-        {selection.length} {t('common.selected')}
+        {selectionCount} {t('common.selected')}
       </TagLabel>
       <TagCloseButton onClick={onClearSelection} />
     </Tag>

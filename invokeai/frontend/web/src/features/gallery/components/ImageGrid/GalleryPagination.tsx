@@ -58,6 +58,13 @@ type PageButtonProps = {
 };
 
 const PageButton = memo(({ page, currentPage, goToPage }: PageButtonProps) => {
+  const onClick = useCallback(() => {
+    if (page === ELLIPSIS) {
+      return;
+    }
+    goToPage(page - 1);
+  }, [goToPage, page]);
+
   if (page === ELLIPSIS) {
     return (
       <Button size="sm" variant="link" isDisabled>
@@ -66,7 +73,7 @@ const PageButton = memo(({ page, currentPage, goToPage }: PageButtonProps) => {
     );
   }
   return (
-    <Button size="sm" onClick={goToPage.bind(null, page - 1)} variant={currentPage === page - 1 ? 'solid' : 'outline'}>
+    <Button size="sm" onClick={onClick} variant={currentPage === page - 1 ? 'solid' : 'outline'}>
       {page}
     </Button>
   );

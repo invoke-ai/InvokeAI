@@ -1,6 +1,5 @@
 import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
 import { getStore } from 'app/store/nanostores/store';
-import type { SerializableObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
@@ -11,9 +10,9 @@ import type {
   ImageDTO,
   ListImagesArgs,
   ListImagesResponse,
-  PostUploadAction,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import type { JsonObject } from 'type-fest';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
@@ -76,7 +75,7 @@ export const imagesApi = api.injectEndpoints({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
     }),
-    getImageMetadata: build.query<SerializableObject | undefined, string>({
+    getImageMetadata: build.query<JsonObject | undefined, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
     }),
@@ -267,12 +266,12 @@ export const imagesApi = api.injectEndpoints({
         file: File;
         image_category: ImageCategory;
         is_intermediate: boolean;
-        postUploadAction?: PostUploadAction;
         session_id?: string;
         board_id?: string;
         crop_visible?: boolean;
-        metadata?: SerializableObject;
+        metadata?: JsonObject;
         isFirstUploadOfBatch?: boolean;
+        withToast?: boolean;
       }
     >({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
@@ -614,7 +613,7 @@ export const getImageDTO = (image_name: string, options?: StartQueryActionCreato
 export const getImageMetadata = (
   image_name: string,
   options?: StartQueryActionCreatorOptions
-): Promise<SerializableObject | undefined> => {
+): Promise<JsonObject | undefined> => {
   const _options = {
     subscribe: false,
     ...options,
@@ -623,30 +622,81 @@ export const getImageMetadata = (
   return req.unwrap();
 };
 
-export type UploadOptions = {
-  blob: Blob;
-  fileName: string;
+export type UploadImageArg = {
+  file: File;
   image_category: ImageCategory;
   is_intermediate: boolean;
+  session_id?: string;
+  board_id?: string;
   crop_visible?: boolean;
-  board_id?: BoardId;
-  metadata?: SerializableObject;
+  metadata?: JsonObject;
+  withToast?: boolean;
 };
-export const uploadImage = (arg: UploadOptions): Promise<ImageDTO> => {
-  const { blob, fileName, image_category, is_intermediate, crop_visible = false, board_id, metadata } = arg;
+
+export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
+  const {
+    file,
+    image_category,
+    is_intermediate,
+    crop_visible = false,
+    board_id,
+    metadata,
+    session_id,
+    withToast = true,
+  } = arg;
 
   const { dispatch } = getStore();
-  const file = new File([blob], fileName, { type: 'image/png' });
+
   const req = dispatch(
-    imagesApi.endpoints.uploadImage.initiate({
-      file,
-      image_category,
-      is_intermediate,
-      crop_visible,
-      board_id,
-      metadata,
+    imagesApi.endpoints.uploadImage.initiate(
+      {
+        file,
+        image_category,
+        is_intermediate,
+        crop_visible,
+        board_id,
+        metadata,
+        session_id,
+        withToast,
+      },
+      { track: false }
+    )
+  );
+  return req.unwrap();
+};
+
+export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> => {
+  const { dispatch } = getStore();
+  const results = await Promise.allSettled(
+    args.map((arg, i) => {
+      const {
+        file,
+        image_category,
+        is_intermediate,
+        crop_visible = false,
+        board_id,
+        metadata,
+        session_id,
+        withToast = true,
+      } = arg;
+      const req = dispatch(
+        imagesApi.endpoints.uploadImage.initiate(
+          {
+            file,
+            image_category,
+            is_intermediate,
+            crop_visible,
+            board_id,
+            metadata,
+            session_id,
+            isFirstUploadOfBatch: i === 0,
+            withToast,
+          },
+          { track: false }
+        )
+      );
+      return req.unwrap();
     })
   );
-  req.reset();
-  return req.unwrap();
+  return results.filter((r): r is PromiseFulfilledResult<ImageDTO> => r.status === 'fulfilled').map((r) => r.value);
 };

@@ -1,38 +1,26 @@
 import { Grid, GridItem } from '@invoke-ai/ui-library';
-import IAIDroppable from 'common/components/IAIDroppable';
-import type {
-  AddControlLayerFromImageDropData,
-  AddGlobalReferenceImageFromImageDropData,
-  AddRasterLayerFromImageDropData,
-  AddRegionalReferenceImageFromImageDropData,
-} from 'features/dnd/types';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { newCanvasEntityFromImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const addRasterLayerFromImageDropData: AddRasterLayerFromImageDropData = {
-  id: 'add-raster-layer-from-image-drop-data',
-  actionType: 'ADD_RASTER_LAYER_FROM_IMAGE',
-};
-
-const addControlLayerFromImageDropData: AddControlLayerFromImageDropData = {
-  id: 'add-control-layer-from-image-drop-data',
-  actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE',
-};
-
-const addRegionalReferenceImageFromImageDropData: AddRegionalReferenceImageFromImageDropData = {
-  id: 'add-control-layer-from-image-drop-data',
-  actionType: 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE',
-};
-
-const addGlobalReferenceImageFromImageDropData: AddGlobalReferenceImageFromImageDropData = {
-  id: 'add-control-layer-from-image-drop-data',
-  actionType: 'ADD_GLOBAL_REFERENCE_IMAGE_FROM_IMAGE',
-};
+const addRasterLayerFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({ type: 'raster_layer' });
+const addControlLayerFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({
+  type: 'control_layer',
+});
+const addRegionalGuidanceReferenceImageFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({
+  type: 'regional_guidance_with_reference_image',
+});
+const addGlobalReferenceImageFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({
+  type: 'reference_image',
+});
 
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();
   const imageViewer = useImageViewer();
+  const isBusy = useCanvasIsBusy();
 
   if (imageViewer.isOpen) {
     return null;
@@ -51,28 +39,36 @@ export const CanvasDropArea = memo(() => {
         pointerEvents="none"
       >
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newRasterLayer')}
-            data={addRasterLayerFromImageDropData}
+          <DndDropTarget
+            dndTarget={newCanvasEntityFromImageDndTarget}
+            dndTargetData={addRasterLayerFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newRasterLayer')}
+            isDisabled={isBusy}
           />
         </GridItem>
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newControlLayer')}
-            data={addControlLayerFromImageDropData}
+          <DndDropTarget
+            dndTarget={newCanvasEntityFromImageDndTarget}
+            dndTargetData={addControlLayerFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newControlLayer')}
+            isDisabled={isBusy}
           />
         </GridItem>
 
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
-            data={addRegionalReferenceImageFromImageDropData}
+          <DndDropTarget
+            dndTarget={newCanvasEntityFromImageDndTarget}
+            dndTargetData={addRegionalGuidanceReferenceImageFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
+            isDisabled={isBusy}
           />
         </GridItem>
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
-            data={addGlobalReferenceImageFromImageDropData}
+          <DndDropTarget
+            dndTarget={newCanvasEntityFromImageDndTarget}
+            dndTargetData={addGlobalReferenceImageFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
+            isDisabled={isBusy}
           />
         </GridItem>
       </Grid>
