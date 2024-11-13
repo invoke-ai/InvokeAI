@@ -2,6 +2,7 @@ import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { BatchImageInputNode } from 'features/nodes/components/flow/nodes/BatchInput/BatchImageInputNode';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -64,6 +65,7 @@ const nodeTypes = {
   invocation: InvocationNodeWrapper,
   current_image: CurrentImageNode,
   notes: NotesNode,
+  image_batch: BatchImageInputNode,
 };
 
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app

@@ -95,6 +95,10 @@ const zImageFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zImageBatchFieldType = zFieldTypeBase.extend({
+  name: z.literal('ImageBatchField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zBoardFieldType = zFieldTypeBase.extend({
   name: z.literal('BoardField'),
   originalType: zStatelessFieldType.optional(),
@@ -175,13 +179,14 @@ const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zStatefulFieldType = z.union([
+export const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
   zStringFieldType,
   zBooleanFieldType,
   zEnumFieldType,
   zImageFieldType,
+  zImageBatchFieldType,
   zBoardFieldType,
   zModelIdentifierFieldType,
   zMainModelFieldType,
@@ -367,6 +372,19 @@ export const isImageFieldInputInstance = (val: unknown): val is ImageFieldInputI
   zImageFieldInputInstance.safeParse(val).success;
 export const isImageFieldInputTemplate = (val: unknown): val is ImageFieldInputTemplate =>
   zImageFieldInputTemplate.safeParse(val).success;
+
+const zImageBatchFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zImageBatchFieldType,
+});
+export type ImageBatchOutputFieldTemplate = z.infer<typeof zImageBatchFieldOutputTemplate>;
+
+export const imageBatchOutputFieldTemplate: ImageBatchOutputFieldTemplate = {
+  fieldKind: 'output',
+  name: 'images',
+  ui_hidden: false,
+  type: { name: 'ImageBatchField', cardinality: 'SINGLE' },
+  title: 'Image',
+};
 // #endregion
 
 // #region BoardField
@@ -991,6 +1009,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zBooleanFieldOutputTemplate,
   zEnumFieldOutputTemplate,
   zImageFieldOutputTemplate,
+  zImageBatchFieldOutputTemplate,
   zBoardFieldOutputTemplate,
   zModelIdentifierFieldOutputTemplate,
   zMainModelFieldOutputTemplate,

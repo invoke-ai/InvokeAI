@@ -12,6 +12,11 @@ import {
 import { selectNodes, selectNodesSlice } from 'features/nodes/store/selectors';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
+import {
+  type FieldInputTemplate,
+  type FieldOutputTemplate,
+  imageBatchOutputFieldTemplate,
+} from 'features/nodes/types/field';
 import { useCallback, useMemo } from 'react';
 import type { EdgeChange, OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
 import { useUpdateNodeInternals } from 'reactflow';
@@ -33,13 +38,20 @@ export const useConnection = () => {
         return;
       }
 
-      const template = templates[node.data.type];
-      if (!template) {
-        return;
+      let fieldTemplate: FieldInputTemplate | FieldOutputTemplate | undefined = undefined;
+
+      if (node.type === 'image_batch' && handleId === 'images' && handleType === 'source') {
+        fieldTemplate = imageBatchOutputFieldTemplate;
+      } else {
+        const template = templates[node.data.type];
+        if (!template) {
+          return;
+        }
+
+        const fieldTemplates = template[handleType === 'source' ? 'outputs' : 'inputs'];
+        fieldTemplate = fieldTemplates[handleId];
       }
 
-      const fieldTemplates = template[handleType === 'source' ? 'outputs' : 'inputs'];
-      const fieldTemplate = fieldTemplates[handleId];
       if (!fieldTemplate) {
         return;
       }

@@ -347,6 +347,18 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
     }),
     [t]
   );
+  const batchInputImageItem = useMemo<FilterableItem>(
+    () =>
+      ({
+        type: 'batch_input',
+        title: 'batch_input',
+        description: 'batch_input',
+        tags: ['batch'],
+        classification: 'stable',
+        nodePack: 'invokeai',
+      }) as const,
+    []
+  );
 
   const items = useMemo<NodeCommandItemData[]>(() => {
     // If we have a connection in progress, we need to filter the node choices
@@ -365,7 +377,7 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
         }
       }
 
-      for (const item of [currentImageFilterItem, notesFilterItem]) {
+      for (const item of [currentImageFilterItem, notesFilterItem, batchInputImageItem]) {
         if (filter(item, searchTerm)) {
           _items.push({
             label: item.title,
@@ -403,7 +415,7 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
     }
 
     return _items;
-  }, [pendingConnection, currentImageFilterItem, searchTerm, notesFilterItem, templatesArray]);
+  }, [pendingConnection, templatesArray, searchTerm, currentImageFilterItem, notesFilterItem, batchInputImageItem]);
 
   return (
     <>

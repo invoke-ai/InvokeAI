@@ -15,6 +15,10 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
     return false;
   }
 
+  if (sourceType.name === 'ImageBatchField') {
+    return isSingle(sourceType) && targetType.name === 'ImageField';
+  }
+
   if (areTypesEqual(sourceType, targetType)) {
     return true;
   }

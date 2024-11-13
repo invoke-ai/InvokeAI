@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import { buildBatchInputImageNode } from 'features/nodes/util/node/buildBatchInputImageNode';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
@@ -14,7 +15,7 @@ export const useBuildNode = () => {
 
   return useCallback(
     // string here is "any invocation type"
-    (type: string | 'current_image' | 'notes'): AnyNode => {
+    (type: string | 'current_image' | 'notes' | 'batch_input'): AnyNode => {
       let _x = window.innerWidth / 2;
       let _y = window.innerHeight / 2;
 
@@ -37,6 +38,10 @@ export const useBuildNode = () => {
 
       if (type === 'notes') {
         return buildNotesNode(position);
+      }
+
+      if (type === 'batch_input') {
+        return buildBatchInputImageNode(position);
       }
 
       // TODO: Keep track of invocation types so we do not need to cast this

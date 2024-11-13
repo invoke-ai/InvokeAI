@@ -1822,7 +1822,7 @@ export type components = {
              * Items
              * @description The list of items to substitute into the node/field.
              */
-            items?: (string | number)[];
+            items?: (string | number | components["schemas"]["ImageField"])[];
         };
         /**
          * BatchEnqueuedEvent
@@ -6751,6 +6751,12 @@ export type components = {
              * @default 1
              */
             denoising_end?: number;
+            /**
+             * Add Noise
+             * @description Add noise based on denoising start.
+             * @default true
+             */
+            add_noise?: boolean;
             /**
              * Transformer
              * @description Flux model (Transformer) to load
@@ -13161,7 +13167,7 @@ export type components = {
              * Value
              * @description The value to substitute into the node/field.
              */
-            value: string | number;
+            value: string | number | components["schemas"]["ImageField"];
         };
         /**
          * Noise

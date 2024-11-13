@@ -18,6 +18,7 @@ import {
   setRegionalGuidanceReferenceImage,
   setUpscaleInitialImage,
 } from 'features/imageActions/actions';
+import { batchImageInputNodeImagesAdded } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
@@ -241,6 +242,47 @@ export const setNodeImageFieldImageDndTarget: DndTarget<SetNodeImageFieldImageDn
   };
 //#endregion
 
+//#region Add Images to Batch Image Input Node
+const _addImagesToBatchImageInputNode = buildTypeAndKey('add-images-to-batch-image-input-node');
+export type AddImagesToBatchImageInputNodeDndTargetData = DndData<
+  typeof _addImagesToBatchImageInputNode.type,
+  typeof _addImagesToBatchImageInputNode.key,
+  { nodeId: string }
+>;
+export const addImagesToBatchImageInputNodeDndTarget: DndTarget<
+  AddImagesToBatchImageInputNodeDndTargetData,
+  SingleImageDndSourceData | MultipleImageDndSourceData
+> = {
+  ..._addImagesToBatchImageInputNode,
+  typeGuard: buildTypeGuard(_addImagesToBatchImageInputNode.key),
+  getData: buildGetData(_addImagesToBatchImageInputNode.key, _addImagesToBatchImageInputNode.type),
+  isValid: ({ sourceData }) => {
+    if (singleImageDndSource.typeGuard(sourceData) || multipleImageDndSource.typeGuard(sourceData)) {
+      return true;
+    }
+    return false;
+  },
+  handler: ({ sourceData, targetData, dispatch }) => {
+    if (!singleImageDndSource.typeGuard(sourceData) && !multipleImageDndSource.typeGuard(sourceData)) {
+      return;
+    }
+
+    const { nodeId } = targetData.payload;
+    const imageDTOs: ImageDTO[] = [];
+
+    if (singleImageDndSource.typeGuard(sourceData)) {
+      imageDTOs.push(sourceData.payload.imageDTO);
+    } else {
+      imageDTOs.push(...sourceData.payload.imageDTOs);
+    }
+
+    const images = imageDTOs.map(({ image_name }) => ({ image_name }));
+
+    dispatch(batchImageInputNodeImagesAdded({ nodeId, images }));
+  },
+};
+//#endregion
+
 //# Set Comparison Image
 const _setComparisonImage = buildTypeAndKey('set-comparison-image');
 export type SetComparisonImageDndTargetData = DndData<
@@ -430,6 +472,7 @@ export const dndTargets = [
   // Single or Multiple Image
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
+  addImagesToBatchImageInputNodeDndTarget,
 ] as const;
 
 export type AnyDndTarget = (typeof dndTargets)[number];

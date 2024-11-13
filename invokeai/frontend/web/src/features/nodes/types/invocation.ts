@@ -1,7 +1,7 @@
 import type { Edge, Node } from 'reactflow';
 import { z } from 'zod';
 
-import { zClassification, zProgressImage } from './common';
+import { zClassification, zImageField, zProgressImage } from './common';
 import { zFieldInputInstance, zFieldInputTemplate, zFieldOutputTemplate } from './field';
 import { zSemVer } from './semver';
 
@@ -49,23 +49,33 @@ const zCurrentImageNodeData = z.object({
   label: z.string(),
   isOpen: z.boolean(),
 });
-const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData]);
+const zImageBatchNodeData = z.object({
+  id: z.string().trim().min(1),
+  type: z.literal('image_batch'),
+  label: z.string(),
+  isOpen: z.boolean(),
+  images: z.array(zImageField),
+});
+const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData, zImageBatchNodeData]);
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
 type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
+export type ImageBatchNodeData = z.infer<typeof zImageBatchNodeData>;
+
 type AnyNodeData = z.infer<typeof zAnyNodeData>;
 
 export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
 export type NotesNode = Node<NotesNodeData, 'notes'>;
 export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
+export type BatchImageInputNode = Node<ImageBatchNodeData, 'image_batch'>;
 export type AnyNode = Node<AnyNodeData>;
 
 export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
 export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
-export const isInvocationNodeData = (node?: AnyNodeData | null): node is InvocationNodeData =>
-  Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
+export const isImageBatchNode = (node?: AnyNode | null): node is BatchImageInputNode =>
+  Boolean(node && node.type === 'image_batch');
 // #endregion
 
 // #region NodeExecutionState

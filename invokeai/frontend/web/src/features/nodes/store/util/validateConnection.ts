@@ -3,6 +3,7 @@ import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
 import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
+import { imageBatchOutputFieldTemplate } from 'features/nodes/types/field';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import type { Connection as NullableConnection, Edge } from 'reactflow';
 import type { SetNonNullable } from 'type-fest';
@@ -78,23 +79,32 @@ export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, temp
       return buildRejectResult('nodes.missingNode');
     }
 
-    const sourceTemplate = templates[sourceNode.data.type];
-    if (!sourceTemplate) {
-      return buildRejectResult('nodes.missingInvocationTemplate');
-    }
-
     const targetTemplate = templates[targetNode.data.type];
     if (!targetTemplate) {
       return buildRejectResult('nodes.missingInvocationTemplate');
     }
 
-    const sourceFieldTemplate = sourceTemplate.outputs[c.sourceHandle];
-    if (!sourceFieldTemplate) {
+    const targetFieldTemplate = targetTemplate.inputs[c.targetHandle];
+    if (!targetFieldTemplate) {
       return buildRejectResult('nodes.missingFieldTemplate');
     }
 
-    const targetFieldTemplate = targetTemplate.inputs[c.targetHandle];
-    if (!targetFieldTemplate) {
+    if (sourceNode.type === 'image_batch') {
+      const isValid = validateConnectionTypes(imageBatchOutputFieldTemplate.type, targetFieldTemplate.type);
+      if (!isValid) {
+        return buildRejectResult('nodes.fieldTypesMustMatch');
+      } else {
+        return buildAcceptResult();
+      }
+    }
+
+    const sourceTemplate = templates[sourceNode.data.type];
+    if (!sourceTemplate) {
+      return buildRejectResult('nodes.missingInvocationTemplate');
+    }
+
+    const sourceFieldTemplate = sourceTemplate.outputs[c.sourceHandle];
+    if (!sourceFieldTemplate) {
       return buildRejectResult('nodes.missingFieldTemplate');
     }
 

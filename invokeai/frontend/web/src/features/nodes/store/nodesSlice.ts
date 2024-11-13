@@ -3,6 +3,7 @@ import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { workflowLoaded } from 'features/nodes/store/actions';
+import type { ImageField } from 'features/nodes/types/common';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -58,7 +59,8 @@ import {
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
-import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
+import { isImageBatchNode, isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
+import { uniqBy } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { Edge, EdgeChange, NodeChange, Viewport, XYPosition } from 'reactflow';
@@ -193,7 +195,7 @@ export const nodesSlice = createSlice({
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
 
       const node = state.nodes?.[nodeIndex];
-      if (!isInvocationNode(node) && !isNotesNode(node)) {
+      if (!isInvocationNode(node) && !isNotesNode(node) && !isImageBatchNode(node)) {
         return;
       }
 
@@ -382,6 +384,34 @@ export const nodesSlice = createSlice({
       }
       node.data.notes = value;
     },
+    batchImageInputNodeImagesAdded: (state, action: PayloadAction<{ nodeId: string; images: ImageField[] }>) => {
+      const { nodeId, images } = action.payload;
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!isImageBatchNode(node)) {
+        return;
+      }
+      node.data.images = uniqBy([...node.data.images, ...images], 'image_name');
+    },
+    batchImageInputNodeImagesRemoved: (state, action: PayloadAction<{ nodeId: string; images: ImageField[] }>) => {
+      const { nodeId, images } = action.payload;
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!isImageBatchNode(node)) {
+        return;
+      }
+      const imageNamesToRemove = images.map(({ image_name }) => image_name);
+      node.data.images = uniqBy(
+        node.data.images.filter(({ image_name }) => imageNamesToRemove.includes(image_name)),
+        'image_name'
+      );
+    },
+    batchImageInputNodeReset: (state, action: PayloadAction<{ nodeId: string }>) => {
+      const { nodeId } = action.payload;
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!isImageBatchNode(node)) {
+        return;
+      }
+      node.data.images = [];
+    },
     nodeEditorReset: (state) => {
       state.nodes = [];
       state.edges = [];
@@ -443,6 +473,9 @@ export const {
   notesNodeValueChanged,
   undo,
   redo,
+  batchImageInputNodeImagesAdded,
+  batchImageInputNodeImagesRemoved,
+  batchImageInputNodeReset,
 } = nodesSlice.actions;
 
 export const $cursorPos = atom<XYPosition | null>(null);

@@ -59,6 +59,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   EnumField: 'blue.500',
   FloatField: 'orange.500',
   ImageField: 'purple.500',
+  ImageBatchField: 'purple.500',
   IntegerField: 'red.500',
   IPAdapterField: 'teal.500',
   IPAdapterModelField: 'teal.500',

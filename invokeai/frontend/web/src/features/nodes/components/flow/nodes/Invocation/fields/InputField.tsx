@@ -23,6 +23,8 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   const { isConnected, isConnectionInProgress, isConnectionStartField, validationResult, shouldDim } =
     useConnectionState({ nodeId, fieldName, kind: 'inputs' });
 
+  console.log({ isConnected, isConnectionInProgress, isConnectionStartField, validationResult, shouldDim });
+
   const isMissingInput = useMemo(() => {
     if (!fieldTemplate) {
       return false;

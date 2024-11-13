@@ -1,8 +1,11 @@
+import { logger } from 'app/logging/logger';
 import type { NodesState } from 'features/nodes/store/types';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { omit, reduce } from 'lodash-es';
 import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
+
+const log = logger('workflows');
 
 /**
  * Builds a graph from the node editor state.
@@ -47,22 +50,31 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
     return nodesAccumulator;
   }, {});
 
+  const filteredNodeIds = filteredNodes.map(({ id }) => id);
+
   // skip out the "dummy" edges between collapsed nodes
-  const filteredEdges = edges.filter((n) => n.type !== 'collapsed');
+  const filteredEdges = edges
+    .filter((edge) => edge.type !== 'collapsed')
+    .filter((edge) => filteredNodeIds.includes(edge.source) && filteredNodeIds.includes(edge.target));
 
   // Reduce the node editor edges into invocation graph edges
   const parsedEdges = filteredEdges.reduce<NonNullable<Graph['edges']>>((edgesAccumulator, edge) => {
     const { source, target, sourceHandle, targetHandle } = edge;
 
+    if (!sourceHandle || !targetHandle) {
+      log.warn({ source, target, sourceHandle, targetHandle }, 'Missing source or taget handle for edge');
+      return edgesAccumulator;
+    }
+
     // Format the edges and add to the edges array
     edgesAccumulator.push({
       source: {
         node_id: source,
-        field: sourceHandle as string,
+        field: sourceHandle,
       },
       destination: {
         node_id: target,
-        field: targetHandle as string,
+        field: targetHandle,
       },
     });
 

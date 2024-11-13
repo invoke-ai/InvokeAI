@@ -64,7 +64,7 @@ type OutputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;
 }>;
 
-const OutputFieldWrapper = memo(({ shouldDim, children }: OutputFieldWrapperProps) => (
+export const OutputFieldWrapper = memo(({ shouldDim, children }: OutputFieldWrapperProps) => (
   <Flex
     position="relative"
     minH={8}
