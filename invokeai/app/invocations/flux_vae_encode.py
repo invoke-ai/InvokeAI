@@ -44,9 +44,8 @@ class FluxVaeEncodeInvocation(BaseInvocation):
         generator = torch.Generator(device=TorchDevice.choose_torch_device()).manual_seed(0)
         with vae_info as vae:
             assert isinstance(vae, AutoEncoder)
-            image_tensor = image_tensor.to(
-                device=TorchDevice.choose_torch_device(), dtype=TorchDevice.choose_torch_dtype()
-            )
+            vae_dtype = next(iter(vae.parameters())).dtype
+            image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
             latents = vae.encode(image_tensor, sample=True, generator=generator)
             return latents
 
