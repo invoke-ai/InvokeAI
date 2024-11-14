@@ -1,3 +1,4 @@
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
@@ -5,6 +6,7 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
+import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { memo, useEffect, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -35,25 +37,28 @@ export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: Props) => {
     if (!element) {
       return;
     }
-    return draggable({
-      element,
-      getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
-      onDragStart: () => {
-        setIsDragging(true);
-      },
-      onDrop: () => {
-        setIsDragging(false);
-      },
-      onGenerateDragPreview: (args) => {
-        if (singleImageDndSource.typeGuard(args.source.data)) {
-          setSingleImageDragPreview({
-            singleImageDndData: args.source.data,
-            onGenerateDragPreviewArgs: args,
-            setDragPreviewState,
-          });
-        }
-      },
-    });
+    return combine(
+      firefoxDndFix(element),
+      draggable({
+        element,
+        getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
+        onDragStart: () => {
+          setIsDragging(true);
+        },
+        onDrop: () => {
+          setIsDragging(false);
+        },
+        onGenerateDragPreview: (args) => {
+          if (singleImageDndSource.typeGuard(args.source.data)) {
+            setSingleImageDragPreview({
+              singleImageDndData: args.source.data,
+              onGenerateDragPreviewArgs: args,
+              setDragPreviewState,
+            });
+          }
+        },
+      })
+    );
   }, [imageDTO, element, store]);
 
   useImageContextMenu(imageDTO, element);

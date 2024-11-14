@@ -1,6 +1,7 @@
 import type { GetOffsetFn } from '@atlaskit/pragmatic-drag-and-drop/dist/types/public-utils/element/custom-native-drag-preview/types';
 import type { Input } from '@atlaskit/pragmatic-drag-and-drop/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { noop } from 'lodash-es';
 import type { CSSProperties } from 'react';
 
 /**
@@ -44,3 +45,67 @@ export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSP
     iterations: 1,
   });
 }
+
+/**
+ * Firefox has a bug where input or textarea elements with draggable parents do not allow selection of their text.
+ *
+ * This helper function implements a workaround by setting the draggable attribute to false when the mouse is over a
+ * input or textarea child of the draggable. It reverts the attribute on mouse out.
+ *
+ * The fix is only applied for Firefox, and should be used in every `pragmatic-drag-and-drop` `draggable`.
+ *
+ * See:
+ * - https://github.com/atlassian/pragmatic-drag-and-drop/issues/111
+ * - https://bugzilla.mozilla.org/show_bug.cgi?id=1853069
+ *
+ * @example
+ * ```tsx
+ * useEffect(() => {
+ *   const element = ref.current;
+ *   if (!element) {
+ *     return;
+ *   }
+ *   return combine(
+ *     firefoxDndFix(element),
+ *     // The rest of the draggable setup is the same
+ *     draggable({
+ *       element,
+ *       // ...
+ *     }),
+ *   );
+ *```
+ * @param element The draggable element
+ * @returns A cleanup function that removes the event listeners
+ */
+export const firefoxDndFix = (element: HTMLElement): (() => void) => {
+  if (!navigator.userAgent.includes('Firefox')) {
+    return noop;
+  }
+
+  const abortController = new AbortController();
+
+  element.addEventListener(
+    'mouseover',
+    (event) => {
+      if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) {
+        element.setAttribute('draggable', 'false');
+      }
+    },
+    { signal: abortController.signal }
+  );
+
+  element.addEventListener(
+    'mouseout',
+    (event) => {
+      if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) {
+        element.setAttribute('draggable', 'true');
+      }
+    },
+    { signal: abortController.signal }
+  );
+
+  return () => {
+    element.setAttribute('draggable', 'true');
+    abortController.abort();
+  };
+};

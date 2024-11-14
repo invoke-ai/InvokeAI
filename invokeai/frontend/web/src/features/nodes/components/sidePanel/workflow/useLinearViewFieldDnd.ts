@@ -4,6 +4,7 @@ import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-
 import { singleWorkflowFieldDndSource } from 'features/dnd/dnd';
 import type { DndListTargetState } from 'features/dnd/types';
 import { idle } from 'features/dnd/types';
+import { firefoxDndFix } from 'features/dnd/util';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
@@ -18,6 +19,7 @@ export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifi
       return;
     }
     return combine(
+      firefoxDndFix(element),
       draggable({
         element,
         getInitialData() {
