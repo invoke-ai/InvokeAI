@@ -158,7 +158,7 @@
         "useSeed": "Usar Semilla",
         "useAll": "Usar Todo",
         "info": "Información",
-        "showOptionsPanel": "Mostrar panel de opciones",
+        "showOptionsPanel": "Mostrar panel lateral (O o T)",
         "symmetry": "Simetría",
         "copyImage": "Copiar la imagen",
         "general": "General",
@@ -170,7 +170,7 @@
         "negativePromptPlaceholder": "Prompt Negativo",
         "controlNetControlMode": "Modo de control",
         "clipSkip": "Omitir el CLIP",
-        "maskBlur": "Difuminar",
+        "maskBlur": "Desenfoque de máscara",
         "patchmatchDownScaleSize": "Reducir a escala",
         "coherenceMode": "Modo"
     },
@@ -202,13 +202,13 @@
         "serverError": "Error en el servidor",
         "canceled": "Procesando la cancelación",
         "connected": "Conectado al servidor",
-        "uploadFailedInvalidUploadDesc": "Debe ser una sola imagen PNG o JPEG",
-        "parameterSet": "Conjunto de parámetros",
-        "parameterNotSet": "Parámetro no configurado",
+        "uploadFailedInvalidUploadDesc": "Deben ser imágenes PNG o JPEG.",
+        "parameterSet": "Parámetro recuperado",
+        "parameterNotSet": "Parámetro no recuperado",
         "problemCopyingImage": "No se puede copiar la imagen",
         "errorCopied": "Error al copiar",
         "baseModelChanged": "Modelo base cambiado",
-        "addedToBoard": "Añadido al tablero",
+        "addedToBoard": "Se agregó a los activos del tablero {{name}}",
         "baseModelChangedCleared_one": "Borrado o desactivado {{count}} submodelo incompatible",
         "baseModelChangedCleared_many": "Borrados o desactivados {{count}} submodelos incompatibles",
         "baseModelChangedCleared_other": "Borrados o desactivados {{count}} submodelos incompatibles"
@@ -322,7 +322,7 @@
     "upsell": {
         "inviteTeammates": "Invitar compañeros de equipo",
         "shareAccess": "Compartir acceso",
-        "professionalUpsell": "Disponible en la edición profesional de Invoke. Haz clic aquí o visita invoke.com/pricing para obtener más detalles."
+        "professionalUpsell": "Disponible en la edición profesional de Invoke. Haga clic aquí o visite invoke.com/pricing para obtener más detalles."
     },
     "controlLayers": {
         "layer_one": "Capa",
@@ -331,5 +331,12 @@
         "layer_withCount_one": "({{count}}) capa",
         "layer_withCount_many": "({{count}}) capas",
         "layer_withCount_other": "({{count}}) capas"
+    },
+    "whatsNew": {
+        "readReleaseNotes": "Leer las notas de la versión",
+        "line1": "<StrongComponent> Fusión de capas </StrongComponent> : nueva <StrongComponent> Fusión hacia abajo </StrongComponent> y <StrongComponent> Fusión visible </StrongComponent> mejorada para todas las capas, con un manejo especial para las capas de guía y control regionales.",
+        "line2": "<StrongComponent> Compatibilidad con token HF </StrongComponent> : cargue modelos que requieran autenticación Hugging Face.",
+        "watchRecentReleaseVideos": "Ver videos de lanzamientos recientes",
+        "watchUiUpdatesOverview": "Descripción general de las actualizaciones de la interfaz de usuario de Watch"
     }
 }
