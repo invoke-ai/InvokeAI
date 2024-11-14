@@ -545,7 +545,6 @@ export const {
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
-  useChangeImageIsIntermediateMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
   useStarImagesMutation,
