@@ -95,8 +95,8 @@
         "close": "Chiudi",
         "clipboard": "Appunti",
         "ok": "Ok",
-        "inpaint": "ridipingi",
-        "outpaint": "dipingi ancora"
+        "inpaint": "",
+        "outpaint": ""
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -178,7 +178,7 @@
             "title": "Applicazione",
             "invoke": {
                 "desc": "Metti in coda una generazione, aggiungendola alla fine della coda.",
-                "title": "Invoke"
+                "title": ""
             },
             "invokeFront": {
                 "title": "Invoke (Fronte)",
@@ -689,7 +689,7 @@
             "canvasIsRasterizing": "La tela sta rasterizzando",
             "canvasIsCompositing": "La tela è in fase di composizione",
             "canvasIsFiltering": "La tela sta filtrando",
-            "invoke": "Invoke"
+            "invoke": ""
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1561,7 +1561,7 @@
             "paragraphs": [
                 "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
             ],
-            "heading": "Ripittura"
+            "heading": ""
         }
     },
     "sdxl": {
