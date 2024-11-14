@@ -77,7 +77,7 @@ const SettingsMenu = () => {
                 {t('common.hotkeysLabel')}
               </MenuItem>
             </HotkeysModal>
-            <SettingsModal config={{ shouldShowInvocationProgressDetailToggle: false }}>
+            <SettingsModal>
               <MenuItem as="button" icon={<PiToggleRightFill />}>
                 {t('common.settingsLabel')}
               </MenuItem>

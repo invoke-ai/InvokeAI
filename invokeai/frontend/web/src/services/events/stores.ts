@@ -11,7 +11,7 @@ export const $lastProgressEvent = atom<S['InvocationProgressEvent'] | null>(null
 export const $progressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
 export const $hasProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));
 export const $isProgressFromCanvas = computed($lastProgressEvent, (val) => val?.destination === 'canvas');
-export const $canvasProgressMessage = computed($lastProgressEvent, (val) => {
+export const $invocationProgressMessage = computed($lastProgressEvent, (val) => {
   if (!val) {
     return null;
   }
