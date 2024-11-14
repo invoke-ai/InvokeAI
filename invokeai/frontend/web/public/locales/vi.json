@@ -1493,7 +1493,8 @@
         "info": "Thông Tin",
         "usePrompt": "Dùng Lệnh",
         "upscaling": "Upscale",
-        "tileSize": "Kích Thước Khối"
+        "tileSize": "Kích Thước Khối",
+        "disabledNoRasterContent": "Đã Tắt (Không Có Nội Dung Dạng Raster)"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -2109,7 +2110,9 @@
         "postProcessingModel": "Model Xử Lý Hậu Kỳ",
         "mainModelDesc": "Model chính (SD1.5 hoặc SDXL)",
         "postProcessingMissingModelWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model xử lý hậu kỳ (ảnh sang ảnh).",
-        "missingModelsWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model cần thiết:"
+        "missingModelsWarning": "Đến <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải model cần thiết:",
+        "incompatibleBaseModel": "Phiên bản model chính không được hỗ trợ để upscale",
+        "incompatibleBaseModelDesc": "Upscale chỉ hỗ trợ cho model phiên bản SD1.5 và SDXL. Đổi model chính để bật lại tính năng upscale."
     },
     "newUserExperience": {
         "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
