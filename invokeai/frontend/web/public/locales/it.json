@@ -711,7 +711,8 @@
         "optimizedImageToImage": "Immagine-a-immagine ottimizzata",
         "sendToCanvas": "Invia alla Tela",
         "coherenceMinDenoise": "Min rid. rumore",
-        "recallMetadata": "Richiama i metadati"
+        "recallMetadata": "Richiama i metadati",
+        "disabledNoRasterContent": "Disabilitato (nessun contenuto Raster)"
     },
     "settings": {
         "models": "Modelli",
@@ -1784,7 +1785,7 @@
         "globalReferenceImage_withCount_many": "Immagini di riferimento Globali",
         "globalReferenceImage_withCount_other": "Immagini di riferimento Globali",
         "controlMode": {
-            "balanced": "Bilanciato",
+            "balanced": "Bilanciato (consigliato)",
             "controlMode": "Modalità di controllo",
             "prompt": "Prompt",
             "control": "Controllo",
@@ -1894,7 +1895,10 @@
             "lineart_anime_edge_detection": {
                 "description": "Genera una mappa dei bordi dal livello selezionato utilizzando il modello di rilevamento dei bordi Lineart Anime.",
                 "label": "Rilevamento bordi Lineart Anime"
-            }
+            },
+            "forMoreControl": "Per un maggiore controllo, fare clic su Avanzate qui sotto.",
+            "advanced": "Avanzate",
+            "processingLayerWith": "Elaborazione del livello con il filtro {{type}}."
         },
         "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",
         "regionalGuidance_withCount_hidden": "Guida regionale ({{count}} nascosti)",
@@ -2040,7 +2044,8 @@
         "replaceCurrent": "Sostituisci corrente",
         "mergeDown": "Unire in basso",
         "newFromImage": "Nuovo da Immagine",
-        "mergingLayers": "Unione dei livelli"
+        "mergingLayers": "Unione dei livelli",
+        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello oppure disegna sulla tela per iniziare."
     },
     "ui": {
         "tabs": {
@@ -2072,7 +2077,9 @@
         "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine).",
         "exceedsMaxSize": "Le impostazioni di ampliamento superano il limite massimo delle dimensioni",
         "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata.",
-        "upscale": "Amplia"
+        "upscale": "Amplia",
+        "incompatibleBaseModel": "Architettura del modello principale non supportata per l'ampliamento",
+        "incompatibleBaseModelDesc": "L'ampliamento è supportato solo per i modelli di architettura SD1.5 e SDXL. Cambia il modello principale per abilitare l'ampliamento."
     },
     "upsell": {
         "inviteTeammates": "Invita collaboratori",
@@ -2136,7 +2143,11 @@
         "whatsNewInInvoke": "Novità in Invoke",
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
-        "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia"
+        "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
+        "items": [
+            "<StrongComponent>SD 3.5</StrongComponent>: supporto per la generazione da testo a immagine nei flussi di lavoro con SD 3.5 Medium e Large.",
+            "<StrongComponent>Tela</StrongComponent>: elaborazione semplificata del livello di controllo e impostazioni di controllo predefinite migliorate."
+        ]
     },
     "system": {
         "logLevel": {
