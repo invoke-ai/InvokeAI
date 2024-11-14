@@ -51,11 +51,13 @@ export const addInpaint = async ({
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, bbox.rect, {
     is_intermediate: true,
+    silent: true,
   });
 
   const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
   const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, bbox.rect, {
     is_intermediate: true,
+    silent: true,
   });
 
   if (!isEqual(scaledSize, originalSize)) {

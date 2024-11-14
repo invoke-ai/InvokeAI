@@ -1,17 +1,19 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { withResultAsync } from 'common/util/result';
 import { selectSelectedImage } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFloppyDiskBold } from 'react-icons/pi';
-import { useAddImagesToBoardMutation, useChangeImageIsIntermediateMutation } from 'services/api/endpoints/images';
+import { uploadImage } from 'services/api/endpoints/images';
+
+const TOAST_ID = 'SAVE_STAGING_AREA_IMAGE_TO_GALLERY';
 
 export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const selectedImage = useAppSelector(selectSelectedImage);
-  const [addImageToBoard] = useAddImagesToBoardMutation();
-  const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
 
   const { t } = useTranslation();
 
@@ -19,21 +21,42 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
     if (!selectedImage) {
       return;
     }
-    if (autoAddBoardId !== 'none') {
-      await addImageToBoard({ imageDTOs: [selectedImage.imageDTO], board_id: autoAddBoardId }).unwrap();
-      // The changeIsImageIntermediate request will use the board_id on this specific imageDTO object, so we need to
-      // update it before making the request - else the optimistic board updates will get out of whack.
-      changeIsImageIntermediate({
-        imageDTO: { ...selectedImage.imageDTO, board_id: autoAddBoardId },
+
+    // To save the image to gallery, we will download it and re-upload it. This allows the user to delete the image
+    // the gallery without borking the canvas, which may need this image to exist.
+    const result = await withResultAsync(async () => {
+      // Download the image
+      const res = await fetch(selectedImage.imageDTO.image_url);
+      const blob = await res.blob();
+      // Create a new file with the same name, which we will upload
+      const file = new File([blob], `copy_of_${selectedImage.imageDTO.image_name}`, { type: 'image/png' });
+
+      await uploadImage({
+        file,
+        // Image should show up in the Images tab
+        image_category: 'general',
         is_intermediate: false,
+        // TODO(psyche): Maybe this should just save to the currently-selected board?
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+        // We will do our own toast - opt out of the default handling
+        silent: true,
+      });
+    });
+
+    if (result.isOk()) {
+      toast({
+        id: TOAST_ID,
+        title: t('controlLayers.savedToGalleryOk'),
+        status: 'success',
       });
     } else {
-      changeIsImageIntermediate({
-        imageDTO: selectedImage.imageDTO,
-        is_intermediate: false,
+      toast({
+        id: TOAST_ID,
+        title: t('controlLayers.savedToGalleryError'),
+        status: 'error',
       });
     }
-  }, [addImageToBoard, autoAddBoardId, changeIsImageIntermediate, selectedImage]);
+  }, [autoAddBoardId, selectedImage, t]);
 
   return (
     <IconButton
@@ -42,7 +65,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
       icon={<PiFloppyDiskBold />}
       onClick={saveSelectedImageToGallery}
       colorScheme="invokeBlue"
-      isDisabled={!selectedImage || !selectedImage.imageDTO.is_intermediate}
+      isDisabled={!selectedImage}
     />
   );
 });
