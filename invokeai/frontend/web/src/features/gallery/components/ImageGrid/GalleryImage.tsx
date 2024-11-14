@@ -123,7 +123,10 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           const { gallery } = store.getState();
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
-          if (gallery.selection.length > 1 && gallery.selection.includes(imageDTO)) {
+          if (
+            gallery.selection.length > 1 &&
+            gallery.selection.find(({ image_name }) => image_name === imageDTO.image_name) !== undefined
+          ) {
             return multipleImageDndSource.getData({
               imageDTOs: gallery.selection,
               boardId: gallery.selectedBoardId,
