@@ -597,7 +597,18 @@
         "huggingFace": "HuggingFace",
         "huggingFaceRepoID": "HuggingFace Repository ID",
         "clipEmbed": "CLIP Embed",
-        "t5Encoder": "T5 Encoder"
+        "t5Encoder": "T5 Encoder",
+        "hfTokenInvalidErrorMessage": "Gettone HuggingFace non valido o mancante.",
+        "hfTokenRequired": "Stai tentando di scaricare un modello che richiede un gettone HuggingFace valido.",
+        "hfTokenUnableToVerifyErrorMessage": "Impossibile verificare il gettone HuggingFace. Ciò è probabilmente dovuto a un errore di rete. Riprova più tardi.",
+        "hfTokenHelperText": "Per utilizzare alcuni modelli è necessario un gettone HF. Fai clic qui per creare o ottenere il tuo gettone.",
+        "hfTokenInvalid": "Gettone HF non valido o mancante",
+        "hfTokenUnableToVerify": "Impossibile verificare il gettone HF",
+        "hfTokenSaved": "Gettone HF salvato",
+        "hfForbidden": "Non hai accesso a questo modello HF",
+        "hfTokenLabel": "Gettone HuggingFace (richiesto per alcuni modelli)",
+        "hfForbiddenErrorMessage": "Consigliamo di visitare la pagina del repository su HuggingFace.com. Il proprietario potrebbe richiedere l'accettazione dei termini per poter effettuare il download.",
+        "hfTokenInvalidErrorMessage2": "Aggiornalo in "
     },
     "parameters": {
         "images": "Immagini",
@@ -699,7 +710,8 @@
         "staged": "Maschera espansa",
         "optimizedImageToImage": "Immagine-a-immagine ottimizzata",
         "sendToCanvas": "Invia alla Tela",
-        "coherenceMinDenoise": "Riduzione minima del rumore"
+        "coherenceMinDenoise": "Min rid. rumore",
+        "recallMetadata": "Richiama i metadati"
     },
     "settings": {
         "models": "Modelli",
@@ -1276,7 +1288,7 @@
         },
         "infillMethod": {
             "paragraphs": [
-                "Metodo di riempimento durante il processo di Outpainting o Inpainting."
+                "Metodo di riempimento durante il processo di Outpaint o Inpaint."
             ],
             "heading": "Metodo di riempimento"
         },
@@ -1444,7 +1456,7 @@
             "heading": "Livello minimo di riduzione del rumore",
             "paragraphs": [
                 "Intensità minima di riduzione rumore per la modalità di Coerenza",
-                "L'intensità minima di riduzione del rumore per la regione di coerenza durante l'inpainting o l'outpainting"
+                "L'intensità minima di riduzione del rumore per la regione di coerenza durante l'inpaint o l'outpaint"
             ]
         },
         "compositingMaskBlur": {
@@ -1498,7 +1510,7 @@
         "optimizedDenoising": {
             "heading": "Immagine-a-immagine ottimizzata",
             "paragraphs": [
-                "Abilita 'Immagine-a-immagine ottimizzata' per una scala di riduzione del rumore più graduale per le trasformazioni da immagine a immagine e di inpainting con modelli Flux. Questa impostazione migliora la capacità di controllare la quantità di modifica applicata a un'immagine, ma può essere disattivata se preferisci usare la scala di riduzione rumore standard. Questa impostazione è ancora in fase di messa a punto ed è in stato beta."
+                "Abilita 'Immagine-a-immagine ottimizzata' per una scala di riduzione del rumore più graduale per le trasformazioni da immagine a immagine e di inpaint con modelli Flux. Questa impostazione migliora la capacità di controllare la quantità di modifica applicata a un'immagine, ma può essere disattivata se preferisci usare la scala di riduzione rumore standard. Questa impostazione è ancora in fase di messa a punto ed è in stato beta."
             ]
         },
         "paramGuidance": {
@@ -2025,7 +2037,8 @@
         "newControlLayer": "Nuovo $t(controlLayers.controlLayer)",
         "newInpaintMask": "Nuova $t(controlLayers.inpaintMask)",
         "replaceCurrent": "Sostituisci corrente",
-        "mergeDown": "Unire in basso"
+        "mergeDown": "Unire in basso",
+        "newFromImage": "Nuovo da Immagine"
     },
     "ui": {
         "tabs": {
