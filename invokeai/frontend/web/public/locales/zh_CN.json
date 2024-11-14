@@ -587,7 +587,23 @@
         "huggingFace": "HuggingFace",
         "hfTokenInvalid": "HF 令牌无效或缺失",
         "hfTokenLabel": "HuggingFace 令牌（某些模型所需）",
-        "hfTokenHelperText": "使用某些模型需要 HF 令牌。点击这里创建或获取你的令牌。"
+        "hfTokenHelperText": "使用某些模型需要 HF 令牌。点击这里创建或获取你的令牌。",
+        "includesNModels": "包括 {{n}} 个模型及其依赖项",
+        "starterBundles": "启动器包",
+        "learnMoreAboutSupportedModels": "了解更多关于我们支持的模型的信息",
+        "hfForbidden": "您没有权限访问这个 HF 模型",
+        "hfTokenInvalidErrorMessage": "无效或缺失 HuggingFace 令牌。",
+        "hfTokenRequired": "您正在尝试下载一个需要有效 HuggingFace 令牌的模型。",
+        "hfTokenSaved": "HF 令牌已保存",
+        "hfForbiddenErrorMessage": "我们建议访问 HuggingFace.com 上的仓库页面。所有者可能要求您接受条款才能下载。",
+        "hfTokenUnableToVerifyErrorMessage": "无法验证 HuggingFace 令牌。这可能是由于网络错误导致的。请稍后再试。",
+        "hfTokenInvalidErrorMessage2": "在这里更新它。 ",
+        "hfTokenUnableToVerify": "无法验证 HF 令牌",
+        "skippingXDuplicates_other": "跳过 {{count}} 个重复项",
+        "starterBundleHelpText": "轻松安装所有用于启动基础模型所需的模型，包括主模型、ControlNets、IP适配器等。选择一个安装包时，会跳过已安装的模型。",
+        "installingBundle": "正在安装模型包",
+        "installingModel": "正在安装模型",
+        "installingXModels_other": "正在安装 {{count}} 个模型"
     },
     "parameters": {
         "images": "图像",
@@ -646,8 +662,23 @@
                 "controlAdapterIncompatibleBaseModel": "Control Adapter的基础模型不兼容",
                 "ipAdapterIncompatibleBaseModel": "IP Adapter的基础模型不兼容",
                 "ipAdapterNoImageSelected": "未选择IP Adapter图像",
-                "rgNoRegion": "未选择区域"
-            }
+                "rgNoRegion": "未选择区域",
+                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，边界框宽度为 {{width}}",
+                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，缩放后的边界框高度为 {{height}}",
+                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，边界框高度为 {{height}}",
+                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，缩放后的边界框宽度为 {{width}}"
+            },
+            "canvasIsFiltering": "画布正在过滤",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)，缩放后的边界框高度为 {{height}}",
+            "noCLIPEmbedModelSelected": "未为FLUX生成选择CLIP嵌入模型",
+            "noFLUXVAEModelSelected": "未为FLUX生成选择VAE模型",
+            "canvasIsRasterizing": "画布正在栅格化",
+            "canvasIsCompositing": "画布正在合成",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)，边界框宽度为 {{width}}",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)，缩放后的边界框宽度为 {{width}}",
+            "noT5EncoderModelSelected": "未为FLUX生成选择T5编码器模型",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)，边界框高度为 {{height}}",
+            "canvasIsTransforming": "画布正在变换"
         },
         "patchmatchDownScaleSize": "缩小",
         "clipSkip": "CLIP 跳过层",
@@ -669,7 +700,15 @@
         "sendToUpscale": "发送到放大",
         "processImage": "处理图像",
         "infillColorValue": "填充颜色",
-        "coherenceMinDenoise": "最小去噪"
+        "coherenceMinDenoise": "最小去噪",
+        "sendToCanvas": "发送到画布",
+        "disabledNoRasterContent": "已禁用（无栅格内容）",
+        "optimizedImageToImage": "优化的图生图",
+        "guidance": "引导",
+        "gaussianBlur": "高斯模糊",
+        "recallMetadata": "调用元数据",
+        "boxBlur": "方框模糊",
+        "staged": "已分阶段处理"
     },
     "settings": {
         "models": "模型",
@@ -699,7 +738,11 @@
         "enableInformationalPopovers": "启用信息弹窗",
         "reloadingIn": "重新加载中",
         "informationalPopoversDisabled": "信息提示框已禁用",
-        "informationalPopoversDisabledDesc": "信息提示框已被禁用.请在设置中重新启用."
+        "informationalPopoversDisabledDesc": "信息提示框已被禁用.请在设置中重新启用.",
+        "enableModelDescriptions": "在下拉菜单中启用模型描述",
+        "confirmOnNewSession": "新会话时确认",
+        "modelDescriptionsDisabledDesc": "下拉菜单中的模型描述已被禁用。可在设置中启用。",
+        "modelDescriptionsDisabled": "下拉菜单中的模型描述已禁用"
     },
     "toast": {
         "uploadFailed": "上传失败",
@@ -740,7 +783,24 @@
         "errorCopied": "错误信息已复制",
         "modelImportCanceled": "模型导入已取消",
         "importFailed": "导入失败",
-        "importSuccessful": "导入成功"
+        "importSuccessful": "导入成功",
+        "layerSavedToAssets": "图层已保存到资产",
+        "sentToUpscale": "已发送到放大处理",
+        "addedToUncategorized": "已添加到看板 $t(boards.uncategorized) 的资产中",
+        "linkCopied": "链接已复制",
+        "uploadFailedInvalidUploadDesc_withCount_other": "最多只能上传 {{count}} 张 PNG 或 JPEG 图像。",
+        "problemSavingLayer": "无法保存图层",
+        "unableToLoadImage": "无法加载图像",
+        "imageNotLoadedDesc": "无法找到图像",
+        "unableToLoadStylePreset": "无法加载样式预设",
+        "stylePresetLoaded": "样式预设已加载",
+        "problemCopyingLayer": "无法复制图层",
+        "sentToCanvas": "已发送到画布",
+        "unableToLoadImageMetadata": "无法加载图像元数据",
+        "imageSaved": "图像已保存",
+        "imageSavingFailed": "图像保存失败",
+        "layerCopiedToClipboard": "图层已复制到剪贴板",
+        "imagesWillBeAddedTo": "上传的图像将添加到看板 {{boardName}} 的资产中。"
     },
     "accessibility": {
         "invokeProgressBar": "Invoke 进度条",
@@ -890,7 +950,12 @@
         "clearWorkflow": "清除工作流",
         "imageAccessError": "无法找到图像 {{image_name}}，正在恢复默认设置",
         "boardAccessError": "无法找到面板 {{board_id}}，正在恢复默认设置",
-        "modelAccessError": "无法找到模型 {{key}}，正在恢复默认设置"
+        "modelAccessError": "无法找到模型 {{key}}，正在恢复默认设置",
+        "noWorkflows": "无工作流程",
+        "workflowHelpText": "需要帮助？请查看我们的《<LinkComponent>工作流程入门指南</LinkComponent>》。",
+        "noMatchingWorkflows": "无匹配的工作流程",
+        "saveToGallery": "保存到图库",
+        "singleFieldType": "{{name}}（单一模型）"
     },
     "queue": {
         "status": "状态",
@@ -1221,7 +1286,8 @@
             "heading": "去噪强度",
             "paragraphs": [
                 "为输入图像添加的噪声量。",
-                "输入 0 会导致结果图像和输入完全相同，输入 1 则会生成全新的图像。"
+                "输入 0 会导致结果图像和输入完全相同，输入 1 则会生成全新的图像。",
+                "当没有具有可见内容的栅格图层时，此设置将被忽略。"
             ]
         },
         "paramSeed": {
@@ -1410,7 +1476,8 @@
             "paragraphs": [
                 "控制提示对生成过程的影响程度.",
                 "与生成CFG Scale相似."
-            ]
+            ],
+            "heading": "CFG比例"
         },
         "structure": {
             "heading": "结构",
@@ -1441,6 +1508,62 @@
             "paragraphs": [
                 "比例控制决定了输出图像的大小,它是基于输入图像分辨率的倍数来计算的.例如对一张1024x1024的图像进行2倍上采样，将会得到一张2048x2048的输出图像."
             ]
+        },
+        "globalReferenceImage": {
+            "heading": "全局参考图像",
+            "paragraphs": [
+                "应用参考图像以影响整个生成过程。"
+            ]
+        },
+        "rasterLayer": {
+            "paragraphs": [
+                "画布的基于像素的内容，用于图像生成过程。"
+            ],
+            "heading": "栅格图层"
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "paragraphs": [
+                "对于区域引导，使用画笔引导全局提示中的元素应出现的位置。",
+                "对于区域参考图像，使用画笔将参考图像应用到特定区域。"
+            ],
+            "heading": "区域引导与区域参考图像"
+        },
+        "regionalReferenceImage": {
+            "heading": "区域参考图像",
+            "paragraphs": [
+                "使用画笔将参考图像应用到特定区域。"
+            ]
+        },
+        "optimizedDenoising": {
+            "heading": "优化的图生图",
+            "paragraphs": [
+                "启用‘优化的图生图’功能，可在使用 Flux 模型进行图生图和图像修复转换时提供更平滑的降噪强度调节。此设置可以提高对图像变化程度的控制能力，但如果您更倾向于使用标准的降噪强度调节方式，也可以关闭此功能。该设置仍在优化中，目前处于测试阶段。"
+            ]
+        },
+        "inpainting": {
+            "paragraphs": [
+                "控制由降噪强度引导的修改区域。"
+            ],
+            "heading": "图像重绘"
+        },
+        "regionalGuidance": {
+            "heading": "区域引导",
+            "paragraphs": [
+                "使用画笔引导全局提示中的元素应出现的位置。"
+            ]
+        },
+        "fluxDevLicense": {
+            "heading": "非商业许可",
+            "paragraphs": [
+                "FLUX.1 [dev] 模型受 FLUX [dev] 非商业许可协议的约束。如需在 Invoke 中将此模型类型用于商业目的，请访问我们的网站了解更多信息。"
+            ]
+        },
+        "paramGuidance": {
+            "paragraphs": [
+                "控制提示对生成过程的影响程度。",
+                "较高的引导值可能导致过度饱和，而过高或过低的引导值可能导致生成结果失真。引导仅适用于FLUX DEV模型。"
+            ],
+            "heading": "引导"
         }
     },
     "invocationCache": {
@@ -1503,7 +1626,18 @@
         "convertGraph": "转换图表",
         "loadWorkflow": "$t(common.load) 工作流",
         "loadFromGraph": "从图表加载工作流",
-        "autoLayout": "自动布局"
+        "autoLayout": "自动布局",
+        "edit": "编辑",
+        "copyShareLinkForWorkflow": "复制工作流程的分享链接",
+        "delete": "删除",
+        "download": "下载",
+        "defaultWorkflows": "默认工作流程",
+        "userWorkflows": "用户工作流程",
+        "projectWorkflows": "项目工作流程",
+        "copyShareLink": "复制分享链接",
+        "chooseWorkflowFromLibrary": "从库中选择工作流程",
+        "uploadAndSaveWorkflow": "上传到库",
+        "deleteWorkflow2": "您确定要删除此工作流程吗？此操作无法撤销。"
     },
     "accordions": {
         "compositing": {
@@ -1542,7 +1676,18 @@
         "addPositivePrompt": "添加 $t(controlLayers.prompt)",
         "addNegativePrompt": "添加 $t(controlLayers.negativePrompt)",
         "rectangle": "矩形",
-        "opacity": "透明度"
+        "opacity": "透明度",
+        "canvas": "画布",
+        "fitBboxToLayers": "将边界框适配到图层",
+        "cropLayerToBbox": "将图层裁剪到边界框",
+        "saveBboxToGallery": "将边界框保存到图库",
+        "savedToGalleryOk": "已保存到图库",
+        "saveLayerToAssets": "将图层保存到资产",
+        "removeBookmark": "移除书签",
+        "regional": "区域",
+        "saveCanvasToGallery": "将画布保存到图库",
+        "global": "全局",
+        "bookmark": "添加书签以快速切换"
     },
     "ui": {
         "tabs": {
