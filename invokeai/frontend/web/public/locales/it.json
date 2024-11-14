@@ -94,7 +94,9 @@
         "view": "Vista",
         "close": "Chiudi",
         "clipboard": "Appunti",
-        "ok": "Ok"
+        "ok": "Ok",
+        "inpaint": "ridipingere",
+        "outpaint": "dipingi ancora"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
