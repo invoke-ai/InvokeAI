@@ -334,8 +334,6 @@
     },
     "whatsNew": {
         "readReleaseNotes": "Leer las notas de la versión",
-        "line1": "<StrongComponent> Fusión de capas </StrongComponent> : nueva <StrongComponent> Fusión hacia abajo </StrongComponent> y <StrongComponent> Fusión visible </StrongComponent> mejorada para todas las capas, con un manejo especial para las capas de guía y control regionales.",
-        "line2": "<StrongComponent> Compatibilidad con token HF </StrongComponent> : cargue modelos que requieran autenticación Hugging Face.",
         "watchRecentReleaseVideos": "Ver videos de lanzamientos recientes",
         "watchUiUpdatesOverview": "Descripción general de las actualizaciones de la interfaz de usuario de Watch"
     }

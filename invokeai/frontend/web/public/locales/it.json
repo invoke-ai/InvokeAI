@@ -711,8 +711,7 @@
         "optimizedImageToImage": "Immagine-a-immagine ottimizzata",
         "sendToCanvas": "Invia alla Tela",
         "coherenceMinDenoise": "Min rid. rumore",
-        "recallMetadata": "Richiama i metadati",
-        "noRasterLayers": "Nessun livello raster"
+        "recallMetadata": "Richiama i metadati"
     },
     "settings": {
         "models": "Modelli",
@@ -2135,10 +2134,8 @@
     },
     "whatsNew": {
         "whatsNewInInvoke": "Novità in Invoke",
-        "line2": "<StrongComponent>Supporto gettone HF</StrongComponent>: carica modelli che richiedono l'autenticazione Hugging Face.",
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
-        "line1": "<StrongComponent>Unione livelli</StrongComponent>: nuova <StrongComponent>Unione in basso</StrongComponent> e <StrongComponent>Unione visibile</StrongComponent> migliorata per tutti i livelli, con gestione speciale per i livelli di controllo e guida regionali.",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia"
     },
     "system": {

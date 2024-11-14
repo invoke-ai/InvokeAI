@@ -1493,8 +1493,7 @@
         "info": "Thông Tin",
         "usePrompt": "Dùng Lệnh",
         "upscaling": "Upscale",
-        "tileSize": "Kích Thước Khối",
-        "noRasterLayers": "Không Có Layer Dạng Raster"
+        "tileSize": "Kích Thước Khối"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -2121,9 +2120,7 @@
         "noModelsInstalled": "Hình như bạn không có model nào được tải cả"
     },
     "whatsNew": {
-        "line1": "Công cụ <ItalicComponent>Chọn Đối Tượng</ItalicComponent> dùng để chọn và chỉnh sửa đối tượng chính xác",
         "whatsNewInInvoke": "Có Gì Mới Ở Invoke",
-        "line2": "Mở rộng hỗ trợ cho Flux, bây giờ với Ảnh Mẫu Toàn Vùng",
         "readReleaseNotes": "Đọc Ghi Chú Phát Hành",
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
