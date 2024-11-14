@@ -94,9 +94,7 @@
         "view": "Vista",
         "close": "Chiudi",
         "clipboard": "Appunti",
-        "ok": "Ok",
-        "inpaint": "",
-        "outpaint": ""
+        "ok": "Ok"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -2135,7 +2133,6 @@
     "whatsNew": {
         "whatsNewInInvoke": "Novità in Invoke",
         "line2": "Supporto Flux esteso, ora con immagini di riferimento globali",
-        "line3": "Tooltip e menu contestuali migliorati",
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "line1": "Strumento <ItalicComponent>Seleziona oggetto</ItalicComponent> per la selezione e la modifica precise degli oggetti",
