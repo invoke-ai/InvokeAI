@@ -768,7 +768,8 @@
         "deletedPrivateBoardsCannotbeRestored": "Gelöschte Boards können nicht wiederhergestellt werden. Wenn Sie „Nur Board löschen“ wählen, werden die Bilder in einen privaten, nicht kategorisierten Status für den Ersteller des Bildes versetzt.",
         "assetsWithCount_one": "{{count}} in der Sammlung",
         "assetsWithCount_other": "{{count}} in der Sammlung",
-        "deletedBoardsCannotbeRestored": "Gelöschte Ordner können nicht wiederhergestellt werden. Die Auswahl von \"Nur Ordner löschen\" verschiebt Bilder in einen unkategorisierten Zustand."
+        "deletedBoardsCannotbeRestored": "Gelöschte Ordner können nicht wiederhergestellt werden. Die Auswahl von \"Nur Ordner löschen\" verschiebt Bilder in einen unkategorisierten Zustand.",
+        "updateBoardError": "Fehler beim Aktualisieren des Ordners"
     },
     "queue": {
         "status": "Status",
@@ -871,7 +872,9 @@
         "recallParameter": "{{label}} Abrufen",
         "parsingFailed": "Parsing Fehlgeschlagen",
         "canvasV2Metadata": "Leinwand",
-        "guidance": "Führung"
+        "guidance": "Führung",
+        "seamlessXAxis": "Nahtlose X Achse",
+        "seamlessYAxis": "Nahtlose Y Achse"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -1392,7 +1395,13 @@
         "pullBboxIntoLayerOk": "Bbox in die Ebene gezogen",
         "saveBboxToGallery": "Bbox in Galerie speichern",
         "tool": {
-            "bbox": "Bbox"
+            "bbox": "Bbox",
+            "brush": "Pinsel",
+            "eraser": "Radiergummi",
+            "colorPicker": "Farbwähler",
+            "view": "Ansicht",
+            "rectangle": "Rechteck",
+            "move": "Verschieben"
         },
         "transform": {
             "fitToBbox": "An Bbox anpassen",
@@ -1511,7 +1520,30 @@
         "layer_one": "Ebene",
         "layer_other": "Ebenen",
         "layer_withCount_one": "Ebene ({{count}})",
-        "layer_withCount_other": "Ebenen ({{count}})"
+        "layer_withCount_other": "Ebenen ({{count}})",
+        "fill": {
+            "fillStyle": "Füllstil",
+            "diagonal": "Diagonal",
+            "vertical": "Vertikal",
+            "fillColor": "Füllfarbe",
+            "grid": "Raster",
+            "solid": "Solide",
+            "crosshatch": "Kreuzschraffur",
+            "horizontal": "Horizontal"
+        },
+        "filter": {
+            "apply": "Anwenden",
+            "reset": "Zurücksetzen",
+            "cancel": "Abbrechen",
+            "spandrel_filter": {
+                "label": "Bild-zu-Bild Modell",
+                "description": "Ein Bild-zu-Bild Modell auf der ausgewählten Ebene ausführen.",
+                "model": "Modell"
+            },
+            "filters": "Filter",
+            "filterType": "Filtertyp",
+            "filter": "Filter"
+        }
     },
     "upsell": {
         "shareAccess": "Zugang teilen",
