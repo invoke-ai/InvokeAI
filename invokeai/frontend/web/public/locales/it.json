@@ -95,8 +95,8 @@
         "close": "Chiudi",
         "clipboard": "Appunti",
         "ok": "Ok",
-        "inpaint": "ridipingere",
-        "outpaint": "dipingi ancora"
+        "inpaint": "",
+        "outpaint": ""
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -1277,8 +1277,8 @@
         },
         "paramDenoisingStrength": {
             "paragraphs": [
-                "Quanto rumore viene aggiunto all'immagine in ingresso.",
-                "0 risulterà in un'immagine identica, mentre 1 risulterà in un'immagine completamente nuova."
+                "Controlla la differenza tra l'immagine generata e il/i livello/i raster.",
+                "Una forza inferiore rimane più vicina ai livelli raster visibili combinati. Una forza superiore si basa maggiormente sul prompt globale."
             ],
             "heading": "Forza di riduzione del rumore"
         },
