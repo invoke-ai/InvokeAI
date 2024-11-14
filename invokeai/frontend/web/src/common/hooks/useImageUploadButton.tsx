@@ -75,11 +75,13 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
       } else {
         //
         const imageDTOs = await uploadImages(
-          files.map((file) => ({
+          files.map((file, i) => ({
             file,
             image_category: 'user',
             is_intermediate: false,
             board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+            silent: false,
+            isFirstUploadOfBatch: i === 0,
           }))
         );
         if (onUpload) {

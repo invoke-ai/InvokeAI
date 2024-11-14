@@ -13,8 +13,9 @@ import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type UploadImageArg, uploadImages } from 'services/api/endpoints/images';
+import { uploadImages } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
+import type { UploadImageArg } from 'services/api/types';
 import { z } from 'zod';
 
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpg', 'image/jpeg'];
@@ -94,11 +95,12 @@ export const FullscreenDropzone = memo(() => {
       }
       const autoAddBoardId = selectAutoAddBoardId(getState());
 
-      const uploadArgs: UploadImageArg[] = files.map((file) => ({
+      const uploadArgs: UploadImageArg[] = files.map((file, i) => ({
         file,
         image_category: 'user',
         is_intermediate: false,
         board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+        isFirstUploadOfBatch: i === 0,
       }));
 
       uploadImages(uploadArgs);

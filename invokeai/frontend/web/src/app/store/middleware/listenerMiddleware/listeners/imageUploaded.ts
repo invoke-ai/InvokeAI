@@ -41,29 +41,33 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       log.debug({ imageDTO }, 'Image uploaded');
 
+      if (action.meta.arg.originalArgs.silent || imageDTO.is_intermediate) {
+        // When a "silent" upload is requested, or the image is intermediate, we can skip all post-upload actions,
+        // like toasts and switching the gallery view
+        return;
+      }
+
       const boardId = imageDTO.board_id ?? 'none';
 
-      if (action.meta.arg.originalArgs.withToast) {
-        const DEFAULT_UPLOADED_TOAST = {
-          id: 'IMAGE_UPLOADED',
-          title: t('toast.imageUploaded'),
-          status: 'success',
-        } as const;
+      const DEFAULT_UPLOADED_TOAST = {
+        id: 'IMAGE_UPLOADED',
+        title: t('toast.imageUploaded'),
+        status: 'success',
+      } as const;
 
-        // default action - just upload and alert user
-        if (lastUploadedToastTimeout !== null) {
-          window.clearTimeout(lastUploadedToastTimeout);
-        }
-        const toastApi = toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          title: DEFAULT_UPLOADED_TOAST.title,
-          description: getUploadedToastDescription(boardId, state),
-          duration: null, // we will close the toast manually
-        });
-        lastUploadedToastTimeout = window.setTimeout(() => {
-          toastApi.close();
-        }, 3000);
+      // default action - just upload and alert user
+      if (lastUploadedToastTimeout !== null) {
+        window.clearTimeout(lastUploadedToastTimeout);
       }
+      const toastApi = toast({
+        ...DEFAULT_UPLOADED_TOAST,
+        title: DEFAULT_UPLOADED_TOAST.title,
+        description: getUploadedToastDescription(boardId, state),
+        duration: null, // we will close the toast manually
+      });
+      lastUploadedToastTimeout = window.setTimeout(() => {
+        toastApi.close();
+      }, 3000);
 
       /**
        * We only want to change the board and view if this is the first upload of a batch, else we end up hijacking

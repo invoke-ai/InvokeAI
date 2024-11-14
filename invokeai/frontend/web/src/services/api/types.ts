@@ -1,5 +1,5 @@
 import type { components, paths } from 'services/api/schema';
-import type { SetRequired } from 'type-fest';
+import type { JsonObject, SetRequired } from 'type-fest';
 
 export type S = components['schemas'];
 
@@ -287,3 +287,42 @@ export type SetHFTokenResponse = NonNullable<
 export type SetHFTokenArg = NonNullable<
   paths['/api/v2/models/hf_login']['post']['requestBody']['content']['application/json']
 >;
+
+export type UploadImageArg = {
+  /**
+   * The file object to upload
+   */
+  file: File;
+  /**
+   * THe category of image to upload
+   */
+  image_category: ImageCategory;
+  /**
+   * Whether the uploaded image is an intermediate image (intermediate images are not shown int he gallery)
+   */
+  is_intermediate: boolean;
+  /**
+   * The session with which to associate the uploaded image
+   */
+  session_id?: string;
+  /**
+   * The board id to add the image to
+   */
+  board_id?: string;
+  /**
+   * Whether or not to crop the image to its bounding box before saving
+   */
+  crop_visible?: boolean;
+  /**
+   * Metadata to embed in the image when saving it
+   */
+  metadata?: JsonObject;
+  /**
+   * Whether this upload should be "silent" (no toast on upload, no changing of gallery view)
+   */
+  silent?: boolean;
+  /**
+   * Whether this is the first upload of a batch (used when displaying user feedback with toasts - ignored if the upload is silent)
+   */
+  isFirstUploadOfBatch?: boolean;
+};

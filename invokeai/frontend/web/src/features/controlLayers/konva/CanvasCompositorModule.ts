@@ -28,19 +28,17 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
-import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
-import type { UploadImageArg } from 'services/api/endpoints/images';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, UploadImageArg } from 'services/api/types';
 import stableHash from 'stable-hash';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
-import type { JsonObject } from 'type-fest';
+import type { JsonObject, SetOptional } from 'type-fest';
 
 type CompositingOptions = {
   /**
@@ -259,7 +257,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   getCompositeImageDTO = async (
     adapters: CanvasEntityAdapter[],
     rect: Rect,
-    uploadOptions: Pick<UploadImageArg, 'is_intermediate' | 'metadata'>,
+    uploadOptions: SetOptional<Omit<UploadImageArg, 'file'>, 'image_category'>,
     compositingOptions?: CompositingOptions,
     forceUpload?: boolean
   ): Promise<ImageDTO> => {
@@ -299,10 +297,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       uploadImage({
         file: new File([blob], 'canvas-composite.png', { type: 'image/png' }),
         image_category: 'general',
-        is_intermediate: uploadOptions.is_intermediate,
-        board_id: uploadOptions.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
-        metadata: uploadOptions.metadata,
-        withToast: false,
+        ...uploadOptions,
       })
     );
     this.$isUploading.set(false);

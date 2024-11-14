@@ -25,6 +25,8 @@ import type {
   RegionalGuidanceReferenceImageState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import type { BoardId } from 'features/gallery/store/types';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,6 +72,11 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
       metadata = selectCanvasMetadata(store.getState());
     }
 
+    let boardId: BoardId | undefined = undefined;
+    if (saveToGallery) {
+      boardId = selectAutoAddBoardId(store.getState());
+    }
+
     const result = await withResultAsync(() => {
       const rasterAdapters = canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
       return canvasManager.compositor.getCompositeImageDTO(
@@ -78,6 +85,8 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
         {
           is_intermediate: !saveToGallery,
           metadata,
+          board_id: boardId,
+          silent: true,
         },
         undefined,
         true // force upload the image to ensure it gets added to the gallery
@@ -222,8 +231,8 @@ export const useNewRasterLayerFromBbox = () => {
       toastError: t('controlLayers.newRasterLayerError'),
     };
   }, [dispatch, t]);
-  const newRasterLayerFromBbox = useSaveCanvas(arg);
-  return newRasterLayerFromBbox;
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
 export const useNewControlLayerFromBbox = () => {

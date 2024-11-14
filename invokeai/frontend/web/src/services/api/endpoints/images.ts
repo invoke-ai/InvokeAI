@@ -6,10 +6,10 @@ import type { components, paths } from 'services/api/schema';
 import type {
   DeleteBoardResult,
   GraphAndWorkflowResponse,
-  ImageCategory,
   ImageDTO,
   ListImagesArgs,
   ListImagesResponse,
+  UploadImageArg,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
 import type { JsonObject } from 'type-fest';
@@ -260,20 +260,7 @@ export const imagesApi = api.injectEndpoints({
         return [];
       },
     }),
-    uploadImage: build.mutation<
-      ImageDTO,
-      {
-        file: File;
-        image_category: ImageCategory;
-        is_intermediate: boolean;
-        session_id?: string;
-        board_id?: string;
-        crop_visible?: boolean;
-        metadata?: JsonObject;
-        isFirstUploadOfBatch?: boolean;
-        withToast?: boolean;
-      }
-    >({
+    uploadImage: build.mutation<ImageDTO, UploadImageArg>({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -622,79 +609,17 @@ export const getImageMetadata = (
   return req.unwrap();
 };
 
-export type UploadImageArg = {
-  file: File;
-  image_category: ImageCategory;
-  is_intermediate: boolean;
-  session_id?: string;
-  board_id?: string;
-  crop_visible?: boolean;
-  metadata?: JsonObject;
-  withToast?: boolean;
-};
-
 export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
-  const {
-    file,
-    image_category,
-    is_intermediate,
-    crop_visible = false,
-    board_id,
-    metadata,
-    session_id,
-    withToast = true,
-  } = arg;
-
   const { dispatch } = getStore();
-
-  const req = dispatch(
-    imagesApi.endpoints.uploadImage.initiate(
-      {
-        file,
-        image_category,
-        is_intermediate,
-        crop_visible,
-        board_id,
-        metadata,
-        session_id,
-        withToast,
-      },
-      { track: false }
-    )
-  );
+  const req = dispatch(imagesApi.endpoints.uploadImage.initiate(arg, { track: false }));
   return req.unwrap();
 };
 
 export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> => {
   const { dispatch } = getStore();
   const results = await Promise.allSettled(
-    args.map((arg, i) => {
-      const {
-        file,
-        image_category,
-        is_intermediate,
-        crop_visible = false,
-        board_id,
-        metadata,
-        session_id,
-        withToast = true,
-      } = arg;
-      const req = dispatch(
-        imagesApi.endpoints.uploadImage.initiate(
-          {
-            file,
-            image_category,
-            is_intermediate,
-            crop_visible,
-            board_id,
-            metadata,
-            session_id,
-            isFirstUploadOfBatch: i === 0,
-            withToast,
-          },
-          { track: false }
-        )
-      );
+    args.map((arg) => {
+      const req = dispatch(imagesApi.endpoints.uploadImage.initiate(arg, { track: false }));
       return req.unwrap();
     })
   );
