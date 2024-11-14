@@ -58,7 +58,6 @@ const CurrentImagePreview = () => {
         pointerEvents="none"
         alignItems="flex-start"
       >
-        <CanvasAlertsInvocationProgress />
         <CanvasAlertsSendingToCanvas />
         <CanvasAlertsInvocationProgress />
       </Flex>
