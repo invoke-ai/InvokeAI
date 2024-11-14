@@ -7,9 +7,10 @@ export const MODEL_TYPE_MAP = {
   any: 'Any',
   'sd-1': 'Stable Diffusion 1.x',
   'sd-2': 'Stable Diffusion 2.x',
+  'sd-3': 'Stable Diffusion 3.x',
   sdxl: 'Stable Diffusion XL',
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
-  flux: 'Flux',
+  flux: 'FLUX',
 };
 
 /**

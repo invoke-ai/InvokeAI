@@ -6,7 +6,6 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -25,17 +24,14 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-import { addControlNets } from './addControlAdapters';
-import { addIPAdapters } from './addIPAdapters';
-
 const log = logger('system');
 
-export const buildFLUXGraph = async (
+export const buildSD3Graph = async (
   state: RootState,
   manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'noise' | 'flux_denoise'>; posCond: Invocation<'flux_text_encoder'> }> => {
+): Promise<{ g: Graph; noise: Invocation<'sd3_denoise'>; posCond: Invocation<'sd3_text_encoder'> }> => {
   const generationMode = await manager.compositor.getGenerationMode();
-  log.debug({ generationMode }, 'Building FLUX graph');
+  log.debug({ generationMode }, 'Building SD3 graph');
 
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
@@ -43,95 +39,95 @@ export const buildFLUXGraph = async (
 
   const { bbox } = canvas;
 
-  const { originalSize, scaledSize } = getSizes(bbox);
-
   const {
     model,
-    guidance,
+    cfgScale: cfg_scale,
     seed,
     steps,
-    fluxVAE,
+    vae,
     t5EncoderModel,
-    clipEmbedModel,
-    img2imgStrength,
+    clipLEmbedModel,
+    clipGEmbedModel,
     optimizedDenoisingEnabled,
+    img2imgStrength,
   } = params;
 
   assert(model, 'No model found in state');
-  assert(t5EncoderModel, 'No T5 Encoder model found in state');
-  assert(clipEmbedModel, 'No CLIP Embed model found in state');
-  assert(fluxVAE, 'No FLUX VAE model found in state');
 
-  const { positivePrompt } = getPresetModifiedPrompts(state);
+  const { originalSize, scaledSize } = getSizes(bbox);
+  const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
 
-  const g = new Graph(getPrefixedId('flux_graph'));
+  const g = new Graph(getPrefixedId('sd3_graph'));
   const modelLoader = g.addNode({
-    type: 'flux_model_loader',
-    id: getPrefixedId('flux_model_loader'),
+    type: 'sd3_model_loader',
+    id: getPrefixedId('sd3_model_loader'),
     model,
     t5_encoder_model: t5EncoderModel,
-    clip_embed_model: clipEmbedModel,
-    vae_model: fluxVAE,
+    clip_l_model: clipLEmbedModel,
+    clip_g_model: clipGEmbedModel,
+    vae_model: vae,
   });
-
   const posCond = g.addNode({
-    type: 'flux_text_encoder',
-    id: getPrefixedId('flux_text_encoder'),
+    type: 'sd3_text_encoder',
+    id: getPrefixedId('pos_cond'),
     prompt: positivePrompt,
   });
 
+  const negCond = g.addNode({
+    type: 'sd3_text_encoder',
+    id: getPrefixedId('neg_cond'),
+    prompt: negativePrompt,
+  });
+
   const denoise = g.addNode({
-    type: 'flux_denoise',
-    id: getPrefixedId('flux_denoise'),
-    guidance,
-    num_steps: steps,
-    seed,
+    type: 'sd3_denoise',
+    id: getPrefixedId('sd3_denoise'),
+    cfg_scale,
+    steps,
     denoising_start: 0,
     denoising_end: 1,
     width: scaledSize.width,
     height: scaledSize.height,
   });
-
   const l2i = g.addNode({
-    type: 'flux_vae_decode',
-    id: getPrefixedId('flux_vae_decode'),
+    type: 'sd3_l2i',
+    id: getPrefixedId('l2i'),
   });
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
-  g.addEdge(modelLoader, 'vae', denoise, 'controlnet_vae');
-  g.addEdge(modelLoader, 'vae', l2i, 'vae');
-
-  g.addEdge(modelLoader, 'clip', posCond, 'clip');
+  g.addEdge(modelLoader, 'clip_l', posCond, 'clip_l');
+  g.addEdge(modelLoader, 'clip_l', negCond, 'clip_l');
+  g.addEdge(modelLoader, 'clip_g', posCond, 'clip_g');
+  g.addEdge(modelLoader, 'clip_g', negCond, 'clip_g');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
-  g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
+  g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
 
-  addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
-
-  g.addEdge(posCond, 'conditioning', denoise, 'positive_text_conditioning');
+  g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
+  g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
 
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-  assert(modelConfig.base === 'flux');
+  assert(modelConfig.base === 'sd-3');
 
   g.upsertMetadata({
-    generation_mode: 'flux_txt2img',
-    guidance,
+    generation_mode: 'sd3_txt2img',
+    cfg_scale,
     width: originalSize.width,
     height: originalSize.height,
     positive_prompt: positivePrompt,
+    negative_prompt: negativePrompt,
     model: Graph.getModelMetadataField(modelConfig),
     seed,
     steps,
-    vae: fluxVAE,
-    t5_encoder: t5EncoderModel,
-    clip_embed_model: clipEmbedModel,
+    vae: vae ?? undefined,
   });
+  g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   let denoising_start: number;
   if (optimizedDenoisingEnabled) {
     // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
-    // more user-friendly for FLUX. Without this, most of the 'change' is concentrated in the high denoise strength
+    // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
     // range (>0.9).
     denoising_start = 1 - img2imgStrength ** 0.2;
   } else {
@@ -149,7 +145,7 @@ export const buildFLUXGraph = async (
       g,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2lNodeType: 'sd3_i2l',
       denoise,
       vaeSource: modelLoader,
       originalSize,
@@ -164,7 +160,7 @@ export const buildFLUXGraph = async (
       g,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2lNodeType: 'sd3_i2l',
       denoise,
       vaeSource: modelLoader,
       modelLoader,
@@ -179,7 +175,7 @@ export const buildFLUXGraph = async (
       g,
       manager,
       l2i,
-      i2lNodeType: 'flux_vae_encode',
+      i2lNodeType: 'sd3_i2l',
       denoise,
       vaeSource: modelLoader,
       modelLoader,
@@ -190,58 +186,6 @@ export const buildFLUXGraph = async (
     });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
-  }
-
-  const controlNetCollector = g.addNode({
-    type: 'collect',
-    id: getPrefixedId('control_net_collector'),
-  });
-  const controlNetResult = await addControlNets(
-    manager,
-    canvas.controlLayers.entities,
-    g,
-    canvas.bbox.rect,
-    controlNetCollector,
-    modelConfig.base
-  );
-  if (controlNetResult.addedControlNets > 0) {
-    g.addEdge(controlNetCollector, 'collection', denoise, 'control');
-  } else {
-    g.deleteNode(controlNetCollector.id);
-  }
-
-  const ipAdapterCollector = g.addNode({
-    type: 'collect',
-    id: getPrefixedId('ip_adapter_collector'),
-  });
-  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollector, modelConfig.base);
-
-  const totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
-  if (totalIPAdaptersAdded > 0) {
-    assert(steps > 2);
-    const cfg_scale_start_step = 1;
-    const cfg_scale_end_step = Math.ceil(steps / 2);
-    assert(cfg_scale_end_step > cfg_scale_start_step);
-
-    const negCond = g.addNode({
-      type: 'flux_text_encoder',
-      id: getPrefixedId('flux_text_encoder'),
-      prompt: '',
-    });
-
-    g.addEdge(modelLoader, 'clip', negCond, 'clip');
-    g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
-    g.addEdge(modelLoader, 'max_seq_len', negCond, 't5_max_seq_len');
-    g.addEdge(negCond, 'conditioning', denoise, 'negative_text_conditioning');
-
-    g.updateNode(denoise, {
-      cfg_scale: 3,
-      cfg_scale_start_step,
-      cfg_scale_end_step,
-    });
-    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
-  } else {
-    g.deleteNode(ipAdapterCollector.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {

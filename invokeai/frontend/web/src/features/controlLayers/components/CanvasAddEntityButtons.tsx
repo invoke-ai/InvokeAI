@@ -9,7 +9,7 @@ import {
   useAddRegionalGuidance,
   useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
-import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -23,6 +23,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
   const isFLUX = useAppSelector(selectIsFLUX);
+  const isSD3 = useAppSelector(selectIsSD3);
 
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
@@ -36,6 +37,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addGlobalReferenceImage}
+              isDisabled={isSD3}
             >
               {t('controlLayers.globalReferenceImage')}
             </Button>
@@ -61,7 +63,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalGuidance}
-              isDisabled={isFLUX}
+              isDisabled={isFLUX || isSD3}
             >
               {t('controlLayers.regionalGuidance')}
             </Button>
@@ -73,7 +75,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalReferenceImage}
-              isDisabled={isFLUX}
+              isDisabled={isFLUX || isSD3}
             >
               {t('controlLayers.regionalReferenceImage')}
             </Button>
@@ -88,6 +90,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addControlLayer}
+              isDisabled={isSD3}
             >
               {t('controlLayers.controlLayer')}
             </Button>

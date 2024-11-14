@@ -18,7 +18,6 @@ import {
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
-  isNonSD3MainModelModelConfig,
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
   isSD3MainModelModelConfig,
@@ -53,7 +52,6 @@ const buildModelsHook =
   };
 
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
-export const useNonSD3MainModels = buildModelsHook(isNonSD3MainModelModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);

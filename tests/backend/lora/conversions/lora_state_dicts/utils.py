@@ -1,8 +1,8 @@
 import torch
 
 
-def keys_to_mock_state_dict(keys: list[str]) -> dict[str, torch.Tensor]:
+def keys_to_mock_state_dict(keys: dict[str, list[int]]) -> dict[str, torch.Tensor]:
     state_dict: dict[str, torch.Tensor] = {}
-    for k in keys:
-        state_dict[k] = torch.empty(1)
+    for k, shape in keys.items():
+        state_dict[k] = torch.empty(shape)
     return state_dict

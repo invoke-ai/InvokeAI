@@ -84,7 +84,15 @@ class FluxVAELoader(ModelLoader):
             model = AutoEncoder(ae_params[config.config_path])
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
-            model.to(dtype=self._torch_dtype)
+            # VAE is broken in float16, which mps defaults to
+            if self._torch_dtype == torch.float16:
+                try:
+                    vae_dtype = torch.tensor([1.0], dtype=torch.bfloat16, device=self._torch_device).dtype
+                except TypeError:
+                    vae_dtype = torch.float32
+            else:
+                vae_dtype = self._torch_dtype
+            model.to(vae_dtype)
 
         return model
 
