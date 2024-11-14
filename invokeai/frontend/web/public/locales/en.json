@@ -704,6 +704,8 @@
         "baseModel": "Base Model",
         "cancel": "Cancel",
         "clipEmbed": "CLIP Embed",
+        "clipLEmbed": "CLIP-L Embed",
+        "clipGEmbed": "CLIP-G Embed",
         "config": "Config",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",

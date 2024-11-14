@@ -147,6 +147,10 @@ GENERATION_MODES = Literal[
     "flux_img2img",
     "flux_inpaint",
     "flux_outpaint",
+    "sd3_txt2img",
+    "sd3_img2img",
+    "sd3_inpaint",
+    "sd3_outpaint",
 ]
 
 

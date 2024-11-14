@@ -9,7 +9,7 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
-import { useNonSD3MainModels } from 'services/api/hooks/modelsByType';
+import { useMainModels } from 'services/api/hooks/modelsByType';
 import { type AnyModelConfig, isCheckpointMainModelConfig, type MainModelConfig } from 'services/api/types';
 
 const ParamMainModelSelect = () => {
@@ -18,7 +18,7 @@ const ParamMainModelSelect = () => {
   const activeTabName = useAppSelector(selectActiveTab);
   const selectedModelKey = useAppSelector(selectModelKey);
   // const selectedModel = useAppSelector(selectModel);
-  const [modelConfigs, { isLoading }] = useNonSD3MainModels();
+  const [modelConfigs, { isLoading }] = useMainModels();
 
   const selectedModel = useMemo(() => {
     if (!modelConfigs) {

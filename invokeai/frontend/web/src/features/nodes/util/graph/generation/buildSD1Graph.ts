@@ -170,7 +170,7 @@ export const buildSD1Graph = async (
   const denoising_start = 1 - params.img2imgStrength;
 
   let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
   > = l2i;
 
   if (generationMode === 'txt2img') {
@@ -180,6 +180,7 @@ export const buildSD1Graph = async (
       g,
       manager,
       l2i,
+      i2lNodeType: 'i2l',
       denoise,
       vaeSource,
       originalSize,
@@ -194,6 +195,7 @@ export const buildSD1Graph = async (
       g,
       manager,
       l2i,
+      i2lNodeType: 'i2l',
       denoise,
       vaeSource,
       modelLoader,
@@ -208,6 +210,7 @@ export const buildSD1Graph = async (
       g,
       manager,
       l2i,
+      i2lNodeType: 'i2l',
       denoise,
       vaeSource,
       modelLoader,

@@ -1,16 +1,19 @@
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
+import torchvision.transforms as tv_transforms
 from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
-from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    DenoiseMaskField,
     FieldDescriptions,
     Input,
     InputField,
+    LatentsField,
     SD3ConditioningField,
     WithBoard,
     WithMetadata,
@@ -19,7 +22,9 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3_text_encoder import SD3_T5_MAX_SEQ_LEN
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.config import BaseModelType
+from invokeai.backend.sd3.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -30,16 +35,24 @@ from invokeai.backend.util.devices import TorchDevice
     title="SD3 Denoise",
     tags=["image", "sd3"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run denoising process with a SD3 model."""
 
+    # If latents is provided, this means we are doing image-to-image.
+    latents: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
+    denoise_mask: Optional[DenoiseMaskField] = InputField(
+        default=None, description=FieldDescriptions.denoise_mask, input=Input.Connection
+    )
+    denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+    denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     transformer: TransformerField = InputField(
-        description=FieldDescriptions.sd3_model,
-        input=Input.Connection,
-        title="Transformer",
+        description=FieldDescriptions.sd3_model, input=Input.Connection, title="Transformer"
     )
     positive_conditioning: SD3ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
@@ -60,6 +73,41 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         name = context.tensors.save(tensor=latents)
         return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+
+    def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
+        """Prepare the inpaint mask.
+        - Loads the mask
+        - Resizes if necessary
+        - Casts to same device/dtype as latents
+
+        Args:
+            context (InvocationContext): The invocation context, for loading the inpaint mask.
+            latents (torch.Tensor): A latent image tensor. Used to determine the target shape, device, and dtype for the
+                inpaint mask.
+
+        Returns:
+            torch.Tensor | None: Inpaint mask. Values of 0.0 represent the regions to be fully denoised, and 1.0
+                represent the regions to be preserved.
+        """
+        if self.denoise_mask is None:
+            return None
+        mask = context.tensors.load(self.denoise_mask.mask_name)
+
+        # The input denoise_mask contains values in [0, 1], where 0.0 represents the regions to be fully denoised, and
+        # 1.0 represents the regions to be preserved.
+        # We invert the mask so that the regions to be preserved are 0.0 and the regions to be denoised are 1.0.
+        mask = 1.0 - mask
+
+        _, _, latent_height, latent_width = latents.shape
+        mask = tv_resize(
+            img=mask,
+            size=[latent_height, latent_width],
+            interpolation=tv_transforms.InterpolationMode.BILINEAR,
+            antialias=False,
+        )
+
+        mask = mask.to(device=latents.device, dtype=latents.dtype)
+        return mask
 
     def _load_text_conditioning(
         self,
@@ -170,14 +218,20 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         prompt_embeds = torch.cat([neg_prompt_embeds, pos_prompt_embeds], dim=0)
         pooled_prompt_embeds = torch.cat([neg_pooled_prompt_embeds, pos_pooled_prompt_embeds], dim=0)
 
-        # Prepare the scheduler.
-        scheduler = FlowMatchEulerDiscreteScheduler()
-        scheduler.set_timesteps(num_inference_steps=self.steps, device=device)
-        timesteps = scheduler.timesteps
-        assert isinstance(timesteps, torch.Tensor)
+        # Prepare the timestep schedule.
+        # We add an extra step to the end to account for the final timestep of 0.0.
+        timesteps: list[float] = torch.linspace(1, 0, self.steps + 1).tolist()
+        # Clip the timesteps schedule based on denoising_start and denoising_end.
+        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+        total_steps = len(timesteps) - 1
 
         # Prepare the CFG scale list.
-        cfg_scale = self._prepare_cfg_scale(len(timesteps))
+        cfg_scale = self._prepare_cfg_scale(total_steps)
+
+        # Load the input latents, if provided.
+        init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
+        if init_latents is not None:
+            init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Generate initial latent noise.
         num_channels_latents = transformer_info.model.config.in_channels
@@ -191,9 +245,34 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             device=device,
             seed=self.seed,
         )
-        latents: torch.Tensor = noise
 
-        total_steps = len(timesteps)
+        # Prepare input latent image.
+        if init_latents is not None:
+            # Noise the init_latents by the appropriate amount for the first timestep.
+            t_0 = timesteps[0]
+            latents = t_0 * noise + (1.0 - t_0) * init_latents
+        else:
+            # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
+            if self.denoising_start > 1e-5:
+                raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            latents = noise
+
+        # If len(timesteps) == 1, then short-circuit. We are just noising the input latents, but not taking any
+        # denoising steps.
+        if len(timesteps) <= 1:
+            return latents
+
+        # Prepare inpaint extension.
+        inpaint_mask = self._prep_inpaint_mask(context, latents)
+        inpaint_extension: InpaintExtension | None = None
+        if inpaint_mask is not None:
+            assert init_latents is not None
+            inpaint_extension = InpaintExtension(
+                init_latents=init_latents,
+                inpaint_mask=inpaint_mask,
+                noise=noise,
+            )
+
         step_callback = self._build_step_callback(context)
 
         step_callback(
@@ -210,11 +289,12 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             assert isinstance(transformer, SD3Transformer2DModel)
 
             # 6. Denoising loop
-            for step_idx, t in tqdm(list(enumerate(timesteps))):
+            for step_idx, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
                 # Expand the latents if we are doing CFG.
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
                 # Expand the timestep to match the latent model input.
-                timestep = t.expand(latent_model_input.shape[0])
+                # Multiply by 1000 to match the default FlowMatchEulerDiscreteScheduler num_train_timesteps.
+                timestep = torch.tensor([t_curr * 1000], device=device).expand(latent_model_input.shape[0])
 
                 noise_pred = transformer(
                     hidden_states=latent_model_input,
@@ -232,21 +312,19 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
                 # Compute the previous noisy sample x_t -> x_t-1.
                 latents_dtype = latents.dtype
-                latents = scheduler.step(model_output=noise_pred, timestep=t, sample=latents, return_dict=False)[0]
+                latents = latents.to(dtype=torch.float32)
+                latents = latents + (t_prev - t_curr) * noise_pred
+                latents = latents.to(dtype=latents_dtype)
 
-                # TODO(ryand): This MPS dtype handling was copied from diffusers, I haven't tested to see if it's
-                # needed.
-                if latents.dtype != latents_dtype:
-                    if torch.backends.mps.is_available():
-                        # some platforms (eg. apple mps) misbehave due to a pytorch bug: https://github.com/pytorch/pytorch/pull/99272
-                        latents = latents.to(latents_dtype)
+                if inpaint_extension is not None:
+                    latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, t_prev)
 
                 step_callback(
                     PipelineIntermediateState(
                         step=step_idx + 1,
                         order=1,
                         total_steps=total_steps,
-                        timestep=int(t),
+                        timestep=int(t_curr),
                         latents=latents,
                     ),
                 )

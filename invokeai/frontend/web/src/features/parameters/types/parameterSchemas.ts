@@ -123,6 +123,16 @@ export const zParameterCLIPEmbedModel = zModelIdentifierField;
 export type ParameterCLIPEmbedModel = z.infer<typeof zParameterCLIPEmbedModel>;
 // #endregion
 
+// #region CLIP embed Model
+export const zParameterCLIPLEmbedModel = zModelIdentifierField;
+export type ParameterCLIPLEmbedModel = z.infer<typeof zParameterCLIPLEmbedModel>;
+// #endregion
+
+// #region CLIP embed Model
+export const zParameterCLIPGEmbedModel = zModelIdentifierField;
+export type ParameterCLIPGEmbedModel = z.infer<typeof zParameterCLIPGEmbedModel>;
+// #endregion
+
 // #region LoRA Model
 const zParameterLoRAModel = zModelIdentifierField;
 export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
