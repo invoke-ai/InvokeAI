@@ -7,7 +7,6 @@ export const useDeferredModelLoadingInvocationProgressMessage = () => {
   const { t } = useTranslation();
   const invocationProgressMessage = useStore($invocationProgressMessage);
   const [delayedMessage, setDelayedMessage] = useState<string | null>(null);
-  const [lastValidMessage, setLastValidMessage] = useState(invocationProgressMessage);
 
   useEffect(() => {
     if (!invocationProgressMessage) {
@@ -20,15 +19,13 @@ export const useDeferredModelLoadingInvocationProgressMessage = () => {
       return;
     }
 
-    setLastValidMessage(invocationProgressMessage);
-
     // Set a timeout to update delayedMessage after 5 seconds
     const timer = setTimeout(() => {
       setDelayedMessage(`${t('common.loadingModel')}...`);
     }, 5000);
 
     return () => clearTimeout(timer); // Cleanup on effect re-run
-  }, [invocationProgressMessage, lastValidMessage, t]);
+  }, [invocationProgressMessage, t]);
 
   return delayedMessage;
 };
