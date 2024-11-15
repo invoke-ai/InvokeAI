@@ -2109,7 +2109,7 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "<StrongComponent>SD 3.5</StrongComponent>: Support for Text-to-Image in Workflows with SD 3.5 Medium and Large.",
+            "<StrongComponent>SD 3.5</StrongComponent>: Support for SD 3.5 Medium and Large.",
             "<StrongComponent>Canvas</StrongComponent>: Streamlined Control Layer processing and improved default Control settings."
         ],
         "readReleaseNotes": "Read Release Notes",
