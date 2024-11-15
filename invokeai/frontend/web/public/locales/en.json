@@ -122,6 +122,7 @@
         "goTo": "Go to",
         "hotkeysLabel": "Hotkeys",
         "loadingImage": "Loading Image",
+        "loadingModel": "Loading Model",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
         "inpaint": "inpaint",
