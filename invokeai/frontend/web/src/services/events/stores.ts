@@ -15,9 +15,6 @@ export const $invocationProgressMessage = computed($lastProgressEvent, (val) => 
   if (!val) {
     return null;
   }
-  if (val.destination !== 'canvas') {
-    return null;
-  }
   let message = val.message;
   if (val.percentage) {
     message += ` (${round(val.percentage * 100)}%)`;
