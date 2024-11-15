@@ -30,11 +30,23 @@ def test_is_state_dict_xlabs_ip_adapter(sd_shapes: dict[str, list[int]]):
     [
         (
             xlabs_flux_ip_adapter_sd_shapes,
-            XlabsIpAdapterParams(num_double_blocks=19, context_dim=4096, hidden_dim=3072, clip_embeddings_dim=768),
+            XlabsIpAdapterParams(
+                num_double_blocks=19,
+                context_dim=4096,
+                hidden_dim=3072,
+                clip_embeddings_dim=768,
+                clip_extra_context_tokens=4,
+            ),
         ),
         (
             xlabs_flux_ip_adapter_v2_sd_shapes,
-            XlabsIpAdapterParams(num_double_blocks=19, context_dim=4096, hidden_dim=3072, clip_embeddings_dim=768),
+            XlabsIpAdapterParams(
+                num_double_blocks=19,
+                context_dim=4096,
+                hidden_dim=3072,
+                clip_embeddings_dim=768,
+                clip_extra_context_tokens=16,
+            ),
         ),
     ],
 )
