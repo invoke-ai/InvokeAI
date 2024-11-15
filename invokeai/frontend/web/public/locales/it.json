@@ -94,7 +94,8 @@
         "view": "Vista",
         "close": "Chiudi",
         "clipboard": "Appunti",
-        "ok": "Ok"
+        "ok": "Ok",
+        "generating": "Generazione"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -750,7 +751,8 @@
         "confirmOnNewSession": "Conferma su nuova sessione",
         "enableModelDescriptions": "Abilita le descrizioni dei modelli nei menu a discesa",
         "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
-        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disabilitate. Abilitale nelle Impostazioni."
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disabilitate. Abilitale nelle Impostazioni.",
+        "showDetailedInvocationProgress": "Mostra dettagli avanzamento"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -1748,7 +1750,7 @@
         "newControlLayerOk": "Livello di controllo creato",
         "bboxOverlay": "Mostra sovrapposizione riquadro",
         "resetCanvas": "Reimposta la tela",
-        "outputOnlyMaskedRegions": "Solo regioni mascherate in uscita",
+        "outputOnlyMaskedRegions": "In uscita solo le regioni generate",
         "enableAutoNegative": "Abilita Auto Negativo",
         "disableAutoNegative": "Disabilita Auto Negativo",
         "showHUD": "Mostra HUD",
@@ -1796,7 +1798,7 @@
         "beginEndStepPercentShort": "Inizio/Fine %",
         "stagingOnCanvas": "Genera immagini nella",
         "ipAdapterMethod": {
-            "full": "Completo",
+            "full": "Stile e Composizione",
             "style": "Solo Stile",
             "composition": "Solo Composizione",
             "ipAdapterMethod": "Metodo Adattatore IP"
@@ -2145,7 +2147,7 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>SD 3.5</StrongComponent>: supporto per la generazione da testo a immagine nei flussi di lavoro con SD 3.5 Medium e Large.",
+            "<StrongComponent>SD 3.5</StrongComponent>: supporto per SD 3.5 Medium e Large.",
             "<StrongComponent>Tela</StrongComponent>: elaborazione semplificata del livello di controllo e impostazioni di controllo predefinite migliorate."
         ]
     },
