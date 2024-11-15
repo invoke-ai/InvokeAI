@@ -78,7 +78,7 @@ class InvokeAdjustImageHuePlusInvocation(BaseInvocation, WithMetadata, WithBoard
     degrees: float = InputField(default=0.0, description="Degrees by which to rotate image hue")
     preserve_lightness: bool = InputField(default=False, description="Whether to preserve CIELAB lightness values")
     ok_adaptive_gamut: float = InputField(
-        default=0.05, description="Higher preserves chroma at the expense of lightness (Oklab)"
+        ge=0, default=0.05, description="Higher preserves chroma at the expense of lightness (Oklab)"
     )
     ok_high_precision: bool = InputField(
         default=True, description="Use more steps in computing gamut (Oklab/Okhsv/Okhsl)"
@@ -295,7 +295,7 @@ class InvokeMaskedBlendLatentsInvocation(BaseInvocation):
         input=Input.Connection,
     )
     mask: Optional[ImageField] = InputField(default=None, description="Mask for blending in latents B")
-    alpha: float = InputField(default=0.5, description=FieldDescriptions.blend_alpha)
+    alpha: float = InputField(ge=0, default=0.5, description=FieldDescriptions.blend_alpha)
 
     def prep_mask_tensor(self, mask_image: Image.Image) -> torch.Tensor:
         if mask_image.mode != "L":
@@ -398,10 +398,10 @@ class InvokeImageEnhanceInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(default=None, description="The image for which to apply processing")
     invert: bool = InputField(default=False, description="Whether to invert the image colors")
-    color: float = InputField(default=1.0, description="Color enhancement factor")
-    contrast: float = InputField(default=1.0, description="Contrast enhancement factor")
-    brightness: float = InputField(default=1.0, description="Brightness enhancement factor")
-    sharpness: float = InputField(default=1.0, description="Sharpness enhancement factor")
+    color: float = InputField(ge=0, default=1.0, description="Color enhancement factor")
+    contrast: float = InputField(ge=0, default=1.0, description="Contrast enhancement factor")
+    brightness: float = InputField(ge=0, default=1.0, description="Brightness enhancement factor")
+    sharpness: float = InputField(ge=0, default=1.0, description="Sharpness enhancement factor")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image_out = context.images.get_pil(self.image.image_name)
@@ -534,7 +534,7 @@ class InvokeImageBlendInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     layer_upper: ImageField = InputField(description="The top image to blend", ui_order=1)
     blend_mode: BLEND_MODES = InputField(default="Normal", description="Available blend modes", ui_order=2)
-    opacity: float = InputField(default=1.0, description="Desired opacity of the upper layer", ui_order=3)
+    opacity: float = InputField(ge=0, default=1.0, description="Desired opacity of the upper layer", ui_order=3)
     mask: Optional[ImageField] = InputField(
         default=None, description="Optional mask, used to restrict areas from blending", ui_order=4
     )
@@ -545,7 +545,7 @@ class InvokeImageBlendInvocation(BaseInvocation, WithMetadata, WithBoard):
         default="RGB", description="Available color spaces for blend computations", ui_order=8
     )
     adaptive_gamut: float = InputField(
-        default=0.0, description="Adaptive gamut clipping (0=off). Higher prioritizes chroma over lightness", ui_order=9
+        ge=0, default=0.0, description="Adaptive gamut clipping (0=off). Higher prioritizes chroma over lightness", ui_order=9
     )
     high_precision: bool = InputField(
         default=True, description="Use more steps in computing gamut when possible", ui_order=10
@@ -1435,7 +1435,7 @@ class InvokeImageCompositorInvocation(BaseInvocation, WithMetadata, WithBoard):
     chroma_key: str = InputField(
         default="", description="Can be empty for corner flood select, or CSS-3 color or tuple"
     )
-    threshold: int = InputField(default=50, description="Subject isolation flood-fill threshold")
+    threshold: int = InputField(ge=0, default=50, description="Subject isolation flood-fill threshold")
     fill_x: bool = InputField(default=False, description="Scale base subject image to fit background width")
     fill_y: bool = InputField(default=True, description="Scale base subject image to fit background height")
     x_offset: int = InputField(default=0, description="x-offset for the subject")
