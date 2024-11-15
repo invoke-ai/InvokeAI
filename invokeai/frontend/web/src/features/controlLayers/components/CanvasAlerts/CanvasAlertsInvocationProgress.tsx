@@ -53,12 +53,16 @@ export const CanvasAlertsInvocationProgress = memo(() => {
     return null;
   }
 
+  if (!isLocal) {
+    return <CanvasAlertsInvocationProgressContentCommercial />;
+  }
+
   // The alert is disabled at the user level
   if (!shouldShowInvocationProgressDetail) {
     return null;
   }
 
-  return isLocal ? <CanvasAlertsInvocationProgressContentLocal /> : <CanvasAlertsInvocationProgressContentCommercial />;
+  return <CanvasAlertsInvocationProgressContentLocal />;
 });
 
 CanvasAlertsInvocationProgress.displayName = 'CanvasAlertsInvocationProgress';
