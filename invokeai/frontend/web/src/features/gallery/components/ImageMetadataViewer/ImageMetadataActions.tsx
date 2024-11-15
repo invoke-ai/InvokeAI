@@ -1,3 +1,4 @@
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { MetadataItem } from 'features/metadata/components/MetadataItem';
 import { MetadataLoRAs } from 'features/metadata/components/MetadataLoRAs';
@@ -18,7 +19,7 @@ const ImageMetadataActions = (props: Props) => {
   }
 
   return (
-    <>
+    <Flex flexDir="column" pl={8}>
       <MetadataItem metadata={metadata} handlers={handlers.generationMode} />
       <MetadataItem metadata={metadata} handlers={handlers.positivePrompt} direction="column" />
       <MetadataItem metadata={metadata} handlers={handlers.negativePrompt} direction="column" />
@@ -48,7 +49,7 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.refinerStart} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerSteps} />
       <MetadataLoRAs metadata={metadata} />
-    </>
+    </Flex>
   );
 };
 
