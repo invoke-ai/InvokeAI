@@ -33,6 +33,7 @@ from invokeai.backend.image_util.composition import (
     srgb_from_okhsl,
     srgb_from_okhsv,
     tensor_from_pil_image,
+    CIELAB_TO_UPLAB_ICC_PATH,
 )
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.invocation_api import (
@@ -120,8 +121,8 @@ class InvokeAdjustImageHuePlusInvocation(BaseInvocation, WithMetadata, WithBoard
         if self.preserve_lightness or (space == "lch") or (space == "uplab"):
             profile_srgb = ImageCms.createProfile("sRGB")
             if space == "uplab":
-                if os.path.isfile("CIELab_to_UPLab.icc"):
-                    profile_uplab = ImageCms.getOpenProfile("CIELab_to_UPLab.icc")
+                with open(CIELAB_TO_UPLAB_ICC_PATH, "rb") as f:
+                    profile_uplab = ImageCms.getOpenProfile(f)
             if profile_uplab is None:
                 profile_lab = ImageCms.createProfile("LAB", colorTemp=6500)
             else:
