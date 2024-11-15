@@ -1,7 +1,7 @@
-# State dict keys and shapes for an XLabs FLUX IP-Adapter model. Intended to be used for unit tests.
+# State dict keys and shapes for an XLabs FLUX IP-Adapter V2 model. Intended to be used for unit tests.
 # These keys were extracted from:
-# https://huggingface.co/XLabs-AI/flux-ip-adapter/resolve/main/ip_adapter.safetensors
-xlabs_flux_ip_adapter_sd_shapes = {
+# https://huggingface.co/XLabs-AI/flux-ip-adapter-v2/blob/main/ip_adapter.safetensors
+xlabs_flux_ip_adapter_v2_sd_shapes = {
     "double_blocks.0.processor.ip_adapter_double_stream_k_proj.bias": [3072],
     "double_blocks.0.processor.ip_adapter_double_stream_k_proj.weight": [3072, 4096],
     "double_blocks.0.processor.ip_adapter_double_stream_v_proj.bias": [3072],
@@ -80,6 +80,6 @@ xlabs_flux_ip_adapter_sd_shapes = {
     "double_blocks.9.processor.ip_adapter_double_stream_v_proj.weight": [3072, 4096],
     "ip_adapter_proj_model.norm.bias": [4096],
     "ip_adapter_proj_model.norm.weight": [4096],
-    "ip_adapter_proj_model.proj.bias": [16384],
-    "ip_adapter_proj_model.proj.weight": [16384, 768],
+    "ip_adapter_proj_model.proj.bias": [65536],
+    "ip_adapter_proj_model.proj.weight": [65536, 768],
 }
