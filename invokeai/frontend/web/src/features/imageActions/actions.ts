@@ -29,7 +29,7 @@ import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } fro
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
-import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
@@ -69,6 +69,15 @@ export const setNodeImageFieldImage = (arg: {
 }) => {
   const { imageDTO, fieldIdentifer, dispatch } = arg;
   dispatch(fieldImageValueChanged({ ...fieldIdentifer, value: imageDTO }));
+};
+
+export const addImagesToNodeImageFieldCollectionAction = (arg: {
+  imageDTOs: ImageDTO[];
+  fieldIdentifer: FieldIdentifier;
+  dispatch: AppDispatch;
+}) => {
+  const { imageDTOs, fieldIdentifer, dispatch } = arg;
+  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifer, value: imageDTOs }));
 };
 
 export const setComparisonImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {

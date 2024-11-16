@@ -22,12 +22,15 @@ const sx = {
   },
 } satisfies SystemStyleObject;
 
-type Props = ImageProps & {
-  imageDTO: ImageDTO;
-  asThumbnail?: boolean;
-};
+/* eslint-disable-next-line @typescript-eslint/no-namespace */
+export namespace DndImage {
+  export interface Props extends ImageProps {
+    imageDTO: ImageDTO;
+    asThumbnail?: boolean;
+  }
+}
 
-export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: Props) => {
+export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: DndImage.Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [element, ref] = useState<HTMLImageElement | null>(null);

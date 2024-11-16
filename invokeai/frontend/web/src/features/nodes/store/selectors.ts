@@ -5,7 +5,14 @@ import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import type { Node } from 'reactflow';
 import { assert } from 'tsafe';
+
+export const selectNode = (nodesSlice: NodesState, nodeId: string): Node => {
+  const node = nodesSlice.nodes.find((node) => node.id === nodeId);
+  assert(node !== undefined, `Node ${nodeId} not found`);
+  return node;
+};
 
 export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode => {
   const node = nodesSlice.nodes.find((node) => node.id === nodeId);

@@ -101,7 +101,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
                     <Text as="span" fontWeight="semibold">
                       {node_path}.{field_name}
                     </Text>
-                    : {value}
+                    : {JSON.stringify(value)}
                   </Text>
                 ))}
             </Flex>

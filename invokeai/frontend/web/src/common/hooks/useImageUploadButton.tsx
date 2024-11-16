@@ -141,11 +141,9 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
 };
 
 const sx = {
-  borderColor: 'error.500',
-  borderStyle: 'solid',
-  borderWidth: 0,
-  borderRadius: 'base',
   '&[data-error=true]': {
+    borderColor: 'error.500',
+    borderStyle: 'solid',
     borderWidth: 1,
   },
 } satisfies SystemStyleObject;
@@ -164,7 +162,34 @@ export const UploadImageButton = ({
     <>
       <IconButton
         aria-label="Upload image"
-        variant="ghost"
+        variant="outline"
+        sx={sx}
+        data-error={isError}
+        icon={<PiUploadBold />}
+        isLoading={uploadApi.request.isLoading}
+        {...rest}
+        {...uploadApi.getUploadButtonProps()}
+      />
+      <input {...uploadApi.getUploadInputProps()} />
+    </>
+  );
+};
+
+export const UploadMultipleImageButton = ({
+  isDisabled = false,
+  onUpload,
+  isError = false,
+  ...rest
+}: {
+  onUpload?: (imageDTOs: ImageDTO[]) => void;
+  isError?: boolean;
+} & SetOptional<IconButtonProps, 'aria-label'>) => {
+  const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: true, onUpload });
+  return (
+    <>
+      <IconButton
+        aria-label="Upload image"
+        variant="outline"
         sx={sx}
         data-error={isError}
         icon={<PiUploadBold />}
