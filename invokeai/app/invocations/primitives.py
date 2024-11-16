@@ -552,7 +552,7 @@ class BoundingBoxInvocation(BaseInvocation):
 class ImageBatchInvocation(BaseInvocation):
     """Create a batched generation, where the workflow is executed once for each image in the batch."""
 
-    images: list[ImageField] = InputField(default=[], description="The images to batch over", input=Input.Direct)
+    images: list[ImageField] = InputField(min_length=1, description="The images to batch over", input=Input.Direct)
 
     def __init__(self):
         raise NotImplementedError("This class should never be executed or instantiated directly.")
