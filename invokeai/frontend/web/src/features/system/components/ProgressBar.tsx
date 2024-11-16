@@ -19,6 +19,26 @@ const ProgressBar = () => {
     return (lastProgressEvent.percentage ?? 0) * 100;
   }, [lastProgressEvent]);
 
+  const isIndeterminate = useMemo(() => {
+    if (!isConnected) {
+      return false;
+    }
+
+    if (!queueStatus?.queue.in_progress) {
+      return false;
+    }
+
+    if (!lastProgressEvent) {
+      return true;
+    }
+
+    if (lastProgressEvent.percentage === null) {
+      return true;
+    }
+
+    return false;
+  }, [isConnected, lastProgressEvent, queueStatus?.queue.in_progress]);
+
   const colorScheme = useMemo(() => {
     if (destination === 'canvas') {
       return 'invokeGreen';
@@ -33,7 +53,7 @@ const ProgressBar = () => {
     <Progress
       value={value}
       aria-label={t('accessibility.invokeProgressBar')}
-      isIndeterminate={isConnected && Boolean(queueStatus?.queue.in_progress) && !lastProgressEvent}
+      isIndeterminate={isIndeterminate}
       h={2}
       w="full"
       colorScheme={colorScheme}
