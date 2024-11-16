@@ -262,7 +262,7 @@ export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
     }
     return false;
   },
-  handler: ({ sourceData, targetData, dispatch }) => {
+  handler: ({ sourceData, targetData, dispatch, getState }) => {
     if (!singleImageDndSource.typeGuard(sourceData) && !multipleImageDndSource.typeGuard(sourceData)) {
       return;
     }
@@ -276,7 +276,7 @@ export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
       imageDTOs.push(...sourceData.payload.imageDTOs);
     }
 
-    addImagesToNodeImageFieldCollectionAction({ fieldIdentifer, imageDTOs, dispatch });
+    addImagesToNodeImageFieldCollectionAction({ fieldIdentifer, imageDTOs, dispatch, getState });
   },
 };
 //#endregion
