@@ -82,7 +82,13 @@ export const ImageFieldCollectionInputComponent = memo(
         )}
         {field.value && field.value.length > 0 && (
           <>
-            <Grid className="nopan" w="full" h="full" templateColumns="repeat(3, 1fr)" gap={2}>
+            <Grid
+              className="nopan"
+              w="full"
+              h="full"
+              templateColumns={`repeat(${Math.min(field.value.length, 3)}, 1fr)`}
+              gap={2}
+            >
               {field.value.map(({ image_name }) => (
                 <GridItem key={image_name}>
                   <DndImageFromImageName imageName={image_name} asThumbnail />
