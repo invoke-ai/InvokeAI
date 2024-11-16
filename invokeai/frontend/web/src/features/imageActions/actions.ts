@@ -1,3 +1,4 @@
+import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
@@ -30,13 +31,17 @@ import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingB
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
 import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import type { FieldIdentifier } from 'features/nodes/types/field';
+import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store/selectors';
+import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { uniqBy } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
+
+const log = logger('system');
 
 export const setGlobalReferenceImage = (arg: {
   imageDTO: ImageDTO;
@@ -75,9 +80,24 @@ export const addImagesToNodeImageFieldCollectionAction = (arg: {
   imageDTOs: ImageDTO[];
   fieldIdentifer: FieldIdentifier;
   dispatch: AppDispatch;
+  getState: () => RootState;
 }) => {
-  const { imageDTOs, fieldIdentifer, dispatch } = arg;
-  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifer, value: imageDTOs }));
+  const { imageDTOs, fieldIdentifer, dispatch, getState } = arg;
+  const fieldInputInstance = selectFieldInputInstance(
+    selectNodesSlice(getState()),
+    fieldIdentifer.nodeId,
+    fieldIdentifer.fieldName
+  );
+
+  if (!isImageFieldCollectionInputInstance(fieldInputInstance)) {
+    log.warn({ fieldIdentifer }, 'Attempted to add images to a non-image field collection');
+    return;
+  }
+
+  const images = fieldInputInstance.value ? [...fieldInputInstance.value] : [];
+  images.push(...imageDTOs.map(({ image_name }) => ({ image_name })));
+  const uniqueImages = uniqBy(images, 'image_name');
+  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifer, value: uniqueImages }));
 };
 
 export const setComparisonImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {
