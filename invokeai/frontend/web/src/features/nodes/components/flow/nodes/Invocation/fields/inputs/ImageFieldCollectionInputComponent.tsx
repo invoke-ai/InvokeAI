@@ -47,6 +47,19 @@ export const ImageFieldCollectionInputComponent = memo(
       [dispatch, field.name, nodeId]
     );
 
+    const isInvalid = useMemo(() => {
+      if (!field.value) {
+        if (fieldTemplate.required) {
+          return true;
+        }
+      } else if (fieldTemplate.minLength !== undefined && field.value.length < fieldTemplate.minLength) {
+        return true;
+      } else if (fieldTemplate.maxLength !== undefined && field.value.length > fieldTemplate.maxLength) {
+        return true;
+      }
+      return false;
+    }, [field.value, fieldTemplate.maxLength, fieldTemplate.minLength, fieldTemplate.required]);
+
     return (
       <Flex
         position="relative"
@@ -57,17 +70,17 @@ export const ImageFieldCollectionInputComponent = memo(
         alignItems="stretch"
         justifyContent="center"
       >
-        {field.value.length === 0 && (
+        {(!field.value || field.value.length === 0) && (
           <UploadMultipleImageButton
             w="full"
             h="auto"
-            isError={fieldTemplate.required}
+            isError={isInvalid}
             onUpload={onUpload}
             fontSize={24}
             variant="outline"
           />
         )}
-        {field.value.length > 0 && (
+        {field.value && field.value.length > 0 && (
           <>
             <Grid className="nopan" w="full" h="full" templateColumns="repeat(3, 1fr)" gap={2}>
               {field.value.map(({ image_name }) => (
