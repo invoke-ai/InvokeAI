@@ -302,6 +302,7 @@ const zStringFieldInputTemplate = zFieldInputTemplateBase
       if (val.maxLength !== undefined && val.minLength !== undefined) {
         return val.maxLength >= val.minLength;
       }
+      return true;
     },
     { message: 'maxLength must be greater than or equal to minLength' }
   );
@@ -406,6 +407,7 @@ const zImageFieldCollectionInputTemplate = zFieldInputTemplateBase
       if (val.maxLength !== undefined && val.minLength !== undefined) {
         return val.maxLength >= val.minLength;
       }
+      return true;
     },
     { message: 'maxLength must be greater than or equal to minLength' }
   );
