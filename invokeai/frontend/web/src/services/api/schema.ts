@@ -8136,9 +8136,8 @@ export type components = {
             /**
              * Images
              * @description The images to batch over
-             * @default []
              */
-            images?: components["schemas"]["ImageField"][];
+            images: components["schemas"]["ImageField"][];
             /**
              * type
              * @default image_batch
