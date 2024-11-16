@@ -9,6 +9,7 @@ import { selectComparisonImages } from 'features/gallery/components/ImageViewer/
 import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
+  addImagesToNodeImageFieldCollectionAction,
   createNewCanvasEntityFromImage,
   removeImagesFromBoard,
   replaceCanvasEntityObjectsWithImage,
@@ -241,6 +242,45 @@ export const setNodeImageFieldImageDndTarget: DndTarget<SetNodeImageFieldImageDn
   };
 //#endregion
 
+//#region Add Images to Image Collection Node Field
+const _addImagesToNodeImageFieldCollection = buildTypeAndKey('add-images-to-image-collection-node-field');
+export type AddImagesToNodeImageFieldCollection = DndData<
+  typeof _addImagesToNodeImageFieldCollection.type,
+  typeof _addImagesToNodeImageFieldCollection.key,
+  { fieldIdentifer: FieldIdentifier }
+>;
+export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
+  AddImagesToNodeImageFieldCollection,
+  SingleImageDndSourceData | MultipleImageDndSourceData
+> = {
+  ..._addImagesToNodeImageFieldCollection,
+  typeGuard: buildTypeGuard(_addImagesToNodeImageFieldCollection.key),
+  getData: buildGetData(_addImagesToNodeImageFieldCollection.key, _addImagesToNodeImageFieldCollection.type),
+  isValid: ({ sourceData }) => {
+    if (singleImageDndSource.typeGuard(sourceData) || multipleImageDndSource.typeGuard(sourceData)) {
+      return true;
+    }
+    return false;
+  },
+  handler: ({ sourceData, targetData, dispatch }) => {
+    if (!singleImageDndSource.typeGuard(sourceData) && !multipleImageDndSource.typeGuard(sourceData)) {
+      return;
+    }
+
+    const { fieldIdentifer } = targetData.payload;
+    const imageDTOs: ImageDTO[] = [];
+
+    if (singleImageDndSource.typeGuard(sourceData)) {
+      imageDTOs.push(sourceData.payload.imageDTO);
+    } else {
+      imageDTOs.push(...sourceData.payload.imageDTOs);
+    }
+
+    addImagesToNodeImageFieldCollectionAction({ fieldIdentifer, imageDTOs, dispatch });
+  },
+};
+//#endregion
+
 //# Set Comparison Image
 const _setComparisonImage = buildTypeAndKey('set-comparison-image');
 export type SetComparisonImageDndTargetData = DndData<
@@ -430,6 +470,7 @@ export const dndTargets = [
   // Single or Multiple Image
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
+  addImagesToNodeImageFieldCollectionDndTarget,
 ] as const;
 
 export type AnyDndTarget = (typeof dndTargets)[number];

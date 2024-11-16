@@ -95,6 +95,11 @@ const zImageFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zImageCollectionFieldType = z.object({
+  name: z.literal('ImageField'),
+  cardinality: z.literal(zCardinality.Values.COLLECTION),
+  originalType: zStatelessFieldType.optional(),
+});
 const zBoardFieldType = zFieldTypeBase.extend({
   name: z.literal('BoardField'),
   originalType: zStatelessFieldType.optional(),
@@ -347,7 +352,6 @@ export const isEnumFieldInputTemplate = (val: unknown): val is EnumFieldInputTem
 // #endregion
 
 // #region ImageField
-
 export const zImageFieldValue = zImageField.optional();
 const zImageFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zImageFieldValue,
@@ -367,6 +371,28 @@ export const isImageFieldInputInstance = (val: unknown): val is ImageFieldInputI
   zImageFieldInputInstance.safeParse(val).success;
 export const isImageFieldInputTemplate = (val: unknown): val is ImageFieldInputTemplate =>
   zImageFieldInputTemplate.safeParse(val).success;
+// #endregion
+
+// #region ImageField Collection
+export const zImageFieldCollectionValue = z.array(zImageField);
+const zImageFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
+  value: zImageFieldCollectionValue,
+});
+const zImageFieldCollectionInputTemplate = zFieldInputTemplateBase.extend({
+  type: zImageCollectionFieldType,
+  originalType: zFieldType.optional(),
+  default: zImageFieldCollectionValue,
+});
+const zImageFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zImageCollectionFieldType,
+});
+export type ImageFieldCollectionValue = z.infer<typeof zImageFieldCollectionValue>;
+export type ImageFieldCollectionInputInstance = z.infer<typeof zImageFieldCollectionInputInstance>;
+export type ImageFieldCollectionInputTemplate = z.infer<typeof zImageFieldCollectionInputTemplate>;
+export const isImageFieldCollectionInputInstance = (val: unknown): val is ImageFieldCollectionInputInstance =>
+  zImageFieldCollectionInputInstance.safeParse(val).success;
+export const isImageFieldCollectionInputTemplate = (val: unknown): val is ImageFieldCollectionInputTemplate =>
+  zImageFieldCollectionInputTemplate.safeParse(val).success;
 // #endregion
 
 // #region BoardField
@@ -885,6 +911,7 @@ export const zStatefulFieldValue = z.union([
   zBooleanFieldValue,
   zEnumFieldValue,
   zImageFieldValue,
+  zImageFieldCollectionValue,
   zBoardFieldValue,
   zModelIdentifierFieldValue,
   zMainModelFieldValue,
@@ -920,6 +947,7 @@ const zStatefulFieldInputInstance = z.union([
   zBooleanFieldInputInstance,
   zEnumFieldInputInstance,
   zImageFieldInputInstance,
+  zImageFieldCollectionInputInstance,
   zBoardFieldInputInstance,
   zModelIdentifierFieldInputInstance,
   zMainModelFieldInputInstance,
@@ -954,6 +982,7 @@ const zStatefulFieldInputTemplate = z.union([
   zBooleanFieldInputTemplate,
   zEnumFieldInputTemplate,
   zImageFieldInputTemplate,
+  zImageFieldCollectionInputTemplate,
   zBoardFieldInputTemplate,
   zModelIdentifierFieldInputTemplate,
   zMainModelFieldInputTemplate,
@@ -991,6 +1020,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zBooleanFieldOutputTemplate,
   zEnumFieldOutputTemplate,
   zImageFieldOutputTemplate,
+  zImageFieldCollectionOutputTemplate,
   zBoardFieldOutputTemplate,
   zModelIdentifierFieldOutputTemplate,
   zMainModelFieldOutputTemplate,

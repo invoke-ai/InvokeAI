@@ -16,6 +16,7 @@ import type {
   FieldValue,
   FloatFieldValue,
   FluxVAEModelFieldValue,
+  ImageFieldCollectionValue,
   ImageFieldValue,
   IntegerFieldValue,
   IPAdapterModelFieldValue,
@@ -42,6 +43,7 @@ import {
   zEnumFieldValue,
   zFloatFieldValue,
   zFluxVAEModelFieldValue,
+  zImageFieldCollectionValue,
   zImageFieldValue,
   zIntegerFieldValue,
   zIPAdapterModelFieldValue,
@@ -319,6 +321,9 @@ export const nodesSlice = createSlice({
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
     },
+    fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zImageFieldCollectionValue);
+    },
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
     },
@@ -416,6 +421,7 @@ export const {
   fieldControlNetModelValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
+  fieldImageCollectionValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
   fieldSpandrelImageToImageModelValueChanged,
@@ -527,6 +533,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldControlNetModelValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
+  fieldImageCollectionValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
   fieldLabelChanged,
