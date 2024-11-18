@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Grid, GridItem, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { UploadMultipleImageButton } from 'common/hooks/useImageUploadButton';
@@ -5,6 +6,7 @@ import type { AddImagesToNodeImageFieldCollection } from 'features/dnd/dnd';
 import { addImagesToNodeImageFieldCollectionDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImageFromImageName } from 'features/dnd/DndImageFromImageName';
+import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
@@ -14,11 +16,21 @@ import type { ImageDTO } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
+const sx = {
+  '&[data-error=true]': {
+    borderColor: 'error.500',
+    borderStyle: 'solid',
+    borderWidth: 1,
+  },
+} satisfies SystemStyleObject;
+
 export const ImageFieldCollectionInputComponent = memo(
   (props: FieldComponentProps<ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate>) => {
     const { t } = useTranslation();
-    const { nodeId, field, fieldTemplate } = props;
+    const { nodeId, field } = props;
     const dispatch = useAppDispatch();
+    const isInvalid = useFieldIsInvalid(nodeId, field.name);
+
     const onReset = useCallback(() => {
       dispatch(
         fieldImageCollectionValueChanged({
@@ -47,19 +59,6 @@ export const ImageFieldCollectionInputComponent = memo(
       [dispatch, field.name, nodeId]
     );
 
-    const isInvalid = useMemo(() => {
-      if (!field.value) {
-        if (fieldTemplate.required) {
-          return true;
-        }
-      } else if (fieldTemplate.minLength !== undefined && field.value.length < fieldTemplate.minLength) {
-        return true;
-      } else if (fieldTemplate.maxLength !== undefined && field.value.length > fieldTemplate.maxLength) {
-        return true;
-      }
-      return false;
-    }, [field.value, fieldTemplate.maxLength, fieldTemplate.minLength, fieldTemplate.required]);
-
     return (
       <Flex
         position="relative"
@@ -84,10 +83,14 @@ export const ImageFieldCollectionInputComponent = memo(
           <>
             <Grid
               className="nopan"
+              borderRadius="base"
               w="full"
               h="full"
               templateColumns={`repeat(${Math.min(field.value.length, 3)}, 1fr)`}
-              gap={2}
+              gap={1}
+              sx={sx}
+              data-error={isInvalid}
+              p={1}
             >
               {field.value.map(({ image_name }) => (
                 <GridItem key={image_name}>
