@@ -1,4 +1,5 @@
 import { Flex, FormControl } from '@invoke-ai/ui-library';
+import FieldResetToDefaultValueButton from 'features/nodes/components/flow/nodes/Invocation/fields/FieldResetToDefaultValueButton';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
@@ -68,8 +69,9 @@ const InputField = ({ nodeId, fieldName }: Props) => {
         px={2}
       >
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
-          <Flex>
+          <Flex gap={1}>
             <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" isInvalid={isInvalid} withTooltip />
+            {isHovered && <FieldResetToDefaultValueButton nodeId={nodeId} fieldName={fieldName} />}
             {isHovered && <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} />}
           </Flex>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
