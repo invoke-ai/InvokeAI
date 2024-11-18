@@ -5,26 +5,25 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { RegionalGuidanceAddPromptsIPAdapterButtons } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceAddPromptsIPAdapterButtons';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
 import { RegionalGuidanceIPAdapters } from './RegionalGuidanceIPAdapters';
 import { RegionalGuidanceNegativePrompt } from './RegionalGuidanceNegativePrompt';
 import { RegionalGuidancePositivePrompt } from './RegionalGuidancePositivePrompt';
 
+const buildSelectFlags = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) =>
+  createMemoizedSelector(selectCanvasSlice, (canvas) => {
+    const entity = selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceSettings');
+    return {
+      hasPositivePrompt: entity.positivePrompt !== null,
+      hasNegativePrompt: entity.negativePrompt !== null,
+      hasIPAdapters: entity.referenceImages.length > 0,
+    };
+  });
 export const RegionalGuidanceSettings = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
-  const selectFlags = useMemo(
-    () =>
-      createMemoizedSelector(selectCanvasSlice, (canvas) => {
-        const entity = selectEntityOrThrow(canvas, entityIdentifier);
-        return {
-          hasPositivePrompt: entity.positivePrompt !== null,
-          hasNegativePrompt: entity.negativePrompt !== null,
-          hasIPAdapters: entity.referenceImages.length > 0,
-        };
-      }),
-    [entityIdentifier]
-  );
+  const selectFlags = useMemo(() => buildSelectFlags(entityIdentifier), [entityIdentifier]);
   const flags = useAppSelector(selectFlags);
 
   return (

@@ -18,7 +18,7 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
-import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
@@ -29,14 +29,17 @@ import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
 import { IPAdapterModel } from './IPAdapterModel';
 
+const buildSelectIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) =>
+  createSelector(
+    selectCanvasSlice,
+    (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'IPAdapterSettings').ipAdapter
+  );
+
 export const IPAdapterSettings = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('reference_image');
-  const selectIPAdapter = useMemo(
-    () => createSelector(selectCanvasSlice, (s) => selectEntityOrThrow(s, entityIdentifier).ipAdapter),
-    [entityIdentifier]
-  );
+  const selectIPAdapter = useMemo(() => buildSelectIPAdapter(entityIdentifier), [entityIdentifier]);
   const ipAdapter = useAppSelector(selectIPAdapter);
 
   const onChangeBeginEndStepPct = useCallback(

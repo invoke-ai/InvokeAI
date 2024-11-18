@@ -7,6 +7,7 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { ControlLayerBadges } from 'features/controlLayers/components/ControlLayer/ControlLayerBadges';
 import { ControlLayerSettings } from 'features/controlLayers/components/ControlLayer/ControlLayerSettings';
+import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -36,24 +37,26 @@ export const ControlLayer = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <ControlLayerAdapterGate>
-        <CanvasEntityContainer>
-          <CanvasEntityHeader>
-            <CanvasEntityPreviewImage />
-            <CanvasEntityEditableTitle />
-            <Spacer />
-            <ControlLayerBadges />
-            <CanvasEntityHeaderCommonActions />
-          </CanvasEntityHeader>
-          <CanvasEntitySettingsWrapper>
-            <ControlLayerSettings />
-          </CanvasEntitySettingsWrapper>
-          <DndDropTarget
-            dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
-            dndTargetData={dndTargetData}
-            label={t('controlLayers.replaceLayer')}
-            isDisabled={isBusy}
-          />
-        </CanvasEntityContainer>
+        <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
+          <CanvasEntityContainer>
+            <CanvasEntityHeader>
+              <CanvasEntityPreviewImage />
+              <CanvasEntityEditableTitle />
+              <Spacer />
+              <ControlLayerBadges />
+              <CanvasEntityHeaderCommonActions />
+            </CanvasEntityHeader>
+            <CanvasEntitySettingsWrapper>
+              <ControlLayerSettings />
+            </CanvasEntitySettingsWrapper>
+            <DndDropTarget
+              dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
+              dndTargetData={dndTargetData}
+              label={t('controlLayers.replaceLayer')}
+              isDisabled={isBusy}
+            />
+          </CanvasEntityContainer>
+        </CanvasEntityStateGate>
       </ControlLayerAdapterGate>
     </EntityIdentifierContext.Provider>
   );

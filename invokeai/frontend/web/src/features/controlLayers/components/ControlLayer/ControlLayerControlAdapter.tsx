@@ -28,24 +28,18 @@ import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiShootingStarFill, PiUploadBold } from 'react-icons/pi';
 import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
 
-const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
-  const selectControlAdapter = useMemo(
-    () =>
-      createMemoizedAppSelector(selectCanvasSlice, (canvas) => {
-        const layer = selectEntityOrThrow(canvas, entityIdentifier);
-        return layer.controlAdapter;
-      }),
-    [entityIdentifier]
-  );
-  const controlAdapter = useAppSelector(selectControlAdapter);
-  return controlAdapter;
-};
+const buildSelectControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
+  createMemoizedAppSelector(selectCanvasSlice, (canvas) => {
+    const layer = selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerControlAdapter');
+    return layer.controlAdapter;
+  });
 
 export const ControlLayerControlAdapter = memo(() => {
   const { t } = useTranslation();
   const { dispatch, getState } = useAppStore();
   const entityIdentifier = useEntityIdentifierContext('control_layer');
-  const controlAdapter = useControlLayerControlAdapter(entityIdentifier);
+  const selectControlAdapter = useMemo(() => buildSelectControlAdapter(entityIdentifier), [entityIdentifier]);
+  const controlAdapter = useAppSelector(selectControlAdapter);
   const filter = useEntityFilter(entityIdentifier);
   const isFLUX = useAppSelector(selectIsFLUX);
   const adapter = useEntityAdapterContext('control_layer');
