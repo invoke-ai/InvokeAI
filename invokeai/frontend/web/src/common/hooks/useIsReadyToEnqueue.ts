@@ -30,15 +30,25 @@ const LAYER_TYPE_TO_TKEY = {
   control_layer: 'controlLayers.controlLayer',
 } as const;
 
-const createSelector = (
-  templates: Templates,
-  isConnected: boolean,
-  canvasIsFiltering: boolean,
-  canvasIsTransforming: boolean,
-  canvasIsRasterizing: boolean,
-  canvasIsCompositing: boolean
-) =>
-  createMemoizedSelector(
+const createSelector = (arg: {
+  templates: Templates;
+  isConnected: boolean;
+  canvasIsFiltering: boolean;
+  canvasIsTransforming: boolean;
+  canvasIsRasterizing: boolean;
+  canvasIsCompositing: boolean;
+  canvasIsSelectingObject: boolean;
+}) => {
+  const {
+    templates,
+    isConnected,
+    canvasIsFiltering,
+    canvasIsTransforming,
+    canvasIsRasterizing,
+    canvasIsCompositing,
+    canvasIsSelectingObject,
+  } = arg;
+  return createMemoizedSelector(
     [
       selectSystemSlice,
       selectNodesSlice,
@@ -146,6 +156,9 @@ const createSelector = (
         }
         if (canvasIsCompositing) {
           reasons.push({ content: i18n.t('parameters.invoke.canvasIsCompositing') });
+        }
+        if (canvasIsSelectingObject) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsSelectingObject') });
         }
 
         if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
@@ -305,6 +318,7 @@ const createSelector = (
       return { isReady: !reasons.length, reasons };
     }
   );
+};
 
 export const useIsReadyToEnqueue = () => {
   const templates = useStore($templates);
@@ -313,18 +327,28 @@ export const useIsReadyToEnqueue = () => {
   const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
   const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
   const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
+  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const selector = useMemo(
     () =>
-      createSelector(
+      createSelector({
         templates,
         isConnected,
         canvasIsFiltering,
         canvasIsTransforming,
         canvasIsRasterizing,
-        canvasIsCompositing
-      ),
-    [templates, isConnected, canvasIsFiltering, canvasIsTransforming, canvasIsRasterizing, canvasIsCompositing]
+        canvasIsCompositing,
+        canvasIsSelectingObject,
+      }),
+    [
+      templates,
+      isConnected,
+      canvasIsFiltering,
+      canvasIsTransforming,
+      canvasIsRasterizing,
+      canvasIsCompositing,
+      canvasIsSelectingObject,
+    ]
   );
   const value = useAppSelector(selector);
   return value;
