@@ -18,6 +18,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
 
 MAX_FLOAT = torch.finfo(torch.tensor(1.0).dtype).max
 
+# CIE Lab to Uniform Perceptual Lab profile is copyright © 2003 Bruce Justin Lindbloom. All rights reserved. <http://www.brucelindbloom.com>
 CIELAB_TO_UPLAB_ICC_PATH = Path(__file__).parent / "assets" / "CIELab_to_UPLab.icc"
 
 
