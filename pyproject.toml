@@ -164,7 +164,7 @@ version = { attr = "invokeai.version.__version__" }
   "*.png",
 ]
 "invokeai.assets.fonts" = ["**/*.ttf"]
-"invokeai.backend" = ["**.png", "**.icc"]
+"invokeai.backend" = ["**.png", "**/*.icc"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
 "invokeai.frontend.web.dist" = ["**"]
 "invokeai.frontend.web.static" = ["**"]
