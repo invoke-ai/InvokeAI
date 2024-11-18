@@ -6,6 +6,7 @@ import { CanvasEntityPreviewImage } from 'features/controlLayers/components/comm
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { RegionalGuidanceBadges } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceBadges';
 import { RegionalGuidanceSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceSettings';
+import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { RegionalGuidanceAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -24,16 +25,18 @@ export const RegionalGuidance = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <RegionalGuidanceAdapterGate>
-        <CanvasEntityContainer>
-          <CanvasEntityHeader>
-            <CanvasEntityPreviewImage />
-            <CanvasEntityEditableTitle />
-            <Spacer />
-            <RegionalGuidanceBadges />
-            <CanvasEntityHeaderCommonActions />
-          </CanvasEntityHeader>
-          <RegionalGuidanceSettings />
-        </CanvasEntityContainer>
+        <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
+          <CanvasEntityContainer>
+            <CanvasEntityHeader>
+              <CanvasEntityPreviewImage />
+              <CanvasEntityEditableTitle />
+              <Spacer />
+              <RegionalGuidanceBadges />
+              <CanvasEntityHeaderCommonActions />
+            </CanvasEntityHeader>
+            <RegionalGuidanceSettings />
+          </CanvasEntityContainer>
+        </CanvasEntityStateGate>
       </RegionalGuidanceAdapterGate>
     </EntityIdentifierContext.Provider>
   );

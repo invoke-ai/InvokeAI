@@ -14,7 +14,7 @@ import {
   rgPositivePromptChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
   CanvasRegionalGuidanceState,
@@ -168,7 +168,7 @@ export const buildSelectValidRegionalGuidanceActions = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
 ) => {
   return createMemoizedSelector(selectCanvasSlice, (canvas) => {
-    const entity = selectEntityOrThrow(canvas, entityIdentifier);
+    const entity = selectEntity(canvas, entityIdentifier);
     return {
       canAddPositivePrompt: entity?.positivePrompt === null,
       canAddNegativePrompt: entity?.negativePrompt === null,

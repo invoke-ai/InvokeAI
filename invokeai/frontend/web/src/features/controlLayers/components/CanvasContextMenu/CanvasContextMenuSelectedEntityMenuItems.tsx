@@ -5,6 +5,7 @@ import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintM
 import { IPAdapterMenuItems } from 'features/controlLayers/components/IPAdapter/IPAdapterMenuItems';
 import { RasterLayerMenuItems } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItems';
 import { RegionalGuidanceMenuItems } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItems';
+import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import {
   EntityIdentifierContext,
   useEntityIdentifierContext,
@@ -40,6 +41,15 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
 
 CanvasContextMenuSelectedEntityMenuItemsContent.displayName = 'CanvasContextMenuSelectedEntityMenuItemsContent';
 
+const CanvasContextMenuSelectedEntityMenuGroup = memo((props: PropsWithChildren) => {
+  const entityIdentifier = useEntityIdentifierContext();
+  const title = useEntityTypeString(entityIdentifier.type);
+
+  return <MenuGroup title={title}>{props.children}</MenuGroup>;
+});
+
+CanvasContextMenuSelectedEntityMenuGroup.displayName = 'CanvasContextMenuSelectedEntityMenuGroup';
+
 export const CanvasContextMenuSelectedEntityMenuItems = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
 
@@ -49,20 +59,13 @@ export const CanvasContextMenuSelectedEntityMenuItems = memo(() => {
 
   return (
     <EntityIdentifierContext.Provider value={selectedEntityIdentifier}>
-      <CanvasContextMenuSelectedEntityMenuGroup>
-        <CanvasContextMenuSelectedEntityMenuItemsContent />
-      </CanvasContextMenuSelectedEntityMenuGroup>
+      <CanvasEntityStateGate entityIdentifier={selectedEntityIdentifier}>
+        <CanvasContextMenuSelectedEntityMenuGroup>
+          <CanvasContextMenuSelectedEntityMenuItemsContent />
+        </CanvasContextMenuSelectedEntityMenuGroup>
+      </CanvasEntityStateGate>
     </EntityIdentifierContext.Provider>
   );
 });
 
 CanvasContextMenuSelectedEntityMenuItems.displayName = 'CanvasContextMenuSelectedEntityMenuItems';
-
-const CanvasContextMenuSelectedEntityMenuGroup = memo((props: PropsWithChildren) => {
-  const entityIdentifier = useEntityIdentifierContext();
-  const title = useEntityTypeString(entityIdentifier.type);
-
-  return <MenuGroup title={title}>{props.children}</MenuGroup>;
-});
-
-CanvasContextMenuSelectedEntityMenuGroup.displayName = 'CanvasContextMenuSelectedEntityMenuGroup';

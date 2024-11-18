@@ -4,6 +4,7 @@ import { CanvasEntityHeader } from 'features/controlLayers/components/common/Can
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
+import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { InpaintMaskAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -19,14 +20,16 @@ export const InpaintMask = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <InpaintMaskAdapterGate>
-        <CanvasEntityContainer>
-          <CanvasEntityHeader>
-            <CanvasEntityPreviewImage />
-            <CanvasEntityEditableTitle />
-            <Spacer />
-            <CanvasEntityHeaderCommonActions />
-          </CanvasEntityHeader>
-        </CanvasEntityContainer>
+        <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
+          <CanvasEntityContainer>
+            <CanvasEntityHeader>
+              <CanvasEntityPreviewImage />
+              <CanvasEntityEditableTitle />
+              <Spacer />
+              <CanvasEntityHeaderCommonActions />
+            </CanvasEntityHeader>
+          </CanvasEntityContainer>
+        </CanvasEntityStateGate>
       </InpaintMaskAdapterGate>
     </EntityIdentifierContext.Provider>
   );

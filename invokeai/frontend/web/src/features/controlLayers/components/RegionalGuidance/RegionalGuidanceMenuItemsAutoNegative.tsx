@@ -13,7 +13,11 @@ export const RegionalGuidanceMenuItemsAutoNegative = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectAutoNegative = useMemo(
-    () => createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).autoNegative),
+    () =>
+      createSelector(
+        selectCanvasSlice,
+        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceMenuItemsAutoNegative').autoNegative
+      ),
     [entityIdentifier]
   );
   const autoNegative = useAppSelector(selectAutoNegative);

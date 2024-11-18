@@ -20,7 +20,10 @@ export const RegionalGuidanceNegativePrompt = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const selectPrompt = useMemo(
     () =>
-      createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).negativePrompt ?? ''),
+      createSelector(
+        selectCanvasSlice,
+        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceNegativePrompt').negativePrompt ?? ''
+      ),
     [entityIdentifier]
   );
   const prompt = useAppSelector(selectPrompt);

@@ -3,6 +3,7 @@ import { Alert, AlertIcon, AlertTitle } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityTitle } from 'features/controlLayers/hooks/useEntityTitle';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
@@ -29,17 +30,23 @@ type AlertData = {
   title: string;
 };
 
+const buildSelectIsEnabled = (entityIdentifier: CanvasEntityIdentifier) =>
+  createSelector(
+    selectCanvasSlice,
+    (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isEnabled
+  );
+
+const buildSelectIsLocked = (entityIdentifier: CanvasEntityIdentifier) =>
+  createSelector(
+    selectCanvasSlice,
+    (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'CanvasAlertsSelectedEntityStatusContent').isLocked
+  );
+
 const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapter }: ContentProps) => {
   const { t } = useTranslation();
   const title = useEntityTitle(entityIdentifier);
-  const selectIsEnabled = useMemo(
-    () => createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).isEnabled),
-    [entityIdentifier]
-  );
-  const selectIsLocked = useMemo(
-    () => createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).isLocked),
-    [entityIdentifier]
-  );
+  const selectIsEnabled = useMemo(() => buildSelectIsEnabled(entityIdentifier), [entityIdentifier]);
+  const selectIsLocked = useMemo(() => buildSelectIsLocked(entityIdentifier), [entityIdentifier]);
   const isEnabled = useAppSelector(selectIsEnabled);
   const isLocked = useAppSelector(selectIsLocked);
   const isHidden = useEntityTypeIsHidden(entityIdentifier.type);
@@ -115,7 +122,11 @@ export const CanvasAlertsSelectedEntityStatus = memo(() => {
     return null;
   }
 
-  return <CanvasAlertsSelectedEntityStatusContent entityIdentifier={selectedEntityIdentifier} adapter={adapter} />;
+  return (
+    <CanvasEntityStateGate entityIdentifier={selectedEntityIdentifier}>
+      <CanvasAlertsSelectedEntityStatusContent entityIdentifier={selectedEntityIdentifier} adapter={adapter} />
+    </CanvasEntityStateGate>
+  );
 });
 
 CanvasAlertsSelectedEntityStatus.displayName = 'CanvasAlertsSelectedEntityStatus';

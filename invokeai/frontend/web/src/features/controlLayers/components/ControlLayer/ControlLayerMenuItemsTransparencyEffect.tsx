@@ -5,9 +5,17 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import { controlLayerWithTransparencyEffectToggled } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfBold } from 'react-icons/pi';
+
+const buildSelectWithTransparencyEffect = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
+  createSelector(
+    selectCanvasSlice,
+    (canvas) =>
+      selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerMenuItemsTransparencyEffect').withTransparencyEffect
+  );
 
 export const ControlLayerMenuItemsTransparencyEffect = memo(() => {
   const { t } = useTranslation();
@@ -15,11 +23,7 @@ export const ControlLayerMenuItemsTransparencyEffect = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('control_layer');
   const isLocked = useEntityIsLocked(entityIdentifier);
   const selectWithTransparencyEffect = useMemo(
-    () =>
-      createSelector(selectCanvasSlice, (canvas) => {
-        const entity = selectEntityOrThrow(canvas, entityIdentifier);
-        return entity.withTransparencyEffect;
-      }),
+    () => buildSelectWithTransparencyEffect(entityIdentifier),
     [entityIdentifier]
   );
   const withTransparencyEffect = useAppSelector(selectWithTransparencyEffect);

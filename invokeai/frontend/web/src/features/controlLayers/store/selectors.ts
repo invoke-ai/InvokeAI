@@ -202,16 +202,24 @@ export const selectRegionalGuidanceEntities = createSelector(
 
 /**
  * Selected an entity from the canvas slice. If the entity is not found, an error is thrown.
+ *
+ * Provide a `caller` string to help identify the caller in the error message.
+ *
  * Wrapper around {@link selectEntity}.
  */
 export function selectEntityOrThrow<T extends CanvasEntityIdentifier>(
   state: CanvasState,
-  entityIdentifier: T
+  entityIdentifier: T,
+  caller: string
 ): Extract<CanvasEntityState, T> {
   const entity = selectEntity(state, entityIdentifier);
-  assert(entity, `Entity with id ${entityIdentifier.id} not found`);
+  assert(entity, `Entity with id ${entityIdentifier.id} not found in ${caller}`);
   return entity;
 }
+
+export const selectEntityExists = <T extends CanvasEntityIdentifier>(entityIdentifier: T) => {
+  return createSelector(selectCanvasSlice, (canvas) => Boolean(selectEntity(canvas, entityIdentifier)));
+};
 
 /**
  * Selects all entities of the given type.

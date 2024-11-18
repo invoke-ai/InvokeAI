@@ -4,6 +4,7 @@ import { CanvasEntityHeader } from 'features/controlLayers/components/common/Can
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { IPAdapterSettings } from 'features/controlLayers/components/IPAdapter/IPAdapterSettings';
+import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -17,14 +18,16 @@ export const IPAdapter = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <CanvasEntityContainer>
-        <CanvasEntityHeader ps={4} py={5}>
-          <CanvasEntityEditableTitle />
-          <Spacer />
-          <CanvasEntityHeaderCommonActions />
-        </CanvasEntityHeader>
-        <IPAdapterSettings />
-      </CanvasEntityContainer>
+      <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
+        <CanvasEntityContainer>
+          <CanvasEntityHeader ps={4} py={5}>
+            <CanvasEntityEditableTitle />
+            <Spacer />
+            <CanvasEntityHeaderCommonActions />
+          </CanvasEntityHeader>
+          <IPAdapterSettings />
+        </CanvasEntityContainer>
+      </CanvasEntityStateGate>
     </EntityIdentifierContext.Provider>
   );
 });

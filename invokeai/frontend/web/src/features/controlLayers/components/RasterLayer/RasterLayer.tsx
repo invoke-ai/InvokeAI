@@ -4,6 +4,7 @@ import { CanvasEntityHeader } from 'features/controlLayers/components/common/Can
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
+import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { RasterLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -30,20 +31,22 @@ export const RasterLayer = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <RasterLayerAdapterGate>
-        <CanvasEntityContainer>
-          <CanvasEntityHeader>
-            <CanvasEntityPreviewImage />
-            <CanvasEntityEditableTitle />
-            <Spacer />
-            <CanvasEntityHeaderCommonActions />
-          </CanvasEntityHeader>
-          <DndDropTarget
-            dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
-            dndTargetData={dndTargetData}
-            label={t('controlLayers.replaceLayer')}
-            isDisabled={isBusy}
-          />
-        </CanvasEntityContainer>
+        <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
+          <CanvasEntityContainer>
+            <CanvasEntityHeader>
+              <CanvasEntityPreviewImage />
+              <CanvasEntityEditableTitle />
+              <Spacer />
+              <CanvasEntityHeaderCommonActions />
+            </CanvasEntityHeader>
+            <DndDropTarget
+              dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
+              dndTargetData={dndTargetData}
+              label={t('controlLayers.replaceLayer')}
+              isDisabled={isBusy}
+            />
+          </CanvasEntityContainer>
+        </CanvasEntityStateGate>
       </RasterLayerAdapterGate>
     </EntityIdentifierContext.Provider>
   );
