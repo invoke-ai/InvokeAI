@@ -11,6 +11,7 @@ import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
+import { isImageFieldCollectionInputInstance, isImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
@@ -103,14 +104,45 @@ const createSelector = (arg: {
                 return;
               }
 
+              const baseTKeyOptions = {
+                nodeLabel: node.data.label || nodeTemplate.title,
+                fieldLabel: field.label || fieldTemplate.title,
+              };
+
               if (fieldTemplate.required && field.value === undefined && !hasConnection) {
-                reasons.push({
-                  content: i18n.t('parameters.invoke.missingInputForField', {
-                    nodeLabel: node.data.label || nodeTemplate.title,
-                    fieldLabel: field.label || fieldTemplate.title,
-                  }),
-                });
+                reasons.push({ content: i18n.t('parameters.invoke.missingInputForField', baseTKeyOptions) });
                 return;
+              } else if (
+                field.value &&
+                isImageFieldCollectionInputInstance(field) &&
+                isImageFieldCollectionInputTemplate(fieldTemplate)
+              ) {
+                // Image collections may have min or max items to validate
+                // TODO(psyche): generalize this to other collection types
+                if (fieldTemplate.minItems !== undefined && fieldTemplate.minItems > 0 && field.value.length === 0) {
+                  reasons.push({ content: i18n.t('parameters.invoke.collectionEmpty', baseTKeyOptions) });
+                  return;
+                }
+                if (fieldTemplate.minItems !== undefined && field.value.length < fieldTemplate.minItems) {
+                  reasons.push({
+                    content: i18n.t('parameters.invoke.collectionTooFewItems', {
+                      ...baseTKeyOptions,
+                      size: field.value.length,
+                      minItems: fieldTemplate.minItems,
+                    }),
+                  });
+                  return;
+                }
+                if (fieldTemplate.maxItems !== undefined && field.value.length > fieldTemplate.maxItems) {
+                  reasons.push({
+                    content: i18n.t('parameters.invoke.collectionTooManyItems', {
+                      ...baseTKeyOptions,
+                      size: field.value.length,
+                      maxItems: fieldTemplate.maxItems,
+                    }),
+                  });
+                  return;
+                }
               }
             });
           });

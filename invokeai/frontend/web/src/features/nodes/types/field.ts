@@ -399,13 +399,13 @@ const zImageFieldCollectionInputTemplate = zFieldInputTemplateBase
     type: zImageCollectionFieldType,
     originalType: zFieldType.optional(),
     default: zImageFieldCollectionValue,
-    maxLength: z.number().int().gte(0).optional(),
-    minLength: z.number().int().gte(0).optional(),
+    maxItems: z.number().int().gte(0).optional(),
+    minItems: z.number().int().gte(0).optional(),
   })
   .refine(
     (val) => {
-      if (val.maxLength !== undefined && val.minLength !== undefined) {
-        return val.maxLength >= val.minLength;
+      if (val.maxItems !== undefined && val.minItems !== undefined) {
+        return val.maxItems >= val.minItems;
       }
       return true;
     },
