@@ -298,13 +298,12 @@ ip_adapter_sdxl = StarterModel(
     previous_names=["IP Adapter SDXL"],
 )
 ip_adapter_flux = StarterModel(
-    name="Standard Reference (XLabs FLUX IP-Adapter)",
+    name="Standard Reference (XLabs FLUX IP-Adapter v2)",
     base=BaseModelType.Flux,
-    source="https://huggingface.co/XLabs-AI/flux-ip-adapter/resolve/main/ip_adapter.safetensors",
+    source="https://huggingface.co/XLabs-AI/flux-ip-adapter-v2/resolve/main/ip_adapter.safetensors",
     description="References images with a more generalized/looser degree of precision.",
     type=ModelType.IPAdapter,
     dependencies=[clip_vit_l_image_encoder],
-    previous_names=["XLabs FLUX IP-Adapter"],
 )
 # endregion
 # region ControlNet
