@@ -417,15 +417,15 @@ const buildImageFieldCollectionInputTemplate: FieldInputTemplateBuilder<ImageFie
   const template: ImageFieldCollectionInputTemplate = {
     ...baseField,
     type: fieldType,
-    default: schemaObject.default ?? undefined,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
   };
 
-  if (schemaObject.minLength !== undefined) {
-    template.minLength = schemaObject.minLength;
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
   }
 
-  if (schemaObject.maxLength !== undefined) {
-    template.maxLength = schemaObject.maxLength;
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
   }
 
   return template;
