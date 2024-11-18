@@ -18,6 +18,7 @@ from torchvision.transforms.functional import to_pil_image as pil_image_from_ten
 
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.backend.image_util.composition import (
+    CIELAB_TO_UPLAB_ICC_PATH,
     MAX_FLOAT,
     equivalent_achromatic_lightness,
     gamut_clip_tensor,
@@ -33,7 +34,6 @@ from invokeai.backend.image_util.composition import (
     srgb_from_okhsl,
     srgb_from_okhsv,
     tensor_from_pil_image,
-    CIELAB_TO_UPLAB_ICC_PATH,
 )
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.invocation_api import (
@@ -546,7 +546,10 @@ class InvokeImageBlendInvocation(BaseInvocation, WithMetadata, WithBoard):
         default="RGB", description="Available color spaces for blend computations", ui_order=8
     )
     adaptive_gamut: float = InputField(
-        ge=0, default=0.0, description="Adaptive gamut clipping (0=off). Higher prioritizes chroma over lightness", ui_order=9
+        ge=0,
+        default=0.0,
+        description="Adaptive gamut clipping (0=off). Higher prioritizes chroma over lightness",
+        ui_order=9,
     )
     high_precision: bool = InputField(
         default=True, description="Use more steps in computing gamut when possible", ui_order=10
