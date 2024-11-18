@@ -69,35 +69,59 @@ export const setUpscaleInitialImage = (arg: { imageDTO: ImageDTO; dispatch: AppD
 
 export const setNodeImageFieldImage = (arg: {
   imageDTO: ImageDTO;
-  fieldIdentifer: FieldIdentifier;
+  fieldIdentifier: FieldIdentifier;
   dispatch: AppDispatch;
 }) => {
-  const { imageDTO, fieldIdentifer, dispatch } = arg;
-  dispatch(fieldImageValueChanged({ ...fieldIdentifer, value: imageDTO }));
+  const { imageDTO, fieldIdentifier, dispatch } = arg;
+  dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
 };
 
 export const addImagesToNodeImageFieldCollectionAction = (arg: {
   imageDTOs: ImageDTO[];
-  fieldIdentifer: FieldIdentifier;
+  fieldIdentifier: FieldIdentifier;
   dispatch: AppDispatch;
   getState: () => RootState;
 }) => {
-  const { imageDTOs, fieldIdentifer, dispatch, getState } = arg;
+  const { imageDTOs, fieldIdentifier, dispatch, getState } = arg;
   const fieldInputInstance = selectFieldInputInstance(
     selectNodesSlice(getState()),
-    fieldIdentifer.nodeId,
-    fieldIdentifer.fieldName
+    fieldIdentifier.nodeId,
+    fieldIdentifier.fieldName
   );
 
   if (!isImageFieldCollectionInputInstance(fieldInputInstance)) {
-    log.warn({ fieldIdentifer }, 'Attempted to add images to a non-image field collection');
+    log.warn({ fieldIdentifier }, 'Attempted to add images to a non-image field collection');
     return;
   }
 
   const images = fieldInputInstance.value ? [...fieldInputInstance.value] : [];
   images.push(...imageDTOs.map(({ image_name }) => ({ image_name })));
   const uniqueImages = uniqBy(images, 'image_name');
-  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifer, value: uniqueImages }));
+  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifier, value: uniqueImages }));
+};
+
+export const removeImageFromNodeImageFieldCollectionAction = (arg: {
+  imageName: string;
+  fieldIdentifier: FieldIdentifier;
+  dispatch: AppDispatch;
+  getState: () => RootState;
+}) => {
+  const { imageName, fieldIdentifier, dispatch, getState } = arg;
+  const fieldInputInstance = selectFieldInputInstance(
+    selectNodesSlice(getState()),
+    fieldIdentifier.nodeId,
+    fieldIdentifier.fieldName
+  );
+
+  if (!isImageFieldCollectionInputInstance(fieldInputInstance)) {
+    log.warn({ fieldIdentifier }, 'Attempted to remove image from a non-image field collection');
+    return;
+  }
+
+  const images = fieldInputInstance.value ? [...fieldInputInstance.value] : [];
+  const imagesWithoutTheImageToRemove = images.filter((image) => image.image_name !== imageName);
+  const uniqueImages = uniqBy(imagesWithoutTheImageToRemove, 'image_name');
+  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifier, value: uniqueImages }));
 };
 
 export const setComparisonImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {
