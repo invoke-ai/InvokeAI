@@ -218,27 +218,6 @@ export const buildFLUXGraph = async (
 
   const totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
   if (totalIPAdaptersAdded > 0) {
-    assert(steps > 2);
-    const cfg_scale_start_step = 1;
-    const cfg_scale_end_step = Math.ceil(steps / 2);
-    assert(cfg_scale_end_step > cfg_scale_start_step);
-
-    const negCond = g.addNode({
-      type: 'flux_text_encoder',
-      id: getPrefixedId('flux_text_encoder'),
-      prompt: '',
-    });
-
-    g.addEdge(modelLoader, 'clip', negCond, 'clip');
-    g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
-    g.addEdge(modelLoader, 'max_seq_len', negCond, 't5_max_seq_len');
-    g.addEdge(negCond, 'conditioning', denoise, 'negative_text_conditioning');
-
-    g.updateNode(denoise, {
-      cfg_scale: 3,
-      cfg_scale_start_step,
-      cfg_scale_end_step,
-    });
     g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
   } else {
     g.deleteNode(ipAdapterCollector.id);
