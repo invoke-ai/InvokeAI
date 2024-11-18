@@ -8,17 +8,18 @@
 # Parts based on Oklab: Copyright (c) 2021 Bj�rn Ottosson <https://bottosson.github.io/>
 # HSL code based on CPython: Copyright (c) 2001-2023 Python Software Foundation; All Rights Reserved
 from math import pi as PI
+from pathlib import Path
 from typing import Literal, Optional
 
 import torch
 from PIL import Image
-from pathlib import Path
 
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 
 MAX_FLOAT = torch.finfo(torch.tensor(1.0).dtype).max
 
 CIELAB_TO_UPLAB_ICC_PATH = Path(__file__).parent / "assets" / "CIELab_to_UPLab.icc"
+
 
 def equivalent_achromatic_lightness(lch_tensor: torch.Tensor):
     """Calculate Equivalent Achromatic Lightness accounting for Helmholtz-Kohlrausch effect"""
