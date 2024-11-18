@@ -1,8 +1,10 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Grid, GridItem } from '@invoke-ai/ui-library';
+import { Box, Flex, Grid, GridItem } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
+import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { UploadMultipleImageButton } from 'common/hooks/useImageUploadButton';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import type { AddImagesToNodeImageFieldCollection } from 'features/dnd/dnd';
 import { addImagesToNodeImageFieldCollectionDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -12,6 +14,7 @@ import { removeImageFromNodeImageFieldCollectionAction } from 'features/imageAct
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiExclamationMarkBold } from 'react-icons/pi';
@@ -19,6 +22,8 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
+
+const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
 
 const sx = {
   borderWidth: 1,
@@ -68,15 +73,7 @@ export const ImageFieldCollectionInputComponent = memo(
     );
 
     return (
-      <Flex
-        position="relative"
-        className="nodrag"
-        w="full"
-        h="full"
-        minH={16}
-        alignItems="stretch"
-        justifyContent="center"
-      >
+      <Flex position="relative" w="full" h="full" minH={16} maxH={64} alignItems="stretch" justifyContent="center">
         {(!field.value || field.value.length === 0) && (
           <UploadMultipleImageButton
             w="full"
@@ -88,23 +85,17 @@ export const ImageFieldCollectionInputComponent = memo(
           />
         )}
         {field.value && field.value.length > 0 && (
-          <Grid
-            className="nopan"
-            borderRadius="base"
-            w="full"
-            h="full"
-            templateColumns="repeat(3, 1fr)"
-            gap={1}
-            sx={sx}
-            data-error={isInvalid}
-            p={1}
-          >
-            {field.value.map(({ image_name }) => (
-              <GridItem key={image_name} position="relative">
-                <ImageGridItemContent imageName={image_name} onRemoveImage={onRemoveImage} />
-              </GridItem>
-            ))}
-          </Grid>
+          <Box w="full" h="auto" p={1} sx={sx} data-error={isInvalid} borderRadius="base">
+            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayscrollbarsOptions}>
+              <Grid className="nopan nowheel" w="full" h="full" templateColumns="repeat(4, 1fr)" gap={1}>
+                {field.value.map(({ image_name }) => (
+                  <GridItem key={image_name} position="relative" className="nodrag">
+                    <ImageGridItemContent imageName={image_name} onRemoveImage={onRemoveImage} />
+                  </GridItem>
+                ))}
+              </Grid>
+            </OverlayScrollbarsComponent>
+          </Box>
         )}
         <DndDropTarget
           dndTarget={addImagesToNodeImageFieldCollectionDndTarget}
@@ -135,7 +126,16 @@ const ImageGridItemContent = memo(
 
     return (
       <>
-        <DndImage imageDTO={query.data} asThumbnail />
+        <DndImage
+          imageDTO={query.data}
+          asThumbnail
+          objectFit="contain"
+          w="full"
+          h="full"
+          aspectRatio="1/1"
+          backgroundSize={8}
+          backgroundImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL}
+        />
         <DndImageIcon
           onClick={onClickRemove}
           icon={<PiArrowCounterClockwiseBold />}
