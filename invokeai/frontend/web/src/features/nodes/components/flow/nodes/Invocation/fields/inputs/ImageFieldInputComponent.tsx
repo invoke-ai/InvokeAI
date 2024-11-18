@@ -38,7 +38,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   const dndTargetData = useMemo<SetNodeImageFieldImageDndTargetData>(
     () =>
       setNodeImageFieldImageDndTarget.getData(
-        { fieldIdentifer: { nodeId, fieldName: field.name } },
+        { fieldIdentifier: { nodeId, fieldName: field.name } },
         field.value?.image_name
       ),
     [field, nodeId]
@@ -85,13 +85,16 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
       {imageDTO && (
         <>
           <DndImage imageDTO={imageDTO} minW={8} minH={8} />
-          <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
-            <DndImageIcon
-              onClick={handleReset}
-              icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
-              tooltip="Reset Image"
-            />
-          </Flex>
+          <DndImageIcon
+            onClick={handleReset}
+            icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
+            tooltip="Reset Image"
+            position="absolute"
+            flexDir="column"
+            top={1}
+            insetInlineEnd={1}
+            gap={1}
+          />
         </>
       )}
       <DndDropTarget

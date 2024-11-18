@@ -1,26 +1,30 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Grid, GridItem, IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { Flex, Grid, GridItem } from '@invoke-ai/ui-library';
+import { useAppStore } from 'app/store/nanostores/store';
+import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { UploadMultipleImageButton } from 'common/hooks/useImageUploadButton';
 import type { AddImagesToNodeImageFieldCollection } from 'features/dnd/dnd';
 import { addImagesToNodeImageFieldCollectionDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import { DndImageFromImageName } from 'features/dnd/DndImageFromImageName';
+import { DndImage } from 'features/dnd/DndImage';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
+import { removeImageFromNodeImageFieldCollectionAction } from 'features/imageActions/actions';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiExclamationMarkBold } from 'react-icons/pi';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
 const sx = {
+  borderWidth: 1,
   '&[data-error=true]': {
     borderColor: 'error.500',
     borderStyle: 'solid',
-    borderWidth: 1,
   },
 } satisfies SystemStyleObject;
 
@@ -28,27 +32,19 @@ export const ImageFieldCollectionInputComponent = memo(
   (props: FieldComponentProps<ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate>) => {
     const { t } = useTranslation();
     const { nodeId, field } = props;
-    const dispatch = useAppDispatch();
+    const store = useAppStore();
+
     const isInvalid = useFieldIsInvalid(nodeId, field.name);
 
-    const onReset = useCallback(() => {
-      dispatch(
-        fieldImageCollectionValueChanged({
-          nodeId,
-          fieldName: field.name,
-          value: [],
-        })
-      );
-    }, [dispatch, field.name, nodeId]);
-
     const dndTargetData = useMemo<AddImagesToNodeImageFieldCollection>(
-      () => addImagesToNodeImageFieldCollectionDndTarget.getData({ fieldIdentifer: { nodeId, fieldName: field.name } }),
+      () =>
+        addImagesToNodeImageFieldCollectionDndTarget.getData({ fieldIdentifier: { nodeId, fieldName: field.name } }),
       [field, nodeId]
     );
 
     const onUpload = useCallback(
       (imageDTOs: ImageDTO[]) => {
-        dispatch(
+        store.dispatch(
           fieldImageCollectionValueChanged({
             nodeId,
             fieldName: field.name,
@@ -56,7 +52,19 @@ export const ImageFieldCollectionInputComponent = memo(
           })
         );
       },
-      [dispatch, field.name, nodeId]
+      [store, nodeId, field.name]
+    );
+
+    const onRemoveImage = useCallback(
+      (imageName: string) => {
+        removeImageFromNodeImageFieldCollectionAction({
+          imageName,
+          fieldIdentifier: { nodeId, fieldName: field.name },
+          dispatch: store.dispatch,
+          getState: store.getState,
+        });
+      },
+      [field.name, nodeId, store.dispatch, store.getState]
     );
 
     return (
@@ -80,33 +88,23 @@ export const ImageFieldCollectionInputComponent = memo(
           />
         )}
         {field.value && field.value.length > 0 && (
-          <>
-            <Grid
-              className="nopan"
-              borderRadius="base"
-              w="full"
-              h="full"
-              templateColumns={`repeat(${Math.min(field.value.length, 3)}, 1fr)`}
-              gap={1}
-              sx={sx}
-              data-error={isInvalid}
-              p={1}
-            >
-              {field.value.map(({ image_name }) => (
-                <GridItem key={image_name}>
-                  <DndImageFromImageName imageName={image_name} asThumbnail />
-                </GridItem>
-              ))}
-            </Grid>
-            <IconButton
-              aria-label="reset"
-              icon={<PiArrowCounterClockwiseBold />}
-              position="absolute"
-              top={0}
-              insetInlineEnd={0}
-              onClick={onReset}
-            />
-          </>
+          <Grid
+            className="nopan"
+            borderRadius="base"
+            w="full"
+            h="full"
+            templateColumns="repeat(3, 1fr)"
+            gap={1}
+            sx={sx}
+            data-error={isInvalid}
+            p={1}
+          >
+            {field.value.map(({ image_name }) => (
+              <GridItem key={image_name} position="relative">
+                <ImageGridItemContent imageName={image_name} onRemoveImage={onRemoveImage} />
+              </GridItem>
+            ))}
+          </Grid>
         )}
         <DndDropTarget
           dndTarget={addImagesToNodeImageFieldCollectionDndTarget}
@@ -119,3 +117,37 @@ export const ImageFieldCollectionInputComponent = memo(
 );
 
 ImageFieldCollectionInputComponent.displayName = 'ImageFieldCollectionInputComponent';
+
+const ImageGridItemContent = memo(
+  ({ imageName, onRemoveImage }: { imageName: string; onRemoveImage: (imageName: string) => void }) => {
+    const query = useGetImageDTOQuery(imageName);
+    const onClickRemove = useCallback(() => {
+      onRemoveImage(imageName);
+    }, [imageName, onRemoveImage]);
+
+    if (query.isLoading) {
+      return <IAINoContentFallbackWithSpinner />;
+    }
+
+    if (!query.data) {
+      return <IAINoContentFallback icon={<PiExclamationMarkBold />} />;
+    }
+
+    return (
+      <>
+        <DndImage imageDTO={query.data} asThumbnail />
+        <DndImageIcon
+          onClick={onClickRemove}
+          icon={<PiArrowCounterClockwiseBold />}
+          tooltip="Reset Image"
+          position="absolute"
+          flexDir="column"
+          top={1}
+          insetInlineEnd={1}
+          gap={1}
+        />
+      </>
+    );
+  }
+);
+ImageGridItemContent.displayName = 'ImageGridItemContent';

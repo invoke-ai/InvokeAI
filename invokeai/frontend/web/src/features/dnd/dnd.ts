@@ -221,7 +221,7 @@ const _setNodeImageFieldImage = buildTypeAndKey('set-node-image-field-image');
 export type SetNodeImageFieldImageDndTargetData = DndData<
   typeof _setNodeImageFieldImage.type,
   typeof _setNodeImageFieldImage.key,
-  { fieldIdentifer: FieldIdentifier }
+  { fieldIdentifier: FieldIdentifier }
 >;
 export const setNodeImageFieldImageDndTarget: DndTarget<SetNodeImageFieldImageDndTargetData, SingleImageDndSourceData> =
   {
@@ -236,8 +236,8 @@ export const setNodeImageFieldImageDndTarget: DndTarget<SetNodeImageFieldImageDn
     },
     handler: ({ sourceData, targetData, dispatch }) => {
       const { imageDTO } = sourceData.payload;
-      const { fieldIdentifer } = targetData.payload;
-      setNodeImageFieldImage({ fieldIdentifer, imageDTO, dispatch });
+      const { fieldIdentifier } = targetData.payload;
+      setNodeImageFieldImage({ fieldIdentifier, imageDTO, dispatch });
     },
   };
 //#endregion
@@ -247,7 +247,7 @@ const _addImagesToNodeImageFieldCollection = buildTypeAndKey('add-images-to-imag
 export type AddImagesToNodeImageFieldCollection = DndData<
   typeof _addImagesToNodeImageFieldCollection.type,
   typeof _addImagesToNodeImageFieldCollection.key,
-  { fieldIdentifer: FieldIdentifier }
+  { fieldIdentifier: FieldIdentifier }
 >;
 export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
   AddImagesToNodeImageFieldCollection,
@@ -267,7 +267,7 @@ export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
       return;
     }
 
-    const { fieldIdentifer } = targetData.payload;
+    const { fieldIdentifier } = targetData.payload;
     const imageDTOs: ImageDTO[] = [];
 
     if (singleImageDndSource.typeGuard(sourceData)) {
@@ -276,7 +276,7 @@ export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
       imageDTOs.push(...sourceData.payload.imageDTOs);
     }
 
-    addImagesToNodeImageFieldCollectionAction({ fieldIdentifer, imageDTOs, dispatch, getState });
+    addImagesToNodeImageFieldCollectionAction({ fieldIdentifier, imageDTOs, dispatch, getState });
   },
 };
 //#endregion
