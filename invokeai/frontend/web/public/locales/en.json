@@ -1787,6 +1787,8 @@
         "newGallerySessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be sent to the gallery.",
         "newCanvasSession": "New Canvas Session",
         "newCanvasSessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be staged on the canvas.",
+        "resetCanvasLayers": "Reset Canvas Layers",
+        "resetGenerationSettings": "Reset Generation Settings",
         "replaceCurrent": "Replace Current",
         "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or draw on the canvas to get started.",
         "controlMode": {
