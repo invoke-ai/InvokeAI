@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import type { Selector } from 'react-redux';
 import { SelectionMode } from 'reactflow';
 
-type WorkflowSettingsState = {
+export type WorkflowSettingsState = {
   _version: 1;
   shouldShowMinimapPanel: boolean;
   shouldValidateGraph: boolean;
