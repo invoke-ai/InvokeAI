@@ -1985,7 +1985,6 @@
         "inpaintMask_withCount_many": "Remplir les masques",
         "inpaintMask_withCount_other": "Remplir les masques",
         "newImg2ImgCanvasFromImage": "Nouvelle Img2Img à partir de l'image",
-        "resetCanvas": "Réinitialiser la Toile",
         "bboxOverlay": "Afficher la superposition des Bounding Box",
         "moveToFront": "Déplacer vers le permier plan",
         "moveToBack": "Déplacer vers l'arrière plan",
@@ -2034,7 +2033,6 @@
             "help2": "Commencez par un point <Bold>Inclure</Bold> au sein de l'objet cible. Ajoutez d'autres points pour affiner la sélection. Moins de points produisent généralement de meilleurs résultats.",
             "help3": "Inversez la sélection pour sélectionner tout sauf l'objet cible."
         },
-        "canvasAsControlLayer": "$t(controlLayers.canvas) en tant que $t(controlLayers.controlLayer)",
         "convertRegionalGuidanceTo": "Convertir $t(controlLayers.regionalGuidance) vers",
         "copyRasterLayerTo": "Copier $t(controlLayers.rasterLayer) vers",
         "newControlLayer": "Nouveau $t(controlLayers.controlLayer)",
@@ -2044,8 +2042,7 @@
         "convertInpaintMaskTo": "Convertir $t(controlLayers.inpaintMask) vers",
         "copyControlLayerTo": "Copier $t(controlLayers.controlLayer) vers",
         "newInpaintMask": "Nouveau $t(controlLayers.inpaintMask)",
-        "newRasterLayer": "Nouveau $t(controlLayers.rasterLayer)",
-        "canvasAsRasterLayer": "$t(controlLayers.canvas) en tant que $t(controlLayers.rasterLayer)"
+        "newRasterLayer": "Nouveau $t(controlLayers.rasterLayer)"
     },
     "upscaling": {
         "exceedsMaxSizeDetails": "La limite maximale d'agrandissement est de {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Veuillez essayer une image plus petite ou réduire votre sélection d'échelle.",

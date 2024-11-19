@@ -1443,7 +1443,6 @@
         "deleteReferenceImage": "Referenzbild löschen",
         "referenceImage": "Referenzbild",
         "opacity": "Opazität",
-        "resetCanvas": "Leinwand zurücksetzen",
         "removeBookmark": "Lesezeichen entfernen",
         "rasterLayer": "Raster-Ebene",
         "rasterLayers_withCount_visible": "Raster-Ebenen ({{count}})",
