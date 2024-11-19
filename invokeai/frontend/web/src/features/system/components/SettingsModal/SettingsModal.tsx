@@ -26,7 +26,6 @@ import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsMo
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import {
   selectSystemShouldAntialiasProgressImage,
   selectSystemShouldConfirmOnDelete,
@@ -59,6 +58,7 @@ type ConfigOptions = {
   shouldShowResetWebUiText?: boolean;
   shouldShowClearIntermediates?: boolean;
   shouldShowLocalizationToggle?: boolean;
+  shouldShowInvocationProgressDetailSetting?: boolean;
 };
 
 const defaultConfig: ConfigOptions = {
@@ -66,6 +66,7 @@ const defaultConfig: ConfigOptions = {
   shouldShowResetWebUiText: true,
   shouldShowClearIntermediates: true,
   shouldShowLocalizationToggle: true,
+  shouldShowInvocationProgressDetailSetting: true,
 };
 
 type SettingsModalProps = {
@@ -107,7 +108,6 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const shouldEnableModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
-  const isInvocationProgressAlertEnabled = useFeatureStatus('invocationProgressAlert');
   const onToggleConfirmOnNewSession = useCallback(() => {
     dispatch(shouldConfirmOnNewSessionToggled());
   }, [dispatch]);
@@ -233,7 +233,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                         onChange={handleChangeShouldAntialiasProgressImage}
                       />
                     </FormControl>
-                    {isInvocationProgressAlertEnabled && (
+                    {Boolean(config?.shouldShowInvocationProgressDetailSetting) && (
                       <FormControl>
                         <FormLabel>{t('settings.showDetailedInvocationProgress')}</FormLabel>
                         <Switch

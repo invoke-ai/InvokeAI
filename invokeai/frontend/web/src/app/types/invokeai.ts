@@ -25,9 +25,7 @@ export type AppFeature =
   | 'invocationCache'
   | 'bulkDownload'
   | 'starterModels'
-  | 'hfToken'
-  | 'invocationProgressAlert';
-
+  | 'hfToken';
 /**
  * A disable-able Stable Diffusion feature
  */
