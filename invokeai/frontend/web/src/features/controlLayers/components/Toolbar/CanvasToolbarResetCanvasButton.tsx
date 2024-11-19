@@ -4,7 +4,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashBold } from 'react-icons/pi';
+import { PiEmptyBold } from 'react-icons/pi';
 
 export const CanvasToolbarResetCanvasButton = memo(() => {
   const { t } = useTranslation();
@@ -20,7 +20,7 @@ export const CanvasToolbarResetCanvasButton = memo(() => {
       tooltip={t('controlLayers.resetCanvas')}
       onClick={onClick}
       colorScheme="error"
-      icon={<PiTrashBold />}
+      icon={<PiEmptyBold />}
       variant="link"
       alignSelf="stretch"
     />
