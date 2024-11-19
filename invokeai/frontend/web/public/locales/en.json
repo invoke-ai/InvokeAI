@@ -1676,7 +1676,7 @@
         "mergingLayers": "Merging layers",
         "clearHistory": "Clear History",
         "bboxOverlay": "Show Bbox Overlay",
-        "resetCanvas": "Reset Canvas",
+        "newSession": "New Session",
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
