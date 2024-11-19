@@ -41,7 +41,11 @@ const ClassificationTooltipContent = memo(({ classification }: { classification:
   }
 
   if (classification === 'internal') {
-    return t('nodes.prototypeDesc');
+    return t('nodes.internalDesc');
+  }
+
+  if (classification === 'special') {
+    return t('nodes.specialDesc');
   }
 
   return null;
