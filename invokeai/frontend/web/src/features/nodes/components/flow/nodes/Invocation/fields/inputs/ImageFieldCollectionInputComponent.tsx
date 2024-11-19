@@ -73,7 +73,16 @@ export const ImageFieldCollectionInputComponent = memo(
     );
 
     return (
-      <Flex position="relative" w="full" h="full" minH={16} maxH={64} alignItems="stretch" justifyContent="center">
+      <Flex
+        className="nodrag"
+        position="relative"
+        w="full"
+        h="full"
+        minH={16}
+        maxH={64}
+        alignItems="stretch"
+        justifyContent="center"
+      >
         {(!field.value || field.value.length === 0) && (
           <UploadMultipleImageButton
             w="full"
@@ -86,8 +95,13 @@ export const ImageFieldCollectionInputComponent = memo(
         )}
         {field.value && field.value.length > 0 && (
           <Box w="full" h="auto" p={1} sx={sx} data-error={isInvalid} borderRadius="base">
-            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayscrollbarsOptions}>
-              <Grid className="nopan nowheel" w="full" h="full" templateColumns="repeat(4, 1fr)" gap={1}>
+            <OverlayScrollbarsComponent
+              className="nowheel"
+              defer
+              style={overlayScrollbarsStyles}
+              options={overlayscrollbarsOptions}
+            >
+              <Grid w="full" h="full" templateColumns="repeat(4, 1fr)" gap={1}>
                 {field.value.map(({ image_name }) => (
                   <GridItem key={image_name} position="relative" className="nodrag">
                     <ImageGridItemContent imageName={image_name} onRemoveImage={onRemoveImage} />
