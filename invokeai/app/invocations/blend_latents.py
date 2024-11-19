@@ -13,6 +13,50 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
 from invokeai.backend.util.devices import TorchDevice
 
 
+def slerp(
+    t: Union[float, np.ndarray],
+    v0: Union[torch.Tensor, np.ndarray],
+    v1: Union[torch.Tensor, np.ndarray],
+    device: torch.device,
+    DOT_THRESHOLD: float = 0.9995,
+):
+    """
+    Spherical linear interpolation
+    Args:
+        t (float/np.ndarray): Float value between 0.0 and 1.0
+        v0 (np.ndarray): Starting vector
+        v1 (np.ndarray): Final vector
+        DOT_THRESHOLD (float): Threshold for considering the two vectors as
+                            colineal. Not recommended to alter this.
+    Returns:
+        v2 (np.ndarray): Interpolation vector between v0 and v1
+    """
+    inputs_are_torch = False
+    if not isinstance(v0, np.ndarray):
+        inputs_are_torch = True
+        v0 = v0.detach().cpu().numpy()
+    if not isinstance(v1, np.ndarray):
+        inputs_are_torch = True
+        v1 = v1.detach().cpu().numpy()
+
+    dot = np.sum(v0 * v1 / (np.linalg.norm(v0) * np.linalg.norm(v1)))
+    if np.abs(dot) > DOT_THRESHOLD:
+        v2 = (1 - t) * v0 + t * v1
+    else:
+        theta_0 = np.arccos(dot)
+        sin_theta_0 = np.sin(theta_0)
+        theta_t = theta_0 * t
+        sin_theta_t = np.sin(theta_t)
+        s0 = np.sin(theta_0 - theta_t) / sin_theta_0
+        s1 = sin_theta_t / sin_theta_0
+        v2 = s0 * v0 + s1 * v1
+
+    if inputs_are_torch:
+        v2 = torch.from_numpy(v2).to(device)
+
+    return v2
+
+
 @invocation(
     "lblend",
     title="Blend Latents",
@@ -64,50 +108,8 @@ class BlendLatentsInvocation(BaseInvocation):
 
         device = TorchDevice.choose_torch_device()
 
-        def slerp(
-            t: Union[float, np.ndarray],
-            v0: Union[torch.Tensor, np.ndarray],
-            v1: Union[torch.Tensor, np.ndarray],
-            DOT_THRESHOLD: float = 0.9995,
-        ):
-            """
-            Spherical linear interpolation
-            Args:
-                t (float/np.ndarray): Float value between 0.0 and 1.0
-                v0 (np.ndarray): Starting vector
-                v1 (np.ndarray): Final vector
-                DOT_THRESHOLD (float): Threshold for considering the two vectors as
-                                    colineal. Not recommended to alter this.
-            Returns:
-                v2 (np.ndarray): Interpolation vector between v0 and v1
-            """
-            inputs_are_torch = False
-            if not isinstance(v0, np.ndarray):
-                inputs_are_torch = True
-                v0 = v0.detach().cpu().numpy()
-            if not isinstance(v1, np.ndarray):
-                inputs_are_torch = True
-                v1 = v1.detach().cpu().numpy()
-
-            dot = np.sum(v0 * v1 / (np.linalg.norm(v0) * np.linalg.norm(v1)))
-            if np.abs(dot) > DOT_THRESHOLD:
-                v2 = (1 - t) * v0 + t * v1
-            else:
-                theta_0 = np.arccos(dot)
-                sin_theta_0 = np.sin(theta_0)
-                theta_t = theta_0 * t
-                sin_theta_t = np.sin(theta_t)
-                s0 = np.sin(theta_0 - theta_t) / sin_theta_0
-                s1 = sin_theta_t / sin_theta_0
-                v2 = s0 * v0 + s1 * v1
-
-            if inputs_are_torch:
-                v2 = torch.from_numpy(v2).to(device)
-
-            return v2
-
         # blend
-        blended_latents = slerp(self.alpha, latents_a, latents_b)
+        blended_latents = slerp(self.alpha, latents_a, latents_b, device)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         blended_latents = blended_latents.to("cpu")
