@@ -182,21 +182,24 @@ export const createNewCanvasEntityFromImage = (arg: {
 };
 
 /**
- * Creates a new canvas with the given image as the initial image, replicating the img2img flow:
+ * Creates a new canvas with the given image as the only layer:
  * - Reset the canvas
  * - Resize the bbox to the image's aspect ratio at the optimal size for the selected model
- * - Add the image as a raster layer
- * - Resizes the layer to fit the bbox using the 'fill' strategy
+ * - Add the image as a layer of the given type
+ * - If `withResize`: Resizes the layer to fit the bbox using the 'fill' strategy
  *
  * This allows the user to immediately generate a new image from the given image without any additional steps.
+ *
+ * Using 'raster_layer' for the type and enabling `withResize` replicates the common img2img flow.
  */
 export const newCanvasFromImage = (arg: {
   imageDTO: ImageDTO;
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
+  withResize: boolean;
   dispatch: AppDispatch;
   getState: () => RootState;
 }) => {
-  const { type, imageDTO, dispatch, getState } = arg;
+  const { type, imageDTO, withResize, dispatch, getState } = arg;
   const state = getState();
 
   const base = selectBboxModelBase(state);
@@ -229,7 +232,9 @@ export const newCanvasFromImage = (arg: {
         objects: [imageObject],
         position: { x, y },
       } satisfies Partial<CanvasRasterLayerState>;
-      addInitCallback(overrides.id);
+      if (withResize) {
+        addInitCallback(overrides.id);
+      }
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
@@ -243,7 +248,9 @@ export const newCanvasFromImage = (arg: {
         position: { x, y },
         controlAdapter: deepClone(initialControlNet),
       } satisfies Partial<CanvasControlLayerState>;
-      addInitCallback(overrides.id);
+      if (withResize) {
+        addInitCallback(overrides.id);
+      }
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
@@ -256,7 +263,9 @@ export const newCanvasFromImage = (arg: {
         objects: [imageObject],
         position: { x, y },
       } satisfies Partial<CanvasInpaintMaskState>;
-      addInitCallback(overrides.id);
+      if (withResize) {
+        addInitCallback(overrides.id);
+      }
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
@@ -269,7 +278,9 @@ export const newCanvasFromImage = (arg: {
         objects: [imageObject],
         position: { x, y },
       } satisfies Partial<CanvasRegionalGuidanceState>;
-      addInitCallback(overrides.id);
+      if (withResize) {
+        addInitCallback(overrides.id);
+      }
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
