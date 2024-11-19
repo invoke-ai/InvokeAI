@@ -1660,7 +1660,6 @@
         "clearCaches": "Очистить кэши",
         "recalculateRects": "Пересчитать прямоугольники",
         "saveBboxToGallery": "Сохранить рамку в галерею",
-        "resetCanvas": "Сбросить холст",
         "canvas": "Холст",
         "global": "Глобальный",
         "newGlobalReferenceImageError": "Проблема с созданием глобального эталонного изображения",

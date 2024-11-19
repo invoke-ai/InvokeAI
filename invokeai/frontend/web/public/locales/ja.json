@@ -637,7 +637,6 @@
             "cancel": "キャンセル",
             "reset": "リセット"
         },
-        "resetCanvas": "キャンバスをリセット",
         "cropLayerToBbox": "レイヤーをバウンディングボックスでクロップ",
         "convertInpaintMaskTo": "$t(controlLayers.inpaintMask)を変換",
         "regionalGuidance_withCount_other": "領域ガイダンス",
