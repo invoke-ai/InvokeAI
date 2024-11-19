@@ -6,7 +6,7 @@ import { isImageFieldCollectionInputInstance } from 'features/nodes/types/field'
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, BatchConfig } from 'services/api/types';
 
 const log = logger('workflows');
@@ -70,11 +70,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         prepend: action.payload.prepend,
       };
 
-      const req = dispatch(
-        queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
-          fixedCacheKey: 'enqueueBatch',
-        })
-      );
+      const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));
       try {
         await req.unwrap();
       } finally {

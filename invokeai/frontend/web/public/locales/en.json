@@ -263,7 +263,8 @@
         "iterations_one": "Iteration",
         "iterations_other": "Iterations",
         "generations_one": "Generation",
-        "generations_other": "Generations"
+        "generations_other": "Generations",
+        "batchSize": "Batch Size"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",

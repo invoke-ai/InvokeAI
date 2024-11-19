@@ -4,7 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { buildAdHocPostProcessingGraph } from 'features/nodes/util/graph/buildAdHocPostProcessingGraph';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -32,9 +32,7 @@ export const addAdHocPostProcessingRequestedListener = (startAppListening: AppSt
 
       try {
         const req = dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
-            fixedCacheKey: 'enqueueBatch',
-          })
+          queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, enqueueMutationFixedCacheKeyOptions)
         );
 
         const enqueueResult = await req.unwrap();

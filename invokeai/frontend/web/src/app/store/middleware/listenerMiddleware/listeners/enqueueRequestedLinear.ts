@@ -13,7 +13,7 @@ import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGr
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { toast } from 'features/toast/toast';
 import { serializeError } from 'serialize-error';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Invocation } from 'services/api/types';
 import { assert, AssertionError } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -91,9 +91,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       }
 
       const req = dispatch(
-        queueApi.endpoints.enqueueBatch.initiate(prepareBatchResult.value, {
-          fixedCacheKey: 'enqueueBatch',
-        })
+        queueApi.endpoints.enqueueBatch.initiate(prepareBatchResult.value, enqueueMutationFixedCacheKeyOptions)
       );
       req.reset();
 

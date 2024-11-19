@@ -6,7 +6,7 @@ import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { memo } from 'react';
 import { PiLightningFill, PiSparkleFill } from 'react-icons/pi';
 
-import { QueueButtonTooltip } from './QueueButtonTooltip';
+import { InvokeButtonTooltip } from './InvokeButtonTooltip/InvokeButtonTooltip';
 
 const invoke = 'Invoke';
 
@@ -18,7 +18,7 @@ export const InvokeButton = memo(() => {
   return (
     <Flex pos="relative" w="200px">
       <QueueIterationsNumberInput />
-      <QueueButtonTooltip prepend={shift}>
+      <InvokeButtonTooltip prepend={shift}>
         <Button
           onClick={shift ? queue.queueFront : queue.queueBack}
           isLoading={queue.isLoading || isLoadingDynamicPrompts}
@@ -36,7 +36,7 @@ export const InvokeButton = memo(() => {
           <span>{invoke}</span>
           <Spacer />
         </Button>
-      </QueueButtonTooltip>
+      </InvokeButtonTooltip>
     </Flex>
   );
 });

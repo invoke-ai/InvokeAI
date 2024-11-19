@@ -1,9 +1,5 @@
-import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { $true } from 'app/store/nanostores/util';
-import { useAppSelector } from 'app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
 import type { AppConfig } from 'app/types/invokeai';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -11,7 +7,6 @@ import type { CanvasState } from 'features/controlLayers/store/types';
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
@@ -21,13 +16,17 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
-import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
-import { $isConnected } from 'services/events/stores';
+
+/**
+ * This file contains selectors and utilities for determining the app is ready to enqueue generations. The handling
+ * differs for each tab (canvas, upscaling, workflows).
+ *
+ * For example, the canvas tab needs to check the status of the canvas manager before enqueuing, while the workflows
+ * tab needs to check the status of the nodes and their connections.
+ */
 
 const LAYER_TYPE_TO_TKEY = {
   reference_image: 'controlLayers.referenceImage',
@@ -37,15 +36,22 @@ const LAYER_TYPE_TO_TKEY = {
   control_layer: 'controlLayers.controlLayer',
 } as const;
 
-type Reason = { prefix?: string; content: string };
+export type Reason = { prefix?: string; content: string };
 
-const handleWorkflowsTab = (arg: {
-  reasons: Reason[];
+const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
+
+const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
+  isConnected: boolean;
   nodes: NodesState;
   workflowSettings: WorkflowSettingsState;
   templates: Templates;
-}) => {
-  const { reasons, nodes, workflowSettings, templates } = arg;
+}): Reason[] => {
+  const { isConnected, nodes, workflowSettings, templates } = arg;
+  const reasons: Reason[] = [];
+
+  if (!isConnected) {
+    reasons.push(disconnectedReason(i18n.t));
+  }
 
   if (workflowSettings.shouldValidateGraph) {
     if (!nodes.nodes.length) {
@@ -121,15 +127,22 @@ const handleWorkflowsTab = (arg: {
       });
     });
   }
+
+  return reasons;
 };
 
-const handleUpscalingTab = (arg: {
-  reasons: Reason[];
+const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
+  isConnected: boolean;
   upscale: UpscaleState;
   config: AppConfig;
   params: ParamsState;
 }) => {
-  const { reasons, upscale, config, params } = arg;
+  const { isConnected, upscale, config, params } = arg;
+  const reasons: Reason[] = [];
+
+  if (!isConnected) {
+    reasons.push(disconnectedReason(i18n.t));
+  }
 
   if (!upscale.upscaleInitialImage) {
     reasons.push({ content: i18n.t('upscaling.missingUpscaleInitialImage') });
@@ -160,10 +173,12 @@ const handleUpscalingTab = (arg: {
       reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
     }
   }
+
+  return reasons;
 };
 
-const handleCanvasTab = (arg: {
-  reasons: Reason[];
+const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
+  isConnected: boolean;
   canvas: CanvasState;
   params: ParamsState;
   dynamicPrompts: DynamicPromptsState;
@@ -174,7 +189,7 @@ const handleCanvasTab = (arg: {
   canvasIsSelectingObject: boolean;
 }) => {
   const {
-    reasons,
+    isConnected,
     canvas,
     params,
     dynamicPrompts,
@@ -184,8 +199,12 @@ const handleCanvasTab = (arg: {
     canvasIsCompositing,
     canvasIsSelectingObject,
   } = arg;
-
   const { model, positivePrompt } = params;
+  const reasons: Reason[] = [];
+
+  if (!isConnected) {
+    reasons.push(disconnectedReason(i18n.t));
+  }
 
   if (canvasIsFiltering) {
     reasons.push({ content: i18n.t('parameters.invoke.canvasIsFiltering') });
@@ -353,10 +372,11 @@ const handleCanvasTab = (arg: {
         reasons.push({ prefix, content });
       }
     });
+
+  return reasons;
 };
 
-const createSelector = (arg: {
-  templates: Templates;
+export const buildSelectReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
   canvasIsFiltering: boolean;
   canvasIsTransforming: boolean;
@@ -365,7 +385,6 @@ const createSelector = (arg: {
   canvasIsSelectingObject: boolean;
 }) => {
   const {
-    templates,
     isConnected,
     canvasIsFiltering,
     canvasIsTransforming,
@@ -373,79 +392,127 @@ const createSelector = (arg: {
     canvasIsCompositing,
     canvasIsSelectingObject,
   } = arg;
-  return createMemoizedSelector(
-    [
-      selectSystemSlice,
-      selectNodesSlice,
-      selectWorkflowSettingsSlice,
-      selectDynamicPromptsSlice,
-      selectCanvasSlice,
-      selectParamsSlice,
-      selectUpscaleSlice,
-      selectConfigSlice,
-      selectActiveTab,
-    ],
-    (system, nodes, workflowSettings, dynamicPrompts, canvas, params, upscale, config, activeTabName) => {
-      const reasons: Reason[] = [];
 
-      // Cannot generate if not connected
-      if (!isConnected) {
-        reasons.push({ content: i18n.t('parameters.invoke.systemDisconnected') });
-      }
-
-      if (activeTabName === 'workflows') {
-        handleWorkflowsTab({ reasons, nodes, workflowSettings, templates });
-      } else if (activeTabName === 'upscaling') {
-        handleUpscalingTab({ reasons, upscale, config, params });
-      } else {
-        handleCanvasTab({
-          reasons,
-          canvas,
-          params,
-          dynamicPrompts,
-          canvasIsFiltering,
-          canvasIsTransforming,
-          canvasIsRasterizing,
-          canvasIsCompositing,
-          canvasIsSelectingObject,
-        });
-      }
-
-      return { isReady: !reasons.length, reasons };
-    }
-  );
-};
-
-export const useIsReadyToEnqueue = () => {
-  const templates = useStore($templates);
-  const isConnected = useStore($isConnected);
-  const canvasManager = useCanvasManagerSafe();
-  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
-  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
-  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
-  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
-  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
-  const selector = useMemo(
-    () =>
-      createSelector({
-        templates,
+  return createSelector(
+    selectCanvasSlice,
+    selectParamsSlice,
+    selectDynamicPromptsSlice,
+    (canvas, params, dynamicPrompts) =>
+      getReasonsWhyCannotEnqueueCanvasTab({
         isConnected,
+        canvas,
+        params,
+        dynamicPrompts,
         canvasIsFiltering,
         canvasIsTransforming,
         canvasIsRasterizing,
         canvasIsCompositing,
         canvasIsSelectingObject,
-      }),
-    [
-      templates,
-      isConnected,
-      canvasIsFiltering,
-      canvasIsTransforming,
-      canvasIsRasterizing,
-      canvasIsCompositing,
-      canvasIsSelectingObject,
-    ]
+      })
   );
-  const value = useAppSelector(selector);
-  return value;
 };
+
+export const buildSelectIsReadyToEnqueueCanvasTab = (arg: {
+  isConnected: boolean;
+  canvasIsFiltering: boolean;
+  canvasIsTransforming: boolean;
+  canvasIsRasterizing: boolean;
+  canvasIsCompositing: boolean;
+  canvasIsSelectingObject: boolean;
+}) => {
+  const {
+    isConnected,
+    canvasIsFiltering,
+    canvasIsTransforming,
+    canvasIsRasterizing,
+    canvasIsCompositing,
+    canvasIsSelectingObject,
+  } = arg;
+
+  return createSelector(
+    selectCanvasSlice,
+    selectParamsSlice,
+    selectDynamicPromptsSlice,
+    (canvas, params, dynamicPrompts) =>
+      getReasonsWhyCannotEnqueueCanvasTab({
+        isConnected,
+        canvas,
+        params,
+        dynamicPrompts,
+        canvasIsFiltering,
+        canvasIsTransforming,
+        canvasIsRasterizing,
+        canvasIsCompositing,
+        canvasIsSelectingObject,
+      }).length === 0
+  );
+};
+
+export const buildSelectReasonsWhyCannotEnqueueUpscaleTab = (arg: { isConnected: boolean }) => {
+  const { isConnected } = arg;
+  return createSelector(selectUpscaleSlice, selectConfigSlice, selectParamsSlice, (upscale, config, params) =>
+    getReasonsWhyCannotEnqueueUpscaleTab({ isConnected, upscale, config, params })
+  );
+};
+
+export const buildSelectIsReadyToEnqueueUpscaleTab = (arg: { isConnected: boolean }) => {
+  const { isConnected } = arg;
+
+  return createSelector(
+    selectUpscaleSlice,
+    selectConfigSlice,
+    selectParamsSlice,
+    (upscale, config, params) =>
+      getReasonsWhyCannotEnqueueUpscaleTab({ isConnected, upscale, config, params }).length === 0
+  );
+};
+
+export const buildSelectReasonsWhyCannotEnqueueWorkflowsTab = (arg: { isConnected: boolean; templates: Templates }) => {
+  const { isConnected, templates } = arg;
+
+  return createSelector(selectNodesSlice, selectWorkflowSettingsSlice, (nodes, workflowSettings) =>
+    getReasonsWhyCannotEnqueueWorkflowsTab({
+      isConnected,
+      nodes,
+      workflowSettings,
+      templates,
+    })
+  );
+};
+
+export const buildSelectIsReadyToEnqueueWorkflowsTab = (arg: { isConnected: boolean; templates: Templates }) => {
+  const { isConnected, templates } = arg;
+
+  return createSelector(
+    selectNodesSlice,
+    selectWorkflowSettingsSlice,
+    (nodes, workflowSettings) =>
+      getReasonsWhyCannotEnqueueWorkflowsTab({
+        isConnected,
+        nodes,
+        workflowSettings,
+        templates,
+      }).length === 0
+  );
+};
+
+export const selectPromptsCount = createSelector(
+  selectParamsSlice,
+  selectDynamicPromptsSlice,
+  (params, dynamicPrompts) => (getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1)
+);
+
+export const selectWorkflowsBatchSize = createSelector(selectNodesSlice, ({ nodes }) =>
+  // The batch size is the product of all batch nodes' collection sizes
+  nodes.filter(isInvocationNode).reduce((batchSize, node) => {
+    if (!isImageFieldCollectionInputInstance(node.data.inputs.images)) {
+      return batchSize;
+    }
+    // If the batch size is not set, default to 1
+    batchSize = batchSize || 1;
+    // Multiply the batch size by the number of images in the batch
+    batchSize = batchSize * (node.data.inputs.images.value?.length ?? 0);
+
+    return batchSize;
+  }, 0)
+);
