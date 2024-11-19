@@ -95,7 +95,8 @@
         "close": "Chiudi",
         "clipboard": "Appunti",
         "ok": "Ok",
-        "generating": "Generazione"
+        "generating": "Generazione",
+        "loadingModel": "Caricamento del modello"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
