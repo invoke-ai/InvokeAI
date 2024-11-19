@@ -13,7 +13,7 @@
         "discordLabel": "Discord",
         "back": "Atrás",
         "loading": "Cargando",
-        "postprocessing": "Postprocesado",
+        "postprocessing": "Postprocesamiento",
         "txt2img": "De texto a imagen",
         "accept": "Aceptar",
         "cancel": "Cancelar",
@@ -64,7 +64,7 @@
         "prevPage": "Página Anterior",
         "red": "Rojo",
         "alpha": "Transparencia",
-        "outputs": "Salidas",
+        "outputs": "Resultados",
         "learnMore": "Aprende más",
         "enabled": "Activado",
         "disabled": "Desactivado",
@@ -73,7 +73,32 @@
         "created": "Creado",
         "save": "Guardar",
         "unknownError": "Error Desconocido",
-        "blue": "Azul"
+        "blue": "Azul",
+        "clipboard": "Portapapeles",
+        "loadingImage": "Cargando la imagen",
+        "inpaint": "inpaint",
+        "ipAdapter": "Adaptador IP",
+        "t2iAdapter": "Adaptador T2I",
+        "apply": "Aplicar",
+        "openInViewer": "Abrir en el visor",
+        "off": "Apagar",
+        "generating": "Generando",
+        "ok": "De acuerdo",
+        "placeholderSelectAModel": "Seleccionar un modelo",
+        "reset": "Restablecer",
+        "none": "Ninguno",
+        "new": "Nuevo",
+        "dontShowMeThese": "No mostrar estos",
+        "loadingModel": "Cargando el modelo",
+        "view": "Ver",
+        "edit": "Editar",
+        "safetensors": "Safetensors",
+        "toResolve": "Para resolver",
+        "localSystem": "Sistema local",
+        "notInstalled": "No $t(common.installed)",
+        "outpaint": "outpaint",
+        "simple": "Sencillo",
+        "close": "Cerrar"
     },
     "gallery": {
         "galleryImageSize": "Tamaño de la imagen",
@@ -85,7 +110,63 @@
         "deleteImage_other": "Eliminar {{count}} Imágenes",
         "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
         "assets": "Activos",
-        "autoAssignBoardOnClick": "Asignación automática de tableros al hacer clic"
+        "autoAssignBoardOnClick": "Asignar automática tableros al hacer clic",
+        "gallery": "Galería",
+        "noImageSelected": "Sin imágenes seleccionadas",
+        "bulkDownloadRequestFailed": "Error al preparar la descarga",
+        "oldestFirst": "La más antigua primero",
+        "sideBySide": "conjuntamente",
+        "selectForCompare": "Seleccionar para comparar",
+        "alwaysShowImageSizeBadge": "Mostrar siempre las dimensiones de la imagen",
+        "currentlyInUse": "Esta imagen se utiliza actualmente con las siguientes funciones:",
+        "unableToLoad": "No se puede cargar la galería",
+        "selectAllOnPage": "Seleccionar todo en la página",
+        "selectAnImageToCompare": "Seleccione una imagen para comparar",
+        "bulkDownloadFailed": "Error en la descarga",
+        "compareHelp2": "Presione <Kbd> M </Kbd> para recorrer los modos de comparación.",
+        "move": "Mover",
+        "copy": "Copiar",
+        "drop": "Gota",
+        "displayBoardSearch": "Tablero de búsqueda",
+        "deleteSelection": "Borrar selección",
+        "downloadSelection": "Descargar selección",
+        "openInViewer": "Abrir en el visor",
+        "searchImages": "Búsqueda por metadatos",
+        "swapImages": "Intercambiar imágenes",
+        "sortDirection": "Orden de clasificación",
+        "showStarredImagesFirst": "Mostrar imágenes destacadas primero",
+        "go": "Ir",
+        "bulkDownloadRequested": "Preparando la descarga",
+        "image": "imagen",
+        "compareHelp4": "Presione <Kbd> Z </Kbd> o <Kbd> Esc </Kbd> para salir.",
+        "viewerImage": "Ver imagen",
+        "dropOrUpload": "$t(gallery.drop) o cargar",
+        "displaySearch": "Buscar imagen",
+        "download": "Descargar",
+        "exitBoardSearch": "Finalizar búsqueda",
+        "exitSearch": "Salir de la búsqueda de imágenes",
+        "featuresWillReset": "Si elimina esta imagen, dichas funciones se restablecerán inmediatamente.",
+        "jump": "Omitir",
+        "loading": "Cargando",
+        "newestFirst": "La más nueva primero",
+        "unstarImage": "Dejar de ser favorita",
+        "bulkDownloadRequestedDesc": "Su solicitud de descarga se está preparando. Esto puede tardar unos minutos.",
+        "hover": "Desplazar",
+        "compareHelp1": "Mantenga presionada la tecla <Kbd> Alt </Kbd> mientras hace clic en una imagen de la galería o utiliza las teclas de flecha para cambiar la imagen de comparación.",
+        "stretchToFit": "Estirar para encajar",
+        "exitCompare": "Salir de la comparación",
+        "starImage": "Imágenes favoritas",
+        "dropToUpload": "$t(gallery.drop) para cargar",
+        "slider": "Deslizador",
+        "assetsTab": "Archivos que has cargado para utilizarlos en tus proyectos.",
+        "imagesTab": "Imágenes que ha creado y guardado en Invoke.",
+        "compareImage": "Comparar imagen",
+        "boardsSettings": "Ajustes de los tableros",
+        "imagesSettings": "Configuración de imágenes de la galería",
+        "compareHelp3": "Presione <Kbd> C </Kbd> para intercambiar las imágenes comparadas.",
+        "showArchivedBoards": "Mostrar paneles archivados",
+        "closeViewer": "Cerrar visor",
+        "openViewer": "Abrir visor"
     },
     "modelManager": {
         "modelManager": "Gestor de Modelos",
@@ -131,7 +212,13 @@
         "modelDeleted": "Modelo eliminado",
         "modelDeleteFailed": "Error al borrar el modelo",
         "settings": "Ajustes",
-        "syncModels": "Sincronizar las plantillas"
+        "syncModels": "Sincronizar las plantillas",
+        "clipEmbed": "Incrustar CLIP",
+        "addModels": "Añadir modelos",
+        "advanced": "Avanzado",
+        "clipGEmbed": "Incrustar CLIP-G",
+        "cancel": "Cancelar",
+        "clipLEmbed": "Incrustar CLIP-L"
     },
     "parameters": {
         "images": "Imágenes",
@@ -163,8 +250,8 @@
         "copyImage": "Copiar la imagen",
         "general": "General",
         "denoisingStrength": "Intensidad de la eliminación del ruido",
-        "seamlessXAxis": "Eje x",
-        "seamlessYAxis": "Eje y",
+        "seamlessXAxis": "Eje X sin juntas",
+        "seamlessYAxis": "Eje Y sin juntas",
         "scheduler": "Programador",
         "positivePromptPlaceholder": "Prompt Positivo",
         "negativePromptPlaceholder": "Prompt Negativo",
@@ -208,10 +295,13 @@
         "problemCopyingImage": "No se puede copiar la imagen",
         "errorCopied": "Error al copiar",
         "baseModelChanged": "Modelo base cambiado",
-        "addedToBoard": "Se agregó a los activos del tablero {{name}}",
+        "addedToBoard": "Se agregó a los activos del panel {{name}}",
         "baseModelChangedCleared_one": "Borrado o desactivado {{count}} submodelo incompatible",
         "baseModelChangedCleared_many": "Borrados o desactivados {{count}} submodelos incompatibles",
-        "baseModelChangedCleared_other": "Borrados o desactivados {{count}} submodelos incompatibles"
+        "baseModelChangedCleared_other": "Borrados o desactivados {{count}} submodelos incompatibles",
+        "addedToUncategorized": "Añadido a los activos del tablero $t(boards.uncategorized)",
+        "imagesWillBeAddedTo": "Las imágenes subidas se añadirán a los activos del panel {{boardName}}.",
+        "layerCopiedToClipboard": "Capa copiada en el portapapeles"
     },
     "accessibility": {
         "invokeProgressBar": "Activar la barra de progreso",
@@ -226,7 +316,8 @@
         "mode": "Modo",
         "submitSupportTicket": "Enviar Ticket de Soporte",
         "toggleRightPanel": "Activar o desactivar el panel derecho (G)",
-        "toggleLeftPanel": "Activar o desactivar el panel izquierdo (T)"
+        "toggleLeftPanel": "Activar o desactivar el panel izquierdo (T)",
+        "uploadImages": "Cargar imagen(es)"
     },
     "nodes": {
         "zoomInNodes": "Acercar",
@@ -238,7 +329,8 @@
         "showMinimapnodes": "Mostrar el minimapa",
         "reloadNodeTemplates": "Recargar las plantillas de nodos",
         "loadWorkflow": "Cargar el flujo de trabajo",
-        "downloadWorkflow": "Descargar el flujo de trabajo en un archivo JSON"
+        "downloadWorkflow": "Descargar el flujo de trabajo en un archivo JSON",
+        "boardAccessError": "No se puede encontrar el panel {{board_id}}, se está restableciendo al valor predeterminado"
     },
     "boards": {
         "autoAddBoard": "Agregar panel automáticamente",
@@ -255,7 +347,7 @@
         "bottomMessage": "Al eliminar este panel y las imágenes que contiene, se restablecerán las funciones que los estén utilizando actualmente.",
         "deleteBoardAndImages": "Borrar el panel y las imágenes",
         "loading": "Cargando...",
-        "deletedBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar. Al Seleccionar 'Borrar Solo el Panel' transferirá las imágenes a un estado sin categorizar.",
+        "deletedBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar. Al Seleccionar 'Borrar solo el panel' transferirá las imágenes a un estado sin categorizar.",
         "move": "Mover",
         "menuItemAutoAdd": "Agregar automáticamente a este panel",
         "searchBoard": "Buscando paneles…",
@@ -263,29 +355,33 @@
         "downloadBoard": "Descargar panel",
         "deleteBoardOnly": "Borrar solo el panel",
         "myBoard": "Mi panel",
-        "noMatching": "No hay paneles que coincidan",
+        "noMatching": "Sin paneles coincidentes",
         "imagesWithCount_one": "{{count}} imagen",
         "imagesWithCount_many": "{{count}} imágenes",
         "imagesWithCount_other": "{{count}} imágenes",
         "assetsWithCount_one": "{{count}} activo",
         "assetsWithCount_many": "{{count}} activos",
         "assetsWithCount_other": "{{count}} activos",
-        "hideBoards": "Ocultar Paneles",
-        "addPrivateBoard": "Agregar un tablero privado",
-        "addSharedBoard": "Agregar Panel Compartido",
+        "hideBoards": "Ocultar paneles",
+        "addPrivateBoard": "Agregar un panel privado",
+        "addSharedBoard": "Añadir panel compartido",
         "boards": "Paneles",
-        "archiveBoard": "Archivar Panel",
+        "archiveBoard": "Archivar panel",
         "archived": "Archivado",
         "selectedForAutoAdd": "Seleccionado para agregar automáticamente",
-        "unarchiveBoard": "Desarchivar el tablero",
-        "noBoards": "No hay tableros {{boardType}}",
-        "shared": "Carpetas compartidas",
-        "deletedPrivateBoardsCannotbeRestored": "Los tableros eliminados no se pueden restaurar. Al elegir \"Eliminar solo tablero\", las imágenes se colocan en un estado privado y sin categoría para el creador de la imagen."
+        "unarchiveBoard": "Desarchivar el panel",
+        "noBoards": "No hay paneles {{boardType}}",
+        "shared": "Paneles compartidos",
+        "deletedPrivateBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar. Al elegir \"Eliminar solo el panel\", las imágenes se colocan en un estado privado y sin categoría para el creador de la imagen.",
+        "viewBoards": "Ver paneles",
+        "private": "Paneles privados",
+        "updateBoardError": "No se pudo actualizar el panel"
     },
     "accordions": {
         "compositing": {
             "title": "Composición",
-            "infillTab": "Relleno"
+            "infillTab": "Relleno",
+            "coherenceTab": "Parámetros de la coherencia"
         },
         "generation": {
             "title": "Generación"
@@ -309,7 +405,10 @@
             "workflows": "Flujos de trabajo",
             "models": "Modelos",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
-            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)"
+            "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
+            "upscaling": "Upscaling",
+            "gallery": "Galería",
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
         }
     },
     "queue": {
@@ -317,7 +416,76 @@
         "front": "Delante",
         "batchQueuedDesc_one": "Se agregó {{count}} sesión a {{direction}} la cola",
         "batchQueuedDesc_many": "Se agregaron {{count}} sesiones a {{direction}} la cola",
-        "batchQueuedDesc_other": "Se agregaron {{count}} sesiones a {{direction}} la cola"
+        "batchQueuedDesc_other": "Se agregaron {{count}} sesiones a {{direction}} la cola",
+        "clearQueueAlertDialog": "Al vaciar la cola se cancela inmediatamente cualquier elemento de procesamiento y se vaciará la cola por completo. Los filtros pendientes se cancelarán.",
+        "time": "Tiempo",
+        "clearFailed": "Error al vaciar la cola",
+        "cancelFailed": "Error al cancelar el elemento",
+        "resumeFailed": "Error al reanudar el proceso",
+        "pause": "Pausar",
+        "pauseTooltip": "Pausar el proceso",
+        "cancelBatchSucceeded": "Lote cancelado",
+        "pruneSucceeded": "Se purgaron {{item_count}} elementos completados de la cola",
+        "pruneFailed": "Error al purgar la cola",
+        "cancelBatchFailed": "Error al cancelar los lotes",
+        "pauseFailed": "Error al pausar el proceso",
+        "status": "Estado",
+        "origin": "Origen",
+        "destination": "Destino",
+        "generations_one": "Generación",
+        "generations_many": "Generaciones",
+        "generations_other": "Generaciones",
+        "resume": "Reanudar",
+        "queueEmpty": "Cola vacía",
+        "cancelItem": "Cancelar elemento",
+        "cancelBatch": "Cancelar lote",
+        "openQueue": "Abrir la cola",
+        "completed": "Completado",
+        "enqueueing": "Añadir lotes a la cola",
+        "clear": "Limpiar",
+        "pauseSucceeded": "Proceso pausado",
+        "resumeSucceeded": "Proceso reanudado",
+        "resumeTooltip": "Reanudar proceso",
+        "cancel": "Cancelar",
+        "cancelTooltip": "Cancelar artículo actual",
+        "pruneTooltip": "Purgar {{item_count}} elementos completados",
+        "batchQueued": "Lote en cola",
+        "pending": "Pendiente",
+        "item": "Elemento",
+        "total": "Total",
+        "in_progress": "En proceso",
+        "failed": "Fallido",
+        "completedIn": "Completado en",
+        "upscaling": "Upscaling",
+        "canvas": "Lienzo",
+        "generation": "Generación",
+        "workflows": "Flujo de trabajo",
+        "other": "Otro",
+        "queueFront": "Añadir al principio de la cola",
+        "gallery": "Galería",
+        "batchFieldValues": "Valores de procesamiento por lotes",
+        "session": "Sesión",
+        "notReady": "La cola aún no está lista",
+        "graphQueued": "Gráfico en cola",
+        "clearQueueAlertDialog2": "¿Estás seguro que deseas vaciar la cola?",
+        "next": "Siguiente",
+        "iterations_one": "Interacción",
+        "iterations_many": "Interacciones",
+        "iterations_other": "Interacciones",
+        "current": "Actual",
+        "queue": "Cola",
+        "queueBack": "Añadir a la cola",
+        "cancelSucceeded": "Elemento cancelado",
+        "clearTooltip": "Cancelar y limpiar todos los elementos",
+        "clearSucceeded": "Cola vaciada",
+        "canceled": "Cancelado",
+        "batch": "Lote",
+        "graphFailedToQueue": "Error al poner el gráfico en cola",
+        "batchFailedToQueue": "Error al poner en cola el lote",
+        "prompts_one": "Prompt",
+        "prompts_many": "Prompts",
+        "prompts_other": "Prompts",
+        "prune": "Eliminar"
     },
     "upsell": {
         "inviteTeammates": "Invitar compañeros de equipo",
@@ -330,11 +498,415 @@
         "layer_other": "Capas",
         "layer_withCount_one": "({{count}}) capa",
         "layer_withCount_many": "({{count}}) capas",
-        "layer_withCount_other": "({{count}}) capas"
+        "layer_withCount_other": "({{count}}) capas",
+        "copyToClipboard": "Copiar al portapapeles"
     },
     "whatsNew": {
         "readReleaseNotes": "Leer las notas de la versión",
-        "watchRecentReleaseVideos": "Ver videos de lanzamientos recientes",
-        "watchUiUpdatesOverview": "Descripción general de las actualizaciones de la interfaz de usuario de Watch"
+        "watchRecentReleaseVideos": "Ver videos de versiones recientes",
+        "watchUiUpdatesOverview": "Descripción general de las actualizaciones de la interfaz de usuario de Watch",
+        "whatsNewInInvoke": "Novedades en Invoke",
+        "items": [
+            "<StrongComponent>SD 3.5</StrongComponent>: compatibilidad con SD 3.5 Medium y Large.",
+            "<StrongComponent>Lienzo</StrongComponent>: Se ha simplificado el procesamiento de la capa de control y se ha mejorado la configuración predeterminada del control."
+        ]
+    },
+    "invocationCache": {
+        "enableFailed": "Error al activar la cache",
+        "cacheSize": "Tamaño de la caché",
+        "hits": "Accesos a la caché",
+        "invocationCache": "Caché",
+        "misses": "Errores de la caché",
+        "clear": "Limpiar",
+        "maxCacheSize": "Tamaño máximo de la caché",
+        "enableSucceeded": "Cache activada",
+        "clearFailed": "Error al borrar la cache",
+        "enable": "Activar",
+        "useCache": "Uso de la caché",
+        "disableSucceeded": "Caché desactivada",
+        "clearSucceeded": "Caché borrada",
+        "disable": "Desactivar",
+        "disableFailed": "Error al desactivar la caché"
+    },
+    "hrf": {
+        "hrf": "Solución de alta resolución",
+        "enableHrf": "Activar corrección de alta resolución",
+        "metadata": {
+            "enabled": "Corrección de alta resolución activada",
+            "strength": "Forzar la corrección de alta resolución",
+            "method": "Método de corrección de alta resolución"
+        },
+        "upscaleMethod": "Método de expansión"
+    },
+    "prompt": {
+        "addPromptTrigger": "Añadir activador de los avisos",
+        "compatibleEmbeddings": "Incrustaciones compatibles",
+        "noMatchingTriggers": "No hay activadores coincidentes"
+    },
+    "hotkeys": {
+        "hotkeys": "Atajo del teclado",
+        "canvas": {
+            "selectViewTool": {
+                "desc": "Selecciona la herramienta de Visualización.",
+                "title": "Visualización"
+            },
+            "cancelFilter": {
+                "title": "Cancelar el filtro",
+                "desc": "Cancelar el filtro pendiente."
+            },
+            "applyTransform": {
+                "title": "Aplicar la transformación",
+                "desc": "Aplicar la transformación pendiente a la capa seleccionada."
+            },
+            "applyFilter": {
+                "desc": "Aplicar el filtro pendiente a la capa seleccionada.",
+                "title": "Aplicar filtro"
+            },
+            "selectBrushTool": {
+                "title": "Pincel",
+                "desc": "Selecciona la herramienta pincel."
+            },
+            "selectBboxTool": {
+                "desc": "Seleccionar la herramienta de selección del marco.",
+                "title": "Selección del marco"
+            },
+            "selectMoveTool": {
+                "desc": "Selecciona la herramienta Mover.",
+                "title": "Mover"
+            },
+            "selectRectTool": {
+                "title": "Rectángulo",
+                "desc": "Selecciona la herramienta Rectángulo."
+            },
+            "decrementToolWidth": {
+                "title": "Reducir el ancho de la herramienta",
+                "desc": "Disminuye la anchura de la herramienta pincel o goma de borrar, según la que esté seleccionada."
+            },
+            "incrementToolWidth": {
+                "title": "Incrementar la anchura de la herramienta",
+                "desc": "Aumenta la anchura de la herramienta pincel o goma de borrar, según la que esté seleccionada."
+            },
+            "fitBboxToCanvas": {
+                "title": "Ajustar bordes al lienzo",
+                "desc": "Escala y posiciona la vista para ajustarla a los bodes."
+            },
+            "fitLayersToCanvas": {
+                "title": "Ajustar capas al lienzo",
+                "desc": "Escala y posiciona la vista para que se ajuste a todas las capas visibles."
+            },
+            "setFillToWhite": {
+                "title": "Establecer color en blanco",
+                "desc": "Establece el color actual de la herramienta en blanco."
+            },
+            "resetSelected": {
+                "title": "Restablecer capa",
+                "desc": "Restablecer la capa seleccionada. Solo se aplica a Máscara de retoque y Guía regional."
+            },
+            "setZoomTo400Percent": {
+                "desc": "Ajuste la aplicación del lienzo al 400%.",
+                "title": "Ampliar al 400%"
+            },
+            "transformSelected": {
+                "desc": "Transformar la capa seleccionada.",
+                "title": "Transformar"
+            },
+            "selectColorPickerTool": {
+                "title": "Selector de color",
+                "desc": "Seleccione la herramienta de selección de color."
+            },
+            "selectEraserTool": {
+                "title": "Borrador",
+                "desc": "Selecciona la herramienta Borrador."
+            },
+            "setZoomTo100Percent": {
+                "title": "Ampliar al 100%",
+                "desc": "Ajuste ampliar el lienzo al 100%."
+            },
+            "undo": {
+                "title": "Deshacer",
+                "desc": "Deshacer la última acción en el lienzo."
+            },
+            "nextEntity": {
+                "desc": "Seleccione la siguiente capa de la lista.",
+                "title": "Capa siguiente"
+            },
+            "redo": {
+                "title": "Rehacer",
+                "desc": "Rehacer la última acción en el lienzo."
+            },
+            "prevEntity": {
+                "title": "Capa anterior",
+                "desc": "Seleccione la capa anterior de la lista."
+            },
+            "title": "Lienzo",
+            "setZoomTo200Percent": {
+                "title": "Ampliar al 200%",
+                "desc": "Ajuste la ampliación del lienzo al 200%."
+            },
+            "setZoomTo800Percent": {
+                "title": "Ampliar al 800%",
+                "desc": "Ajuste la ampliación del lienzo al 800%."
+            },
+            "filterSelected": {
+                "desc": "Filtra la capa seleccionada. Solo se aplica a las capas Ráster y Control.",
+                "title": "Filtrar"
+            },
+            "cancelTransform": {
+                "title": "Cancelar transformación",
+                "desc": "Cancelar la transformación pendiente."
+            },
+            "deleteSelected": {
+                "title": "Borrar la capa",
+                "desc": "Borrar la capa seleccionada."
+            },
+            "quickSwitch": {
+                "desc": "Cambiar entre las dos últimas capas seleccionadas. Si una capa está seleccionada, cambia siempre entre ella y la última capa no seleccionada.",
+                "title": "Cambio rápido de capa"
+            }
+        },
+        "app": {
+            "selectModelsTab": {
+                "title": "Seleccione la pestaña Modelos",
+                "desc": "Selecciona la pestaña Modelos."
+            },
+            "focusPrompt": {
+                "desc": "Mueve el foco del cursor a la indicación positiva.",
+                "title": "Enfoque"
+            },
+            "toggleLeftPanel": {
+                "title": "Alternar panel izquierdo",
+                "desc": "Mostrar u ocultar el panel izquierdo."
+            },
+            "selectQueueTab": {
+                "title": "Seleccione la pestaña Cola",
+                "desc": "Seleccione la pestaña Cola."
+            },
+            "selectCanvasTab": {
+                "title": "Seleccione la pestaña Lienzo",
+                "desc": "Selecciona la pestaña Lienzo."
+            },
+            "clearQueue": {
+                "title": "Vaciar cola",
+                "desc": "Cancelar y variar todos los elementos de la cola."
+            },
+            "selectUpscalingTab": {
+                "title": "Selecciona la pestaña Ampliar",
+                "desc": "Selecciona la pestaña Aumento de escala."
+            },
+            "togglePanels": {
+                "desc": "Muestra u oculta los paneles izquierdo y derecho a la vez.",
+                "title": "Alternar paneles"
+            },
+            "toggleRightPanel": {
+                "title": "Alternar panel derecho",
+                "desc": "Mostrar u ocultar el panel derecho."
+            },
+            "invokeFront": {
+                "desc": "Pone en cola la solicitud de compilación y la agrega al principio de la cola.",
+                "title": "Invocar (frente)"
+            },
+            "cancelQueueItem": {
+                "title": "Cancelar",
+                "desc": "Cancelar el elemento de la cola que se está procesando."
+            },
+            "invoke": {
+                "desc": "Pone en cola la solicitud de compilación y la agrega al final de la cola.",
+                "title": "Invocar"
+            },
+            "title": "Aplicación",
+            "selectWorkflowsTab": {
+                "title": "Seleccione la pestaña Flujos de trabajo",
+                "desc": "Selecciona la pestaña Flujos de trabajo."
+            },
+            "resetPanelLayout": {
+                "title": "Reiniciar la posición del panel",
+                "desc": "Restablece los paneles izquierdo y derecho a su tamaño y disposición por defecto."
+            }
+        },
+        "workflows": {
+            "addNode": {
+                "title": "Añadir nodo",
+                "desc": "Abrir añadir nodo."
+            },
+            "selectAll": {
+                "title": "Seleccionar todo",
+                "desc": "Seleccione todos los nodos y enlaces."
+            },
+            "deleteSelection": {
+                "desc": "Borrar todos los nodos y enlaces seleccionados.",
+                "title": "Borrar"
+            },
+            "undo": {
+                "desc": "Deshaga la última acción.",
+                "title": "Deshacer"
+            },
+            "redo": {
+                "desc": "Rehacer la última acción.",
+                "title": "Rehacer"
+            },
+            "pasteSelection": {
+                "desc": "Pegar nodos y bordes copiados.",
+                "title": "Pegar"
+            },
+            "title": "Flujos de trabajo",
+            "copySelection": {
+                "desc": "Copiar nodos y bordes seleccionados.",
+                "title": "Copiar"
+            },
+            "pasteSelectionWithEdges": {
+                "desc": "Pega los nodos copiados, los enlaces y todos los enlaces conectados a los nodos copiados.",
+                "title": "Pegar con enlaces"
+            }
+        },
+        "viewer": {
+            "useSize": {
+                "title": "Usar dimensiones",
+                "desc": "Utiliza las dimensiones de la imagen actual como el tamaño del borde."
+            },
+            "remix": {
+                "title": "Remezcla",
+                "desc": "Recupera todos los metadatos excepto la semilla de la imagen actual."
+            },
+            "loadWorkflow": {
+                "desc": "Carga el flujo de trabajo guardado de la imagen actual (si tiene uno).",
+                "title": "Cargar flujo de trabajo"
+            },
+            "recallAll": {
+                "desc": "Recupera todos los metadatos de la imagen actual.",
+                "title": "Recuperar todos los metadatos"
+            },
+            "recallPrompts": {
+                "desc": "Recuerde las indicaciones positivas y negativas de la imagen actual.",
+                "title": "Recordatorios"
+            },
+            "recallSeed": {
+                "title": "Recuperar semilla",
+                "desc": "Recupera la semilla de la imagen actual."
+            },
+            "runPostprocessing": {
+                "title": "Ejecutar posprocesamiento",
+                "desc": "Ejecutar el posprocesamiento seleccionado en la imagen actual."
+            },
+            "toggleMetadata": {
+                "title": "Mostrar/ocultar los metadatos",
+                "desc": "Mostrar u ocultar la superposición de metadatos de la imagen actual."
+            },
+            "nextComparisonMode": {
+                "desc": "Desplácese por los modos de comparación.",
+                "title": "Siguiente comparación"
+            },
+            "title": "Visor de imágenes",
+            "toggleViewer": {
+                "title": "Mostrar/Ocultar el visor de imágenes",
+                "desc": "Mostrar u ocultar el visor de imágenes. Solo disponible en la pestaña Lienzo."
+            },
+            "swapImages": {
+                "title": "Intercambiar imágenes en la comparación",
+                "desc": "Intercambia las imágenes que se están comparando."
+            }
+        },
+        "gallery": {
+            "clearSelection": {
+                "title": "Limpiar selección",
+                "desc": "Borrar la selección actual, si hay alguna."
+            },
+            "galleryNavUp": {
+                "title": "Subir",
+                "desc": "Navega hacia arriba en la cuadrícula de la galería y selecciona esa imagen. Si estás en la parte superior de la página, ve a la página anterior."
+            },
+            "galleryNavLeft": {
+                "title": "Izquierda",
+                "desc": "Navegue hacia la izquierda en la rejilla de la galería, seleccionando esa imagen. Si está en la primera imagen de la fila, vaya a la fila anterior. Si está en la primera imagen de la página, vaya a la página anterior."
+            },
+            "galleryNavDown": {
+                "title": "Bajar",
+                "desc": "Navegue hacia abajo en la parrilla de la galería, seleccionando esa imagen. Si se encuentra al final de la página, vaya a la página siguiente."
+            },
+            "galleryNavRight": {
+                "title": "A la derecha",
+                "desc": "Navegue hacia la derecha en la rejilla de la galería, seleccionando esa imagen. Si está en la última imagen de la fila, vaya a la fila siguiente. Si está en la última imagen de la página, vaya a la página siguiente."
+            },
+            "galleryNavUpAlt": {
+                "desc": "Igual que arriba, pero selecciona la imagen de comparación, abriendo el modo de comparación si no está ya abierto.",
+                "title": "Arriba (Comparar imagen)"
+            },
+            "deleteSelection": {
+                "desc": "Borrar todas las imágenes seleccionadas. Por defecto, se le pedirá que confirme la eliminación. Si las imágenes están actualmente en uso en la aplicación, se te avisará.",
+                "title": "Borrar"
+            },
+            "title": "Galería",
+            "selectAllOnPage": {
+                "title": "Seleccionar todo en la página",
+                "desc": "Seleccionar todas las imágenes en la página actual."
+            }
+        },
+        "searchHotkeys": "Buscar teclas de acceso rápido",
+        "noHotkeysFound": "Sin teclas de acceso rápido",
+        "clearSearch": "Limpiar la búsqueda"
+    },
+    "metadata": {
+        "guidance": "Orientación",
+        "createdBy": "Creado por",
+        "noImageDetails": "Sin detalles en la imagen",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "height": "Altura",
+        "imageDimensions": "Dimensiones de la imagen",
+        "seamlessXAxis": "Eje X sin juntas",
+        "seamlessYAxis": "Eje Y sin juntas",
+        "generationMode": "Modo de generación",
+        "scheduler": "Programador",
+        "width": "Ancho",
+        "Threshold": "Umbral de ruido",
+        "canvasV2Metadata": "Lienzo",
+        "metadata": "Metadatos",
+        "model": "Modelo",
+        "allPrompts": "Todas las indicaciones",
+        "cfgScale": "Escala CFG",
+        "imageDetails": "Detalles de la imagen",
+        "negativePrompt": "Indicación negativa",
+        "noMetaData": "Sin metadatos",
+        "parameterSet": "Parámetro {{parameter}} establecido",
+        "vae": "Autocodificador",
+        "workflow": "Flujo de trabajo",
+        "seed": "Semilla",
+        "strength": "Forzar imagen a imagen",
+        "recallParameters": "Parámetros de recuperación",
+        "recallParameter": "Recuperar {{label}}",
+        "steps": "Pasos",
+        "noRecallParameters": "Sin parámetros para recuperar",
+        "parsingFailed": "Error al analizar"
+    },
+    "system": {
+        "logLevel": {
+            "debug": "Depurar",
+            "info": "Información",
+            "warn": "Advertir",
+            "fatal": "Grave",
+            "error": "Error",
+            "trace": "Rastro",
+            "logLevel": "Nivel del registro"
+        },
+        "enableLogging": "Activar registro",
+        "logNamespaces": {
+            "workflows": "Flujos de trabajo",
+            "system": "Sistema",
+            "metadata": "Metadatos",
+            "gallery": "Galería",
+            "logNamespaces": "Espacios para los nombres de registro",
+            "generation": "Generación",
+            "events": "Eventos",
+            "canvas": "Lienzo",
+            "config": "Ajustes",
+            "models": "Modelos",
+            "queue": "Cola"
+        }
+    },
+    "newUserExperience": {
+        "downloadStarterModels": "Descargar modelos de inicio",
+        "toGetStarted": "Para empezar, introduzca un mensaje en el cuadro y haga clic en <StrongComponent>Invocar</StrongComponent> para generar su primera imagen. Seleccione una plantilla para mejorar los resultados. Puede elegir guardar sus imágenes directamente en <StrongComponent>Galería</StrongComponent> o editarlas en <StrongComponent>Lienzo</StrongComponent>.",
+        "importModels": "Importar modelos",
+        "noModelsInstalled": "Parece que no tienes ningún modelo instalado",
+        "gettingStartedSeries": "¿Desea más orientación? Consulte nuestra <LinkComponent>Serie de introducción</LinkComponent> para obtener consejos sobre cómo aprovechar todo el potencial de Invoke Studio.",
+        "toGetStartedLocal": "Para empezar, asegúrate de descargar o importar los modelos necesarios para ejecutar Invoke. A continuación, introduzca un mensaje en el cuadro y haga clic en <StrongComponent>Invocar</StrongComponent> para generar su primera imagen. Seleccione una plantilla para mejorar los resultados. Puede elegir guardar sus imágenes directamente en <StrongComponent>Galería</StrongComponent> o editarlas en el <StrongComponent>Lienzo</StrongComponent>."
     }
 }
