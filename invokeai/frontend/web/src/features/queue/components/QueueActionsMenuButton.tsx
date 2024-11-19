@@ -1,9 +1,6 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  useNewCanvasSession,
-  useNewGallerySession,
-} from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
+import { SessionMenuItems } from 'common/components/SessionMenuItems';
 import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
@@ -12,16 +9,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiImageBold,
-  PiListBold,
-  PiPaintBrushBold,
-  PiPauseFill,
-  PiPlayFill,
-  PiQueueBold,
-  PiTrashSimpleBold,
-  PiXBold,
-} from 'react-icons/pi';
+import { PiListBold, PiPauseFill, PiPlayFill, PiQueueBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
 export const QueueActionsMenuButton = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
@@ -29,8 +17,6 @@ export const QueueActionsMenuButton = memo(() => {
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
-  const { newGallerySessionWithDialog } = useNewGallerySession();
-  const { newCanvasSessionWithDialog } = useNewCanvasSession();
   const clearQueue = useClearQueue();
   const {
     resumeProcessor,
@@ -52,12 +38,7 @@ export const QueueActionsMenuButton = memo(() => {
         <MenuButton ref={ref} as={IconButton} size="lg" aria-label="Queue Actions Menu" icon={<PiListBold />} />
         <MenuList>
           <MenuGroup title={t('common.new')}>
-            <MenuItem icon={<PiImageBold />} onClick={newGallerySessionWithDialog}>
-              {t('controlLayers.newGallerySession')}
-            </MenuItem>
-            <MenuItem icon={<PiPaintBrushBold />} onClick={newCanvasSessionWithDialog}>
-              {t('controlLayers.newCanvasSession')}
-            </MenuItem>
+            <SessionMenuItems />
           </MenuGroup>
           <MenuGroup title={t('queue.queue')}>
             <MenuItem

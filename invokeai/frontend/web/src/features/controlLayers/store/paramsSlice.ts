@@ -273,23 +273,26 @@ export const paramsSlice = createSlice({
     setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceMinDenoise = action.payload;
     },
+    paramsReset: (state) => resetState(state),
   },
   extraReducers(builder) {
-    builder.addMatcher(newSessionRequested, (state) => {
-      // When a new session is requested, we need to keep the current model selections, plus dependent state
-      // like VAE precision. Everything else gets reset to default.
-      const newState = deepClone(initialState);
-      newState.model = state.model;
-      newState.vae = state.vae;
-      newState.fluxVAE = state.fluxVAE;
-      newState.vaePrecision = state.vaePrecision;
-      newState.t5EncoderModel = state.t5EncoderModel;
-      newState.clipEmbedModel = state.clipEmbedModel;
-      newState.refinerModel = state.refinerModel;
-      return newState;
-    });
+    builder.addMatcher(newSessionRequested, (state) => resetState(state));
   },
 });
+
+const resetState = (state: ParamsState): ParamsState => {
+  // When a new session is requested, we need to keep the current model selections, plus dependent state
+  // like VAE precision. Everything else gets reset to default.
+  const newState = deepClone(initialState);
+  newState.model = state.model;
+  newState.vae = state.vae;
+  newState.fluxVAE = state.fluxVAE;
+  newState.vaePrecision = state.vaePrecision;
+  newState.t5EncoderModel = state.t5EncoderModel;
+  newState.clipEmbedModel = state.clipEmbedModel;
+  newState.refinerModel = state.refinerModel;
+  return newState;
+};
 
 export const {
   setInfillMethod,
@@ -334,6 +337,7 @@ export const {
   setRefinerNegativeAestheticScore,
   setRefinerStart,
   modelChanged,
+  paramsReset,
 } = paramsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

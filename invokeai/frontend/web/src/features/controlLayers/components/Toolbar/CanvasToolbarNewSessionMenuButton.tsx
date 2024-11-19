@@ -1,16 +1,11 @@
-import { IconButton, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import {
-  useNewCanvasSession,
-  useNewGallerySession,
-} from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
+import { IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { SessionMenuItems } from 'common/components/SessionMenuItems';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFilePlusBold, PiImageBold, PiPaintBrushBold } from 'react-icons/pi';
+import { PiFilePlusBold } from 'react-icons/pi';
 
 export const CanvasToolbarNewSessionMenuButton = memo(() => {
   const { t } = useTranslation();
-  const { newGallerySessionWithDialog } = useNewGallerySession();
-  const { newCanvasSessionWithDialog } = useNewCanvasSession();
   return (
     <Menu placement="bottom-end">
       <MenuButton
@@ -21,12 +16,7 @@ export const CanvasToolbarNewSessionMenuButton = memo(() => {
         alignSelf="stretch"
       />
       <MenuList>
-        <MenuItem icon={<PiImageBold />} onClick={newGallerySessionWithDialog}>
-          {t('controlLayers.newGallerySession')}
-        </MenuItem>
-        <MenuItem icon={<PiPaintBrushBold />} onClick={newCanvasSessionWithDialog}>
-          {t('controlLayers.newCanvasSession')}
-        </MenuItem>
+        <SessionMenuItems />
       </MenuList>
     </Menu>
   );
