@@ -27,7 +27,7 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
 
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
     const { dispatch, getState } = store;
-    newCanvasFromImage({ imageDTO, type: 'raster_layer', dispatch, getState });
+    newCanvasFromImage({ imageDTO, withResize: false, type: 'raster_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -39,7 +39,31 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
 
   const onClickNewCanvasWithControlLayerFromImage = useCallback(() => {
     const { dispatch, getState } = store;
-    newCanvasFromImage({ imageDTO, type: 'control_layer', dispatch, getState });
+    newCanvasFromImage({ imageDTO, withResize: false, type: 'control_layer', dispatch, getState });
+    dispatch(setActiveTab('canvas'));
+    imageViewer.close();
+    toast({
+      id: 'SENT_TO_CANVAS',
+      title: t('toast.sentToCanvas'),
+      status: 'success',
+    });
+  }, [imageDTO, imageViewer, store, t]);
+
+  const onClickNewCanvasWithRasterLayerFromImageWithResize = useCallback(() => {
+    const { dispatch, getState } = store;
+    newCanvasFromImage({ imageDTO, withResize: true, type: 'raster_layer', dispatch, getState });
+    dispatch(setActiveTab('canvas'));
+    imageViewer.close();
+    toast({
+      id: 'SENT_TO_CANVAS',
+      title: t('toast.sentToCanvas'),
+      status: 'success',
+    });
+  }, [imageDTO, imageViewer, store, t]);
+
+  const onClickNewCanvasWithControlLayerFromImageWithResize = useCallback(() => {
+    const { dispatch, getState } = store;
+    newCanvasFromImage({ imageDTO, withResize: true, type: 'control_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -113,10 +137,24 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
           </MenuItem>
           <MenuItem
             icon={<PiFileBold />}
+            onClickCapture={onClickNewCanvasWithRasterLayerFromImageWithResize}
+            isDisabled={isBusy}
+          >
+            {t('controlLayers.canvasAsRasterLayerResize')}
+          </MenuItem>
+          <MenuItem
+            icon={<PiFileBold />}
             onClickCapture={onClickNewCanvasWithControlLayerFromImage}
             isDisabled={isBusy || isSD3}
           >
             {t('controlLayers.canvasAsControlLayer')}
+          </MenuItem>
+          <MenuItem
+            icon={<PiFileBold />}
+            onClickCapture={onClickNewCanvasWithControlLayerFromImageWithResize}
+            isDisabled={isBusy || isSD3}
+          >
+            {t('controlLayers.canvasAsControlLayerResize')}
           </MenuItem>
           <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewInpaintMaskFromImage} isDisabled={isBusy}>
             {t('controlLayers.inpaintMask')}
