@@ -2118,8 +2118,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "<StrongComponent>SD 3.5</StrongComponent>: Support for SD 3.5 Medium and Large.",
-            "<StrongComponent>Canvas</StrongComponent>: Streamlined Control Layer processing and improved default Control settings."
+            "<StrongComponent>Workflows</StrongComponent>: Run a workflow for a collection of images using the new <StrongComponent>Image Batch</StrongComponent> node.",
+            "<StrongComponent>FLUX</StrongComponent>: Support for XLabs IP Adapter v2."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
