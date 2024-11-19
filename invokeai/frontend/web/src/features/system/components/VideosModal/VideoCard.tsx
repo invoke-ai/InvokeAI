@@ -18,7 +18,7 @@ export const VideoCard = memo(({ video }: { video: VideoData }) => {
         </Text>
         <Spacer />
         <Text variant="subtext">{formatTime(length)}</Text>
-        <ExternalLink fontSize="sm" href={link} label={t('supportVideos.watchOnYoutube')} />
+        <ExternalLink fontSize="sm" href={link} label={t('supportVideos.watch')} />
       </Flex>
       <Text fontSize="md" variant="subtext">
         {t(`supportVideos.videos.${tKey}.description`)}
