@@ -51,7 +51,7 @@ import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO, S } from 'services/api/types';
 import { QueueError } from 'services/events/errors';
 import type { Param0 } from 'tsafe';
@@ -402,7 +402,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
         queueApi.endpoints.enqueueBatch.initiate(batch, {
           // Use the same cache key for all enqueueBatch requests, so that all consumers of this query get the same status
           // updates.
-          fixedCacheKey: 'enqueueBatch',
+          ...enqueueMutationFixedCacheKeyOptions,
           // We do not need RTK to track this request in the store
           track: false,
         })

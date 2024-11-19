@@ -4,7 +4,7 @@ import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser'
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
-import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
+import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
@@ -62,7 +62,7 @@ const FloatingSidePanelButtons = (props: Props) => {
             flexGrow={1}
           />
         </Tooltip>
-        <QueueButtonTooltip prepend={shift} placement="end">
+        <InvokeButtonTooltip prepend={shift} placement="end">
           <IconButton
             aria-label={t('queue.queueBack')}
             onClick={shift ? queue.queueFront : queue.queueBack}
@@ -72,7 +72,7 @@ const FloatingSidePanelButtons = (props: Props) => {
             colorScheme="invokeYellow"
             flexGrow={1}
           />
-        </QueueButtonTooltip>
+        </InvokeButtonTooltip>
         <Tooltip label={t('queue.cancelTooltip')} placement="end">
           <IconButton
             isDisabled={cancelCurrent.isDisabled}

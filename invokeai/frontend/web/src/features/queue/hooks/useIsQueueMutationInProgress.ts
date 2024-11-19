@@ -1,4 +1,5 @@
 import {
+  enqueueMutationFixedCacheKeyOptions,
   useCancelQueueItemMutation,
   // useCancelByBatchIdsMutation,
   useClearQueueMutation,
@@ -9,9 +10,9 @@ import {
 } from 'services/api/endpoints/queue';
 
 export const useIsQueueMutationInProgress = () => {
-  const [_triggerEnqueueBatch, { isLoading: isLoadingEnqueueBatch }] = useEnqueueBatchMutation({
-    fixedCacheKey: 'enqueueBatch',
-  });
+  const [_triggerEnqueueBatch, { isLoading: isLoadingEnqueueBatch }] = useEnqueueBatchMutation(
+    enqueueMutationFixedCacheKeyOptions
+  );
   const [_triggerResumeProcessor, { isLoading: isLoadingResumeProcessor }] = useResumeProcessorMutation({
     fixedCacheKey: 'resumeProcessor',
   });
