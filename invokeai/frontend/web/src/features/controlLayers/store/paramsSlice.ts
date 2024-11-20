@@ -83,7 +83,7 @@ const initialState: ParamsState = {
   canvasCoherenceMode: 'Gaussian Blur',
   canvasCoherenceMinDenoise: 0,
   canvasCoherenceEdgeSize: 16,
-  infillMethod: 'patchmatch',
+  infillMethod: 'lama',
   infillTileSize: 32,
   infillPatchmatchDownscaleSize: 1,
   infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
