@@ -59,7 +59,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
   useSocketIO();
   useGlobalModifiersInit();
   useGlobalHotkeys();
-  useGetOpenAPISchemaQuery();
+  const { data: openApiData } = useGetOpenAPISchemaQuery();
   useSyncLoggingConfig();
 
   const handleReset = useCallback(() => {
@@ -83,7 +83,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
     dispatch(appStarted());
   }, [dispatch]);
 
-  useStudioInitAction(studioInitAction);
+  useStudioInitAction(studioInitAction, !!openApiData);
   useStarterModelsToast();
   useSyncQueueStatus();
   useFocusRegionWatcher();

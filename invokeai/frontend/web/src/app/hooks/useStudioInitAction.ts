@@ -46,7 +46,7 @@ export type StudioInitAction =
  * - Use `getImageDTO` helper instead of `useGetImageDTO`
  * - Usee the `$imageViewer` atom instead of `useImageViewer`
  */
-export const useStudioInitAction = (action?: StudioInitAction) => {
+export const useStudioInitAction = (action?: StudioInitAction, schemaLoaded?: boolean) => {
   useAssertSingleton('useStudioInitAction');
   const { t } = useTranslation();
   // Use a ref to ensure that we only perform the action once
@@ -181,9 +181,6 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
     didInit.current = true;
 
     switch (action.type) {
-      case 'loadWorkflow':
-        handleLoadWorkflow(action.data.workflowId);
-        break;
       case 'selectStylePreset':
         handleSelectStylePreset(action.data.stylePresetId);
         break;
@@ -196,13 +193,20 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       case 'goToDestination':
         handleGoToDestination(action.data.destination);
         break;
+      default:
+        break;
     }
-  }, [
-    handleSendToCanvas,
-    handleUseAllMetadata,
-    action,
-    handleLoadWorkflow,
-    handleSelectStylePreset,
-    handleGoToDestination,
-  ]);
+  }, [handleSendToCanvas, handleUseAllMetadata, action, handleSelectStylePreset, handleGoToDestination]);
+
+  useEffect(() => {
+    if (didInit.current || !action || !schemaLoaded) {
+      return;
+    }
+
+    didInit.current = true;
+
+    if (action.type === 'loadWorkflow') {
+      handleLoadWorkflow(action.data.workflowId);
+    }
+  }, [action, handleLoadWorkflow, schemaLoaded]);
 };
