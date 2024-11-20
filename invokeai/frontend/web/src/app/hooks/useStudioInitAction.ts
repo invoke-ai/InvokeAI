@@ -1,3 +1,4 @@
+import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { withResultAsync } from 'common/util/result';
@@ -9,6 +10,7 @@ import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
+import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
@@ -46,11 +48,12 @@ export type StudioInitAction =
  * - Use `getImageDTO` helper instead of `useGetImageDTO`
  * - Usee the `$imageViewer` atom instead of `useImageViewer`
  */
-export const useStudioInitAction = (action?: StudioInitAction, schemaLoaded?: boolean) => {
+export const useStudioInitAction = (action?: StudioInitAction) => {
   useAssertSingleton('useStudioInitAction');
   const { t } = useTranslation();
   // Use a ref to ensure that we only perform the action once
   const didInit = useRef(false);
+  const didParseOpenAPISchema = useStore($hasTemplates);
   const store = useAppStore();
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
 
@@ -174,36 +177,30 @@ export const useStudioInitAction = (action?: StudioInitAction, schemaLoaded?: bo
   );
 
   useEffect(() => {
-    if (didInit.current || !action) {
+    if (didInit.current || !action || !didParseOpenAPISchema) {
       return;
     }
 
+    didInit.current = true;
+
     switch (action.type) {
       case 'loadWorkflow':
-        if (schemaLoaded) {
-          handleLoadWorkflow(action.data.workflowId);
-          didInit.current = true;
-        }
+        handleLoadWorkflow(action.data.workflowId);
         break;
-
       case 'selectStylePreset':
         handleSelectStylePreset(action.data.stylePresetId);
-        didInit.current = true;
         break;
 
       case 'sendToCanvas':
         handleSendToCanvas(action.data.imageName);
-        didInit.current = true;
         break;
 
       case 'useAllParameters':
         handleUseAllMetadata(action.data.imageName);
-        didInit.current = true;
         break;
 
       case 'goToDestination':
         handleGoToDestination(action.data.destination);
-        didInit.current = true;
         break;
 
       default:
@@ -216,6 +213,6 @@ export const useStudioInitAction = (action?: StudioInitAction, schemaLoaded?: bo
     handleSelectStylePreset,
     handleGoToDestination,
     handleLoadWorkflow,
-    schemaLoaded,
+    didParseOpenAPISchema,
   ]);
 };
