@@ -485,6 +485,7 @@ MODEL_NAME_TO_PREPROCESSOR = {
     "lineart anime": "lineart_anime_image_processor",
     "lineart_anime": "lineart_anime_image_processor",
     "lineart": "lineart_image_processor",
+    "soft": "hed_image_processor",
     "softedge": "hed_image_processor",
     "hed": "hed_image_processor",
     "shuffle": "content_shuffle_image_processor",
