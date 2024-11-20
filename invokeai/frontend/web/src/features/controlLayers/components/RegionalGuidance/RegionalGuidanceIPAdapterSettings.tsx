@@ -6,6 +6,7 @@ import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapter/IPAdapterImagePreview';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
+import { RegionalGuidanceIPAdapterSettingsEmptyState } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceIPAdapterSettingsEmptyState';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -32,7 +33,7 @@ type Props = {
   referenceImageId: string;
 };
 
-export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
+const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -159,6 +160,29 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
       </Flex>
     </Flex>
   );
+});
+
+RegionalGuidanceIPAdapterSettingsContent.displayName = 'RegionalGuidanceIPAdapterSettingsContent';
+
+export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
+
+  const selectIPAdapterHasImage = useMemo(
+    () =>
+      createSelector(selectCanvasSlice, (canvas) => {
+        const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+        assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
+        return referenceImage.ipAdapter.image !== null;
+      }),
+    [entityIdentifier, referenceImageId]
+  );
+  const hasImage = useAppSelector(selectIPAdapterHasImage);
+
+  if (!hasImage) {
+    return <RegionalGuidanceIPAdapterSettingsEmptyState referenceImageId={referenceImageId} />;
+  }
+
+  return <RegionalGuidanceIPAdapterSettingsContent referenceImageId={referenceImageId} />;
 });
 
 RegionalGuidanceIPAdapterSettings.displayName = 'RegionalGuidanceIPAdapterSettings';
