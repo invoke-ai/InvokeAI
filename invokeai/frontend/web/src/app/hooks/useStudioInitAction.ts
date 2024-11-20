@@ -178,35 +178,44 @@ export const useStudioInitAction = (action?: StudioInitAction, schemaLoaded?: bo
       return;
     }
 
-    didInit.current = true;
-
     switch (action.type) {
+      case 'loadWorkflow':
+        if (schemaLoaded) {
+          handleLoadWorkflow(action.data.workflowId);
+          didInit.current = true;
+        }
+        break;
+
       case 'selectStylePreset':
         handleSelectStylePreset(action.data.stylePresetId);
+        didInit.current = true;
         break;
+
       case 'sendToCanvas':
         handleSendToCanvas(action.data.imageName);
+        didInit.current = true;
         break;
+
       case 'useAllParameters':
         handleUseAllMetadata(action.data.imageName);
+        didInit.current = true;
         break;
+
       case 'goToDestination':
         handleGoToDestination(action.data.destination);
+        didInit.current = true;
         break;
+
       default:
         break;
     }
-  }, [handleSendToCanvas, handleUseAllMetadata, action, handleSelectStylePreset, handleGoToDestination]);
-
-  useEffect(() => {
-    if (didInit.current || !action || !schemaLoaded) {
-      return;
-    }
-
-    didInit.current = true;
-
-    if (action.type === 'loadWorkflow') {
-      handleLoadWorkflow(action.data.workflowId);
-    }
-  }, [action, handleLoadWorkflow, schemaLoaded]);
+  }, [
+    handleSendToCanvas,
+    handleUseAllMetadata,
+    action,
+    handleSelectStylePreset,
+    handleGoToDestination,
+    handleLoadWorkflow,
+    schemaLoaded,
+  ]);
 };
