@@ -1,6 +1,7 @@
 import einops
 import torch
 
+from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.math import attention
 from invokeai.backend.flux.modules.layers import DoubleStreamBlock
@@ -63,6 +64,7 @@ class CustomDoubleStreamBlockProcessor:
         vec: torch.Tensor,
         pe: torch.Tensor,
         ip_adapter_extensions: list[XLabsIPAdapterExtension],
+        regional_prompting_extension: RegionalPromptingExtension,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """A custom implementation of DoubleStreamBlock.forward() with additional features:
         - IP-Adapter support

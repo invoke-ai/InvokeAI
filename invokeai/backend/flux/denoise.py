@@ -7,10 +7,10 @@ from tqdm import tqdm
 from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFluxOutput, sum_controlnet_flux_outputs
 from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
+from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.model import Flux
-from invokeai.backend.flux.text_conditioning import FluxRegionalTextConditioning
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 
@@ -19,8 +19,8 @@ def denoise(
     # model input
     img: torch.Tensor,
     img_ids: torch.Tensor,
-    pos_text_conditioning: FluxRegionalTextConditioning,
-    neg_text_conditioning: FluxRegionalTextConditioning | None,
+    pos_regional_prompting_extension: RegionalPromptingExtension,
+    neg_regional_prompting_extension: RegionalPromptingExtension | None,
     # sampling parameters
     timesteps: list[float],
     step_callback: Callable[[PipelineIntermediateState], None],
@@ -50,16 +50,16 @@ def denoise(
         # Run ControlNet models.
         controlnet_residuals: list[ControlNetFluxOutput] = []
         for controlnet_extension in controlnet_extensions:
-            # FIX(ryand): Revive ControlNet functionality.
+            # TODO(ryand): Think about how to handle regional prompting with ControlNet.
             controlnet_residuals.append(
                 controlnet_extension.run_controlnet(
                     timestep_index=step_index,
                     total_num_timesteps=total_steps,
                     img=img,
                     img_ids=img_ids,
-                    txt=txt,
-                    txt_ids=txt_ids,
-                    y=vec,
+                    txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
+                    txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
+                    y=pos_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
                     timesteps=t_vec,
                     guidance=guidance_vec,
                 )
@@ -74,9 +74,9 @@ def denoise(
         pred = model(
             img=img,
             img_ids=img_ids,
-            txt=txt,
-            txt_ids=txt_ids,
-            y=vec,
+            txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
+            txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
+            y=pos_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
             timesteps=t_vec,
             guidance=guidance_vec,
             timestep_index=step_index,
@@ -84,6 +84,7 @@ def denoise(
             controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
             controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
             ip_adapter_extensions=pos_ip_adapter_extensions,
+            regional_prompting_extension=pos_regional_prompting_extension,
         )
 
         step_cfg_scale = cfg_scale[step_index]
@@ -93,15 +94,15 @@ def denoise(
             # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance
             # on systems with sufficient VRAM.
 
-            if neg_txt is None or neg_txt_ids is None or neg_vec is None:
+            if neg_regional_prompting_extension is None:
                 raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
 
             neg_pred = model(
                 img=img,
                 img_ids=img_ids,
-                txt=neg_txt,
-                txt_ids=neg_txt_ids,
-                y=neg_vec,
+                txt=neg_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
+                txt_ids=neg_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
+                y=neg_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
                 timesteps=t_vec,
                 guidance=guidance_vec,
                 timestep_index=step_index,
