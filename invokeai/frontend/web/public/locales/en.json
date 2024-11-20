@@ -1781,6 +1781,7 @@
         "pullBboxIntoLayer": "Pull Bbox into Layer",
         "pullBboxIntoReferenceImage": "Pull Bbox into Reference Image",
         "showProgressOnCanvas": "Show Progress on Canvas",
+        "useImage": "Use Image",
         "prompt": "Prompt",
         "negativePrompt": "Negative Prompt",
         "beginEndStepPercentShort": "Begin/End %",
@@ -1793,6 +1794,7 @@
         "resetGenerationSettings": "Reset Generation Settings",
         "replaceCurrent": "Replace Current",
         "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or draw on the canvas to get started.",
+        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer to get started.",
         "controlMode": {
             "controlMode": "Control Mode",
             "balanced": "Balanced (recommended)",
