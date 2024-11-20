@@ -10,6 +10,7 @@ from invokeai.backend.flux.extensions.instantx_controlnet_extension import Insta
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.text_conditioning import FluxRegionalTextConditioning
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 
@@ -18,14 +19,8 @@ def denoise(
     # model input
     img: torch.Tensor,
     img_ids: torch.Tensor,
-    # positive text conditioning
-    txt: torch.Tensor,
-    txt_ids: torch.Tensor,
-    vec: torch.Tensor,
-    # negative text conditioning
-    neg_txt: torch.Tensor | None,
-    neg_txt_ids: torch.Tensor | None,
-    neg_vec: torch.Tensor | None,
+    pos_text_conditioning: FluxRegionalTextConditioning,
+    neg_text_conditioning: FluxRegionalTextConditioning | None,
     # sampling parameters
     timesteps: list[float],
     step_callback: Callable[[PipelineIntermediateState], None],
@@ -55,6 +50,7 @@ def denoise(
         # Run ControlNet models.
         controlnet_residuals: list[ControlNetFluxOutput] = []
         for controlnet_extension in controlnet_extensions:
+            # FIX(ryand): Revive ControlNet functionality.
             controlnet_residuals.append(
                 controlnet_extension.run_controlnet(
                     timestep_index=step_index,

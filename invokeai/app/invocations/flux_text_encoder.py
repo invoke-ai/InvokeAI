@@ -1,11 +1,11 @@
 from contextlib import ExitStack
-from typing import Iterator, Literal, Tuple
+from typing import Iterator, Literal, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
+from invokeai.app.invocations.fields import FieldDescriptions, FluxConditioningField, Input, InputField, TensorField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -42,6 +42,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
         description="Max sequence length for the T5 encoder. Expected to be 256 for FLUX schnell models and 512 for FLUX dev models."
     )
     prompt: str = InputField(description="Text prompt to encode.")
+    mask: Optional[TensorField] = InputField(
+        default=None, description="A mask defining the region that this conditioning prompt applies to."
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> FluxConditioningOutput:
@@ -54,7 +57,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
         )
 
         conditioning_name = context.conditioning.save(conditioning_data)
-        return FluxConditioningOutput.build(conditioning_name)
+        return FluxConditioningOutput(
+            conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+        )
 
     def _t5_encode(self, context: InvocationContext) -> torch.Tensor:
         t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer)
