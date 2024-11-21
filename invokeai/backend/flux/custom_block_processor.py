@@ -14,7 +14,12 @@ class CustomDoubleStreamBlockProcessor:
 
     @staticmethod
     def _double_stream_block_forward(
-        block: DoubleStreamBlock, img: torch.Tensor, txt: torch.Tensor, vec: torch.Tensor, pe: torch.Tensor
+        block: DoubleStreamBlock,
+        img: torch.Tensor,
+        txt: torch.Tensor,
+        vec: torch.Tensor,
+        pe: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """This function is a direct copy of DoubleStreamBlock.forward(), but it returns some of the intermediate
         values.
@@ -41,7 +46,7 @@ class CustomDoubleStreamBlockProcessor:
         k = torch.cat((txt_k, img_k), dim=2)
         v = torch.cat((txt_v, img_v), dim=2)
 
-        attn = attention(q, k, v, pe=pe)
+        attn = attention(q, k, v, pe=pe, attn_mask=attn_mask)
         txt_attn, img_attn = attn[:, : txt.shape[1]], attn[:, txt.shape[1] :]
 
         # calculate the img bloks

@@ -17,6 +17,7 @@ class RegionalPromptingExtension:
 
     def __init__(self, regional_text_conditioning: FluxRegionalTextConditioning):
         self.regional_text_conditioning = regional_text_conditioning
+        self.attn_mask = self._prepare_attn_mask()
 
     @classmethod
     def from_text_conditioning(cls, text_conditioning: list[FluxTextConditioning]):
@@ -24,11 +25,8 @@ class RegionalPromptingExtension:
 
     def _prepare_attn_mask(self) -> torch.Tensor:
         device = self.regional_text_conditioning.image_masks[0].device
-        # img_seq_len = latent_height * latent_width
-        img_seq_len = (
-            self.regional_text_conditioning.image_masks.shape[-1]
-            * self.regional_text_conditioning.image_masks.shape[-2]
-        )
+        # img_seq_len = packed_height * packed_width
+        img_seq_len = self.regional_text_conditioning.image_masks.shape[2]
         txt_seq_len = self.regional_text_conditioning.t5_embeddings.shape[1]
 
         # In the double stream attention blocks, the txt seq and img seq are concatenated and then attention is applied.
@@ -44,8 +42,8 @@ class RegionalPromptingExtension:
             (txt_seq_len + img_seq_len, txt_seq_len + img_seq_len), device=device, dtype=torch.bool
         )
 
-        for i in range(len(self.regional_text_conditioning.t5_embeddings)):
-            image_mask = self.regional_text_conditioning.image_masks[i].flatten()
+        for i in range(len(self.regional_text_conditioning.t5_embedding_ranges)):
+            image_mask = self.regional_text_conditioning.image_masks[0, i]
             t5_embedding_range = self.regional_text_conditioning.t5_embedding_ranges[i]
 
             # 1. txt attends to itself
@@ -54,15 +52,19 @@ class RegionalPromptingExtension:
             ] = True
 
             # 2. txt attends to corresponding regional img
-            # TODO(ryand): Make sure that broadcasting works as expected.
-            regional_attention_mask[t5_embedding_range.start : t5_embedding_range.end, txt_seq_len:] = image_mask
+            # Note that we reshape to (1, img_seq_len) to ensure broadcasting works as desired.
+            regional_attention_mask[t5_embedding_range.start : t5_embedding_range.end, txt_seq_len:] = image_mask.view(
+                1, img_seq_len
+            )
 
             # 3. regional img attends to corresponding txt
-            # TODO(ryand): Make sure that broadcasting works as expected.
-            regional_attention_mask[txt_seq_len:, t5_embedding_range.start : t5_embedding_range.end] = image_mask
+            # Note that we reshape to (img_seq_len, 1) to ensure broadcasting works as desired.
+            regional_attention_mask[txt_seq_len:, t5_embedding_range.start : t5_embedding_range.end] = image_mask.view(
+                img_seq_len, 1
+            )
 
             # 4. regional img attends to itself
-            # TODO(ryand): Make sure that broadcasting works as expected.
+            image_mask = image_mask.view(img_seq_len, 1)
             regional_attention_mask[txt_seq_len:, txt_seq_len:] = image_mask @ image_mask.T
 
         return regional_attention_mask
@@ -119,26 +121,30 @@ class RegionalPromptingExtension:
 
     @staticmethod
     def preprocess_regional_prompt_mask(
-        mask: Optional[torch.Tensor], target_height: int, target_width: int, dtype: torch.dtype
+        mask: Optional[torch.Tensor], packed_height: int, packed_width: int, dtype: torch.dtype
     ) -> torch.Tensor:
         """Preprocess a regional prompt mask to match the target height and width.
         If mask is None, returns a mask of all ones with the target height and width.
         If mask is not None, resizes the mask to the target height and width using 'nearest' interpolation.
 
+        packed_height and packed_width are the target height and width of the mask in the 'packed' latent space.
+
         Returns:
-            torch.Tensor: The processed mask. shape: (1, 1, target_height, target_width).
+            torch.Tensor: The processed mask. shape: (1, 1, packed_height * packed_width).
         """
 
         if mask is None:
-            return torch.ones((1, 1, target_height, target_width), dtype=dtype)
+            return torch.ones((1, 1, packed_height * packed_width), dtype=dtype)
 
         mask = to_standard_float_mask(mask, out_dtype=dtype)
 
         tf = torchvision.transforms.Resize(
-            (target_height, target_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
+            (packed_height, packed_width), interpolation=torchvision.transforms.InterpolationMode.NEAREST
         )
 
         # Add a batch dimension to the mask, because torchvision expects shape (batch, channels, h, w).
         mask = mask.unsqueeze(0)  # Shape: (1, h, w) -> (1, 1, h, w)
         resized_mask = tf(mask)
-        return resized_mask
+
+        # Flatten the height and width dimensions into a single image_seq_len dimension.
+        return resized_mask.flatten(start_dim=2)

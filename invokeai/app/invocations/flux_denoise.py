@@ -162,13 +162,15 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             seed=self.seed,
         )
         b, _c, latent_h, latent_w = noise.shape
+        packed_h = latent_h // 2
+        packed_w = latent_w // 2
 
         # Load the conditioning data.
         pos_text_conditionings = self._load_text_conditioning(
             context=context,
             cond_field=self.positive_text_conditioning,
-            latent_height=latent_h,
-            latent_width=latent_w,
+            packed_height=packed_h,
+            packed_width=packed_w,
             dtype=inference_dtype,
         )
         neg_text_conditionings: list[FluxTextConditioning] | None = None
@@ -176,8 +178,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             neg_text_conditionings = self._load_text_conditioning(
                 context=context,
                 cond_field=self.negative_text_conditioning,
-                latent_height=latent_h,
-                latent_width=latent_w,
+                packed_height=packed_h,
+                packed_width=packed_w,
                 dtype=inference_dtype,
             )
         pos_regional_prompting_extension = RegionalPromptingExtension.from_text_conditioning(pos_text_conditionings)
@@ -191,10 +193,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         is_schnell = "schnell" in transformer_info.config.config_path
 
         # Calculate the timestep schedule.
-        image_seq_len = noise.shape[-1] * noise.shape[-2] // 4
         timesteps = get_schedule(
             num_steps=self.num_steps,
-            image_seq_len=image_seq_len,
+            image_seq_len=packed_h * packed_w,
             shift=not is_schnell,
         )
 
@@ -239,8 +240,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         noise = pack(noise)
         x = pack(x)
 
-        # Now that we have 'packed' the latent tensors, verify that we calculated the image_seq_len correctly.
-        assert image_seq_len == x.shape[1]
+        # Now that we have 'packed' the latent tensors, verify that we calculated the image_seq_len, packed_h, and
+        # packed_w correctly.
+        assert packed_h * packed_w == x.shape[1]
 
         # Prepare inpaint extension.
         inpaint_extension: InpaintExtension | None = None
@@ -348,8 +350,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self,
         context: InvocationContext,
         cond_field: FluxConditioningField | list[FluxConditioningField],
-        latent_height: int,
-        latent_width: int,
+        packed_height: int,
+        packed_width: int,
         dtype: torch.dtype,
     ) -> list[FluxTextConditioning]:
         """Load text conditioning data from a FluxConditioningField or a list of FluxConditioningFields."""
@@ -371,7 +373,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             mask: Optional[torch.Tensor] = None
             if cond_field.mask is not None:
                 mask = context.tensors.load(cond_field.mask.tensor_name)
-            mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype)
+            mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(mask, packed_height, packed_width, dtype)
 
             text_conditionings.append(FluxTextConditioning(t5_embeddings, clip_embeddings, mask))
 

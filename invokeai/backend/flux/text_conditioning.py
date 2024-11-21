@@ -21,7 +21,7 @@ class FluxRegionalTextConditioning:
     t5_txt_ids: torch.Tensor
 
     # A binary mask indicating the regions of the image that the prompt should be applied to.
-    # Shape: (1, num_prompts, height, width)
+    # Shape: (1, num_prompts, image_seq_len)
     # Dtype: torch.bool
     image_masks: torch.Tensor
 
