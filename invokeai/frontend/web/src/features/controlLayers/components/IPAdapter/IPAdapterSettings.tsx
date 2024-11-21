@@ -5,6 +5,7 @@ import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginE
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
+import { IPAdapterSettingsEmptyState } from 'features/controlLayers/components/IPAdapter/IPAdapterSettingsEmptyState';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { usePullBboxIntoGlobalReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -17,7 +18,7 @@ import {
   referenceImageIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectEntity, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
@@ -35,7 +36,7 @@ const buildSelectIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'referenc
     (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'IPAdapterSettings').ipAdapter
   );
 
-export const IPAdapterSettings = memo(() => {
+const IPAdapterSettingsContent = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('reference_image');
@@ -132,6 +133,27 @@ export const IPAdapterSettings = memo(() => {
       </Flex>
     </CanvasEntitySettingsWrapper>
   );
+});
+
+IPAdapterSettingsContent.displayName = 'IPAdapterSettingsContent';
+
+const buildSelectIPAdapterHasImage = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) =>
+  createSelector(selectCanvasSlice, (canvas) => {
+    const referenceImage = selectEntity(canvas, entityIdentifier);
+    return !!referenceImage && referenceImage.ipAdapter.image !== null;
+  });
+
+export const IPAdapterSettings = memo(() => {
+  const entityIdentifier = useEntityIdentifierContext('reference_image');
+
+  const selectIPAdapterHasImage = useMemo(() => buildSelectIPAdapterHasImage(entityIdentifier), [entityIdentifier]);
+  const hasImage = useAppSelector(selectIPAdapterHasImage);
+
+  if (!hasImage) {
+    return <IPAdapterSettingsEmptyState />;
+  }
+
+  return <IPAdapterSettingsContent />;
 });
 
 IPAdapterSettings.displayName = 'IPAdapterSettings';
