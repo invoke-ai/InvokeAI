@@ -18,6 +18,7 @@ import type {
   CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  EntityMovedByPayload,
   FillStyle,
   RegionalGuidanceReferenceImageState,
   RgbColor,
@@ -51,7 +52,7 @@ import type {
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
-  EntityMovedPayload,
+  EntityMovedToPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
   IPMethodV2,
@@ -1201,7 +1202,7 @@ export const canvasSlice = createSlice({
       }
       entity.fill.style = style;
     },
-    entityMoved: (state, action: PayloadAction<EntityMovedPayload>) => {
+    entityMovedTo: (state, action: PayloadAction<EntityMovedToPayload>) => {
       const { entityIdentifier, position } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
@@ -1211,6 +1212,20 @@ export const canvasSlice = createSlice({
       if (isRenderableEntity(entity)) {
         entity.position = position;
       }
+    },
+    entityMovedBy: (state, action: PayloadAction<EntityMovedByPayload>) => {
+      const { entityIdentifier, offset } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+
+      if (!isRenderableEntity(entity)) {
+        return;
+      }
+
+      entity.position.x += offset.x;
+      entity.position.y += offset.y;
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
       const { entityIdentifier, imageObject, position, replaceObjects, isSelected } = action.payload;
@@ -1505,7 +1520,8 @@ export const {
   entityIsLockedToggled,
   entityFillColorChanged,
   entityFillStyleChanged,
-  entityMoved,
+  entityMovedTo,
+  entityMovedBy,
   entityDuplicated,
   entityRasterized,
   entityBrushLineAdded,

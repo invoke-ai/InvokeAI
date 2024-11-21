@@ -439,7 +439,8 @@ export type EntityIdentifierPayload<
       entityIdentifier: CanvasEntityIdentifier<U>;
     } & T;
 
-export type EntityMovedPayload = EntityIdentifierPayload<{ position: Coordinate }>;
+export type EntityMovedToPayload = EntityIdentifierPayload<{ position: Coordinate }>;
+export type EntityMovedByPayload = EntityIdentifierPayload<{ offset: Coordinate }>;
 export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{
   brushLine: CanvasBrushLineState | CanvasBrushLineWithPressureState;
 }>;
