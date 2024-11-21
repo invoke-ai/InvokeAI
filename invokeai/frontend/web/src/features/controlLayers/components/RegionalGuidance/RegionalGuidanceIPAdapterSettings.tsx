@@ -20,7 +20,7 @@ import {
   rgIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
-import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
@@ -164,16 +164,20 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
 
 RegionalGuidanceIPAdapterSettingsContent.displayName = 'RegionalGuidanceIPAdapterSettingsContent';
 
+const buildSelectIPAdapterHasImage = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
+  referenceImageId: string
+) =>
+  createSelector(selectCanvasSlice, (canvas) => {
+    const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+    return !!referenceImage && referenceImage.ipAdapter.image !== null;
+  });
+
 export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
 
   const selectIPAdapterHasImage = useMemo(
-    () =>
-      createSelector(selectCanvasSlice, (canvas) => {
-        const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
-        assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
-        return referenceImage.ipAdapter.image !== null;
-      }),
+    () => buildSelectIPAdapterHasImage(entityIdentifier, referenceImageId),
     [entityIdentifier, referenceImageId]
   );
   const hasImage = useAppSelector(selectIPAdapterHasImage);
