@@ -25,7 +25,7 @@ import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dn
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiXBold } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -116,7 +116,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
           size="sm"
           variant="link"
           alignSelf="stretch"
-          icon={<PiTrashSimpleFill />}
+          icon={<PiXBold />}
           tooltip={t('controlLayers.deleteReferenceImage')}
           aria-label={t('controlLayers.deleteReferenceImage')}
           onClick={onDeleteIPAdapter}
