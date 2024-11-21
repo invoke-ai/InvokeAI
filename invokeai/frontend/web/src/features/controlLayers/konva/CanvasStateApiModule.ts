@@ -20,7 +20,8 @@ import {
   controlLayerAdded,
   entityBrushLineAdded,
   entityEraserLineAdded,
-  entityMoved,
+  entityMovedBy,
+  entityMovedTo,
   entityRasterized,
   entityRectAdded,
   entityReset,
@@ -40,7 +41,8 @@ import type {
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
-  EntityMovedPayload,
+  EntityMovedByPayload,
+  EntityMovedToPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
   Rect,
@@ -139,8 +141,15 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   /**
    * Updates an entity's position, pushing state to redux.
    */
-  setEntityPosition = (arg: EntityMovedPayload) => {
-    this.store.dispatch(entityMoved(arg));
+  setEntityPosition = (arg: EntityMovedToPayload) => {
+    this.store.dispatch(entityMovedTo(arg));
+  };
+
+  /**
+   * Moves an entity by the give offset, pushing state to redux.
+   */
+  moveEntityBy = (arg: EntityMovedByPayload) => {
+    this.store.dispatch(entityMovedBy(arg));
   };
 
   /**

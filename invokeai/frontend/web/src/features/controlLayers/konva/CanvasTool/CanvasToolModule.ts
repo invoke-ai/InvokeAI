@@ -532,12 +532,9 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    switch (
-      this.$tool.get() // before repeat, as we may want to catch repeating keys
-    ) {
-      case 'move':
-        this.tools.move.onKeyDown(e);
-        break;
+    // Handle nudging - must be before repeat, as we may want to catch repeating keys
+    if (this.tools.move.isNudgeKey(e.key)) {
+      this.tools.move.nudge(e.key);
     }
 
     if (e.repeat) {
