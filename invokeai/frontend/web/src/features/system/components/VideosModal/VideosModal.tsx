@@ -10,6 +10,7 @@ import {
   ModalOverlay,
   Text,
 } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import {
@@ -18,25 +19,45 @@ import {
   studioSessionsPlaylistLink,
 } from 'features/system/components/VideosModal/data';
 import { VideoCardList } from 'features/system/components/VideosModal/VideoCardList';
+import { videoModalLinkClicked } from 'features/system/store/actions';
 import { discordLink } from 'features/system/store/constants';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 export const [useVideosModal] = buildUseDisclosure(false);
 
 const StudioSessionsPlaylistLink = () => {
+  const dispatch = useAppDispatch();
+  const handleLinkClick = useCallback(() => {
+    dispatch(videoModalLinkClicked('Studio session playlist'));
+  }, [dispatch]);
+
   return (
     <ExternalLink
       fontWeight="semibold"
       href={studioSessionsPlaylistLink}
       display="inline-flex"
       label="Studio Sessions playlist"
+      onClick={handleLinkClick}
     />
   );
 };
 
 const DiscordLink = () => {
-  return <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label="Discord" />;
+  const dispatch = useAppDispatch();
+  const handleLinkClick = useCallback(() => {
+    dispatch(videoModalLinkClicked('Discord'));
+  }, [dispatch]);
+
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={discordLink}
+      display="inline-flex"
+      label="Discord"
+      onClick={handleLinkClick}
+    />
+  );
 };
 
 const components = {
