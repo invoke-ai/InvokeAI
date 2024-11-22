@@ -37,8 +37,8 @@ export const gettingStartedVideos: VideoData[] = [
   },
   {
     tKey: 'creatingAndComposingOnInvokesControlCanvas',
-    link: 'https://www.youtube.com/watch?v=MohWv5GZVGM&list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO&index=5&t=28s&pp=iAQB',
-    length: { minutes: 13, seconds: 56 },
+    link: 'https://www.youtube.com/watch?v=O4LaFcYFxlA',
+    length: { minutes: 2, seconds: 52 },
   },
   {
     tKey: 'upscaling',
