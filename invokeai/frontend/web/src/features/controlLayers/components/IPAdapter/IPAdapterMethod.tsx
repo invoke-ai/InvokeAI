@@ -6,6 +6,8 @@ import { isIPMethodV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
+import { useAppSelector } from '../../../../app/store/storeHooks';
+import { selectSystemShouldEnableModelDescriptions } from '../../../system/store/systemSlice';
 
 type Props = {
   method: IPMethodV2;
@@ -14,13 +16,15 @@ type Props = {
 
 export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
   const { t } = useTranslation();
+  const shouldShowModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
+
   const options: { label: string; value: IPMethodV2 }[] = useMemo(
     () => [
-      { label: t('controlLayers.ipAdapterMethod.full'), value: 'full' },
-      { label: t('controlLayers.ipAdapterMethod.style'), value: 'style' },
-      { label: t('controlLayers.ipAdapterMethod.composition'), value: 'composition' },
+      { label: t('controlLayers.ipAdapterMethod.full'), value: 'full', description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.fullDesc'): undefined },
+      { label: t('controlLayers.ipAdapterMethod.style'), value: 'style', description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.styleDesc') : undefined },
+      { label: t('controlLayers.ipAdapterMethod.composition'), value: 'composition', description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.compositionDesc'): undefined },
     ],
-    [t]
+    [t, shouldShowModelDescriptions]
   );
   const _onChange = useCallback<ComboboxOnChange>(
     (v) => {

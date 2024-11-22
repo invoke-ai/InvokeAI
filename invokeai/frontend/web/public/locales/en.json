@@ -1319,8 +1319,8 @@
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
             "paragraphs": [
-                "The part of the of the denoising process that will have the Control Adapter applied.",
-                "Generally, Control Adapters applied at the start of the process guide composition, and Control Adapters applied at the end guide details."
+                "This setting determines which portion of the denoising (generation) process incorporates the guidance from this layer.",
+                "• Start Step (%): Specifies when to begin applying the guidance from this layer during the generation process.", "• End Step (%): Specifies when to stop applying this layer's guidance and revert general guidance from the model and other settings."
             ]
         },
         "controlNetControlMode": {
@@ -1338,13 +1338,13 @@
             "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
         },
         "ipAdapterMethod": {
-            "heading": "Method",
-            "paragraphs": ["Method by which to apply the current IP Adapter."]
+            "heading": "Mode",
+            "paragraphs": ["The mode defines how the reference image will guide the generation process."]
         },
         "controlNetWeight": {
             "heading": "Weight",
             "paragraphs": [
-                "Weight of the Control Adapter. Higher weight will lead to larger impacts on the final image."
+                "Adjusts how strongly the layer influences the generation process", "• Higher Weight (.75-2): Creates a more significant impact on the final result.", "• Lower Weight (0-.75): Creates a smaller impact on the final result."
             ]
         },
         "dynamicPrompts": {
@@ -1803,10 +1803,13 @@
             "megaControl": "Mega Control"
         },
         "ipAdapterMethod": {
-            "ipAdapterMethod": "IP Adapter Method",
+            "ipAdapterMethod": "Mode",
             "full": "Style and Composition",
+            "fullDesc": "Applies both the visual style (colors, textures) and the composition (layout and structure) from the reference image.",
             "style": "Style Only",
-            "composition": "Composition Only"
+            "styleDesc": "Focuses on replicating the visual style of the reference image, including colors, textures, and artistic details, without considering its layout.",
+            "composition": "Composition Only",
+            "compositionDesc": "Focuses on replicating the layout and structure of the reference image while ignoring its visual style."
         },
         "fill": {
             "fillColor": "Fill Color",
