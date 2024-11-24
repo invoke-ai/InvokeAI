@@ -334,6 +334,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
             )
 
+            # activities = [torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA]
+            # with torch.profiler.profile(activities=activities, record_shapes=True, with_stack=True) as prof:
             x = denoise(
                 model=transformer,
                 img=x,
@@ -353,6 +355,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 pos_ip_adapter_extensions=pos_ip_adapter_extensions,
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
             )
+            # prof.export_chrome_trace("trace.json")
 
         x = unpack(x.float(), self.height, self.width)
         return x
