@@ -24,7 +24,7 @@ def rope(pos: Tensor, dim: int, theta: int) -> Tensor:
     out = torch.einsum("...n,d->...nd", pos, omega)
     out = torch.stack([torch.cos(out), -torch.sin(out), torch.sin(out), torch.cos(out)], dim=-1)
     out = rearrange(out, "b n d (i j) -> b n d i j", i=2, j=2)
-    return out.float()
+    return out.to(dtype=pos.dtype, device=pos.device)
 
 
 def apply_rope(xq: Tensor, xk: Tensor, freqs_cis: Tensor) -> tuple[Tensor, Tensor]:
@@ -32,4 +32,4 @@ def apply_rope(xq: Tensor, xk: Tensor, freqs_cis: Tensor) -> tuple[Tensor, Tenso
     xk_ = xk.view(*xk.shape[:-1], -1, 1, 2)
     xq_out = freqs_cis[..., 0] * xq_[..., 0] + freqs_cis[..., 1] * xq_[..., 1]
     xk_out = freqs_cis[..., 0] * xk_[..., 0] + freqs_cis[..., 1] * xk_[..., 1]
-    return xq_out.view(*xq.shape).type_as(xq), xk_out.view(*xk.shape).type_as(xk)
+    return xq_out.view(*xq.shape), xk_out.view(*xk.shape)
