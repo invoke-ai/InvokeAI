@@ -66,10 +66,7 @@ class RMSNorm(torch.nn.Module):
         self.scale = nn.Parameter(torch.ones(dim))
 
     def forward(self, x: Tensor):
-        x_dtype = x.dtype
-        x = x.float()
-        rrms = torch.rsqrt(torch.mean(x**2, dim=-1, keepdim=True) + 1e-6)
-        return (x * rrms).to(dtype=x_dtype) * self.scale
+        return torch.nn.functional.rms_norm(x, self.scale.shape, self.scale, eps=1e-6)
 
 
 class QKNorm(torch.nn.Module):
