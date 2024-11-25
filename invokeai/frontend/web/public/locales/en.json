@@ -1320,7 +1320,8 @@
             "heading": "Begin / End Step Percentage",
             "paragraphs": [
                 "This setting determines which portion of the denoising (generation) process incorporates the guidance from this layer.",
-                "• Start Step (%): Specifies when to begin applying the guidance from this layer during the generation process.", "• End Step (%): Specifies when to stop applying this layer's guidance and revert general guidance from the model and other settings."
+                "• Start Step (%): Specifies when to begin applying the guidance from this layer during the generation process.",
+                "• End Step (%): Specifies when to stop applying this layer's guidance and revert general guidance from the model and other settings."
             ]
         },
         "controlNetControlMode": {
@@ -1344,7 +1345,9 @@
         "controlNetWeight": {
             "heading": "Weight",
             "paragraphs": [
-                "Adjusts how strongly the layer influences the generation process", "• Higher Weight (.75-2): Creates a more significant impact on the final result.", "• Lower Weight (0-.75): Creates a smaller impact on the final result."
+                "Adjusts how strongly the layer influences the generation process",
+                "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
+                "• Lower Weight (0-.75): Creates a smaller impact on the final result."
             ]
         },
         "dynamicPrompts": {
