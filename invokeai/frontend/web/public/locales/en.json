@@ -1805,11 +1805,11 @@
         "ipAdapterMethod": {
             "ipAdapterMethod": "Mode",
             "full": "Style and Composition",
-            "fullDesc": "Applies both the visual style (colors, textures) and the composition (layout and structure) from the reference image.",
+            "fullDesc": "Applies visual style (colors, textures) & composition (layout, structure).",
             "style": "Style Only",
-            "styleDesc": "Focuses on replicating the visual style of the reference image, including colors, textures, and artistic details, without considering its layout.",
+            "styleDesc": "Applies visual style (colors, textures) without considering its layout.",
             "composition": "Composition Only",
-            "compositionDesc": "Focuses on replicating the layout and structure of the reference image while ignoring its visual style."
+            "compositionDesc": "Replicates layout & structure while ignoring the reference's style."
         },
         "fill": {
             "fillColor": "Fill Color",
