@@ -74,8 +74,14 @@ class CustomDoubleStreamBlockProcessor:
         """A custom implementation of DoubleStreamBlock.forward() with additional features:
         - IP-Adapter support
         """
+
         img, txt, img_q = CustomDoubleStreamBlockProcessor._double_stream_block_forward(
-            block, img, txt, vec, pe, attn_mask=regional_prompting_extension.attn_mask
+            block,
+            img,
+            txt,
+            vec,
+            pe,
+            attn_mask=regional_prompting_extension.attn_mask_with_unrestricted_img_self_attn,
         )
 
         # Apply IP-Adapter conditioning.

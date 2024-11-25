@@ -9,7 +9,8 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Range
 class FluxTextConditioning:
     t5_embeddings: torch.Tensor
     clip_embeddings: torch.Tensor
-    mask: torch.Tensor
+    # If mask is None, the prompt is a global prompt.
+    mask: torch.Tensor | None
 
 
 @dataclass
@@ -24,10 +25,11 @@ class FluxRegionalTextConditioning:
     # Shape: (1, 768)
     clip_embeddings: torch.Tensor
 
-    # A binary mask indicating the regions of the image that the prompt should be applied to.
-    # Shape: (1, num_prompts, image_seq_len)
-    # Dtype: torch.bool
-    image_masks: torch.Tensor
+    # A binary mask indicating the regions of the image that the prompt should be applied to. If None, the prompt is a
+    # global prompt.
+    # image_masks[i] is the mask for the ith prompt.
+    # image_masks[i] has shape (1, image_seq_len) and dtype torch.bool.
+    image_masks: list[torch.Tensor | None]
 
     # List of ranges that represent the embedding ranges for each mask.
     # t5_embedding_ranges[i] contains the range of the t5 embeddings that correspond to image_masks[i].

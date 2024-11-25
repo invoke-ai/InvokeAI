@@ -184,9 +184,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
                 device=TorchDevice.choose_torch_device(),
             )
-        pos_regional_prompting_extension = RegionalPromptingExtension.from_text_conditioning(pos_text_conditionings)
+        pos_regional_prompting_extension = RegionalPromptingExtension.from_text_conditioning(
+            pos_text_conditionings, img_seq_len=packed_h * packed_w
+        )
         neg_regional_prompting_extension = (
-            RegionalPromptingExtension.from_text_conditioning(neg_text_conditionings)
+            RegionalPromptingExtension.from_text_conditioning(neg_text_conditionings, img_seq_len=packed_h * packed_w)
             if neg_text_conditionings
             else None
         )
@@ -377,9 +379,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             if cond_field.mask is not None:
                 mask = context.tensors.load(cond_field.mask.tensor_name)
                 mask = mask.to(device=device)
-            mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(
-                mask, packed_height, packed_width, dtype, device
-            )
+                mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(
+                    mask, packed_height, packed_width, dtype, device
+                )
 
             text_conditionings.append(FluxTextConditioning(t5_embeddings, clip_embeddings, mask))
 

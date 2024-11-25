@@ -15,19 +15,54 @@ class RegionalPromptingExtension:
     Implementation inspired by: https://arxiv.org/pdf/2411.02395
     """
 
-    def __init__(self, regional_text_conditioning: FluxRegionalTextConditioning):
+    def __init__(
+        self,
+        regional_text_conditioning: FluxRegionalTextConditioning,
+        attn_mask_with_restricted_img_self_attn: torch.Tensor | None = None,
+        attn_mask_with_unrestricted_img_self_attn: torch.Tensor | None = None,
+    ):
         self.regional_text_conditioning = regional_text_conditioning
-        self.attn_mask = self._prepare_attn_mask()
+        self.attn_mask_with_restricted_img_self_attn = attn_mask_with_restricted_img_self_attn
+        self.attn_mask_with_unrestricted_img_self_attn = attn_mask_with_unrestricted_img_self_attn
 
     @classmethod
-    def from_text_conditioning(cls, text_conditioning: list[FluxTextConditioning]):
-        return cls(regional_text_conditioning=cls._concat_regional_text_conditioning(text_conditioning))
+    def from_text_conditioning(cls, text_conditioning: list[FluxTextConditioning], img_seq_len: int):
+        """Create a RegionalPromptingExtension from a list of text conditionings.
 
-    def _prepare_attn_mask(self) -> torch.Tensor:
-        device = self.regional_text_conditioning.image_masks[0].device
-        # img_seq_len = packed_height * packed_width
-        img_seq_len = self.regional_text_conditioning.image_masks.shape[2]
-        txt_seq_len = self.regional_text_conditioning.t5_embeddings.shape[1]
+        Args:
+            text_conditioning (list[FluxTextConditioning]): The text conditionings to use for regional prompting.
+            img_seq_len (int): The image sequence length (i.e. packed_height * packed_width).
+        """
+        regional_text_conditioning = cls._concat_regional_text_conditioning(text_conditioning)
+        attn_mask_with_restricted_img_self_attn = cls._prepare_attn_mask(
+            regional_text_conditioning, img_seq_len, restrict_img_self_attn=True
+        )
+        attn_mask_with_unrestricted_img_self_attn = cls._prepare_attn_mask(
+            regional_text_conditioning, img_seq_len, restrict_img_self_attn=False
+        )
+        return cls(
+            regional_text_conditioning=regional_text_conditioning,
+            attn_mask_with_restricted_img_self_attn=attn_mask_with_restricted_img_self_attn,
+            attn_mask_with_unrestricted_img_self_attn=attn_mask_with_unrestricted_img_self_attn,
+        )
+
+    @classmethod
+    def _prepare_attn_mask(
+        cls,
+        regional_text_conditioning: FluxRegionalTextConditioning,
+        img_seq_len: int,
+        restrict_img_self_attn: bool,
+    ) -> torch.Tensor:
+        device = TorchDevice.choose_torch_device()
+
+        # Infer txt_seq_len from the t5_embeddings tensor.
+        txt_seq_len = regional_text_conditioning.t5_embeddings.shape[1]
+
+        # Decide whether to compute the img self-attention region mask.
+        # When compute_img_self_attn_region_mask is True, img self attention is only allowed within regions.
+        # When compute_img_self_attn_region_mask is False, img self attention is not constrained.
+        has_region_masks = any(mask is not None for mask in regional_text_conditioning.image_masks)
+        compute_img_self_attn_region_mask = restrict_img_self_attn and has_region_masks
 
         # In the double stream attention blocks, the txt seq and img seq are concatenated and then attention is applied.
         # Concatenation happens in the following order: [txt_seq, img_seq].
@@ -39,34 +74,38 @@ class RegionalPromptingExtension:
 
         # Initialize empty attention mask.
         regional_attention_mask = torch.zeros(
-            (txt_seq_len + img_seq_len, txt_seq_len + img_seq_len), device=device, dtype=torch.bool
+            (txt_seq_len + img_seq_len, txt_seq_len + img_seq_len), device=device, dtype=torch.float16
         )
 
-        for i in range(len(self.regional_text_conditioning.t5_embedding_ranges)):
-            image_mask = self.regional_text_conditioning.image_masks[0, i]
-            t5_embedding_range = self.regional_text_conditioning.t5_embedding_ranges[i]
-
+        for image_mask, t5_embedding_range in zip(
+            regional_text_conditioning.image_masks, regional_text_conditioning.t5_embedding_ranges, strict=True
+        ):
             # 1. txt attends to itself
             regional_attention_mask[
                 t5_embedding_range.start : t5_embedding_range.end, t5_embedding_range.start : t5_embedding_range.end
-            ] = True
+            ] = 1.0
 
             # 2. txt attends to corresponding regional img
             # Note that we reshape to (1, img_seq_len) to ensure broadcasting works as desired.
-            regional_attention_mask[t5_embedding_range.start : t5_embedding_range.end, txt_seq_len:] = image_mask.view(
-                1, img_seq_len
-            )
+            fill_value = image_mask.view(1, img_seq_len) if image_mask is not None else 1.0
+            regional_attention_mask[t5_embedding_range.start : t5_embedding_range.end, txt_seq_len:] = fill_value
 
             # 3. regional img attends to corresponding txt
             # Note that we reshape to (img_seq_len, 1) to ensure broadcasting works as desired.
-            regional_attention_mask[txt_seq_len:, t5_embedding_range.start : t5_embedding_range.end] = image_mask.view(
-                img_seq_len, 1
-            )
+            fill_value = image_mask.view(img_seq_len, 1) if image_mask is not None else 1.0
+            regional_attention_mask[txt_seq_len:, t5_embedding_range.start : t5_embedding_range.end] = fill_value
 
             # 4. regional img attends to itself
-            # image_mask = image_mask.view(img_seq_len, 1)
-            # regional_attention_mask[txt_seq_len:, txt_seq_len:] = image_mask @ image_mask.T
-        regional_attention_mask[txt_seq_len:, txt_seq_len:] = True
+            if compute_img_self_attn_region_mask and image_mask is not None:
+                image_mask = image_mask.view(img_seq_len, 1)
+                regional_attention_mask[txt_seq_len:, txt_seq_len:] += image_mask @ image_mask.T
+
+        if not compute_img_self_attn_region_mask:
+            # Allow unrestricted img self attention.
+            regional_attention_mask[txt_seq_len:, txt_seq_len:] = 1.0
+
+        # Convert attention mask to boolean.
+        regional_attention_mask = regional_attention_mask > 0.5
 
         return regional_attention_mask
 
@@ -77,8 +116,8 @@ class RegionalPromptingExtension:
     ) -> FluxRegionalTextConditioning:
         """Concatenate regional text conditioning data into a single conditioning tensor (with associated masks)."""
         concat_t5_embeddings: list[torch.Tensor] = []
-        concat_image_masks: list[torch.Tensor] = []
         concat_t5_embedding_ranges: list[Range] = []
+        image_masks: list[torch.Tensor | None] = []
 
         # Choose global CLIP embedding.
         # Use the first global prompt's CLIP embedding as the global CLIP embedding. If there is no global prompt, use
@@ -97,7 +136,7 @@ class RegionalPromptingExtension:
                 Range(start=cur_t5_embedding_len, end=cur_t5_embedding_len + text_conditioning.t5_embeddings.shape[1])
             )
 
-            concat_image_masks.append(text_conditioning.mask)
+            image_masks.append(text_conditioning.mask)
 
             cur_t5_embedding_len += text_conditioning.t5_embeddings.shape[1]
 
@@ -113,7 +152,7 @@ class RegionalPromptingExtension:
             t5_embeddings=t5_embeddings,
             clip_embeddings=global_clip_embedding,
             t5_txt_ids=t5_txt_ids,
-            image_masks=torch.cat(concat_image_masks, dim=1),
+            image_masks=image_masks,
             t5_embedding_ranges=concat_t5_embedding_ranges,
         )
 
