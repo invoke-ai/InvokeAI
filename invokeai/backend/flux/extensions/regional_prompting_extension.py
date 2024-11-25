@@ -25,6 +25,12 @@ class RegionalPromptingExtension:
         self.attn_mask_with_restricted_img_self_attn = attn_mask_with_restricted_img_self_attn
         self.attn_mask_with_unrestricted_img_self_attn = attn_mask_with_unrestricted_img_self_attn
 
+    def get_double_stream_attn_mask(self, block_index: int) -> torch.Tensor | None:
+        return self.attn_mask_with_unrestricted_img_self_attn
+
+    def get_single_stream_attn_mask(self) -> torch.Tensor | None:
+        return self.attn_mask_with_unrestricted_img_self_attn
+
     @classmethod
     def from_text_conditioning(cls, text_conditioning: list[FluxTextConditioning], img_seq_len: int):
         """Create a RegionalPromptingExtension from a list of text conditionings.
