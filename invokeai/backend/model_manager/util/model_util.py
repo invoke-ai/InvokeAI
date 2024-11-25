@@ -44,7 +44,7 @@ def _fast_safetensors_reader(path: str) -> Dict[str, torch.Tensor]:
     return checkpoint
 
 
-def read_checkpoint_meta(path: Union[str, Path], scan: bool = False) -> Dict[str, torch.Tensor]:
+def read_checkpoint_meta(path: Union[str, Path], scan: bool = True) -> Dict[str, torch.Tensor]:
     if str(path).endswith(".safetensors"):
         try:
             path_str = path.as_posix() if isinstance(path, Path) else path
@@ -55,7 +55,7 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False) -> Dict[str
     else:
         if scan:
             scan_result = scan_file_path(path)
-            if scan_result.infected_files != 0:
+            if scan_result.infected_files != 0 or scan_result.scan_err:
                 raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
         if str(path).endswith(".gguf"):
             # The GGUF reader used here uses numpy memmap, so these tensors are not loaded into memory during this function
