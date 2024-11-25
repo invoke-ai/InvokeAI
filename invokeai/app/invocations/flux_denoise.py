@@ -172,6 +172,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             packed_height=packed_h,
             packed_width=packed_w,
             dtype=inference_dtype,
+            device=TorchDevice.choose_torch_device(),
         )
         neg_text_conditionings: list[FluxTextConditioning] | None = None
         if self.negative_text_conditioning is not None:
@@ -181,6 +182,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 packed_height=packed_h,
                 packed_width=packed_w,
                 dtype=inference_dtype,
+                device=TorchDevice.choose_torch_device(),
             )
         pos_regional_prompting_extension = RegionalPromptingExtension.from_text_conditioning(pos_text_conditionings)
         neg_regional_prompting_extension = (
@@ -353,6 +355,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         packed_height: int,
         packed_width: int,
         dtype: torch.dtype,
+        device: torch.device,
     ) -> list[FluxTextConditioning]:
         """Load text conditioning data from a FluxConditioningField or a list of FluxConditioningFields."""
         # Normalize to a list of FluxConditioningFields.
@@ -365,7 +368,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             assert len(cond_data.conditionings) == 1
             flux_conditioning = cond_data.conditionings[0]
             assert isinstance(flux_conditioning, FLUXConditioningInfo)
-            flux_conditioning = flux_conditioning.to(dtype=dtype)
+            flux_conditioning = flux_conditioning.to(dtype=dtype, device=device)
             t5_embeddings = flux_conditioning.t5_embeds
             clip_embeddings = flux_conditioning.clip_embeds
 
@@ -373,7 +376,10 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             mask: Optional[torch.Tensor] = None
             if cond_field.mask is not None:
                 mask = context.tensors.load(cond_field.mask.tensor_name)
-            mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(mask, packed_height, packed_width, dtype)
+                mask = mask.to(device=device)
+            mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(
+                mask, packed_height, packed_width, dtype, device
+            )
 
             text_conditionings.append(FluxTextConditioning(t5_embeddings, clip_embeddings, mask))
 

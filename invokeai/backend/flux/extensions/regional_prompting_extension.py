@@ -110,7 +110,7 @@ class RegionalPromptingExtension:
 
     @staticmethod
     def preprocess_regional_prompt_mask(
-        mask: Optional[torch.Tensor], packed_height: int, packed_width: int, dtype: torch.dtype
+        mask: Optional[torch.Tensor], packed_height: int, packed_width: int, dtype: torch.dtype, device: torch.device
     ) -> torch.Tensor:
         """Preprocess a regional prompt mask to match the target height and width.
         If mask is None, returns a mask of all ones with the target height and width.
@@ -123,7 +123,7 @@ class RegionalPromptingExtension:
         """
 
         if mask is None:
-            return torch.ones((1, 1, packed_height * packed_width), dtype=dtype)
+            return torch.ones((1, 1, packed_height * packed_width), dtype=dtype, device=device)
 
         mask = to_standard_float_mask(mask, out_dtype=dtype)
 
