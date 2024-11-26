@@ -175,12 +175,13 @@ class RegionalPromptingExtension:
 
         # Handle image background regions.
         if background_region_mask is None:
-            # There are no region masks, so allow unrestricted img self attention.
-            regional_attention_mask[txt_seq_len:, txt_seq_len:] = 1.0
+            # There are no region masks, so allow unrestricted img-img attention, and unrestricted img-txt attention.
+            regional_attention_mask[txt_seq_len:, :] = 1.0
+            regional_attention_mask[:, txt_seq_len:] = 1.0
         else:
-            # Allow background regions to attend to themselves and to the rest of the image.
-            regional_attention_mask[txt_seq_len:, txt_seq_len:] += background_region_mask.view(img_seq_len, 1)
-            regional_attention_mask[txt_seq_len:, txt_seq_len:] += background_region_mask.view(1, img_seq_len)
+            # Allow background regions to attend to themselves and to the entire txt embedding.
+            regional_attention_mask[txt_seq_len:, :] += background_region_mask.view(img_seq_len, 1)
+            regional_attention_mask[:, txt_seq_len:] += background_region_mask.view(1, img_seq_len)
 
         # Convert attention mask to boolean.
         regional_attention_mask = regional_attention_mask > 0.5
