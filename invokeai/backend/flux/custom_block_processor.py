@@ -134,5 +134,5 @@ class CustomSingleStreamBlockProcessor:
         """A custom implementation of SingleStreamBlock.forward() with additional features:
         - Masking
         """
-        attn_mask = regional_prompting_extension.get_double_stream_attn_mask(block_index)
+        attn_mask = regional_prompting_extension.get_single_stream_attn_mask(block_index)
         return CustomSingleStreamBlockProcessor._single_stream_block_forward(block, img, vec, pe, attn_mask=attn_mask)
