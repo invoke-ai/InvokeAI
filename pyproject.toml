@@ -56,7 +56,7 @@ dependencies = [
   "torchmetrics",
   "torchsde",
   "torchvision",
-  "transformers==4.41.1",
+  "transformers==4.46.3",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.1",
