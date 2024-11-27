@@ -49,7 +49,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance} isDisabled={isFLUX || isSD3}>
+          <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance} isDisabled={isSD3}>
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage} isDisabled={isFLUX || isSD3}>
