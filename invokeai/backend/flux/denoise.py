@@ -50,7 +50,6 @@ def denoise(
         # Run ControlNet models.
         controlnet_residuals: list[ControlNetFluxOutput] = []
         for controlnet_extension in controlnet_extensions:
-            # TODO(ryand): Think about how to handle regional prompting with ControlNet.
             controlnet_residuals.append(
                 controlnet_extension.run_controlnet(
                     timestep_index=step_index,
