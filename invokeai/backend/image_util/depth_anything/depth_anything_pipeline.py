@@ -17,9 +17,23 @@ class DepthAnythingPipeline(RawModel):
         self._pipeline = pipeline
 
     def generate_depth(self, image: Image.Image) -> Image.Image:
-        depth_map = self._pipeline(image)["depth"]
-        assert isinstance(depth_map, Image.Image)
-        return depth_map
+        pipeline_result = self._pipeline(image)
+        predicted_depth = pipeline_result["predicted_depth"]
+        assert isinstance(predicted_depth, torch.Tensor)
+
+        # Convert to PIL Image.
+        # Note: The pipeline already returns a PIL Image (pipeline_result["depth"]), but it contains artifacts as
+        # described here: https://github.com/invoke-ai/InvokeAI/issues/7358.
+        # We implement custom post-processing logic to avoid the artifacts.
+        prediction = torch.nn.functional.interpolate(
+            predicted_depth.unsqueeze(1), size=image.size[::-1], mode="bilinear", align_corners=False
+        )
+        prediction = prediction / prediction.max()
+        output = prediction.squeeze().cpu().numpy()
+        output = (output * 255).clip(0, 255)
+        formatted = output.astype("uint8")
+        depth = Image.fromarray(formatted)
+        return depth
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
         if device is not None and device.type not in {"cpu", "cuda"}:
