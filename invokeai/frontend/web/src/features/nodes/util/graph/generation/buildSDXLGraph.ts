@@ -276,7 +276,6 @@ export const buildSDXLGraph = async (
     g,
     canvas.bbox.rect,
     modelConfig.base,
-    denoise,
     posCond,
     negCond,
     posCondCollect,

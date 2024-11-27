@@ -35,7 +35,6 @@ const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => 
  * @param regions Array of regions to add
  * @param g The graph to add the layers to
  * @param base The base model type
- * @param denoise The main denoise node
  * @param posCond The positive conditioning node
  * @param negCond The negative conditioning node
  * @param posCondCollect The positive conditioning collector
@@ -50,7 +49,6 @@ export const addRegions = async (
   g: Graph,
   bbox: Rect,
   base: BaseModelType,
-  denoise: Invocation<'denoise_latents' | 'flux_denoise'>,
   posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>,
   negCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> | null,
   posCondCollect: Invocation<'collect'>,

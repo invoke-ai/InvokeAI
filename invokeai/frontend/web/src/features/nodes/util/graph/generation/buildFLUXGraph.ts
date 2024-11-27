@@ -225,7 +225,6 @@ export const buildFLUXGraph = async (
     g,
     canvas.bbox.rect,
     modelConfig.base,
-    denoise,
     posCond,
     null,
     posCondCollect,

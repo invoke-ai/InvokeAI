@@ -271,7 +271,6 @@ export const buildSD1Graph = async (
     g,
     canvas.bbox.rect,
     modelConfig.base,
-    denoise,
     posCond,
     negCond,
     posCondCollect,
