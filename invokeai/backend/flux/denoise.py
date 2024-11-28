@@ -109,6 +109,7 @@ def denoise(
                 controlnet_double_block_residuals=None,
                 controlnet_single_block_residuals=None,
                 ip_adapter_extensions=neg_ip_adapter_extensions,
+                regional_prompting_extension=neg_regional_prompting_extension,
             )
             pred = neg_pred + step_cfg_scale * (pred - neg_pred)
 
