@@ -2,7 +2,7 @@
 
 ## Builder stage
 
-FROM library/ubuntu:23.04 AS builder
+FROM library/ubuntu:22.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
@@ -41,9 +41,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm6.1"; \
     else \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu124"; \
-    fi &&\
-
-    # xformers + triton fails to install on arm64
+    fi && \
+          \
+    # xformers + triton fails to install on arm64 \
     if [ "$GPU_DRIVER" = "cuda" ] && [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         pip install $extra_index_url_arg -e ".[xformers]"; \
     else \
@@ -66,7 +66,7 @@ RUN npx vite build
 
 #### Runtime stage ---------------------------------------
 
-FROM library/ubuntu:23.04 AS runtime
+FROM library/ubuntu:22.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -83,7 +83,8 @@ RUN apt update && apt install -y --no-install-recommends \
         gosu \
         magic-wormhole \
         libglib2.0-0 \
-        libgl1-mesa-glx \
+        libgl1 \
+        libglx-mesa0 \
         python3-venv \
         python3-pip \
         build-essential \
