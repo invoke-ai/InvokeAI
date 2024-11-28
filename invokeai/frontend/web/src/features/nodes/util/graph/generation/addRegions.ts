@@ -30,10 +30,25 @@ const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => 
   return isEnabled && (hasTextPrompt || hasIPAdapter);
 };
 
+type AddRegionsArg = {
+  manager: CanvasManager;
+  regions: CanvasRegionalGuidanceState[];
+  g: Graph;
+  bbox: Rect;
+  base: BaseModelType;
+  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+  negCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> | null;
+  posCondCollect: Invocation<'collect'>;
+  negCondCollect: Invocation<'collect'> | null;
+  ipAdapterCollect: Invocation<'collect'>;
+};
+
 /**
  * Adds regional guidance to the graph
+ * @param manager The canvas manager
  * @param regions Array of regions to add
  * @param g The graph to add the layers to
+ * @param bbox The bounding box
  * @param base The base model type
  * @param posCond The positive conditioning node
  * @param negCond The negative conditioning node
@@ -43,18 +58,18 @@ const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => 
  * @returns A promise that resolves to the regions that were successfully added to the graph
  */
 
-export const addRegions = async (
-  manager: CanvasManager,
-  regions: CanvasRegionalGuidanceState[],
-  g: Graph,
-  bbox: Rect,
-  base: BaseModelType,
-  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>,
-  negCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> | null,
-  posCondCollect: Invocation<'collect'>,
-  negCondCollect: Invocation<'collect'> | null,
-  ipAdapterCollect: Invocation<'collect'>
-): Promise<AddedRegionResult[]> => {
+export const addRegions = async ({
+  manager,
+  regions,
+  g,
+  bbox,
+  base,
+  posCond,
+  negCond,
+  posCondCollect,
+  negCondCollect,
+  ipAdapterCollect,
+}: AddRegionsArg): Promise<AddedRegionResult[]> => {
   const isSDXL = base === 'sdxl';
   const isFLUX = base === 'flux';
 

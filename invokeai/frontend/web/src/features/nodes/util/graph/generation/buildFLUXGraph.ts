@@ -213,31 +213,31 @@ export const buildFLUXGraph = async (
     g.deleteNode(controlNetCollector.id);
   }
 
-  const ipAdapterCollector = g.addNode({
+  const ipAdapterCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollector, modelConfig.base);
+  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollect, modelConfig.base);
 
-  const regionsResult = await addRegions(
+  const regionsResult = await addRegions({
     manager,
-    canvas.regionalGuidance.entities,
+    regions: canvas.regionalGuidance.entities,
     g,
-    canvas.bbox.rect,
-    modelConfig.base,
+    bbox: canvas.bbox.rect,
+    base: modelConfig.base,
     posCond,
-    null,
+    negCond: null,
     posCondCollect,
-    null,
-    ipAdapterCollector
-  );
+    negCondCollect: null,
+    ipAdapterCollect,
+  });
 
   const totalIPAdaptersAdded =
     ipAdapterResult.addedIPAdapters + regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
   if (totalIPAdaptersAdded > 0) {
-    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
+    g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
   } else {
-    g.deleteNode(ipAdapterCollector.id);
+    g.deleteNode(ipAdapterCollect.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {
