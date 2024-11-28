@@ -4,13 +4,13 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleFill } from 'react-icons/pi';
 
-import { useClearQueue } from './ClearQueueConfirmationAlertDialog';
+import { useClearQueueDialog } from './ClearQueueConfirmationAlertDialog';
 
 type Props = ButtonProps;
 
 const ClearQueueButton = (props: Props) => {
   const { t } = useTranslation();
-  const clearQueue = useClearQueue();
+  const clearQueue = useClearQueueDialog();
 
   return (
     <>

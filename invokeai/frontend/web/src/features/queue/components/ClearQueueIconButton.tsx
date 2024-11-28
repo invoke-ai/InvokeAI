@@ -4,11 +4,11 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
-import { useClearQueue } from './ClearQueueConfirmationAlertDialog';
+import { useClearQueueDialog } from './ClearQueueConfirmationAlertDialog';
 
 export const ClearQueueIconButton = memo((_) => {
   const { t } = useTranslation();
-  const clearQueue = useClearQueue();
+  const clearQueue = useClearQueueDialog();
   const cancelCurrentQueueItem = useCancelCurrentQueueItem();
 
   // Show the single item clear button when shift is pressed
