@@ -1,4 +1,5 @@
 import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
+import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
@@ -623,4 +624,21 @@ export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> 
     })
   );
   return results.filter((r): r is PromiseFulfilledResult<ImageDTO> => r.status === 'fulfilled').map((r) => r.value);
+};
+
+/**
+ * Convert an ImageDTO to a File by downloading the image from the server.
+ * @param imageDTO The image to download and convert to a File
+ */
+export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
+  const init: RequestInit = {};
+  const authToken = $authToken.get();
+  if (authToken) {
+    init.headers = { Authorization: `Bearer ${authToken}` };
+  }
+  const res = await fetch(imageDTO.image_url, init);
+  const blob = await res.blob();
+  // Create a new file with the same name, which we will upload
+  const file = new File([blob], `copy_of_${imageDTO.image_name}`, { type: 'image/png' });
+  return file;
 };
