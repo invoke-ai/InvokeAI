@@ -2,7 +2,7 @@
 
 ## Builder stage
 
-FROM library/ubuntu:22.04 AS builder
+FROM library/ubuntu:24.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
@@ -66,7 +66,7 @@ RUN npx vite build
 
 #### Runtime stage ---------------------------------------
 
-FROM library/ubuntu:22.04 AS runtime
+FROM library/ubuntu:24.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
