@@ -110,7 +110,7 @@ async def cancel_by_batch_ids(
 @session_queue_router.put(
     "/{queue_id}/cancel_by_destination",
     operation_id="cancel_by_destination",
-    responses={200: {"model": CancelByBatchIDsResult}},
+    responses={200: {"model": CancelByDestinationResult}},
 )
 async def cancel_by_destination(
     queue_id: str = Path(description="The queue id to perform this operation on"),
