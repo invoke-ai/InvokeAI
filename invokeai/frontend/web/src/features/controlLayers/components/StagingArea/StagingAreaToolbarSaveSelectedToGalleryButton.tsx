@@ -1,6 +1,4 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $authToken } from 'app/store/nanostores/authToken';
 import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
 import { selectSelectedImage } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -9,14 +7,13 @@ import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFloppyDiskBold } from 'react-icons/pi';
-import { uploadImage } from 'services/api/endpoints/images';
+import { imageDTOToFile, uploadImage } from 'services/api/endpoints/images';
 
 const TOAST_ID = 'SAVE_STAGING_AREA_IMAGE_TO_GALLERY';
 
 export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const selectedImage = useAppSelector(selectSelectedImage);
-  const authToken = useStore($authToken);
 
   const { t } = useTranslation();
 
@@ -28,18 +25,8 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
     // To save the image to gallery, we will download it and re-upload it. This allows the user to delete the image
     // the gallery without borking the canvas, which may need this image to exist.
     const result = await withResultAsync(async () => {
-      // Download the image
-      const requestOpts = authToken
-        ? {
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-            },
-          }
-        : {};
-      const res = await fetch(selectedImage.imageDTO.image_url, requestOpts);
-      const blob = await res.blob();
       // Create a new file with the same name, which we will upload
-      const file = new File([blob], `copy_of_${selectedImage.imageDTO.image_name}`, { type: 'image/png' });
+      const file = await imageDTOToFile(selectedImage.imageDTO);
 
       await uploadImage({
         file,
@@ -66,7 +53,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
         status: 'error',
       });
     }
-  }, [autoAddBoardId, selectedImage, t, authToken]);
+  }, [autoAddBoardId, selectedImage, t]);
 
   return (
     <IconButton
