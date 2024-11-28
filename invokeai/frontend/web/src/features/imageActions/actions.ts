@@ -20,6 +20,7 @@ import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/stor
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasEntityState,
   CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
@@ -134,14 +135,16 @@ export const createNewCanvasEntityFromImage = (arg: {
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
   dispatch: AppDispatch;
   getState: () => RootState;
+  overrides?: Partial<Pick<CanvasEntityState, 'isEnabled' | 'isLocked' | 'name'>>;
 }) => {
-  const { type, imageDTO, dispatch, getState } = arg;
+  const { type, imageDTO, dispatch, getState, overrides: _overrides } = arg;
   const state = getState();
   const imageObject = imageDTOToImageObject(imageDTO);
   const { x, y } = selectBboxRect(state);
   const overrides = {
     objects: [imageObject],
     position: { x, y },
+    ..._overrides,
   };
   switch (type) {
     case 'raster_layer': {
