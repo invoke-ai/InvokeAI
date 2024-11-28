@@ -5,6 +5,7 @@ import { StagingAreaToolbarDiscardSelectedButton } from 'features/controlLayers/
 import { StagingAreaToolbarImageCountButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarImageCountButton';
 import { StagingAreaToolbarNextButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarNextButton';
 import { StagingAreaToolbarPrevButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarPrevButton';
+import { StagingAreaToolbarSaveAsMenu } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarSaveAsMenu';
 import { StagingAreaToolbarSaveSelectedToGalleryButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarSaveSelectedToGalleryButton';
 import { StagingAreaToolbarToggleShowResultsButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarToggleShowResultsButton';
 import { memo } from 'react';
@@ -21,6 +22,7 @@ export const StagingAreaToolbar = memo(() => {
         <StagingAreaToolbarAcceptButton />
         <StagingAreaToolbarToggleShowResultsButton />
         <StagingAreaToolbarSaveSelectedToGalleryButton />
+        <StagingAreaToolbarSaveAsMenu />
         <StagingAreaToolbarDiscardSelectedButton />
         <StagingAreaToolbarDiscardAllButton />
       </ButtonGroup>
