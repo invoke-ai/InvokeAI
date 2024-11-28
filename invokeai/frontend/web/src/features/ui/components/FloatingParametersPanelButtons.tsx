@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useClearQueueDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
@@ -31,7 +31,7 @@ const FloatingSidePanelButtons = (props: Props) => {
   const shift = useShiftModifier();
   const tab = useAppSelector(selectActiveTab);
   const imageViewer = useImageViewer();
-  const clearQueue = useClearQueue();
+  const clearQueue = useClearQueueDialog();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const cancelCurrent = useCancelCurrentQueueItem();
 
