@@ -3,6 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { SessionMenuItems } from 'common/components/SessionMenuItems';
 import { useClearQueueDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -17,6 +18,7 @@ export const QueueActionsMenuButton = memo(() => {
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
+  const cancelCurrent = useCancelCurrentQueueItem();
   const clearQueue = useClearQueueDialog();
   const {
     resumeProcessor,
@@ -44,9 +46,9 @@ export const QueueActionsMenuButton = memo(() => {
             <MenuItem
               isDestructive
               icon={<PiXBold />}
-              onClick={clearQueue.openDialog}
-              isLoading={clearQueue.isLoading}
-              isDisabled={clearQueue.isDisabled}
+              onClick={cancelCurrent.cancelQueueItem}
+              isLoading={cancelCurrent.isLoading}
+              isDisabled={cancelCurrent.isDisabled}
             >
               {t('queue.cancelTooltip')}
             </MenuItem>
