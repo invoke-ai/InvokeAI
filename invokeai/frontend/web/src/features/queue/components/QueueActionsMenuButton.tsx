@@ -1,6 +1,7 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { SessionMenuItems } from 'common/components/SessionMenuItems';
+import { useCancelAllExceptCurrentQueueItemDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { useClearQueueDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
@@ -10,7 +11,15 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiListBold, PiPauseFill, PiPlayFill, PiQueueBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
+import {
+  PiListBold,
+  PiPauseFill,
+  PiPlayFill,
+  PiQueueBold,
+  PiTrashSimpleBold,
+  PiXBold,
+  PiXCircle,
+} from 'react-icons/pi';
 
 export const QueueActionsMenuButton = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
@@ -18,6 +27,7 @@ export const QueueActionsMenuButton = memo(() => {
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
+  const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
   const cancelCurrent = useCancelCurrentQueueItem();
   const clearQueue = useClearQueueDialog();
   const {
@@ -51,6 +61,15 @@ export const QueueActionsMenuButton = memo(() => {
               isDisabled={cancelCurrent.isDisabled}
             >
               {t('queue.cancelTooltip')}
+            </MenuItem>
+            <MenuItem
+              isDestructive
+              icon={<PiXCircle />}
+              onClick={cancelAllExceptCurrent.openDialog}
+              isLoading={cancelAllExceptCurrent.isLoading}
+              isDisabled={cancelAllExceptCurrent.isDisabled}
+            >
+              {t('queue.cancelAllExceptCurrentTooltip')}
             </MenuItem>
             <MenuItem
               isDestructive
