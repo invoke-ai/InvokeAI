@@ -1050,7 +1050,7 @@
                 "ipAdapterIncompatibleBaseModel": "incompatible IP Adapter base model",
                 "ipAdapterNoImageSelected": "no IP Adapter image selected",
                 "rgNoPromptsOrIPAdapters": "no text prompts or IP Adapters",
-                "rgNoRegion": "no region selected"
+                "emptyLayer": "empty layer"
             }
         },
         "maskBlur": "Mask Blur",
