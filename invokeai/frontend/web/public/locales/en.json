@@ -176,7 +176,8 @@
         "reset": "Reset",
         "none": "None",
         "new": "New",
-        "generating": "Generating"
+        "generating": "Generating",
+        "warnings": "Warnings"
     },
     "hrf": {
         "hrf": "High Resolution Fix",

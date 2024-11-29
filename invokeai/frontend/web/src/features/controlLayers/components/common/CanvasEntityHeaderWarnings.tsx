@@ -1,4 +1,4 @@
-import { IconButton, ListItem, UnorderedList } from '@invoke-ai/ui-library';
+import { Flex, IconButton, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -86,12 +86,16 @@ export const CanvasEntityHeaderWarnings = memo(() => {
 CanvasEntityHeaderWarnings.displayName = 'CanvasEntityHeaderWarnings';
 
 const TooltipContent = memo((props: { warnings: string[] }) => {
+  const { t } = useTranslation();
   return (
-    <UnorderedList>
-      {props.warnings.map((warning, index) => (
-        <ListItem key={index}>{warning}</ListItem>
-      ))}
-    </UnorderedList>
+    <Flex flexDir="column">
+      <Text>{t('common.warnings')}:</Text>
+      <UnorderedList>
+        {props.warnings.map((warning, index) => (
+          <ListItem key={index}>{warning}</ListItem>
+        ))}
+      </UnorderedList>
+    </Flex>
   );
 });
 TooltipContent.displayName = 'TooltipContent';
