@@ -25,7 +25,7 @@ export const getRegionalGuidanceWarnings = (
     if (model) {
       if (model.base === 'sd-3' || model.base === 'sd-2') {
         // Unsupported model architecture
-        warnings.push('controlLayers.invalidBaseModelType');
+        warnings.push('parameters.invoke.layer.unsupportedModel');
       } else if (model.base === 'flux') {
         // Some features are not supported for flux models
         if (entity.negativePrompt !== null) {
@@ -71,7 +71,7 @@ export const getGlobalReferenceImageWarnings = (
   } else if (model) {
     if (model.base === 'sd-3' || model.base === 'sd-2') {
       // Unsupported model architecture
-      warnings.push('controlLayers.invalidBaseModelType');
+      warnings.push('parameters.invoke.layer.unsupportedModel');
     } else if (entity.ipAdapter.model.base !== model.base) {
       // Supported model architecture but doesn't match
       warnings.push('parameters.invoke.layer.ipAdapterIncompatibleBaseModel');
@@ -99,7 +99,7 @@ export const getControlLayerWarnings = (entity: CanvasControlLayerState, model: 
     } else if (model) {
       if (model.base === 'sd-3' || model.base === 'sd-2') {
         // Unsupported model architecture
-        warnings.push('controlLayers.invalidBaseModelType');
+        warnings.push('parameters.invoke.layer.unsupportedModel');
       } else if (entity.controlAdapter.model.base !== model.base) {
         // Supported model architecture but doesn't match
         warnings.push('parameters.invoke.layer.controlAdapterIncompatibleBaseModel');
