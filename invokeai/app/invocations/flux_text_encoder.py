@@ -29,7 +29,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     title="FLUX Text Encoding",
     tags=["prompt", "conditioning", "flux"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class FluxTextEncoderInvocation(BaseInvocation):
@@ -47,6 +47,11 @@ class FluxTextEncoderInvocation(BaseInvocation):
     )
     t5_max_seq_len: Literal[256, 512] = InputField(
         description="Max sequence length for the T5 encoder. Expected to be 256 for FLUX schnell models and 512 for FLUX dev models."
+    )
+    use_short_t5_seq_len: bool = InputField(
+        description="Use a shorter sequence length for the T5 encoder if a short prompt is used. This can improve "
+        + "performance and reduce peak memory, but may result in slightly different image outputs.",
+        default=True,
     )
     prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
     mask: Optional[TensorField] = InputField(
@@ -74,6 +79,10 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
         prompt = [self.prompt]
 
+        valid_seq_lens = [self.t5_max_seq_len]
+        if self.use_short_t5_seq_len:
+            valid_seq_lens = [128, 256, 512]
+
         with (
             t5_text_encoder_info as t5_text_encoder,
             t5_tokenizer_info as t5_tokenizer,
@@ -81,10 +90,10 @@ class FluxTextEncoderInvocation(BaseInvocation):
             assert isinstance(t5_text_encoder, T5EncoderModel)
             assert isinstance(t5_tokenizer, T5Tokenizer)
 
-            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
+            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False)
 
             context.util.signal_progress("Running T5 encoder")
-            prompt_embeds = t5_encoder(prompt)
+            prompt_embeds = t5_encoder(prompt, valid_seq_lens)
 
         assert isinstance(prompt_embeds, torch.Tensor)
         return prompt_embeds
@@ -122,10 +131,10 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 # There are currently no supported CLIP quantized models. Add support here if needed.
                 raise ValueError(f"Unsupported model format: {clip_text_encoder_config.format}")
 
-            clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
+            clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True)
 
             context.util.signal_progress("Running CLIP encoder")
-            pooled_prompt_embeds = clip_encoder(prompt)
+            pooled_prompt_embeds = clip_encoder(prompt, [77])
 
         assert isinstance(pooled_prompt_embeds, torch.Tensor)
         return pooled_prompt_embeds
