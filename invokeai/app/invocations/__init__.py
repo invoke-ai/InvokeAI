@@ -15,6 +15,11 @@ custom_nodes_readme_path = str(custom_nodes_path / "README.md")
 shutil.copy(Path(__file__).parent / "custom_nodes/init.py", custom_nodes_init_path)
 shutil.copy(Path(__file__).parent / "custom_nodes/README.md", custom_nodes_readme_path)
 
+# set the same permissions as the destination directory, in case our source is read-only,
+# so that the files are user-writable
+for p in custom_nodes_path.glob("**/*"):
+    p.chmod(custom_nodes_path.stat().st_mode)
+
 # Import custom nodes, see https://docs.python.org/3/library/importlib.html#importing-programmatically
 spec = spec_from_file_location("custom_nodes", custom_nodes_init_path)
 if spec is None or spec.loader is None:
