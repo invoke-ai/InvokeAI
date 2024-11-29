@@ -35,7 +35,7 @@ class Migration11Callback:
 
     def _remove_convert_cache(self) -> None:
         """Rename models/.cache to models/.convert_cache."""
-        self._logger.info("Removing .cache directory. Converted models will now be cached in .convert_cache.")
+        self._logger.info("Removing models/.cache directory. Converted models will now be cached in .convert_cache.")
         legacy_convert_path = self._app_config.root_path / "models" / ".cache"
         shutil.rmtree(legacy_convert_path, ignore_errors=True)
 
