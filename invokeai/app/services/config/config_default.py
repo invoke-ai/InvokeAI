@@ -536,11 +536,13 @@ def get_config() -> InvokeAIAppConfig:
 
     # Compare directories recursively
     comparison = filecmp.dircmp(configs_src, dest_path)
-    need_copy = any([
-        comparison.left_only,  # Files exist only in source
-        comparison.diff_files, # Files that differ
-        comparison.common_funny # Files that couldn't be compared
-    ])
+    need_copy = any(
+        [
+            comparison.left_only,  # Files exist only in source
+            comparison.diff_files,  # Files that differ
+            comparison.common_funny,  # Files that couldn't be compared
+        ]
+    )
 
     if need_copy:
         # Get permissions from destination directory
