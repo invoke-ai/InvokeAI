@@ -11,6 +11,7 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -79,7 +80,10 @@ export const buildFLUXGraph = async (
     id: getPrefixedId('flux_text_encoder'),
     prompt: positivePrompt,
   });
-
+  const posCondCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('pos_cond_collect'),
+  });
   const denoise = g.addNode({
     type: 'flux_denoise',
     id: getPrefixedId('flux_denoise'),
@@ -104,12 +108,11 @@ export const buildFLUXGraph = async (
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
+  g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_text_conditioning');
+  g.addEdge(denoise, 'latents', l2i, 'latents');
 
   addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
-
-  g.addEdge(posCond, 'conditioning', denoise, 'positive_text_conditioning');
-
-  g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'flux');
@@ -196,31 +199,50 @@ export const buildFLUXGraph = async (
     type: 'collect',
     id: getPrefixedId('control_net_collector'),
   });
-  const controlNetResult = await addControlNets(
+  const controlNetResult = await addControlNets({
     manager,
-    canvas.controlLayers.entities,
+    entities: canvas.controlLayers.entities,
     g,
-    canvas.bbox.rect,
-    controlNetCollector,
-    modelConfig.base
-  );
+    rect: canvas.bbox.rect,
+    collector: controlNetCollector,
+    model: modelConfig,
+  });
   if (controlNetResult.addedControlNets > 0) {
     g.addEdge(controlNetCollector, 'collection', denoise, 'control');
   } else {
     g.deleteNode(controlNetCollector.id);
   }
 
-  const ipAdapterCollector = g.addNode({
+  const ipAdapterCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollector, modelConfig.base);
+  const ipAdapterResult = addIPAdapters({
+    entities: canvas.referenceImages.entities,
+    g,
+    collector: ipAdapterCollect,
+    model: modelConfig,
+  });
 
-  const totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
+  const regionsResult = await addRegions({
+    manager,
+    regions: canvas.regionalGuidance.entities,
+    g,
+    bbox: canvas.bbox.rect,
+    model: modelConfig,
+    posCond,
+    negCond: null,
+    posCondCollect,
+    negCondCollect: null,
+    ipAdapterCollect,
+  });
+
+  const totalIPAdaptersAdded =
+    ipAdapterResult.addedIPAdapters + regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
   if (totalIPAdaptersAdded > 0) {
-    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
+    g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
   } else {
-    g.deleteNode(ipAdapterCollector.id);
+    g.deleteNode(ipAdapterCollect.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {

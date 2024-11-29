@@ -5,7 +5,11 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor, nn
 
-from invokeai.backend.flux.custom_block_processor import CustomDoubleStreamBlockProcessor
+from invokeai.backend.flux.custom_block_processor import (
+    CustomDoubleStreamBlockProcessor,
+    CustomSingleStreamBlockProcessor,
+)
+from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.modules.layers import (
     DoubleStreamBlock,
@@ -95,6 +99,7 @@ class Flux(nn.Module):
         controlnet_double_block_residuals: list[Tensor] | None,
         controlnet_single_block_residuals: list[Tensor] | None,
         ip_adapter_extensions: list[XLabsIPAdapterExtension],
+        regional_prompting_extension: RegionalPromptingExtension,
     ) -> Tensor:
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
@@ -117,7 +122,6 @@ class Flux(nn.Module):
             assert len(controlnet_double_block_residuals) == len(self.double_blocks)
         for block_index, block in enumerate(self.double_blocks):
             assert isinstance(block, DoubleStreamBlock)
-
             img, txt = CustomDoubleStreamBlockProcessor.custom_double_block_forward(
                 timestep_index=timestep_index,
                 total_num_timesteps=total_num_timesteps,
@@ -128,6 +132,7 @@ class Flux(nn.Module):
                 vec=vec,
                 pe=pe,
                 ip_adapter_extensions=ip_adapter_extensions,
+                regional_prompting_extension=regional_prompting_extension,
             )
 
             if controlnet_double_block_residuals is not None:
@@ -140,7 +145,17 @@ class Flux(nn.Module):
             assert len(controlnet_single_block_residuals) == len(self.single_blocks)
 
         for block_index, block in enumerate(self.single_blocks):
-            img = block(img, vec=vec, pe=pe)
+            assert isinstance(block, SingleStreamBlock)
+            img = CustomSingleStreamBlockProcessor.custom_single_block_forward(
+                timestep_index=timestep_index,
+                total_num_timesteps=total_num_timesteps,
+                block_index=block_index,
+                block=block,
+                img=img,
+                vec=vec,
+                pe=pe,
+                regional_prompting_extension=regional_prompting_extension,
+            )
 
             if controlnet_single_block_residuals is not None:
                 img[:, txt.shape[1] :, ...] += controlnet_single_block_residuals[block_index]

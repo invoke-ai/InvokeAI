@@ -3,15 +3,12 @@ import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasRegionalGuidanceState,
-  IPAdapterConfig,
-  Rect,
-  RegionalGuidanceReferenceImageState,
-} from 'features/controlLayers/store/types';
+import type { CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
+import { getRegionalGuidanceWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { serializeError } from 'serialize-error';
-import type { BaseModelType, Invocation } from 'services/api/types';
+import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -23,19 +20,26 @@ type AddedRegionResult = {
   addedIPAdapters: number;
 };
 
-const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => {
-  const isEnabled = rg.isEnabled;
-  const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
-  const hasIPAdapter = rg.referenceImages.filter(({ ipAdapter }) => isValidIPAdapter(ipAdapter, base)).length > 0;
-  return isEnabled && (hasTextPrompt || hasIPAdapter);
+type AddRegionsArg = {
+  manager: CanvasManager;
+  regions: CanvasRegionalGuidanceState[];
+  g: Graph;
+  bbox: Rect;
+  model: ParameterModel;
+  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+  negCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> | null;
+  posCondCollect: Invocation<'collect'>;
+  negCondCollect: Invocation<'collect'> | null;
+  ipAdapterCollect: Invocation<'collect'>;
 };
 
 /**
  * Adds regional guidance to the graph
+ * @param manager The canvas manager
  * @param regions Array of regions to add
  * @param g The graph to add the layers to
- * @param base The base model type
- * @param denoise The main denoise node
+ * @param bbox The bounding box
+ * @param model The main model
  * @param posCond The positive conditioning node
  * @param negCond The negative conditioning node
  * @param posCondCollect The positive conditioning collector
@@ -44,22 +48,28 @@ const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => 
  * @returns A promise that resolves to the regions that were successfully added to the graph
  */
 
-export const addRegions = async (
-  manager: CanvasManager,
-  regions: CanvasRegionalGuidanceState[],
-  g: Graph,
-  bbox: Rect,
-  base: BaseModelType,
-  denoise: Invocation<'denoise_latents'>,
-  posCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,
-  negCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,
-  posCondCollect: Invocation<'collect'>,
-  negCondCollect: Invocation<'collect'>,
-  ipAdapterCollect: Invocation<'collect'>
-): Promise<AddedRegionResult[]> => {
-  const isSDXL = base === 'sdxl';
+export const addRegions = async ({
+  manager,
+  regions,
+  g,
+  bbox,
+  model,
+  posCond,
+  negCond,
+  posCondCollect,
+  negCondCollect,
+  ipAdapterCollect,
+}: AddRegionsArg): Promise<AddedRegionResult[]> => {
+  const isSDXL = model.base === 'sdxl';
+  const isFLUX = model.base === 'flux';
 
-  const validRegions = regions.filter((rg) => isValidRegion(rg, base));
+  const validRegions = regions.filter((rg) => {
+    if (!rg.isEnabled) {
+      return false;
+    }
+    return getRegionalGuidanceWarnings(rg, model).length === 0;
+  });
+
   const results: AddedRegionResult[] = [];
 
   for (const region of validRegions) {
@@ -94,20 +104,27 @@ export const addRegions = async (
     if (region.positivePrompt) {
       // The main positive conditioning node
       result.addedPositivePrompt = true;
-      const regionalPosCond = g.addNode(
-        isSDXL
-          ? {
-              type: 'sdxl_compel_prompt',
-              id: getPrefixedId('prompt_region_positive_cond'),
-              prompt: region.positivePrompt,
-              style: region.positivePrompt, // TODO: Should we put the positive prompt in both fields?
-            }
-          : {
-              type: 'compel',
-              id: getPrefixedId('prompt_region_positive_cond'),
-              prompt: region.positivePrompt,
-            }
-      );
+      let regionalPosCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+      if (isSDXL) {
+        regionalPosCond = g.addNode({
+          type: 'sdxl_compel_prompt',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+          style: region.positivePrompt, // TODO: Should we put the positive prompt in both fields?
+        });
+      } else if (isFLUX) {
+        regionalPosCond = g.addNode({
+          type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else {
+        regionalPosCond = g.addNode({
+          type: 'compel',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      }
       // Connect the mask to the conditioning
       g.addEdge(maskToTensor, 'mask', regionalPosCond, 'mask');
       // Connect the conditioning to the collector
@@ -115,38 +132,55 @@ export const addRegions = async (
       // Copy the connections to the "global" positive conditioning node to the regional cond
       if (posCond.type === 'compel') {
         for (const edge of g.getEdgesTo(posCond, ['clip', 'mask'])) {
-          // Clone the edge, but change the destination node to the regional conditioning node
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (posCond.type === 'sdxl_compel_prompt') {
+        for (const edge of g.getEdgesTo(posCond, ['clip', 'clip2', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (posCond.type === 'flux_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['clip', 't5_encoder', 't5_max_seq_len', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);
         }
       } else {
-        for (const edge of g.getEdgesTo(posCond, ['clip', 'clip2', 'mask'])) {
-          // Clone the edge, but change the destination node to the regional conditioning node
-          const clone = deepClone(edge);
-          clone.destination.node_id = regionalPosCond.id;
-          g.addEdgeFromObj(clone);
-        }
+        assert(false, 'Unsupported positive conditioning node type.');
       }
     }
 
     if (region.negativePrompt) {
-      result.addedNegativePrompt = true;
+      assert(negCond, 'Negative conditioning node is required if there is a negative prompt');
+      assert(negCondCollect, 'Negative conditioning collector is required if there is a negative prompt');
+
       // The main negative conditioning node
-      const regionalNegCond = g.addNode(
-        isSDXL
-          ? {
-              type: 'sdxl_compel_prompt',
-              id: getPrefixedId('prompt_region_negative_cond'),
-              prompt: region.negativePrompt,
-              style: region.negativePrompt,
-            }
-          : {
-              type: 'compel',
-              id: getPrefixedId('prompt_region_negative_cond'),
-              prompt: region.negativePrompt,
-            }
-      );
+      result.addedNegativePrompt = true;
+      let regionalNegCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+      if (isSDXL) {
+        regionalNegCond = g.addNode({
+          type: 'sdxl_compel_prompt',
+          id: getPrefixedId('prompt_region_negative_cond'),
+          prompt: region.negativePrompt,
+          style: region.negativePrompt,
+        });
+      } else if (isFLUX) {
+        regionalNegCond = g.addNode({
+          type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_negative_cond'),
+          prompt: region.negativePrompt,
+        });
+      } else {
+        regionalNegCond = g.addNode({
+          type: 'compel',
+          id: getPrefixedId('prompt_region_negative_cond'),
+          prompt: region.negativePrompt,
+        });
+      }
+
       // Connect the mask to the conditioning
       g.addEdge(maskToTensor, 'mask', regionalNegCond, 'mask');
       // Connect the conditioning to the collector
@@ -158,17 +192,27 @@ export const addRegions = async (
           clone.destination.node_id = regionalNegCond.id;
           g.addEdgeFromObj(clone);
         }
-      } else {
+      } else if (negCond.type === 'sdxl_compel_prompt') {
         for (const edge of g.getEdgesTo(negCond, ['clip', 'clip2', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalNegCond.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (negCond.type === 'flux_text_encoder') {
+        for (const edge of g.getEdgesTo(negCond, ['clip', 't5_encoder', 't5_max_seq_len', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalNegCond.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else {
+        assert(false, 'Unsupported negative conditioning node type.');
       }
     }
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
     if (region.autoNegative && region.positivePrompt) {
+      assert(negCondCollect, 'Negative conditioning collector is required if there is an auto-negative setting');
+
       result.addedAutoNegativePositivePrompt = true;
       // We re-use the mask image, but invert it when converting to tensor
       const invertTensorMask = g.addNode({
@@ -178,20 +222,27 @@ export const addRegions = async (
       // Connect the OG mask image to the inverted mask-to-tensor node
       g.addEdge(maskToTensor, 'mask', invertTensorMask, 'mask');
       // Create the conditioning node. It's going to be connected to the negative cond collector, but it uses the positive prompt
-      const regionalPosCondInverted = g.addNode(
-        isSDXL
-          ? {
-              type: 'sdxl_compel_prompt',
-              id: getPrefixedId('prompt_region_positive_cond_inverted'),
-              prompt: region.positivePrompt,
-              style: region.positivePrompt,
-            }
-          : {
-              type: 'compel',
-              id: getPrefixedId('prompt_region_positive_cond_inverted'),
-              prompt: region.positivePrompt,
-            }
-      );
+      let regionalPosCondInverted: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+      if (isSDXL) {
+        regionalPosCondInverted = g.addNode({
+          type: 'sdxl_compel_prompt',
+          id: getPrefixedId('prompt_region_positive_cond_inverted'),
+          prompt: region.positivePrompt,
+          style: region.positivePrompt,
+        });
+      } else if (isFLUX) {
+        regionalPosCondInverted = g.addNode({
+          type: 'flux_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond_inverted'),
+          prompt: region.positivePrompt,
+        });
+      } else {
+        regionalPosCondInverted = g.addNode({
+          type: 'compel',
+          id: getPrefixedId('prompt_region_positive_cond_inverted'),
+          prompt: region.positivePrompt,
+        });
+      }
       // Connect the inverted mask to the conditioning
       g.addEdge(invertTensorMask, 'mask', regionalPosCondInverted, 'mask');
       // Connect the conditioning to the negative collector
@@ -203,20 +254,26 @@ export const addRegions = async (
           clone.destination.node_id = regionalPosCondInverted.id;
           g.addEdgeFromObj(clone);
         }
-      } else {
+      } else if (posCond.type === 'sdxl_compel_prompt') {
         for (const edge of g.getEdgesTo(posCond, ['clip', 'clip2', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalPosCondInverted.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (posCond.type === 'flux_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['clip', 't5_encoder', 't5_max_seq_len', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCondInverted.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else {
+        assert(false, 'Unsupported positive conditioning node type.');
       }
     }
 
-    const validRGIPAdapters: RegionalGuidanceReferenceImageState[] = region.referenceImages.filter(({ ipAdapter }) =>
-      isValidIPAdapter(ipAdapter, base)
-    );
+    for (const { id, ipAdapter } of region.referenceImages) {
+      assert(!isFLUX, 'Regional IP adapters are not supported for FLUX.');
 
-    for (const { id, ipAdapter } of validRGIPAdapters) {
       result.addedIPAdapters++;
       const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
       assert(model, 'IP Adapter model is required');
@@ -247,12 +304,4 @@ export const addRegions = async (
   g.upsertMetadata({ regions: validRegions });
 
   return results;
-};
-
-const isValidIPAdapter = (ipAdapter: IPAdapterConfig, base: BaseModelType): boolean => {
-  // Must be have a model that matches the current base and must have a control image
-  const hasModel = Boolean(ipAdapter.model);
-  const modelMatchesBase = ipAdapter.model?.base === base;
-  const hasImage = Boolean(ipAdapter.image);
-  return hasModel && modelMatchesBase && hasImage;
 };

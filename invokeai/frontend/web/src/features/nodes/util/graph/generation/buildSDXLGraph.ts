@@ -232,14 +232,14 @@ export const buildSDXLGraph = async (
     type: 'collect',
     id: getPrefixedId('control_net_collector'),
   });
-  const controlNetResult = await addControlNets(
+  const controlNetResult = await addControlNets({
     manager,
-    canvas.controlLayers.entities,
+    entities: canvas.controlLayers.entities,
     g,
-    canvas.bbox.rect,
-    controlNetCollector,
-    modelConfig.base
-  );
+    rect: canvas.bbox.rect,
+    collector: controlNetCollector,
+    model: modelConfig,
+  });
   if (controlNetResult.addedControlNets > 0) {
     g.addEdge(controlNetCollector, 'collection', denoise, 'control');
   } else {
@@ -250,46 +250,50 @@ export const buildSDXLGraph = async (
     type: 'collect',
     id: getPrefixedId('t2i_adapter_collector'),
   });
-  const t2iAdapterResult = await addT2IAdapters(
+  const t2iAdapterResult = await addT2IAdapters({
     manager,
-    canvas.controlLayers.entities,
+    entities: canvas.controlLayers.entities,
     g,
-    canvas.bbox.rect,
-    t2iAdapterCollector,
-    modelConfig.base
-  );
+    rect: canvas.bbox.rect,
+    collector: t2iAdapterCollector,
+    model: modelConfig,
+  });
   if (t2iAdapterResult.addedT2IAdapters > 0) {
     g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
   } else {
     g.deleteNode(t2iAdapterCollector.id);
   }
 
-  const ipAdapterCollector = g.addNode({
+  const ipAdapterCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollector, modelConfig.base);
-
-  const regionsResult = await addRegions(
-    manager,
-    canvas.regionalGuidance.entities,
+  const ipAdapterResult = addIPAdapters({
+    entities: canvas.referenceImages.entities,
     g,
-    canvas.bbox.rect,
-    modelConfig.base,
-    denoise,
+    collector: ipAdapterCollect,
+    model: modelConfig,
+  });
+
+  const regionsResult = await addRegions({
+    manager,
+    regions: canvas.regionalGuidance.entities,
+    g,
+    bbox: canvas.bbox.rect,
+    model: modelConfig,
     posCond,
     negCond,
     posCondCollect,
     negCondCollect,
-    ipAdapterCollector
-  );
+    ipAdapterCollect,
+  });
 
   const totalIPAdaptersAdded =
     ipAdapterResult.addedIPAdapters + regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
   if (totalIPAdaptersAdded > 0) {
-    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
+    g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
   } else {
-    g.deleteNode(ipAdapterCollector.id);
+    g.deleteNode(ipAdapterCollect.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {

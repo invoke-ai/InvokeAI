@@ -5,10 +5,10 @@ from einops import rearrange
 from torch import Tensor
 
 
-def attention(q: Tensor, k: Tensor, v: Tensor, pe: Tensor) -> Tensor:
+def attention(q: Tensor, k: Tensor, v: Tensor, pe: Tensor, attn_mask: Tensor | None = None) -> Tensor:
     q, k = apply_rope(q, k, pe)
 
-    x = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+    x = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
     x = rearrange(x, "B H L D -> B L (H D)")
 
     return x

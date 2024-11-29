@@ -4,6 +4,13 @@ import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState } from 'features/controlLayers/store/types';
+import {
+  getControlLayerWarnings,
+  getGlobalReferenceImageWarnings,
+  getInpaintMaskWarnings,
+  getRasterLayerWarnings,
+  getRegionalGuidanceWarnings,
+} from 'features/controlLayers/store/validators';
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
@@ -278,17 +285,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems: string[] = [];
-      // Must have model
-      if (!controlLayer.controlAdapter.model) {
-        problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoModelSelected'));
-      }
-      // Model base must match
-      if (controlLayer.controlAdapter.model?.base !== model?.base) {
-        problems.push(i18n.t('parameters.invoke.layer.controlAdapterIncompatibleBaseModel'));
-      }
+      const problems = getControlLayerWarnings(controlLayer, model);
+
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
@@ -300,23 +300,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems: string[] = [];
-
-      // Must have model
-      if (!entity.ipAdapter.model) {
-        problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));
-      }
-      // Model base must match
-      if (entity.ipAdapter.model?.base !== model?.base) {
-        problems.push(i18n.t('parameters.invoke.layer.ipAdapterIncompatibleBaseModel'));
-      }
-      // Must have an image
-      if (!entity.ipAdapter.image) {
-        problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoImageSelected'));
-      }
+      const problems = getGlobalReferenceImageWarnings(entity, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
@@ -328,32 +315,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems: string[] = [];
-      // Must have a region
-      if (entity.objects.length === 0) {
-        problems.push(i18n.t('parameters.invoke.layer.rgNoRegion'));
-      }
-      // Must have at least 1 prompt or IP Adapter
-      if (entity.positivePrompt === null && entity.negativePrompt === null && entity.referenceImages.length === 0) {
-        problems.push(i18n.t('parameters.invoke.layer.rgNoPromptsOrIPAdapters'));
-      }
-      entity.referenceImages.forEach(({ ipAdapter }) => {
-        // Must have model
-        if (!ipAdapter.model) {
-          problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));
-        }
-        // Model base must match
-        if (ipAdapter.model?.base !== model?.base) {
-          problems.push(i18n.t('parameters.invoke.layer.ipAdapterIncompatibleBaseModel'));
-        }
-        // Must have an image
-        if (!ipAdapter.image) {
-          problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoImageSelected'));
-        }
-      });
+      const problems = getRegionalGuidanceWarnings(entity, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
@@ -365,10 +330,25 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems: string[] = [];
+      const problems = getRasterLayerWarnings(entity, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+        reasons.push({ prefix, content });
+      }
+    });
+
+  canvas.inpaintMasks.entities
+    .filter((entity) => entity.isEnabled)
+    .forEach((entity, i) => {
+      const layerLiteral = i18n.t('controlLayers.layer_one');
+      const layerNumber = i + 1;
+      const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
+      const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
+      const problems = getInpaintMaskWarnings(entity, model);
+
+      if (problems.length) {
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
