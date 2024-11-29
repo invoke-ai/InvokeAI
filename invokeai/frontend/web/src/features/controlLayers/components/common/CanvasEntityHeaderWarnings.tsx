@@ -33,15 +33,15 @@ const buildSelectWarnings = (entityIdentifier: CanvasEntityIdentifier, t: TFunct
     const entityType = entity.type;
 
     if (entityType === 'control_layer') {
-      warnings = getControlLayerWarnings(entity, model, t);
+      warnings = getControlLayerWarnings(entity, model);
     } else if (entityType === 'regional_guidance') {
-      warnings = getRegionalGuidanceWarnings(entity, model, t);
+      warnings = getRegionalGuidanceWarnings(entity, model);
     } else if (entityType === 'inpaint_mask') {
-      warnings = getInpaintMaskWarnings(entity, model, t);
+      warnings = getInpaintMaskWarnings(entity, model);
     } else if (entityType === 'raster_layer') {
-      warnings = getRasterLayerWarnings(entity, model, t);
+      warnings = getRasterLayerWarnings(entity, model);
     } else if (entityType === 'reference_image') {
-      warnings = getGlobalReferenceImageWarnings(entity, model, t);
+      warnings = getGlobalReferenceImageWarnings(entity, model);
     } else {
       assert<Equals<typeof entityType, never>>(false, 'Unexpected entity type');
     }
@@ -51,7 +51,7 @@ const buildSelectWarnings = (entityIdentifier: CanvasEntityIdentifier, t: TFunct
       return EMPTY_ARRAY;
     }
 
-    return warnings.map(upperFirst);
+    return warnings.map((w) => t(w)).map(upperFirst);
   });
 };
 

@@ -285,10 +285,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getControlLayerWarnings(controlLayer, model, i18n.t);
+      const problems = getControlLayerWarnings(controlLayer, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
@@ -300,10 +300,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getGlobalReferenceImageWarnings(entity, model, i18n.t);
+      const problems = getGlobalReferenceImageWarnings(entity, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
@@ -315,10 +315,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getRegionalGuidanceWarnings(entity, model, i18n.t);
+      const problems = getRegionalGuidanceWarnings(entity, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
@@ -330,10 +330,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getRasterLayerWarnings(entity, model, i18n.t);
+      const problems = getRasterLayerWarnings(entity, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
@@ -345,10 +345,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getInpaintMaskWarnings(entity, model, i18n.t);
+      const problems = getInpaintMaskWarnings(entity, model);
 
       if (problems.length) {
-        const content = upperFirst(problems.join(', '));
+        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
         reasons.push({ prefix, content });
       }
     });
