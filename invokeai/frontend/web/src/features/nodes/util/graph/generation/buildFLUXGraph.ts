@@ -224,7 +224,7 @@ export const buildFLUXGraph = async (
     regions: canvas.regionalGuidance.entities,
     g,
     bbox: canvas.bbox.rect,
-    base: modelConfig.base,
+    model: modelConfig,
     posCond,
     negCond: null,
     posCondCollect,

@@ -270,7 +270,7 @@ export const buildSD1Graph = async (
     regions: canvas.regionalGuidance.entities,
     g,
     bbox: canvas.bbox.rect,
-    base: modelConfig.base,
+    model: modelConfig,
     posCond,
     negCond,
     posCondCollect,
