@@ -1,9 +1,10 @@
 import einops
 import torch
 
+from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.math import attention
-from invokeai.backend.flux.modules.layers import DoubleStreamBlock
+from invokeai.backend.flux.modules.layers import DoubleStreamBlock, SingleStreamBlock
 
 
 class CustomDoubleStreamBlockProcessor:
@@ -13,7 +14,12 @@ class CustomDoubleStreamBlockProcessor:
 
     @staticmethod
     def _double_stream_block_forward(
-        block: DoubleStreamBlock, img: torch.Tensor, txt: torch.Tensor, vec: torch.Tensor, pe: torch.Tensor
+        block: DoubleStreamBlock,
+        img: torch.Tensor,
+        txt: torch.Tensor,
+        vec: torch.Tensor,
+        pe: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """This function is a direct copy of DoubleStreamBlock.forward(), but it returns some of the intermediate
         values.
@@ -40,7 +46,7 @@ class CustomDoubleStreamBlockProcessor:
         k = torch.cat((txt_k, img_k), dim=2)
         v = torch.cat((txt_v, img_v), dim=2)
 
-        attn = attention(q, k, v, pe=pe)
+        attn = attention(q, k, v, pe=pe, attn_mask=attn_mask)
         txt_attn, img_attn = attn[:, : txt.shape[1]], attn[:, txt.shape[1] :]
 
         # calculate the img bloks
@@ -63,11 +69,15 @@ class CustomDoubleStreamBlockProcessor:
         vec: torch.Tensor,
         pe: torch.Tensor,
         ip_adapter_extensions: list[XLabsIPAdapterExtension],
+        regional_prompting_extension: RegionalPromptingExtension,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """A custom implementation of DoubleStreamBlock.forward() with additional features:
         - IP-Adapter support
         """
-        img, txt, img_q = CustomDoubleStreamBlockProcessor._double_stream_block_forward(block, img, txt, vec, pe)
+        attn_mask = regional_prompting_extension.get_double_stream_attn_mask(block_index)
+        img, txt, img_q = CustomDoubleStreamBlockProcessor._double_stream_block_forward(
+            block, img, txt, vec, pe, attn_mask=attn_mask
+        )
 
         # Apply IP-Adapter conditioning.
         for ip_adapter_extension in ip_adapter_extensions:
@@ -81,3 +91,48 @@ class CustomDoubleStreamBlockProcessor:
             )
 
         return img, txt
+
+
+class CustomSingleStreamBlockProcessor:
+    """A class containing a custom implementation of SingleStreamBlock.forward() with additional features (masking,
+    etc.)
+    """
+
+    @staticmethod
+    def _single_stream_block_forward(
+        block: SingleStreamBlock,
+        x: torch.Tensor,
+        vec: torch.Tensor,
+        pe: torch.Tensor,
+        attn_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """This function is a direct copy of SingleStreamBlock.forward()."""
+        mod, _ = block.modulation(vec)
+        x_mod = (1 + mod.scale) * block.pre_norm(x) + mod.shift
+        qkv, mlp = torch.split(block.linear1(x_mod), [3 * block.hidden_size, block.mlp_hidden_dim], dim=-1)
+
+        q, k, v = einops.rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=block.num_heads)
+        q, k = block.norm(q, k, v)
+
+        # compute attention
+        attn = attention(q, k, v, pe=pe, attn_mask=attn_mask)
+        # compute activation in mlp stream, cat again and run second linear layer
+        output = block.linear2(torch.cat((attn, block.mlp_act(mlp)), 2))
+        return x + mod.gate * output
+
+    @staticmethod
+    def custom_single_block_forward(
+        timestep_index: int,
+        total_num_timesteps: int,
+        block_index: int,
+        block: SingleStreamBlock,
+        img: torch.Tensor,
+        vec: torch.Tensor,
+        pe: torch.Tensor,
+        regional_prompting_extension: RegionalPromptingExtension,
+    ) -> torch.Tensor:
+        """A custom implementation of SingleStreamBlock.forward() with additional features:
+        - Masking
+        """
+        attn_mask = regional_prompting_extension.get_single_stream_attn_mask(block_index)
+        return CustomSingleStreamBlockProcessor._single_stream_block_forward(block, img, vec, pe, attn_mask=attn_mask)

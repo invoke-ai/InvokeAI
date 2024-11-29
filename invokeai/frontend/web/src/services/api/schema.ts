@@ -6564,6 +6564,11 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * @description The mask associated with this conditioning tensor. Excluded regions should be set to False, included regions should be set to True.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
         };
         /**
          * FluxConditioningOutput
@@ -6771,15 +6776,17 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"];
             /**
+             * Positive Text Conditioning
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_text_conditioning?: components["schemas"]["FluxConditioningField"];
+            positive_text_conditioning?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][];
             /**
+             * Negative Text Conditioning
              * @description Negative conditioning tensor. Can be None if cfg_scale is 1.0.
              * @default null
              */
-            negative_text_conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            negative_text_conditioning?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
             /**
              * CFG Scale
              * @description Classifier-Free Guidance scale
@@ -7133,6 +7140,11 @@ export type components = {
              * @default null
              */
             prompt?: string;
+            /**
+             * @description A mask defining the region that this conditioning prompt applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
             /**
              * type
              * @default flux_text_encoder

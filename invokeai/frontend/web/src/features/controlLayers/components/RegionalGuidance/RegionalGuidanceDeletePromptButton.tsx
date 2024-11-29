@@ -1,27 +1,28 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import type { IconButtonProps } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleFill } from 'react-icons/pi';
+import { PiXBold } from 'react-icons/pi';
 
-type Props = {
+type Props = Omit<IconButtonProps, 'aria-label'> & {
   onDelete: () => void;
 };
 
-export const RegionalGuidanceDeletePromptButton = memo(({ onDelete }: Props) => {
+export const RegionalGuidanceDeletePromptButton = memo(({ onDelete, ...rest }: Props) => {
   const { t } = useTranslation();
   return (
-    <Tooltip label={t('controlLayers.deletePrompt')}>
-      <IconButton
-        variant="link"
-        aria-label={t('controlLayers.deletePrompt')}
-        icon={<PiTrashSimpleFill />}
-        onClick={onDelete}
-        flexGrow={0}
-        size="sm"
-        p={0}
-        colorScheme="error"
-      />
-    </Tooltip>
+    <IconButton
+      tooltip={t('common.delete')}
+      variant="link"
+      aria-label={t('common.delete')}
+      icon={<PiXBold />}
+      onClick={onDelete}
+      flexGrow={0}
+      size="sm"
+      p={0}
+      colorScheme="error"
+      {...rest}
+    />
   );
 });
 
