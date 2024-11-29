@@ -81,7 +81,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
         valid_seq_lens = [self.t5_max_seq_len]
         if self.use_short_t5_seq_len:
-            valid_seq_lens = [128, 256, 512]
+            # We allow a minimum sequence length of 128. Going too short results in more significant image chagnes.
+            valid_seq_lens = list(range(128, self.t5_max_seq_len, 128))
+            valid_seq_lens.append(self.t5_max_seq_len)
 
         with (
             t5_text_encoder_info as t5_text_encoder,
