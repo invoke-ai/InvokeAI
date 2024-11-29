@@ -58,6 +58,9 @@ const isAllowedOutputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_OUTPUT_FIELD_NAMES.includes(fieldName)) {
     return false;
   }
+  if (nodeType === 'image_batch' && fieldName !== 'image') {
+    return false;
+  }
   return true;
 };
 

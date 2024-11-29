@@ -1320,8 +1320,9 @@
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
             "paragraphs": [
-                "The part of the of the denoising process that will have the Control Adapter applied.",
-                "Generally, Control Adapters applied at the start of the process guide composition, and Control Adapters applied at the end guide details."
+                "This setting determines which portion of the denoising (generation) process incorporates the guidance from this layer.",
+                "• Start Step (%): Specifies when to begin applying the guidance from this layer during the generation process.",
+                "• End Step (%): Specifies when to stop applying this layer's guidance and revert general guidance from the model and other settings."
             ]
         },
         "controlNetControlMode": {
@@ -1339,13 +1340,15 @@
             "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
         },
         "ipAdapterMethod": {
-            "heading": "Method",
-            "paragraphs": ["Method by which to apply the current IP Adapter."]
+            "heading": "Mode",
+            "paragraphs": ["The mode defines how the reference image will guide the generation process."]
         },
         "controlNetWeight": {
             "heading": "Weight",
             "paragraphs": [
-                "Weight of the Control Adapter. Higher weight will lead to larger impacts on the final image."
+                "Adjusts how strongly the layer influences the generation process",
+                "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
+                "• Lower Weight (0-.75): Creates a smaller impact on the final result."
             ]
         },
         "dynamicPrompts": {
@@ -1782,6 +1785,7 @@
         "pullBboxIntoLayer": "Pull Bbox into Layer",
         "pullBboxIntoReferenceImage": "Pull Bbox into Reference Image",
         "showProgressOnCanvas": "Show Progress on Canvas",
+        "useImage": "Use Image",
         "prompt": "Prompt",
         "negativePrompt": "Negative Prompt",
         "beginEndStepPercentShort": "Begin/End %",
@@ -1794,6 +1798,7 @@
         "resetGenerationSettings": "Reset Generation Settings",
         "replaceCurrent": "Replace Current",
         "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or draw on the canvas to get started.",
+        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer to get started.",
         "controlMode": {
             "controlMode": "Control Mode",
             "balanced": "Balanced (recommended)",
@@ -1802,10 +1807,13 @@
             "megaControl": "Mega Control"
         },
         "ipAdapterMethod": {
-            "ipAdapterMethod": "IP Adapter Method",
+            "ipAdapterMethod": "Mode",
             "full": "Style and Composition",
+            "fullDesc": "Applies visual style (colors, textures) & composition (layout, structure).",
             "style": "Style Only",
-            "composition": "Composition Only"
+            "styleDesc": "Applies visual style (colors, textures) without considering its layout.",
+            "composition": "Composition Only",
+            "compositionDesc": "Replicates layout & structure while ignoring the reference's style."
         },
         "fill": {
             "fillColor": "Fill Color",

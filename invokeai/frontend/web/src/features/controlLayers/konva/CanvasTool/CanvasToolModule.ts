@@ -528,11 +528,16 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onKeyDown = (e: KeyboardEvent) => {
-    if (e.repeat) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
 
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    // Handle nudging - must be before repeat, as we may want to catch repeating keys
+    if (this.tools.move.isNudgeKey(e.key)) {
+      this.tools.move.nudge(e.key);
+    }
+
+    if (e.repeat) {
       return;
     }
 

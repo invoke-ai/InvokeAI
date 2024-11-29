@@ -9,6 +9,7 @@ import {
   getEmptyRect,
   getKonvaNodeDebugAttrs,
   getPrefixedId,
+  offsetCoord,
 } from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
@@ -556,6 +557,25 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     this.log.trace({ position }, 'Position changed');
     this.manager.stateApi.setEntityPosition({ entityIdentifier: this.parent.entityIdentifier, position });
+  };
+
+  nudgeBy = (offset: Coordinate) => {
+    // We can immediately move both the proxy rect and layer objects so we don't have to wait for a redux round-trip,
+    // which can take up to 2ms in my testing. This is optional, but can make the interaction feel more responsive,
+    // especially on lower-end devices.
+    // Get the relative position of the layer's objects, according to konva
+    const position = this.konva.proxyRect.position();
+    // Offset the position by the nudge amount
+    const newPosition = offsetCoord(position, offset);
+    // Set the new position of the proxy rect - this doesn't move the layer objects - only the outline rect
+    this.konva.proxyRect.setAttrs(newPosition);
+    // Sync the layer objects with the proxy rect - moves them to the new position
+    this.syncObjectGroupWithProxyRect();
+
+    // Push to redux. The state change will do a round-trip, and eventually make it back to the canvas classes, at
+    // which point the layer will be moved to the new position.
+    this.manager.stateApi.moveEntityBy({ entityIdentifier: this.parent.entityIdentifier, offset });
+    this.log.trace({ offset }, 'Nudged');
   };
 
   syncObjectGroupWithProxyRect = () => {

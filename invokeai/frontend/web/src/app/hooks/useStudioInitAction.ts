@@ -1,3 +1,4 @@
+import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { withResultAsync } from 'common/util/result';
@@ -9,6 +10,7 @@ import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
+import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
@@ -51,6 +53,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   const { t } = useTranslation();
   // Use a ref to ensure that we only perform the action once
   const didInit = useRef(false);
+  const didParseOpenAPISchema = useStore($hasTemplates);
   const store = useAppStore();
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
 
@@ -174,7 +177,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   );
 
   useEffect(() => {
-    if (didInit.current || !action) {
+    if (didInit.current || !action || !didParseOpenAPISchema) {
       return;
     }
 
@@ -187,22 +190,29 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       case 'selectStylePreset':
         handleSelectStylePreset(action.data.stylePresetId);
         break;
+
       case 'sendToCanvas':
         handleSendToCanvas(action.data.imageName);
         break;
+
       case 'useAllParameters':
         handleUseAllMetadata(action.data.imageName);
         break;
+
       case 'goToDestination':
         handleGoToDestination(action.data.destination);
+        break;
+
+      default:
         break;
     }
   }, [
     handleSendToCanvas,
     handleUseAllMetadata,
     action,
-    handleLoadWorkflow,
     handleSelectStylePreset,
     handleGoToDestination,
+    handleLoadWorkflow,
+    didParseOpenAPISchema,
   ]);
 };

@@ -469,7 +469,7 @@ class ModelProbe(object):
         """
         # scan model
         scan_result = scan_file_path(checkpoint)
-        if scan_result.infected_files != 0:
+        if scan_result.infected_files != 0 or scan_result.scan_err:
             raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
 
 
