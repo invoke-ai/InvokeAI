@@ -1,35 +1,41 @@
 import { logger } from 'app/logging/logger';
 import { withResultAsync } from 'common/util/result';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type {
-  CanvasControlLayerState,
-  ControlNetConfig,
-  Rect,
-  T2IAdapterConfig,
-} from 'features/controlLayers/store/types';
+import type { CanvasControlLayerState, Rect } from 'features/controlLayers/store/types';
+import { getControlLayerWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { serializeError } from 'serialize-error';
-import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
+import type { ImageDTO, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
+
+type AddControlNetsArg = {
+  manager: CanvasManager;
+  entities: CanvasControlLayerState[];
+  g: Graph;
+  rect: Rect;
+  collector: Invocation<'collect'>;
+  model: ParameterModel;
+};
 
 type AddControlNetsResult = {
   addedControlNets: number;
 };
 
-export const addControlNets = async (
-  manager: CanvasManager,
-  layers: CanvasControlLayerState[],
-  g: Graph,
-  rect: Rect,
-  collector: Invocation<'collect'>,
-  base: BaseModelType
-): Promise<AddControlNetsResult> => {
-  const validControlLayers = layers
-    .filter((layer) => layer.isEnabled)
-    .filter((layer) => isValidControlAdapter(layer.controlAdapter, base))
-    .filter((layer) => layer.controlAdapter.type === 'controlnet');
+export const addControlNets = async ({
+  manager,
+  entities,
+  g,
+  rect,
+  collector,
+  model,
+}: AddControlNetsArg): Promise<AddControlNetsResult> => {
+  const validControlLayers = entities
+    .filter((entity) => entity.isEnabled)
+    .filter((entity) => entity.controlAdapter.type === 'controlnet')
+    .filter((entity) => getControlLayerWarnings(entity, model).length === 0);
 
   const result: AddControlNetsResult = {
     addedControlNets: 0,
@@ -54,22 +60,31 @@ export const addControlNets = async (
   return result;
 };
 
+type AddT2IAdaptersArg = {
+  manager: CanvasManager;
+  entities: CanvasControlLayerState[];
+  g: Graph;
+  rect: Rect;
+  collector: Invocation<'collect'>;
+  model: ParameterModel;
+};
+
 type AddT2IAdaptersResult = {
   addedT2IAdapters: number;
 };
 
-export const addT2IAdapters = async (
-  manager: CanvasManager,
-  layers: CanvasControlLayerState[],
-  g: Graph,
-  rect: Rect,
-  collector: Invocation<'collect'>,
-  base: BaseModelType
-): Promise<AddT2IAdaptersResult> => {
-  const validControlLayers = layers
-    .filter((layer) => layer.isEnabled)
-    .filter((layer) => isValidControlAdapter(layer.controlAdapter, base))
-    .filter((layer) => layer.controlAdapter.type === 't2i_adapter');
+export const addT2IAdapters = async ({
+  manager,
+  entities,
+  g,
+  rect,
+  collector,
+  model,
+}: AddT2IAdaptersArg): Promise<AddT2IAdaptersResult> => {
+  const validControlLayers = entities
+    .filter((entity) => entity.isEnabled)
+    .filter((entity) => entity.controlAdapter.type === 't2i_adapter')
+    .filter((entity) => getControlLayerWarnings(entity, model).length === 0);
 
   const result: AddT2IAdaptersResult = {
     addedT2IAdapters: 0,
@@ -144,12 +159,4 @@ const addT2IAdapterToGraph = (
   });
 
   g.addEdge(t2iAdapter, 't2i_adapter', collector, 'item');
-};
-
-const isValidControlAdapter = (controlAdapter: ControlNetConfig | T2IAdapterConfig, base: BaseModelType): boolean => {
-  // Must be have a model
-  const hasModel = Boolean(controlAdapter.model);
-  // Model must match the current base model
-  const modelMatchesBase = controlAdapter.model?.base === base;
-  return hasModel && modelMatchesBase;
 };

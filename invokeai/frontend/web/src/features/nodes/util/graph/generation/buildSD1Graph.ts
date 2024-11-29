@@ -227,14 +227,14 @@ export const buildSD1Graph = async (
     type: 'collect',
     id: getPrefixedId('control_net_collector'),
   });
-  const controlNetResult = await addControlNets(
+  const controlNetResult = await addControlNets({
     manager,
-    canvas.controlLayers.entities,
+    entities: canvas.controlLayers.entities,
     g,
-    canvas.bbox.rect,
-    controlNetCollector,
-    modelConfig.base
-  );
+    rect: canvas.bbox.rect,
+    collector: controlNetCollector,
+    model: modelConfig,
+  });
   if (controlNetResult.addedControlNets > 0) {
     g.addEdge(controlNetCollector, 'collection', denoise, 'control');
   } else {
@@ -245,14 +245,14 @@ export const buildSD1Graph = async (
     type: 'collect',
     id: getPrefixedId('t2i_adapter_collector'),
   });
-  const t2iAdapterResult = await addT2IAdapters(
+  const t2iAdapterResult = await addT2IAdapters({
     manager,
-    canvas.controlLayers.entities,
+    entities: canvas.controlLayers.entities,
     g,
-    canvas.bbox.rect,
-    t2iAdapterCollector,
-    modelConfig.base
-  );
+    rect: canvas.bbox.rect,
+    collector: t2iAdapterCollector,
+    model: modelConfig,
+  });
   if (t2iAdapterResult.addedT2IAdapters > 0) {
     g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
   } else {
@@ -263,7 +263,12 @@ export const buildSD1Graph = async (
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollect, modelConfig.base);
+  const ipAdapterResult = addIPAdapters({
+    entities: canvas.referenceImages.entities,
+    g,
+    collector: ipAdapterCollect,
+    model: modelConfig,
+  });
 
   const regionsResult = await addRegions({
     manager,
