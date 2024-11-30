@@ -29,7 +29,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     title="FLUX Text Encoding",
     tags=["prompt", "conditioning", "flux"],
     category="conditioning",
-    version="1.1.0",
+    version="1.1.1",
     classification=Classification.Prototype,
 )
 class FluxTextEncoderInvocation(BaseInvocation):
