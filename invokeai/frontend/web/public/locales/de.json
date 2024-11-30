@@ -96,7 +96,9 @@
         "new": "Neu",
         "ok": "OK",
         "close": "Schließen",
-        "clipboard": "Zwischenablage"
+        "clipboard": "Zwischenablage",
+        "generating": "Generieren",
+        "loadingModel": "Lade Modell"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -591,7 +593,15 @@
         "loraTriggerPhrases": "LoRA-Auslösephrasen",
         "installingBundle": "Bündel wird installiert",
         "triggerPhrases": "Auslösephrasen",
-        "mainModelTriggerPhrases": "Hauptmodell-Auslösephrasen"
+        "mainModelTriggerPhrases": "Hauptmodell-Auslösephrasen",
+        "noDefaultSettings": "Für dieses Modell sind keine Standardeinstellungen konfiguriert. Besuchen Sie den Modell-Manager, um Standardeinstellungen hinzuzufügen.",
+        "defaultSettingsOutOfSync": "Einige Einstellungen stimmen nicht mit den Standardeinstellungen des Modells überein:",
+        "clipLEmbed": "CLIP-L einbetten",
+        "clipGEmbed": "CLIP-G einbetten",
+        "hfTokenLabel": "HuggingFace-Token (für einige Modelle erforderlich)",
+        "hfTokenHelperText": "Für die Nutzung einiger Modelle ist ein HF-Token erforderlich. Klicken Sie hier, um Ihr Token zu erstellen oder zu erhalten.",
+        "hfForbidden": "Sie haben keinen Zugriff auf dieses HF-Modell",
+        "hfTokenInvalid": "Ungültiges oder fehlendes HF-Token"
     },
     "parameters": {
         "images": "Bilder",
@@ -841,7 +851,8 @@
         "upscaling": "Hochskalierung",
         "canvas": "Leinwand",
         "prompts_one": "Prompt",
-        "prompts_other": "Prompts"
+        "prompts_other": "Prompts",
+        "batchSize": "Stapelgröße"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -1081,6 +1092,21 @@
         },
         "patchmatchDownScaleSize": {
             "heading": "Herunterskalieren"
+        },
+        "paramHeight": {
+            "heading": "Höhe",
+            "paragraphs": [
+                "Höhe des generierten Bildes. Muss ein Vielfaches von 8 sein."
+            ]
+        },
+        "paramUpscaleMethod": {
+            "heading": "Vergrößerungsmethode",
+            "paragraphs": [
+                "Methode zum Hochskalieren des Bildes für High Resolution Fix."
+            ]
+        },
+        "paramHrf": {
+            "heading": "High Resolution Fix aktivieren"
         }
     },
     "invocationCache": {
