@@ -217,7 +217,10 @@
         "direction": "Phương Hướng",
         "unknownError": "Lỗi Không Rõ",
         "selected": "Đã chọn",
-        "tab": "Tab"
+        "tab": "Tab",
+        "loadingModel": "Đang Tải Model",
+        "generating": "Đang Tạo Sinh",
+        "warnings": "Cảnh Báo"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -290,7 +293,8 @@
         "cancelSucceeded": "Mục Đã Huỷ Bỏ",
         "completedIn": "Hoàn tất trong",
         "graphQueued": "Đồ Thị Đã Vào Hàng",
-        "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng"
+        "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng",
+        "batchSize": "Kích Thước Vùng Hàng Loạt"
     },
     "hotkeys": {
         "canvas": {
@@ -733,7 +737,9 @@
         "textualInversions": "Bộ Đảo Ngược Văn Bản",
         "loraTriggerPhrases": "Từ Ngữ Kích Hoạt Cho LoRA",
         "width": "Chiều Rộng",
-        "starterModelsInModelManager": "Model khởi đầu có thể tìm thấy ở Trình Quản Lý Model"
+        "starterModelsInModelManager": "Model khởi đầu có thể tìm thấy ở Trình Quản Lý Model",
+        "clipLEmbed": "CLIP-L Embed",
+        "clipGEmbed": "CLIP-G Embed"
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -905,7 +911,7 @@
         "unknownNode": "Node Không Rõ",
         "unknownNodeType": "Loại Node Không Rõ",
         "unknownTemplate": "Mẫu Trình Bày Không Rõ",
-        "cannotConnectOutputToOutput": "Không thế kết nối đầu ra với đầu vào",
+        "cannotConnectOutputToOutput": "Không thế kết nối đầu ra với đầu ra",
         "cannotConnectToSelf": "Không thể kết nối với chính nó",
         "workflow": "Workflow",
         "addNodeToolTip": "Thêm Node (Shift+A, Space)",
@@ -952,7 +958,9 @@
         "executionStateInProgress": "Đang Xử Lý",
         "showLegendNodes": "Hiển Thị Vùng Nhập",
         "outputFieldTypeParseError": "Không thể phân tích loại dữ liệu đầu ra của {{node}}.{{field}} ({{message}})",
-        "modelAccessError": "Không thể tìm thấy model {{key}}, chuyển về mặc định"
+        "modelAccessError": "Không thể tìm thấy model {{key}}, chuyển về mặc định",
+        "internalDesc": "Trình kích hoạt này được dùng bên trong bởi Invoke. Nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng và có thể bị xoá bất cứ lúc nào.",
+        "specialDesc": "Trình kích hoạt này có một số xử lý đặc biệt trong ứng dụng. Ví dụ, Node Hàng Loạt được dùng để xếp vào nhiều đồ thị từ một workflow."
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -1105,7 +1113,9 @@
         },
         "controlNetWeight": {
             "paragraphs": [
-                "Trọng lượng của Control Adapter. Trọng lượng càng cao sẽ dẫn đến tác động càng lớn lên ảnh cuối cùng."
+                "Điều chỉnh mức độ layer ảnh hưởng đến quá trình xử lý tạo sinh.",
+                "• Trọng Lượng Lớn Hơn (.75-2): Gây ra ảnh hưởng lớn hơn lên kết quả cuối cùng.",
+                "• Trọng Lượng Nhỏ Hơn (0-.75): Gây ra ảnh hưởng nhỏ hơn lên kết quả cuối cùng."
             ],
             "heading": "Trọng Lượng"
         },
@@ -1149,7 +1159,7 @@
         },
         "ipAdapterMethod": {
             "paragraphs": [
-                "Cách thức dùng để áp dụng IP Adapter hiện tại."
+                "Phương thức định nghĩa cách ảnh mẫu sẽ chỉ dẫn quá trình xử lý tạo sinh."
             ],
             "heading": "Cách Thức"
         },
@@ -1196,8 +1206,9 @@
         },
         "controlNetBeginEnd": {
             "paragraphs": [
-                "Một phần trong quá trình xử lý khử nhiễu mà sẽ được Control Adapter áp dụng.",
-                "Nói chung, Control Adapter áp dụng vào lúc bắt đầu của quá trình hướng dẫn thành phần, và cũng áp dụng vào lúc kết thúc hướng dẫn chi tiết."
+                "Cài đặt này xác định phần xử lý khử nhiễu (trong khi tạo sinh) kết hợp với chỉ dẫn từ layer này.",
+                "• Bước Bắt Đầu (%): Chỉ định lúc bắt đầu áp dụng chỉ dẫn từ layer này trong quá trình tạo sinh.",
+                "• Bước Kết Thúc (%): Chỉ định lúc dừng áp dụng chỉ dẫn của layer này và trở về chỉ dẫn chung từ model và các thiết lập khác."
             ],
             "heading": "Phần Trăm Tham Số Bước Khi Bắt Đầu/Kết Thúc"
         },
@@ -1410,15 +1421,20 @@
                 "rgNoPromptsOrIPAdapters": "không có lệnh chữ hoặc IP Adapter",
                 "controlAdapterIncompatibleBaseModel": "model cơ sở của Control Adapter không tương thích",
                 "ipAdapterIncompatibleBaseModel": "dạng model cơ sở của IP Adapter không tương thích",
-                "controlAdapterNoModelSelected": "không có model Control Adapter được chọn"
+                "controlAdapterNoModelSelected": "không có model Control Adapter được chọn",
+                "emptyLayer": "layer trống",
+                "rgAutoNegativeNotSupported": "trình tự động đảo chiều không được hỗ trợ cho model cơ sở đang dùng",
+                "rgNegativePromptNotSupported": "lệnh tiêu cực không được hỗ trợ cho model cơ sở đang dùng",
+                "unsupportedModel": "layer không được hỗ trợ cho model cơ sở đang dùng",
+                "rgReferenceImagesNotSupported": "ảnh mẫu khu vực không được hỗ trợ cho model cơ sở đang dùng"
             },
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều rộng hộp giới hạn là {{width}}",
             "noModelSelected": "Không có model được lựa chọn",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều dài hộp giới hạn là {{height}}",
-            "canvasIsFiltering": "Canvas đang được lọc",
-            "canvasIsRasterizing": "Canvas đang được raster hoá",
-            "canvasIsTransforming": "Canvas đang được biến đổi",
-            "canvasIsCompositing": "Canvas đang được kết hợp",
+            "canvasIsFiltering": "Canvas đang bận (đang lọc)",
+            "canvasIsRasterizing": "Canvas đang bận (đang raster hoá)",
+            "canvasIsTransforming": "Canvas đang bận (đang biến đổi)",
+            "canvasIsCompositing": "Canvas đang bận (đang kết hợp)",
             "noPrompts": "Không có lệnh được tạo",
             "noNodesInGraph": "Không có node trong đồ thị",
             "addingImagesTo": "Thêm ảnh vào",
@@ -1430,8 +1446,12 @@
             "missingNodeTemplate": "Thiếu mẫu trình bày node",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều dài hộp giới hạn là {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều rộng hộp giới hạn là {{width}}",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} thiếu đầu ra",
-            "missingFieldTemplate": "Thiếu vùng mẫu trình bày"
+            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: thiếu đầu vào",
+            "missingFieldTemplate": "Thiếu vùng mẫu trình bày",
+            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} tài nguyên trống",
+            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: quá ít mục, tối thiểu {{minItems}}",
+            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: quá nhiều mục, tối đa {{maxItems}}",
+            "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)"
         },
         "cfgScale": "Thước Đo CFG",
         "useSeed": "Dùng Tham Số Hạt Giống",
@@ -1542,7 +1562,8 @@
         "resetWebUIDesc2": "Nếu ảnh không được xuất hiện trong thư viện hoặc điều gì đó không ổn đang diễn ra, hãy thử khởi động lại trước khi báo lỗi trên Github.",
         "displayInProgress": "Hiển Thị Hình Ảnh Đang Xử Lý",
         "intermediatesClearedFailed": "Có Vấn Đề Khi Dọn Sạch Sản Phẩm Trung Gian",
-        "enableInvisibleWatermark": "Bật Chế Độ Ẩn Watermark"
+        "enableInvisibleWatermark": "Bật Chế Độ Ẩn Watermark",
+        "showDetailedInvocationProgress": "Hiện Dữ Liệu Xử Lý"
     },
     "sdxl": {
         "loading": "Đang Tải...",
@@ -1594,7 +1615,7 @@
         "pullBboxIntoLayerError": "Có Vấn Đề Khi Chuyển Hộp Giới Hạn Thành Layer",
         "pullBboxIntoReferenceImageOk": "Chuyển Hộp Giới Hạn Thành Ảnh Mẫu",
         "clearCaches": "Xoá Bộ Nhớ Đệm",
-        "outputOnlyMaskedRegions": "Chỉ Xuất Đầu Ra Ở Vùng Phủ",
+        "outputOnlyMaskedRegions": "Chỉ Xuất Đầu Ra Ở Vùng Tạo Sinh",
         "addLayer": "Thêm Layer",
         "regional": "Khu Vực",
         "regionIsEmpty": "Vùng được chọn trống",
@@ -1608,10 +1629,13 @@
         "moveForward": "Chuyển Lên Đầu",
         "fitBboxToLayers": "Xếp Vừa Hộp Giới Hạn Vào Layer",
         "ipAdapterMethod": {
-            "full": "Đầy Đủ",
+            "full": "Phong Cách Và Thành Phần",
             "style": "Chỉ Lấy Phong Cách",
             "composition": "Chỉ Lấy Thành Phần",
-            "ipAdapterMethod": "Cách Thức IP Adapter"
+            "ipAdapterMethod": "Cách Thức",
+            "compositionDesc": "Áp dụng cách trình bày và bỏ qua phong cách mẫu.",
+            "fullDesc": "Áp dụng phong cách trực quan (màu, cấu tạo) & thành phần (cách trình bày).",
+            "styleDesc": "Áp dụng phong cách trực quan (màu, cấu tạo) và bỏ qua cách trình bày."
         },
         "deletePrompt": "Xoá Lệnh",
         "rasterLayer": "Layer Dạng Raster",
@@ -1899,7 +1923,16 @@
             "colorPicker": "Chọn Màu"
         },
         "mergingLayers": "Đang gộp layer",
-        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, hoặc vẽ trên canvas để bắt đầu."
+        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, hoặc vẽ trên canvas để bắt đầu.",
+        "referenceImageEmptyState": "<UploadButton>Tải lên ảnh</UploadButton> hoặc kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này để bắt đầu.",
+        "useImage": "Dùng Hình Ảnh",
+        "resetCanvasLayers": "Khởi Động Lại Layer Canvas",
+        "asRasterLayer": "Như $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "Như $t(controlLayers.rasterLayer) (Thay Đổi Kích Thước)",
+        "asControlLayer": "Như $t(controlLayers.controlLayer)",
+        "asControlLayerResize": "Như $t(controlLayers.controlLayer) (Thay Đổi Kích Thước)",
+        "newSession": "Phiên Làm Việc Mới",
+        "resetGenerationSettings": "Khởi Động Lại Cài Đặt Tạo Sinh"
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2124,8 +2157,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "<StrongComponent>SD 3.5</StrongComponent>: Hỗ trợ cho Từ ngữ Sang Hình Ảnh trong Workflow với phiên bản SD 3.5 Medium hoặc Large.",
-            "<StrongComponent>Canvas</StrongComponent>: Hợp lý hoá cách xử lý Layer Điều Khiển Được và cải thiện thiết lập điều khiển mặc định."
+            "<StrongComponent>Workflows</StrongComponent>: Chạy một workflow cho nhiều ảnh bằng node <StrongComponent>Ảnh Hàng Loạt</StrongComponent> mới.",
+            "<StrongComponent>FLUX</StrongComponent>: Hỗ trợ cho XLabs IP Adapter v2."
         ]
     },
     "upsell": {
@@ -2133,5 +2166,67 @@
         "inviteTeammates": "Thêm Đồng Đội",
         "shareAccess": "Chia Sẻ Quyền Truy Cập",
         "professionalUpsell": "Không có sẵn Phiên Bản Chuyên Nghiệp cho Invoke. Bấm vào đây hoặc đến invoke.com/pricing để thêm chi tiết."
+    },
+    "supportVideos": {
+        "supportVideos": "Video Hỗ Trợ",
+        "gettingStarted": "Bắt Đầu Làm Quen",
+        "studioSessionsDesc1": "Xem thử <StudioSessionsPlaylistLink /> để hiểu rõ Invoke hơn.",
+        "studioSessionsDesc2": "Đến <DiscordLink /> để tham gia vào phiên trực tiếp và hỏi câu hỏi. Các phiên được tải lên danh sách phát vào các tuần.",
+        "videos": {
+            "howDoIDoImageToImageTransformation": {
+                "title": "Làm Sao Để Tôi Dùng Trình Biến Đổi Hình Ảnh Sang Hình Ảnh?",
+                "description": "Hướng dẫn cách thực hiện biến đổi ảnh sang ảnh trong Invoke."
+            },
+            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
+                "description": "Giới thiệu về ảnh mẫu và IP adapter toàn vùng.",
+                "title": "Làm Sao Để Tôi Dùng IP Adapter Toàn Vùng Và Ảnh Mẫu?"
+            },
+            "creatingAndComposingOnInvokesControlCanvas": {
+                "description": "Học cách sáng tạo ảnh bằng trình điều khiển canvas của Invoke.",
+                "title": "Sáng Tạo Trong Trình Kiểm Soát Canvas Của Invoke"
+            },
+            "upscaling": {
+                "description": "Cách upscale ảnh bằng bộ công cụ của Invoke để nâng cấp độ phân giải.",
+                "title": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)"
+            },
+            "howDoIGenerateAndSaveToTheGallery": {
+                "title": "Làm Sao Để Tôi Tạo Sinh Và Lưu Vào Thư Viện?",
+                "description": "Các bước để tạo sinh và lưu ảnh vào thư viện."
+            },
+            "howDoIEditOnTheCanvas": {
+                "description": "Hướng dẫn chỉnh sửa ảnh trực tiếp trên canvas.",
+                "title": "Làm Sao Để Tôi Chỉnh Sửa Trên Canvas?"
+            },
+            "howDoIUseControlNetsAndControlLayers": {
+                "title": "Làm Sao Để Tôi Dùng ControlNet và Layer Điều Khiển Được?",
+                "description": "Học cách áp dụng layer điều khiển được và controlnet vào ảnh của bạn."
+            },
+            "howDoIUseInpaintMasks": {
+                "title": "Làm Sao Để Tôi Dùng Lớp Phủ Inpaint?",
+                "description": "Cách áp dụng lớp phủ inpaint vào chỉnh sửa và thay đổi ảnh."
+            },
+            "howDoIOutpaint": {
+                "title": "Làm Sao Để Tôi Outpaint?",
+                "description": "Hướng dẫn outpaint bên ngoài viền ảnh gốc."
+            },
+            "creatingYourFirstImage": {
+                "description": "Giới thiệu về cách tạo ảnh từ ban đầu bằng công cụ Invoke.",
+                "title": "Tạo Hình Ảnh Đầu Tiên Của Bạn"
+            },
+            "usingControlLayersAndReferenceGuides": {
+                "description": "Học cách chỉ dẫn ảnh được tạo ra bằng layer điều khiển được và ảnh mẫu.",
+                "title": "Dùng Layer Điều Khiển Được và Chỉ Dẫn Mẫu"
+            },
+            "understandingImageToImageAndDenoising": {
+                "title": "Hiểu Rõ Trình Hình Ảnh Sang Hình Ảnh Và Trình Khử Nhiễu",
+                "description": "Tổng quan về trình biến đổi ảnh sang ảnh và trình khử nhiễu trong Invoke."
+            },
+            "exploringAIModelsAndConceptAdapters": {
+                "title": "Khám Phá Model AI Và Khái Niệm Về Adapter",
+                "description": "Đào sâu vào model AI và cách dùng những adapter để điều khiển một cách sáng tạo."
+            }
+        },
+        "controlCanvas": "Điều Khiển Canvas",
+        "watch": "Xem"
     }
 }
