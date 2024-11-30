@@ -22,15 +22,15 @@ Before starting these steps, ensure you have your local environment [configured 
 2. Fork the [InvokeAI](https://github.com/invoke-ai/InvokeAI) repository to your GitHub profile. This means that you will have a copy of the repository under **your-GitHub-username/InvokeAI**.
 3. Clone the repository to your local machine using:
 
-   ```bash
-   git clone https://github.com/your-GitHub-username/InvokeAI.git
-   ```
+    ```bash
+    git clone https://github.com/your-GitHub-username/InvokeAI.git
+    ```
 
 If you're unfamiliar with using Git through the commandline, [GitHub Desktop](https://desktop.github.com) is a easy-to-use alternative with a UI. You can do all the same steps listed here, but through the interface. 4. Create a new branch for your fix using:
 
-    ```bash
-    git checkout -b branch-name-here
-    ```
+  ```bash
+  git checkout -b branch-name-here
+  ```
 
 5. Make the appropriate changes for the issue you are trying to address or the feature that you want to add.
 6. Add the file contents of the changed files to the "snapshot" git uses to manage the state of the project, also known as the index:
