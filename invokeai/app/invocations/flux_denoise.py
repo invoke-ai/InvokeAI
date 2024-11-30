@@ -58,7 +58,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.2.1",
+    version="3.2.2",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
