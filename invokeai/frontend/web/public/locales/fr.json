@@ -327,7 +327,6 @@
                 "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la hauteur de la bounding box est {{height}}",
                 "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la largeur de la bounding box est {{width}}",
                 "ipAdapterIncompatibleBaseModel": "modèle de base d'IP adapter incompatible",
-                "rgNoRegion": "aucune zone sélectionnée",
                 "controlAdapterNoModelSelected": "aucun modèle de Control Adapter sélectionné"
             },
             "noPrompts": "Aucun prompts généré",

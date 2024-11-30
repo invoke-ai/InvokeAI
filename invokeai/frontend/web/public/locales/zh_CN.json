@@ -668,7 +668,6 @@
                 "controlAdapterIncompatibleBaseModel": "Control Adapter的基础模型不兼容",
                 "ipAdapterIncompatibleBaseModel": "IP Adapter的基础模型不兼容",
                 "ipAdapterNoImageSelected": "未选择IP Adapter图像",
-                "rgNoRegion": "未选择区域",
                 "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，边界框宽度为 {{width}}",
                 "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，缩放后的边界框高度为 {{height}}",
                 "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，边界框高度为 {{height}}",

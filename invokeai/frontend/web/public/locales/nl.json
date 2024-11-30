@@ -236,7 +236,6 @@
                 "controlAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor controle-adapter",
                 "ipAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor IP-adapter",
                 "ipAdapterNoImageSelected": "geen afbeelding voor IP-adapter geselecteerd",
-                "rgNoRegion": "geen gebied geselecteerd",
                 "rgNoPromptsOrIPAdapters": "geen tekstprompts of IP-adapters",
                 "ipAdapterNoModelSelected": "geen IP-adapter geselecteerd"
             }
