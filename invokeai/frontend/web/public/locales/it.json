@@ -671,7 +671,6 @@
                 "ipAdapterIncompatibleBaseModel": "Il modello base dell'adattatore IP non è compatibile",
                 "ipAdapterNoImageSelected": "Nessuna immagine dell'adattatore IP selezionata",
                 "rgNoPromptsOrIPAdapters": "Nessun prompt o adattatore IP",
-                "rgNoRegion": "Nessuna regione selezionata",
                 "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, larghezza riquadro è {{width}}",
                 "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, altezza riquadro è {{height}}",
                 "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, larghezza del riquadro scalato {{width}}",

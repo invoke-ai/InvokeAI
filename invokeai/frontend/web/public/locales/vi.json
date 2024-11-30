@@ -1412,7 +1412,6 @@
         "invoke": {
             "layer": {
                 "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, tỉ lệ chiều dài hộp giới hạn là {{height}}",
-                "rgNoRegion": "không có vùng được chọn",
                 "ipAdapterNoModelSelected": "không có IP Adapter được lựa chọn",
                 "ipAdapterNoImageSelected": "không có ảnh IP Adapter được lựa chọn",
                 "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, chiều dài hộp giới hạn là {{height}}",

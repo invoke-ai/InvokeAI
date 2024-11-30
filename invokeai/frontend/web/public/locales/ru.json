@@ -652,7 +652,6 @@
                 "ipAdapterNoModelSelected": "IP адаптер не выбран",
                 "controlAdapterNoModelSelected": "не выбрана модель адаптера контроля",
                 "controlAdapterIncompatibleBaseModel": "несовместимая базовая модель адаптера контроля",
-                "rgNoRegion": "регион не выбран",
                 "rgNoPromptsOrIPAdapters": "нет текстовых запросов или IP-адаптеров",
                 "ipAdapterIncompatibleBaseModel": "несовместимая базовая модель IP-адаптера",
                 "ipAdapterNoImageSelected": "изображение IP-адаптера не выбрано",
