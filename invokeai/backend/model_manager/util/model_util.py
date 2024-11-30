@@ -52,16 +52,15 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = True) -> Dict[str,
         except Exception:
             # TODO: create issue for support "meta"?
             checkpoint = safetensors.torch.load_file(path, device="cpu")
+    elif str(path).endswith(".gguf"):
+        # The GGUF reader used here uses numpy memmap, so these tensors are not loaded into memory during this function
+        checkpoint = gguf_sd_loader(Path(path), compute_dtype=torch.float32)
     else:
         if scan:
             scan_result = scan_file_path(path)
             if scan_result.infected_files != 0 or scan_result.scan_err:
                 raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
-        if str(path).endswith(".gguf"):
-            # The GGUF reader used here uses numpy memmap, so these tensors are not loaded into memory during this function
-            checkpoint = gguf_sd_loader(Path(path), compute_dtype=torch.float32)
-        else:
-            checkpoint = torch.load(path, map_location=torch.device("meta"))
+        checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
 
 
