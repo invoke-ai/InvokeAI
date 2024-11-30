@@ -96,7 +96,8 @@
         "clipboard": "Appunti",
         "ok": "Ok",
         "generating": "Generazione",
-        "loadingModel": "Caricamento del modello"
+        "loadingModel": "Caricamento del modello",
+        "warnings": "Avvisi"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -674,7 +675,12 @@
                 "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, larghezza riquadro è {{width}}",
                 "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, altezza riquadro è {{height}}",
                 "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, larghezza del riquadro scalato {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, altezza del riquadro scalato {{height}}"
+                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, altezza del riquadro scalato {{height}}",
+                "rgNegativePromptNotSupported": "prompt negativo non supportato per il modello base selezionato",
+                "rgAutoNegativeNotSupported": "auto-negativo non supportato per il modello base selezionato",
+                "emptyLayer": "livello vuoto",
+                "unsupportedModel": "livello non supportato per il modello base selezionato",
+                "rgReferenceImagesNotSupported": "immagini di riferimento regionali non supportate per il modello base selezionato"
             },
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), altezza riquadro è {{height}}",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza riquadro è {{width}}",
@@ -686,7 +692,11 @@
             "canvasIsTransforming": "La tela sta trasformando",
             "canvasIsRasterizing": "La tela sta rasterizzando",
             "canvasIsCompositing": "La tela è in fase di composizione",
-            "canvasIsFiltering": "La tela sta filtrando"
+            "canvasIsFiltering": "La tela sta filtrando",
+            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi elementi, massimo {{maxItems}}",
+            "canvasIsSelectingObject": "La tela è occupata (selezione dell'oggetto)",
+            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi pochi elementi, minimo {{minItems}}",
+            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} raccolta vuota"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -971,7 +981,9 @@
         "saveToGallery": "Salva nella Galleria",
         "noMatchingWorkflows": "Nessun flusso di lavoro corrispondente",
         "noWorkflows": "Nessun flusso di lavoro",
-        "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>."
+        "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>.",
+        "specialDesc": "Questa invocazione comporta una gestione speciale nell'applicazione. Ad esempio, i nodi Lotto vengono utilizzati per mettere in coda più grafici da un singolo flusso di lavoro.",
+        "internalDesc": "Questa invocazione è utilizzata internamente da Invoke. Potrebbe subire modifiche significative durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento."
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1092,7 +1104,8 @@
         "workflows": "Flussi di lavoro",
         "generation": "Generazione",
         "other": "Altro",
-        "gallery": "Galleria"
+        "gallery": "Galleria",
+        "batchSize": "Dimensione del lotto"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1195,7 +1208,8 @@
             "heading": "Percentuale passi Inizio / Fine",
             "paragraphs": [
                 "La parte del processo di rimozione del rumore in cui verrà applicato l'adattatore di controllo.",
-                "In genere, gli adattatori di controllo applicati all'inizio del processo guidano la composizione, mentre quelli applicati alla fine guidano i dettagli."
+                "In genere, gli adattatori di controllo applicati all'inizio del processo guidano la composizione, mentre quelli applicati alla fine guidano i dettagli.",
+                "• Passo finale (%): specifica quando interrompere l'applicazione della guida di questo livello e ripristinare la guida generale dal modello e altre impostazioni."
             ]
         },
         "noiseUseCPU": {
@@ -1299,7 +1313,9 @@
         "controlNetWeight": {
             "heading": "Peso",
             "paragraphs": [
-                "Peso dell'adattatore di controllo. Un peso maggiore porterà a impatti maggiori sull'immagine finale."
+                "Regola la forza con cui il livello influenza il processo di generazione",
+                "• Peso maggiore (0.75-2): crea un impatto più significativo sul risultato finale.",
+                "• Peso inferiore (0-0.75): crea un impatto minore sul risultato finale."
             ]
         },
         "paramCFGScale": {
@@ -1800,7 +1816,10 @@
             "full": "Stile e Composizione",
             "style": "Solo Stile",
             "composition": "Solo Composizione",
-            "ipAdapterMethod": "Metodo Adattatore IP"
+            "ipAdapterMethod": "Metodo Adattatore IP",
+            "fullDesc": "Applica lo stile visivo (colori, texture) e la composizione (disposizione, struttura).",
+            "styleDesc": "Applica lo stile visivo (colori, texture) senza considerare la disposizione.",
+            "compositionDesc": "Replica disposizione e struttura ignorando lo stile di riferimento."
         },
         "showingType": "Mostra {{type}}",
         "dynamicGrid": "Griglia dinamica",
@@ -2043,7 +2062,16 @@
         "replaceCurrent": "Sostituisci corrente",
         "mergeDown": "Unire in basso",
         "mergingLayers": "Unione dei livelli",
-        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello oppure disegna sulla tela per iniziare."
+        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello oppure disegna sulla tela per iniziare.",
+        "useImage": "Usa immagine",
+        "resetGenerationSettings": "Ripristina impostazioni di generazione",
+        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello.",
+        "asRasterLayer": "Come $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "Come $t(controlLayers.rasterLayer) (Ridimensiona)",
+        "asControlLayer": "Come $t(controlLayers.controlLayer)",
+        "asControlLayerResize": "Come $t(controlLayers.controlLayer) (Ridimensiona)",
+        "newSession": "Nuova sessione",
+        "resetCanvasLayers": "Ripristina livelli Tela"
     },
     "ui": {
         "tabs": {
@@ -2143,7 +2171,7 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>SD 3.5</StrongComponent>: supporto per SD 3.5 Medium e Large.",
+            "<StrongComponent>Flussi di lavoro</StrongComponent>: esegui un flusso di lavoro per una raccolta di immagini utilizzando il nuovo nodo <StrongComponent>Lotto di immagini</StrongComponent>.",
             "<StrongComponent>Tela</StrongComponent>: elaborazione semplificata del livello di controllo e impostazioni di controllo predefinite migliorate."
         ]
     },
@@ -2171,5 +2199,67 @@
             "logNamespaces": "Elementi del registro"
         },
         "enableLogging": "Abilita la registrazione"
+    },
+    "supportVideos": {
+        "gettingStarted": "Iniziare",
+        "supportVideos": "Video di supporto",
+        "videos": {
+            "usingControlLayersAndReferenceGuides": {
+                "title": "Utilizzo di livelli di controllo e guide di riferimento",
+                "description": "Scopri come guidare la creazione delle tue immagini con livelli di controllo e immagini di riferimento."
+            },
+            "creatingYourFirstImage": {
+                "description": "Introduzione alla creazione di un'immagine da zero utilizzando gli strumenti di Invoke.",
+                "title": "Creazione della tua prima immagine"
+            },
+            "understandingImageToImageAndDenoising": {
+                "description": "Panoramica delle trasformazioni immagine-a-immagine e della riduzione del rumore in Invoke.",
+                "title": "Comprendere immagine-a-immagine e riduzione del rumore"
+            },
+            "howDoIDoImageToImageTransformation": {
+                "description": "Tutorial su come eseguire trasformazioni da immagine a immagine in Invoke.",
+                "title": "Come si esegue la trasformazione da immagine-a-immagine?"
+            },
+            "howDoIUseInpaintMasks": {
+                "title": "Come si usano le maschere Inpaint?",
+                "description": "Come applicare maschere inpaint per la correzione e la variazione delle immagini."
+            },
+            "howDoIOutpaint": {
+                "description": "Guida all'outpainting oltre i confini dell'immagine originale.",
+                "title": "Come posso eseguire l'outpainting?"
+            },
+            "exploringAIModelsAndConceptAdapters": {
+                "description": "Approfondisci i modelli di intelligenza artificiale e scopri come utilizzare gli adattatori concettuali per il controllo creativo.",
+                "title": "Esplorazione dei modelli di IA e degli adattatori concettuali"
+            },
+            "upscaling": {
+                "title": "Ampliamento",
+                "description": "Come ampliare le immagini con gli strumenti di Invoke per migliorarne la risoluzione."
+            },
+            "creatingAndComposingOnInvokesControlCanvas": {
+                "description": "Impara a comporre immagini utilizzando la tela di controllo di Invoke.",
+                "title": "Creare e comporre sulla tela di controllo di Invoke"
+            },
+            "howDoIGenerateAndSaveToTheGallery": {
+                "description": "Passaggi per generare e salvare le immagini nella galleria.",
+                "title": "Come posso generare e salvare nella Galleria?"
+            },
+            "howDoIEditOnTheCanvas": {
+                "title": "Come posso apportare modifiche sulla tela?",
+                "description": "Guida alla modifica delle immagini direttamente sulla tela."
+            },
+            "howDoIUseControlNetsAndControlLayers": {
+                "title": "Come posso utilizzare le Reti di Controllo e i Livelli di Controllo?",
+                "description": "Impara ad applicare livelli di controllo e reti di controllo alle tue immagini."
+            },
+            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
+                "title": "Come si utilizzano gli adattatori IP globali e le immagini di riferimento?",
+                "description": "Introduzione all'aggiunta di immagini di riferimento e adattatori IP globali."
+            }
+        },
+        "controlCanvas": "Tela di Controllo",
+        "watch": "Guarda",
+        "studioSessionsDesc1": "Dai un'occhiata a <StudioSessionsPlaylistLink /> per approfondimenti su Invoke.",
+        "studioSessionsDesc2": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e fare domande. Le sessioni vengono caricate sulla playlist la settimana successiva."
     }
 }
