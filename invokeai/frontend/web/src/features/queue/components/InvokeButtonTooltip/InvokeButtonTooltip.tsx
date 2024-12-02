@@ -147,8 +147,6 @@ const UpscaleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean 
           <ReasonsList reasons={reasons} />
         </>
       )}
-      <StyledDivider />
-      <AddingToText />
     </Flex>
   );
 });
@@ -180,8 +178,6 @@ const WorkflowsTabTooltipContent = memo(({ prepend = false }: { prepend?: boolea
           <ReasonsList reasons={reasons} />
         </>
       )}
-      <StyledDivider />
-      <AddingToText />
     </Flex>
   );
 });
