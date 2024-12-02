@@ -7,7 +7,7 @@ import type {
 } from 'features/controlLayers/store/types';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 
-export const WARNINGS = {
+const WARNINGS = {
   UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
   RG_NO_PROMPTS_OR_IP_ADAPTERS: 'controlLayers.warnings.rgNoPromptsOrIPAdapters',
   RG_NEGATIVE_PROMPT_NOT_SUPPORTED: 'controlLayers.warnings.rgNegativePromptNotSupported',
