@@ -1718,6 +1718,8 @@
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
         "regionalGuidance": "Regional Guidance",
+        "referenceImageRegional": "Reference Image (Regional)",
+        "referenceImageGlobal": "Reference Image (Global)",
         "asRasterLayer": "As $t(controlLayers.rasterLayer)",
         "asRasterLayerResize": "As $t(controlLayers.rasterLayer) (Resize)",
         "asControlLayer": "As $t(controlLayers.controlLayer)",
