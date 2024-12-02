@@ -663,7 +663,7 @@
             "addingImagesTo": "Aggiungi immagini a",
             "systemDisconnected": "Sistema disconnesso",
             "missingNodeTemplate": "Modello di nodo mancante",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} ingresso mancante",
+            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: ingresso mancante",
             "missingFieldTemplate": "Modello di campo mancante",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), altezza riquadro è {{height}}",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza riquadro è {{width}}",
@@ -672,10 +672,10 @@
             "noT5EncoderModelSelected": "Nessun modello di encoder T5 selezionato per la generazione con FLUX",
             "noCLIPEmbedModelSelected": "Nessun modello CLIP Embed selezionato per la generazione con FLUX",
             "noFLUXVAEModelSelected": "Nessun modello VAE selezionato per la generazione con FLUX",
-            "canvasIsTransforming": "La tela sta trasformando",
-            "canvasIsRasterizing": "La tela sta rasterizzando",
-            "canvasIsCompositing": "La tela è in fase di composizione",
-            "canvasIsFiltering": "La tela sta filtrando",
+            "canvasIsTransforming": "La tela è occupata (sta trasformando)",
+            "canvasIsRasterizing": "La tela è occupata (sta rasterizzando)",
+            "canvasIsCompositing": "La tela è occupata (in composizione)",
+            "canvasIsFiltering": "La tela è occupata (sta filtrando)",
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi elementi, massimo {{maxItems}}",
             "canvasIsSelectingObject": "La tela è occupata (selezione dell'oggetto)",
             "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi pochi elementi, minimo {{minItems}}",
@@ -1190,8 +1190,8 @@
         "controlNetBeginEnd": {
             "heading": "Percentuale passi Inizio / Fine",
             "paragraphs": [
-                "La parte del processo di rimozione del rumore in cui verrà applicato l'adattatore di controllo.",
-                "In genere, gli adattatori di controllo applicati all'inizio del processo guidano la composizione, mentre quelli applicati alla fine guidano i dettagli.",
+                "Questa impostazione determina quale parte del processo di rimozione del rumore (generazione) incorpora la guida da questo livello.",
+                "• Passo iniziale (%): specifica quando iniziare ad applicare la guida da questo livello durante il processo di generazione.",
                 "• Passo finale (%): specifica quando interrompere l'applicazione della guida di questo livello e ripristinare la guida generale dal modello e altre impostazioni."
             ]
         },
@@ -1475,9 +1475,9 @@
             ]
         },
         "ipAdapterMethod": {
-            "heading": "Metodo",
+            "heading": "Modalità",
             "paragraphs": [
-                "Metodo con cui applicare l'adattatore IP corrente."
+                "La modalità definisce il modo in cui l'immagine di riferimento guiderà il processo di generazione."
             ]
         },
         "scale": {
@@ -1799,7 +1799,7 @@
             "full": "Stile e Composizione",
             "style": "Solo Stile",
             "composition": "Solo Composizione",
-            "ipAdapterMethod": "Metodo Adattatore IP",
+            "ipAdapterMethod": "Modalità",
             "fullDesc": "Applica lo stile visivo (colori, texture) e la composizione (disposizione, struttura).",
             "styleDesc": "Applica lo stile visivo (colori, texture) senza considerare la disposizione.",
             "compositionDesc": "Replica disposizione e struttura ignorando lo stile di riferimento."
@@ -2054,7 +2054,24 @@
         "asControlLayer": "Come $t(controlLayers.controlLayer)",
         "asControlLayerResize": "Come $t(controlLayers.controlLayer) (Ridimensiona)",
         "newSession": "Nuova sessione",
-        "resetCanvasLayers": "Ripristina livelli Tela"
+        "resetCanvasLayers": "Ripristina livelli Tela",
+        "referenceImageRegional": "Immagine di riferimento (regionale)",
+        "referenceImageGlobal": "Immagine di riferimento (globale)",
+        "warnings": {
+            "controlAdapterNoModelSelected": "nessun modello selezionato per il livello di controllo",
+            "controlAdapterNoControl": "nessun controllo selezionato/disegnato",
+            "ipAdapterNoModelSelected": "nessun modello di immagine di riferimento selezionato",
+            "rgNoPromptsOrIPAdapters": "nessun prompt testuale o immagini di riferimento",
+            "rgReferenceImagesNotSupported": "Immagini di riferimento regionali non supportate per il modello base selezionato",
+            "rgNoRegion": "nessuna regione disegnata",
+            "problemsFound": "Problemi riscontrati",
+            "unsupportedModel": "livello non supportato per il modello base selezionato",
+            "controlAdapterIncompatibleBaseModel": "modello di base del livello di controllo incompatibile",
+            "rgNegativePromptNotSupported": "Prompt negativo non supportato per il modello base selezionato",
+            "ipAdapterIncompatibleBaseModel": "modello base dell'immagine di riferimento incompatibile",
+            "ipAdapterNoImageSelected": "nessuna immagine di riferimento selezionata",
+            "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato"
+        }
     },
     "ui": {
         "tabs": {
@@ -2155,7 +2172,7 @@
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
             "<StrongComponent>Flussi di lavoro</StrongComponent>: esegui un flusso di lavoro per una raccolta di immagini utilizzando il nuovo nodo <StrongComponent>Lotto di immagini</StrongComponent>.",
-            "<StrongComponent>Tela</StrongComponent>: elaborazione semplificata del livello di controllo e impostazioni di controllo predefinite migliorate."
+            "<StrongComponent>FLUX</StrongComponent>: Supporto per XLabs IP Adapter v2."
         ]
     },
     "system": {
