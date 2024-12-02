@@ -22,6 +22,7 @@ const zLanguage = z.enum([
   'sv',
   'tr',
   'ua',
+  'vi',
   'zh_CN',
   'zh_Hant',
 ]);
