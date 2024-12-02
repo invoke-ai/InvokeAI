@@ -648,18 +648,6 @@
             "missingFieldTemplate": "Отсутствует шаблон поля",
             "addingImagesTo": "Добавление изображений в",
             "invoke": "Создать",
-            "layer": {
-                "ipAdapterNoModelSelected": "IP адаптер не выбран",
-                "controlAdapterNoModelSelected": "не выбрана модель адаптера контроля",
-                "controlAdapterIncompatibleBaseModel": "несовместимая базовая модель адаптера контроля",
-                "rgNoPromptsOrIPAdapters": "нет текстовых запросов или IP-адаптеров",
-                "ipAdapterIncompatibleBaseModel": "несовместимая базовая модель IP-адаптера",
-                "ipAdapterNoImageSelected": "изображение IP-адаптера не выбрано",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, масштабированная ширина рамки {{width}}",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, высота рамки {{height}}",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, ширина рамки {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, масштабированная высота рамки {{height}}"
-            },
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), ширина рамки {{width}}",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), высота рамки {{height}}",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), масштабированная высота рамки {{height}}",
