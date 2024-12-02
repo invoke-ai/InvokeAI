@@ -317,18 +317,6 @@
         "info": "Info",
         "showOptionsPanel": "Afficher le panneau latéral (O ou T)",
         "invoke": {
-            "layer": {
-                "rgNoPromptsOrIPAdapters": "aucun prompts ou IP Adapters",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la largeur de la bounding box mise à l'échelle est {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la hauteur de la bounding box mise à l'échelle est {{height}}",
-                "ipAdapterNoModelSelected": "aucun IP adapter sélectionné",
-                "ipAdapterNoImageSelected": "aucune image d'IP adapter sélectionnée",
-                "controlAdapterIncompatibleBaseModel": "modèle de base de Control Adapter incompatible",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la hauteur de la bounding box est {{height}}",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la largeur de la bounding box est {{width}}",
-                "ipAdapterIncompatibleBaseModel": "modèle de base d'IP adapter incompatible",
-                "controlAdapterNoModelSelected": "aucun modèle de Control Adapter sélectionné"
-            },
             "noPrompts": "Aucun prompts généré",
             "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} entrée manquante",
             "missingFieldTemplate": "Modèle de champ manquant",

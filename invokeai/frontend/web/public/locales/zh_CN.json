@@ -661,18 +661,6 @@
             "missingFieldTemplate": "缺失模板",
             "addingImagesTo": "添加图像到",
             "noPrompts": "没有已生成的提示词",
-            "layer": {
-                "ipAdapterNoModelSelected": "未选择IP adapter",
-                "controlAdapterNoModelSelected": "未选择Control Adapter模型",
-                "rgNoPromptsOrIPAdapters": "无文本提示或IP Adapters",
-                "controlAdapterIncompatibleBaseModel": "Control Adapter的基础模型不兼容",
-                "ipAdapterIncompatibleBaseModel": "IP Adapter的基础模型不兼容",
-                "ipAdapterNoImageSelected": "未选择IP Adapter图像",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，边界框宽度为 {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，缩放后的边界框高度为 {{height}}",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，边界框高度为 {{height}}",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}，缩放后的边界框宽度为 {{width}}"
-            },
             "canvasIsFiltering": "画布正在过滤",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)，缩放后的边界框高度为 {{height}}",
             "noCLIPEmbedModelSelected": "未为FLUX生成选择CLIP嵌入模型",

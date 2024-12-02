@@ -230,15 +230,7 @@
             "systemDisconnected": "Systeem is niet verbonden",
             "missingNodeTemplate": "Knooppuntsjabloon ontbreekt",
             "missingFieldTemplate": "Veldsjabloon ontbreekt",
-            "addingImagesTo": "Bezig met toevoegen van afbeeldingen aan",
-            "layer": {
-                "controlAdapterNoModelSelected": "geen controle-adaptermodel geselecteerd",
-                "controlAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor controle-adapter",
-                "ipAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor IP-adapter",
-                "ipAdapterNoImageSelected": "geen afbeelding voor IP-adapter geselecteerd",
-                "rgNoPromptsOrIPAdapters": "geen tekstprompts of IP-adapters",
-                "ipAdapterNoModelSelected": "geen IP-adapter geselecteerd"
-            }
+            "addingImagesTo": "Bezig met toevoegen van afbeeldingen aan"
         },
         "patchmatchDownScaleSize": "Verklein",
         "useCpuNoise": "Gebruik CPU-ruis",

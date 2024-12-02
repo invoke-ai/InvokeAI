@@ -1410,23 +1410,6 @@
         "processImage": "Xử Lý Hình Ảnh",
         "useSize": "Dùng Kích Thước",
         "invoke": {
-            "layer": {
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, tỉ lệ chiều dài hộp giới hạn là {{height}}",
-                "ipAdapterNoModelSelected": "không có IP Adapter được lựa chọn",
-                "ipAdapterNoImageSelected": "không có ảnh IP Adapter được lựa chọn",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, chiều dài hộp giới hạn là {{height}}",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, tỉ lệ chiều rộng hộp giới hạn là {{width}}",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, chiều rộng hộp giới hạn là {{width}}",
-                "rgNoPromptsOrIPAdapters": "không có lệnh chữ hoặc IP Adapter",
-                "controlAdapterIncompatibleBaseModel": "model cơ sở của Control Adapter không tương thích",
-                "ipAdapterIncompatibleBaseModel": "dạng model cơ sở của IP Adapter không tương thích",
-                "controlAdapterNoModelSelected": "không có model Control Adapter được chọn",
-                "emptyLayer": "layer trống",
-                "rgAutoNegativeNotSupported": "trình tự động đảo chiều không được hỗ trợ cho model cơ sở đang dùng",
-                "rgNegativePromptNotSupported": "lệnh tiêu cực không được hỗ trợ cho model cơ sở đang dùng",
-                "unsupportedModel": "layer không được hỗ trợ cho model cơ sở đang dùng",
-                "rgReferenceImagesNotSupported": "ảnh mẫu khu vực không được hỗ trợ cho model cơ sở đang dùng"
-            },
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều rộng hộp giới hạn là {{width}}",
             "noModelSelected": "Không có model được lựa chọn",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều dài hộp giới hạn là {{height}}",
