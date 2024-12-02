@@ -1,8 +1,10 @@
 import { Button, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { RegionalGuidanceDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceDeletePromptButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { rgIPAdapterDeleted } from 'features/controlLayers/store/canvasSlice';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -31,6 +33,9 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
   const onClickGalleryButton = useCallback(() => {
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
+  const onDeleteIPAdapter = useCallback(() => {
+    dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
+  }, [dispatch, entityIdentifier, referenceImageId]);
 
   const dndTargetData = useMemo<SetRegionalGuidanceReferenceImageDndTargetData>(
     () =>
@@ -43,6 +48,7 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
 
   return (
     <Flex flexDir="column" gap={3} position="relative" w="full" p={4}>
+      <RegionalGuidanceDeletePromptButton onDelete={onDeleteIPAdapter} position="absolute" top={0} insetInlineEnd={0} />
       <Text textAlign="center" color="base.300">
         <Trans
           i18nKey="controlLayers.referenceImageEmptyState"

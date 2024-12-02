@@ -176,7 +176,8 @@
         "reset": "Reset",
         "none": "None",
         "new": "New",
-        "generating": "Generating"
+        "generating": "Generating",
+        "warnings": "Warnings"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -1040,6 +1041,7 @@
             "noNodesInGraph": "No nodes in graph",
             "systemDisconnected": "System disconnected",
             "layer": {
+                "unsupportedModel": "layer not supported for selected base model",
                 "controlAdapterNoModelSelected": "no Control Adapter model selected",
                 "controlAdapterIncompatibleBaseModel": "incompatible Control Adapter base model",
                 "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, bbox width is {{width}}",
@@ -1050,7 +1052,10 @@
                 "ipAdapterIncompatibleBaseModel": "incompatible IP Adapter base model",
                 "ipAdapterNoImageSelected": "no IP Adapter image selected",
                 "rgNoPromptsOrIPAdapters": "no text prompts or IP Adapters",
-                "rgNoRegion": "no region selected"
+                "rgNegativePromptNotSupported": "negative prompt not supported for selected base model",
+                "rgReferenceImagesNotSupported": "regional reference images not supported for selected base model",
+                "rgAutoNegativeNotSupported": "auto-negative not supported for selected base model",
+                "emptyLayer": "empty layer"
             }
         },
         "maskBlur": "Mask Blur",

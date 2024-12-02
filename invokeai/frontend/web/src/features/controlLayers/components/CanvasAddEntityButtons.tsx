@@ -63,7 +63,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalGuidance}
-              isDisabled={isFLUX || isSD3}
+              isDisabled={isSD3}
             >
               {t('controlLayers.regionalGuidance')}
             </Button>
