@@ -8,17 +8,18 @@ import type {
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 
 export const WARNINGS = {
-  EMPTY_LAYER: 'parameters.invoke.layer.emptyLayer',
-  UNSUPPORTED_MODEL: 'parameters.invoke.layer.unsupportedModel',
-  RG_NO_PROMPTS_OR_IP_ADAPTERS: 'parameters.invoke.layer.rgNoPromptsOrIPAdapters',
-  RG_NEGATIVE_PROMPT_NOT_SUPPORTED: 'parameters.invoke.layer.rgNegativePromptNotSupported',
-  RG_REFERENCE_IMAGES_NOT_SUPPORTED: 'parameters.invoke.layer.rgReferenceImagesNotSupported',
-  RG_AUTO_NEGATIVE_NOT_SUPPORTED: 'parameters.invoke.layer.rgAutoNegativeNotSupported',
-  IP_ADAPTER_NO_MODEL_SELECTED: 'parameters.invoke.layer.ipAdapterNoModelSelected',
-  IP_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'parameters.invoke.layer.ipAdapterIncompatibleBaseModel',
-  IP_ADAPTER_NO_IMAGE_SELECTED: 'parameters.invoke.layer.ipAdapterNoImageSelected',
-  CONTROL_ADAPTER_NO_MODEL_SELECTED: 'parameters.invoke.layer.controlAdapterNoModelSelected',
-  CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'parameters.invoke.layer.controlAdapterIncompatibleBaseModel',
+  UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
+  RG_NO_PROMPTS_OR_IP_ADAPTERS: 'controlLayers.warnings.rgNoPromptsOrIPAdapters',
+  RG_NEGATIVE_PROMPT_NOT_SUPPORTED: 'controlLayers.warnings.rgNegativePromptNotSupported',
+  RG_REFERENCE_IMAGES_NOT_SUPPORTED: 'controlLayers.warnings.rgReferenceImagesNotSupported',
+  RG_AUTO_NEGATIVE_NOT_SUPPORTED: 'controlLayers.warnings.rgAutoNegativeNotSupported',
+  RG_NO_REGION: 'controlLayers.warnings.rgNoRegion',
+  IP_ADAPTER_NO_MODEL_SELECTED: 'controlLayers.warnings.ipAdapterNoModelSelected',
+  IP_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'controlLayers.warnings.ipAdapterIncompatibleBaseModel',
+  IP_ADAPTER_NO_IMAGE_SELECTED: 'controlLayers.warnings.ipAdapterNoImageSelected',
+  CONTROL_ADAPTER_NO_MODEL_SELECTED: 'controlLayers.warnings.controlAdapterNoModelSelected',
+  CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'controlLayers.warnings.controlAdapterIncompatibleBaseModel',
+  CONTROL_ADAPTER_NO_CONTROL: 'controlLayers.warnings.controlAdapterNoControl',
 } as const;
 
 type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
@@ -30,45 +31,45 @@ export const getRegionalGuidanceWarnings = (
   const warnings: WarningTKey[] = [];
 
   if (entity.objects.length === 0) {
-    // Layer is in empty state - skip other checks
-    warnings.push(WARNINGS.EMPTY_LAYER);
-  } else {
-    if (entity.positivePrompt === null && entity.negativePrompt === null && entity.referenceImages.length === 0) {
-      // Must have at least 1 prompt or IP Adapter
-      warnings.push(WARNINGS.RG_NO_PROMPTS_OR_IP_ADAPTERS);
-    }
+    // Layer is in empty state
+    warnings.push(WARNINGS.RG_NO_REGION);
+  }
 
-    if (model) {
-      if (model.base === 'sd-3' || model.base === 'sd-2') {
-        // Unsupported model architecture
-        warnings.push(WARNINGS.UNSUPPORTED_MODEL);
-      } else if (model.base === 'flux') {
-        // Some features are not supported for flux models
-        if (entity.negativePrompt !== null) {
-          warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
-        }
-        if (entity.referenceImages.length > 0) {
-          warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
-        }
-        if (entity.autoNegative) {
-          warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
-        }
-      } else {
-        entity.referenceImages.forEach(({ ipAdapter }) => {
-          if (!ipAdapter.model) {
-            // No model selected
-            warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-          } else if (ipAdapter.model.base !== model.base) {
-            // Supported model architecture but doesn't match
-            warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
-          }
+  if (entity.positivePrompt === null && entity.negativePrompt === null && entity.referenceImages.length === 0) {
+    // Must have at least 1 prompt or IP Adapter
+    warnings.push(WARNINGS.RG_NO_PROMPTS_OR_IP_ADAPTERS);
+  }
 
-          if (!ipAdapter.image) {
-            // No image selected
-            warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
-          }
-        });
+  if (model) {
+    if (model.base === 'sd-3' || model.base === 'sd-2') {
+      // Unsupported model architecture
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+    } else if (model.base === 'flux') {
+      // Some features are not supported for flux models
+      if (entity.negativePrompt !== null) {
+        warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
       }
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    } else {
+      entity.referenceImages.forEach(({ ipAdapter }) => {
+        if (!ipAdapter.model) {
+          // No model selected
+          warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
+        } else if (ipAdapter.model.base !== model.base) {
+          // Supported model architecture but doesn't match
+          warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+        }
+
+        if (!ipAdapter.image) {
+          // No image selected
+          warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+        }
+      });
     }
   }
 
@@ -109,20 +110,20 @@ export const getControlLayerWarnings = (
   const warnings: WarningTKey[] = [];
 
   if (entity.objects.length === 0) {
-    // Layer is in empty state - skip other checks
-    warnings.push(WARNINGS.EMPTY_LAYER);
-  } else {
-    if (!entity.controlAdapter.model) {
-      // No model selected
-      warnings.push(WARNINGS.CONTROL_ADAPTER_NO_MODEL_SELECTED);
-    } else if (model) {
-      if (model.base === 'sd-3' || model.base === 'sd-2') {
-        // Unsupported model architecture
-        warnings.push(WARNINGS.UNSUPPORTED_MODEL);
-      } else if (entity.controlAdapter.model.base !== model.base) {
-        // Supported model architecture but doesn't match
-        warnings.push(WARNINGS.CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL);
-      }
+    // Layer is in empty state
+    warnings.push(WARNINGS.CONTROL_ADAPTER_NO_CONTROL);
+  }
+
+  if (!entity.controlAdapter.model) {
+    // No model selected
+    warnings.push(WARNINGS.CONTROL_ADAPTER_NO_MODEL_SELECTED);
+  } else if (model) {
+    if (model.base === 'sd-3' || model.base === 'sd-2') {
+      // Unsupported model architecture
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+    } else if (entity.controlAdapter.model.base !== model.base) {
+      // Supported model architecture but doesn't match
+      warnings.push(WARNINGS.CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL);
     }
   }
 
@@ -130,29 +131,23 @@ export const getControlLayerWarnings = (
 };
 
 export const getRasterLayerWarnings = (
-  entity: CanvasRasterLayerState,
+  _entity: CanvasRasterLayerState,
   _model: ParameterModel | null
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
-  if (entity.objects.length === 0) {
-    // Layer is in empty state - skip other checks
-    warnings.push(WARNINGS.EMPTY_LAYER);
-  }
+  // There are no warnings at the moment for raster layers.
 
   return warnings;
 };
 
 export const getInpaintMaskWarnings = (
-  entity: CanvasInpaintMaskState,
+  _entity: CanvasInpaintMaskState,
   _model: ParameterModel | null
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
-  if (entity.objects.length === 0) {
-    // Layer is in empty state - skip other checks
-    warnings.push(WARNINGS.EMPTY_LAYER);
-  }
+  // There are no warnings at the moment for inpaint masks.
 
   return warnings;
 };
