@@ -77,6 +77,32 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, imageViewer, store, t]);
 
+  const onClickNewRegionalReferenceImageFromImage = useCallback(() => {
+    const { dispatch, getState } = store;
+    createNewCanvasEntityFromImage({ imageDTO, type: 'reference_image', dispatch, getState });
+    dispatch(sentImageToCanvas());
+    dispatch(setActiveTab('canvas'));
+    imageViewer.close();
+    toast({
+      id: 'SENT_TO_CANVAS',
+      title: t('toast.sentToCanvas'),
+      status: 'success',
+    });
+  }, [imageDTO, imageViewer, store, t]);
+
+  const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
+    const { dispatch, getState } = store;
+    createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance_with_reference_image', dispatch, getState });
+    dispatch(sentImageToCanvas());
+    dispatch(setActiveTab('canvas'));
+    imageViewer.close();
+    toast({
+      id: 'SENT_TO_CANVAS',
+      title: t('toast.sentToCanvas'),
+      status: 'success',
+    });
+  }, [imageDTO, imageViewer, store, t]);
+
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiPlusBold />}>
       <Menu {...subMenu.menuProps}>
@@ -103,6 +129,20 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
           </MenuItem>
           <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRasterLayerFromImage} isDisabled={isBusy}>
             {t('controlLayers.rasterLayer')}
+          </MenuItem>
+          <MenuItem
+            icon={<NewLayerIcon />}
+            onClickCapture={onClickNewRegionalReferenceImageFromImage}
+            isDisabled={isBusy}
+          >
+            {t('controlLayers.referenceImageRegional')}
+          </MenuItem>
+          <MenuItem
+            icon={<NewLayerIcon />}
+            onClickCapture={onClickNewGlobalReferenceImageFromImage}
+            isDisabled={isBusy}
+          >
+            {t('controlLayers.referenceImageGlobal')}
           </MenuItem>
         </MenuList>
       </Menu>
