@@ -1914,7 +1914,24 @@
         "asControlLayer": "Như $t(controlLayers.controlLayer)",
         "asControlLayerResize": "Như $t(controlLayers.controlLayer) (Thay Đổi Kích Thước)",
         "newSession": "Phiên Làm Việc Mới",
-        "resetGenerationSettings": "Khởi Động Lại Cài Đặt Tạo Sinh"
+        "resetGenerationSettings": "Khởi Động Lại Cài Đặt Tạo Sinh",
+        "referenceImageRegional": "Ảnh Mẫu (Khu Vực)",
+        "referenceImageGlobal": "Ảnh Mẫu (Toàn Vùng)",
+        "warnings": {
+            "problemsFound": "Phát hiện vấn đề",
+            "unsupportedModel": "layer không được hỗ trợ cho model cơ sở này",
+            "controlAdapterNoModelSelected": "không có model được chọn cho Layer Chỉnh Sửa Được",
+            "controlAdapterNoControl": "chưa chọn/vẽ điều khiển",
+            "ipAdapterIncompatibleBaseModel": "model cơ sở cho Ảnh Mẫu không tương thích",
+            "ipAdapterNoImageSelected": "chưa chọn Ảnh Mẫu",
+            "controlAdapterIncompatibleBaseModel": "model cơ sở cho Layer Chỉnh Sửa Được không tương thích",
+            "ipAdapterNoModelSelected": "không có model được chọn cho Ảnh Mẫu",
+            "rgNoPromptsOrIPAdapters": "không có lệnh hoặc Ảnh Mẫu",
+            "rgNegativePromptNotSupported": "Lệnh Tiêu Cực không được hỗ trợ cho model cơ sở được chọn",
+            "rgReferenceImagesNotSupported": "Ảnh Mẫu Khu Vực không được hỗ trợ cho model cơ sở được chọn",
+            "rgAutoNegativeNotSupported": "Tự Động Đảo Chiều không được hỗ trợ cho model cơ sở được chọn",
+            "rgNoRegion": "không có khu vực được vẽ"
+        }
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2139,8 +2156,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "<StrongComponent>Workflows</StrongComponent>: Chạy một workflow cho nhiều ảnh bằng node <StrongComponent>Ảnh Hàng Loạt</StrongComponent> mới.",
-            "<StrongComponent>FLUX</StrongComponent>: Hỗ trợ cho XLabs IP Adapter v2."
+            "<StrongComponent>Hướng Dẫn Khu Vực FLUX (beta)</StrongComponent>: Bản beta của Hướng Dẫn Khu Vực FLUX của chúng ta đã có mắt tại bảng điều khiển lệnh khu vực.",
+            "<StrongComponent>Nhiều Cải Tiến Ở UX</StrongComponent>: Một số nâng cấp nhỏ ở trải nghiệm và chất lượng người dùng trên toàn bộ ứng dụng."
         ]
     },
     "upsell": {
