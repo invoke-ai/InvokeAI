@@ -13,6 +13,6 @@ class TorchAutocastContext(TorchDispatchMode):
         self._to_device = to_device
 
     def __torch_dispatch__(self, func, types, args, kwargs):
-        print(f"Dispatch Log: {func}(*{args}, **{kwargs})")
-        print(f"Dispatch Log: {types}")
+        # print(f"Dispatch Log: {func}(*{args}, **{kwargs})")
+        # print(f"Dispatch Log: {types}")
         return cast_to_device_and_run(func, args, kwargs, self._to_device)
