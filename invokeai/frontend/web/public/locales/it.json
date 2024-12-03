@@ -2171,8 +2171,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>Flussi di lavoro</StrongComponent>: esegui un flusso di lavoro per una raccolta di immagini utilizzando il nuovo nodo <StrongComponent>Lotto di immagini</StrongComponent>.",
-            "<StrongComponent>FLUX</StrongComponent>: Supporto per XLabs IP Adapter v2."
+            "<StrongComponent>FLUX Regional Guidance (beta)</StrongComponent>: la nostra versione beta di FLUX Regional Guidance è attiva per il controllo dei prompt regionali.",
+            "<StrongComponent>Vari miglioramenti dell'esperienza utente</StrongComponent>: numerosi piccoli miglioramenti dell'esperienza utente e della qualità della vita in tutta l'app."
         ]
     },
     "system": {
