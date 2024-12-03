@@ -63,12 +63,9 @@ export const addRegions = async ({
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
 
-  const validRegions = regions.filter((rg) => {
-    if (!rg.isEnabled) {
-      return false;
-    }
-    return getRegionalGuidanceWarnings(rg, model).length === 0;
-  });
+  const validRegions = regions
+    .filter((entity) => entity.isEnabled)
+    .filter((entity) => getRegionalGuidanceWarnings(entity, model).length === 0);
 
   const results: AddedRegionResult[] = [];
 
