@@ -31,7 +31,7 @@ const optionsObject: Record<Language, string> = {
   sv: 'Svenska',
   tr: 'Türkçe',
   ua: 'Украї́нська',
-  vi: 'tiếng Việt',
+  vi: 'Tiếng Việt',
   zh_CN: '简体中文',
   zh_Hant: '漢語',
 };
