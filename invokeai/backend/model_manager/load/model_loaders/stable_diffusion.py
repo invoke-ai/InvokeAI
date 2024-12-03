@@ -135,7 +135,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             raise Exception(
                 f"No configuration template known for base={config.base}, prediction_type={config.prediction_type}"
             ) from e
-        
+
         # Without SilenceWarnings we get log messages like this:
         # site-packages/huggingface_hub/file_download.py:1132: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
         # warnings.warn(
