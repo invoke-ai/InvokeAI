@@ -20,7 +20,8 @@ import {
   controlLayerAdded,
   entityBrushLineAdded,
   entityEraserLineAdded,
-  entityMoved,
+  entityMovedBy,
+  entityMovedTo,
   entityRasterized,
   entityRectAdded,
   entityReset,
@@ -36,23 +37,23 @@ import {
   selectGridSize,
 } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasEntityType,
   CanvasState,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
-  EntityMovedPayload,
+  EntityMovedByPayload,
+  EntityMovedToPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
   Rect,
   RgbaColor,
 } from 'features/controlLayers/store/types';
-import { RGBA_BLACK } from 'features/controlLayers/store/types';
+import { isRenderableEntityIdentifier, RGBA_BLACK } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO, S } from 'services/api/types';
 import { QueueError } from 'services/events/errors';
 import type { Param0 } from 'tsafe';
@@ -140,8 +141,15 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   /**
    * Updates an entity's position, pushing state to redux.
    */
-  setEntityPosition = (arg: EntityMovedPayload) => {
-    this.store.dispatch(entityMoved(arg));
+  setEntityPosition = (arg: EntityMovedToPayload) => {
+    this.store.dispatch(entityMovedTo(arg));
+  };
+
+  /**
+   * Moves an entity by the give offset, pushing state to redux.
+   */
+  moveEntityBy = (arg: EntityMovedByPayload) => {
+    this.store.dispatch(entityMovedBy(arg));
   };
 
   /**
@@ -293,6 +301,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       },
     };
 
+    let didSuceed = false;
+
     /**
      * If a timeout is provided, we will cancel the graph if it takes too long - but we need a way to clear the timeout
      * if the graph completes or errors before the timeout.
@@ -343,6 +353,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
           reject(getImageDTOResult.error);
           return;
         }
+
+        didSuceed = true;
 
         // Ok!
         resolve(getImageDTOResult.value);
@@ -399,7 +411,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
         queueApi.endpoints.enqueueBatch.initiate(batch, {
           // Use the same cache key for all enqueueBatch requests, so that all consumers of this query get the same status
           // updates.
-          fixedCacheKey: 'enqueueBatch',
+          ...enqueueMutationFixedCacheKeyOptions,
           // We do not need RTK to track this request in the store
           track: false,
         })
@@ -434,6 +446,10 @@ export class CanvasStateApiModule extends CanvasModuleBase {
 
       if (timeout) {
         timeoutId = window.setTimeout(() => {
+          if (didSuceed) {
+            // If we already succeeded, we don't need to do anything
+            return;
+          }
           this.log.trace('Graph canceled by timeout');
           clearListeners();
           cancelGraph();
@@ -443,6 +459,10 @@ export class CanvasStateApiModule extends CanvasModuleBase {
 
       if (signal) {
         signal.addEventListener('abort', () => {
+          if (didSuceed) {
+            // If we already succeeded, we don't need to do anything
+            return;
+          }
           this.log.trace('Graph canceled by signal');
           _clearTimeout();
           clearListeners();
@@ -535,24 +555,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   /**
-   * Checks if an entity type is hidden. Individual entities are not hidden; the entire entity type is hidden.
-   */
-  getIsTypeHidden = (type: CanvasEntityType): boolean => {
-    switch (type) {
-      case 'raster_layer':
-        return this.getRasterLayersState().isHidden;
-      case 'control_layer':
-        return this.getControlLayersState().isHidden;
-      case 'inpaint_mask':
-        return this.getInpaintMasksState().isHidden;
-      case 'regional_guidance':
-        return this.getRegionsState().isHidden;
-      default:
-        assert(false, 'Unhandled entity type');
-    }
-  };
-
-  /**
    * Gets the number of entities that are currently rendered on the canvas.
    */
   getRenderedEntityCount = (): number => {
@@ -571,10 +573,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getSelectedEntityAdapter = (): CanvasEntityAdapter | null => {
     const state = this.getCanvasState();
-    if (state.selectedEntityIdentifier) {
-      return this.manager.getAdapter(state.selectedEntityIdentifier);
+    if (!state.selectedEntityIdentifier) {
+      return null;
     }
-    return null;
+    if (!isRenderableEntityIdentifier(state.selectedEntityIdentifier)) {
+      return null;
+    }
+    return this.manager.getAdapter(state.selectedEntityIdentifier);
   };
 
   /**
@@ -684,4 +689,20 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Whether the shift key is currently pressed.
    */
   $shiftKey = $shift;
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      $filteringAdapter: this.$filteringAdapter.get()?.entityIdentifier ?? null,
+      $isFiltering: this.$isFiltering.get(),
+      $transformingAdapter: this.$transformingAdapter.get()?.entityIdentifier ?? null,
+      $isTransforming: this.$isTransforming.get(),
+      $rasterizingAdapter: this.$rasterizingAdapter.get()?.entityIdentifier ?? null,
+      $isRasterizing: this.$isRasterizing.get(),
+      $segmentingAdapter: this.$segmentingAdapter.get()?.entityIdentifier ?? null,
+      $isSegmenting: this.$isSegmenting.get(),
+    };
+  };
 }

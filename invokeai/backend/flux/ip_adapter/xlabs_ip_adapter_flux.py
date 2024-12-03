@@ -31,13 +31,16 @@ class XlabsIpAdapterParams:
     hidden_dim: int
 
     clip_embeddings_dim: int
+    clip_extra_context_tokens: int
 
 
 class XlabsIpAdapterFlux(torch.nn.Module):
     def __init__(self, params: XlabsIpAdapterParams):
         super().__init__()
         self.image_proj = ImageProjModel(
-            cross_attention_dim=params.context_dim, clip_embeddings_dim=params.clip_embeddings_dim
+            cross_attention_dim=params.context_dim,
+            clip_embeddings_dim=params.clip_embeddings_dim,
+            clip_extra_context_tokens=params.clip_extra_context_tokens,
         )
         self.ip_adapter_double_blocks = IPAdapterDoubleBlocks(
             num_double_blocks=params.num_double_blocks, context_dim=params.context_dim, hidden_dim=params.hidden_dim

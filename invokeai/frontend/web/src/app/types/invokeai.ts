@@ -26,7 +26,6 @@ export type AppFeature =
   | 'bulkDownload'
   | 'starterModels'
   | 'hfToken';
-
 /**
  * A disable-able Stable Diffusion feature
  */

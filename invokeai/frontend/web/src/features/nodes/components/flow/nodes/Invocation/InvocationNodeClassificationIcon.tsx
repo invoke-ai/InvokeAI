@@ -3,7 +3,7 @@ import { useNodeClassification } from 'features/nodes/hooks/useNodeClassificatio
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCircuitryBold, PiFlaskBold, PiHammerBold } from 'react-icons/pi';
+import { PiCircuitryBold, PiFlaskBold, PiHammerBold, PiLightningFill } from 'react-icons/pi';
 
 interface Props {
   nodeId: string;
@@ -41,7 +41,11 @@ const ClassificationTooltipContent = memo(({ classification }: { classification:
   }
 
   if (classification === 'internal') {
-    return t('nodes.prototypeDesc');
+    return t('nodes.internalDesc');
+  }
+
+  if (classification === 'special') {
+    return t('nodes.specialDesc');
   }
 
   return null;
@@ -60,6 +64,10 @@ const ClassificationIcon = ({ classification }: { classification: Classification
 
   if (classification === 'internal') {
     return <Icon as={PiCircuitryBold} display="block" boxSize={4} color="invokePurple.300" />;
+  }
+
+  if (classification === 'special') {
+    return <Icon as={PiLightningFill} display="block" boxSize={4} color="invokeGreen.300" />;
   }
 
   return null;

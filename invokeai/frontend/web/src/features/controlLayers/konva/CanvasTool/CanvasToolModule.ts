@@ -161,6 +161,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const tool = this.$tool.get();
     const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
+    const selectedEntityAdapter = this.manager.stateApi.getSelectedEntityAdapter();
 
     if (this.manager.stage.getIsDragging()) {
       this.tools.view.syncCursorStyle();
@@ -169,7 +170,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     } else if (segmentingAdapter) {
       segmentingAdapter.segmentAnything.syncCursorStyle();
     } else if (transformingAdapter) {
-      // The transformer handles cursor style via events
+      transformingAdapter.transformer.syncCursorStyle();
     } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (this.manager.stagingArea.$isStaging.get()) {
@@ -178,7 +179,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.tools.bbox.syncCursorStyle();
     } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       stage.setCursor('not-allowed');
-    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.$isInteractable.get()) {
+    } else if (selectedEntityAdapter?.$isDisabled.get()) {
+      stage.setCursor('not-allowed');
+    } else if (selectedEntityAdapter?.$isEntityTypeHidden.get()) {
+      stage.setCursor('not-allowed');
+    } else if (selectedEntityAdapter?.$isLocked.get()) {
       stage.setCursor('not-allowed');
     } else if (tool === 'brush') {
       this.tools.brush.syncCursorStyle();
@@ -301,7 +306,15 @@ export class CanvasToolModule extends CanvasModuleBase {
       return false;
     }
 
-    if (!selectedEntity.$isInteractable.get()) {
+    if (selectedEntity.$isDisabled.get()) {
+      return false;
+    }
+
+    if (selectedEntity.$isEntityTypeHidden.get()) {
+      return false;
+    }
+
+    if (selectedEntity.$isLocked.get()) {
       return false;
     }
 
@@ -515,11 +528,16 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onKeyDown = (e: KeyboardEvent) => {
-    if (e.repeat) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
 
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    // Handle nudging - must be before repeat, as we may want to catch repeating keys
+    if (this.tools.move.isNudgeKey(e.key)) {
+      this.tools.move.nudge(e.key);
+    }
+
+    if (e.repeat) {
       return;
     }
 

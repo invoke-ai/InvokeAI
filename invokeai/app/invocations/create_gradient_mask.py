@@ -131,6 +131,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
                     image_tensor = image_tensor.unsqueeze(0)
                 img_mask = tv_resize(mask, image_tensor.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
                 masked_image = image_tensor * torch.where(img_mask < 0.5, 0.0, 1.0)
+                context.util.signal_progress("Running VAE encoder")
                 masked_latents = ImageToLatentsInvocation.vae_encode(
                     vae_info, self.fp32, self.tiled, masked_image.clone()
                 )

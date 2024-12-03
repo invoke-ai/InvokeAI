@@ -1,19 +1,19 @@
 import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
+import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
-import type { SerializableObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
   DeleteBoardResult,
   GraphAndWorkflowResponse,
-  ImageCategory,
   ImageDTO,
   ListImagesArgs,
   ListImagesResponse,
-  PostUploadAction,
+  UploadImageArg,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import type { JsonObject } from 'type-fest';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
@@ -76,7 +76,7 @@ export const imagesApi = api.injectEndpoints({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
     }),
-    getImageMetadata: build.query<SerializableObject | undefined, string>({
+    getImageMetadata: build.query<JsonObject | undefined, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
     }),
@@ -261,20 +261,7 @@ export const imagesApi = api.injectEndpoints({
         return [];
       },
     }),
-    uploadImage: build.mutation<
-      ImageDTO,
-      {
-        file: File;
-        image_category: ImageCategory;
-        is_intermediate: boolean;
-        postUploadAction?: PostUploadAction;
-        session_id?: string;
-        board_id?: string;
-        crop_visible?: boolean;
-        metadata?: SerializableObject;
-        isFirstUploadOfBatch?: boolean;
-      }
-    >({
+    uploadImage: build.mutation<ImageDTO, UploadImageArg>({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -559,7 +546,6 @@ export const {
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
-  useChangeImageIsIntermediateMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
   useStarImagesMutation,
@@ -614,7 +600,7 @@ export const getImageDTO = (image_name: string, options?: StartQueryActionCreato
 export const getImageMetadata = (
   image_name: string,
   options?: StartQueryActionCreatorOptions
-): Promise<SerializableObject | undefined> => {
+): Promise<JsonObject | undefined> => {
   const _options = {
     subscribe: false,
     ...options,
@@ -623,30 +609,36 @@ export const getImageMetadata = (
   return req.unwrap();
 };
 
-export type UploadOptions = {
-  blob: Blob;
-  fileName: string;
-  image_category: ImageCategory;
-  is_intermediate: boolean;
-  crop_visible?: boolean;
-  board_id?: BoardId;
-  metadata?: SerializableObject;
-};
-export const uploadImage = (arg: UploadOptions): Promise<ImageDTO> => {
-  const { blob, fileName, image_category, is_intermediate, crop_visible = false, board_id, metadata } = arg;
-
+export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
   const { dispatch } = getStore();
-  const file = new File([blob], fileName, { type: 'image/png' });
-  const req = dispatch(
-    imagesApi.endpoints.uploadImage.initiate({
-      file,
-      image_category,
-      is_intermediate,
-      crop_visible,
-      board_id,
-      metadata,
+  const req = dispatch(imagesApi.endpoints.uploadImage.initiate(arg, { track: false }));
+  return req.unwrap();
+};
+
+export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> => {
+  const { dispatch } = getStore();
+  const results = await Promise.allSettled(
+    args.map((arg) => {
+      const req = dispatch(imagesApi.endpoints.uploadImage.initiate(arg, { track: false }));
+      return req.unwrap();
     })
   );
-  req.reset();
-  return req.unwrap();
+  return results.filter((r): r is PromiseFulfilledResult<ImageDTO> => r.status === 'fulfilled').map((r) => r.value);
+};
+
+/**
+ * Convert an ImageDTO to a File by downloading the image from the server.
+ * @param imageDTO The image to download and convert to a File
+ */
+export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
+  const init: RequestInit = {};
+  const authToken = $authToken.get();
+  if (authToken) {
+    init.headers = { Authorization: `Bearer ${authToken}` };
+  }
+  const res = await fetch(imageDTO.image_url, init);
+  const blob = await res.blob();
+  // Create a new file with the same name, which we will upload
+  const file = new File([blob], `copy_of_${imageDTO.image_name}`, { type: 'image/png' });
+  return file;
 };

@@ -155,7 +155,6 @@
         "path": "Pad",
         "triggerPhrases": "Triggerzinnen",
         "typePhraseHere": "Typ zin hier in",
-        "useDefaultSettings": "Gebruik standaardinstellingen",
         "modelImageDeleteFailed": "Fout bij verwijderen modelafbeelding",
         "modelImageUpdated": "Modelafbeelding bijgewerkt",
         "modelImageUpdateFailed": "Fout bij bijwerken modelafbeelding",
@@ -231,16 +230,7 @@
             "systemDisconnected": "Systeem is niet verbonden",
             "missingNodeTemplate": "Knooppuntsjabloon ontbreekt",
             "missingFieldTemplate": "Veldsjabloon ontbreekt",
-            "addingImagesTo": "Bezig met toevoegen van afbeeldingen aan",
-            "layer": {
-                "controlAdapterNoModelSelected": "geen controle-adaptermodel geselecteerd",
-                "controlAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor controle-adapter",
-                "ipAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor IP-adapter",
-                "ipAdapterNoImageSelected": "geen afbeelding voor IP-adapter geselecteerd",
-                "rgNoRegion": "geen gebied geselecteerd",
-                "rgNoPromptsOrIPAdapters": "geen tekstprompts of IP-adapters",
-                "ipAdapterNoModelSelected": "geen IP-adapter geselecteerd"
-            }
+            "addingImagesTo": "Bezig met toevoegen van afbeeldingen aan"
         },
         "patchmatchDownScaleSize": "Verklein",
         "useCpuNoise": "Gebruik CPU-ruis",
@@ -666,7 +656,6 @@
         }
     },
     "metadata": {
-        "seamless": "Naadloos",
         "positivePrompt": "Positieve prompt",
         "negativePrompt": "Negatieve prompt",
         "generationMode": "Genereermodus",

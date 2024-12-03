@@ -1,3 +1,5 @@
+import type { IconButtonProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -7,14 +9,23 @@ import { useCallback } from 'react';
 import type { FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { useUploadImageMutation } from 'services/api/endpoints/images';
-import type { PostUploadAction } from 'services/api/types';
+import { PiUploadBold } from 'react-icons/pi';
+import { uploadImages, useUploadImageMutation } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
+import { assert } from 'tsafe';
+import type { SetOptional } from 'type-fest';
 
-type UseImageUploadButtonArgs = {
-  postUploadAction?: PostUploadAction;
-  isDisabled?: boolean;
-  allowMultiple?: boolean;
-};
+type UseImageUploadButtonArgs =
+  | {
+      isDisabled?: boolean;
+      allowMultiple: false;
+      onUpload?: (imageDTO: ImageDTO) => void;
+    }
+  | {
+      isDisabled?: boolean;
+      allowMultiple: true;
+      onUpload?: (imageDTOs: ImageDTO[]) => void;
+    };
 
 const log = logger('gallery');
 
@@ -37,30 +48,53 @@ const log = logger('gallery');
  * <Button {...getUploadButtonProps()} /> // will open the file dialog on click
  * <input {...getUploadInputProps()} /> // hidden, handles native upload functionality
  */
-export const useImageUploadButton = ({
-  postUploadAction,
-  isDisabled,
-  allowMultiple = false,
-}: UseImageUploadButtonArgs) => {
+export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
-  const [uploadImage] = useUploadImageMutation();
+  const [uploadImage, request] = useUploadImageMutation();
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
   const { t } = useTranslation();
 
   const onDropAccepted = useCallback(
-    (files: File[]) => {
-      for (const [i, file] of files.entries()) {
-        uploadImage({
+    async (files: File[]) => {
+      if (!allowMultiple) {
+        if (files.length > 1) {
+          log.warn('Multiple files dropped but only one allowed');
+          return;
+        }
+        if (files.length === 0) {
+          // Should never happen
+          log.warn('No files dropped');
+          return;
+        }
+        const file = files[0];
+        assert(file !== undefined); // should never happen
+        const imageDTO = await uploadImage({
           file,
           image_category: 'user',
           is_intermediate: false,
-          postUploadAction: postUploadAction ?? { type: 'TOAST' },
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          isFirstUploadOfBatch: i === 0,
-        });
+          silent: true,
+        }).unwrap();
+        if (onUpload) {
+          onUpload(imageDTO);
+        }
+      } else {
+        const imageDTOs = await uploadImages(
+          files.map((file, i) => ({
+            file,
+            image_category: 'user',
+            is_intermediate: false,
+            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+            silent: false,
+            isFirstUploadOfBatch: i === 0,
+          }))
+        );
+        if (onUpload) {
+          onUpload(imageDTOs);
+        }
       }
     },
-    [autoAddBoardId, postUploadAction, uploadImage]
+    [allowMultiple, autoAddBoardId, onUpload, uploadImage]
   );
 
   const onDropRejected = useCallback(
@@ -103,5 +137,67 @@ export const useImageUploadButton = ({
     maxFiles: maxImageUploadCount,
   });
 
-  return { getUploadButtonProps, getUploadInputProps, openUploader };
+  return { getUploadButtonProps, getUploadInputProps, openUploader, request };
+};
+
+const sx = {
+  '&[data-error=true]': {
+    borderColor: 'error.500',
+    borderStyle: 'solid',
+    borderWidth: 1,
+  },
+} satisfies SystemStyleObject;
+
+export const UploadImageButton = ({
+  isDisabled = false,
+  onUpload,
+  isError = false,
+  ...rest
+}: {
+  onUpload?: (imageDTO: ImageDTO) => void;
+  isError?: boolean;
+} & SetOptional<IconButtonProps, 'aria-label'>) => {
+  const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: false, onUpload });
+  return (
+    <>
+      <IconButton
+        aria-label="Upload image"
+        variant="outline"
+        sx={sx}
+        data-error={isError}
+        icon={<PiUploadBold />}
+        isLoading={uploadApi.request.isLoading}
+        {...rest}
+        {...uploadApi.getUploadButtonProps()}
+      />
+      <input {...uploadApi.getUploadInputProps()} />
+    </>
+  );
+};
+
+export const UploadMultipleImageButton = ({
+  isDisabled = false,
+  onUpload,
+  isError = false,
+  ...rest
+}: {
+  onUpload?: (imageDTOs: ImageDTO[]) => void;
+  isError?: boolean;
+} & SetOptional<IconButtonProps, 'aria-label'>) => {
+  const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: true, onUpload });
+  return (
+    <>
+      <IconButton
+        aria-label="Upload image"
+        variant="outline"
+        sx={sx}
+        data-error={isError}
+        icon={<PiUploadBold />}
+        isLoading={uploadApi.request.isLoading}
+        {...rest}
+        {...uploadApi.getUploadButtonProps()}
+      />
+      <input {...uploadApi.getUploadInputProps()} />
+    </>
+  );
 };

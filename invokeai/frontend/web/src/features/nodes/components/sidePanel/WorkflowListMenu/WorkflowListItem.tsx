@@ -105,7 +105,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       onMouseOut={handleMouseOut}
       alignItems="center"
     >
-      <Tooltip label={<WorkflowListItemTooltip workflow={workflow} />}>
+      <Tooltip label={<WorkflowListItemTooltip workflow={workflow} />} closeOnScroll>
         <Flex flexDir="column" gap={1}>
           <Flex gap={4} alignItems="center">
             <Text noOfLines={2}>{workflow.name}</Text>
@@ -137,6 +137,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
           label={t('workflows.edit')}
           // This prevents an issue where the tooltip isn't closed after the modal is opened
           isOpen={!isHovered ? false : undefined}
+          closeOnScroll
         >
           <IconButton
             size="sm"
@@ -150,6 +151,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
           label={t('workflows.download')}
           // This prevents an issue where the tooltip isn't closed after the modal is opened
           isOpen={!isHovered ? false : undefined}
+          closeOnScroll
         >
           <IconButton
             size="sm"
@@ -164,6 +166,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
             label={t('workflows.copyShareLink')}
             // This prevents an issue where the tooltip isn't closed after the modal is opened
             isOpen={!isHovered ? false : undefined}
+            closeOnScroll
           >
             <IconButton
               size="sm"
@@ -179,6 +182,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
             label={t('workflows.delete')}
             // This prevents an issue where the tooltip isn't closed after the modal is opened
             isOpen={!isHovered ? false : undefined}
+            closeOnScroll
           >
             <IconButton
               size="sm"

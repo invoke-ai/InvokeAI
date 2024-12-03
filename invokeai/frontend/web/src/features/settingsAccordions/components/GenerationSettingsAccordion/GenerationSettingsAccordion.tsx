@@ -4,7 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
@@ -30,6 +30,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const modelConfig = useSelectedModelConfig();
   const activeTabName = useAppSelector(selectActiveTab);
   const isFLUX = useAppSelector(selectIsFLUX);
+  const isSD3 = useAppSelector(selectIsSD3);
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectLoRAsSlice, (loras) => {
@@ -74,7 +75,7 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && <ParamScheduler />}
+              {!isFLUX && !isSD3 && <ParamScheduler />}
               <ParamSteps />
               {isFLUX ? <ParamGuidance /> : <ParamCFGScale />}
             </FormControlGroup>

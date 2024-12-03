@@ -5,7 +5,7 @@ from typing import Literal
 import numpy as np
 import torch
 from PIL import Image
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from transformers import AutoModelForMaskGeneration, AutoProcessor
 from transformers.models.sam import SamModel
 from transformers.models.sam.processing_sam import SamProcessor
@@ -77,18 +77,13 @@ class SegmentAnythingInvocation(BaseInvocation):
         default="all",
     )
 
-    @model_validator(mode="after")
-    def check_point_lists_or_bounding_box(self):
-        if self.point_lists is None and self.bounding_boxes is None:
-            raise ValueError("Either point_lists or bounding_box must be provided.")
-        elif self.point_lists is not None and self.bounding_boxes is not None:
-            raise ValueError("Only one of point_lists or bounding_box can be provided.")
-        return self
-
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MaskOutput:
         # The models expect a 3-channel RGB image.
         image_pil = context.images.get_pil(self.image.image_name, mode="RGB")
+
+        if self.point_lists is not None and self.bounding_boxes is not None:
+            raise ValueError("Only one of point_lists or bounding_box can be provided.")
 
         if (not self.bounding_boxes or len(self.bounding_boxes) == 0) and (
             not self.point_lists or len(self.point_lists) == 0

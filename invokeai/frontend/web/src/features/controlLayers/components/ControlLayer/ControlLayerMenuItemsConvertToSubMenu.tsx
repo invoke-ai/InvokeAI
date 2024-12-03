@@ -2,7 +2,8 @@ import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useIsEntityInteractable } from 'features/controlLayers/hooks/useEntityIsInteractable';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import {
   controlLayerConvertedToInpaintMask,
   controlLayerConvertedToRasterLayer,
@@ -17,7 +18,8 @@ export const ControlLayerMenuItemsConvertToSubMenu = memo(() => {
   const subMenu = useSubMenu();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('control_layer');
-  const isInteractable = useIsEntityInteractable(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
+  const isLocked = useEntityIsLocked(entityIdentifier);
 
   const convertToInpaintMask = useCallback(() => {
     dispatch(controlLayerConvertedToInpaintMask({ entityIdentifier, replace: true }));
@@ -32,19 +34,19 @@ export const ControlLayerMenuItemsConvertToSubMenu = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem {...subMenu.parentMenuItemProps} icon={<PiSwapBold />}>
+    <MenuItem {...subMenu.parentMenuItemProps} icon={<PiSwapBold />} isDisabled={isLocked || isBusy}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
           <SubMenuButtonContent label={t('controlLayers.convertControlLayerTo')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          <MenuItem onClick={convertToInpaintMask} icon={<PiSwapBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={convertToInpaintMask} icon={<PiSwapBold />} isDisabled={isLocked || isBusy}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
-          <MenuItem onClick={convertToRegionalGuidance} icon={<PiSwapBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={convertToRegionalGuidance} icon={<PiSwapBold />} isDisabled={isLocked || isBusy}>
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
-          <MenuItem onClick={convertToRasterLayer} icon={<PiSwapBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={convertToRasterLayer} icon={<PiSwapBold />} isDisabled={isLocked || isBusy}>
             {t('controlLayers.rasterLayer')}
           </MenuItem>
         </MenuList>

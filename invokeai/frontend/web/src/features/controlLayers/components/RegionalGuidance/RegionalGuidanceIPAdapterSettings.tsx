@@ -6,6 +6,7 @@ import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapter/IPAdapterImagePreview';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
+import { RegionalGuidanceIPAdapterSettingsEmptyState } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceIPAdapterSettingsEmptyState';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -19,19 +20,20 @@ import {
   rgIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
-import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import type { RGIPAdapterImageDropData } from 'features/dnd/types';
+import type { CanvasEntityIdentifier, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
+import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
+import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
+import { PiBoundingBoxBold, PiXBold } from 'react-icons/pi';
+import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type Props = {
   referenceImageId: string;
 };
 
-export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
+const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -91,18 +93,15 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
     [dispatch, entityIdentifier, referenceImageId]
   );
 
-  const droppableData = useMemo<RGIPAdapterImageDropData>(
-    () => ({
-      actionType: 'SET_RG_IP_ADAPTER_IMAGE',
-      context: { id: entityIdentifier.id, referenceImageId: referenceImageId },
-      id: entityIdentifier.id,
-    }),
-    [entityIdentifier.id, referenceImageId]
+  const dndTargetData = useMemo<SetRegionalGuidanceReferenceImageDndTargetData>(
+    () =>
+      setRegionalGuidanceReferenceImageDndTarget.getData(
+        { entityIdentifier, referenceImageId },
+        ipAdapter.image?.image_name
+      ),
+    [entityIdentifier, ipAdapter.image?.image_name, referenceImageId]
   );
-  const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(
-    () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, referenceImageId: referenceImageId }),
-    [entityIdentifier.id, referenceImageId]
-  );
+
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
 
@@ -117,7 +116,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
           size="sm"
           variant="link"
           alignSelf="stretch"
-          icon={<PiTrashSimpleFill />}
+          icon={<PiXBold />}
           tooltip={t('controlLayers.deleteReferenceImage')}
           aria-label={t('controlLayers.deleteReferenceImage')}
           onClick={onDeleteIPAdapter}
@@ -151,16 +150,43 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
             <IPAdapterImagePreview
-              image={ipAdapter.image ?? null}
+              image={ipAdapter.image}
               onChangeImage={onChangeImage}
-              droppableData={droppableData}
-              postUploadAction={postUploadAction}
+              dndTarget={setRegionalGuidanceReferenceImageDndTarget}
+              dndTargetData={dndTargetData}
             />
           </Flex>
         </Flex>
       </Flex>
     </Flex>
   );
+});
+
+RegionalGuidanceIPAdapterSettingsContent.displayName = 'RegionalGuidanceIPAdapterSettingsContent';
+
+const buildSelectIPAdapterHasImage = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
+  referenceImageId: string
+) =>
+  createSelector(selectCanvasSlice, (canvas) => {
+    const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+    return !!referenceImage && referenceImage.ipAdapter.image !== null;
+  });
+
+export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
+
+  const selectIPAdapterHasImage = useMemo(
+    () => buildSelectIPAdapterHasImage(entityIdentifier, referenceImageId),
+    [entityIdentifier, referenceImageId]
+  );
+  const hasImage = useAppSelector(selectIPAdapterHasImage);
+
+  if (!hasImage) {
+    return <RegionalGuidanceIPAdapterSettingsEmptyState referenceImageId={referenceImageId} />;
+  }
+
+  return <RegionalGuidanceIPAdapterSettingsContent referenceImageId={referenceImageId} />;
 });
 
 RegionalGuidanceIPAdapterSettings.displayName = 'RegionalGuidanceIPAdapterSettings';

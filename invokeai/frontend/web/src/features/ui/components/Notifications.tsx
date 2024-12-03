@@ -21,14 +21,14 @@ import { useTranslation } from 'react-i18next';
 import { PiLightbulbFilamentBold } from 'react-icons/pi';
 import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
-import { CanvasV2Announcement } from './CanvasV2Announcement';
+import { WhatsNew } from './WhatsNew';
 
 const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
 
 export const Notifications = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const shouldShowNotification = useAppSelector((s) => s.ui.shouldShowNotification);
+  const shouldShowNotification = useAppSelector((s) => s.ui.shouldShowNotificationV2);
   const resetIndicator = useCallback(() => {
     dispatch(shouldShowNotificationChanged(false));
   }, [dispatch]);
@@ -58,11 +58,16 @@ export const Notifications = () => {
           <Flex alignItems="center" gap={3}>
             <Image src={InvokeSymbol} boxSize={6} />
             {t('whatsNew.whatsNewInInvoke')}
-            {isLocal && <Text variant="subtext">{`v${data.version}`}</Text>}
+            {!!data.version.length &&
+              (isLocal ? (
+                <Text variant="subtext">{`v${data.version}`}</Text>
+              ) : (
+                <Text variant="subtext">{data.version}</Text>
+              ))}
           </Flex>
         </PopoverHeader>
-        <PopoverBody p={2}>
-          <CanvasV2Announcement />
+        <PopoverBody p={2} maxW={300}>
+          <WhatsNew />
         </PopoverBody>
       </PopoverContent>
     </Popover>

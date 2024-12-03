@@ -18,9 +18,15 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getBoardField, getPresetModifiedPrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  CANVAS_OUTPUT_PREFIX,
+  getBoardField,
+  getPresetModifiedPrompts,
+  getSizes,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
@@ -31,7 +37,7 @@ export const buildSD1Graph = async (
   state: RootState,
   manager: CanvasManager
 ): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel'> }> => {
-  const generationMode = manager.compositor.getGenerationMode();
+  const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
   const params = selectParamsSlice(state);
@@ -120,10 +126,6 @@ export const buildSD1Graph = async (
         })
       : null;
 
-  let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
-  > = l2i;
-
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
   g.addEdge(clipSkip, 'clip', posCond, 'clip');
@@ -165,63 +167,74 @@ export const buildSD1Graph = async (
   > = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
+  const denoising_start = 1 - params.img2imgStrength;
+
+  let canvasOutput: Invocation<
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
+  > = l2i;
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
+    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
-    canvasOutput = await addImageToImage(
+    canvasOutput = await addImageToImage({
       g,
       manager,
       l2i,
+      i2lNodeType: 'i2l',
       denoise,
       vaeSource,
       originalSize,
       scaledSize,
       bbox,
-      1 - params.img2imgStrength,
-      vaePrecision === 'fp32'
-    );
+      denoising_start,
+      fp32: vaePrecision === 'fp32',
+    });
   } else if (generationMode === 'inpaint') {
-    canvasOutput = await addInpaint(
+    canvasOutput = await addInpaint({
       state,
       g,
       manager,
       l2i,
+      i2lNodeType: 'i2l',
       denoise,
       vaeSource,
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
-      vaePrecision === 'fp32'
-    );
+      denoising_start,
+      fp32: vaePrecision === 'fp32',
+    });
   } else if (generationMode === 'outpaint') {
-    canvasOutput = await addOutpaint(
+    canvasOutput = await addOutpaint({
       state,
       g,
       manager,
       l2i,
+      i2lNodeType: 'i2l',
       denoise,
       vaeSource,
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
-      fp32
-    );
+      denoising_start,
+      fp32,
+    });
+  } else {
+    assert<Equals<typeof generationMode, never>>(false);
   }
 
   const controlNetCollector = g.addNode({
     type: 'collect',
     id: getPrefixedId('control_net_collector'),
   });
-  const controlNetResult = await addControlNets(
+  const controlNetResult = await addControlNets({
     manager,
-    canvas.controlLayers.entities,
+    entities: canvas.controlLayers.entities,
     g,
-    canvas.bbox.rect,
-    controlNetCollector,
-    modelConfig.base
-  );
+    rect: canvas.bbox.rect,
+    collector: controlNetCollector,
+    model: modelConfig,
+  });
   if (controlNetResult.addedControlNets > 0) {
     g.addEdge(controlNetCollector, 'collection', denoise, 'control');
   } else {
@@ -232,46 +245,50 @@ export const buildSD1Graph = async (
     type: 'collect',
     id: getPrefixedId('t2i_adapter_collector'),
   });
-  const t2iAdapterResult = await addT2IAdapters(
+  const t2iAdapterResult = await addT2IAdapters({
     manager,
-    canvas.controlLayers.entities,
+    entities: canvas.controlLayers.entities,
     g,
-    canvas.bbox.rect,
-    t2iAdapterCollector,
-    modelConfig.base
-  );
+    rect: canvas.bbox.rect,
+    collector: t2iAdapterCollector,
+    model: modelConfig,
+  });
   if (t2iAdapterResult.addedT2IAdapters > 0) {
     g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
   } else {
     g.deleteNode(t2iAdapterCollector.id);
   }
 
-  const ipAdapterCollector = g.addNode({
+  const ipAdapterCollect = g.addNode({
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollector, modelConfig.base);
-
-  const regionsResult = await addRegions(
-    manager,
-    canvas.regionalGuidance.entities,
+  const ipAdapterResult = addIPAdapters({
+    entities: canvas.referenceImages.entities,
     g,
-    canvas.bbox.rect,
-    modelConfig.base,
-    denoise,
+    collector: ipAdapterCollect,
+    model: modelConfig,
+  });
+
+  const regionsResult = await addRegions({
+    manager,
+    regions: canvas.regionalGuidance.entities,
+    g,
+    bbox: canvas.bbox.rect,
+    model: modelConfig,
     posCond,
     negCond,
     posCondCollect,
     negCondCollect,
-    ipAdapterCollector
-  );
+    ipAdapterCollect,
+  });
 
   const totalIPAdaptersAdded =
     ipAdapterResult.addedIPAdapters + regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
   if (totalIPAdaptersAdded > 0) {
-    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
+    g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
   } else {
-    g.deleteNode(ipAdapterCollector.id);
+    g.deleteNode(ipAdapterCollect.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {
@@ -291,7 +308,7 @@ export const buildSD1Graph = async (
   }
 
   g.updateNode(canvasOutput, {
-    id: getPrefixedId('canvas_output'),
+    id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
     is_intermediate,
     use_cache: false,
     board,

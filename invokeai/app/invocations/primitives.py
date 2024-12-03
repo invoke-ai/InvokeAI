@@ -4,7 +4,13 @@ from typing import Optional
 
 import torch
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    Classification,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     BoundingBoxField,
@@ -18,6 +24,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
     OutputField,
+    SD3ConditioningField,
     TensorField,
     UIComponent,
 )
@@ -426,6 +433,17 @@ class FluxConditioningOutput(BaseInvocationOutput):
         return cls(conditioning=FluxConditioningField(conditioning_name=conditioning_name))
 
 
+@invocation_output("sd3_conditioning_output")
+class SD3ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single SD3 conditioning tensor"""
+
+    conditioning: SD3ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "SD3ConditioningOutput":
+        return cls(conditioning=SD3ConditioningField(conditioning_name=conditioning_name))
+
+
 @invocation_output("conditioning_output")
 class ConditioningOutput(BaseInvocationOutput):
     """Base class for nodes that output a single conditioning tensor"""
@@ -521,3 +539,23 @@ class BoundingBoxInvocation(BaseInvocation):
 
 
 # endregion
+
+
+@invocation(
+    "image_batch",
+    title="Image Batch",
+    tags=["primitives", "image", "batch", "internal"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class ImageBatchInvocation(BaseInvocation):
+    """Create a batched generation, where the workflow is executed once for each image in the batch."""
+
+    images: list[ImageField] = InputField(min_length=1, description="The images to batch over", input=Input.Direct)
+
+    def __init__(self):
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        raise NotImplementedError("This class should never be executed or instantiated directly.")

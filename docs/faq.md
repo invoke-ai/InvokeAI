@@ -209,7 +209,7 @@ checkpoint models.
 
 To solve this, go to the Model Manager tab (the cube), select the
 checkpoint model that's giving you trouble, and press the "Convert"
-button in the upper right of your browser window. This will conver the
+button in the upper right of your browser window. This will convert the
 checkpoint into a diffusers model, after which loading should be
 faster and less memory-intensive.
 

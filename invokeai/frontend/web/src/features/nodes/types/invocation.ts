@@ -64,8 +64,6 @@ export type AnyNode = Node<AnyNodeData>;
 export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
 export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
-export const isInvocationNodeData = (node?: AnyNodeData | null): node is InvocationNodeData =>
-  Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
 // #endregion
 
 // #region NodeExecutionState

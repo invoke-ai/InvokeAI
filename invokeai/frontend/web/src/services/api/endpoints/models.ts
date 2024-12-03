@@ -3,7 +3,7 @@ import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfig, GetHFTokenStatusResponse, SetHFTokenArg, SetHFTokenResponse } from 'services/api/types';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV2Url, LIST_TAG } from '..';
@@ -259,6 +259,22 @@ export const modelsApi = api.injectEndpoints({
       query: () => buildModelsUrl('starter_models'),
       providesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
+    getHFTokenStatus: build.query<GetHFTokenStatusResponse, void>({
+      query: () => buildModelsUrl('hf_login'),
+      providesTags: ['HFTokenStatus'],
+    }),
+    setHFToken: build.mutation<SetHFTokenResponse, SetHFTokenArg>({
+      query: (body) => ({ url: buildModelsUrl('hf_login'), method: 'POST', body }),
+      invalidatesTags: ['HFTokenStatus'],
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(modelsApi.util.updateQueryData('getHFTokenStatus', undefined, () => data));
+        } catch {
+          // no-op
+        }
+      },
+    }),
   }),
 });
 
@@ -277,6 +293,8 @@ export const {
   useCancelModelInstallMutation,
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
+  useGetHFTokenStatusQuery,
+  useSetHFTokenMutation,
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();

@@ -53,6 +53,7 @@ class BaseModelType(str, Enum):
     Any = "any"
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
+    StableDiffusion3 = "sd-3"
     StableDiffusionXL = "sdxl"
     StableDiffusionXLRefiner = "sdxl-refiner"
     Flux = "flux"
@@ -83,13 +84,22 @@ class SubModelType(str, Enum):
     Transformer = "transformer"
     TextEncoder = "text_encoder"
     TextEncoder2 = "text_encoder_2"
+    TextEncoder3 = "text_encoder_3"
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
+    Tokenizer3 = "tokenizer_3"
     VAE = "vae"
     VAEDecoder = "vae_decoder"
     VAEEncoder = "vae_encoder"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
+
+
+class ClipVariantType(str, Enum):
+    """Variant type."""
+
+    L = "large"
+    G = "gigantic"
 
 
 class ModelVariantType(str, Enum):
@@ -147,6 +157,17 @@ class ModelSourceType(str, Enum):
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
 
 
+AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, None]
+
+
+class SubmodelDefinition(BaseModel):
+    path_or_prefix: str
+    model_type: ModelType
+    variant: AnyVariant = None
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
 class MainModelDefaultSettings(BaseModel):
     vae: str | None = Field(default=None, description="Default VAE for this model (model key)")
     vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
@@ -193,6 +214,9 @@ class ModelConfigBase(BaseModel):
         schema["required"].extend(["key", "type", "format"])
 
     model_config = ConfigDict(validate_assignment=True, json_schema_extra=json_schema_extra)
+    submodels: Optional[Dict[SubModelType, SubmodelDefinition]] = Field(
+        description="Loadable submodels in this model", default=None
+    )
 
 
 class CheckpointConfigBase(ModelConfigBase):
@@ -335,7 +359,7 @@ class MainConfigBase(ModelConfigBase):
     default_settings: Optional[MainModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
-    variant: ModelVariantType = ModelVariantType.Normal
+    variant: AnyVariant = ModelVariantType.Normal
 
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
@@ -419,10 +443,31 @@ class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
 
     type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    variant: ClipVariantType = ClipVariantType.L
 
     @staticmethod
     def get_tag() -> Tag:
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}")
+
+
+class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig):
+    """Model config for CLIP-G Embeddings."""
+
+    variant: ClipVariantType = ClipVariantType.G
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.G}")
+
+
+class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig):
+    """Model config for CLIP-L Embeddings."""
+
+    variant: ClipVariantType = ClipVariantType.L
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.L}")
 
 
 class CLIPVisionDiffusersConfig(DiffusersConfigBase):
@@ -501,6 +546,8 @@ AnyModelConfig = Annotated[
         Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
         Annotated[CLIPEmbedDiffusersConfig, CLIPEmbedDiffusersConfig.get_tag()],
+        Annotated[CLIPLEmbedDiffusersConfig, CLIPLEmbedDiffusersConfig.get_tag()],
+        Annotated[CLIPGEmbedDiffusersConfig, CLIPGEmbedDiffusersConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]

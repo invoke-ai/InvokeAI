@@ -22,7 +22,7 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiArrowsOutBold, PiQuestion, PiSwapBold } from 'react-icons/pi';
+import { PiArrowsLeftRightBold, PiArrowsOutBold, PiQuestion } from 'react-icons/pi';
 
 export const CompareToolbar = memo(() => {
   const { t } = useTranslation();
@@ -60,14 +60,16 @@ export const CompareToolbar = memo(() => {
   useRegisteredHotkeys({ id: 'nextComparisonMode', category: 'viewer', callback: nextMode, dependencies: [nextMode] });
 
   return (
-    <Flex w="full" gap={2}>
+    <Flex w="full" px={2} gap={2} bg="base.750" borderTopRadius="base" h={12}>
       <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineEnd="auto">
+        <Flex marginInlineEnd="auto" alignItems="center">
           <IconButton
-            icon={<PiSwapBold />}
+            icon={<PiArrowsLeftRightBold />}
             aria-label={`${t('gallery.swapImages')} (C)`}
             tooltip={`${t('gallery.swapImages')} (C)`}
             onClick={swapImages}
+            variant="link"
+            alignSelf="stretch"
           />
           {comparisonMode !== 'side-by-side' && (
             <IconButton
@@ -75,14 +77,15 @@ export const CompareToolbar = memo(() => {
               tooltip={t('gallery.stretchToFit')}
               onClick={toggleComparisonFit}
               colorScheme={comparisonFit === 'fill' ? 'invokeBlue' : 'base'}
-              variant="outline"
+              variant="link"
+              alignSelf="stretch"
               icon={<PiArrowsOutBold />}
             />
           )}
         </Flex>
       </Flex>
-      <Flex flex={1} gap={4} justifyContent="center">
-        <ButtonGroup variant="outline">
+      <Flex flex={1} justifyContent="center">
+        <ButtonGroup variant="outline" alignItems="center">
           <Button
             flexShrink={0}
             onClick={setComparisonModeSlider}
@@ -110,11 +113,13 @@ export const CompareToolbar = memo(() => {
         <Flex gap={2} marginInlineStart="auto" alignItems="center">
           <Tooltip label={<CompareHelp />}>
             <Flex alignItems="center">
-              <Icon boxSize={6} color="base.500" as={PiQuestion} lineHeight={0} />
+              <Icon boxSize={6} color="base.300" as={PiQuestion} lineHeight={0} />
             </Flex>
           </Tooltip>
           <Button
-            variant="ghost"
+            variant="link"
+            alignSelf="stretch"
+            px={2}
             aria-label={`${t('gallery.exitCompare')} (Esc)`}
             tooltip={`${t('gallery.exitCompare')} (Esc)`}
             onClick={exitCompare}

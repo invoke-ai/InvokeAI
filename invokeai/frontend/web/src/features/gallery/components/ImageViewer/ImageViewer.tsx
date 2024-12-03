@@ -2,7 +2,6 @@ import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
@@ -38,7 +37,6 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       ref={ref}
       tabIndex={-1}
       layerStyle="first"
-      p={2}
       borderRadius="base"
       position="absolute"
       flexDirection="column"
@@ -46,20 +44,16 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       right={0}
       bottom={0}
       left={0}
-      rowGap={4}
       alignItems="center"
       justifyContent="center"
     >
       {hasImageToCompare && <CompareToolbar />}
       {!hasImageToCompare && <ViewerToolbar closeButton={closeButton} />}
-      <Box ref={containerRef} w="full" h="full">
+      <Box ref={containerRef} w="full" h="full" p={2}>
         {!hasImageToCompare && <CurrentImagePreview />}
         {hasImageToCompare && <ImageComparison containerDims={containerDims} />}
       </Box>
       <ImageComparisonDroppable />
-      <Box position="absolute" top={14} insetInlineStart={2}>
-        <CanvasAlertsSendingToCanvas />
-      </Box>
     </Flex>
   );
 });
@@ -88,7 +82,8 @@ const ImageViewerCloseButton = memo(() => {
       tooltip={t('gallery.closeViewer')}
       aria-label={t('gallery.closeViewer')}
       icon={<PiXBold />}
-      variant="ghost"
+      variant="link"
+      alignSelf="stretch"
       onClick={imageViewer.close}
     />
   );

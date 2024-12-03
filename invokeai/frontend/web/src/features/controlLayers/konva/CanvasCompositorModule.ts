@@ -1,23 +1,52 @@
-import type { SerializableObject } from 'common/types';
 import { withResultAsync } from 'common/util/result';
+import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
+import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { Transparency } from 'features/controlLayers/konva/util';
 import {
   canvasToBlob,
   canvasToImageData,
   getImageDataTransparency,
   getPrefixedId,
+  getRectUnion,
+  mapId,
   previewBlob,
 } from 'features/controlLayers/konva/util';
-import type { GenerationMode, Rect } from 'features/controlLayers/store/types';
-import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import {
+  selectActiveControlLayerEntities,
+  selectActiveInpaintMaskEntities,
+  selectActiveRasterLayerEntities,
+  selectActiveRegionalGuidanceEntities,
+} from 'features/controlLayers/store/selectors';
+import type {
+  CanvasRenderableEntityIdentifier,
+  CanvasRenderableEntityState,
+  CanvasRenderableEntityType,
+  GenerationMode,
+  Rect,
+} from 'features/controlLayers/store/types';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
-import type { UploadOptions } from 'services/api/endpoints/images';
+import { serializeError } from 'serialize-error';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, UploadImageArg } from 'services/api/types';
 import stableHash from 'stable-hash';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
+import type { JsonObject, SetOptional } from 'type-fest';
+
+type CompositingOptions = {
+  /**
+   * The global composite operation to use when compositing each entity.
+   * See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+   */
+  globalCompositeOperation?: GlobalCompositeOperation;
+};
 
 /**
  * Handles compositing operations:
@@ -54,45 +83,102 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   }
 
   /**
-   * Gets the entity IDs of all raster layers that should be included in the composite raster layer.
-   * A raster layer is included if it is enabled and has objects. The ids are sorted by draw order.
-   * @returns An array of raster layer entity IDs
+   * Gets the rect union of all visible entities of the given entity type. This is used for "merge visible".
+   *
+   * If no entity type is provided, all visible entities are included in the rect.
+   *
+   * @param type The optional entity type
+   * @returns The rect
    */
-  getCompositeRasterLayerEntityIds = (): string[] => {
-    const validSortedIds = [];
-    const sortedIds = this.manager.stateApi.getRasterLayersState().entities.map(({ id }) => id);
-    for (const id of sortedIds) {
-      const adapter = this.manager.adapters.rasterLayers.get(id);
-      if (!adapter) {
-        this.log.warn({ id }, 'Raster layer adapter not found');
+  getVisibleRectOfType = (type?: CanvasRenderableEntityType): Rect => {
+    const rects = [];
+
+    for (const adapter of this.manager.getAllAdapters()) {
+      if (!adapter.state.isEnabled) {
         continue;
       }
-      if (adapter.state.isEnabled && adapter.state.objects.length > 0) {
-        validSortedIds.push(adapter.id);
+      if (type && adapter.state.type !== type) {
+        continue;
+      }
+      if (adapter.renderer.hasObjects()) {
+        rects.push(adapter.transformer.getRelativeRect());
       }
     }
-    return validSortedIds;
+
+    return getRectUnion(...rects);
   };
 
   /**
-   * Gets a hash of the composite raster layer, which includes the state of all raster layers that are included in the
-   * composite plus arbitrary extra data that should contribute to the hash (e.g. a rect).
-   * @param extra Any extra data to include in the hash
-   * @returns A hash for the composite raster layer
+   * Gets the rect union of the given entity adapters. This is used for "merge down" and "merge selected".
+   *
+   * Unlike `getVisibleRectOfType`, **disabled entities are included in the rect**, per the conventional behaviour of
+   * these merge methods.
+   *
+   * @param adapters The entity adapters to include in the rect
+   * @returns The rect
    */
-  getCompositeRasterLayerHash = (extra: SerializableObject): string => {
-    const adapterHashes: SerializableObject[] = [];
+  getRectOfAdapters = (adapters: CanvasEntityAdapter[]): Rect => {
+    const rects = [];
 
-    for (const id of this.getCompositeRasterLayerEntityIds()) {
-      const adapter = this.manager.adapters.rasterLayers.get(id);
-      if (!adapter) {
-        this.log.warn({ id }, 'Raster layer adapter not found');
-        continue;
+    for (const adapter of adapters) {
+      if (adapter.renderer.hasObjects()) {
+        rects.push(adapter.transformer.getRelativeRect());
       }
+    }
+
+    return getRectUnion(...rects);
+  };
+
+  /**
+   * Gets all visible adapters for the given entity type. Visible adapters are those that are not disabled and have
+   * objects to render. This is used for "merge visible" functionality and for calculating the generation mode.
+   *
+   * This includes all adapters that are not disabled and have objects to render.
+   *
+   * @param type The entity type
+   * @returns The adapters for the given entity type that are eligible to be included in a composite
+   */
+  getVisibleAdaptersOfType = <T extends CanvasRenderableEntityType>(type: T): CanvasEntityAdapterFromType<T>[] => {
+    let entities: CanvasRenderableEntityState[];
+
+    switch (type) {
+      case 'raster_layer':
+        entities = this.manager.stateApi.getRasterLayersState().entities;
+        break;
+      case 'inpaint_mask':
+        entities = this.manager.stateApi.getInpaintMasksState().entities;
+        break;
+      case 'control_layer':
+        entities = this.manager.stateApi.getControlLayersState().entities;
+        break;
+      case 'regional_guidance':
+        entities = this.manager.stateApi.getRegionsState().entities;
+        break;
+      default:
+        assert(false, `Unhandled entity type: ${type}`);
+    }
+
+    const adapters: CanvasEntityAdapter[] = entities
+      // Get the identifier for each entity
+      .map((entity) => getEntityIdentifier(entity))
+      // Get the adapter for each entity
+      .map(this.manager.getAdapter)
+      // Filter out null adapters
+      .filter((adapter) => !!adapter)
+      // Filter out adapters that are disabled or have no objects (and are thus not to be included in the composite)
+      .filter((adapter) => !adapter.$isDisabled.get() && adapter.renderer.hasObjects());
+
+    return adapters as CanvasEntityAdapterFromType<T>[];
+  };
+
+  getCompositeHash = (adapters: CanvasEntityAdapter[], extra: JsonObject): string => {
+    const adapterHashes: JsonObject[] = [];
+
+    for (const adapter of adapters) {
       adapterHashes.push(adapter.getHashableState());
     }
 
-    const data: SerializableObject = {
+    const data: JsonObject = {
       extra,
       adapterHashes,
     };
@@ -101,23 +187,33 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   };
 
   /**
-   * Gets a canvas element for the composite raster layer. Only the region defined by the rect is included in the canvas.
+   * Composites the given canvas entities for the given rect and returns the resulting canvas.
    *
-   * If the hash of the composite raster layer is found in the cache, the cached canvas is returned.
+   * The canvas element is cached to avoid recomputing it when the canvas state has not changed.
    *
+   * The canvas entities are drawn in the order they are provided.
+   *
+   * @param adapters The adapters for the canvas entities to composite, in the order they should be drawn
    * @param rect The region to include in the canvas
-   * @returns A canvas element with the composite raster layer drawn on it
+   * @param compositingOptions Options for compositing the entities
+   * @returns The composite canvas
    */
-  getCompositeRasterLayerCanvas = (rect: Rect): HTMLCanvasElement => {
-    const hash = this.getCompositeRasterLayerHash({ rect });
+  getCompositeCanvas = (
+    adapters: CanvasEntityAdapter[],
+    rect: Rect,
+    compositingOptions?: CompositingOptions
+  ): HTMLCanvasElement => {
+    const entityIdentifiers = adapters.map((adapter) => adapter.entityIdentifier);
+
+    const hash = this.getCompositeHash(adapters, { rect });
     const cachedCanvas = this.manager.cache.canvasElementCache.get(hash);
 
     if (cachedCanvas) {
-      this.log.trace({ rect }, 'Using cached composite raster layer canvas');
+      this.log.debug({ entityIdentifiers, rect }, 'Using cached composite canvas');
       return cachedCanvas;
     }
 
-    this.log.trace({ rect }, 'Building composite raster layer canvas');
+    this.log.debug({ entityIdentifiers, rect }, 'Building composite canvas');
     this.$isCompositing.set(true);
 
     const canvas = document.createElement('canvas');
@@ -129,13 +225,12 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     ctx.imageSmoothingEnabled = false;
 
-    for (const id of this.getCompositeRasterLayerEntityIds()) {
-      const adapter = this.manager.adapters.rasterLayers.get(id);
-      if (!adapter) {
-        this.log.warn({ id }, 'Raster layer adapter not found');
-        continue;
-      }
-      this.log.trace({ id }, 'Drawing raster layer to composite canvas');
+    if (compositingOptions?.globalCompositeOperation) {
+      ctx.globalCompositeOperation = compositingOptions.globalCompositeOperation;
+    }
+
+    for (const adapter of adapters) {
+      this.log.debug({ entityIdentifier: adapter.entityIdentifier }, 'Drawing entity to composite canvas');
       const adapterCanvas = adapter.getCanvas(rect);
       ctx.drawImage(adapterCanvas, 0, 0);
     }
@@ -145,23 +240,44 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   };
 
   /**
-   * Rasterizes the composite raster layer and uploads it to the server.
+   * Composites the given canvas entities for the given rect and uploads the resulting image.
    *
-   * If the hash of the composite raster layer is found in the cache, the cached image DTO is returned.
+   * The uploaded image is cached to avoid recomputing it when the canvas state has not changed. The canvas elements
+   * created for each entity are also cached to avoid recomputing them when the canvas state has not changed.
    *
+   * The canvas entities are drawn in the order they are provided.
+   *
+   * @param adapters The adapters for the canvas entities to composite, in the order they should be drawn
    * @param rect The region to include in the rasterized image
-   * @param options Options for uploading the image
-   * @returns A promise that resolves to the uploaded image DTO
+   * @param uploadOptions Options for uploading the image
+   * @param compositingOptions Options for compositing the entities
+   * @param forceUpload If true, the image is always re-uploaded, returning a new image DTO
+   * @returns A promise that resolves to the image DTO
    */
-  rasterizeAndUploadCompositeRasterLayer = async (
+  getCompositeImageDTO = async (
+    adapters: CanvasEntityAdapter[],
     rect: Rect,
-    options: Pick<UploadOptions, 'is_intermediate' | 'metadata'>
+    uploadOptions: SetOptional<Omit<UploadImageArg, 'file'>, 'image_category'>,
+    compositingOptions?: CompositingOptions,
+    forceUpload?: boolean
   ): Promise<ImageDTO> => {
-    this.log.trace({ rect }, 'Rasterizing composite raster layer');
-
     assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
 
-    const canvas = this.getCompositeRasterLayerCanvas(rect);
+    const hash = this.getCompositeHash(adapters, { rect });
+    const cachedImageName = forceUpload ? undefined : this.manager.cache.imageNameCache.get(hash);
+
+    let imageDTO: ImageDTO | null = null;
+
+    if (cachedImageName) {
+      imageDTO = await getImageDTOSafe(cachedImageName);
+      if (imageDTO) {
+        this.log.debug({ rect, imageName: cachedImageName, imageDTO }, 'Using cached composite image');
+        return imageDTO;
+      }
+      this.log.warn({ rect, imageName: cachedImageName }, 'Cached image name not found, recompositing');
+    }
+
+    const canvas = this.getCompositeCanvas(adapters, rect, compositingOptions);
 
     this.$isProcessing.set(true);
     const blobResult = await withResultAsync(() => canvasToBlob(canvas));
@@ -173,217 +289,166 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     const blob = blobResult.value;
 
     if (this.manager._isDebugging) {
-      previewBlob(blob, 'Composite raster layer canvas');
+      previewBlob(blob, 'Composite');
     }
 
     this.$isUploading.set(true);
     const uploadResult = await withResultAsync(() =>
       uploadImage({
-        blob,
-        fileName: 'composite-raster-layer.png',
+        file: new File([blob], 'canvas-composite.png', { type: 'image/png' }),
         image_category: 'general',
-        is_intermediate: options.is_intermediate,
-        board_id: options.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
-        metadata: options.metadata,
+        ...uploadOptions,
       })
     );
     this.$isUploading.set(false);
     if (uploadResult.isErr()) {
       throw uploadResult.error;
     }
-    const imageDTO = uploadResult.value;
-    return imageDTO;
-  };
-
-  /**
-   * Gets the image DTO for the composite raster layer.
-   *
-   * If the image is found in the cache, the cached image DTO is returned.
-   *
-   * @param rect The region to include in the image
-   * @returns A promise that resolves to the image DTO
-   */
-  getCompositeRasterLayerImageDTO = async (rect: Rect): Promise<ImageDTO> => {
-    let imageDTO: ImageDTO | null = null;
-
-    const hash = this.getCompositeRasterLayerHash({ rect });
-    const cachedImageName = this.manager.cache.imageNameCache.get(hash);
-
-    if (cachedImageName) {
-      imageDTO = await getImageDTOSafe(cachedImageName);
-      if (imageDTO) {
-        this.log.trace({ rect, imageName: cachedImageName, imageDTO }, 'Using cached composite raster layer image');
-        return imageDTO;
-      }
-    }
-
-    imageDTO = await this.rasterizeAndUploadCompositeRasterLayer(rect, { is_intermediate: true });
+    imageDTO = uploadResult.value;
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
 
   /**
-   * Gets the entity IDs of all inpaint masks that should be included in the composite inpaint mask.
-   * An inpaint mask is included if it is enabled and has objects. The ids are sorted by draw order.
-   * @returns An array of inpaint mask entity IDs
+   * Creates a merged composite image from the given entities. The entities are drawn in the order they are provided.
+   *
+   * The merged image is uploaded to the server and a new entity is created with the uploaded image as the only object.
+   *
+   * All entities must have the same type.
+   *
+   * @param entityIdentifiers The entity identifiers to merge
+   * @param deleteMergedEntities Whether to delete the merged entities after creating the new merged entity
+   * @returns A promise that resolves to the image DTO, or null if the merge failed
    */
-  getCompositeInpaintMaskEntityIds = (): string[] => {
-    const validSortedIds = [];
-    const sortedIds = this.manager.stateApi.getInpaintMasksState().entities.map(({ id }) => id);
-    for (const id of sortedIds) {
-      const adapter = this.manager.adapters.inpaintMasks.get(id);
-      if (!adapter) {
-        this.log.warn({ id }, 'Inpaint mask adapter not found');
-        continue;
-      }
-      if (adapter.state.isEnabled && adapter.state.objects.length > 0) {
-        validSortedIds.push(adapter.id);
-      }
+  mergeByEntityIdentifiers = async <T extends CanvasRenderableEntityIdentifier>(
+    entityIdentifiers: T[],
+    deleteMergedEntities: boolean
+  ): Promise<ImageDTO | null> => {
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergingLayers'), withCount: false });
+    if (entityIdentifiers.length <= 1) {
+      this.log.warn({ entityIdentifiers }, 'Cannot merge less than 2 entities');
+      return null;
     }
-    return validSortedIds;
-  };
+    const type = entityIdentifiers[0]?.type;
+    assert(type, 'Cannot merge entities with no type (this should never happen)');
 
-  /**
-   * Gets a hash of the composite inpaint mask, which includes the state of all inpaint masks that are included in the
-   * composite plus arbitrary extra data that should contribute to the hash (e.g. a rect).
-   * @param extra Any extra data to include in the hash
-   * @returns A hash for the composite inpaint mask
-   */
-  getCompositeInpaintMaskHash = (extra: SerializableObject): string => {
-    const adapterHashes: SerializableObject[] = [];
+    const adapters = this.manager.getAdapters(entityIdentifiers);
+    assert(adapters.length === entityIdentifiers.length, 'Failed to get all adapters for entity identifiers');
 
-    for (const id of this.getCompositeInpaintMaskEntityIds()) {
-      const adapter = this.manager.adapters.inpaintMasks.get(id);
-      if (!adapter) {
-        this.log.warn({ id }, 'Inpaint mask adapter not found');
-        continue;
-      }
-      adapterHashes.push(adapter.getHashableState());
-    }
+    const rect = this.getRectOfAdapters(adapters);
 
-    const data: SerializableObject = {
-      extra,
-      adapterHashes,
+    const compositingOptions: CompositingOptions = {
+      globalCompositeOperation: type === 'control_layer' ? 'lighter' : undefined,
     };
 
-    return stableHash(data);
-  };
-
-  /**
-   * Gets a canvas element for the composite inpaint mask. Only the region defined by the rect is included in the canvas.
-   *
-   * If the hash of the composite inpaint mask is found in the cache, the cached canvas is returned.
-   *
-   * @param rect The region to include in the canvas
-   * @returns A canvas element with the composite inpaint mask drawn on it
-   */
-  getCompositeInpaintMaskCanvas = (rect: Rect): HTMLCanvasElement => {
-    const hash = this.getCompositeInpaintMaskHash({ rect });
-    const cachedCanvas = this.manager.cache.canvasElementCache.get(hash);
-
-    if (cachedCanvas) {
-      this.log.trace({ rect }, 'Using cached composite inpaint mask canvas');
-      return cachedCanvas;
-    }
-
-    this.log.trace({ rect }, 'Building composite inpaint mask canvas');
-    this.$isCompositing.set(true);
-    const canvas = document.createElement('canvas');
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-
-    const ctx = canvas.getContext('2d');
-    assert(ctx !== null);
-
-    ctx.imageSmoothingEnabled = false;
-
-    for (const id of this.getCompositeInpaintMaskEntityIds()) {
-      const adapter = this.manager.adapters.inpaintMasks.get(id);
-      if (!adapter) {
-        this.log.warn({ id }, 'Inpaint mask adapter not found');
-        continue;
-      }
-      this.log.trace({ id }, 'Drawing inpaint mask to composite canvas');
-      const adapterCanvas = adapter.getCanvas(rect);
-      ctx.drawImage(adapterCanvas, 0, 0);
-    }
-    this.manager.cache.canvasElementCache.set(hash, canvas);
-    this.$isCompositing.set(false);
-    return canvas;
-  };
-
-  /**
-   * Rasterizes the composite inpaint mask and uploads it to the server.
-   *
-   * If the hash of the composite inpaint mask is found in the cache, the cached image DTO is returned.
-   *
-   * @param rect The region to include in the rasterized image
-   * @param saveToGallery Whether to save the image to the gallery or just return the uploaded image DTO
-   * @returns A promise that resolves to the uploaded image DTO
-   */
-  rasterizeAndUploadCompositeInpaintMask = async (rect: Rect, saveToGallery: boolean) => {
-    this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
-
-    assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
-
-    const canvas = this.getCompositeInpaintMaskCanvas(rect);
-
-    this.$isProcessing.set(true);
-    const blobResult = await withResultAsync(() => canvasToBlob(canvas));
-    this.$isProcessing.set(false);
-
-    if (blobResult.isErr()) {
-      throw blobResult.error;
-    }
-    const blob = blobResult.value;
-
-    if (this.manager._isDebugging) {
-      previewBlob(blob, 'Composite inpaint mask canvas');
-    }
-
-    this.$isUploading.set(true);
-    const uploadResult = await withResultAsync(() =>
-      uploadImage({
-        blob,
-        fileName: 'composite-inpaint-mask.png',
-        image_category: 'general',
-        is_intermediate: !saveToGallery,
-        board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
-      })
+    const result = await withResultAsync(() =>
+      this.getCompositeImageDTO(adapters, rect, { is_intermediate: true }, compositingOptions)
     );
-    this.$isUploading.set(false);
-    if (uploadResult.isErr()) {
-      throw uploadResult.error;
+
+    if (result.isErr()) {
+      this.log.error({ error: serializeError(result.error) }, 'Failed to merge selected entities');
+      toast({
+        id: 'MERGE_LAYERS_TOAST',
+        title: t('controlLayers.mergeVisibleError'),
+        status: 'error',
+        withCount: false,
+      });
+      return null;
     }
-    const imageDTO = uploadResult.value;
-    return imageDTO;
+
+    // All layer types have the same arg - create a new entity with the image as the only object, positioned at the
+    // top left corner of the visible rect for the given entity type.
+    const addEntityArg = {
+      isSelected: true,
+      overrides: {
+        objects: [imageDTOToImageObject(result.value)],
+        position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
+      },
+      mergedEntitiesToDelete: deleteMergedEntities ? entityIdentifiers.map(mapId) : [],
+    };
+
+    switch (type) {
+      case 'raster_layer':
+        this.manager.stateApi.addRasterLayer(addEntityArg);
+        break;
+      case 'inpaint_mask':
+        this.manager.stateApi.addInpaintMask(addEntityArg);
+        break;
+      case 'regional_guidance':
+        this.manager.stateApi.addRegionalGuidance(addEntityArg);
+        break;
+      case 'control_layer':
+        this.manager.stateApi.addControlLayer(addEntityArg);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
+    }
+
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
+
+    return result.value;
   };
 
   /**
-   * Gets the image DTO for the composite inpaint mask.
+   * Merges all visible entities of the given type. This is used for "merge visible" functionality.
    *
-   * If the image is found in the cache, the cached image DTO is returned.
-   *
-   * @param rect The region to include in the image
-   * @returns A promise that resolves to the image DTO
+   * @param type The type of entity to merge
+   * @returns A promise that resolves to the image DTO, or null if the merge failed
    */
-  getCompositeInpaintMaskImageDTO = async (rect: Rect): Promise<ImageDTO> => {
-    let imageDTO: ImageDTO | null = null;
+  mergeVisibleOfType = (type: CanvasRenderableEntityType): Promise<ImageDTO | null> => {
+    let entities: CanvasRenderableEntityState[];
 
-    const hash = this.getCompositeInpaintMaskHash({ rect });
-    const cachedImageName = this.manager.cache.imageNameCache.get(hash);
-
-    if (cachedImageName) {
-      imageDTO = await getImageDTOSafe(cachedImageName);
-      if (imageDTO) {
-        this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached composite inpaint mask image');
-        return imageDTO;
-      }
+    switch (type) {
+      case 'raster_layer':
+        entities = this.manager.stateApi.runSelector(selectActiveRasterLayerEntities);
+        break;
+      case 'inpaint_mask':
+        entities = this.manager.stateApi.runSelector(selectActiveInpaintMaskEntities);
+        break;
+      case 'regional_guidance':
+        entities = this.manager.stateApi.runSelector(selectActiveRegionalGuidanceEntities);
+        break;
+      case 'control_layer':
+        entities = this.manager.stateApi.runSelector(selectActiveControlLayerEntities);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
     }
 
-    imageDTO = await this.rasterizeAndUploadCompositeInpaintMask(rect, false);
-    this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
-    return imageDTO;
+    const entityIdentifiers = entities.map(getEntityIdentifier);
+
+    return this.mergeByEntityIdentifiers(entityIdentifiers, false);
+  };
+
+  /**
+   * Calculates the transparency of the composite of the give adapters.
+   * @param adapters The adapters to composite
+   * @param rect The region to include in the composite
+   * @param hash The hash to use for caching the result
+   * @returns A promise that resolves to the transparency of the composite
+   */
+  getTransparency = (adapters: CanvasEntityAdapter[], rect: Rect, hash: string): Promise<Transparency> => {
+    const entityIdentifiers = adapters.map((adapter) => adapter.entityIdentifier);
+    const logCtx = { entityIdentifiers, rect };
+    return CanvasCacheModule.getWithFallback({
+      cache: this.manager.cache.transparencyCalculationCache,
+      key: hash,
+      getValue: async () => {
+        const compositeInpaintMaskCanvas = this.getCompositeCanvas(adapters, rect);
+
+        const compositeInpaintMaskImageData = await CanvasCacheModule.getWithFallback({
+          cache: this.manager.cache.imageDataCache,
+          key: hash,
+          getValue: () => Promise.resolve(canvasToImageData(compositeInpaintMaskCanvas)),
+          onHit: () => this.log.trace(logCtx, 'Using cached image data'),
+          onMiss: () => this.log.trace(logCtx, 'Calculating image data'),
+        });
+
+        return getImageDataTransparency(compositeInpaintMaskImageData);
+      },
+      onHit: () => this.log.trace(logCtx, 'Using cached transparency'),
+      onMiss: () => this.log.trace(logCtx, 'Calculating transparency'),
+    });
   };
 
   /**
@@ -404,29 +469,37 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    *
    * @returns The generation mode
    */
-  getGenerationMode(): GenerationMode {
+  getGenerationMode = async (): Promise<GenerationMode> => {
     const { rect } = this.manager.stateApi.getBbox();
 
-    const compositeInpaintMaskHash = this.getCompositeInpaintMaskHash({ rect });
-    const compositeRasterLayerHash = this.getCompositeRasterLayerHash({ rect });
+    const rasterLayerAdapters = this.manager.compositor.getVisibleAdaptersOfType('raster_layer');
+    const compositeRasterLayerHash = this.getCompositeHash(rasterLayerAdapters, { rect });
+
+    const inpaintMaskAdapters = this.manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
+    const compositeInpaintMaskHash = this.getCompositeHash(inpaintMaskAdapters, { rect });
+
     const hash = stableHash({ rect, compositeInpaintMaskHash, compositeRasterLayerHash });
     const cachedGenerationMode = this.manager.cache.generationModeCache.get(hash);
 
     if (cachedGenerationMode) {
-      this.log.trace({ rect, cachedGenerationMode }, 'Using cached generation mode');
+      this.log.debug({ rect, cachedGenerationMode }, 'Using cached generation mode');
       return cachedGenerationMode;
     }
 
-    const compositeInpaintMaskCanvas = this.getCompositeInpaintMaskCanvas(rect);
-    this.$isProcessing.set(true);
-    const compositeInpaintMaskImageData = canvasToImageData(compositeInpaintMaskCanvas);
-    const compositeInpaintMaskTransparency = getImageDataTransparency(compositeInpaintMaskImageData);
-    this.$isProcessing.set(false);
+    this.log.debug({ rect }, 'Calculating generation mode');
 
-    const compositeRasterLayerCanvas = this.getCompositeRasterLayerCanvas(rect);
     this.$isProcessing.set(true);
-    const compositeRasterLayerImageData = canvasToImageData(compositeRasterLayerCanvas);
-    const compositeRasterLayerTransparency = getImageDataTransparency(compositeRasterLayerImageData);
+    const compositeRasterLayerTransparency = await this.getTransparency(
+      rasterLayerAdapters,
+      rect,
+      compositeRasterLayerHash
+    );
+
+    const compositeInpaintMaskTransparency = await this.getTransparency(
+      inpaintMaskAdapters,
+      rect,
+      compositeInpaintMaskHash
+    );
     this.$isProcessing.set(false);
 
     let generationMode: GenerationMode;
@@ -447,7 +520,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     this.manager.cache.generationModeCache.set(hash, generationMode);
     return generationMode;
-  }
+  };
 
   repr = () => {
     return {

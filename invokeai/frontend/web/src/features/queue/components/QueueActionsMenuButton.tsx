@@ -1,27 +1,16 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import {
-  useNewCanvasSession,
-  useNewGallerySession,
-} from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
-import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { SessionMenuItems } from 'common/components/SessionMenuItems';
+import { useClearQueueDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiImageBold,
-  PiListBold,
-  PiPaintBrushBold,
-  PiPauseFill,
-  PiPlayFill,
-  PiQueueBold,
-  PiTrashSimpleBold,
-  PiXBold,
-} from 'react-icons/pi';
+import { PiListBold, PiPauseFill, PiPlayFill, PiQueueBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 
 export const QueueActionsMenuButton = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
@@ -29,9 +18,8 @@ export const QueueActionsMenuButton = memo(() => {
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
-  const { newGallerySessionWithDialog } = useNewGallerySession();
-  const { newCanvasSessionWithDialog } = useNewCanvasSession();
-  const clearQueue = useClearQueue();
+  const cancelCurrent = useCancelCurrentQueueItem();
+  const clearQueue = useClearQueueDialog();
   const {
     resumeProcessor,
     isLoading: isLoadingResumeProcessor,
@@ -52,20 +40,15 @@ export const QueueActionsMenuButton = memo(() => {
         <MenuButton ref={ref} as={IconButton} size="lg" aria-label="Queue Actions Menu" icon={<PiListBold />} />
         <MenuList>
           <MenuGroup title={t('common.new')}>
-            <MenuItem icon={<PiImageBold />} onClick={newGallerySessionWithDialog}>
-              {t('controlLayers.newGallerySession')}
-            </MenuItem>
-            <MenuItem icon={<PiPaintBrushBold />} onClick={newCanvasSessionWithDialog}>
-              {t('controlLayers.newCanvasSession')}
-            </MenuItem>
+            <SessionMenuItems />
           </MenuGroup>
           <MenuGroup title={t('queue.queue')}>
             <MenuItem
               isDestructive
               icon={<PiXBold />}
-              onClick={clearQueue.openDialog}
-              isLoading={clearQueue.isLoading}
-              isDisabled={clearQueue.isDisabled}
+              onClick={cancelCurrent.cancelQueueItem}
+              isLoading={cancelCurrent.isLoading}
+              isDisabled={cancelCurrent.isDisabled}
             >
               {t('queue.cancelTooltip')}
             </MenuItem>

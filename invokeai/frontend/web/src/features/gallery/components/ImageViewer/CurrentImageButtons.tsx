@@ -1,4 +1,4 @@
-import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { Divider, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -46,73 +46,81 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
 
   return (
     <>
-      <ButtonGroup>
-        <Menu isLazy>
-          <MenuButton
-            as={IconButton}
-            aria-label={t('parameters.imageActions')}
-            tooltip={t('parameters.imageActions')}
-            isDisabled={!imageDTO}
-            icon={<PiDotsThreeOutlineFill />}
-          />
-          <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
-        </Menu>
-      </ButtonGroup>
+      <Menu isLazy>
+        <MenuButton
+          as={IconButton}
+          aria-label={t('parameters.imageActions')}
+          tooltip={t('parameters.imageActions')}
+          isDisabled={!imageDTO}
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiDotsThreeOutlineFill />}
+        />
+        <MenuList>{imageDTO && <SingleSelectionMenuItems imageDTO={imageDTO} />}</MenuList>
+      </Menu>
 
-      <ButtonGroup>
-        <IconButton
-          icon={<PiFlowArrowBold />}
-          tooltip={`${t('nodes.loadWorkflow')} (W)`}
-          aria-label={`${t('nodes.loadWorkflow')} (W)`}
-          isDisabled={!imageActions.hasWorkflow || !hasTemplates}
-          onClick={imageActions.loadWorkflow}
-        />
-        <IconButton
-          icon={<PiArrowsCounterClockwiseBold />}
-          tooltip={`${t('parameters.remixImage')} (R)`}
-          aria-label={`${t('parameters.remixImage')} (R)`}
-          isDisabled={!imageActions.hasMetadata}
-          onClick={imageActions.remix}
-        />
-        <IconButton
-          icon={<PiQuotesBold />}
-          tooltip={`${t('parameters.usePrompt')} (P)`}
-          aria-label={`${t('parameters.usePrompt')} (P)`}
-          isDisabled={!imageActions.hasPrompts}
-          onClick={imageActions.recallPrompts}
-        />
-        <IconButton
-          icon={<PiPlantBold />}
-          tooltip={`${t('parameters.useSeed')} (S)`}
-          aria-label={`${t('parameters.useSeed')} (S)`}
-          isDisabled={!imageActions.hasSeed}
-          onClick={imageActions.recallSeed}
-        />
-        <IconButton
-          icon={<PiRulerBold />}
-          tooltip={`${t('parameters.useSize')} (D)`}
-          aria-label={`${t('parameters.useSize')} (D)`}
-          onClick={imageActions.recallSize}
-          isDisabled={isStaging}
-        />
-        <IconButton
-          icon={<PiAsteriskBold />}
-          tooltip={`${t('parameters.useAll')} (A)`}
-          aria-label={`${t('parameters.useAll')} (A)`}
-          isDisabled={!imageActions.hasMetadata}
-          onClick={imageActions.recallAll}
-        />
-      </ButtonGroup>
+      <Divider orientation="vertical" h={8} mx={2} />
 
-      {isUpscalingEnabled && (
-        <ButtonGroup>
-          <PostProcessingPopover imageDTO={imageDTO} />
-        </ButtonGroup>
-      )}
+      <IconButton
+        icon={<PiFlowArrowBold />}
+        tooltip={`${t('nodes.loadWorkflow')} (W)`}
+        aria-label={`${t('nodes.loadWorkflow')} (W)`}
+        isDisabled={!imageActions.hasWorkflow || !hasTemplates}
+        variant="link"
+        alignSelf="stretch"
+        onClick={imageActions.loadWorkflow}
+      />
+      <IconButton
+        icon={<PiArrowsCounterClockwiseBold />}
+        tooltip={`${t('parameters.remixImage')} (R)`}
+        aria-label={`${t('parameters.remixImage')} (R)`}
+        isDisabled={!imageActions.hasMetadata}
+        variant="link"
+        alignSelf="stretch"
+        onClick={imageActions.remix}
+      />
+      <IconButton
+        icon={<PiQuotesBold />}
+        tooltip={`${t('parameters.usePrompt')} (P)`}
+        aria-label={`${t('parameters.usePrompt')} (P)`}
+        isDisabled={!imageActions.hasPrompts}
+        variant="link"
+        alignSelf="stretch"
+        onClick={imageActions.recallPrompts}
+      />
+      <IconButton
+        icon={<PiPlantBold />}
+        tooltip={`${t('parameters.useSeed')} (S)`}
+        aria-label={`${t('parameters.useSeed')} (S)`}
+        isDisabled={!imageActions.hasSeed}
+        variant="link"
+        alignSelf="stretch"
+        onClick={imageActions.recallSeed}
+      />
+      <IconButton
+        icon={<PiRulerBold />}
+        tooltip={`${t('parameters.useSize')} (D)`}
+        aria-label={`${t('parameters.useSize')} (D)`}
+        variant="link"
+        alignSelf="stretch"
+        onClick={imageActions.recallSize}
+        isDisabled={isStaging}
+      />
+      <IconButton
+        icon={<PiAsteriskBold />}
+        tooltip={`${t('parameters.useAll')} (A)`}
+        aria-label={`${t('parameters.useAll')} (A)`}
+        isDisabled={!imageActions.hasMetadata}
+        variant="link"
+        alignSelf="stretch"
+        onClick={imageActions.recallAll}
+      />
 
-      <ButtonGroup>
-        <DeleteImageButton onClick={imageActions.delete} />
-      </ButtonGroup>
+      {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} />}
+
+      <Divider orientation="vertical" h={8} mx={2} />
+
+      <DeleteImageButton onClick={imageActions.delete} />
     </>
   );
 });

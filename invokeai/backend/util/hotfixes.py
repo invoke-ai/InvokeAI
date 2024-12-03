@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import diffusers
 import torch
 from diffusers.configuration_utils import ConfigMixin, register_to_config
-from diffusers.loaders import FromOriginalModelMixin
+from diffusers.loaders.single_file_model import FromOriginalModelMixin
 from diffusers.models.attention_processor import AttentionProcessor, AttnProcessor
 from diffusers.models.controlnet import ControlNetConditioningEmbedding, ControlNetOutput, zero_module
 from diffusers.models.embeddings import (
@@ -32,6 +32,8 @@ from invokeai.backend.util.logging import InvokeAILogger
 logger = InvokeAILogger.get_logger(__name__)
 
 
+# NOTE(ryand): I'm not the origina author of this code, but for future reference, it appears that this class was copied
+# from diffusers in order to add support for the encoder_attention_mask argument.
 class ControlNetModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
     """
     A ControlNet model.

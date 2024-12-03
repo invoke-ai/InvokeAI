@@ -425,3 +425,7 @@ const resetListQueryData = (
   // we have to manually kick off another query to get the first page and re-initialize the list
   dispatch(queueApi.endpoints.listQueueItems.initiate(undefined));
 };
+
+export const enqueueMutationFixedCacheKeyOptions = {
+  fixedCacheKey: 'enqueueBatch',
+} as const;

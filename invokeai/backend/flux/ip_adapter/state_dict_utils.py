@@ -41,10 +41,12 @@ def infer_xlabs_ip_adapter_params_from_state_dict(state_dict: dict[str, torch.Te
     hidden_dim = state_dict["double_blocks.0.processor.ip_adapter_double_stream_k_proj.weight"].shape[0]
     context_dim = state_dict["double_blocks.0.processor.ip_adapter_double_stream_k_proj.weight"].shape[1]
     clip_embeddings_dim = state_dict["ip_adapter_proj_model.proj.weight"].shape[1]
+    clip_extra_context_tokens = state_dict["ip_adapter_proj_model.proj.weight"].shape[0] // context_dim
 
     return XlabsIpAdapterParams(
         num_double_blocks=num_double_blocks,
         context_dim=context_dim,
         hidden_dim=hidden_dim,
         clip_embeddings_dim=clip_embeddings_dim,
+        clip_extra_context_tokens=clip_extra_context_tokens,
     )

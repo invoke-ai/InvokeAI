@@ -1,4 +1,3 @@
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
@@ -8,13 +7,11 @@ import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 export const GlobalImageHotkeys = memo(() => {
   useAssertSingleton('GlobalImageHotkeys');
-  const lastSelectedImage = useAppSelector(selectLastSelectedImage);
-  const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
+  const imageDTO = useAppSelector(selectLastSelectedImage);
 
   if (!imageDTO) {
     return null;

@@ -140,6 +140,22 @@ flux_dev = StarterModel(
     type=ModelType.Main,
     dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
 )
+sd35_medium = StarterModel(
+    name="SD3.5 Medium",
+    base=BaseModelType.StableDiffusion3,
+    source="stabilityai/stable-diffusion-3.5-medium",
+    description="Medium SD3.5 Model: ~15GB",
+    type=ModelType.Main,
+    dependencies=[],
+)
+sd35_large = StarterModel(
+    name="SD3.5 Large",
+    base=BaseModelType.StableDiffusion3,
+    source="stabilityai/stable-diffusion-3.5-large",
+    description="Large SD3.5 Model: ~19G",
+    type=ModelType.Main,
+    dependencies=[],
+)
 cyberrealistic_sd1 = StarterModel(
     name="CyberRealistic v4.1",
     base=BaseModelType.StableDiffusion1,
@@ -282,13 +298,12 @@ ip_adapter_sdxl = StarterModel(
     previous_names=["IP Adapter SDXL"],
 )
 ip_adapter_flux = StarterModel(
-    name="Standard Reference (XLabs FLUX IP-Adapter)",
+    name="Standard Reference (XLabs FLUX IP-Adapter v2)",
     base=BaseModelType.Flux,
-    source="https://huggingface.co/XLabs-AI/flux-ip-adapter/resolve/main/flux-ip-adapter.safetensors",
+    source="https://huggingface.co/XLabs-AI/flux-ip-adapter-v2/resolve/main/ip_adapter.safetensors",
     description="References images with a more generalized/looser degree of precision.",
     type=ModelType.IPAdapter,
     dependencies=[clip_vit_l_image_encoder],
-    previous_names=["XLabs FLUX IP-Adapter"],
 )
 # endregion
 # region ControlNet
@@ -570,6 +585,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux_dev_quantized,
     flux_schnell,
     flux_dev,
+    sd35_medium,
+    sd35_large,
     cyberrealistic_sd1,
     rev_animated_sd1,
     dreamshaper_8_sd1,

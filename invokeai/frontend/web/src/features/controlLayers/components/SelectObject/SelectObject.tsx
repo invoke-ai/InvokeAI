@@ -115,7 +115,7 @@ const SelectObjectContent = memo(
             onClick={adapter.segmentAnything.processImmediate}
             loadingText={t('controlLayers.selectObject.process')}
             variant="ghost"
-            isDisabled={isProcessing || !hasPoints || autoProcess}
+            isDisabled={isProcessing || !hasPoints || (autoProcess && hasImageState)}
           >
             {t('controlLayers.selectObject.process')}
             {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}

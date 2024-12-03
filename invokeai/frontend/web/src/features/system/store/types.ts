@@ -22,6 +22,7 @@ const zLanguage = z.enum([
   'sv',
   'tr',
   'ua',
+  'vi',
   'zh_CN',
   'zh_Hant',
 ]);
@@ -41,4 +42,5 @@ export interface SystemState {
   logIsEnabled: boolean;
   logLevel: LogLevel;
   logNamespaces: LogNamespace[];
+  shouldShowInvocationProgressDetail: boolean;
 }

@@ -1,7 +1,6 @@
 import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
@@ -12,22 +11,32 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import { getKonvaNodeDebugAttrs, getRectIntersection } from 'features/controlLayers/konva/util';
-import { selectIsolatedLayerPreview } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
-  buildSelectIsHidden,
+  selectIsolatedLayerPreview,
+  selectIsolatedStagingPreview,
+} from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
   buildSelectIsSelected,
+  getSelectIsTypeHidden,
   selectBboxRect,
   selectCanvasSlice,
   selectEntity,
 } from 'features/controlLayers/store/selectors';
-import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from 'features/controlLayers/store/types';
+import {
+  type CanvasEntityIdentifier,
+  type CanvasRenderableEntityState,
+  isRasterLayerEntityIdentifier,
+  type Rect,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { atom, computed } from 'nanostores';
+import { atom } from 'nanostores';
 import rafThrottle from 'raf-throttle';
 import type { Logger } from 'roarr';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
+import type { Jsonifiable, JsonObject } from 'type-fest';
 
 // Ideally, we'd type `adapter` as `CanvasEntityAdapterBase`, but the generics make this tricky. `CanvasEntityAdapter`
 // is a union of all entity adapters and is functionally identical to `CanvasEntityAdapterBase`. We'll need to do a
@@ -97,9 +106,12 @@ export abstract class CanvasEntityAdapterBase<
   abstract getCanvas: (rect?: Rect) => HTMLCanvasElement;
 
   /**
-   * Gets a hashable representation of the entity's state.
+   * Gets a hashable representation of the entity's _renderable_ state. This should exclude any properties that are not
+   * relevant to rendering the entity.
+   *
+   * This is used for caching.
    */
-  abstract getHashableState: () => SerializableObject;
+  abstract getHashableState: () => JsonObject;
 
   /**
    * Callbacks that are executed when the module is initialized.
@@ -172,7 +184,14 @@ export abstract class CanvasEntityAdapterBase<
     }
   };
 
-  selectIsHidden: Selector<RootState, boolean>;
+  /**
+   * A selector that selects whether the entity type is hidden.
+   */
+  selectIsTypeHidden: Selector<RootState, boolean>;
+
+  /**
+   * A selector that selects whether the entity is selected.
+   */
   selectIsSelected: Selector<RootState, boolean>;
 
   /**
@@ -206,17 +225,11 @@ export abstract class CanvasEntityAdapterBase<
   /**
    * Whether this entity is hidden. This is synced with the entity's group type visibility.
    */
-  $isHidden = atom(false);
+  $isEntityTypeHidden = atom(false);
   /**
    * Whether this entity is empty. This is computed based on the entity's objects.
    */
   $isEmpty = atom(true);
-  /**
-   * Whether this entity is interactable. This is computed based on the entity's locked, disabled, and hidden states.
-   */
-  $isInteractable = computed([this.$isLocked, this.$isDisabled, this.$isHidden], (isLocked, isDisabled, isHidden) => {
-    return !isLocked && !isDisabled && !isHidden;
-  });
   /**
    * A cache of the entity's canvas element. This is generated from a clone of the entity's Konva layer.
    */
@@ -257,22 +270,25 @@ export abstract class CanvasEntityAdapterBase<
     assert(state !== undefined, 'Missing entity state on creation');
     this.state = state;
 
-    this.selectIsHidden = buildSelectIsHidden(this.entityIdentifier);
+    this.selectIsTypeHidden = getSelectIsTypeHidden(this.entityIdentifier.type);
     this.selectIsSelected = buildSelectIsSelected(this.entityIdentifier);
 
     /**
      * There are a number of reason we may need to show or hide a layer:
      * - The entity is enabled/disabled
      * - The entity type is hidden/shown
-     * - Staging status changes and `isolatedStagingPreview` is enabled
-     * - Global filtering status changes and `isolatedFilteringPreview` is enabled
-     * - Global transforming status changes and `isolatedTransformingPreview` is enabled
-     * - The entity is selected or deselected (only selected and onscreen entities are rendered)
+     * - `isolatedStagingPreview` is enabled and we start or stop staging
+     * - `isolatedLayerPreview` is enabled and we start or stop filtering, transforming, select-object-ing
+     * - The entity is selected or deselected (only selected and onscreen entities are rendered as a perf optimization)
      */
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsHidden, this.syncVisibility));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsTypeHidden, this.syncVisibility));
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectIsolatedLayerPreview, this.syncVisibility)
     );
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectIsolatedStagingPreview, this.syncVisibility)
+    );
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectIsStaging, this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$filteringAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$transformingAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$segmentingAdapter.listen(this.syncVisibility));
@@ -282,7 +298,9 @@ export abstract class CanvasEntityAdapterBase<
      * The tool preview may need to be updated when the entity is locked or disabled. For example, when we disable the
      * entity, we should hide the tool preview & change the cursor.
      */
-    this.subscriptions.add(this.$isInteractable.subscribe(this.manager.tool.render));
+    this.subscriptions.add(this.$isDisabled.subscribe(this.manager.tool.render));
+    this.subscriptions.add(this.$isLocked.subscribe(this.manager.tool.render));
+    this.subscriptions.add(this.$isEntityTypeHidden.subscribe(this.manager.tool.render));
 
     /**
      * When the stage is transformed in any way (panning, zooming, resizing) or the entity is moved, we need to update
@@ -401,10 +419,9 @@ export abstract class CanvasEntityAdapterBase<
    */
   syncIsEnabled = () => {
     this.log.trace('Updating visibility');
-    this.konva.layer.visible(this.state.isEnabled);
-    this.renderer.syncKonvaCache(this.state.isEnabled);
-    this.transformer.syncInteractionState();
     this.$isDisabled.set(!this.state.isEnabled);
+    this.syncVisibility();
+    this.transformer.syncInteractionState();
   };
 
   /**
@@ -416,6 +433,7 @@ export abstract class CanvasEntityAdapterBase<
     if (didRender) {
       // If the objects have changed, we need to recalculate the transformer's bounding box.
       this.transformer.requestRectCalculation();
+      this.transformer.syncInteractionState();
     }
   };
 
@@ -434,45 +452,70 @@ export abstract class CanvasEntityAdapterBase<
   };
 
   syncVisibility = rafThrottle(() => {
-    // Handle the base hidden state
-    if (this.manager.stateApi.runSelector(this.selectIsHidden)) {
+    /**
+     * If the entity type is hidden, so should the entity be hidden.
+     */
+    if (this.manager.stateApi.runSelector(this.selectIsTypeHidden)) {
       this.setVisibility(false);
       return;
     }
 
-    const isolatedLayerPreview = this.manager.stateApi.runSelector(selectIsolatedLayerPreview);
-
-    // Handle isolated preview modes - if another entity is filtering or transforming, we may need to hide this entity.
-    if (isolatedLayerPreview) {
-      const filteringEntityIdentifier = this.manager.stateApi.$filteringAdapter.get()?.entityIdentifier;
-      if (filteringEntityIdentifier && filteringEntityIdentifier.id !== this.id) {
+    if (this.manager.stateApi.runSelector(selectIsolatedStagingPreview)) {
+      /**
+       * When staging w/ isolatedStagingPreview enabled, we only show raster layers.
+       *
+       * This allows the user to easily see how the new generation fits in with the rest of the canvas without the
+       * other layer types getting in the way.
+       */
+      const isStaging = this.manager.stateApi.runSelector(selectIsStaging);
+      const isRasterLayer = isRasterLayerEntityIdentifier(this.entityIdentifier);
+      if (isStaging && !isRasterLayer) {
         this.setVisibility(false);
         return;
       }
     }
 
-    if (isolatedLayerPreview) {
-      const transformingEntity = this.manager.stateApi.$transformingAdapter.get();
+    if (this.manager.stateApi.runSelector(selectIsolatedLayerPreview)) {
+      /**
+       * Handle isolated preview modes - if another entity is filtering, transforming, or select-object-ing, we may need
+       * to hide this entity.
+       */
+      const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
+      if (filteringAdapter && filteringAdapter !== this) {
+        this.setVisibility(false);
+        return;
+      }
+
+      const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
       if (
-        transformingEntity &&
-        transformingEntity.entityIdentifier.id !== this.id &&
+        transformingAdapter &&
+        transformingAdapter !== this &&
         // Silent transforms should be transparent to the user, so we don't need to hide the entity.
-        !transformingEntity.transformer.$silentTransform.get()
+        !transformingAdapter.transformer.$silentTransform.get()
       ) {
         this.setVisibility(false);
         return;
       }
-    }
 
-    if (isolatedLayerPreview) {
-      const segmentingEntity = this.manager.stateApi.$segmentingAdapter.get();
-      if (segmentingEntity && segmentingEntity.entityIdentifier.id !== this.id) {
+      const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
+      if (segmentingAdapter && segmentingAdapter !== this) {
         this.setVisibility(false);
         return;
       }
     }
 
-    // If the entity is not selected and offscreen, we can hide it
+    /**
+     * Disabled entities should be hidden.
+     */
+    if (this.$isDisabled.get()) {
+      this.setVisibility(false);
+      return;
+    }
+
+    /**
+     * When the entity is offscreen and not selected, we should hide it. If it is selected and offscreen, it still needs
+     * to be visible so the user can interact with it.
+     */
     if (!this.$isOnScreen.get() && !this.manager.stateApi.getIsSelected(this.entityIdentifier.id)) {
       this.setVisibility(false);
       return;
@@ -482,17 +525,30 @@ export abstract class CanvasEntityAdapterBase<
   });
 
   setVisibility = (isVisible: boolean) => {
-    const isHidden = this.$isHidden.get();
     const isLayerVisible = this.konva.layer.visible();
 
-    if (isHidden === !isVisible && isLayerVisible === isVisible) {
+    if (isLayerVisible === isVisible) {
       // No change
       return;
     }
     this.log.trace(isVisible ? 'Showing' : 'Hiding');
-    this.$isHidden.set(!isVisible);
     this.konva.layer.visible(isVisible);
-
+    if (isVisible) {
+      /**
+       * When a layer is created and initially not visible, its compositing rect won't be set up properly. Then, when
+       * we show it in this method, it the layer will not render as it should.
+       *
+       * For example, if an inpaint mask is created via select-object while the isolated layer preview feature is
+       * enabled, it will be hidden on its first render, and the compositing rect will not be sized/positioned/filled.
+       * When next show the layer, the its underlying objects will be rendered directly, without the compositing rect
+       * providing the correct fill.
+       *
+       * The simplest way to ensure this doesn't happen is to always update the compositing rect when showing the layer.
+       */
+      this.renderer.updateCompositingRectSize();
+      this.renderer.updateCompositingRectPosition();
+      this.renderer.updateCompositingRectFill();
+    }
     this.renderer.syncKonvaCache();
   };
 
@@ -502,15 +558,15 @@ export abstract class CanvasEntityAdapterBase<
   syncIsLocked = () => {
     // The only thing we need to do is update the transformer's interaction state. For tool interactions, like drawing
     // shapes, we defer to the CanvasToolModule to handle the locked state.
-    this.transformer.syncInteractionState();
     this.$isLocked.set(this.state.isLocked);
+    this.transformer.syncInteractionState();
   };
 
   /**
    * Gets a hash of the entity's state, as provided by `getHashableState`. If `extra` is provided, it will be included in
    * the hash.
    */
-  hash = (extra?: SerializableObject): string => {
+  hash = (extra?: Jsonifiable): string => {
     const arg = {
       state: this.getHashableState(),
       extra,
@@ -558,14 +614,13 @@ export abstract class CanvasEntityAdapterBase<
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
       bufferRenderer: this.bufferRenderer.repr(),
-      segmentAnything: this.segmentAnything?.repr(),
-      filterer: this.filterer?.repr(),
+      segmentAnything: this.segmentAnything?.repr() ?? null,
+      filterer: this.filterer?.repr() ?? null,
       hasCache: this.$canvasCache.get() !== null,
       isLocked: this.$isLocked.get(),
       isDisabled: this.$isDisabled.get(),
-      isHidden: this.$isHidden.get(),
+      isEntityTypeHidden: this.$isEntityTypeHidden.get(),
       isEmpty: this.$isEmpty.get(),
-      isInteractable: this.$isInteractable.get(),
       isOnScreen: this.$isOnScreen.get(),
       intersectsBbox: this.$intersectsBbox.get(),
       konva: getKonvaNodeDebugAttrs(this.konva.layer),

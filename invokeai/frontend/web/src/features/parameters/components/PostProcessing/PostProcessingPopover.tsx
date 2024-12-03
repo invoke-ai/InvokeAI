@@ -47,6 +47,8 @@ export const PostProcessingPopover = memo((props: Props) => {
           onClick={onOpen}
           icon={<PiFrameCornersBold />}
           aria-label={t('parameters.postProcessing')}
+          variant="link"
+          alignSelf="stretch"
         />
       </PopoverTrigger>
       <PopoverContent>

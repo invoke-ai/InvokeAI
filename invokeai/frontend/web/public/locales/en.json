@@ -122,6 +122,7 @@
         "goTo": "Go to",
         "hotkeysLabel": "Hotkeys",
         "loadingImage": "Loading Image",
+        "loadingModel": "Loading Model",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
         "inpaint": "inpaint",
@@ -174,7 +175,9 @@
         "placeholderSelectAModel": "Select a model",
         "reset": "Reset",
         "none": "None",
-        "new": "New"
+        "new": "New",
+        "generating": "Generating",
+        "warnings": "Warnings"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -261,7 +264,8 @@
         "iterations_one": "Iteration",
         "iterations_other": "Iterations",
         "generations_one": "Generation",
-        "generations_other": "Generations"
+        "generations_other": "Generations",
+        "batchSize": "Batch Size"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",
@@ -682,7 +686,8 @@
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
-        "seamless": "Seamless",
+        "seamlessXAxis": "Seamless X Axis",
+        "seamlessYAxis": "Seamless Y Axis",
         "seed": "Seed",
         "steps": "Steps",
         "strength": "Image to image strength",
@@ -703,6 +708,8 @@
         "baseModel": "Base Model",
         "cancel": "Cancel",
         "clipEmbed": "CLIP Embed",
+        "clipLEmbed": "CLIP-L Embed",
+        "clipGEmbed": "CLIP-G Embed",
         "config": "Config",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",
@@ -732,7 +739,17 @@
         "huggingFacePlaceholder": "owner/model-name",
         "huggingFaceRepoID": "HuggingFace Repo ID",
         "huggingFaceHelper": "If multiple models are found in this repo, you will be prompted to select one to install.",
-        "hfToken": "HuggingFace Token",
+        "hfTokenLabel": "HuggingFace Token (Required for some models)",
+        "hfTokenHelperText": "A HF token is required to use some models. Click here to create or get your token.",
+        "hfTokenInvalid": "Invalid or Missing HF Token",
+        "hfForbidden": "You do not have access to this HF model",
+        "hfForbiddenErrorMessage": "We recommend visiting the repo page on HuggingFace.com. The owner may require acceptance of terms in order to download.",
+        "hfTokenInvalidErrorMessage": "Invalid or missing HuggingFace token.",
+        "hfTokenRequired": "You are trying to download a model that requires a valid HuggingFace Token.",
+        "hfTokenInvalidErrorMessage2": "Update it in the ",
+        "hfTokenUnableToVerify": "Unable to Verify HF Token",
+        "hfTokenUnableToVerifyErrorMessage": "Unable to verify HuggingFace token. This is likely due to a network error. Please try again later.",
+        "hfTokenSaved": "HF Token Saved",
         "imageEncoderModelId": "Image Encoder Model ID",
         "includesNModels": "Includes {{n}} models and their dependencies",
         "installQueue": "Install Queue",
@@ -962,6 +979,8 @@
         "zoomOutNodes": "Zoom Out",
         "betaDesc": "This invocation is in beta. Until it is stable, it may have breaking changes during app updates. We plan to support this invocation long-term.",
         "prototypeDesc": "This invocation is a prototype. It may have breaking changes during app updates and may be removed at any time.",
+        "internalDesc": "This invocation is used internally by Invoke. It may have breaking changes during app updates and may be removed at any time.",
+        "specialDesc": "This invocation some special handling in the app. For example, Batch nodes are used to queue multiple graphs from a single workflow.",
         "imageAccessError": "Unable to find image {{image_name}}, resetting to default",
         "boardAccessError": "Unable to find board {{board_id}}, resetting to default",
         "modelAccessError": "Unable to find model {{key}}, resetting to default",
@@ -986,6 +1005,7 @@
         "controlNetControlMode": "Control Mode",
         "copyImage": "Copy Image",
         "denoisingStrength": "Denoising Strength",
+        "disabledNoRasterContent": "Disabled (No Raster Content)",
         "downloadImage": "Download Image",
         "general": "General",
         "guidance": "Guidance",
@@ -999,8 +1019,11 @@
             "addingImagesTo": "Adding images to",
             "invoke": "Invoke",
             "missingFieldTemplate": "Missing field template",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} missing input",
+            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: missing input",
             "missingNodeTemplate": "Missing node template",
+            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} empty collection",
+            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: too few items, minimum {{minItems}}",
+            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: too many items, maximum {{maxItems}}",
             "noModelSelected": "No model selected",
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
@@ -1009,26 +1032,14 @@
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox height is {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), scaled bbox width is {{width}}",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), scaled bbox height is {{height}}",
-            "canvasIsFiltering": "Canvas is filtering",
-            "canvasIsTransforming": "Canvas is transforming",
-            "canvasIsRasterizing": "Canvas is rasterizing",
-            "canvasIsCompositing": "Canvas is compositing",
+            "canvasIsFiltering": "Canvas is busy (filtering)",
+            "canvasIsTransforming": "Canvas is busy (transforming)",
+            "canvasIsRasterizing": "Canvas is busy (rasterizing)",
+            "canvasIsCompositing": "Canvas is busy (compositing)",
+            "canvasIsSelectingObject": "Canvas is busy (selecting object)",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
-            "systemDisconnected": "System disconnected",
-            "layer": {
-                "controlAdapterNoModelSelected": "no Control Adapter model selected",
-                "controlAdapterIncompatibleBaseModel": "incompatible Control Adapter base model",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, bbox width is {{width}}",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, bbox height is {{height}}",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, scaled bbox width is {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, scaled bbox height is {{height}}",
-                "ipAdapterNoModelSelected": "no IP adapter selected",
-                "ipAdapterIncompatibleBaseModel": "incompatible IP Adapter base model",
-                "ipAdapterNoImageSelected": "no IP Adapter image selected",
-                "rgNoPromptsOrIPAdapters": "no text prompts or IP Adapters",
-                "rgNoRegion": "no region selected"
-            }
+            "systemDisconnected": "System disconnected"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
@@ -1036,6 +1047,7 @@
         "patchmatchDownScaleSize": "Downscale",
         "perlinNoise": "Perlin Noise",
         "positivePromptPlaceholder": "Positive Prompt",
+        "recallMetadata": "Recall Metadata",
         "iterations": "Iterations",
         "scale": "Scale",
         "scaleBeforeProcessing": "Scale Before Processing",
@@ -1124,6 +1136,7 @@
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
+        "showDetailedInvocationProgress": "Show Progress Details",
         "showProgressInViewer": "Show Progress Images in Viewer",
         "ui": "User Interface",
         "clearIntermediatesDisabled": "Queue must be empty to clear intermediates",
@@ -1294,8 +1307,9 @@
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
             "paragraphs": [
-                "The part of the of the denoising process that will have the Control Adapter applied.",
-                "Generally, Control Adapters applied at the start of the process guide composition, and Control Adapters applied at the end guide details."
+                "This setting determines which portion of the denoising (generation) process incorporates the guidance from this layer.",
+                "• Start Step (%): Specifies when to begin applying the guidance from this layer during the generation process.",
+                "• End Step (%): Specifies when to stop applying this layer's guidance and revert general guidance from the model and other settings."
             ]
         },
         "controlNetControlMode": {
@@ -1305,7 +1319,7 @@
         "controlNetProcessor": {
             "heading": "Processor",
             "paragraphs": [
-                "Method of processing the input image to guide the generation process. Different processors will providedifferent effects or styles in your generated images."
+                "Method of processing the input image to guide the generation process. Different processors will provide different effects or styles in your generated images."
             ]
         },
         "controlNetResizeMode": {
@@ -1313,13 +1327,15 @@
             "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
         },
         "ipAdapterMethod": {
-            "heading": "Method",
-            "paragraphs": ["Method by which to apply the current IP Adapter."]
+            "heading": "Mode",
+            "paragraphs": ["The mode defines how the reference image will guide the generation process."]
         },
         "controlNetWeight": {
             "heading": "Weight",
             "paragraphs": [
-                "Weight of the Control Adapter. Higher weight will lead to larger impacts on the final image."
+                "Adjusts how strongly the layer influences the generation process",
+                "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
+                "• Lower Weight (0-.75): Creates a smaller impact on the final result."
             ]
         },
         "dynamicPrompts": {
@@ -1400,8 +1416,9 @@
         "paramDenoisingStrength": {
             "heading": "Denoising Strength",
             "paragraphs": [
-                "How much noise is added to the input image.",
-                "0 will result in an identical image, while 1 will result in a completely new image."
+                "Controls how much the generated image varies from the raster layer(s).",
+                "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
+                "When there are no raster layers with visible content, this setting is ignored."
             ]
         },
         "paramHeight": {
@@ -1646,15 +1663,17 @@
         "pullBboxIntoReferenceImageError": "Problem Pulling BBox Into ReferenceImage",
         "regionIsEmpty": "Selected region is empty",
         "mergeVisible": "Merge Visible",
-        "mergeVisibleOk": "Merged visible layers",
-        "mergeVisibleError": "Error merging visible layers",
+        "mergeDown": "Merge Down",
+        "mergeVisibleOk": "Merged layers",
+        "mergeVisibleError": "Error merging layers",
+        "mergingLayers": "Merging layers",
         "clearHistory": "Clear History",
         "bboxOverlay": "Show Bbox Overlay",
-        "resetCanvas": "Reset Canvas",
+        "newSession": "New Session",
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
-        "outputOnlyMaskedRegions": "Output Only Masked Regions",
+        "outputOnlyMaskedRegions": "Output Only Generated Regions",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
@@ -1682,8 +1701,12 @@
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
         "regionalGuidance": "Regional Guidance",
-        "canvasAsRasterLayer": "$t(controlLayers.canvas) as $t(controlLayers.rasterLayer)",
-        "canvasAsControlLayer": "$t(controlLayers.canvas) as $t(controlLayers.controlLayer)",
+        "referenceImageRegional": "Reference Image (Regional)",
+        "referenceImageGlobal": "Reference Image (Global)",
+        "asRasterLayer": "As $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "As $t(controlLayers.rasterLayer) (Resize)",
+        "asControlLayer": "As $t(controlLayers.controlLayer)",
+        "asControlLayerResize": "As $t(controlLayers.controlLayer) (Resize)",
         "referenceImage": "Reference Image",
         "regionalReferenceImage": "Regional Reference Image",
         "globalReferenceImage": "Global Reference Image",
@@ -1751,6 +1774,7 @@
         "pullBboxIntoLayer": "Pull Bbox into Layer",
         "pullBboxIntoReferenceImage": "Pull Bbox into Reference Image",
         "showProgressOnCanvas": "Show Progress on Canvas",
+        "useImage": "Use Image",
         "prompt": "Prompt",
         "negativePrompt": "Negative Prompt",
         "beginEndStepPercentShort": "Begin/End %",
@@ -1759,19 +1783,41 @@
         "newGallerySessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be sent to the gallery.",
         "newCanvasSession": "New Canvas Session",
         "newCanvasSessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be staged on the canvas.",
+        "resetCanvasLayers": "Reset Canvas Layers",
+        "resetGenerationSettings": "Reset Generation Settings",
         "replaceCurrent": "Replace Current",
+        "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or draw on the canvas to get started.",
+        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer to get started.",
+        "warnings": {
+            "problemsFound": "Problems found",
+            "unsupportedModel": "layer not supported for selected base model",
+            "controlAdapterNoModelSelected": "no Control Layer model selected",
+            "controlAdapterIncompatibleBaseModel": "incompatible Control Layer base model",
+            "controlAdapterNoControl": "no control selected/drawn",
+            "ipAdapterNoModelSelected": "no Reference Image model selected",
+            "ipAdapterIncompatibleBaseModel": "incompatible Reference Image base model",
+            "ipAdapterNoImageSelected": "no Reference Image image selected",
+            "rgNoPromptsOrIPAdapters": "no text prompts or Reference Images",
+            "rgNegativePromptNotSupported": "Negative Prompt not supported for selected base model",
+            "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
+            "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
+            "rgNoRegion": "no region drawn"
+        },
         "controlMode": {
             "controlMode": "Control Mode",
-            "balanced": "Balanced",
+            "balanced": "Balanced (recommended)",
             "prompt": "Prompt",
             "control": "Control",
             "megaControl": "Mega Control"
         },
         "ipAdapterMethod": {
-            "ipAdapterMethod": "IP Adapter Method",
-            "full": "Full",
+            "ipAdapterMethod": "Mode",
+            "full": "Style and Composition",
+            "fullDesc": "Applies visual style (colors, textures) & composition (layout, structure).",
             "style": "Style Only",
-            "composition": "Composition Only"
+            "styleDesc": "Applies visual style (colors, textures) without considering its layout.",
+            "composition": "Composition Only",
+            "compositionDesc": "Replicates layout & structure while ignoring the reference's style."
         },
         "fill": {
             "fillColor": "Fill Color",
@@ -1801,6 +1847,9 @@
             "process": "Process",
             "apply": "Apply",
             "cancel": "Cancel",
+            "advanced": "Advanced",
+            "processingLayerWith": "Processing layer with the {{type}} filter.",
+            "forMoreControl": "For more control, click Advanced below.",
             "spandrel_filter": {
                 "label": "Image-to-Image Model",
                 "description": "Run an image-to-image model on the selected layer.",
@@ -1978,7 +2027,9 @@
         "upscaleModelDesc": "Upscale (image to image) model",
         "missingUpscaleInitialImage": "Missing initial image for upscaling",
         "missingUpscaleModel": "Missing upscale model",
-        "missingTileControlNetModel": "No valid tile ControlNet models installed"
+        "missingTileControlNetModel": "No valid tile ControlNet models installed",
+        "incompatibleBaseModel": "Unsupported main model architecture for upscaling",
+        "incompatibleBaseModelDesc": "Upscaling is supported for SD1.5 and SDXL architecture models only. Change the main model to enable upscaling."
     },
     "stylePresets": {
         "active": "Active",
@@ -2081,13 +2132,74 @@
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
-        "canvasV2Announcement": {
-            "newCanvas": "A powerful new control canvas",
-            "newLayerTypes": "New layer types for even more control",
-            "fluxSupport": "Support for the Flux family of models",
-            "readReleaseNotes": "Read Release Notes",
-            "watchReleaseVideo": "Watch Release Video",
-            "watchUiUpdatesOverview": "Watch UI Updates Overview"
+        "items": [
+            "<StrongComponent>FLUX Regional Guidance (beta)</StrongComponent>: Our beta release of FLUX Regional Guidance is live for regional prompt control.",
+            "<StrongComponent>Various UX Improvements</StrongComponent>: A number of small UX and Quality of Life improvements throughout the app."
+        ],
+        "readReleaseNotes": "Read Release Notes",
+        "watchRecentReleaseVideos": "Watch Recent Release Videos",
+        "watchUiUpdatesOverview": "Watch UI Updates Overview"
+    },
+    "supportVideos": {
+        "supportVideos": "Support Videos",
+        "gettingStarted": "Getting Started",
+        "controlCanvas": "Control Canvas",
+        "watch": "Watch",
+        "studioSessionsDesc1": "Check out the <StudioSessionsPlaylistLink /> for Invoke deep dives.",
+        "studioSessionsDesc2": "Join our <DiscordLink /> to participate in the live sessions and ask questions. Sessions are uploaded to the playlist the following week.",
+        "videos": {
+            "creatingYourFirstImage": {
+                "title": "Creating Your First Image",
+                "description": "Introduction to creating an image from scratch using Invoke's tools."
+            },
+            "usingControlLayersAndReferenceGuides": {
+                "title": "Using Control Layers and Reference Guides",
+                "description": "Learn how to guide your image creation with control layers and reference images."
+            },
+            "understandingImageToImageAndDenoising": {
+                "title": "Understanding Image-to-Image and Denoising",
+                "description": "Overview of image-to-image transformations and denoising in Invoke."
+            },
+            "exploringAIModelsAndConceptAdapters": {
+                "title": "Exploring AI Models and Concept Adapters",
+                "description": "Dive into AI models and how to use concept adapters for creative control."
+            },
+            "creatingAndComposingOnInvokesControlCanvas": {
+                "title": "Creating and Composing on Invoke's Control Canvas",
+                "description": "Learn to compose images using Invoke's control canvas."
+            },
+            "upscaling": {
+                "title": "Upscaling",
+                "description": "How to upscale images with Invoke's tools to enhance resolution."
+            },
+            "howDoIGenerateAndSaveToTheGallery": {
+                "title": "How Do I Generate and Save to the Gallery?",
+                "description": "Steps to generate and save images to the gallery."
+            },
+            "howDoIEditOnTheCanvas": {
+                "title": "How Do I Edit on the Canvas?",
+                "description": "Guide to editing images directly on the canvas."
+            },
+            "howDoIDoImageToImageTransformation": {
+                "title": "How Do I Do Image-to-Image Transformation?",
+                "description": "Tutorial on performing image-to-image transformations in Invoke."
+            },
+            "howDoIUseControlNetsAndControlLayers": {
+                "title": "How Do I Use Control Nets and Control Layers?",
+                "description": "Learn to apply control layers and controlnets to your images."
+            },
+            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
+                "title": "How Do I Use Global IP Adapters and Reference Images?",
+                "description": "Introduction to adding reference images and global IP adapters."
+            },
+            "howDoIUseInpaintMasks": {
+                "title": "How Do I Use Inpaint Masks?",
+                "description": "How to apply inpaint masks for image correction and variation."
+            },
+            "howDoIOutpaint": {
+                "title": "How Do I Outpaint?",
+                "description": "Guide to outpainting beyond the original image borders."
+            }
         }
     }
 }

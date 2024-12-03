@@ -160,6 +160,10 @@ class LoggerInterface(InvocationContextInterface):
 
 
 class ImagesInterface(InvocationContextInterface):
+    def __init__(self, services: InvocationServices, data: InvocationContextData, util: "UtilInterface") -> None:
+        super().__init__(services, data)
+        self._util = util
+
     def save(
         self,
         image: Image,
@@ -185,6 +189,8 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The saved image DTO.
         """
+
+        self._util.signal_progress("Saving image")
 
         # If `metadata` is provided directly, use that. Else, use the metadata provided by `WithMetadata`, falling back to None.
         metadata_ = None
@@ -336,6 +342,10 @@ class ConditioningInterface(InvocationContextInterface):
 class ModelsInterface(InvocationContextInterface):
     """Common API for loading, downloading and managing models."""
 
+    def __init__(self, services: InvocationServices, data: InvocationContextData, util: "UtilInterface") -> None:
+        super().__init__(services, data)
+        self._util = util
+
     def exists(self, identifier: Union[str, "ModelIdentifierField"]) -> bool:
         """Check if a model exists.
 
@@ -368,11 +378,15 @@ class ModelsInterface(InvocationContextInterface):
 
         if isinstance(identifier, str):
             model = self._services.model_manager.store.get_model(identifier)
-            return self._services.model_manager.load.load_model(model, submodel_type)
         else:
-            _submodel_type = submodel_type or identifier.submodel_type
+            submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
-            return self._services.model_manager.load.load_model(model, _submodel_type)
+
+        message = f"Loading model {model.name}"
+        if submodel_type:
+            message += f" ({submodel_type.value})"
+        self._util.signal_progress(message)
+        return self._services.model_manager.load.load_model(model, submodel_type)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
@@ -397,6 +411,10 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
+        message = f"Loading model {name}"
+        if submodel_type:
+            message += f" ({submodel_type.value})"
+        self._util.signal_progress(message)
         return self._services.model_manager.load.load_model(configs[0], submodel_type)
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
@@ -467,6 +485,7 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             Path to the downloaded model
         """
+        self._util.signal_progress(f"Downloading model {source}")
         return self._services.model_manager.install.download_and_cache_model(source=source)
 
     def load_local_model(
@@ -489,6 +508,8 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             A LoadedModelWithoutConfig object.
         """
+
+        self._util.signal_progress(f"Loading model {model_path.name}")
         return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
 
     def load_remote_model(
@@ -514,6 +535,8 @@ class ModelsInterface(InvocationContextInterface):
             A LoadedModelWithoutConfig object.
         """
         model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
+
+        self._util.signal_progress(f"Loading model {source}")
         return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
 
 
@@ -707,12 +730,12 @@ def build_invocation_context(
     """
 
     logger = LoggerInterface(services=services, data=data)
-    images = ImagesInterface(services=services, data=data)
     tensors = TensorsInterface(services=services, data=data)
-    models = ModelsInterface(services=services, data=data)
     config = ConfigInterface(services=services, data=data)
     util = UtilInterface(services=services, data=data, is_canceled=is_canceled)
     conditioning = ConditioningInterface(services=services, data=data)
+    models = ModelsInterface(services=services, data=data, util=util)
+    images = ImagesInterface(services=services, data=data, util=util)
     boards = BoardsInterface(services=services, data=data)
 
     ctx = InvocationContext(

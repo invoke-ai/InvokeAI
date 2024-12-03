@@ -9,6 +9,7 @@ import {
   MenuList,
   Spacer,
   Spinner,
+  Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -28,15 +29,12 @@ import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
-const FilterContent = memo(
+const FilterContentAdvanced = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
-    const ref = useRef<HTMLDivElement>(null);
-    useFocusRegion('canvas', ref, { focusOnMount: true });
     const config = useStore(adapter.filterer.$filterConfig);
-    const isCanvasFocused = useIsRegionFocused('canvas');
     const isProcessing = useStore(adapter.filterer.$isProcessing);
-    const hasProcessed = useStore(adapter.filterer.$hasProcessed);
+    const hasImageState = useStore(adapter.filterer.$hasImageState);
     const autoProcess = useAppSelector(selectAutoProcess);
 
     const onChangeFilterConfig = useCallback(
@@ -73,36 +71,8 @@ const FilterContent = memo(
       adapter.filterer.saveAs('control_layer');
     }, [adapter.filterer]);
 
-    useRegisteredHotkeys({
-      id: 'applyFilter',
-      category: 'canvas',
-      callback: adapter.filterer.apply,
-      options: { enabled: !isProcessing && isCanvasFocused },
-      dependencies: [adapter.filterer, isProcessing, isCanvasFocused],
-    });
-
-    useRegisteredHotkeys({
-      id: 'cancelFilter',
-      category: 'canvas',
-      callback: adapter.filterer.cancel,
-      options: { enabled: !isProcessing && isCanvasFocused },
-      dependencies: [adapter.filterer, isProcessing, isCanvasFocused],
-    });
-
     return (
-      <Flex
-        ref={ref}
-        bg="base.800"
-        borderRadius="base"
-        p={4}
-        flexDir="column"
-        gap={4}
-        w={420}
-        h="auto"
-        shadow="dark-lg"
-        transitionProperty="height"
-        transitionDuration="normal"
-      >
+      <>
         <Flex w="full" gap={4}>
           <Heading size="md" color="base.300" userSelect="none">
             {t('controlLayers.filter.filter')}
@@ -118,7 +88,7 @@ const FilterContent = memo(
             variant="ghost"
             onClick={adapter.filterer.processImmediate}
             loadingText={t('controlLayers.filter.process')}
-            isDisabled={isProcessing || !isValid || autoProcess}
+            isDisabled={isProcessing || !isValid || (autoProcess && hasImageState)}
           >
             {t('controlLayers.filter.process')}
             {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}
@@ -136,7 +106,7 @@ const FilterContent = memo(
             onClick={adapter.filterer.apply}
             loadingText={t('controlLayers.filter.apply')}
             variant="ghost"
-            isDisabled={isProcessing || !isValid || !hasProcessed}
+            isDisabled={isProcessing || !isValid || !hasImageState}
           >
             {t('controlLayers.filter.apply')}
           </Button>
@@ -145,22 +115,22 @@ const FilterContent = memo(
               as={Button}
               loadingText={t('controlLayers.selectObject.saveAs')}
               variant="ghost"
-              isDisabled={isProcessing || !isValid || !hasProcessed}
+              isDisabled={isProcessing || !isValid || !hasImageState}
               rightIcon={<PiCaretDownBold />}
             >
               {t('controlLayers.selectObject.saveAs')}
             </MenuButton>
             <MenuList>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsInpaintMask}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsInpaintMask}>
                 {t('controlLayers.newInpaintMask')}
               </MenuItem>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsRegionalGuidance}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsRegionalGuidance}>
                 {t('controlLayers.newRegionalGuidance')}
               </MenuItem>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsControlLayer}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsControlLayer}>
                 {t('controlLayers.newControlLayer')}
               </MenuItem>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsRasterLayer}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsRasterLayer}>
                 {t('controlLayers.newRasterLayer')}
               </MenuItem>
             </MenuList>
@@ -169,12 +139,67 @@ const FilterContent = memo(
             {t('controlLayers.filter.cancel')}
           </Button>
         </ButtonGroup>
-      </Flex>
+      </>
     );
   }
 );
 
-FilterContent.displayName = 'FilterContent';
+FilterContentAdvanced.displayName = 'FilterContentAdvanced';
+
+const FilterContentSimple = memo(
+  ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
+    const { t } = useTranslation();
+    const config = useStore(adapter.filterer.$filterConfig);
+    const isProcessing = useStore(adapter.filterer.$isProcessing);
+    const hasImageState = useStore(adapter.filterer.$hasImageState);
+
+    const isValid = useMemo(() => {
+      return IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
+    }, [config]);
+
+    const onClickAdvanced = useCallback(() => {
+      adapter.filterer.$simple.set(false);
+    }, [adapter.filterer.$simple]);
+
+    return (
+      <>
+        <Flex w="full" gap={4}>
+          <Heading size="md" color="base.300" userSelect="none">
+            {t('controlLayers.filter.filter')}
+          </Heading>
+          <Spacer />
+        </Flex>
+        <Flex flexDir="column" w="full" gap={2} pb={2}>
+          <Text color="base.500" textAlign="center">
+            {t('controlLayers.filter.processingLayerWith', { type: t(`controlLayers.filter.${config.type}.label`) })}
+          </Text>
+          <Text color="base.500" textAlign="center">
+            {t('controlLayers.filter.forMoreControl')}
+          </Text>
+        </Flex>
+        <ButtonGroup isAttached={false} size="sm" w="full">
+          <Button variant="ghost" onClick={onClickAdvanced}>
+            {t('controlLayers.filter.advanced')}
+          </Button>
+          <Spacer />
+          <Button
+            onClick={adapter.filterer.apply}
+            loadingText={t('controlLayers.filter.apply')}
+            variant="ghost"
+            isDisabled={isProcessing || !isValid || !hasImageState}
+          >
+            {t('controlLayers.filter.apply')}
+          </Button>
+          <Button variant="ghost" onClick={adapter.filterer.cancel} loadingText={t('controlLayers.filter.cancel')}>
+            {t('controlLayers.filter.cancel')}
+          </Button>
+        </ButtonGroup>
+      </>
+    );
+  }
+);
+
+FilterContentSimple.displayName = 'FilterContentSimple';
 
 export const Filter = () => {
   const canvasManager = useCanvasManager();
@@ -182,8 +207,54 @@ export const Filter = () => {
   if (!adapter) {
     return null;
   }
-
   return <FilterContent adapter={adapter} />;
 };
 
 Filter.displayName = 'Filter';
+
+const FilterContent = memo(
+  ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
+    const simplified = useStore(adapter.filterer.$simple);
+    const isCanvasFocused = useIsRegionFocused('canvas');
+    const isProcessing = useStore(adapter.filterer.$isProcessing);
+    const ref = useRef<HTMLDivElement>(null);
+    useFocusRegion('canvas', ref, { focusOnMount: true });
+
+    useRegisteredHotkeys({
+      id: 'applyFilter',
+      category: 'canvas',
+      callback: adapter.filterer.apply,
+      options: { enabled: !isProcessing && isCanvasFocused, enableOnFormTags: true },
+      dependencies: [adapter.filterer, isProcessing, isCanvasFocused],
+    });
+
+    useRegisteredHotkeys({
+      id: 'cancelFilter',
+      category: 'canvas',
+      callback: adapter.filterer.cancel,
+      options: { enabled: !isProcessing && isCanvasFocused, enableOnFormTags: true },
+      dependencies: [adapter.filterer, isProcessing, isCanvasFocused],
+    });
+
+    return (
+      <Flex
+        ref={ref}
+        bg="base.800"
+        borderRadius="base"
+        p={4}
+        flexDir="column"
+        gap={4}
+        w={420}
+        h="auto"
+        shadow="dark-lg"
+        transitionProperty="height"
+        transitionDuration="normal"
+      >
+        {simplified && <FilterContentSimple adapter={adapter} />}
+        {!simplified && <FilterContentAdvanced adapter={adapter} />}
+      </Flex>
+    );
+  }
+);
+
+FilterContent.displayName = 'FilterContent';

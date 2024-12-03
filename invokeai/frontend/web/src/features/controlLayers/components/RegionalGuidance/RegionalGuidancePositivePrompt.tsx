@@ -20,7 +20,10 @@ export const RegionalGuidancePositivePrompt = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const selectPrompt = useMemo(
     () =>
-      createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).positivePrompt ?? ''),
+      createSelector(
+        selectCanvasSlice,
+        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidancePositivePrompt').positivePrompt ?? ''
+      ),
     [entityIdentifier]
   );
   const prompt = useAppSelector(selectPrompt);

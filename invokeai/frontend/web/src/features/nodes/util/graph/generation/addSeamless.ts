@@ -23,6 +23,12 @@ export const addSeamless = (
 ): Invocation<'seamless'> | null => {
   const { seamlessXAxis: seamless_x, seamlessYAxis: seamless_y } = state.params;
 
+  // Always write seamless metadata to ensure recalling all parameters will reset the seamless settings
+  g.upsertMetadata({
+    seamless_x,
+    seamless_y,
+  });
+
   if (!seamless_x && !seamless_y) {
     return null;
   }
@@ -32,11 +38,6 @@ export const addSeamless = (
     id: getPrefixedId('seamless'),
     seamless_x,
     seamless_y,
-  });
-
-  g.upsertMetadata({
-    seamless_x: seamless_x || undefined,
-    seamless_y: seamless_y || undefined,
   });
 
   // Seamless slots into the graph between the model loader and the denoise node

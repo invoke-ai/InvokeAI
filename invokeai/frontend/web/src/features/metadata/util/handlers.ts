@@ -199,6 +199,16 @@ export const handlers = {
     parser: parsers.sdxlPositiveStylePrompt,
     recaller: recallers.sdxlPositiveStylePrompt,
   }),
+  seamlessX: buildHandlers({
+    getLabel: () => t('metadata.seamlessXAxis'),
+    parser: parsers.seamlessX,
+    recaller: recallers.seamlessX,
+  }),
+  seamlessY: buildHandlers({
+    getLabel: () => t('metadata.seamlessYAxis'),
+    parser: parsers.seamlessY,
+    recaller: recallers.seamlessY,
+  }),
   seed: buildHandlers({ getLabel: () => t('metadata.seed'), parser: parsers.seed, recaller: recallers.seed }),
   steps: buildHandlers({ getLabel: () => t('metadata.steps'), parser: parsers.steps, recaller: recallers.steps }),
   strength: buildHandlers({

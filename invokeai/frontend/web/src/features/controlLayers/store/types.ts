@@ -1,4 +1,3 @@
-import type { SerializableObject } from 'common/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
@@ -9,6 +8,7 @@ import {
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
 const zId = z.string().min(1);
@@ -332,6 +332,7 @@ const zCanvasRenderableEntityState = z.discriminatedUnion('type', [
   zCanvasInpaintMaskState,
 ]);
 export type CanvasRenderableEntityState = z.infer<typeof zCanvasRenderableEntityState>;
+export type CanvasRenderableEntityType = CanvasRenderableEntityState['type'];
 
 const zCanvasEntityType = z.union([
   zCanvasRasterLayerState.shape.type,
@@ -347,7 +348,7 @@ export const zCanvasEntityIdentifer = z.object({
   type: zCanvasEntityType,
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
-
+export type CanvasRenderableEntityIdentifier = CanvasEntityIdentifier<CanvasRenderableEntityType>;
 export type LoRA = {
   id: string;
   isEnabled: boolean;
@@ -428,7 +429,7 @@ export type StageAttrs = {
 };
 
 export type EntityIdentifierPayload<
-  T extends SerializableObject | void = void,
+  T extends JsonObject | void = void,
   U extends CanvasEntityType = CanvasEntityType,
 > = T extends void
   ? {
@@ -438,7 +439,8 @@ export type EntityIdentifierPayload<
       entityIdentifier: CanvasEntityIdentifier<U>;
     } & T;
 
-export type EntityMovedPayload = EntityIdentifierPayload<{ position: Coordinate }>;
+export type EntityMovedToPayload = EntityIdentifierPayload<{ position: Coordinate }>;
+export type EntityMovedByPayload = EntityIdentifierPayload<{ offset: Coordinate }>;
 export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{
   brushLine: CanvasBrushLineState | CanvasBrushLineWithPressureState;
 }>;
@@ -450,6 +452,7 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;
   position: Coordinate;
   replaceObjects: boolean;
+  isSelected?: boolean;
 }>;
 
 /**
@@ -465,7 +468,9 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-function isRenderableEntityType(
+export type CanvasEntityStateFromType<T extends CanvasEntityType> = Extract<CanvasEntityState, { type: T }>;
+
+export function isRenderableEntityType(
   entityType: CanvasEntityState['type']
 ): entityType is CanvasRenderableEntityState['type'] {
   return (
@@ -535,6 +540,12 @@ export function isSaveableEntityIdentifier(
 
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
   return isRenderableEntityType(entity.type);
+}
+
+export function isRenderableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasRenderableEntityIdentifier {
+  return isRenderableEntityType(entityIdentifier.type);
 }
 
 export const getEntityIdentifier = <T extends CanvasEntityType>(

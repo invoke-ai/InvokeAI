@@ -2,7 +2,7 @@ import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 
 export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -16,11 +16,7 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
 
       const batchConfig = prepareLinearUIBatch(state, g, prepend, noise, posCond, 'upscaling', 'gallery');
 
-      const req = dispatch(
-        queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
-          fixedCacheKey: 'enqueueBatch',
-        })
-      );
+      const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));
       try {
         await req.unwrap();
       } finally {

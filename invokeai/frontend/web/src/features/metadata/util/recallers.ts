@@ -18,6 +18,8 @@ import {
   setRefinerStart,
   setRefinerSteps,
   setScheduler,
+  setSeamlessXAxis,
+  setSeamlessYAxis,
   setSeed,
   setSteps,
   t5EncoderModelSelected,
@@ -44,6 +46,8 @@ import type {
   ParameterSDXLRefinerNegativeAestheticScore,
   ParameterSDXLRefinerPositiveAestheticScore,
   ParameterSDXLRefinerStart,
+  ParameterSeamlessX,
+  ParameterSeamlessY,
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
@@ -104,6 +108,14 @@ const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {
 
 const recallStrength: MetadataRecallFunc<ParameterStrength> = (strength) => {
   getStore().dispatch(setImg2imgStrength(strength));
+};
+
+const recallSeamlessX: MetadataRecallFunc<ParameterSeamlessX> = (enabled) => {
+  getStore().dispatch(setSeamlessXAxis(enabled));
+};
+
+const recallSeamlessY: MetadataRecallFunc<ParameterSeamlessY> = (enabled) => {
+  getStore().dispatch(setSeamlessYAxis(enabled));
 };
 
 const recallHRFEnabled: MetadataRecallFunc<ParameterHRFEnabled> = (hrfEnabled) => {
@@ -211,6 +223,8 @@ export const recallers = {
   height: recallHeight,
   steps: recallSteps,
   strength: recallStrength,
+  seamlessX: recallSeamlessX,
+  seamlessY: recallSeamlessY,
   hrfEnabled: recallHRFEnabled,
   hrfStrength: recallHRFStrength,
   hrfMethod: recallHRFMethod,

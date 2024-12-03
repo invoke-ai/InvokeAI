@@ -50,8 +50,31 @@ class FLUXConditioningInfo:
 
 
 @dataclass
+class SD3ConditioningInfo:
+    clip_l_pooled_embeds: torch.Tensor
+    clip_l_embeds: torch.Tensor
+    clip_g_pooled_embeds: torch.Tensor
+    clip_g_embeds: torch.Tensor
+    t5_embeds: torch.Tensor | None
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.clip_l_pooled_embeds = self.clip_l_pooled_embeds.to(device=device, dtype=dtype)
+        self.clip_l_embeds = self.clip_l_embeds.to(device=device, dtype=dtype)
+        self.clip_g_pooled_embeds = self.clip_g_pooled_embeds.to(device=device, dtype=dtype)
+        self.clip_g_embeds = self.clip_g_embeds.to(device=device, dtype=dtype)
+        if self.t5_embeds is not None:
+            self.t5_embeds = self.t5_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
-    conditionings: List[BasicConditioningInfo] | List[SDXLConditioningInfo] | List[FLUXConditioningInfo]
+    conditionings: (
+        List[BasicConditioningInfo]
+        | List[SDXLConditioningInfo]
+        | List[FLUXConditioningInfo]
+        | List[SD3ConditioningInfo]
+    )
 
 
 @dataclass

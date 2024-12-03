@@ -1,4 +1,3 @@
-import type { SerializableObject } from 'common/types';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
@@ -9,6 +8,7 @@ import { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/Canvas
 import type { CanvasControlLayerState, CanvasEntityIdentifier, Rect } from 'features/controlLayers/store/types';
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
+import type { JsonObject } from 'type-fest';
 
 export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<
   CanvasControlLayerState,
@@ -77,8 +77,13 @@ export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<
     return canvas;
   };
 
-  getHashableState = (): SerializableObject => {
-    const keysToOmit: (keyof CanvasControlLayerState)[] = ['name', 'controlAdapter', 'withTransparencyEffect'];
+  getHashableState = (): JsonObject => {
+    const keysToOmit: (keyof CanvasControlLayerState)[] = [
+      'name',
+      'controlAdapter',
+      'withTransparencyEffect',
+      'isLocked',
+    ];
     return omit(this.state, keysToOmit);
   };
 }

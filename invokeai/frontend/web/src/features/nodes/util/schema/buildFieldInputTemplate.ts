@@ -3,6 +3,8 @@ import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
   CLIPEmbedModelFieldInputTemplate,
+  CLIPGEmbedModelFieldInputTemplate,
+  CLIPLEmbedModelFieldInputTemplate,
   ColorFieldInputTemplate,
   ControlNetModelFieldInputTemplate,
   EnumFieldInputTemplate,
@@ -11,6 +13,7 @@ import type {
   FloatFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
   FluxVAEModelFieldInputTemplate,
+  ImageFieldCollectionInputTemplate,
   ImageFieldInputTemplate,
   IntegerFieldInputTemplate,
   IPAdapterModelFieldInputTemplate,
@@ -18,6 +21,7 @@ import type {
   MainModelFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
   SchedulerFieldInputTemplate,
+  SD3MainModelFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
   SDXLRefinerModelFieldInputTemplate,
   SpandrelImageToImageModelFieldInputTemplate,
@@ -28,7 +32,7 @@ import type {
   T5EncoderModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { isStatefulFieldType } from 'features/nodes/types/field';
+import { isImageCollectionFieldType, isStatefulFieldType } from 'features/nodes/types/field';
 import type { InvocationFieldSchema } from 'features/nodes/types/openapi';
 import { isSchemaObject } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
@@ -36,7 +40,7 @@ import { isNumber, startCase } from 'lodash-es';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FieldInputTemplateBuilder<T extends FieldInputTemplate = any> = // valid `any`!
-  (arg: { schemaObject: InvocationFieldSchema; baseField: Omit<T, 'type'>; fieldType: T['type'] }) => T;
+  (arg: { schemaObject: InvocationFieldSchema; baseField: Omit<T, 'type' | 'default'>; fieldType: T['type'] }) => T;
 
 const buildIntegerFieldInputTemplate: FieldInputTemplateBuilder<IntegerFieldInputTemplate> = ({
   schemaObject,
@@ -198,6 +202,20 @@ const buildFluxMainModelFieldInputTemplate: FieldInputTemplateBuilder<FluxMainMo
   return template;
 };
 
+const buildSD3MainModelFieldInputTemplate: FieldInputTemplateBuilder<SD3MainModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SD3MainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildRefinerModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLRefinerModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -246,6 +264,34 @@ const buildCLIPEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPEmbed
   fieldType,
 }) => {
   const template: CLIPEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildCLIPLEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPLEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPLEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildCLIPGEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPGEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPGEmbedModelFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -363,6 +409,28 @@ const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTem
   return template;
 };
 
+const buildImageFieldCollectionInputTemplate: FieldInputTemplateBuilder<ImageFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ImageFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  return template;
+};
+
 const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -446,6 +514,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   MainModelField: buildMainModelFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
   SDXLMainModelField: buildSDXLMainModelFieldInputTemplate,
+  SD3MainModelField: buildSD3MainModelFieldInputTemplate,
   FluxMainModelField: buildFluxMainModelFieldInputTemplate,
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
@@ -454,6 +523,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   VAEModelField: buildVAEModelFieldInputTemplate,
   T5EncoderModelField: buildT5EncoderModelFieldInputTemplate,
   CLIPEmbedModelField: buildCLIPEmbedModelFieldInputTemplate,
+  CLIPLEmbedModelField: buildCLIPLEmbedModelFieldInputTemplate,
+  CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
 } as const;
 
@@ -466,7 +537,7 @@ export const buildFieldInputTemplate = (
 
   // This is the base field template that is common to all fields. The builder function will add all other
   // properties to this template.
-  const baseField: Omit<FieldInputTemplate, 'type'> = {
+  const baseField: Omit<FieldInputTemplate, 'type' | 'default'> = {
     name: fieldName,
     title: fieldSchema.title ?? (fieldName ? startCase(fieldName) : ''),
     required,
@@ -481,14 +552,23 @@ export const buildFieldInputTemplate = (
   };
 
   if (isStatefulFieldType(fieldType)) {
-    const builder = TEMPLATE_BUILDER_MAP[fieldType.name];
-    const template = builder({
-      schemaObject: fieldSchema,
-      baseField,
-      fieldType,
-    });
+    if (isImageCollectionFieldType(fieldType)) {
+      fieldType;
+      return buildImageFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else {
+      const builder = TEMPLATE_BUILDER_MAP[fieldType.name];
+      const template = builder({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
 
-    return template;
+      return template;
+    }
   } else {
     // This is a StatelessField, create it directly.
     const template: StatelessFieldInputTemplate = {

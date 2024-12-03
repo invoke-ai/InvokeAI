@@ -7,7 +7,6 @@ import MultipleSelectionMenuItems from 'features/gallery/components/ImageContext
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
 import { map } from 'nanostores';
-import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -60,12 +59,12 @@ const getImageDTOFromMap = (target: Node): ImageDTO | undefined => {
  * @param imageDTO The image DTO to register the context menu for.
  * @param targetRef The ref of the target element that should trigger the context menu.
  */
-export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: RefObject<HTMLDivElement>) => {
+export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: HTMLDivElement | null) => {
   useEffect(() => {
-    if (!targetRef.current || !imageDTO) {
+    if (!targetRef || !imageDTO) {
       return;
     }
-    const el = targetRef.current;
+    const el = targetRef;
     elToImageMap.set(el, imageDTO);
     return () => {
       elToImageMap.delete(el);

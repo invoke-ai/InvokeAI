@@ -1,15 +1,16 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
+import { deepClone } from 'common/util/deepClone';
 import { CanvasEntityMenuItemsCopyToClipboard } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopyToClipboard';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLayerHooks';
-import { useIsEntityInteractable } from 'features/controlLayers/hooks/useEntityIsInteractable';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   rasterLayerConvertedToControlLayer,
   rasterLayerConvertedToInpaintMask,
   rasterLayerConvertedToRegionalGuidance,
 } from 'features/controlLayers/store/canvasSlice';
+import { initialControlNet } from 'features/controlLayers/store/util';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
@@ -20,8 +21,7 @@ export const RasterLayerMenuItemsCopyToSubMenu = memo(() => {
 
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('raster_layer');
-  const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
-  const isInteractable = useIsEntityInteractable(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
 
   const copyToInpaintMask = useCallback(() => {
     dispatch(rasterLayerConvertedToInpaintMask({ entityIdentifier }));
@@ -35,26 +35,26 @@ export const RasterLayerMenuItemsCopyToSubMenu = memo(() => {
     dispatch(
       rasterLayerConvertedToControlLayer({
         entityIdentifier,
-        overrides: { controlAdapter: defaultControlAdapter },
+        overrides: { controlAdapter: deepClone(initialControlNet) },
       })
     );
-  }, [defaultControlAdapter, dispatch, entityIdentifier]);
+  }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem {...subMenu.parentMenuItemProps} icon={<PiCopyBold />}>
+    <MenuItem {...subMenu.parentMenuItemProps} icon={<PiCopyBold />} isDisabled={isBusy}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
           <SubMenuButtonContent label={t('controlLayers.copyRasterLayerTo')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
           <CanvasEntityMenuItemsCopyToClipboard />
-          <MenuItem onClick={copyToInpaintMask} icon={<PiCopyBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={copyToInpaintMask} icon={<PiCopyBold />} isDisabled={isBusy}>
             {t('controlLayers.newInpaintMask')}
           </MenuItem>
-          <MenuItem onClick={copyToRegionalGuidance} icon={<PiCopyBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={copyToRegionalGuidance} icon={<PiCopyBold />} isDisabled={isBusy}>
             {t('controlLayers.newRegionalGuidance')}
           </MenuItem>
-          <MenuItem onClick={copyToControlLayer} icon={<PiCopyBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={copyToControlLayer} icon={<PiCopyBold />} isDisabled={isBusy}>
             {t('controlLayers.newControlLayer')}
           </MenuItem>
         </MenuList>

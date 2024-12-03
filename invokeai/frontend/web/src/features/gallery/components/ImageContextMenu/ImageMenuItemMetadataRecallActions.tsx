@@ -25,7 +25,7 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiArrowBendUpLeftBold />}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
-          <SubMenuButtonContent label="Recall Metadata" />
+          <SubMenuButtonContent label={t('parameters.recallMetadata')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
           <MenuItem icon={<PiArrowsCounterClockwiseBold />} onClick={remix} isDisabled={!hasMetadata}>

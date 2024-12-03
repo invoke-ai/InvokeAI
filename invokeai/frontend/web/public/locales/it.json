@@ -92,7 +92,12 @@
         "none": "Niente",
         "new": "Nuovo",
         "view": "Vista",
-        "close": "Chiudi"
+        "close": "Chiudi",
+        "clipboard": "Appunti",
+        "ok": "Ok",
+        "generating": "Generazione",
+        "loadingModel": "Caricamento del modello",
+        "warnings": "Avvisi"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -542,7 +547,6 @@
         "defaultSettingsSaved": "Impostazioni predefinite salvate",
         "defaultSettings": "Impostazioni predefinite",
         "metadata": "Metadati",
-        "useDefaultSettings": "Usa le impostazioni predefinite",
         "triggerPhrases": "Frasi Trigger",
         "deleteModelImage": "Elimina l'immagine del modello",
         "localOnly": "solo locale",
@@ -588,7 +592,26 @@
         "installingXModels_many": "Installazione di {{count}} modelli",
         "installingXModels_other": "Installazione di {{count}} modelli",
         "includesNModels": "Include {{n}} modelli e le loro dipendenze",
-        "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato."
+        "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato.",
+        "noDefaultSettings": "Nessuna impostazione predefinita configurata per questo modello. Visita Gestione Modelli per aggiungere impostazioni predefinite.",
+        "defaultSettingsOutOfSync": "Alcune impostazioni non corrispondono a quelle predefinite del modello:",
+        "restoreDefaultSettings": "Fare clic per utilizzare le impostazioni predefinite del modello.",
+        "usingDefaultSettings": "Utilizzo delle impostazioni predefinite del modello",
+        "huggingFace": "HuggingFace",
+        "huggingFaceRepoID": "HuggingFace Repository ID",
+        "clipEmbed": "CLIP Embed",
+        "t5Encoder": "T5 Encoder",
+        "hfTokenInvalidErrorMessage": "Gettone HuggingFace non valido o mancante.",
+        "hfTokenRequired": "Stai tentando di scaricare un modello che richiede un gettone HuggingFace valido.",
+        "hfTokenUnableToVerifyErrorMessage": "Impossibile verificare il gettone HuggingFace. Ciò è probabilmente dovuto a un errore di rete. Riprova più tardi.",
+        "hfTokenHelperText": "Per utilizzare alcuni modelli è necessario un gettone HF. Fai clic qui per creare o ottenere il tuo gettone.",
+        "hfTokenInvalid": "Gettone HF non valido o mancante",
+        "hfTokenUnableToVerify": "Impossibile verificare il gettone HF",
+        "hfTokenSaved": "Gettone HF salvato",
+        "hfForbidden": "Non hai accesso a questo modello HF",
+        "hfTokenLabel": "Gettone HuggingFace (richiesto per alcuni modelli)",
+        "hfForbiddenErrorMessage": "Consigliamo di visitare la pagina del repository su HuggingFace.com. Il proprietario potrebbe richiedere l'accettazione dei termini per poter effettuare il download.",
+        "hfTokenInvalidErrorMessage2": "Aggiornalo in "
     },
     "parameters": {
         "images": "Immagini",
@@ -640,21 +663,8 @@
             "addingImagesTo": "Aggiungi immagini a",
             "systemDisconnected": "Sistema disconnesso",
             "missingNodeTemplate": "Modello di nodo mancante",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} ingresso mancante",
+            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: ingresso mancante",
             "missingFieldTemplate": "Modello di campo mancante",
-            "layer": {
-                "controlAdapterNoModelSelected": "Nessun modello di adattatore di controllo selezionato",
-                "controlAdapterIncompatibleBaseModel": "Il modello base dell'adattatore di controllo non è compatibile",
-                "ipAdapterNoModelSelected": "Nessun adattatore IP selezionato",
-                "ipAdapterIncompatibleBaseModel": "Il modello base dell'adattatore IP non è compatibile",
-                "ipAdapterNoImageSelected": "Nessuna immagine dell'adattatore IP selezionata",
-                "rgNoPromptsOrIPAdapters": "Nessun prompt o adattatore IP",
-                "rgNoRegion": "Nessuna regione selezionata",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, larghezza riquadro è {{width}}",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, altezza riquadro è {{height}}",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, larghezza del riquadro scalato {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, altezza del riquadro scalato {{height}}"
-            },
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), altezza riquadro è {{height}}",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza riquadro è {{width}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza del riquadro scalato è {{width}}",
@@ -662,10 +672,14 @@
             "noT5EncoderModelSelected": "Nessun modello di encoder T5 selezionato per la generazione con FLUX",
             "noCLIPEmbedModelSelected": "Nessun modello CLIP Embed selezionato per la generazione con FLUX",
             "noFLUXVAEModelSelected": "Nessun modello VAE selezionato per la generazione con FLUX",
-            "canvasIsTransforming": "La tela sta trasformando",
-            "canvasIsRasterizing": "La tela sta rasterizzando",
-            "canvasIsCompositing": "La tela è in fase di composizione",
-            "canvasIsFiltering": "La tela sta filtrando"
+            "canvasIsTransforming": "La tela è occupata (sta trasformando)",
+            "canvasIsRasterizing": "La tela è occupata (sta rasterizzando)",
+            "canvasIsCompositing": "La tela è occupata (in composizione)",
+            "canvasIsFiltering": "La tela è occupata (sta filtrando)",
+            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi elementi, massimo {{maxItems}}",
+            "canvasIsSelectingObject": "La tela è occupata (selezione dell'oggetto)",
+            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi pochi elementi, minimo {{minItems}}",
+            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} raccolta vuota"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -689,7 +703,10 @@
         "boxBlur": "Sfocatura Box",
         "staged": "Maschera espansa",
         "optimizedImageToImage": "Immagine-a-immagine ottimizzata",
-        "sendToCanvas": "Invia alla Tela"
+        "sendToCanvas": "Invia alla Tela",
+        "coherenceMinDenoise": "Min rid. rumore",
+        "recallMetadata": "Richiama i metadati",
+        "disabledNoRasterContent": "Disabilitato (nessun contenuto Raster)"
     },
     "settings": {
         "models": "Modelli",
@@ -724,7 +741,11 @@
         "reloadingIn": "Ricaricando in",
         "informationalPopoversDisabled": "Testo informativo a comparsa disabilitato",
         "informationalPopoversDisabledDesc": "I testi informativi a comparsa sono disabilitati. Attivali nelle impostazioni.",
-        "confirmOnNewSession": "Conferma su nuova sessione"
+        "confirmOnNewSession": "Conferma su nuova sessione",
+        "enableModelDescriptions": "Abilita le descrizioni dei modelli nei menu a discesa",
+        "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disabilitate. Abilitale nelle Impostazioni.",
+        "showDetailedInvocationProgress": "Mostra dettagli avanzamento"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -943,7 +964,9 @@
         "saveToGallery": "Salva nella Galleria",
         "noMatchingWorkflows": "Nessun flusso di lavoro corrispondente",
         "noWorkflows": "Nessun flusso di lavoro",
-        "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>."
+        "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>.",
+        "specialDesc": "Questa invocazione comporta una gestione speciale nell'applicazione. Ad esempio, i nodi Lotto vengono utilizzati per mettere in coda più grafici da un singolo flusso di lavoro.",
+        "internalDesc": "Questa invocazione è utilizzata internamente da Invoke. Potrebbe subire modifiche significative durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento."
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1064,7 +1087,8 @@
         "workflows": "Flussi di lavoro",
         "generation": "Generazione",
         "other": "Altro",
-        "gallery": "Galleria"
+        "gallery": "Galleria",
+        "batchSize": "Dimensione del lotto"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1076,7 +1100,8 @@
         "noLoRAsInstalled": "Nessun LoRA installato",
         "addLora": "Aggiungi LoRA",
         "defaultVAE": "VAE predefinito",
-        "concepts": "Concetti"
+        "concepts": "Concetti",
+        "lora": "LoRA"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1133,7 +1158,8 @@
             "paragraphs": [
                 "Scegli quanti livelli del modello CLIP saltare.",
                 "Alcuni modelli funzionano meglio con determinate impostazioni di CLIP Skip."
-            ]
+            ],
+            "heading": "CLIP Skip"
         },
         "compositingCoherencePass": {
             "heading": "Passaggio di Coerenza",
@@ -1164,8 +1190,9 @@
         "controlNetBeginEnd": {
             "heading": "Percentuale passi Inizio / Fine",
             "paragraphs": [
-                "La parte del processo di rimozione del rumore in cui verrà applicato l'adattatore di controllo.",
-                "In genere, gli adattatori di controllo applicati all'inizio del processo guidano la composizione, mentre quelli applicati alla fine guidano i dettagli."
+                "Questa impostazione determina quale parte del processo di rimozione del rumore (generazione) incorpora la guida da questo livello.",
+                "• Passo iniziale (%): specifica quando iniziare ad applicare la guida da questo livello durante il processo di generazione.",
+                "• Passo finale (%): specifica quando interrompere l'applicazione della guida di questo livello e ripristinare la guida generale dal modello e altre impostazioni."
             ]
         },
         "noiseUseCPU": {
@@ -1248,8 +1275,9 @@
         },
         "paramDenoisingStrength": {
             "paragraphs": [
-                "Quanto rumore viene aggiunto all'immagine in ingresso.",
-                "0 risulterà in un'immagine identica, mentre 1 risulterà in un'immagine completamente nuova."
+                "Controlla la differenza tra l'immagine generata e il/i livello/i raster.",
+                "Una forza inferiore rimane più vicina ai livelli raster visibili combinati. Una forza superiore si basa maggiormente sul prompt globale.",
+                "Se non sono presenti livelli raster con contenuto visibile, questa impostazione viene ignorata."
             ],
             "heading": "Forza di riduzione del rumore"
         },
@@ -1261,14 +1289,16 @@
         },
         "infillMethod": {
             "paragraphs": [
-                "Metodo di riempimento durante il processo di Outpainting o Inpainting."
+                "Metodo di riempimento durante il processo di Outpaint o Inpaint."
             ],
             "heading": "Metodo di riempimento"
         },
         "controlNetWeight": {
             "heading": "Peso",
             "paragraphs": [
-                "Peso dell'adattatore di controllo. Un peso maggiore porterà a impatti maggiori sull'immagine finale."
+                "Regola la forza con cui il livello influenza il processo di generazione",
+                "• Peso maggiore (0.75-2): crea un impatto più significativo sul risultato finale.",
+                "• Peso inferiore (0-0.75): crea un impatto minore sul risultato finale."
             ]
         },
         "paramCFGScale": {
@@ -1429,7 +1459,7 @@
             "heading": "Livello minimo di riduzione del rumore",
             "paragraphs": [
                 "Intensità minima di riduzione rumore per la modalità di Coerenza",
-                "L'intensità minima di riduzione del rumore per la regione di coerenza durante l'inpainting o l'outpainting"
+                "L'intensità minima di riduzione del rumore per la regione di coerenza durante l'inpaint o l'outpaint"
             ]
         },
         "compositingMaskBlur": {
@@ -1445,9 +1475,9 @@
             ]
         },
         "ipAdapterMethod": {
-            "heading": "Metodo",
+            "heading": "Modalità",
             "paragraphs": [
-                "Metodo con cui applicare l'adattatore IP corrente."
+                "La modalità definisce il modo in cui l'immagine di riferimento guiderà il processo di generazione."
             ]
         },
         "scale": {
@@ -1483,7 +1513,7 @@
         "optimizedDenoising": {
             "heading": "Immagine-a-immagine ottimizzata",
             "paragraphs": [
-                "Abilita 'Immagine-a-immagine ottimizzata' per una scala di riduzione del rumore più graduale per le trasformazioni da immagine a immagine e di inpainting con modelli Flux. Questa impostazione migliora la capacità di controllare la quantità di modifica applicata a un'immagine, ma può essere disattivata se preferisci usare la scala di riduzione rumore standard. Questa impostazione è ancora in fase di messa a punto ed è in stato beta."
+                "Abilita 'Immagine-a-immagine ottimizzata' per una scala di riduzione del rumore più graduale per le trasformazioni da immagine a immagine e di inpaint con modelli Flux. Questa impostazione migliora la capacità di controllare la quantità di modifica applicata a un'immagine, ma può essere disattivata se preferisci usare la scala di riduzione rumore standard. Questa impostazione è ancora in fase di messa a punto ed è in stato beta."
             ]
         },
         "paramGuidance": {
@@ -1491,6 +1521,42 @@
             "paragraphs": [
                 "Controlla quanto il prompt influenza il processo di generazione.",
                 "Valori di guida elevati possono causare sovrasaturazione e una guida elevata o bassa può causare risultati di generazione distorti. La guida si applica solo ai modelli FLUX DEV."
+            ]
+        },
+        "regionalReferenceImage": {
+            "paragraphs": [
+                "Pennello per applicare un'immagine di riferimento ad aree specifiche."
+            ],
+            "heading": "Immagine di riferimento Regionale"
+        },
+        "rasterLayer": {
+            "paragraphs": [
+                "Contenuto basato sui pixel della tua tela, utilizzato durante la generazione dell'immagine."
+            ],
+            "heading": "Livello Raster"
+        },
+        "regionalGuidance": {
+            "heading": "Guida Regionale",
+            "paragraphs": [
+                "Pennello per guidare la posizione in cui devono apparire gli elementi dei prompt globali."
+            ]
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "heading": "Guida regionale e immagine di riferimento regionale",
+            "paragraphs": [
+                "Per la Guida Regionale, utilizzare il pennello per indicare dove devono apparire gli elementi dei prompt globali.",
+                "Per l'immagine di riferimento regionale, utilizzare il pennello per applicare un'immagine di riferimento ad aree specifiche."
+            ]
+        },
+        "globalReferenceImage": {
+            "heading": "Immagine di riferimento Globale",
+            "paragraphs": [
+                "Applica un'immagine di riferimento per influenzare l'intera generazione."
+            ]
+        },
+        "inpainting": {
+            "paragraphs": [
+                "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
             ]
         }
     },
@@ -1513,7 +1579,6 @@
         "refinerSteps": "Passi Affinamento"
     },
     "metadata": {
-        "seamless": "Senza giunture",
         "positivePrompt": "Prompt positivo",
         "negativePrompt": "Prompt negativo",
         "generationMode": "Modalità generazione",
@@ -1541,7 +1606,10 @@
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
         "canvasV2Metadata": "Tela",
-        "guidance": "Guida"
+        "guidance": "Guida",
+        "seamlessXAxis": "Asse X senza giunte",
+        "seamlessYAxis": "Asse Y senza giunte",
+        "vae": "VAE"
     },
     "hrf": {
         "enableHrf": "Abilita Correzione Alta Risoluzione",
@@ -1638,11 +1706,11 @@
         "regionalGuidance": "Guida regionale",
         "opacity": "Opacità",
         "mergeVisible": "Fondi il visibile",
-        "mergeVisibleOk": "Livelli visibili uniti",
+        "mergeVisibleOk": "Livelli uniti",
         "deleteReferenceImage": "Elimina l'immagine di riferimento",
         "referenceImage": "Immagine di riferimento",
         "fitBboxToLayers": "Adatta il riquadro di delimitazione ai livelli",
-        "mergeVisibleError": "Errore durante l'unione dei livelli visibili",
+        "mergeVisibleError": "Errore durante l'unione dei livelli",
         "regionalReferenceImage": "Immagine di riferimento Regionale",
         "newLayerFromImage": "Nuovo livello da immagine",
         "newCanvasFromImage": "Nuova tela da immagine",
@@ -1680,8 +1748,7 @@
         "newRegionalReferenceImageError": "Problema nella creazione dell'immagine di riferimento regionale",
         "newControlLayerOk": "Livello di controllo creato",
         "bboxOverlay": "Mostra sovrapposizione riquadro",
-        "resetCanvas": "Reimposta la tela",
-        "outputOnlyMaskedRegions": "Solo regioni mascherate in uscita",
+        "outputOnlyMaskedRegions": "In uscita solo le regioni generate",
         "enableAutoNegative": "Abilita Auto Negativo",
         "disableAutoNegative": "Disabilita Auto Negativo",
         "showHUD": "Mostra HUD",
@@ -1718,7 +1785,7 @@
         "globalReferenceImage_withCount_many": "Immagini di riferimento Globali",
         "globalReferenceImage_withCount_other": "Immagini di riferimento Globali",
         "controlMode": {
-            "balanced": "Bilanciato",
+            "balanced": "Bilanciato (consigliato)",
             "controlMode": "Modalità di controllo",
             "prompt": "Prompt",
             "control": "Controllo",
@@ -1729,12 +1796,15 @@
         "beginEndStepPercentShort": "Inizio/Fine %",
         "stagingOnCanvas": "Genera immagini nella",
         "ipAdapterMethod": {
-            "full": "Completo",
+            "full": "Stile e Composizione",
             "style": "Solo Stile",
             "composition": "Solo Composizione",
-            "ipAdapterMethod": "Metodo Adattatore IP"
+            "ipAdapterMethod": "Modalità",
+            "fullDesc": "Applica lo stile visivo (colori, texture) e la composizione (disposizione, struttura).",
+            "styleDesc": "Applica lo stile visivo (colori, texture) senza considerare la disposizione.",
+            "compositionDesc": "Replica disposizione e struttura ignorando lo stile di riferimento."
         },
-        "showingType": "Mostrare {{type}}",
+        "showingType": "Mostra {{type}}",
         "dynamicGrid": "Griglia dinamica",
         "tool": {
             "view": "Muovi",
@@ -1828,7 +1898,10 @@
             "lineart_anime_edge_detection": {
                 "description": "Genera una mappa dei bordi dal livello selezionato utilizzando il modello di rilevamento dei bordi Lineart Anime.",
                 "label": "Rilevamento bordi Lineart Anime"
-            }
+            },
+            "forMoreControl": "Per un maggiore controllo, fare clic su Avanzate qui sotto.",
+            "advanced": "Avanzate",
+            "processingLayerWith": "Elaborazione del livello con il filtro {{type}}."
         },
         "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",
         "regionalGuidance_withCount_hidden": "Guida regionale ({{count}} nascosti)",
@@ -1862,8 +1935,6 @@
         "layer_withCount_one": "Livello ({{count}})",
         "layer_withCount_many": "Livelli ({{count}})",
         "layer_withCount_other": "Livelli ({{count}})",
-        "convertToControlLayer": "Converti in livello di controllo",
-        "convertToRasterLayer": "Converti in livello raster",
         "unlocked": "Sbloccato",
         "enableTransparencyEffect": "Abilita l'effetto trasparenza",
         "replaceLayer": "Sostituisci livello",
@@ -1876,9 +1947,7 @@
         "newCanvasSession": "Nuova sessione Tela",
         "deleteSelected": "Elimina selezione",
         "settings": {
-            "isolatedFilteringPreview": "Anteprima del filtraggio isolata",
             "isolatedStagingPreview": "Anteprima di generazione isolata",
-            "isolatedTransformingPreview": "Anteprima di trasformazione isolata",
             "isolatedPreview": "Anteprima isolata",
             "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
             "snapToGrid": {
@@ -1890,7 +1959,9 @@
             "preserveMask": {
                 "alert": "Preservare la regione mascherata",
                 "label": "Preserva la regione mascherata"
-            }
+            },
+            "isolatedLayerPreview": "Anteprima livello isolato",
+            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione."
         },
         "transform": {
             "reset": "Reimposta",
@@ -1935,9 +2006,72 @@
             "canvasGroup": "Tela",
             "newRasterLayer": "Nuovo Livello Raster",
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
-            "saveToGalleryGroup": "Salva nella Galleria"
+            "saveToGalleryGroup": "Salva nella Galleria",
+            "newInpaintMask": "Nuova maschera Inpaint",
+            "newRegionalGuidance": "Nuova Guida Regionale"
         },
-        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine"
+        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
+        "copyRasterLayerTo": "Copia $t(controlLayers.rasterLayer) in",
+        "copyControlLayerTo": "Copia $t(controlLayers.controlLayer) in",
+        "copyInpaintMaskTo": "Copia $t(controlLayers.inpaintMask) in",
+        "selectObject": {
+            "dragToMove": "Trascina un punto per spostarlo",
+            "clickToAdd": "Fare clic sul livello per aggiungere un punto",
+            "clickToRemove": "Clicca su un punto per rimuoverlo",
+            "help3": "Inverte la selezione per selezionare tutto tranne l'oggetto di destinazione.",
+            "pointType": "Tipo punto",
+            "apply": "Applica",
+            "reset": "Reimposta",
+            "cancel": "Annulla",
+            "selectObject": "Seleziona oggetto",
+            "invertSelection": "Inverti selezione",
+            "exclude": "Escludi",
+            "include": "Includi",
+            "neutral": "Neutro",
+            "saveAs": "Salva come",
+            "process": "Elabora",
+            "help1": "Seleziona un singolo oggetto di destinazione. Aggiungi i punti <Bold>Includi</Bold> e <Bold>Escludi</Bold> per indicare quali parti del livello fanno parte dell'oggetto di destinazione.",
+            "help2": "Inizia con un punto <Bold>Include</Bold> all'interno dell'oggetto di destinazione. Aggiungi altri punti per perfezionare la selezione. Meno punti in genere producono risultati migliori."
+        },
+        "convertControlLayerTo": "Converti $t(controlLayers.controlLayer) in",
+        "newRasterLayer": "Nuovo $t(controlLayers.rasterLayer)",
+        "newRegionalGuidance": "Nuova $t(controlLayers.regionalGuidance)",
+        "convertInpaintMaskTo": "Converti $t(controlLayers.inpaintMask) in",
+        "copyRegionalGuidanceTo": "Copia $t(controlLayers.regionalGuidance) in",
+        "convertRasterLayerTo": "Converti $t(controlLayers.rasterLayer) in",
+        "convertRegionalGuidanceTo": "Converti $t(controlLayers.regionalGuidance) in",
+        "newControlLayer": "Nuovo $t(controlLayers.controlLayer)",
+        "newInpaintMask": "Nuova $t(controlLayers.inpaintMask)",
+        "replaceCurrent": "Sostituisci corrente",
+        "mergeDown": "Unire in basso",
+        "mergingLayers": "Unione dei livelli",
+        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello oppure disegna sulla tela per iniziare.",
+        "useImage": "Usa immagine",
+        "resetGenerationSettings": "Ripristina impostazioni di generazione",
+        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello.",
+        "asRasterLayer": "Come $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "Come $t(controlLayers.rasterLayer) (Ridimensiona)",
+        "asControlLayer": "Come $t(controlLayers.controlLayer)",
+        "asControlLayerResize": "Come $t(controlLayers.controlLayer) (Ridimensiona)",
+        "newSession": "Nuova sessione",
+        "resetCanvasLayers": "Ripristina livelli Tela",
+        "referenceImageRegional": "Immagine di riferimento (regionale)",
+        "referenceImageGlobal": "Immagine di riferimento (globale)",
+        "warnings": {
+            "controlAdapterNoModelSelected": "nessun modello selezionato per il livello di controllo",
+            "controlAdapterNoControl": "nessun controllo selezionato/disegnato",
+            "ipAdapterNoModelSelected": "nessun modello di immagine di riferimento selezionato",
+            "rgNoPromptsOrIPAdapters": "nessun prompt testuale o immagini di riferimento",
+            "rgReferenceImagesNotSupported": "Immagini di riferimento regionali non supportate per il modello base selezionato",
+            "rgNoRegion": "nessuna regione disegnata",
+            "problemsFound": "Problemi riscontrati",
+            "unsupportedModel": "livello non supportato per il modello base selezionato",
+            "controlAdapterIncompatibleBaseModel": "modello di base del livello di controllo incompatibile",
+            "rgNegativePromptNotSupported": "Prompt negativo non supportato per il modello base selezionato",
+            "ipAdapterIncompatibleBaseModel": "modello base dell'immagine di riferimento incompatibile",
+            "ipAdapterNoImageSelected": "nessuna immagine di riferimento selezionata",
+            "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato"
+        }
     },
     "ui": {
         "tabs": {
@@ -1969,7 +2103,9 @@
         "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine).",
         "exceedsMaxSize": "Le impostazioni di ampliamento superano il limite massimo delle dimensioni",
         "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata.",
-        "upscale": "Amplia"
+        "upscale": "Amplia",
+        "incompatibleBaseModel": "Architettura del modello principale non supportata per l'ampliamento",
+        "incompatibleBaseModelDesc": "L'ampliamento è supportato solo per i modelli di architettura SD1.5 e SDXL. Cambia il modello principale per abilitare l'ampliamento."
     },
     "upsell": {
         "inviteTeammates": "Invita collaboratori",
@@ -2030,15 +2166,14 @@
         "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
     },
     "whatsNew": {
-        "canvasV2Announcement": {
-            "readReleaseNotes": "Leggi le Note di Rilascio",
-            "fluxSupport": "Supporto per la famiglia di modelli Flux",
-            "newCanvas": "Una nuova potente tela di controllo",
-            "watchReleaseVideo": "Guarda il video di rilascio",
-            "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
-            "newLayerTypes": "Nuovi tipi di livello per un miglior controllo"
-        },
-        "whatsNewInInvoke": "Novità in Invoke"
+        "whatsNewInInvoke": "Novità in Invoke",
+        "readReleaseNotes": "Leggi le note di rilascio",
+        "watchRecentReleaseVideos": "Guarda i video su questa versione",
+        "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
+        "items": [
+            "<StrongComponent>Flussi di lavoro</StrongComponent>: esegui un flusso di lavoro per una raccolta di immagini utilizzando il nuovo nodo <StrongComponent>Lotto di immagini</StrongComponent>.",
+            "<StrongComponent>FLUX</StrongComponent>: Supporto per XLabs IP Adapter v2."
+        ]
     },
     "system": {
         "logLevel": {
@@ -2064,5 +2199,67 @@
             "logNamespaces": "Elementi del registro"
         },
         "enableLogging": "Abilita la registrazione"
+    },
+    "supportVideos": {
+        "gettingStarted": "Iniziare",
+        "supportVideos": "Video di supporto",
+        "videos": {
+            "usingControlLayersAndReferenceGuides": {
+                "title": "Utilizzo di livelli di controllo e guide di riferimento",
+                "description": "Scopri come guidare la creazione delle tue immagini con livelli di controllo e immagini di riferimento."
+            },
+            "creatingYourFirstImage": {
+                "description": "Introduzione alla creazione di un'immagine da zero utilizzando gli strumenti di Invoke.",
+                "title": "Creazione della tua prima immagine"
+            },
+            "understandingImageToImageAndDenoising": {
+                "description": "Panoramica delle trasformazioni immagine-a-immagine e della riduzione del rumore in Invoke.",
+                "title": "Comprendere immagine-a-immagine e riduzione del rumore"
+            },
+            "howDoIDoImageToImageTransformation": {
+                "description": "Tutorial su come eseguire trasformazioni da immagine a immagine in Invoke.",
+                "title": "Come si esegue la trasformazione da immagine-a-immagine?"
+            },
+            "howDoIUseInpaintMasks": {
+                "title": "Come si usano le maschere Inpaint?",
+                "description": "Come applicare maschere inpaint per la correzione e la variazione delle immagini."
+            },
+            "howDoIOutpaint": {
+                "description": "Guida all'outpainting oltre i confini dell'immagine originale.",
+                "title": "Come posso eseguire l'outpainting?"
+            },
+            "exploringAIModelsAndConceptAdapters": {
+                "description": "Approfondisci i modelli di intelligenza artificiale e scopri come utilizzare gli adattatori concettuali per il controllo creativo.",
+                "title": "Esplorazione dei modelli di IA e degli adattatori concettuali"
+            },
+            "upscaling": {
+                "title": "Ampliamento",
+                "description": "Come ampliare le immagini con gli strumenti di Invoke per migliorarne la risoluzione."
+            },
+            "creatingAndComposingOnInvokesControlCanvas": {
+                "description": "Impara a comporre immagini utilizzando la tela di controllo di Invoke.",
+                "title": "Creare e comporre sulla tela di controllo di Invoke"
+            },
+            "howDoIGenerateAndSaveToTheGallery": {
+                "description": "Passaggi per generare e salvare le immagini nella galleria.",
+                "title": "Come posso generare e salvare nella Galleria?"
+            },
+            "howDoIEditOnTheCanvas": {
+                "title": "Come posso apportare modifiche sulla tela?",
+                "description": "Guida alla modifica delle immagini direttamente sulla tela."
+            },
+            "howDoIUseControlNetsAndControlLayers": {
+                "title": "Come posso utilizzare le Reti di Controllo e i Livelli di Controllo?",
+                "description": "Impara ad applicare livelli di controllo e reti di controllo alle tue immagini."
+            },
+            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
+                "title": "Come si utilizzano gli adattatori IP globali e le immagini di riferimento?",
+                "description": "Introduzione all'aggiunta di immagini di riferimento e adattatori IP globali."
+            }
+        },
+        "controlCanvas": "Tela di Controllo",
+        "watch": "Guarda",
+        "studioSessionsDesc1": "Dai un'occhiata a <StudioSessionsPlaylistLink /> per approfondimenti su Invoke.",
+        "studioSessionsDesc2": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e fare domande. Le sessioni vengono caricate sulla playlist la settimana successiva."
     }
 }

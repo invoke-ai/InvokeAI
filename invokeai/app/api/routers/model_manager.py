@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
+import contextlib
 import io
 import pathlib
 import shutil
@@ -10,6 +11,7 @@ from enum import Enum
 from tempfile import TemporaryDirectory
 from typing import List, Optional, Type
 
+import huggingface_hub
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
@@ -27,6 +29,7 @@ from invokeai.app.services.model_records import (
     ModelRecordChanges,
     UnknownModelException,
 )
+from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -923,3 +926,51 @@ async def get_stats() -> Optional[CacheStats]:
     """Return performance statistics on the model manager's RAM cache. Will return null if no models have been loaded."""
 
     return ApiDependencies.invoker.services.model_manager.load.ram_cache.stats
+
+
+class HFTokenStatus(str, Enum):
+    VALID = "valid"
+    INVALID = "invalid"
+    UNKNOWN = "unknown"
+
+
+class HFTokenHelper:
+    @classmethod
+    def get_status(cls) -> HFTokenStatus:
+        try:
+            if huggingface_hub.get_token_permission(huggingface_hub.get_token()):
+                # Valid token!
+                return HFTokenStatus.VALID
+            # No token set
+            return HFTokenStatus.INVALID
+        except Exception:
+            return HFTokenStatus.UNKNOWN
+
+    @classmethod
+    def set_token(cls, token: str) -> HFTokenStatus:
+        with SuppressOutput(), contextlib.suppress(Exception):
+            huggingface_hub.login(token=token, add_to_git_credential=False)
+        return cls.get_status()
+
+
+@model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
+async def get_hf_login_status() -> HFTokenStatus:
+    token_status = HFTokenHelper.get_status()
+
+    if token_status is HFTokenStatus.UNKNOWN:
+        ApiDependencies.invoker.services.logger.warning("Unable to verify HF token")
+
+    return token_status
+
+
+@model_manager_router.post("/hf_login", operation_id="do_hf_login", response_model=HFTokenStatus)
+async def do_hf_login(
+    token: str = Body(description="Hugging Face token to use for login", embed=True),
+) -> HFTokenStatus:
+    HFTokenHelper.set_token(token)
+    token_status = HFTokenHelper.get_status()
+
+    if token_status is HFTokenStatus.UNKNOWN:
+        ApiDependencies.invoker.services.logger.warning("Unable to verify HF token")
+
+    return token_status

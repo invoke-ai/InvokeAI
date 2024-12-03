@@ -544,7 +544,6 @@
         "scanResults": "Результаты сканирования",
         "source": "Источник",
         "triggerPhrases": "Триггерные фразы",
-        "useDefaultSettings": "Использовать стандартные настройки",
         "modelName": "Название модели",
         "modelSettings": "Настройки модели",
         "upcastAttention": "Внимание",
@@ -573,7 +572,6 @@
         "simpleModelPlaceholder": "URL или путь к локальному файлу или папке diffusers",
         "urlOrLocalPath": "URL или локальный путь",
         "urlOrLocalPathHelper": "URL-адреса должны указывать на один файл. Локальные пути могут указывать на один файл или папку для одной модели диффузоров.",
-        "hfToken": "Токен HuggingFace",
         "starterModels": "Стартовые модели",
         "textualInversions": "Текстовые инверсии",
         "loraModels": "LoRAs",
@@ -650,19 +648,6 @@
             "missingFieldTemplate": "Отсутствует шаблон поля",
             "addingImagesTo": "Добавление изображений в",
             "invoke": "Создать",
-            "layer": {
-                "ipAdapterNoModelSelected": "IP адаптер не выбран",
-                "controlAdapterNoModelSelected": "не выбрана модель адаптера контроля",
-                "controlAdapterIncompatibleBaseModel": "несовместимая базовая модель адаптера контроля",
-                "rgNoRegion": "регион не выбран",
-                "rgNoPromptsOrIPAdapters": "нет текстовых запросов или IP-адаптеров",
-                "ipAdapterIncompatibleBaseModel": "несовместимая базовая модель IP-адаптера",
-                "ipAdapterNoImageSelected": "изображение IP-адаптера не выбрано",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, масштабированная ширина рамки {{width}}",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, высота рамки {{height}}",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, ширина рамки {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, масштабированная высота рамки {{height}}"
-            },
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), ширина рамки {{width}}",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), высота рамки {{height}}",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), масштабированная высота рамки {{height}}",
@@ -1402,7 +1387,6 @@
         }
     },
     "metadata": {
-        "seamless": "Бесшовность",
         "positivePrompt": "Запрос",
         "negativePrompt": "Негативный запрос",
         "generationMode": "Режим генерации",
@@ -1663,7 +1647,6 @@
         "clearCaches": "Очистить кэши",
         "recalculateRects": "Пересчитать прямоугольники",
         "saveBboxToGallery": "Сохранить рамку в галерею",
-        "resetCanvas": "Сбросить холст",
         "canvas": "Холст",
         "global": "Глобальный",
         "newGlobalReferenceImageError": "Проблема с созданием глобального эталонного изображения",
@@ -1836,14 +1819,12 @@
         },
         "settings": {
             "isolatedPreview": "Изолированный предпросмотр",
-            "isolatedTransformingPreview": "Изолированный предпросмотр преобразования",
             "invertBrushSizeScrollDirection": "Инвертировать прокрутку для размера кисти",
             "snapToGrid": {
                 "label": "Привязка к сетке",
                 "on": "Вкл",
                 "off": "Выкл"
             },
-            "isolatedFilteringPreview": "Изолированный предпросмотр фильтрации",
             "pressureSensitivity": "Чувствительность к давлению",
             "isolatedStagingPreview": "Изолированный предпросмотр на промежуточной стадии",
             "preserveMask": {
@@ -1865,7 +1846,6 @@
         "enableAutoNegative": "Включить авто негатив",
         "maskFill": "Заполнение маски",
         "viewProgressInViewer": "Просматривайте прогресс и результаты в <Btn>Просмотрщике изображений</Btn>.",
-        "convertToRasterLayer": "Конвертировать в растровый слой",
         "tool": {
             "move": "Двигать",
             "bbox": "Ограничительная рамка",
@@ -1933,7 +1913,6 @@
         "newGallerySession": "Новая сессия галереи",
         "sendToCanvasDesc": "Нажатие кнопки Invoke отображает вашу текущую работу на холсте.",
         "globalReferenceImages_withCount_hidden": "Глобальные эталонные изображения ({{count}} скрыто)",
-        "convertToControlLayer": "Конвертировать в контрольный слой",
         "layer_withCount_one": "Слой ({{count}})",
         "layer_withCount_few": "Слои ({{count}})",
         "layer_withCount_many": "Слои ({{count}})",
@@ -2063,14 +2042,6 @@
         }
     },
     "whatsNew": {
-        "canvasV2Announcement": {
-            "newLayerTypes": "Новые типы слоев для еще большего контроля",
-            "readReleaseNotes": "Прочитать информацию о выпуске",
-            "watchReleaseVideo": "Смотреть видео о выпуске",
-            "fluxSupport": "Поддержка семейства моделей Flux",
-            "newCanvas": "Новый мощный холст управления",
-            "watchUiUpdatesOverview": "Обзор обновлений пользовательского интерфейса"
-        },
         "whatsNewInInvoke": "Что нового в Invoke"
     },
     "newUserExperience": {

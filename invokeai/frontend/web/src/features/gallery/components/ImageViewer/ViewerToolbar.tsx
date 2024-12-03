@@ -12,18 +12,18 @@ type Props = {
 
 export const ViewerToolbar = memo(({ closeButton }: Props) => {
   return (
-    <Flex w="full" gap={2}>
+    <Flex w="full" px={2} gap={2} bg="base.750" borderTopRadius="base" h={12}>
       <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineEnd="auto">
+        <Flex marginInlineEnd="auto" alignItems="center">
           <ToggleProgressButton />
           <ToggleMetadataViewerButton />
         </Flex>
       </Flex>
-      <Flex flex={1} gap={2} justifyContent="center">
+      <Flex flex={1} justifyContent="center" alignItems="center">
         <CurrentImageButtons />
       </Flex>
       <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineStart="auto">
+        <Flex marginInlineStart="auto" alignItems="center">
           {closeButton}
         </Flex>
       </Flex>

@@ -1,4 +1,3 @@
-import type { SerializableObject } from 'common/types';
 import { parseify } from 'common/util/serialize';
 import type { Templates } from 'features/nodes/store/types';
 import {
@@ -11,13 +10,14 @@ import { isWorkflowInvocationNode } from 'features/nodes/types/workflow';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
+import type { JsonObject } from 'type-fest';
 
 import { parseAndMigrateWorkflow } from './migrations';
 
 type WorkflowWarning = {
   message: string;
   issues?: string[];
-  data: SerializableObject;
+  data: JsonObject;
 };
 
 type ValidateWorkflowResult = {
@@ -30,6 +30,7 @@ const MODEL_FIELD_TYPES = [
   'MainModelField',
   'SDXLMainModelField',
   'FluxMainModelField',
+  'SD3MainModelField',
   'SDXLRefinerModelField',
   'VAEModelField',
   'LoRAModelField',

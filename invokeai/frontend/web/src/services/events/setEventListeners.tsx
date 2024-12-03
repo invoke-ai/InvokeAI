@@ -5,8 +5,9 @@ import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import { $isHFForbiddenToastOpen } from 'features/modelManagerV2/hooks/useHFForbiddenToast';
+import { $isHFLoginToastOpen } from 'features/modelManagerV2/hooks/useHFLoginToast';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
@@ -20,6 +21,7 @@ import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
+import type { JsonObject } from 'type-fest';
 
 import { $lastProgressEvent } from './stores';
 
@@ -74,7 +76,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('invocation_started', (data) => {
     const { invocation_source_id, invocation } = data;
-    log.debug({ data } as SerializableObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
+    log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
     if (nes) {
       nes.status = zNodeStatus.enum.IN_PROGRESS;
@@ -94,7 +96,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
     _message += ` (${invocation.type}, ${invocation_source_id})`;
 
-    log.trace({ data } as SerializableObject, _message);
+    log.trace({ data } as JsonObject, _message);
 
     $lastProgressEvent.set(data);
 
@@ -111,7 +113,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('invocation_error', (data) => {
     const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
-    log.error({ data } as SerializableObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
+    log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
     const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
     if (nes) {
       nes.status = zNodeStatus.enum.FAILED;
@@ -294,6 +296,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     const { id, error, error_type } = data;
     const installs = selectModelInstalls(getState()).data;
+
+    if (error === 'Unauthorized') {
+      $isHFLoginToastOpen.set(true);
+    }
+
+    if (error === 'Forbidden') {
+      $isHFForbiddenToastOpen.set({ isEnabled: true, source: data.source });
+    }
 
     if (!installs?.find((install) => install.id === id)) {
       dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));

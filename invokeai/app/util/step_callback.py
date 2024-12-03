@@ -34,6 +34,25 @@ SD1_5_LATENT_RGB_FACTORS = [
     [-0.1307, -0.1874, -0.7445],  # L4
 ]
 
+SD3_5_LATENT_RGB_FACTORS = [
+    [-0.05240681, 0.03251581, 0.0749016],
+    [-0.0580572, 0.00759826, 0.05729818],
+    [0.16144888, 0.01270368, -0.03768577],
+    [0.14418615, 0.08460266, 0.15941818],
+    [0.04894035, 0.0056485, -0.06686988],
+    [0.05187166, 0.19222395, 0.06261094],
+    [0.1539433, 0.04818359, 0.07103094],
+    [-0.08601796, 0.09013458, 0.10893912],
+    [-0.12398469, -0.06766567, 0.0033688],
+    [-0.0439737, 0.07825329, 0.02258823],
+    [0.03101129, 0.06382551, 0.07753657],
+    [-0.01315361, 0.08554491, -0.08772475],
+    [0.06464487, 0.05914605, 0.13262741],
+    [-0.07863674, -0.02261737, -0.12761454],
+    [-0.09923835, -0.08010759, -0.06264447],
+    [-0.03392309, -0.0804029, -0.06078822],
+]
+
 FLUX_LATENT_RGB_FACTORS = [
     [-0.0412, 0.0149, 0.0521],
     [0.0056, 0.0291, 0.0768],
@@ -110,6 +129,9 @@ def stable_diffusion_step_callback(
         sdxl_latent_rgb_factors = torch.tensor(SDXL_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
         sdxl_smooth_matrix = torch.tensor(SDXL_SMOOTH_MATRIX, dtype=sample.dtype, device=sample.device)
         image = sample_to_lowres_estimated_image(sample, sdxl_latent_rgb_factors, sdxl_smooth_matrix)
+    elif base_model == BaseModelType.StableDiffusion3:
+        sd3_latent_rgb_factors = torch.tensor(SD3_5_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
+        image = sample_to_lowres_estimated_image(sample, sd3_latent_rgb_factors)
     else:
         v1_5_latent_rgb_factors = torch.tensor(SD1_5_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
         image = sample_to_lowres_estimated_image(sample, v1_5_latent_rgb_factors)

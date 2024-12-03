@@ -97,16 +97,16 @@ Prior to installing PyPatchMatch, you need to take the following steps:
    sudo pacman -S --needed base-devel
    ```
 
-2. Install `opencv` and `blas`:
+2. Install `opencv`, `blas`, and required dependencies:
 
    ```sh
-   sudo pacman -S opencv blas
+   sudo pacman -S opencv blas fmt glew vtk hdf5
    ```
 
    or for CUDA support
 
    ```sh
-   sudo pacman -S opencv-cuda blas
+   sudo pacman -S opencv-cuda blas fmt glew vtk hdf5
    ```
 
 3. Fix the naming of the `opencv` package configuration file:

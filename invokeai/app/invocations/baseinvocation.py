@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import sys
 import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -62,6 +63,7 @@ class Classification(str, Enum, metaclass=MetaEnum):
     - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
     - `Deprecated`: The invocation is deprecated and may be removed in a future version.
     - `Internal`: The invocation is not intended for use by end-users. It may be changed or removed at any time, but is exposed for users to play with.
+    - `Special`: The invocation is a special case and does not fit into any of the other classifications.
     """
 
     Stable = "stable"
@@ -69,6 +71,7 @@ class Classification(str, Enum, metaclass=MetaEnum):
     Prototype = "prototype"
     Deprecated = "deprecated"
     Internal = "internal"
+    Special = "special"
 
 
 class UIConfigBase(BaseModel):
@@ -192,11 +195,18 @@ class BaseInvocation(ABC, BaseModel):
         """Gets a pydantc TypeAdapter for the union of all invocation types."""
         if not cls._typeadapter or cls._typeadapter_needs_update:
             AnyInvocation = TypeAliasType(
-                "AnyInvocation", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
+                "AnyInvocation", Annotated[Union[tuple(cls.get_invocations())], Field(discriminator="type")]
             )
             cls._typeadapter = TypeAdapter(AnyInvocation)
             cls._typeadapter_needs_update = False
         return cls._typeadapter
+
+    @classmethod
+    def invalidate_typeadapter(cls) -> None:
+        """Invalidates the typeadapter, forcing it to be rebuilt on next access. If the invocation allowlist or
+        denylist is changed, this should be called to ensure the typeadapter is updated and validation respects
+        the updated allowlist and denylist."""
+        cls._typeadapter_needs_update = True
 
     @classmethod
     def get_invocations(cls) -> Iterable[BaseInvocation]:
@@ -478,6 +488,26 @@ def invocation(
         invocation_type_field = Field(
             title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
         )
+
+        # Validate the `invoke()` method is implemented
+        if "invoke" in cls.__abstractmethods__:
+            raise ValueError(f'Invocation "{invocation_type}" must implement the "invoke" method')
+
+        # And validate that `invoke()` returns a subclass of `BaseInvocationOutput
+        invoke_return_annotation = signature(cls.invoke).return_annotation
+
+        try:
+            # TODO(psyche): If `invoke()` is not defined, `return_annotation` ends up as the string "BaseInvocationOutput"
+            # instead of the class `BaseInvocationOutput`. This may be a pydantic bug: https://github.com/pydantic/pydantic/issues/7978
+            if isinstance(invoke_return_annotation, str):
+                invoke_return_annotation = getattr(sys.modules[cls.__module__], invoke_return_annotation)
+
+            assert invoke_return_annotation is not BaseInvocationOutput
+            assert issubclass(invoke_return_annotation, BaseInvocationOutput)
+        except Exception:
+            raise ValueError(
+                f'Invocation "{invocation_type}" must have a return annotation of a subclass of BaseInvocationOutput (got "{invoke_return_annotation}")'
+            )
 
         docstring = cls.__doc__
         cls = create_model(

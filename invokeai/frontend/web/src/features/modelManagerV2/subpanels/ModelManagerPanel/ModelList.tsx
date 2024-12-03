@@ -80,19 +80,19 @@ const ModelList = () => {
     [clipVisionModels, searchTerm, filteredModelType]
   );
 
-  const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels();
+  const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels({ excludeSubmodels: true });
   const filteredVAEModels = useMemo(
     () => modelsFilter(vaeModels, searchTerm, filteredModelType),
     [vaeModels, searchTerm, filteredModelType]
   );
 
-  const [t5EncoderModels, { isLoading: isLoadingT5EncoderModels }] = useT5EncoderModels();
+  const [t5EncoderModels, { isLoading: isLoadingT5EncoderModels }] = useT5EncoderModels({ excludeSubmodels: true });
   const filteredT5EncoderModels = useMemo(
     () => modelsFilter(t5EncoderModels, searchTerm, filteredModelType),
     [t5EncoderModels, searchTerm, filteredModelType]
   );
 
-  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useCLIPEmbedModels();
+  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useCLIPEmbedModels({ excludeSubmodels: true });
   const filteredClipEmbedModels = useMemo(
     () => modelsFilter(clipEmbedModels, searchTerm, filteredModelType),
     [clipEmbedModels, searchTerm, filteredModelType]

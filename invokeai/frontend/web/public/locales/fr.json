@@ -5,7 +5,7 @@
         "reportBugLabel": "Signaler un bug",
         "settingsLabel": "Paramètres",
         "img2img": "Image vers Image",
-        "nodes": "Processus",
+        "nodes": "Workflows",
         "upload": "Importer",
         "load": "Charger",
         "back": "Retour",
@@ -95,7 +95,8 @@
         "positivePrompt": "Prompt Positif",
         "negativePrompt": "Prompt Négatif",
         "ok": "Ok",
-        "close": "Fermer"
+        "close": "Fermer",
+        "clipboard": "Presse-papier"
     },
     "gallery": {
         "galleryImageSize": "Taille de l'image",
@@ -161,7 +162,7 @@
         "unstarImage": "Retirer le marquage de l'Image",
         "viewerImage": "Visualisation de l'Image",
         "imagesSettings": "Paramètres des images de la galerie",
-        "assetsTab": "Fichiers que vous avez importé pour vos projets.",
+        "assetsTab": "Fichiers que vous avez importés pour vos projets.",
         "imagesTab": "Images que vous avez créées et enregistrées dans Invoke.",
         "boardsSettings": "Paramètres des planches"
     },
@@ -219,7 +220,6 @@
         "typePhraseHere": "Écrire une phrase ici",
         "cancel": "Annuler",
         "defaultSettingsSaved": "Paramètres par défaut enregistrés",
-        "hfToken": "Token HuggingFace",
         "imageEncoderModelId": "ID du modèle d'encodeur d'image",
         "path": "Chemin sur le disque",
         "repoVariant": "Variante de dépôt",
@@ -254,7 +254,6 @@
         "loraModels": "LoRAs",
         "main": "Principal",
         "urlOrLocalPathHelper": "Les URL doivent pointer vers un seul fichier. Les chemins locaux peuvent pointer vers un seul fichier ou un dossier pour un seul modèle de diffuseurs.",
-        "useDefaultSettings": "Utiliser les paramètres par défaut",
         "modelImageUpdateFailed": "Mise à jour de l'image du modèle échouée",
         "loraTriggerPhrases": "Phrases de déclenchement LoRA",
         "mainModelTriggerPhrases": "Phrases de déclenchement du modèle principal",
@@ -284,24 +283,28 @@
         "skippingXDuplicates_many": ", en ignorant {{count}} doublons",
         "skippingXDuplicates_other": ", en ignorant {{count}} doublons",
         "installingModel": "Modèle en cours d'installation",
-        "installingBundle": "Pack en cours d'installation"
+        "installingBundle": "Pack en cours d'installation",
+        "noDefaultSettings": "Aucun paramètre par défaut configuré pour ce modèle. Visitez le Gestionnaire de Modèles pour ajouter des paramètres par défaut.",
+        "usingDefaultSettings": "Utilisation des paramètres par défaut du modèle",
+        "defaultSettingsOutOfSync": "Certain paramètres ne correspondent pas aux valeurs par défaut du modèle :",
+        "restoreDefaultSettings": "Cliquez pour utiliser les paramètres par défaut du modèle."
     },
     "parameters": {
         "images": "Images",
-        "steps": "Etapes",
-        "cfgScale": "CFG Echelle",
+        "steps": "Étapes",
+        "cfgScale": "Échelle CFG",
         "width": "Largeur",
         "height": "Hauteur",
         "seed": "Graine",
-        "shuffle": "Mélanger la graine",
+        "shuffle": "Nouvelle graine",
         "noiseThreshold": "Seuil de Bruit",
         "perlinNoise": "Bruit de Perlin",
         "type": "Type",
         "strength": "Force",
         "upscaling": "Agrandissement",
-        "scale": "Echelle",
+        "scale": "Échelle",
         "imageFit": "Ajuster Image Initiale à la Taille de Sortie",
-        "scaleBeforeProcessing": "Echelle Avant Traitement",
+        "scaleBeforeProcessing": "Échelle Avant Traitement",
         "scaledWidth": "Larg. Échelle",
         "scaledHeight": "Haut. Échelle",
         "infillMethod": "Méthode de Remplissage",
@@ -314,19 +317,6 @@
         "info": "Info",
         "showOptionsPanel": "Afficher le panneau latéral (O ou T)",
         "invoke": {
-            "layer": {
-                "rgNoPromptsOrIPAdapters": "aucun prompts ou IP Adapters",
-                "t2iAdapterIncompatibleScaledBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la largeur de la bounding box mise à l'échelle est {{width}}",
-                "t2iAdapterIncompatibleScaledBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la hauteur de la bounding box mise à l'échelle est {{height}}",
-                "ipAdapterNoModelSelected": "aucun IP adapter sélectionné",
-                "ipAdapterNoImageSelected": "aucune image d'IP adapter sélectionnée",
-                "controlAdapterIncompatibleBaseModel": "modèle de base de Control Adapter incompatible",
-                "t2iAdapterIncompatibleBboxHeight": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la hauteur de la bounding box est {{height}}",
-                "t2iAdapterIncompatibleBboxWidth": "$t(parameters.invoke.layer.t2iAdapterRequiresDimensionsToBeMultipleOf) {{multiple}}, la largeur de la bounding box est {{width}}",
-                "ipAdapterIncompatibleBaseModel": "modèle de base d'IP adapter incompatible",
-                "rgNoRegion": "aucune zone sélectionnée",
-                "controlAdapterNoModelSelected": "aucun modèle de Control Adapter sélectionné"
-            },
             "noPrompts": "Aucun prompts généré",
             "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} entrée manquante",
             "missingFieldTemplate": "Modèle de champ manquant",
@@ -422,7 +412,10 @@
         "clearIntermediatesWithCount_other": "Effacé {{count}} Intermédiaires",
         "informationalPopoversDisabled": "Pop-ups d'information désactivés",
         "informationalPopoversDisabledDesc": "Les pop-ups d'information ont été désactivés. Activez-les dans les paramètres.",
-        "confirmOnNewSession": "Confirmer lors d'une nouvelle session"
+        "confirmOnNewSession": "Confirmer lors d'une nouvelle session",
+        "modelDescriptionsDisabledDesc": "Les descriptions des modèles dans les menus déroulants ont été désactivées. Activez-les dans les paramètres.",
+        "enableModelDescriptions": "Activer les descriptions de modèle dans les menus déroulants",
+        "modelDescriptionsDisabled": "Descriptions de modèle dans les menus déroulants désactivés"
     },
     "toast": {
         "uploadFailed": "Importation échouée",
@@ -435,22 +428,22 @@
         "parameterNotSet": "Paramètre non Rappelé",
         "canceled": "Traitement annulé",
         "addedToBoard": "Ajouté aux ressources de la planche {{name}}",
-        "workflowLoaded": "Processus chargé",
+        "workflowLoaded": "Workflow chargé",
         "connected": "Connecté au serveur",
         "setNodeField": "Définir comme champ de nœud",
         "imageUploadFailed": "Échec de l'importation de l'image",
-        "loadedWithWarnings": "Processus chargé avec des avertissements",
+        "loadedWithWarnings": "Workflow chargé avec des avertissements",
         "imageUploaded": "Image importée",
         "modelAddedSimple": "Modèle ajouté à la file d'attente",
         "setControlImage": "Définir comme image de contrôle",
-        "workflowDeleted": "Processus supprimé",
+        "workflowDeleted": "Workflow supprimé",
         "baseModelChangedCleared_one": "Effacé ou désactivé {{count}} sous-modèle incompatible",
         "baseModelChangedCleared_many": "Effacé ou désactivé {{count}} sous-modèles incompatibles",
         "baseModelChangedCleared_other": "Effacé ou désactivé {{count}} sous-modèles incompatibles",
         "invalidUpload": "Importation invalide",
         "problemDownloadingImage": "Impossible de télécharger l'image",
-        "problemRetrievingWorkflow": "Problème de récupération du processus",
-        "problemDeletingWorkflow": "Problème de suppression du processus",
+        "problemRetrievingWorkflow": "Problème de récupération du Workflow",
+        "problemDeletingWorkflow": "Problème de suppression du Workflow",
         "prunedQueue": "File d'attente vidée",
         "parameters": "Paramètres",
         "modelImportCanceled": "Importation du modèle annulée",
@@ -550,7 +543,7 @@
     "accordions": {
         "advanced": {
             "title": "Avancé",
-            "options": "$t(accordions.advanced.title) Options"
+            "options": "Options $t(accordions.advanced.title)"
         },
         "image": {
             "title": "Image"
@@ -631,7 +624,7 @@
         "graphQueued": "Graph ajouté à la file d'attente",
         "other": "Autre",
         "generation": "Génération",
-        "workflows": "Processus",
+        "workflows": "Workflows",
         "batchFailedToQueue": "Impossible d'ajouter le Lot dans à la file d'attente",
         "graphFailedToQueue": "Impossible d'ajouter le graph à la file d'attente",
         "item": "Élément",
@@ -704,8 +697,8 @@
                 "desc": "Rappelle toutes les métadonnées pour l'image actuelle."
             },
             "loadWorkflow": {
-                "title": "Charger le processus",
-                "desc": "Charge le processus enregistré de l'image actuelle (s'il en a un)."
+                "title": "Ouvrir un Workflow",
+                "desc": "Charge le workflow enregistré lié à l'image actuelle (s'il en a un)."
             },
             "recallSeed": {
                 "desc": "Rappelle la graine pour l'image actuelle.",
@@ -756,8 +749,8 @@
                 "desc": "Séléctionne l'onglet Agrandissement."
             },
             "selectWorkflowsTab": {
-                "desc": "Sélectionne l'onglet Processus.",
-                "title": "Sélectionner l'onglet Processus"
+                "desc": "Sélectionne l'onglet Workflows.",
+                "title": "Sélectionner l'onglet Workflows"
             },
             "togglePanels": {
                 "desc": "Affiche ou masque les panneaux gauche et droit en même temps.",
@@ -963,11 +956,11 @@
             },
             "undo": {
                 "title": "Annuler",
-                "desc": "Annule la dernière action de processus."
+                "desc": "Annule la dernière action de workflow."
             },
             "redo": {
                 "title": "Rétablir",
-                "desc": "Rétablit la dernière action de processus."
+                "desc": "Rétablit la dernière action de workflow."
             },
             "addNode": {
                 "desc": "Ouvre le menu d'ajout de nœud.",
@@ -985,7 +978,7 @@
                 "desc": "Colle les nœuds et les connections copiés.",
                 "title": "Coller"
             },
-            "title": "Processus"
+            "title": "Workflows"
         }
     },
     "popovers": {
@@ -1372,6 +1365,43 @@
                 "Des valeurs de guidage élevées peuvent entraîner une saturation excessive, et un guidage élevé ou faible peut entraîner des résultats de génération déformés. Le guidage ne s'applique qu'aux modèles FLUX DEV."
             ],
             "heading": "Guidage"
+        },
+        "globalReferenceImage": {
+            "heading": "Image de Référence Globale",
+            "paragraphs": [
+                "Applique une image de référence pour influencer l'ensemble de la génération."
+            ]
+        },
+        "regionalReferenceImage": {
+            "heading": "Image de Référence Régionale",
+            "paragraphs": [
+                "Pinceau pour appliquer une image de référence à des zones spécifiques."
+            ]
+        },
+        "inpainting": {
+            "heading": "Inpainting",
+            "paragraphs": [
+                "Contrôle la zone qui est modifiée, guidé par la force de débruitage."
+            ]
+        },
+        "regionalGuidance": {
+            "heading": "Guide Régional",
+            "paragraphs": [
+                "Pinceau pour guider l'emplacement des éléments provenant des prompts globaux."
+            ]
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "heading": "Guide régional et image de référence régionale",
+            "paragraphs": [
+                "Pour le Guide Régional, utilisez le pinceau pour indiquer où les éléments des prompts globaux doivent apparaître.",
+                "Pour l'image de référence régionale, pinceau pour appliquer une image de référence à des zones spécifiques."
+            ]
+        },
+        "rasterLayer": {
+            "heading": "Couche Rastérisation",
+            "paragraphs": [
+                "Contenu basé sur les pixels de votre toile, utilisé lors de la génération d'images."
+            ]
         }
     },
     "dynamicPrompts": {
@@ -1392,12 +1422,11 @@
         "positivePrompt": "Prompt Positif",
         "allPrompts": "Tous les Prompts",
         "negativePrompt": "Prompt Négatif",
-        "seamless": "Sans jointure",
         "metadata": "Métadonné",
         "scheduler": "Planificateur",
         "imageDetails": "Détails de l'Image",
         "seed": "Graine",
-        "workflow": "Processus",
+        "workflow": "Workflow",
         "width": "Largeur",
         "Threshold": "Seuil de bruit",
         "noMetaData": "Aucune métadonnée trouvée",
@@ -1446,8 +1475,8 @@
         "hideMinimapnodes": "Masquer MiniCarte",
         "zoomOutNodes": "Dézoomer",
         "zoomInNodes": "Zoomer",
-        "downloadWorkflow": "Télécharger processus en JSON",
-        "loadWorkflow": "Charger le processus",
+        "downloadWorkflow": "Exporter le Workflow au format JSON",
+        "loadWorkflow": "Charger un Workflow",
         "reloadNodeTemplates": "Recharger les modèles de nœuds",
         "animatedEdges": "Connexions animées",
         "cannotConnectToSelf": "Impossible de se connecter à soi-même",
@@ -1470,16 +1499,16 @@
         "float": "Flottant",
         "mismatchedVersion": "Nœud invalide : le nœud {{node}} de type {{type}} a une version incompatible (essayez de mettre à jour ?)",
         "missingTemplate": "Nœud invalide : le nœud {{node}} de type {{type}} modèle manquant (non installé ?)",
-        "noWorkflow": "Pas de processus",
+        "noWorkflow": "Pas de Workflow",
         "validateConnectionsHelp": "Prévenir la création de connexions invalides et l'invocation de graphes invalides",
-        "workflowSettings": "Paramètres de l'Éditeur de Processus",
-        "workflowValidation": "Erreur de validation du processus",
+        "workflowSettings": "Paramètres de l'Éditeur de Workflow",
+        "workflowValidation": "Erreur de validation du Workflow",
         "executionStateInProgress": "En cours",
         "node": "Noeud",
         "scheduler": "Planificateur",
         "notes": "Notes",
-        "notesDescription": "Ajouter des notes sur votre processus",
-        "unableToLoadWorkflow": "Impossible de charger le processus",
+        "notesDescription": "Ajouter des notes sur votre workflow",
+        "unableToLoadWorkflow": "Impossible de charger le Workflow",
         "addNode": "Ajouter un nœud",
         "problemSettingTitle": "Problème lors de définition du Titre",
         "connectionWouldCreateCycle": "La connexion créerait un cycle",
@@ -1502,7 +1531,7 @@
         "noOutputRecorded": "Aucun résultat enregistré",
         "removeLinearView": "Retirer de la vue linéaire",
         "snapToGrid": "Aligner sur la grille",
-        "workflow": "Processus",
+        "workflow": "Workflow",
         "updateApp": "Mettre à jour l'application",
         "updateNode": "Mettre à jour le nœud",
         "nodeOutputs": "Sorties de nœud",
@@ -1515,7 +1544,7 @@
         "string": "Chaîne de caractères",
         "workflowName": "Nom",
         "snapToGridHelp": "Aligner les nœuds sur la grille lors du déplacement",
-        "unableToValidateWorkflow": "Impossible de valider le processus",
+        "unableToValidateWorkflow": "Impossible de valider le Workflow",
         "validateConnections": "Valider les connexions et le graphique",
         "unableToUpdateNodes_one": "Impossible de mettre à jour {{count}} nœud",
         "unableToUpdateNodes_many": "Impossible de mettre à jour {{count}} nœuds",
@@ -1528,15 +1557,15 @@
         "nodePack": "Paquet de nœuds",
         "sourceNodeDoesNotExist": "Connexion invalide : le nœud source/de sortie {{node}} n'existe pas",
         "sourceNodeFieldDoesNotExist": "Connexion invalide : {{node}}.{{field}} n'existe pas",
-        "unableToGetWorkflowVersion": "Impossible d'obtenir la version du schéma de processus",
-        "newWorkflowDesc2": "Votre processus actuel comporte des modifications non enregistrées.",
+        "unableToGetWorkflowVersion": "Impossible d'obtenir la version du schéma du Workflow",
+        "newWorkflowDesc2": "Votre workflow actuel comporte des modifications non enregistrées.",
         "deletedInvalidEdge": "Connexion invalide supprimé {{source}} -> {{target}}",
         "targetNodeDoesNotExist": "Connexion invalide : le nœud cible/entrée {{node}} n'existe pas",
         "targetNodeFieldDoesNotExist": "Connexion invalide : le champ {{node}}.{{field}} n'existe pas",
         "nodeVersion": "Version du noeud",
-        "clearWorkflowDesc2": "Votre processus actuel comporte des modifications non enregistrées.",
-        "clearWorkflow": "Effacer le Processus",
-        "clearWorkflowDesc": "Effacer ce processus et en commencer un nouveau ?",
+        "clearWorkflowDesc2": "Votre workflow actuel comporte des modifications non enregistrées.",
+        "clearWorkflow": "Effacer le Workflow",
+        "clearWorkflowDesc": "Effacer ce workflow et en commencer un nouveau ?",
         "unsupportedArrayItemType": "type d'élément de tableau non pris en charge \"{{type}}\"",
         "addLinearView": "Ajouter à la vue linéaire",
         "collectionOrScalarFieldType": "{{name}} (Unique ou Collection)",
@@ -1545,7 +1574,7 @@
         "ipAdapter": "IP-Adapter",
         "viewMode": "Utiliser en vue linéaire",
         "collectionFieldType": "{{name}} (Collection)",
-        "newWorkflow": "Nouveau processus",
+        "newWorkflow": "Nouveau Workflow",
         "reorderLinearView": "Réorganiser la vue linéaire",
         "unknownOutput": "Sortie inconnue : {{name}}",
         "outputFieldTypeParseError": "Impossible d'analyser le type du champ de sortie {{node}}.{{field}} ({{message}})",
@@ -1555,13 +1584,13 @@
         "unknownFieldType": "$t(nodes.unknownField) type : {{type}}",
         "inputFieldTypeParseError": "Impossible d'analyser le type du champ d'entrée {{node}}.{{field}} ({{message}})",
         "unableToExtractSchemaNameFromRef": "impossible d'extraire le nom du schéma à partir de la référence",
-        "editMode": "Modifier dans l'éditeur de processus",
-        "unknownErrorValidatingWorkflow": "Erreur inconnue lors de la validation du processus",
+        "editMode": "Modifier dans l'éditeur de Workflow",
+        "unknownErrorValidatingWorkflow": "Erreur inconnue lors de la validation du Workflow",
         "updateAllNodes": "Mettre à jour les nœuds",
         "allNodesUpdated": "Tous les nœuds mis à jour",
-        "newWorkflowDesc": "Créer un nouveau processus ?",
+        "newWorkflowDesc": "Créer un nouveau workflow ?",
         "edit": "Modifier",
-        "noFieldsViewMode": "Ce processus n'a aucun champ sélectionné à afficher. Consultez le processus complet pour configurer les valeurs.",
+        "noFieldsViewMode": "Ce workflow n'a aucun champ sélectionné à afficher. Consultez le workflow complet pour configurer les valeurs.",
         "graph": "Graph",
         "modelAccessError": "Impossible de trouver le modèle {{key}}, réinitialisation aux paramètres par défaut",
         "showEdgeLabelsHelp": "Afficher le nom sur les connections, indiquant les nœuds connectés",
@@ -1575,9 +1604,9 @@
         "missingInvocationTemplate": "Modèle d'invocation manquant",
         "imageAccessError": "Impossible de trouver l'image {{image_name}}, réinitialisation à la valeur par défaut",
         "boardAccessError": "Impossible de trouver la planche {{board_id}}, réinitialisation à la valeur par défaut",
-        "workflowHelpText": "Besoin d'aide ? Consultez notre guide sur <LinkComponent>Comment commencer avec les Processus</LinkComponent>.",
-        "noWorkflows": "Aucun Processus",
-        "noMatchingWorkflows": "Aucun processus correspondant"
+        "workflowHelpText": "Besoin d'aide ? Consultez notre guide sur <LinkComponent>Comment commencer avec les Workflows</LinkComponent>.",
+        "noWorkflows": "Aucun Workflows",
+        "noMatchingWorkflows": "Aucun Workflows correspondant"
     },
     "models": {
         "noMatchingModels": "Aucun modèle correspondant",
@@ -1594,59 +1623,51 @@
     },
     "workflows": {
         "workflowLibrary": "Bibliothèque",
-        "loading": "Chargement des processus",
-        "searchWorkflows": "Rechercher des processus",
-        "workflowCleared": "Processus effacé",
+        "loading": "Chargement des Workflows",
+        "searchWorkflows": "Chercher des Workflows",
+        "workflowCleared": "Workflow effacé",
         "noDescription": "Aucune description",
-        "deleteWorkflow": "Supprimer le processus",
-        "openWorkflow": "Ouvrir le processus",
+        "deleteWorkflow": "Supprimer le Workflow",
+        "openWorkflow": "Ouvrir le Workflow",
         "uploadWorkflow": "Charger à partir d'un fichier",
-        "workflowName": "Nom du processus",
-        "unnamedWorkflow": "Processus sans nom",
-        "saveWorkflowAs": "Enregistrer le processus sous",
-        "workflows": "Processus",
-        "savingWorkflow": "Enregistrement du processus...",
-        "saveWorkflowToProject": "Enregistrer le processus dans le projet",
+        "workflowName": "Nom du Workflow",
+        "unnamedWorkflow": "Workflow sans nom",
+        "saveWorkflowAs": "Enregistrer le Workflow sous",
+        "workflows": "Workflows",
+        "savingWorkflow": "Enregistrement du Workflow...",
+        "saveWorkflowToProject": "Enregistrer le Workflow dans le projet",
         "downloadWorkflow": "Enregistrer dans le fichier",
-        "saveWorkflow": "Enregistrer le processus",
-        "problemSavingWorkflow": "Problème de sauvegarde du processus",
-        "workflowEditorMenu": "Menu de l'Éditeur de Processus",
-        "newWorkflowCreated": "Nouveau processus créé",
-        "clearWorkflowSearchFilter": "Réinitialiser le filtre de recherche de processus",
-        "problemLoading": "Problème de chargement des processus",
-        "workflowSaved": "Processus enregistré",
-        "noWorkflows": "Pas de processus",
+        "saveWorkflow": "Enregistrer le Workflow",
+        "problemSavingWorkflow": "Problème de sauvegarde du Workflow",
+        "workflowEditorMenu": "Menu de l'Éditeur de Workflow",
+        "newWorkflowCreated": "Nouveau Workflow créé",
+        "clearWorkflowSearchFilter": "Réinitialiser le filtre de recherche de Workflow",
+        "problemLoading": "Problème de chargement des Workflows",
+        "workflowSaved": "Workflow enregistré",
+        "noWorkflows": "Pas de Workflows",
         "ascending": "Ascendant",
-        "loadFromGraph": "Charger le processus à partir du graphique",
+        "loadFromGraph": "Charger le Workflow à partir du graphique",
         "descending": "Descendant",
         "created": "Créé",
         "updated": "Mis à jour",
-        "loadWorkflow": "$t(common.load) Processus",
+        "loadWorkflow": "$t(common.load) Workflow",
         "convertGraph": "Convertir le graphique",
         "opened": "Ouvert",
         "name": "Nom",
         "autoLayout": "Mise en page automatique",
-        "defaultWorkflows": "Processus par défaut",
-        "userWorkflows": "Processus utilisateur",
-        "projectWorkflows": "Processus du projet",
+        "defaultWorkflows": "Workflows par défaut",
+        "userWorkflows": "Workflows de l'utilisateur",
+        "projectWorkflows": "Workflows du projet",
         "copyShareLink": "Copier le lien de partage",
-        "chooseWorkflowFromLibrary": "Choisir le Processus dans la Bibliothèque",
+        "chooseWorkflowFromLibrary": "Choisir le Workflow dans la Bibliothèque",
         "uploadAndSaveWorkflow": "Importer dans la bibliothèque",
         "edit": "Modifer",
-        "deleteWorkflow2": "Êtes-vous sûr de vouloir supprimer ce processus ? Ceci ne peut pas être annulé.",
+        "deleteWorkflow2": "Êtes-vous sûr de vouloir supprimer ce Workflow ? Cette action ne peut pas être annulé.",
         "download": "Télécharger",
-        "copyShareLinkForWorkflow": "Copier le lien de partage pour le processus",
+        "copyShareLinkForWorkflow": "Copier le lien de partage pour le Workflow",
         "delete": "Supprimer"
     },
     "whatsNew": {
-        "canvasV2Announcement": {
-            "watchReleaseVideo": "Regarder la vidéo de lancement",
-            "newLayerTypes": "Nouveaux types de couches pour un contrôle encore plus précis",
-            "fluxSupport": "Support pour la famille de modèles Flux",
-            "readReleaseNotes": "Lire les notes de version",
-            "newCanvas": "Une nouvelle Toile de contrôle puissant",
-            "watchUiUpdatesOverview": "Regarder l'aperçu des mises à jour de l'UI"
-        },
         "whatsNewInInvoke": "Quoi de neuf dans Invoke"
     },
     "ui": {
@@ -1657,7 +1678,7 @@
             "gallery": "Galerie",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "generation": "Génération",
-            "workflows": "Processus",
+            "workflows": "Workflows",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "models": "Modèles",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)"
@@ -1767,7 +1788,9 @@
             "bboxGroup": "Créer à partir de la bounding box",
             "newRegionalReferenceImage": "Nouvelle image de référence régionale",
             "newGlobalReferenceImage": "Nouvelle image de référence globale",
-            "newControlLayer": "Nouveau couche de contrôle"
+            "newControlLayer": "Nouveau couche de contrôle",
+            "newInpaintMask": "Nouveau Masque Inpaint",
+            "newRegionalGuidance": "Nouveau Guide Régional"
         },
         "bookmark": "Marque-page pour Changement Rapide",
         "saveLayerToAssets": "Enregistrer la couche dans les ressources",
@@ -1780,8 +1803,6 @@
                 "on": "Activé",
                 "label": "Aligner sur la grille"
             },
-            "isolatedFilteringPreview": "Aperçu de filtrage isolé",
-            "isolatedTransformingPreview": "Aperçu de transformation isolée",
             "invertBrushSizeScrollDirection": "Inverser le défilement pour la taille du pinceau",
             "pressureSensitivity": "Sensibilité à la pression",
             "preserveMask": {
@@ -1789,9 +1810,10 @@
                 "alert": "Préserver la zone masquée"
             },
             "isolatedPreview": "Aperçu Isolé",
-            "isolatedStagingPreview": "Aperçu de l'attente isolé"
+            "isolatedStagingPreview": "Aperçu de l'attente isolé",
+            "isolatedLayerPreview": "Aperçu de la couche isolée",
+            "isolatedLayerPreviewDesc": "Pour afficher uniquement cette couche lors de l'exécution d'opérations telles que le filtrage ou la transformation."
         },
-        "convertToRasterLayer": "Convertir en Couche de Rastérisation",
         "transparency": "Transparence",
         "moveBackward": "Reculer",
         "rectangle": "Rectangle",
@@ -1914,7 +1936,6 @@
         "globalReferenceImage_withCount_one": "$t(controlLayers.globalReferenceImage)",
         "globalReferenceImage_withCount_many": "Images de référence globales",
         "globalReferenceImage_withCount_other": "Images de référence globales",
-        "convertToControlLayer": "Convertir en Couche de Contrôle",
         "layer_withCount_one": "Couche {{count}}",
         "layer_withCount_many": "Couches {{count}}",
         "layer_withCount_other": "Couches {{count}}",
@@ -1951,7 +1972,6 @@
         "inpaintMask_withCount_many": "Remplir les masques",
         "inpaintMask_withCount_other": "Remplir les masques",
         "newImg2ImgCanvasFromImage": "Nouvelle Img2Img à partir de l'image",
-        "resetCanvas": "Réinitialiser la Toile",
         "bboxOverlay": "Afficher la superposition des Bounding Box",
         "moveToFront": "Déplacer vers le permier plan",
         "moveToBack": "Déplacer vers l'arrière plan",
@@ -1977,7 +1997,39 @@
         "pullBboxIntoReferenceImageOk": "Bounding Box insérée dans l'Image de référence",
         "controlLayer_withCount_one": "$t(controlLayers.controlLayer)",
         "controlLayer_withCount_many": "Controler les couches",
-        "controlLayer_withCount_other": "Controler les couches"
+        "controlLayer_withCount_other": "Controler les couches",
+        "copyInpaintMaskTo": "Copier $t(controlLayers.inpaintMask) vers",
+        "copyRegionalGuidanceTo": "Copier $t(controlLayers.regionalGuidance) vers",
+        "convertRasterLayerTo": "Convertir $t(controlLayers.rasterLayer) vers",
+        "selectObject": {
+            "selectObject": "Sélectionner l'objet",
+            "clickToAdd": "Cliquez sur la couche pour ajouter un point",
+            "apply": "Appliquer",
+            "cancel": "Annuler",
+            "dragToMove": "Faites glisser un point pour le déplacer",
+            "clickToRemove": "Cliquez sur un point pour le supprimer",
+            "include": "Inclure",
+            "invertSelection": "Sélection Inversée",
+            "saveAs": "Enregistrer sous",
+            "neutral": "Neutre",
+            "pointType": "Type de point",
+            "exclude": "Exclure",
+            "process": "Traiter",
+            "reset": "Réinitialiser",
+            "help1": "Sélectionnez un seul objet cible. Ajoutez des points <Bold>Inclure</Bold> et <Bold>Exclure</Bold> pour indiquer quelles parties de la couche font partie de l'objet cible.",
+            "help2": "Commencez par un point <Bold>Inclure</Bold> au sein de l'objet cible. Ajoutez d'autres points pour affiner la sélection. Moins de points produisent généralement de meilleurs résultats.",
+            "help3": "Inversez la sélection pour sélectionner tout sauf l'objet cible."
+        },
+        "convertRegionalGuidanceTo": "Convertir $t(controlLayers.regionalGuidance) vers",
+        "copyRasterLayerTo": "Copier $t(controlLayers.rasterLayer) vers",
+        "newControlLayer": "Nouveau $t(controlLayers.controlLayer)",
+        "newRegionalGuidance": "Nouveau $t(controlLayers.regionalGuidance)",
+        "replaceCurrent": "Remplacer Actuel",
+        "convertControlLayerTo": "Convertir $t(controlLayers.controlLayer) vers",
+        "convertInpaintMaskTo": "Convertir $t(controlLayers.inpaintMask) vers",
+        "copyControlLayerTo": "Copier $t(controlLayers.controlLayer) vers",
+        "newInpaintMask": "Nouveau $t(controlLayers.inpaintMask)",
+        "newRasterLayer": "Nouveau $t(controlLayers.rasterLayer)"
     },
     "upscaling": {
         "exceedsMaxSizeDetails": "La limite maximale d'agrandissement est de {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Veuillez essayer une image plus petite ou réduire votre sélection d'échelle.",
@@ -2048,7 +2100,7 @@
             "config": "Configuration",
             "canvas": "Toile",
             "generation": "Génération",
-            "workflows": "Processus",
+            "workflows": "Workflows",
             "system": "Système",
             "models": "Modèles",
             "logNamespaces": "Journalisation des espaces de noms",
@@ -2071,9 +2123,9 @@
     "newUserExperience": {
         "toGetStarted": "Pour commencer, saisissez un prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement dans la <StrongComponent>Galerie</StrongComponent> ou de les modifier sur la <StrongComponent>Toile</StrongComponent>.",
         "gettingStartedSeries": "Vous souhaitez plus de conseils ? Consultez notre <LinkComponent>Série de démarrage</LinkComponent> pour des astuces sur l'exploitation du plein potentiel de l'Invoke Studio.",
-        "noModelsInstalled": "Il semblerait qu'aucun modèle ne soit installé",
+        "noModelsInstalled": "Il semble qu'aucun modèle ne soit installé",
         "downloadStarterModels": "Télécharger les modèles de démarrage",
-        "importModels": "Importer Modèles",
+        "importModels": "Importer des Modèles",
         "toGetStartedLocal": "Pour commencer, assurez-vous de télécharger ou d'importer des modèles nécessaires pour exécuter Invoke. Ensuite, saisissez le prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement sur <StrongComponent>Galerie</StrongComponent> ou les modifier sur la <StrongComponent>Toile</StrongComponent>."
     },
     "upsell": {

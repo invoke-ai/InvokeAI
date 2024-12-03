@@ -16,7 +16,6 @@ import { addGalleryOffsetChangedListener } from 'app/store/middleware/listenerMi
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
 import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
 import { addImageDeletionListeners } from 'app/store/middleware/listenerMiddleware/listeners/imageDeletionListeners';
-import { addImageDroppedListener } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 import { addImageRemovedFromBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageRemovedFromBoard';
 import { addImagesStarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesStarred';
 import { addImagesUnstarredListener } from 'app/store/middleware/listenerMiddleware/listeners/imagesUnstarred';
@@ -92,9 +91,6 @@ addGetOpenAPISchemaListener(startAppListening);
 // Workflows
 addWorkflowLoadRequestedListener(startAppListening);
 addUpdateAllNodesRequestedListener(startAppListening);
-
-// DND
-addImageDroppedListener(startAppListening);
 
 // Models
 addModelSelectedListener(startAppListening);

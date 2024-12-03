@@ -86,7 +86,7 @@ class ModelLoadService(ModelLoadServiceBase):
 
         def torch_load_file(checkpoint: Path) -> AnyModel:
             scan_result = scan_file_path(checkpoint)
-            if scan_result.infected_files != 0:
+            if scan_result.infected_files != 0 or scan_result.scan_err:
                 raise Exception("The model at {checkpoint} is potentially infected by malware. Aborting load.")
             result = torch_load(checkpoint, map_location="cpu")
             return result

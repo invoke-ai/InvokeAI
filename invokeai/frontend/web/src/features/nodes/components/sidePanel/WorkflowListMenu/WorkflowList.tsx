@@ -2,6 +2,7 @@ import { Button, Collapse, Flex, Icon, Spinner, Text } from '@invoke-ai/ui-libra
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
 import { useCategorySections } from 'features/nodes/hooks/useCategorySections';
 import {
   selectWorkflowOrderBy,
@@ -61,7 +62,7 @@ export const WorkflowList = ({ category }: { category: WorkflowCategory }) => {
           </Text>
         </Flex>
       </Button>
-      <Collapse in={isOpen}>
+      <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
         {isLoading ? (
           <Flex alignItems="center" justifyContent="center" p={20}>
             <Spinner />

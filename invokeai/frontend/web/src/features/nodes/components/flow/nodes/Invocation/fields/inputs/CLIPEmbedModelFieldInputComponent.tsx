@@ -39,14 +39,15 @@ const CLIPEmbedModelFieldInputComponent = (props: Props) => {
     isLoading,
     selectedModel: field.value,
   });
+  const required = props.fieldTemplate.required;
 
   return (
     <Flex w="full" alignItems="center" gap={2}>
       <Tooltip label={!disabledTabs.includes('models') && t('modelManager.starterModelsInModelManager')}>
-        <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
+        <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value && required}>
           <Combobox
             value={value}
-            placeholder={placeholder}
+            placeholder={required ? placeholder : `(Optional) ${placeholder}`}
             options={options}
             onChange={onChange}
             noOptionsMessage={noOptionsMessage}

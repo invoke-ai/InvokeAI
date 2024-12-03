@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import {
   controlLayerModelChanged,
   referenceImageIPAdapterModelChanged,
@@ -41,6 +40,7 @@ import {
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfig,
 } from 'services/api/types';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('models');
 
@@ -85,7 +85,7 @@ type ModelHandler = (
   models: AnyModelConfig[],
   state: RootState,
   dispatch: AppDispatch,
-  log: Logger<SerializableObject>
+  log: Logger<JsonObject>
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
@@ -164,7 +164,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
   // We have a VAE selected, need to check if it is available
 
   // Grab just the VAE models
-  const vaeModels = models.filter(isNonFluxVAEModelConfig);
+  const vaeModels = models.filter((m) => isNonFluxVAEModelConfig(m));
 
   // If the current VAE model is available, we don't need to do anything
   if (vaeModels.some((m) => m.key === selectedVAEModel.key)) {
@@ -297,7 +297,7 @@ const handleUpscaleModel: ModelHandler = (models, state, dispatch, log) => {
 
 const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedT5EncoderModel = state.params.t5EncoderModel;
-  const t5EncoderModels = models.filter(isT5EncoderModelConfig);
+  const t5EncoderModels = models.filter((m) => isT5EncoderModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
   if (selectedT5EncoderModel && t5EncoderModels.some((m) => m.key === selectedT5EncoderModel.key)) {
@@ -325,7 +325,7 @@ const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedCLIPEmbedModel = state.params.clipEmbedModel;
-  const CLIPEmbedModels = models.filter(isCLIPEmbedModelConfig);
+  const CLIPEmbedModels = models.filter((m) => isCLIPEmbedModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
   if (selectedCLIPEmbedModel && CLIPEmbedModels.some((m) => m.key === selectedCLIPEmbedModel.key)) {
@@ -353,7 +353,7 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedFLUXVAEModel = state.params.fluxVAE;
-  const fluxVAEModels = models.filter(isFluxVAEModelConfig);
+  const fluxVAEModels = models.filter((m) => isFluxVAEModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
   if (selectedFLUXVAEModel && fluxVAEModels.some((m) => m.key === selectedFLUXVAEModel.key)) {

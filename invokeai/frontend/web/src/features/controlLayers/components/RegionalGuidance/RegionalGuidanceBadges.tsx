@@ -10,7 +10,11 @@ export const RegionalGuidanceBadges = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const selectAutoNegative = useMemo(
-    () => createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).autoNegative),
+    () =>
+      createSelector(
+        selectCanvasSlice,
+        (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'RegionalGuidanceBadges').autoNegative
+      ),
     [entityIdentifier]
   );
   const autoNegative = useAppSelector(selectAutoNegative);

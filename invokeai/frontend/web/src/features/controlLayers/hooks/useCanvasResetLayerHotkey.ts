@@ -1,9 +1,8 @@
-import { useStore } from '@nanostores/react';
-import { $false } from 'app/store/nanostores/util';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import { entityReset } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
@@ -14,30 +13,30 @@ import { useCallback, useMemo } from 'react';
 export function useCanvasResetLayerHotkey() {
   useAssertSingleton(useCanvasResetLayerHotkey.name);
   const dispatch = useAppDispatch();
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const entityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
-  const adapter = useEntityAdapterSafe(selectedEntityIdentifier);
-  const isInteractable = useStore(adapter?.$isInteractable ?? $false);
+  const adapter = useEntityAdapterSafe(entityIdentifier);
+  const isLocked = useEntityIsLocked(entityIdentifier);
   const imageViewer = useImageViewer();
 
   const resetSelectedLayer = useCallback(() => {
-    if (selectedEntityIdentifier === null || adapter === null) {
+    if (entityIdentifier === null || adapter === null) {
       return;
     }
     adapter.bufferRenderer.clearBuffer();
-    dispatch(entityReset({ entityIdentifier: selectedEntityIdentifier }));
-  }, [adapter, dispatch, selectedEntityIdentifier]);
+    dispatch(entityReset({ entityIdentifier }));
+  }, [adapter, dispatch, entityIdentifier]);
 
-  const isResetEnabled = useMemo(
-    () => selectedEntityIdentifier !== null && isMaskEntityIdentifier(selectedEntityIdentifier),
-    [selectedEntityIdentifier]
+  const isResetAllowed = useMemo(
+    () => entityIdentifier !== null && isMaskEntityIdentifier(entityIdentifier),
+    [entityIdentifier]
   );
 
   useRegisteredHotkeys({
     id: 'resetSelected',
     category: 'canvas',
     callback: resetSelectedLayer,
-    options: { enabled: isResetEnabled && !isBusy && isInteractable && !imageViewer.isOpen },
-    dependencies: [isResetEnabled, isBusy, isInteractable, resetSelectedLayer, imageViewer.isOpen],
+    options: { enabled: isResetAllowed && !isBusy && !isLocked && !imageViewer.isOpen },
+    dependencies: [isResetAllowed, isBusy, isLocked, resetSelectedLayer, imageViewer.isOpen],
   });
 }

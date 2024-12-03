@@ -44,6 +44,7 @@ VARIANT_TO_IN_CHANNEL_MAP = {
 @ModelLoaderRegistry.register(
     base=BaseModelType.StableDiffusionXLRefiner, type=ModelType.Main, format=ModelFormat.Diffusers
 )
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion3, type=ModelType.Main, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.Main, format=ModelFormat.Checkpoint)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.Main, format=ModelFormat.Checkpoint)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -52,13 +53,6 @@ VARIANT_TO_IN_CHANNEL_MAP = {
 )
 class StableDiffusionDiffusersModel(GenericDiffusersLoader):
     """Class to load main models."""
-
-    model_base_to_model_type = {
-        BaseModelType.StableDiffusion1: "FrozenCLIPEmbedder",
-        BaseModelType.StableDiffusion2: "FrozenOpenCLIPEmbedder",
-        BaseModelType.StableDiffusionXL: "SDXL",
-        BaseModelType.StableDiffusionXLRefiner: "SDXL-Refiner",
-    }
 
     def _load_model(
         self,
@@ -135,14 +129,13 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:
             raise Exception(f"No diffusers pipeline known for base={config.base}, variant={config.variant}") from e
-
         try:
             config_dir = config_dirs[config.base][config.prediction_type]
         except KeyError as e:
             raise Exception(
                 f"No configuration template known for base={config.base}, prediction_type={config.prediction_type}"
             ) from e
-
+        
         # Without SilenceWarnings we get log messages like this:
         # site-packages/huggingface_hub/file_download.py:1132: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
         # warnings.warn(

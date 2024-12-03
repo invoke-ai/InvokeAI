@@ -1,6 +1,7 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
 import { selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
@@ -23,7 +24,7 @@ export const StylePresetList = ({ title, data }: { title: string; data: StylePre
           </Text>
         </Flex>
       </Button>
-      <Collapse in={isOpen}>
+      <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
         {data.length ? (
           data.map((preset) => <StylePresetListItem preset={preset} key={preset.id} />)
         ) : (

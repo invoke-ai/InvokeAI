@@ -40,6 +40,8 @@ class AppVersion(BaseModel):
 
     version: str = Field(description="App version")
 
+    highlights: Optional[list[str]] = Field(default=None, description="Highlights of release")
+
 
 class AppDependencyVersions(BaseModel):
     """App depencency Versions Response"""

@@ -499,6 +499,22 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
                         accum_adapter_state[idx] += value * t2i_adapter_weight
 
+            # Hack: force compatibility with irregular resolutions by padding the feature map with zeros
+            for idx, tensor in enumerate(accum_adapter_state):
+                # The tensor size is supposed to be some integer downscale factor of the latents size.
+                # Internally, the unet will pad the latents before downscaling between levels when it is no longer divisible by its downscale factor.
+                # If the latent size does not scale down evenly, we need to pad the tensor so that it matches the the downscaled padded latents later on.
+                scale_factor = latents.size()[-1] // tensor.size()[-1]
+                required_padding_width = math.ceil(latents.size()[-1] / scale_factor) - tensor.size()[-1]
+                required_padding_height = math.ceil(latents.size()[-2] / scale_factor) - tensor.size()[-2]
+                tensor = torch.nn.functional.pad(
+                    tensor,
+                    (0, required_padding_width, 0, required_padding_height, 0, 0, 0, 0),
+                    mode="constant",
+                    value=0,
+                )
+                accum_adapter_state[idx] = tensor
+
             down_intrablock_additional_residuals = accum_adapter_state
 
         # Handle inpainting models.

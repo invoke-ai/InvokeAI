@@ -9,6 +9,8 @@ import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
   ParameterCLIPEmbedModel,
+  ParameterCLIPGEmbedModel,
+  ParameterCLIPLEmbedModel,
   ParameterGuidance,
   ParameterMaskBlurMethod,
   ParameterModel,
@@ -71,6 +73,8 @@ export type ParamsState = {
   refinerStart: number;
   t5EncoderModel: ParameterT5EncoderModel | null;
   clipEmbedModel: ParameterCLIPEmbedModel | null;
+  clipLEmbedModel: ParameterCLIPLEmbedModel | null;
+  clipGEmbedModel: ParameterCLIPGEmbedModel | null;
 };
 
 const initialState: ParamsState = {
@@ -79,7 +83,7 @@ const initialState: ParamsState = {
   canvasCoherenceMode: 'Gaussian Blur',
   canvasCoherenceMinDenoise: 0,
   canvasCoherenceEdgeSize: 16,
-  infillMethod: 'patchmatch',
+  infillMethod: 'lama',
   infillTileSize: 32,
   infillPatchmatchDownscaleSize: 1,
   infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
@@ -115,6 +119,8 @@ const initialState: ParamsState = {
   refinerStart: 0.8,
   t5EncoderModel: null,
   clipEmbedModel: null,
+  clipLEmbedModel: null,
+  clipGEmbedModel: null,
 };
 
 export const paramsSlice = createSlice({
@@ -192,6 +198,12 @@ export const paramsSlice = createSlice({
     clipEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPEmbedModel | null>) => {
       state.clipEmbedModel = action.payload;
     },
+    clipLEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPLEmbedModel | null>) => {
+      state.clipLEmbedModel = action.payload;
+    },
+    clipGEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPGEmbedModel | null>) => {
+      state.clipGEmbedModel = action.payload;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -261,23 +273,26 @@ export const paramsSlice = createSlice({
     setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceMinDenoise = action.payload;
     },
+    paramsReset: (state) => resetState(state),
   },
   extraReducers(builder) {
-    builder.addMatcher(newSessionRequested, (state) => {
-      // When a new session is requested, we need to keep the current model selections, plus dependent state
-      // like VAE precision. Everything else gets reset to default.
-      const newState = deepClone(initialState);
-      newState.model = state.model;
-      newState.vae = state.vae;
-      newState.fluxVAE = state.fluxVAE;
-      newState.vaePrecision = state.vaePrecision;
-      newState.t5EncoderModel = state.t5EncoderModel;
-      newState.clipEmbedModel = state.clipEmbedModel;
-      newState.refinerModel = state.refinerModel;
-      return newState;
-    });
+    builder.addMatcher(newSessionRequested, (state) => resetState(state));
   },
 });
+
+const resetState = (state: ParamsState): ParamsState => {
+  // When a new session is requested, we need to keep the current model selections, plus dependent state
+  // like VAE precision. Everything else gets reset to default.
+  const newState = deepClone(initialState);
+  newState.model = state.model;
+  newState.vae = state.vae;
+  newState.fluxVAE = state.fluxVAE;
+  newState.vaePrecision = state.vaePrecision;
+  newState.t5EncoderModel = state.t5EncoderModel;
+  newState.clipEmbedModel = state.clipEmbedModel;
+  newState.refinerModel = state.refinerModel;
+  return newState;
+};
 
 export const {
   setInfillMethod,
@@ -305,6 +320,8 @@ export const {
   vaePrecisionChanged,
   t5EncoderModelSelected,
   clipEmbedModelSelected,
+  clipLEmbedModelSelected,
+  clipGEmbedModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   positivePromptChanged,
@@ -320,6 +337,7 @@ export const {
   setRefinerNegativeAestheticScore,
   setRefinerStart,
   modelChanged,
+  paramsReset,
 } = paramsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -341,6 +359,7 @@ export const createParamsSelector = <T>(selector: Selector<ParamsState, T>) =>
 export const selectBase = createParamsSelector((params) => params.model?.base);
 export const selectIsSDXL = createParamsSelector((params) => params.model?.base === 'sdxl');
 export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
+export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
@@ -349,6 +368,10 @@ export const selectFLUXVAE = createParamsSelector((params) => params.fluxVAE);
 export const selectVAEKey = createParamsSelector((params) => params.vae?.key);
 export const selectT5EncoderModel = createParamsSelector((params) => params.t5EncoderModel);
 export const selectCLIPEmbedModel = createParamsSelector((params) => params.clipEmbedModel);
+export const selectCLIPLEmbedModel = createParamsSelector((params) => params.clipLEmbedModel);
+
+export const selectCLIPGEmbedModel = createParamsSelector((params) => params.clipGEmbedModel);
+
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
 export const selectSteps = createParamsSelector((params) => params.steps);

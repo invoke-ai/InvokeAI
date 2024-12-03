@@ -4,10 +4,13 @@ import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/se
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 
-export const useEntityIsLocked = (entityIdentifier: CanvasEntityIdentifier) => {
+export const useEntityIsLocked = (entityIdentifier: CanvasEntityIdentifier | null) => {
   const selectIsLocked = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
+        if (!entityIdentifier) {
+          return false;
+        }
         const entity = selectEntity(canvas, entityIdentifier);
         if (!entity) {
           return false;

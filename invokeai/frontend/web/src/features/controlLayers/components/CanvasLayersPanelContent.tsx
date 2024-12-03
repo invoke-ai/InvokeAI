@@ -7,6 +7,8 @@ import { EntityListSelectedEntityActionBar } from 'features/controlLayers/compon
 import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo, useRef } from 'react';
 
+import { ParamDenoisingStrength } from './ParamDenoisingStrength';
+
 export const CanvasLayersPanelContent = memo(() => {
   const hasEntities = useAppSelector(selectHasEntities);
   const layersPanelFocusRef = useRef<HTMLDivElement>(null);
@@ -15,6 +17,8 @@ export const CanvasLayersPanelContent = memo(() => {
   return (
     <Flex ref={layersPanelFocusRef} flexDir="column" gap={2} w="full" h="full">
       <EntityListSelectedEntityActionBar />
+      <Divider py={0} />
+      <ParamDenoisingStrength />
       <Divider py={0} />
       {!hasEntities && <CanvasAddEntityButtons />}
       {hasEntities && <CanvasEntityList />}

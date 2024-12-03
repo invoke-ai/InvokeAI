@@ -1,8 +1,9 @@
 import { Flex, FormControl } from '@invoke-ai/ui-library';
+import FieldResetToDefaultValueButton from 'features/nodes/components/flow/nodes/Invocation/fields/FieldResetToDefaultValueButton';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
-import { useDoesInputHaveValue } from 'features/nodes/hooks/useDoesInputHaveValue';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
+import { memo, useCallback, useState } from 'react';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldHandle from './FieldHandle';
@@ -17,31 +18,11 @@ interface Props {
 
 const InputField = ({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
-  const doesFieldHaveValue = useDoesInputHaveValue(nodeId, fieldName);
   const [isHovered, setIsHovered] = useState(false);
+  const isInvalid = useFieldIsInvalid(nodeId, fieldName);
 
   const { isConnected, isConnectionInProgress, isConnectionStartField, validationResult, shouldDim } =
     useConnectionState({ nodeId, fieldName, kind: 'inputs' });
-
-  const isMissingInput = useMemo(() => {
-    if (!fieldTemplate) {
-      return false;
-    }
-
-    if (!fieldTemplate.required) {
-      return false;
-    }
-
-    if (!isConnected && fieldTemplate.input === 'connection') {
-      return true;
-    }
-
-    if (!doesFieldHaveValue && !isConnected && fieldTemplate.input !== 'connection') {
-      return true;
-    }
-
-    return false;
-  }, [fieldTemplate, isConnected, doesFieldHaveValue]);
 
   const onMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -54,12 +35,12 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   if (fieldTemplate.input === 'connection' || isConnected) {
     return (
       <InputFieldWrapper shouldDim={shouldDim}>
-        <FormControl isInvalid={isMissingInput} isDisabled={isConnected} px={2}>
+        <FormControl isInvalid={isInvalid} isDisabled={isConnected} px={2}>
           <EditableFieldTitle
             nodeId={nodeId}
             fieldName={fieldName}
             kind="inputs"
-            isMissingInput={isMissingInput}
+            isInvalid={isInvalid}
             withTooltip
             shouldDim
           />
@@ -79,7 +60,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   return (
     <InputFieldWrapper shouldDim={shouldDim}>
       <FormControl
-        isInvalid={isMissingInput}
+        isInvalid={isInvalid}
         isDisabled={isConnected}
         // Without pointerEvents prop, disabled inputs don't trigger reactflow events. For example, when making a
         // connection, the mouse up to end the connection won't fire, leaving the connection in-progress.
@@ -88,14 +69,9 @@ const InputField = ({ nodeId, fieldName }: Props) => {
         px={2}
       >
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
-          <Flex>
-            <EditableFieldTitle
-              nodeId={nodeId}
-              fieldName={fieldName}
-              kind="inputs"
-              isMissingInput={isMissingInput}
-              withTooltip
-            />
+          <Flex gap={1}>
+            <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" isInvalid={isInvalid} withTooltip />
+            {isHovered && <FieldResetToDefaultValueButton nodeId={nodeId} fieldName={fieldName} />}
             {isHovered && <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} />}
           </Flex>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />

@@ -2,7 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useIsEntityInteractable } from 'features/controlLayers/hooks/useEntityIsInteractable';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   entityArrangedBackwardOne,
   entityArrangedForwardOne,
@@ -56,7 +56,7 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext();
-  const isInteractable = useIsEntityInteractable(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
@@ -92,28 +92,28 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
         aria-label={t('controlLayers.moveToFront')}
         tooltip={t('controlLayers.moveToFront')}
         onClick={moveToFront}
-        isDisabled={!validActions.canMoveToFront || !isInteractable}
+        isDisabled={!validActions.canMoveToFront || isBusy}
         icon={<PiArrowLineUpBold />}
       />
       <IconMenuItem
         aria-label={t('controlLayers.moveForward')}
         tooltip={t('controlLayers.moveForward')}
         onClick={moveForwardOne}
-        isDisabled={!validActions.canMoveForwardOne || !isInteractable}
+        isDisabled={!validActions.canMoveForwardOne || isBusy}
         icon={<PiArrowUpBold />}
       />
       <IconMenuItem
         aria-label={t('controlLayers.moveBackward')}
         tooltip={t('controlLayers.moveBackward')}
         onClick={moveBackwardOne}
-        isDisabled={!validActions.canMoveBackwardOne || !isInteractable}
+        isDisabled={!validActions.canMoveBackwardOne || isBusy}
         icon={<PiArrowDownBold />}
       />
       <IconMenuItem
         aria-label={t('controlLayers.moveToBack')}
         tooltip={t('controlLayers.moveToBack')}
         onClick={moveToBack}
-        isDisabled={!validActions.canMoveToBack || !isInteractable}
+        isDisabled={!validActions.canMoveToBack || isBusy}
         icon={<PiArrowLineDownBold />}
       />
     </>

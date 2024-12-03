@@ -8,6 +8,7 @@ const FALLBACK_ICON_SIZE = '24px';
 const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: string | null; imageWidth?: number }) => {
   return (
     <Tooltip
+      closeOnScroll
       label={
         presetImageUrl && (
           <Image

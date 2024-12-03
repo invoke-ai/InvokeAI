@@ -14,8 +14,11 @@ import {
   selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasEntityStateFromType,
+  CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  EntityMovedByPayload,
   FillStyle,
   RegionalGuidanceReferenceImageState,
   RgbColor,
@@ -49,7 +52,7 @@ import type {
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
-  EntityMovedPayload,
+  EntityMovedToPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
   IPMethodV2,
@@ -123,27 +126,28 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRasterLayerState>;
           isSelected?: boolean;
-          isMergingVisible?: boolean;
+          mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, isMergingVisible } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
-
-        if (isMergingVisible) {
-          // When merging visible, we delete all disabled layers
-          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => !layer.isEnabled);
-        }
 
         state.rasterLayers.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.rasterLayers.entities = state.rasterLayers.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
       prepare: (payload: {
         overrides?: Partial<CanvasRasterLayerState>;
         isSelected?: boolean;
-        isMergingVisible?: boolean;
+        mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
       }),
@@ -271,19 +275,34 @@ export const canvasSlice = createSlice({
     controlLayerAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }>
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasControlLayerState>;
+          isSelected?: boolean;
+          mergedEntitiesToDelete?: string[];
+        }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getControlLayerState(id, overrides);
 
         state.controlLayers.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.controlLayers.entities = state.controlLayers.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload: { overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }) => ({
+      prepare: (payload: {
+        overrides?: Partial<CanvasControlLayerState>;
+        isSelected?: boolean;
+        mergedEntitiesToDelete?: string[];
+      }) => ({
         payload: { ...payload, id: getPrefixedId('control_layer') },
       }),
     },
@@ -595,19 +614,34 @@ export const canvasSlice = createSlice({
     rgAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }>
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasRegionalGuidanceState>;
+          isSelected?: boolean;
+          mergedEntitiesToDelete?: string[];
+        }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getRegionalGuidanceState(id, overrides);
 
         state.regionalGuidance.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload?: { overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }) => ({
+      prepare: (payload?: {
+        overrides?: Partial<CanvasRegionalGuidanceState>;
+        isSelected?: boolean;
+        mergedEntitiesToDelete?: string[];
+      }) => ({
         payload: { ...payload, id: getPrefixedId('regional_guidance') },
       }),
     },
@@ -822,28 +856,29 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasInpaintMaskState>;
           isSelected?: boolean;
-          isMergingVisible?: boolean;
+          mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, isMergingVisible } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getInpaintMaskState(id, overrides);
 
-        if (isMergingVisible) {
-          // When merging visible, we delete all disabled layers
-          state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => !layer.isEnabled);
-        }
-
         state.inpaintMasks.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.inpaintMasks.entities = state.inpaintMasks.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
       prepare: (payload?: {
         overrides?: Partial<CanvasInpaintMaskState>;
         isSelected?: boolean;
-        isMergingVisible?: boolean;
+        mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
       }),
@@ -1167,7 +1202,7 @@ export const canvasSlice = createSlice({
       }
       entity.fill.style = style;
     },
-    entityMoved: (state, action: PayloadAction<EntityMovedPayload>) => {
+    entityMovedTo: (state, action: PayloadAction<EntityMovedToPayload>) => {
       const { entityIdentifier, position } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
@@ -1178,8 +1213,22 @@ export const canvasSlice = createSlice({
         entity.position = position;
       }
     },
+    entityMovedBy: (state, action: PayloadAction<EntityMovedByPayload>) => {
+      const { entityIdentifier, offset } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+
+      if (!isRenderableEntity(entity)) {
+        return;
+      }
+
+      entity.position.x += offset.x;
+      entity.position.y += offset.y;
+    },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, position, replaceObjects } = action.payload;
+      const { entityIdentifier, imageObject, position, replaceObjects, isSelected } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -1190,6 +1239,10 @@ export const canvasSlice = createSlice({
           entity.objects = [imageObject];
           entity.position = position;
         }
+      }
+
+      if (isSelected) {
+        state.selectedEntityIdentifier = entityIdentifier;
       }
     },
     entityBrushLineAdded: (state, action: PayloadAction<EntityBrushLineAddedPayload>) => {
@@ -1313,6 +1366,46 @@ export const canvasSlice = createSlice({
       }
       moveToStart(selectAllEntitiesOfType(state, entity.type), entity);
     },
+    entitiesReordered: <T extends CanvasEntityType>(
+      state: CanvasState,
+      action: PayloadAction<{ type: T; entityIdentifiers: CanvasEntityIdentifier<T>[] }>
+    ) => {
+      const { type, entityIdentifiers } = action.payload;
+
+      switch (type) {
+        case 'raster_layer': {
+          state.rasterLayers.entities = reorderEntities(
+            state.rasterLayers.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'raster_layer'>[]
+          );
+          break;
+        }
+        case 'control_layer':
+          state.controlLayers.entities = reorderEntities(
+            state.controlLayers.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'control_layer'>[]
+          );
+          break;
+        case 'inpaint_mask':
+          state.inpaintMasks.entities = reorderEntities(
+            state.inpaintMasks.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'inpaint_mask'>[]
+          );
+          break;
+        case 'regional_guidance':
+          state.regionalGuidance.entities = reorderEntities(
+            state.regionalGuidance.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'regional_guidance'>[]
+          );
+          break;
+        case 'reference_image':
+          state.referenceImages.entities = reorderEntities(
+            state.referenceImages.entities,
+            entityIdentifiers as CanvasEntityIdentifier<'reference_image'>[]
+          );
+          break;
+      }
+    },
     entityOpacityChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ opacity: number }>>) => {
       const { entityIdentifier, opacity } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -1427,7 +1520,8 @@ export const {
   entityIsLockedToggled,
   entityFillColorChanged,
   entityFillStyleChanged,
-  entityMoved,
+  entityMovedTo,
+  entityMovedBy,
   entityDuplicated,
   entityRasterized,
   entityBrushLineAdded,
@@ -1439,6 +1533,7 @@ export const {
   entityArrangedBackwardOne,
   entityArrangedToBack,
   entityOpacityChanged,
+  entitiesReordered,
   // allEntitiesDeleted, // currently unused
   allEntitiesOfTypeIsHiddenToggled,
   // bbox
@@ -1572,3 +1667,17 @@ function actionsThrottlingFilter(action: UnknownAction) {
   }, THROTTLE_MS);
   return true;
 }
+
+const reorderEntities = <T extends CanvasEntityType>(
+  entities: CanvasEntityStateFromType<T>[],
+  sortedEntityIdentifiers: CanvasEntityIdentifier<T>[]
+) => {
+  const sortedEntities: CanvasEntityStateFromType<T>[] = [];
+  for (const { id } of sortedEntityIdentifiers.toReversed()) {
+    const entity = entities.find((entity) => entity.id === id);
+    if (entity) {
+      sortedEntities.push(entity);
+    }
+  }
+  return sortedEntities;
+};

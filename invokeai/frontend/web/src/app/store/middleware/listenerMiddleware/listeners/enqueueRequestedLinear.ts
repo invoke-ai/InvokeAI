@@ -1,19 +1,22 @@
 import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { SerializableObject } from 'common/types';
+import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import type { Result } from 'common/util/result';
 import { withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
+import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { toast } from 'features/toast/toast';
 import { serializeError } from 'serialize-error';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Invocation } from 'services/api/types';
-import { assert } from 'tsafe';
+import { assert, AssertionError } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('generation');
 
@@ -32,8 +35,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       let buildGraphResult: Result<
         {
           g: Graph;
-          noise: Invocation<'noise' | 'flux_denoise'>;
-          posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+          noise: Invocation<'noise' | 'flux_denoise' | 'sd3_denoise'>;
+          posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'sd3_text_encoder'>;
         },
         Error
       >;
@@ -49,6 +52,9 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         case `sd-2`:
           buildGraphResult = await withResultAsync(() => buildSD1Graph(state, manager));
           break;
+        case `sd-3`:
+          buildGraphResult = await withResultAsync(() => buildSD3Graph(state, manager));
+          break;
         case `flux`:
           buildGraphResult = await withResultAsync(() => buildFLUXGraph(state, manager));
           break;
@@ -57,7 +63,17 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       }
 
       if (buildGraphResult.isErr()) {
-        log.error({ error: serializeError(buildGraphResult.error) }, 'Failed to build graph');
+        let description: string | null = null;
+        if (buildGraphResult.error instanceof AssertionError) {
+          description = extractMessageFromAssertionError(buildGraphResult.error);
+        }
+        const error = serializeError(buildGraphResult.error);
+        log.error({ error }, 'Failed to build graph');
+        toast({
+          status: 'error',
+          title: 'Failed to build graph',
+          description,
+        });
         return;
       }
 
@@ -75,9 +91,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       }
 
       const req = dispatch(
-        queueApi.endpoints.enqueueBatch.initiate(prepareBatchResult.value, {
-          fixedCacheKey: 'enqueueBatch',
-        })
+        queueApi.endpoints.enqueueBatch.initiate(prepareBatchResult.value, enqueueMutationFixedCacheKeyOptions)
       );
       req.reset();
 
@@ -88,7 +102,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         return;
       }
 
-      log.debug({ batchConfig: prepareBatchResult.value } as SerializableObject, 'Enqueued batch');
+      log.debug({ batchConfig: prepareBatchResult.value } as JsonObject, 'Enqueued batch');
     },
   });
 };

@@ -1,15 +1,32 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { Transparency } from 'features/controlLayers/konva/util';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { GenerationMode } from 'features/controlLayers/store/types';
 import { LRUCache } from 'lru-cache';
 import type { Logger } from 'roarr';
+
+type GetCacheEntryWithFallbackArg<T extends NonNullable<unknown>> = {
+  cache: LRUCache<string, T>;
+  key: string;
+  getValue: () => Promise<T>;
+  onHit?: (value: T) => void;
+  onMiss?: () => void;
+};
 
 type CanvasCacheModuleConfig = {
   /**
    * The maximum size of the image name cache.
    */
   imageNameCacheSize: number;
+  /**
+   * The maximum size of the image data cache.
+   */
+  imageDataCacheSize: number;
+  /**
+   * The maximum size of the transparency calculation cache.
+   */
+  transparencyCalculationCacheSize: number;
   /**
    * The maximum size of the canvas element cache.
    */
@@ -21,7 +38,9 @@ type CanvasCacheModuleConfig = {
 };
 
 const DEFAULT_CONFIG: CanvasCacheModuleConfig = {
-  imageNameCacheSize: 100,
+  imageNameCacheSize: 1000,
+  imageDataCacheSize: 32,
+  transparencyCalculationCacheSize: 1000,
   canvasElementCacheSize: 32,
   generationModeCacheSize: 100,
 };
@@ -41,26 +60,38 @@ export class CanvasCacheModule extends CanvasModuleBase {
   config: CanvasCacheModuleConfig = DEFAULT_CONFIG;
 
   /**
-   * A cache for storing image names. Used as a cache for results of layer/canvas/entity exports. For example, when we
-   * rasterize a layer and upload it to the server, we store the image name in this cache.
+   * A cache for storing image names.
    *
-   * The cache key is a hash of the exported entity's state and the export rect.
+   * For example, the key might be a hash of a composite of entities with the uploaded image name as the value.
    */
   imageNameCache = new LRUCache<string, string>({ max: this.config.imageNameCacheSize });
 
   /**
-   * A cache for storing canvas elements. Similar to the image name cache, but for canvas elements. The primary use is
-   * for caching composite layers. For example, the canvas compositor module uses this to store the canvas elements for
-   * individual raster layers when creating a composite of the layers.
+   * A cache for storing canvas elements.
    *
-   * The cache key is a hash of the exported entity's state and the export rect.
+   * For example, the key might be a hash of a composite of entities with the canvas element as the value.
    */
   canvasElementCache = new LRUCache<string, HTMLCanvasElement>({ max: this.config.canvasElementCacheSize });
+
   /**
-   * A cache for the generation mode calculation, which is fairly expensive.
+   * A cache for image data objects.
    *
-   * The cache key is a hash of all the objects that contribute to the generation mode calculation (e.g. the composite
-   * raster layer, the composite inpaint mask, and bounding box), and the value is the generation mode.
+   * For example, the key might be a hash of a composite of entities with the image data as the value.
+   */
+  imageDataCache = new LRUCache<string, ImageData>({ max: this.config.imageDataCacheSize });
+
+  /**
+   * A cache for transparency calculation results.
+   *
+   * For example, the key might be a hash of a composite of entities with the transparency as the value.
+   */
+  transparencyCalculationCache = new LRUCache<string, Transparency>({ max: this.config.imageDataCacheSize });
+
+  /**
+   * A cache for generation mode calculation results.
+   *
+   * For example, the key might be a hash of a composite of raster and inpaint mask entities with the generation mode
+   * as the value.
    */
   generationModeCache = new LRUCache<string, GenerationMode>({ max: this.config.generationModeCacheSize });
 
@@ -74,6 +105,33 @@ export class CanvasCacheModule extends CanvasModuleBase {
 
     this.log.debug('Creating cache module');
   }
+
+  /**
+   * A helper function for getting a cache entry with a fallback.
+   * @param param0.cache The LRUCache to get the entry from.
+   * @param param0.key The key to use to retrieve the entry.
+   * @param param0.getValue An async function to generate the value if the entry is not in the cache.
+   * @param param0.onHit An optional function to call when the entry is in the cache.
+   * @param param0.onMiss An optional function to call when the entry is not in the cache.
+   * @returns
+   */
+  static getWithFallback = async <T extends NonNullable<unknown>>({
+    cache,
+    getValue,
+    key,
+    onHit,
+    onMiss,
+  }: GetCacheEntryWithFallbackArg<T>): Promise<T> => {
+    let value = cache.get(key);
+    if (value === undefined) {
+      onMiss?.();
+      value = await getValue();
+      cache.set(key, value);
+    } else {
+      onHit?.(value);
+    }
+    return value;
+  };
 
   /**
    * Clears all caches.

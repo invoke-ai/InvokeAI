@@ -5,14 +5,10 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
 import { canvasToBlob } from 'features/controlLayers/konva/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useUploadImageMutation } from 'services/api/endpoints/images';
+import { uploadImage } from 'services/api/endpoints/images';
 
 export const useSaveLayerToAssets = () => {
-  const { t } = useTranslation();
-  const [uploadImage] = useUploadImageMutation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
 
   const saveLayerToAssets = useCallback(
@@ -27,30 +23,17 @@ export const useSaveLayerToAssets = () => {
       if (!adapter) {
         return;
       }
-      try {
-        const canvas = adapter.getCanvas();
-        const blob = await canvasToBlob(canvas);
-        const file = new File([blob], `layer-${adapter.id}.png`, { type: 'image/png' });
-        await uploadImage({
-          file,
-          image_category: 'user',
-          is_intermediate: false,
-          postUploadAction: { type: 'TOAST' },
-          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-        });
-
-        toast({
-          status: 'info',
-          title: t('toast.layerSavedToAssets'),
-        });
-      } catch (error) {
-        toast({
-          status: 'error',
-          title: t('toast.problemSavingLayer'),
-        });
-      }
+      const canvas = adapter.getCanvas();
+      const blob = await canvasToBlob(canvas);
+      const file = new File([blob], `layer-${adapter.id}.png`, { type: 'image/png' });
+      uploadImage({
+        file,
+        image_category: 'user',
+        is_intermediate: false,
+        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+      });
     },
-    [t, autoAddBoardId, uploadImage]
+    [autoAddBoardId]
   );
 
   return saveLayerToAssets;

@@ -23,13 +23,13 @@ interface Props {
   nodeId: string;
   fieldName: string;
   kind: 'inputs' | 'outputs';
-  isMissingInput?: boolean;
+  isInvalid?: boolean;
   withTooltip?: boolean;
   shouldDim?: boolean;
 }
 
 const EditableFieldTitle = forwardRef((props: Props, ref) => {
-  const { nodeId, fieldName, kind, isMissingInput = false, withTooltip = false, shouldDim = false } = props;
+  const { nodeId, fieldName, kind, isInvalid = false, withTooltip = false, shouldDim = false } = props;
   const label = useFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useFieldTemplateTitle(nodeId, fieldName, kind);
   const { t } = useTranslation();
@@ -78,7 +78,7 @@ const EditableFieldTitle = forwardRef((props: Props, ref) => {
           fontWeight="semibold"
           sx={editablePreviewStyles}
           noOfLines={1}
-          color={isMissingInput ? 'error.300' : 'base.300'}
+          color={isInvalid ? 'error.300' : 'base.300'}
           opacity={shouldDim ? 0.5 : 1}
         />
       </Tooltip>

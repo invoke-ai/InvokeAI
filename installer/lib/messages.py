@@ -259,7 +259,7 @@ def select_gpu() -> GpuType:
                     [
                         f"Detected the [gold1]{OS}-{ARCH}[/] platform",
                         "",
-                        "See [deep_sky_blue1]https://invoke-ai.github.io/InvokeAI/#system[/] to ensure your system meets the minimum requirements.",
+                        "See [deep_sky_blue1]https://invoke-ai.github.io/InvokeAI/installation/requirements/[/] to ensure your system meets the minimum requirements.",
                         "",
                         "[red3]🠶[/] [b]Your GPU drivers must be correctly installed before using InvokeAI![/] [red3]🠴[/]",
                     ]

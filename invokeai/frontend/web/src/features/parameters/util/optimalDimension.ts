@@ -24,7 +24,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
 /**
  * Gets the grid size for a given base model. For Flux, the grid size is 16, otherwise it is 8.
  * - sd-1, sd-2, sdxl: 8
- * - flux: 16
+ * - flux, sd-3: 16
  * - default: 8
  * @param base The base model
  * @returns The grid size for the model, defaulting to 8
@@ -32,6 +32,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
 export const getGridSize = (base?: BaseModelType | null): number => {
   switch (base) {
     case 'flux':
+    case 'sd-3':
       return 16;
     case 'sd-1':
     case 'sd-2':

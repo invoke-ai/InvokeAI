@@ -1,21 +1,22 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { CANVAS_OUTPUT_PREFIX } from 'features/nodes/util/graph/graphBuilderUtils';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
 import { $lastProgressEvent } from 'services/events/stores';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
 const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
-  return data.invocation_source_id.split(':')[0] === 'canvas_output';
+  return data.invocation_source_id.split(':')[0] === CANVAS_OUTPUT_PREFIX;
 };
 
 const nodeTypeDenylist = ['load_image', 'image'];
@@ -143,10 +144,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
   };
 
   return async (data: S['InvocationCompleteEvent']) => {
-    log.debug(
-      { data } as SerializableObject,
-      `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
-    );
+    log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
     if (data.origin === 'workflows') {
       await handleOriginWorkflows(data);

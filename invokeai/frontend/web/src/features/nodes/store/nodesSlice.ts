@@ -8,12 +8,15 @@ import type {
   BoardFieldValue,
   BooleanFieldValue,
   CLIPEmbedModelFieldValue,
+  CLIPGEmbedModelFieldValue,
+  CLIPLEmbedModelFieldValue,
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
   FieldValue,
   FloatFieldValue,
   FluxVAEModelFieldValue,
+  ImageFieldCollectionValue,
   ImageFieldValue,
   IntegerFieldValue,
   IPAdapterModelFieldValue,
@@ -33,11 +36,14 @@ import {
   zBoardFieldValue,
   zBooleanFieldValue,
   zCLIPEmbedModelFieldValue,
+  zCLIPGEmbedModelFieldValue,
+  zCLIPLEmbedModelFieldValue,
   zColorFieldValue,
   zControlNetModelFieldValue,
   zEnumFieldValue,
   zFloatFieldValue,
   zFluxVAEModelFieldValue,
+  zImageFieldCollectionValue,
   zImageFieldValue,
   zIntegerFieldValue,
   zIPAdapterModelFieldValue,
@@ -315,6 +321,9 @@ export const nodesSlice = createSlice({
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
     },
+    fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zImageFieldCollectionValue);
+    },
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
     },
@@ -353,6 +362,12 @@ export const nodesSlice = createSlice({
     },
     fieldCLIPEmbedValueChanged: (state, action: FieldValueAction<CLIPEmbedModelFieldValue>) => {
       fieldValueReducer(state, action, zCLIPEmbedModelFieldValue);
+    },
+    fieldCLIPLEmbedValueChanged: (state, action: FieldValueAction<CLIPLEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPLEmbedModelFieldValue);
+    },
+    fieldCLIPGEmbedValueChanged: (state, action: FieldValueAction<CLIPGEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPGEmbedModelFieldValue);
     },
     fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
       fieldValueReducer(state, action, zFluxVAEModelFieldValue);
@@ -406,6 +421,7 @@ export const {
   fieldControlNetModelValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
+  fieldImageCollectionValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
   fieldSpandrelImageToImageModelValueChanged,
@@ -420,6 +436,8 @@ export const {
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
   fieldCLIPEmbedValueChanged,
+  fieldCLIPLEmbedValueChanged,
+  fieldCLIPGEmbedValueChanged,
   fieldFluxVAEModelValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
@@ -515,6 +533,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldControlNetModelValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
+  fieldImageCollectionValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
   fieldLabelChanged,
@@ -527,6 +546,8 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
   fieldCLIPEmbedValueChanged,
+  fieldCLIPLEmbedValueChanged,
+  fieldCLIPGEmbedValueChanged,
   fieldFluxVAEModelValueChanged,
   // The `nodesChanged` has extra logic and is handled in its own extra reducer
   // nodesChanged,

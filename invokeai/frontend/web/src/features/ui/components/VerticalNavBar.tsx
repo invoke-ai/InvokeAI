@@ -4,6 +4,7 @@ import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
 import StatusIndicator from 'features/system/components/StatusIndicator';
+import { VideosModalButton } from 'features/system/components/VideosModal/VideosModalButton';
 import { TabMountGate } from 'features/ui/components/TabMountGate';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +40,7 @@ export const VerticalNavBar = memo(() => {
       <Spacer />
       <StatusIndicator />
       <Notifications />
+      <VideosModalButton />
       {customNavComponent ? customNavComponent : <SettingsMenu />}
     </Flex>
   );

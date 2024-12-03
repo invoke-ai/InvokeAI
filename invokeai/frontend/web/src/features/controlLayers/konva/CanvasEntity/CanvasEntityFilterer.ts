@@ -1,29 +1,36 @@
+import { deepClone } from 'common/util/deepClone';
 import { withResult, withResultAsync } from 'common/util/result';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
+import { addCoords, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
-import type { CanvasEntityType, CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasImageState, CanvasRenderableEntityType } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import Konva from 'konva';
 import { debounce } from 'lodash-es';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
 import { isControlNetOrT2IAdapterModelConfig } from 'services/api/types';
+import stableHash from 'stable-hash';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 type CanvasEntityFiltererConfig = {
-  processDebounceMs: number;
+  /**
+   * The debounce time in milliseconds for processing the filter.
+   */
+  PROCESS_DEBOUNCE_MS: number;
 };
 
 const DEFAULT_CONFIG: CanvasEntityFiltererConfig = {
-  processDebounceMs: 1000,
+  PROCESS_DEBOUNCE_MS: 1000,
 };
 
 export class CanvasEntityFilterer extends CanvasModuleBase {
@@ -34,19 +41,71 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  imageState: CanvasImageState | null = null;
-  subscriptions = new Set<() => void>();
   config: CanvasEntityFiltererConfig = DEFAULT_CONFIG;
+
+  subscriptions = new Set<() => void>();
 
   /**
    * The AbortController used to cancel the filter processing.
    */
   abortController: AbortController | null = null;
 
+  /**
+   * Whether the module is currently filtering an image.
+   */
   $isFiltering = atom<boolean>(false);
-  $hasProcessed = atom<boolean>(false);
+  /**
+   * The hash of the last processed config. This is used to prevent re-processing the same config.
+   */
+  $lastProcessedHash = atom<string>('');
+
+  /**
+   * Whether the module is currently processing the filter.
+   */
   $isProcessing = atom<boolean>(false);
+
+  /**
+   * The config for the filter.
+   */
   $filterConfig = atom<FilterConfig>(IMAGE_FILTERS.canny_edge_detection.buildDefaults());
+
+  /**
+   * The initial filter config, used to reset the filter config.
+   */
+  $initialFilterConfig = atom<FilterConfig | null>(null);
+
+  /**
+   * The ephemeral image state of the filtered image.
+   */
+  $imageState = atom<CanvasImageState | null>(null);
+
+  /**
+   * Whether the module has an image state. This is a computed value based on $imageState.
+   */
+  $hasImageState = computed(this.$imageState, (imageState) => imageState !== null);
+
+  /**
+   * Whether the filter is in simple mode. In simple mode, the filter is started with a default filter config and the
+   * user is not presented with filter settings.
+   */
+  $simple = atom<boolean>(false);
+
+  /**
+   * The filtered image object module, if it exists.
+   */
+  imageModule: CanvasObjectImage | null = null;
+
+  /**
+   * The Konva nodes for the module.
+   */
+  konva: {
+    /**
+     * The main Konva group node for the module. This is added to the parent layer on start, and removed on teardown.
+     */
+    group: Konva.Group;
+  };
+
+  KONVA_GROUP_NAME = `${this.type}:group`;
 
   constructor(parent: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer) {
     super();
@@ -57,9 +116,17 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating filter module');
+
+    this.konva = {
+      group: new Konva.Group({ name: this.KONVA_GROUP_NAME }),
+    };
   }
 
+  /**
+   * Adds event listeners needed while filtering the entity.
+   */
   subscribe = () => {
+    // As the filter config changes, process the filter
     this.subscriptions.add(
       this.$filterConfig.listen(() => {
         if (this.manager.stateApi.getSettings().autoProcess && this.$isFiltering.get()) {
@@ -67,6 +134,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
         }
       })
     );
+    // When auto-process is enabled, process the filter
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
         if (autoProcess && this.$isFiltering.get()) {
@@ -76,11 +144,18 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     );
   };
 
+  /**
+   * Removes event listeners used while filtering the entity.
+   */
   unsubscribe = () => {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
   };
 
+  /**
+   * Starts the filter module.
+   * @param config The filter config to use. If omitted, the default filter config is used.
+   */
   start = (config?: FilterConfig) => {
     const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
     if (filteringAdapter) {
@@ -90,31 +165,64 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
     this.log.trace('Initializing filter');
 
-    this.subscribe();
+    // Reset any previous state
+    this.resetEphemeralState();
+    this.$isFiltering.set(true);
+
+    // Update the konva group's position to match the parent entity
+    const pixelRect = this.parent.transformer.$pixelRect.get();
+    const position = addCoords(this.parent.state.position, pixelRect);
+    this.konva.group.setAttrs(position);
+
+    // Add the group to the parent layer
+    this.parent.konva.layer.add(this.konva.group);
 
     if (config) {
+      // If a config is provided, use it
       this.$filterConfig.set(config);
-    } else if (this.parent.type === 'control_layer_adapter' && this.parent.state.controlAdapter.model) {
+      this.$initialFilterConfig.set(config);
+      this.$simple.set(true);
+    } else {
+      const initialConfig = this.createInitialFilterConfig();
+      this.$filterConfig.set(initialConfig);
+      this.$initialFilterConfig.set(initialConfig);
+      this.$simple.set(false);
+    }
+
+    this.subscribe();
+
+    this.manager.stateApi.$filteringAdapter.set(this.parent);
+
+    if (this.manager.stateApi.getSettings().autoProcess) {
+      this.processImmediate();
+    }
+  };
+
+  createInitialFilterConfig = (): FilterConfig => {
+    if (this.parent.type === 'control_layer_adapter' && this.parent.state.controlAdapter.model) {
       // If the parent is a control layer adapter, we should check if the model has a default filter and set it if so
       const selectModelConfig = buildSelectModelConfig(
         this.parent.state.controlAdapter.model.key,
         isControlNetOrT2IAdapterModelConfig
       );
       const modelConfig = this.manager.stateApi.runSelector(selectModelConfig);
-      const filter = getFilterForModel(modelConfig);
-      this.$filterConfig.set(filter.buildDefaults());
+      // This always returns a filter
+      const filter = getFilterForModel(modelConfig) ?? IMAGE_FILTERS.canny_edge_detection;
+      return filter.buildDefaults();
     } else {
-      // Otherwise, set the default filter
-      this.$filterConfig.set(IMAGE_FILTERS.canny_edge_detection.buildDefaults());
-    }
-    this.$isFiltering.set(true);
-    this.manager.stateApi.$filteringAdapter.set(this.parent);
-    if (this.manager.stateApi.getSettings().autoProcess) {
-      this.processImmediate();
+      // Otherwise, used the default filter
+      return IMAGE_FILTERS.canny_edge_detection.buildDefaults();
     }
   };
 
+  /**
+   * Processes the filter, updating the module's state and rendering the filtered image.
+   */
   processImmediate = async () => {
+    if (!this.$isFiltering.get()) {
+      this.log.warn('Cannot process filter when not initialized');
+      return;
+    }
     const config = this.$filterConfig.get();
     const filterData = IMAGE_FILTERS[config.type];
 
@@ -122,6 +230,12 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     const isValid = filterData.validateConfig?.(config as never) ?? true;
     if (!isValid) {
       this.log.error({ config }, 'Invalid filter config');
+      return;
+    }
+
+    const hash = stableHash({ config });
+    if (hash === this.$lastProcessedHash.get()) {
+      this.log.trace('Already processed config');
       return;
     }
 
@@ -158,78 +272,104 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.manager.stateApi.runGraphAndReturnImageOutput({
         graph,
         outputNodeId,
-        // The filter graph should always be prepended to the queue so it's processed ASAP.
         prepend: true,
-        /**
-         * The filter node may need to download a large model. Currently, the models required by the filter nodes are
-         * downloaded just-in-time, as required by the filter. If we use a timeout here, we might get into a catch-22
-         * where the filter node is waiting for the model to download, but the download gets canceled if the filter
-         * node times out.
-         *
-         * (I suspect the model download will actually _not_ be canceled if the graph is canceled, but let's not chance it!)
-         *
-         * TODO(psyche): Figure out a better way to handle this. Probably need to download the models ahead of time.
-         */
-        // timeout: 5000,
-        /**
-         * The filter node should be able to cancel the request if it's taking too long. This will cancel the graph's
-         * queue item and clear any event listeners on the request.
-         */
         signal: controller.signal,
       })
     );
+
+    // If there is an error, log it and bail out of this processing run
     if (filterResult.isErr()) {
-      this.log.error({ error: serializeError(filterResult.error) }, 'Error processing filter');
+      this.log.error({ error: serializeError(filterResult.error) }, 'Error filtering');
       this.$isProcessing.set(false);
+      // Clean up the abort controller as needed
+      if (!this.abortController.signal.aborted) {
+        this.abortController.abort();
+      }
       this.abortController = null;
       return;
     }
 
-    this.log.trace({ imageDTO: filterResult.value }, 'Filter processed');
-    this.imageState = imageDTOToImageObject(filterResult.value);
+    this.log.trace({ imageDTO: filterResult.value }, 'Filtered');
 
-    await this.parent.bufferRenderer.setBuffer(this.imageState, true);
+    // Prepare the ephemeral image state
+    const imageState = imageDTOToImageObject(filterResult.value);
+    this.$imageState.set(imageState);
+
+    // Destroy any existing masked image and create a new one
+    if (this.imageModule) {
+      this.imageModule.destroy();
+    }
+
+    this.imageModule = new CanvasObjectImage(imageState, this);
+
+    // Force update the masked image - after awaiting, the image will be rendered (in memory)
+    await this.imageModule.update(imageState, true);
+
+    this.konva.group.add(this.imageModule.konva.group);
+
+    // The porcessing is complete, set can set the last processed hash and isProcessing to false
+    this.$lastProcessedHash.set(hash);
 
     this.$isProcessing.set(false);
-    this.$hasProcessed.set(true);
+
+    // Clean up the abort controller as needed
+    if (!this.abortController.signal.aborted) {
+      this.abortController.abort();
+    }
+
     this.abortController = null;
   };
 
-  process = debounce(this.processImmediate, this.config.processDebounceMs);
+  /**
+   * Debounced version of processImmediate.
+   */
+  process = debounce(this.processImmediate, this.config.PROCESS_DEBOUNCE_MS);
 
+  /**
+   * Applies the filter image to the entity, replacing the entity's objects with the filtered image.
+   */
   apply = () => {
-    const imageState = this.imageState;
-    if (!imageState) {
+    const filteredImageObjectState = this.$imageState.get();
+    if (!filteredImageObjectState) {
       this.log.warn('No image state to apply filter to');
       return;
     }
-    this.log.trace('Applying filter');
-    this.parent.bufferRenderer.commitBuffer();
+    this.log.trace('Applying');
+
+    // Have the parent adopt the image module - this prevents a flash of the original layer content before the filtered
+    // image is rendered
+    if (this.imageModule) {
+      this.parent.renderer.adoptObjectRenderer(this.imageModule);
+    }
+
+    // Rasterize the entity, replacing the objects with the masked image
     const rect = this.parent.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
-      imageObject: imageState,
+      imageObject: filteredImageObjectState,
       position: {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
       },
       replaceObjects: true,
     });
-    this.imageState = null;
-    this.unsubscribe();
-    this.$isFiltering.set(false);
-    this.$hasProcessed.set(false);
-    this.manager.stateApi.$filteringAdapter.set(null);
+
+    // Final cleanup and teardown, returning user to main canvas UI
+    this.teardown();
   };
 
-  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
-    const imageState = this.imageState;
+  /**
+   * Saves the filtered image as a new entity of the given type.
+   * @param type The type of entity to save the filtered image as.
+   */
+  saveAs = (type: CanvasRenderableEntityType) => {
+    const imageState = this.$imageState.get();
     if (!imageState) {
       this.log.warn('No image state to apply filter to');
       return;
     }
-    this.log.trace('Applying filter');
-    this.parent.bufferRenderer.commitBuffer();
+    this.log.trace(`Saving as ${type}`);
+
     const rect = this.parent.transformer.getRelativeRect();
     const arg = {
       overrides: {
@@ -258,35 +398,51 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       default:
         assert<Equals<typeof type, never>>(false);
     }
+  };
 
-    this.imageState = null;
+  resetEphemeralState = () => {
+    // First we need to bail out of any processing
+    if (this.abortController && !this.abortController.signal.aborted) {
+      this.abortController.abort();
+    }
+    this.abortController = null;
+
+    // If the image module exists, and is a child of the group, destroy it. It might not be a child of the group if
+    // the user has applied the filter and the image has been adopted by the parent entity.
+    if (this.imageModule && this.imageModule.konva.group.parent === this.konva.group) {
+      this.imageModule.destroy();
+      this.imageModule = null;
+    }
+    const initialFilterConfig = deepClone(this.$initialFilterConfig.get() ?? this.createInitialFilterConfig());
+    this.$filterConfig.set(initialFilterConfig);
+    this.$imageState.set(null);
+    this.$lastProcessedHash.set('');
+    this.$isProcessing.set(false);
+  };
+
+  teardown = () => {
     this.unsubscribe();
+    this.konva.group.remove();
+    // The reset must be done _after_ unsubscribing from listeners, in case the listeners would otherwise react to
+    // the reset. For example, if auto-processing is enabled and we reset the state, it may trigger processing.
+    this.resetEphemeralState();
     this.$isFiltering.set(false);
-    this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
   };
 
+  /**
+   * Resets the module (e.g. remove all points and the mask image).
+   *
+   * Does not cancel or otherwise complete the segmenting process.
+   */
   reset = () => {
-    this.log.trace('Resetting filter');
-
-    this.abortController?.abort();
-    this.abortController = null;
-    this.parent.bufferRenderer.clearBuffer();
-    this.parent.transformer.updatePosition();
-    this.parent.renderer.syncKonvaCache(true);
-    this.imageState = null;
-    this.$hasProcessed.set(false);
+    this.log.trace('Resetting');
+    this.resetEphemeralState();
   };
 
   cancel = () => {
-    this.log.trace('Cancelling filter');
-
-    this.reset();
-    this.unsubscribe();
-    this.$isProcessing.set(false);
-    this.$isFiltering.set(false);
-    this.$hasProcessed.set(false);
-    this.manager.stateApi.$filteringAdapter.set(null);
+    this.log.trace('Canceling');
+    this.teardown();
   };
 
   repr = () => {
@@ -294,11 +450,14 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       id: this.id,
       type: this.type,
       path: this.path,
+      parent: this.parent.id,
       config: this.config,
+      imageState: deepClone(this.$imageState.get()),
       $isFiltering: this.$isFiltering.get(),
-      $hasProcessed: this.$hasProcessed.get(),
+      $lastProcessedHash: this.$lastProcessedHash.get(),
       $isProcessing: this.$isProcessing.get(),
       $filterConfig: this.$filterConfig.get(),
+      konva: { group: getKonvaNodeDebugAttrs(this.konva.group) },
     };
   };
 
@@ -309,5 +468,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     }
     this.abortController = null;
     this.unsubscribe();
+    this.konva.group.destroy();
   };
 }
