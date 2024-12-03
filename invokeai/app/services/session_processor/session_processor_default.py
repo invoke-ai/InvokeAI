@@ -379,7 +379,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
         # Make sure the cancel event is for the currently processing queue item
-        if self._queue_item and self._queue_item.item_id is not event[1].item_id:
+        if self._queue_item and self._queue_item.item_id != event[1].item_id:
             return
         if self._queue_item and event[1].status in ["completed", "failed", "canceled"]:
             # When the queue item is canceled via HTTP, the queue item status is set to `"canceled"` and this event is
