@@ -18,7 +18,7 @@ from invokeai.backend.model_manager import (
     SubModelType,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
-from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import (
     is_state_dict_likely_flux_control,

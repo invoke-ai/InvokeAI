@@ -1,13 +1,11 @@
 from dataclasses import dataclass
-from typing import Dict, Generic, Optional, TypeVar
+from typing import Any, Dict, Optional
 
 import torch
 
-T = TypeVar("T")
-
 
 @dataclass
-class CacheRecord(Generic[T]):
+class CacheRecord:
     """
     Elements of the cache:
 
@@ -30,7 +28,7 @@ class CacheRecord(Generic[T]):
     """
 
     key: str
-    model: T
+    model: Any
     device: torch.device
     state_dict: Optional[Dict[str, torch.Tensor]]
     size: int

@@ -95,7 +95,7 @@ class ModelCache:
         self._log_memory_usage = log_memory_usage
         self._stats: Optional[CacheStats] = None
 
-        self._cached_models: Dict[str, CacheRecord[AnyModel]] = {}
+        self._cached_models: Dict[str, CacheRecord] = {}
         self._cache_stack: List[str] = []
 
     @property
