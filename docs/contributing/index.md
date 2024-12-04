@@ -34,11 +34,11 @@ Please reach out to @hipsterusername on [Discord](https://discord.gg/ZmtBAhwWhy)
 
 ## Contributors
 
-This project is a combined effort of dedicated people from across the world. [Check out the list of all these amazing people](https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/). We thank them for their time, hard work and effort.
+This project is a combined effort of dedicated people from across the world. [Check out the list of all these amazing people](contributors.md). We thank them for their time, hard work and effort.
 
 ## Code of Conduct
 
-The InvokeAI community is a welcoming place, and we want your help in maintaining that. Please review our [Code of Conduct](https://github.com/invoke-ai/InvokeAI/blob/main/docs/CODE_OF_CONDUCT.md) to learn more - it's essential to maintaining a respectful and inclusive environment.
+The InvokeAI community is a welcoming place, and we want your help in maintaining that. Please review our [Code of Conduct](../CODE_OF_CONDUCT.md) to learn more - it's essential to maintaining a respectful and inclusive environment.
 
 By making a contribution to this project, you certify that:
 

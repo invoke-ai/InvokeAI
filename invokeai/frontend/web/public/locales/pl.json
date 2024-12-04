@@ -10,7 +10,24 @@
         "load": "Załaduj",
         "statusDisconnected": "Odłączono od serwera",
         "githubLabel": "GitHub",
-        "discordLabel": "Discord"
+        "discordLabel": "Discord",
+        "clipboard": "Schowek",
+        "aboutDesc": "Wykorzystujesz Invoke do pracy? Sprawdź:",
+        "ai": "SI",
+        "areYouSure": "Czy jesteś pewien?",
+        "copyError": "$t(gallery.copy) Błąd",
+        "apply": "Zastosuj",
+        "copy": "Kopiuj",
+        "or": "albo",
+        "add": "Dodaj",
+        "off": "Wyłączony",
+        "accept": "Zaakceptuj",
+        "cancel": "Anuluj",
+        "advanced": "Zawansowane",
+        "back": "Do tyłu",
+        "auto": "Automatyczny",
+        "beta": "Beta",
+        "close": "Wyjdź"
     },
     "gallery": {
         "galleryImageSize": "Rozmiar obrazów",
@@ -65,6 +82,42 @@
         "uploadImage": "Wgrywanie obrazu",
         "previousImage": "Poprzedni obraz",
         "nextImage": "Następny obraz",
-        "menu": "Menu"
+        "menu": "Menu",
+        "mode": "Tryb"
+    },
+    "boards": {
+        "cancel": "Anuluj",
+        "noBoards": "Brak tablic typu {{boardType}}",
+        "imagesWithCount_one": "{{count}} zdjęcie",
+        "imagesWithCount_few": "{{count}} zdjęcia",
+        "imagesWithCount_many": "{{count}} zdjęcia",
+        "private": "Prywatne tablice",
+        "updateBoardError": "Błąd aktualizacji tablicy",
+        "uncategorized": "Nieskategoryzowane",
+        "selectBoard": "Wybierz tablicę",
+        "downloadBoard": "Pobierz tablice",
+        "loading": "Ładowanie...",
+        "move": "Przenieś",
+        "noMatching": "Brak pasujących tablic"
+    },
+    "accordions": {
+        "compositing": {
+            "title": "Kompozycja",
+            "infillTab": "Inskrypcja",
+            "coherenceTab": "Przebieg Koherencji"
+        },
+        "generation": {
+            "title": "Generowanie"
+        },
+        "image": {
+            "title": "Zdjęcie"
+        },
+        "advanced": {
+            "options": "$t(accordions.advanced.title) Opcje",
+            "title": "Zaawansowane"
+        },
+        "control": {
+            "title": "Kontrola"
+        }
     }
 }

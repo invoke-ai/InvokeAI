@@ -50,7 +50,7 @@ Applications are built on top of the invoke framework. They should construct `in
 
 ### Web UI
 
-The Web UI is built on top of an HTTP API built with [FastAPI](https://fastapi.tiangolo.com/) and [Socket.IO](https://socket.io/). The frontend code is found in `/frontend` and the backend code is found in `/ldm/invoke/app/api_app.py` and `/ldm/invoke/app/api/`. The code is further organized as such:
+The Web UI is built on top of an HTTP API built with [FastAPI](https://fastapi.tiangolo.com/) and [Socket.IO](https://socket.io/). The frontend code is found in `/invokeai/frontend` and the backend code is found in `/invokeai/app/api_app.py` and `/invokeai/app/api/`. The code is further organized as such:
 
 | Component | Description |
 | --- | --- |
@@ -62,7 +62,7 @@ The Web UI is built on top of an HTTP API built with [FastAPI](https://fastapi.t
 
 ### CLI
 
-The CLI is built automatically from invocation metadata, and also supports invocation piping and auto-linking. Code is available in `/ldm/invoke/app/cli_app.py`.
+The CLI is built automatically from invocation metadata, and also supports invocation piping and auto-linking. Code is available in `/invokeai/frontend/cli`.
 
 ## Invoke
 
@@ -70,7 +70,7 @@ The Invoke framework provides the interface to the underlying AI systems and is 
 
 ### Invoker
 
-The invoker (`/ldm/invoke/app/services/invoker.py`) is the primary interface through which applications interact with the framework. Its primary purpose is to create, manage, and invoke sessions. It also maintains two sets of services:
+The invoker (`/invokeai/app/services/invoker.py`) is the primary interface through which applications interact with the framework. Its primary purpose is to create, manage, and invoke sessions. It also maintains two sets of services:
 - **invocation services**, which are used by invocations to interact with core functionality.
 - **invoker services**, which are used by the invoker to manage sessions and manage the invocation queue.
 
@@ -82,12 +82,12 @@ The session graph does not support looping. This is left as an application probl
 
 ### Invocations
 
-Invocations represent individual units of execution, with inputs and outputs. All invocations are located in `/ldm/invoke/app/invocations`, and are all automatically discovered and made available in the applications. These are the primary way to expose new functionality in Invoke.AI, and the [implementation guide](INVOCATIONS.md) explains how to add new invocations.
+Invocations represent individual units of execution, with inputs and outputs. All invocations are located in `/invokeai/app/invocations`, and are all automatically discovered and made available in the applications. These are the primary way to expose new functionality in Invoke.AI, and the [implementation guide](INVOCATIONS.md) explains how to add new invocations.
 
 ### Services
 
-Services provide invocations access AI Core functionality and other necessary functionality (e.g. image storage). These are available in `/ldm/invoke/app/services`. As a general rule, new services should provide an interface as an abstract base class, and may provide a lightweight local implementation by default in their module. The goal for all services should be to enable the usage of different implementations (e.g. using cloud storage for image storage), but should not load any module dependencies unless that implementation has been used (i.e. don't import anything that won't be used, especially if it's expensive to import).
+Services provide invocations access AI Core functionality and other necessary functionality (e.g. image storage). These are available in `/invokeai/app/services`. As a general rule, new services should provide an interface as an abstract base class, and may provide a lightweight local implementation by default in their module. The goal for all services should be to enable the usage of different implementations (e.g. using cloud storage for image storage), but should not load any module dependencies unless that implementation has been used (i.e. don't import anything that won't be used, especially if it's expensive to import).
 
 ## AI Core
 
-The AI Core is represented by the rest of the code base (i.e. the code outside of `/ldm/invoke/app/`).
+The AI Core is represented by the rest of the code base (i.e. the code outside of `/invokeai/app/`).

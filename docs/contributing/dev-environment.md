@@ -27,9 +27,9 @@ If you just want to use Invoke, you should use the [installer][installer link].
 
 5. Activate the venv (you'll need to do this every time you want to run the app):
 
-        ```sh
-        source .venv/bin/activate
-        ```
+      ```sh
+      source .venv/bin/activate
+      ```
 
 6. Install the repo as an [editable install][editable install link]:
 
@@ -37,7 +37,7 @@ If you just want to use Invoke, you should use the [installer][installer link].
       pip install -e ".[dev,test,xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
       ```
 
-      Refer to the [manual installation][manual install link]] instructions for more determining the correct install options. `xformers` is optional, but `dev` and `test` are not.
+      Refer to the [manual installation][manual install link] instructions for more determining the correct install options. `xformers` is optional, but `dev` and `test` are not.
 
 7. Install the frontend dev toolchain:
 

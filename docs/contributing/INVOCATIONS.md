@@ -287,8 +287,8 @@ new Invocation ready to be used.
 
 Once you've created a Node, the next step is to share it with the community! The
 best way to do this is to submit a Pull Request to add the Node to the
-[Community Nodes](nodes/communityNodes) list. If you're not sure how to do that,
-take a look a at our [contributing nodes overview](contributingNodes).
+[Community Nodes](../nodes/communityNodes.md) list. If you're not sure how to do that,
+take a look a at our [contributing nodes overview](../nodes/contributingNodes.md).
 
 ## Advanced
 

@@ -29,7 +29,13 @@ import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/
 import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'services/api/types';
 
-/** @knipignore */
+/**
+ * Selects the default control adapter configuration based on the model configurations and the base.
+ *
+ * Be sure to clone the output of this selector before modifying it!
+ *
+ * @knipignore
+ */
 export const selectDefaultControlAdapter = createSelector(
   selectModelConfigsQuery,
   selectBase,
@@ -52,6 +58,11 @@ export const selectDefaultControlAdapter = createSelector(
   }
 );
 
+/**
+ * Selects the default IP adapter configuration based on the model configurations and the base.
+ *
+ * Be sure to clone the output of this selector before modifying it!
+ */
 export const selectDefaultIPAdapter = createSelector(
   selectModelConfigsQuery,
   selectBase,
@@ -117,7 +128,9 @@ export const useAddRegionalReferenceImage = () => {
 
   const func = useCallback(() => {
     const overrides: Partial<CanvasRegionalGuidanceState> = {
-      referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter: defaultIPAdapter }],
+      referenceImages: [
+        { id: getPrefixedId('regional_guidance_reference_image'), ipAdapter: deepClone(defaultIPAdapter) },
+      ],
     };
     dispatch(rgAdded({ isSelected: true, overrides }));
   }, [defaultIPAdapter, dispatch]);
@@ -129,7 +142,7 @@ export const useAddGlobalReferenceImage = () => {
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
   const func = useCallback(() => {
-    const overrides = { ipAdapter: defaultIPAdapter };
+    const overrides = { ipAdapter: deepClone(defaultIPAdapter) };
     dispatch(referenceImageAdded({ isSelected: true, overrides }));
   }, [defaultIPAdapter, dispatch]);
 
@@ -140,7 +153,7 @@ export const useAddRegionalGuidanceIPAdapter = (entityIdentifier: CanvasEntityId
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
   const func = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: { ipAdapter: defaultIPAdapter } }));
+    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: { ipAdapter: deepClone(defaultIPAdapter) } }));
   }, [defaultIPAdapter, dispatch, entityIdentifier]);
 
   return func;

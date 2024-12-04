@@ -89,7 +89,7 @@ const TooltipContent = memo((props: { warnings: string[] }) => {
   const { t } = useTranslation();
   return (
     <Flex flexDir="column">
-      <Text>{t('common.warnings')}:</Text>
+      <Text>{t('controlLayers.warnings.problemsFound')}:</Text>
       <UnorderedList>
         {props.warnings.map((warning, index) => (
           <ListItem key={index}>{warning}</ListItem>

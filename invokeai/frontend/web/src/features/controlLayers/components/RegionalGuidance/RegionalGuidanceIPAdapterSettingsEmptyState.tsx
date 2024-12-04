@@ -1,7 +1,6 @@
-import { Button, Flex, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { RegionalGuidanceDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceDeletePromptButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { rgIPAdapterDeleted } from 'features/controlLayers/store/canvasSlice';
@@ -12,6 +11,7 @@ import { setRegionalGuidanceReferenceImage } from 'features/imageActions/actions
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 type Props = {
@@ -47,27 +47,44 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
   );
 
   return (
-    <Flex flexDir="column" gap={3} position="relative" w="full" p={4}>
-      <RegionalGuidanceDeletePromptButton onDelete={onDeleteIPAdapter} position="absolute" top={0} insetInlineEnd={0} />
-      <Text textAlign="center" color="base.300">
-        <Trans
-          i18nKey="controlLayers.referenceImageEmptyState"
-          components={{
-            UploadButton: (
-              <Button
-                isDisabled={isBusy}
-                size="sm"
-                variant="link"
-                color="base.300"
-                {...uploadApi.getUploadButtonProps()}
-              />
-            ),
-            GalleryButton: (
-              <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
-            ),
-          }}
+    <Flex flexDir="column" gap={2} position="relative" w="full">
+      <Flex alignItems="center" gap={2}>
+        <Text fontWeight="semibold" color="base.400">
+          {t('controlLayers.referenceImage')}
+        </Text>
+        <Spacer />
+        <IconButton
+          size="sm"
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiXBold />}
+          tooltip={t('controlLayers.deleteReferenceImage')}
+          aria-label={t('controlLayers.deleteReferenceImage')}
+          onClick={onDeleteIPAdapter}
+          colorScheme="error"
         />
-      </Text>
+      </Flex>
+      <Flex alignItems="center" gap={2} p={4}>
+        <Text textAlign="center" color="base.300">
+          <Trans
+            i18nKey="controlLayers.referenceImageEmptyState"
+            components={{
+              UploadButton: (
+                <Button
+                  isDisabled={isBusy}
+                  size="sm"
+                  variant="link"
+                  color="base.300"
+                  {...uploadApi.getUploadButtonProps()}
+                />
+              ),
+              GalleryButton: (
+                <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
+              ),
+            }}
+          />
+        </Text>
+      </Flex>
       <input {...uploadApi.getUploadInputProps()} />
       <DndDropTarget
         dndTarget={setRegionalGuidanceReferenceImageDndTarget}

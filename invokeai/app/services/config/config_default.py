@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import filecmp
 import locale
 import os
 import re
@@ -525,9 +526,35 @@ def get_config() -> InvokeAIAppConfig:
     ]
     example_config.write_file(config.config_file_path.with_suffix(".example.yaml"), as_example=True)
 
-    # Copy all legacy configs - We know `__path__[0]` is correct here
+    # Copy all legacy configs only if needed
+    # We know `__path__[0]` is correct here
     configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
-    shutil.copytree(configs_src, config.legacy_conf_path, dirs_exist_ok=True)
+    dest_path = config.legacy_conf_path
+
+    # Create destination (we don't need to check for existence)
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    # Compare directories recursively
+    comparison = filecmp.dircmp(configs_src, dest_path)
+    need_copy = any(
+        [
+            comparison.left_only,  # Files exist only in source
+            comparison.diff_files,  # Files that differ
+            comparison.common_funny,  # Files that couldn't be compared
+        ]
+    )
+
+    if need_copy:
+        # Get permissions from destination directory
+        dest_mode = dest_path.stat().st_mode
+
+        # Copy directory tree
+        shutil.copytree(configs_src, dest_path, dirs_exist_ok=True)
+
+        # Set permissions on copied files to match destination directory
+        dest_path.chmod(dest_mode)
+        for p in dest_path.glob("**/*"):
+            p.chmod(dest_mode)
 
     if config.config_file_path.exists():
         config_from_file = load_and_migrate_config(config.config_file_path)

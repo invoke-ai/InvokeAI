@@ -9,20 +9,20 @@ model. These are the:
   configuration information. Among other things, the record service
   tracks the type of the model, its provenance, and where it can be
   found on disk.
-  
+
 * _ModelInstallServiceBase_ A service for installing models to
   disk. It uses `DownloadQueueServiceBase` to download models and
   their metadata, and `ModelRecordServiceBase` to store that
   information. It is also responsible for managing the InvokeAI
   `models` directory and its contents.
-  
+
 * _DownloadQueueServiceBase_
   A multithreaded downloader responsible
   for downloading models from a remote source to disk. The download
   queue has special methods for downloading repo_id folders from
   Hugging Face, as well as discriminating among model versions in
   Civitai, but can be used for arbitrary content.
-  
+
   * _ModelLoadServiceBase_
   Responsible for loading a model from disk
   into RAM and VRAM and getting it ready for inference.
@@ -207,9 +207,9 @@ for use in the InvokeAI web server. Its signature is:
 
 ```
 def open(
-       cls, 
-    config: InvokeAIAppConfig, 
-    conn: Optional[sqlite3.Connection] = None, 
+       cls,
+    config: InvokeAIAppConfig,
+    conn: Optional[sqlite3.Connection] = None,
     lock: Optional[threading.Lock] = None
     ) -> Union[ModelRecordServiceSQL, ModelRecordServiceFile]:
 ```
@@ -363,7 +363,7 @@ functionality:
 
 * Registering a model config record for a model already located on the
   local filesystem, without moving it or changing its path.
-  
+
 * Installing a model alreadiy located on the local filesystem, by
   moving it into the InvokeAI root directory under the
   `models` folder (or wherever config parameter `models_dir`
@@ -371,21 +371,21 @@ functionality:
 
 * Probing of models to determine their type, base type and other key
   information.
-  
+
 * Interface with the InvokeAI event bus to provide status updates on
   the download, installation and registration process.
-  
+
 * Downloading a model from an arbitrary URL and installing it in
   `models_dir`.
 
 * Special handling for HuggingFace repo_ids to recursively download
   the contents of the repository, paying attention to alternative
   variants such as fp16.
-  
+
 * Saving tags and other metadata about the model into the invokeai database
   when fetching from a repo that provides that type of information,
   (currently only HuggingFace).
-  
+
 ### Initializing the installer
 
 A default installer is created at InvokeAI api startup time and stored
@@ -461,7 +461,7 @@ revision.
 `config` is an optional dict of values that will override the
 autoprobed values for model type, base, scheduler prediction type, and
 so forth. See [Model configuration and
-probing](#Model-configuration-and-probing) for details.
+probing](#model-configuration-and-probing) for details.
 
 `access_token` is an optional access token for accessing resources
 that need authentication.
@@ -494,7 +494,7 @@ source8 = URLModelSource(url='https://civitai.com/api/download/models/63006', ac
 
 for source in [source1, source2, source3, source4, source5, source6, source7]:
    install_job = installer.install_model(source)
-   
+
 source2job = installer.wait_for_installs(timeout=120)
 for source in sources:
     job = source2job[source]
@@ -504,7 +504,7 @@ for source in sources:
   print(f"{source} installed as {model_key}")
  elif job.errored:
      print(f"{source}: {job.error_type}.\nStack trace:\n{job.error}")
- 
+
 ```
 
 As shown here, the `import_model()` method accepts a variety of

@@ -16,6 +16,9 @@ set -e -o pipefail
 
 USER_ID=${CONTAINER_UID:-1000}
 USER=ubuntu
+# if the user does not exist, create it. It is expected to be present on ubuntu >=24.x
+_=$(id ${USER} 2>&1) || useradd -u ${USER_ID} ${USER}
+# ensure the UID is correct
 usermod -u ${USER_ID} ${USER} 1>/dev/null
 
 ### Set the $PUBLIC_KEY env var to enable SSH access.
@@ -36,6 +39,8 @@ fi
 mkdir -p "${INVOKEAI_ROOT}"
 chown --recursive ${USER} "${INVOKEAI_ROOT}" || true
 cd "${INVOKEAI_ROOT}"
+export HF_HOME=${HF_HOME:-$INVOKEAI_ROOT/.cache/huggingface}
+export MPLCONFIGDIR=${MPLCONFIGDIR:-$INVOKEAI_ROOT/.matplotlib}
 
 # Run the CMD as the Container User (not root).
 exec gosu ${USER} "$@"

@@ -1,6 +1,6 @@
 # InvokeAI Backend Tests
 
-We use `pytest` to run the backend python tests. (See [pyproject.toml](/pyproject.toml) for the default `pytest` options.)
+We use `pytest` to run the backend python tests. (See [pyproject.toml](https://github.com/invoke-ai/InvokeAI/blob/main/pyproject.toml) for the default `pytest` options.)
 
 ## Fast vs. Slow
 All tests are categorized as either 'fast' (no test annotation) or 'slow' (annotated with the `@pytest.mark.slow` decorator).
@@ -33,7 +33,7 @@ pytest tests -m ""
 
 ## Test Organization
 
-All backend tests are in the [`tests/`](/tests/) directory. This directory mirrors the organization of the `invokeai/` directory. For example, tests for `invokeai/model_management/model_manager.py` would be found in `tests/model_management/test_model_manager.py`.
+All backend tests are in the [`tests/`](https://github.com/invoke-ai/InvokeAI/tree/main/tests) directory. This directory mirrors the organization of the `invokeai/` directory. For example, tests for `invokeai/model_management/model_manager.py` would be found in `tests/model_management/test_model_manager.py`.
 
 TODO: The above statement is aspirational. A re-organization of legacy tests is required to make it true.
 

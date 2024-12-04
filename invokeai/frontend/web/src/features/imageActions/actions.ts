@@ -169,13 +169,13 @@ export const createNewCanvasEntityFromImage = (arg: {
       break;
     }
     case 'reference_image': {
-      const ipAdapter = selectDefaultIPAdapter(getState());
+      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
       break;
     }
     case 'regional_guidance_with_reference_image': {
-      const ipAdapter = selectDefaultIPAdapter(getState());
+      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
@@ -291,14 +291,14 @@ export const newCanvasFromImage = (arg: {
       break;
     }
     case 'reference_image': {
-      const ipAdapter = selectDefaultIPAdapter(getState());
+      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       dispatch(canvasReset());
       dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
       break;
     }
     case 'regional_guidance_with_reference_image': {
-      const ipAdapter = selectDefaultIPAdapter(getState());
+      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
       dispatch(canvasReset());

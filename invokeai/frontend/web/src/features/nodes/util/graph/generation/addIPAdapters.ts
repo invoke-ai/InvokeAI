@@ -17,7 +17,9 @@ type AddIPAdaptersArg = {
 };
 
 export const addIPAdapters = ({ entities, g, collector, model }: AddIPAdaptersArg): AddIPAdaptersResult => {
-  const validIPAdapters = entities.filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
+  const validIPAdapters = entities
+    .filter((entity) => entity.isEnabled)
+    .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
   const result: AddIPAdaptersResult = {
     addedIPAdapters: 0,
