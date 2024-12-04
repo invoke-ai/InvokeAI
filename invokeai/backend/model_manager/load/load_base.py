@@ -18,7 +18,8 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 
 
 @dataclass
@@ -60,7 +61,7 @@ class LoadedModelWithoutConfig:
     not have a state_dict, in which case this value will be None.
     """
 
-    _locker: ModelLockerBase
+    _locker: ModelLocker
 
     def __enter__(self) -> AnyModel:
         """Context entry."""

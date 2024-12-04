@@ -14,7 +14,8 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.config import DiffusersConfigBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.util.devices import TorchDevice
@@ -66,7 +67,7 @@ class ModelLoader(ModelLoaderBase):
         model_base = self._app_config.models_path
         return (model_base / config.path).resolve()
 
-    def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> ModelLockerBase:
+    def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> ModelLocker:
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         try:
             return self._ram_cache.get(config.key, submodel_type, stats_name=stats_name)
