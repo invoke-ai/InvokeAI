@@ -1,6 +1,5 @@
 # Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Development team
 # TODO: Add Stalker's proper name to copyright
-""" """
 
 import gc
 import math
@@ -15,9 +14,6 @@ from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
-    ModelCacheBase,
-)
 from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
@@ -30,7 +26,7 @@ GB = 2**30
 MB = 2**20
 
 
-class ModelCache(ModelCacheBase[AnyModel]):
+class ModelCache:
     """A cache for managing models in memory.
 
     The cache is based on two levels of model storage:

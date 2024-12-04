@@ -8,13 +8,13 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
 
 
 class ModelLocker:
     """Internal class that mediates movement in and out of GPU."""
 
-    def __init__(self, cache: ModelCacheBase[AnyModel], cache_entry: CacheRecord[AnyModel]):
+    def __init__(self, cache: ModelCache, cache_entry: CacheRecord):
         """
         Initialize the model locker.
 
