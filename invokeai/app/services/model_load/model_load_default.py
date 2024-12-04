@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.load import (
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger

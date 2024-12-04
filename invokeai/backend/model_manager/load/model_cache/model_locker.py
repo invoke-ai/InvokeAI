@@ -8,7 +8,7 @@ import torch
 
 from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
-from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 
 
 class ModelLocker:
