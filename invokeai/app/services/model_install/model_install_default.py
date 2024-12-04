@@ -438,7 +438,7 @@ class ModelInstallService(ModelInstallServiceBase):
         variants = "|".join(ModelRepoVariant.__members__.values())
         hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
         source_obj: Optional[StringLikeSource] = None
-        source_stripped = source.strip('\"') # Strip possible quotes from source string to avoid later errors with local files or directories
+        source_stripped = source.strip('"')
 
         if Path(source_stripped).exists():  # A local file or directory
             source_obj = LocalModelSource(path=Path(source_stripped))
