@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from invokeai.backend.model_cache_v2.cached_model import CachedModel
@@ -15,9 +16,47 @@ class DummyModule(torch.nn.Module):
         return x
 
 
-def test_cached_model_partial_load():
+parameterize_mps_and_cuda = pytest.mark.parametrize(
+    ("device"),
+    [
+        pytest.param(
+            "mps", marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS is not available.")
+        ),
+        pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available.")),
+    ],
+)
+
+
+@parameterize_mps_and_cuda
+def test_cached_model_total_bytes(device: str):
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA is not available.")
+    if device == "mps" and not torch.backends.mps.is_available():
+        pytest.skip("MPS is not available.")
+
     model = DummyModule()
-    cached_model = CachedModel(model=model, compute_device=torch.device("cuda"))
+    cached_model = CachedModel(model=model, compute_device=torch.device(device))
+    linear_numel = 10 * 10 + 10
+    assert cached_model.total_bytes() == linear_numel * 4 * 2
+
+    cached_model.model.to(dtype=torch.float16)
+    assert cached_model.total_bytes() == linear_numel * 2 * 2
+
+
+@parameterize_mps_and_cuda
+def test_cached_model_cur_vram_bytes(device: str):
+    model = DummyModule()
+    cached_model = CachedModel(model=model, compute_device=torch.device(device))
+    assert cached_model.cur_vram_bytes() == 0
+
+    cached_model.model.to(device=torch.device(device))
+    assert cached_model.cur_vram_bytes() == cached_model.total_bytes()
+
+
+@parameterize_mps_and_cuda
+def test_cached_model_partial_load(device: str):
+    model = DummyModule()
+    cached_model = CachedModel(model=model, compute_device=torch.device(device))
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == 0
 
@@ -28,10 +67,11 @@ def test_cached_model_partial_load():
     assert loaded_bytes == cached_model.cur_vram_bytes()
 
 
-def test_cached_model_partial_unload():
+@parameterize_mps_and_cuda
+def test_cached_model_partial_unload(device: str):
     model = DummyModule()
-    model.to("cuda")
-    cached_model = CachedModel(model=model, compute_device=torch.device("cuda"))
+    model.to(device=torch.device(device))
+    cached_model = CachedModel(model=model, compute_device=torch.device(device))
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == model_total_bytes
 
