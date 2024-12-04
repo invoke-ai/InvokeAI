@@ -7,7 +7,8 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.model_manager import AnyModel
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import CacheRecord, ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 
 
 class ModelLocker:
