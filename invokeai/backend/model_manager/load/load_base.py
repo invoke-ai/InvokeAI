@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 
 
