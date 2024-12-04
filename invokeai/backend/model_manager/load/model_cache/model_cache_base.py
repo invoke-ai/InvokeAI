@@ -15,32 +15,7 @@ from typing import Dict, Generic, Optional, TypeVar
 import torch
 
 from invokeai.backend.model_manager.config import AnyModel, SubModelType
-
-
-class ModelLockerBase(ABC):
-    """Base class for the model locker used by the loader."""
-
-    @abstractmethod
-    def lock(self) -> AnyModel:
-        """Lock the contained model and move it into VRAM."""
-        pass
-
-    @abstractmethod
-    def unlock(self) -> None:
-        """Unlock the contained model, and remove it from VRAM."""
-        pass
-
-    @abstractmethod
-    def get_state_dict(self) -> Optional[Dict[str, torch.Tensor]]:
-        """Return the state dict (if any) for the cached model."""
-        pass
-
-    @property
-    @abstractmethod
-    def model(self) -> AnyModel:
-        """Return the model."""
-        pass
-
+from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 
 T = TypeVar("T")
 
@@ -197,7 +172,7 @@ class ModelCacheBase(ABC, Generic[T]):
         key: str,
         submodel_type: Optional[SubModelType] = None,
         stats_name: Optional[str] = None,
-    ) -> ModelLockerBase:
+    ) -> ModelLocker:
         """
         Retrieve model using key and optional submodel_type.
 

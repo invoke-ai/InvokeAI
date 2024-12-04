@@ -17,7 +17,6 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
     CacheRecord,
     CacheStats,
     ModelCacheBase,
-    ModelLockerBase,
 )
 from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
@@ -184,7 +183,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         key: str,
         submodel_type: Optional[SubModelType] = None,
         stats_name: Optional[str] = None,
-    ) -> ModelLockerBase:
+    ) -> ModelLocker:
         """
         Retrieve model using key and optional submodel_type.
 

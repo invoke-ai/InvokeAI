@@ -7,14 +7,10 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.model_manager import AnyModel
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
-    CacheRecord,
-    ModelCacheBase,
-    ModelLockerBase,
-)
+from invokeai.backend.model_manager.load.model_cache.model_cache_base import CacheRecord, ModelCacheBase
 
 
-class ModelLocker(ModelLockerBase):
+class ModelLocker:
     """Internal class that mediates movement in and out of GPU."""
 
     def __init__(self, cache: ModelCacheBase[AnyModel], cache_entry: CacheRecord[AnyModel]):
