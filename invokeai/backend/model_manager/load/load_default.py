@@ -14,7 +14,7 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.config import DiffusersConfigBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, get_model_cache_key
 from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
@@ -70,7 +70,7 @@ class ModelLoader(ModelLoaderBase):
     def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> ModelLocker:
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         try:
-            return self._ram_cache.get(config.key, submodel_type, stats_name=stats_name)
+            return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)
         except IndexError:
             pass
 
@@ -79,16 +79,11 @@ class ModelLoader(ModelLoaderBase):
         loaded_model = self._load_model(config, submodel_type)
 
         self._ram_cache.put(
-            config.key,
-            submodel_type=submodel_type,
+            get_model_cache_key(config.key, submodel_type),
             model=loaded_model,
         )
 
-        return self._ram_cache.get(
-            key=config.key,
-            submodel_type=submodel_type,
-            stats_name=stats_name,
-        )
+        return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None

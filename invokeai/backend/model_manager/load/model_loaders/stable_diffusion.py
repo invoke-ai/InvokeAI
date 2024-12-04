@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.config import (
     DiffusersConfigBase,
     MainCheckpointConfig,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -132,5 +133,5 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             if subtype == submodel_type:
                 continue
             if submodel := getattr(pipeline, subtype.value, None):
-                self._ram_cache.put(config.key, submodel_type=subtype, model=submodel)
+                self._ram_cache.put(get_model_cache_key(config.key, subtype), model=submodel)
         return getattr(pipeline, submodel_type.value)
