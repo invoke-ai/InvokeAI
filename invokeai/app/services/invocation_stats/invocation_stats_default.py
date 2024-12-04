@@ -20,7 +20,7 @@ from invokeai.app.services.invocation_stats.invocation_stats_common import (
     NodeExecutionStatsSummary,
 )
 from invokeai.app.services.invoker import Invoker
-from invokeai.backend.model_manager.load.model_cache import CacheStats
+from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 
 # Size of 1GB in bytes.
 GB = 2**30
