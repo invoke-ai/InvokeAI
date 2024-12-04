@@ -14,7 +14,7 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.config import DiffusersConfigBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
 from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
@@ -29,7 +29,7 @@ class ModelLoader(ModelLoaderBase):
         self,
         app_config: InvokeAIAppConfig,
         logger: Logger,
-        ram_cache: ModelCacheBase[AnyModel],
+        ram_cache: ModelCache,
     ):
         """Initialize the loader."""
         self._app_config = app_config
@@ -59,7 +59,7 @@ class ModelLoader(ModelLoaderBase):
         return LoadedModel(config=model_config, _locker=locker)
 
     @property
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the ram cache associated with this loader."""
         return self._ram_cache
 

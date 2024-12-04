@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
 from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 
 
@@ -111,7 +111,7 @@ class ModelLoaderBase(ABC):
         self,
         app_config: InvokeAIAppConfig,
         logger: Logger,
-        ram_cache: ModelCacheBase[AnyModel],
+        ram_cache: ModelCache,
     ):
         """Initialize the loader."""
         pass
@@ -139,6 +139,6 @@ class ModelLoaderBase(ABC):
 
     @property
     @abstractmethod
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the ram cache associated with this loader."""
         pass

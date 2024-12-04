@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.load import (
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -30,7 +30,7 @@ class ModelLoadService(ModelLoadServiceBase):
     def __init__(
         self,
         app_config: InvokeAIAppConfig,
-        ram_cache: ModelCacheBase[AnyModel],
+        ram_cache: ModelCache,
         registry: Optional[Type[ModelLoaderRegistryBase]] = ModelLoaderRegistry,
     ):
         """Initialize the model load service."""
@@ -45,7 +45,7 @@ class ModelLoadService(ModelLoadServiceBase):
         self._invoker = invoker
 
     @property
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the RAM cache used by this loader."""
         return self._ram_cache
 
