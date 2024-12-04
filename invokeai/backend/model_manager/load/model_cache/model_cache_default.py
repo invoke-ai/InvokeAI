@@ -14,8 +14,8 @@ import torch
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
-    CacheStats,
     ModelCacheBase,
 )
 from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
