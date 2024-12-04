@@ -26,6 +26,13 @@ GB = 2**30
 MB = 2**20
 
 
+def get_model_cache_key(model_key: str, submodel_type: Optional[SubModelType] = None) -> str:
+    if submodel_type:
+        return f"{model_key}:{submodel_type.value}"
+    else:
+        return model_key
+
+
 class ModelCache:
     """A cache for managing models in memory.
 
@@ -159,10 +166,8 @@ class ModelCache:
         self,
         key: str,
         model: AnyModel,
-        submodel_type: Optional[SubModelType] = None,
     ) -> None:
-        """Store model under key and optional submodel_type."""
-        key = self._make_cache_key(key, submodel_type)
+        """Insert model into the cache."""
         if key in self._cached_models:
             return
         size = calc_model_size_by_data(self.logger, model)
@@ -177,20 +182,15 @@ class ModelCache:
     def get(
         self,
         key: str,
-        submodel_type: Optional[SubModelType] = None,
         stats_name: Optional[str] = None,
     ) -> ModelLocker:
-        """
-        Retrieve model using key and optional submodel_type.
+        """Retrieve a model from the cache.
 
-        :param key: Opaque model key
-        :param submodel_type: Type of the submodel to fetch
-        :param stats_name: A human-readable id for the model for the purposes of
-        stats reporting.
+        :param key: Model key
+        :param stats_name: A human-readable id for the model for the purposes of stats reporting.
 
-        This may raise an IndexError if the model is not in the cache.
+        Raises IndexError if the model is not in the cache.
         """
-        key = self._make_cache_key(key, submodel_type)
         if key in self._cached_models:
             if self.stats:
                 self.stats.hits += 1
