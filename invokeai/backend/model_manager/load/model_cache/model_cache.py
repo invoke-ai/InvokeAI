@@ -13,7 +13,6 @@ from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
-from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -153,7 +152,7 @@ class ModelCache:
         self,
         key: str,
         stats_name: Optional[str] = None,
-    ) -> ModelLocker:
+    ) -> CacheRecord:
         """Retrieve a model from the cache.
 
         :param key: Model key
@@ -185,10 +184,7 @@ class ModelCache:
         self._cache_stack = [k for k in self._cache_stack if k != key]
         self._cache_stack.append(key)
 
-        return ModelLocker(
-            cache=self,
-            cache_entry=cache_entry,
-        )
+        return cache_entry
 
     def lock(self, key: str) -> None:
         """Lock a model for use and move it into VRAM."""

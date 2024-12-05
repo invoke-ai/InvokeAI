@@ -14,8 +14,8 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.config import DiffusersConfigBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
+from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, get_model_cache_key
-from invokeai.backend.model_manager.load.model_cache.model_locker import ModelLocker
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.util.devices import TorchDevice
@@ -55,8 +55,8 @@ class ModelLoader(ModelLoaderBase):
             raise InvalidModelConfigException(f"Files for model '{model_config.name}' not found at {model_path}")
 
         with skip_torch_weight_init():
-            locker = self._load_and_cache(model_config, submodel_type)
-        return LoadedModel(config=model_config, _locker=locker)
+            cache_record = self._load_and_cache(model_config, submodel_type)
+        return LoadedModel(config=model_config, cache_record=cache_record, cache=self._ram_cache)
 
     @property
     def ram_cache(self) -> ModelCache:
@@ -67,7 +67,7 @@ class ModelLoader(ModelLoaderBase):
         model_base = self._app_config.models_path
         return (model_base / config.path).resolve()
 
-    def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> ModelLocker:
+    def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> CacheRecord:
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         try:
             return self._ram_cache.get(key=get_model_cache_key(config.key, submodel_type), stats_name=stats_name)

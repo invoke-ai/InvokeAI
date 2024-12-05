@@ -78,9 +78,8 @@ class ModelLoadService(ModelLoadServiceBase):
         self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
     ) -> LoadedModelWithoutConfig:
         cache_key = str(model_path)
-        ram_cache = self.ram_cache
         try:
-            return LoadedModelWithoutConfig(_locker=ram_cache.get(key=cache_key))
+            return LoadedModelWithoutConfig(cache_record=self._ram_cache.get(key=cache_key), cache=self._ram_cache)
         except IndexError:
             pass
 
@@ -109,5 +108,5 @@ class ModelLoadService(ModelLoadServiceBase):
         )
         assert loader is not None
         raw_model = loader(model_path)
-        ram_cache.put(key=cache_key, model=raw_model)
-        return LoadedModelWithoutConfig(_locker=ram_cache.get(key=cache_key))
+        self._ram_cache.put(key=cache_key, model=raw_model)
+        return LoadedModelWithoutConfig(cache_record=self._ram_cache.get(key=cache_key), cache=self._ram_cache)
