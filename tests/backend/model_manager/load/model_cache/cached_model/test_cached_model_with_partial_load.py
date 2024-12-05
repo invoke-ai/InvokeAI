@@ -4,7 +4,7 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
-from tests.backend.model_manager.load.model_cache.cached_model.dummy_module import DummyModule
+from tests.backend.model_manager.load.model_cache.dummy_module import DummyModule
 
 parameterize_mps_and_cuda = pytest.mark.parametrize(
     ("device"),
