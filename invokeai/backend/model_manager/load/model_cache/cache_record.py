@@ -36,15 +36,12 @@ class CacheRecord:
     _locks: int = 0
 
     def lock(self) -> None:
-        """Lock this record."""
         self._locks += 1
 
     def unlock(self) -> None:
-        """Unlock this record."""
         self._locks -= 1
         assert self._locks >= 0
 
     @property
-    def locked(self) -> bool:
-        """Return true if record is locked."""
+    def is_locked(self) -> bool:
         return self._locks > 0

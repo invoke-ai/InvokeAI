@@ -131,12 +131,7 @@ class ModelCache:
         """Set the CacheStats object for collectin cache statistics."""
         self._stats = stats
 
-    def put(
-        self,
-        key: str,
-        model: AnyModel,
-    ) -> None:
-        """Insert model into the cache."""
+    def put(self, key: str, model: AnyModel) -> None:
         if key in self._cached_models:
             return
         size = calc_model_size_by_data(self._logger, model)
@@ -148,11 +143,7 @@ class ModelCache:
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
 
-    def get(
-        self,
-        key: str,
-        stats_name: Optional[str] = None,
-    ) -> CacheRecord:
+    def get(self, key: str, stats_name: Optional[str] = None) -> CacheRecord:
         """Retrieve a model from the cache.
 
         :param key: Model key
@@ -245,7 +236,7 @@ class ModelCache:
                 break
             if not cache_entry.loaded:
                 continue
-            if not cache_entry.locked:
+            if not cache_entry.is_locked:
                 self._move_model_to_device(cache_entry, self._storage_device)
                 cache_entry.loaded = False
                 vram_in_use = torch.cuda.memory_allocated() + size_required
@@ -349,7 +340,7 @@ class ModelCache:
                     in_ram_models += 1
                 else:
                     in_vram_models += 1
-                if cache_record.locked:
+                if cache_record.is_locked:
                     locked_in_vram_models += 1
 
                 self._logger.debug(
@@ -386,7 +377,7 @@ class ModelCache:
                 f"Model: {model_key}, locks: {cache_entry._locks}, device: {device}, loaded: {cache_entry.loaded}"
             )
 
-            if not cache_entry.locked:
+            if not cache_entry.is_locked:
                 self._logger.debug(
                     f"Removing {model_key} from RAM cache to free at least {(size/GB):.2f} GB (-{(cache_entry.size/GB):.2f} GB)"
                 )

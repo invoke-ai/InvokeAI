@@ -3,7 +3,7 @@ import torch
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
-class CachedModel:
+class CachedModelWithPartialLoad:
     """A wrapper around a PyTorch model to handle partial loads and unloads between the CPU and the compute device.
 
     Note: "VRAM" is used throughout this class to refer to the memory on the compute device. It could be CUDA memory,
