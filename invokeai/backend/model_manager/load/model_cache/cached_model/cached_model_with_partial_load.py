@@ -1,5 +1,8 @@
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.torch_function_autocast_context import (
+    add_autocast_to_module_forward,
+)
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
@@ -14,11 +17,20 @@ class CachedModelWithPartialLoad:
         self._model = model
         self._compute_device = compute_device
 
+        # Monkey-patch the model to add autocasting to the model's forward method.
+        add_autocast_to_module_forward(model, compute_device)
+
+        # TODO(ryand): Manage a read-only CPU copy of the model state dict.
         # TODO(ryand): Add memoization for total_bytes and cur_vram_bytes?
 
     @property
     def model(self) -> torch.nn.Module:
         return self._model
+
+    def get_cpu_state_dict(self) -> dict[str, torch.Tensor] | None:
+        """Get a read-only copy of the model's state dict in RAM."""
+        # TODO(ryand): Document this better and implement it.
+        return None
 
     def total_bytes(self) -> int:
         """Get the total size (in bytes) of all the weights in the model."""
@@ -27,6 +39,14 @@ class CachedModelWithPartialLoad:
     def cur_vram_bytes(self) -> int:
         """Get the size (in bytes) of the weights that are currently in VRAM."""
         return sum(calc_tensor_size(p) for p in self._model.parameters() if p.device.type == self._compute_device.type)
+
+    def full_load_to_vram(self) -> int:
+        """Load all weights into VRAM."""
+        return self.partial_load_to_vram(self.total_bytes())
+
+    def full_unload_from_vram(self) -> int:
+        """Unload all weights from VRAM."""
+        return self.partial_unload_from_vram(self.total_bytes())
 
     def partial_load_to_vram(self, vram_bytes_to_load: int) -> int:
         """Load more weights into VRAM without exceeding vram_bytes_to_load.

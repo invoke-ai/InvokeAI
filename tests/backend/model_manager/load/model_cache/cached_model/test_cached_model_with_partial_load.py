@@ -70,3 +70,69 @@ def test_cached_model_partial_unload(device: str):
     assert freed_bytes >= bytes_to_free
     assert freed_bytes < model_total_bytes
     assert freed_bytes == model_total_bytes - cached_model.cur_vram_bytes()
+
+
+@parameterize_mps_and_cuda
+def test_cached_model_full_load(device: str):
+    model = DummyModule()
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+
+    # Model starts in CPU memory.
+    model_total_bytes = cached_model.total_bytes()
+    assert cached_model.cur_vram_bytes() == 0
+
+    # Full load the model into VRAM.
+    loaded_bytes = cached_model.full_load_to_vram()
+    assert loaded_bytes > 0
+    assert loaded_bytes == model_total_bytes
+    assert loaded_bytes == cached_model.cur_vram_bytes()
+    assert all(p.device.type == device for p in cached_model.model.parameters())
+
+
+@parameterize_mps_and_cuda
+def test_cached_model_full_load_from_partial(device: str):
+    model = DummyModule()
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+
+    # Model starts in CPU memory.
+    model_total_bytes = cached_model.total_bytes()
+    assert cached_model.cur_vram_bytes() == 0
+
+    # Partially load the model into VRAM.
+    target_vram_bytes = int(model_total_bytes * 0.6)
+    loaded_bytes = cached_model.partial_load_to_vram(target_vram_bytes)
+    assert loaded_bytes > 0
+    assert loaded_bytes < model_total_bytes
+    assert loaded_bytes == cached_model.cur_vram_bytes()
+
+    # Full load the rest of the model into VRAM.
+    loaded_bytes_2 = cached_model.full_load_to_vram()
+    assert loaded_bytes_2 > 0
+    assert loaded_bytes_2 < model_total_bytes
+    assert loaded_bytes + loaded_bytes_2 == cached_model.cur_vram_bytes()
+    assert loaded_bytes + loaded_bytes_2 == model_total_bytes
+    assert all(p.device.type == device for p in cached_model.model.parameters())
+
+
+@parameterize_mps_and_cuda
+def test_cached_model_full_unload(device: str):
+    model = DummyModule()
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+
+    # Model starts in CPU memory.
+    model_total_bytes = cached_model.total_bytes()
+    assert cached_model.cur_vram_bytes() == 0
+
+    # Partially load the model into VRAM.
+    target_vram_bytes = int(model_total_bytes * 0.6)
+    loaded_bytes = cached_model.partial_load_to_vram(target_vram_bytes)
+    assert loaded_bytes > 0
+    assert loaded_bytes < model_total_bytes
+    assert loaded_bytes == cached_model.cur_vram_bytes()
+
+    # Full unload the model from VRAM.
+    unloaded_bytes = cached_model.full_unload_from_vram()
+    assert unloaded_bytes > 0
+    assert unloaded_bytes == loaded_bytes
+    assert cached_model.cur_vram_bytes() == 0
+    assert all(p.device.type == "cpu" for p in cached_model.model.parameters())

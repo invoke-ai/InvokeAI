@@ -28,9 +28,21 @@ class CachedModelOnlyFullLoad:
     def model(self) -> torch.nn.Module:
         return self._model
 
+    def get_cpu_state_dict(self) -> dict[str, torch.Tensor] | None:
+        """Get a read-only copy of the model's state dict in RAM."""
+        # TODO(ryand): Document this better and implement it.
+        return None
+
     def total_bytes(self) -> int:
         """Get the total size (in bytes) of all the weights in the model."""
         return self._total_bytes
+
+    def cur_vram_bytes(self) -> int:
+        """Get the size (in bytes) of the weights that are currently in VRAM."""
+        if self._is_in_vram:
+            return self._total_bytes
+        else:
+            return 0
 
     def is_in_vram(self) -> bool:
         """Return true if the model is currently in VRAM."""
