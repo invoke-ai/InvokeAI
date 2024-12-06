@@ -142,7 +142,7 @@ class ModelCache:
         """Add a model to the cache."""
         if key in self._cached_models:
             self._logger.debug(
-                f"Attempted to add model {key} ({type(model)}), but it already exists in the cache. No action necessary."
+                f"Attempted to add model {key} ({model.__class__.__name__}), but it already exists in the cache. No action necessary."
             )
             return
 
@@ -161,7 +161,7 @@ class ModelCache:
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
         self._logger.debug(
-            f"Added model {key} (Type: {type(model)}, Wrap mode: {type(wrapped_model)}, Model size: {size/MB:.2f}MB)"
+            f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size/MB:.2f}MB)"
         )
 
     def get(self, key: str, stats_name: Optional[str] = None) -> CacheRecord:
@@ -197,7 +197,7 @@ class ModelCache:
         self._cache_stack = [k for k in self._cache_stack if k != key]
         self._cache_stack.append(key)
 
-        self._logger.debug(f"Cache hit: {key} (Type: {type(cache_entry.cached_model.model)})")
+        self._logger.debug(f"Cache hit: {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
 
         return cache_entry
 
@@ -206,11 +206,13 @@ class ModelCache:
         cache_entry = self._cached_models[key]
         cache_entry.lock()
 
-        self._logger.debug(f"Locking model {key} (Type: {type(cache_entry.cached_model.model)})")
+        self._logger.debug(f"Locking model {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
 
         try:
             self._load_locked_model(cache_entry)
-            self._logger.debug(f"Finished locking model {key} (Type: {type(cache_entry.cached_model.model)})")
+            self._logger.debug(
+                f"Finished locking model {key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
+            )
         except torch.cuda.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
             cache_entry.unlock()
@@ -225,7 +227,7 @@ class ModelCache:
         """Unlock a model."""
         cache_entry = self._cached_models[key]
         cache_entry.unlock()
-        self._logger.debug(f"Unlocked model {key} (Type: {type(cache_entry.cached_model.model)})")
+        self._logger.debug(f"Unlocked model {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
 
     def _load_locked_model(self, cache_entry: CacheRecord) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
@@ -264,6 +266,7 @@ class ModelCache:
             raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
+        vram_available = self._get_vram_available()
         self._logger.debug(f"Loaded model onto execution device: model_bytes_loaded={(model_bytes_loaded/MB):.2f}MB, ")
         self._logger.debug(
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
@@ -294,10 +297,10 @@ class ModelCache:
         """Helper function for preparing a VRAM state log string."""
         model_cur_vram_bytes_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         return (
-            f"model_total={model_total_bytes/MB:.2f}MB, "
-            + f"model_vram={model_cur_vram_bytes/MB:.2f}MB ({model_cur_vram_bytes_percent:.2%} %), "
-            + f"vram_total={int(self._max_vram_cache_size * GB)/MB:.2f}MB, "
-            + f"vram_available={(vram_available/MB):.2f}MB, "
+            f"model_total={model_total_bytes/MB:.0f} MB, "
+            + f"model_vram={model_cur_vram_bytes/MB:.0f} MB ({model_cur_vram_bytes_percent:.1%} %), "
+            + f"vram_total={int(self._max_vram_cache_size * GB)/MB:.0f} MB, "
+            + f"vram_available={(vram_available/MB):.0f} MB, "
         )
 
     def _offload_unlocked_models(self, vram_bytes_to_free: int) -> int:
@@ -321,16 +324,14 @@ class ModelCache:
                 cache_entry_bytes_freed = cache_entry.cached_model.partial_unload_from_vram(
                     vram_bytes_to_free - vram_bytes_freed
                 )
-                self._logger.debug(
-                    f"Partially unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed/MB):.2f}MB."
-                )
             elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
                 cache_entry_bytes_freed = cache_entry.cached_model.full_unload_from_vram()
-                self._logger.debug(
-                    f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed/MB):.2f}MB."
-                )
             else:
                 raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
+            if cache_entry_bytes_freed > 0:
+                self._logger.debug(
+                    f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed/MB):.0f} MB."
+                )
             vram_bytes_freed += cache_entry_bytes_freed
 
         TorchDevice.empty_cache()
@@ -429,39 +430,35 @@ class ModelCache:
         vram_available_bytes = self._get_vram_available()
         vram_available_bytes_percent = vram_available_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
 
-        label_chars = 40
         log = f"{title}\n"
 
-        log += (
-            f"  Storage Device ({self._storage_device.type}) Limit:".ljust(label_chars)
-            + f"{ram_size_bytes/MB:6.0f} MB\n"
+        log_format = "  {:<30} Limit: {:>7.1f} MB, Used: {:>7.1f} MB ({:>5.1%}), Available: {:>7.1f} MB ({:>5.1%})\n"
+        log += log_format.format(
+            f"Storage Device ({self._storage_device.type})",
+            ram_size_bytes / MB,
+            ram_in_use_bytes / MB,
+            ram_in_use_bytes_percent,
+            ram_available_bytes / MB,
+            ram_available_bytes_percent,
         )
-        log += (
-            f"  Storage Device ({self._storage_device.type}) Used:".ljust(label_chars)
-            + f"{ram_in_use_bytes/MB:6.0f} MB ({ram_in_use_bytes_percent:3.1%} %)\n"
+        log += log_format.format(
+            f"Compute Device ({self._execution_device.type})",
+            vram_size_bytes / MB,
+            vram_in_use_bytes / MB,
+            vram_in_use_bytes_percent,
+            vram_available_bytes / MB,
+            vram_available_bytes_percent,
         )
-        log += (
-            f"  Storage Device ({self._storage_device.type}) Available:".ljust(label_chars)
-            + f"{ram_available_bytes/MB:6.0f} MB ({ram_available_bytes_percent:3.1%} %)\n"
-        )
-        log += (
-            f"  Compute Device ({self._execution_device.type}) Limit:".ljust(label_chars)
-            + f"{vram_size_bytes/MB:6.0f} MB\n"
-        )
-        log += (
-            f"  Compute Device ({self._execution_device.type}) Used:".ljust(label_chars)
-            + f"{vram_in_use_bytes/MB:6.0f} MB ({vram_in_use_bytes_percent:3.1%} %)\n"
-        )
-        log += (
-            f"  Compute Device ({self._execution_device.type}) Available:".ljust(label_chars)
-            + f"{vram_available_bytes/MB:6.0f} MB ({vram_available_bytes_percent:3.1%} %)\n"
-        )
+
         if torch.cuda.is_available():
-            log += "  CUDA Memory Allocated:".ljust(label_chars) + f"{torch.cuda.memory_allocated()/MB:6.0f} MB\n"
-        log += f"  Total models: {len(self._cached_models)}\n"
+            log += "  {:<30} {} MB\n".format("CUDA Memory Allocated:", torch.cuda.memory_allocated() / MB)
+        log += "  {:<30} {}\n".format("Total models:", len(self._cached_models))
 
         if include_entry_details and len(self._cached_models) > 0:
             log += "  Models:\n"
+            log_format = (
+                "    {:<80} total={:>7.1f} MB, vram={:>7.1f} MB ({:>5.1%}), ram={:>7.1f} MB ({:>5.1%}), locked={}\n"
+            )
             for cache_record in self._cached_models.values():
                 total_bytes = cache_record.cached_model.total_bytes()
                 cur_vram_bytes = cache_record.cached_model.cur_vram_bytes()
@@ -469,11 +466,15 @@ class ModelCache:
                 cur_ram_bytes = total_bytes - cur_vram_bytes
                 cur_ram_bytes_percent = cur_ram_bytes / total_bytes if total_bytes > 0 else 0
 
-                log += f"    {cache_record.key} ({type(cache_record.cached_model.model)}): "
-                log += f"total={total_bytes/MB:6.0f} MB, "
-                log += f"vram={cur_vram_bytes/MB:6.0f} MB ({cur_vram_bytes_percent:3.1%} %), "
-                log += f"ram={cur_ram_bytes/MB:6.0f} MB ({cur_ram_bytes_percent:3.1%} %), "
-                log += f"locked={cache_record.is_locked}\n"
+                log += log_format.format(
+                    f"{cache_record.key} ({cache_record.cached_model.model.__class__.__name__}):",
+                    total_bytes / MB,
+                    cur_vram_bytes / MB,
+                    cur_vram_bytes_percent,
+                    cur_ram_bytes / MB,
+                    cur_ram_bytes_percent,
+                    cache_record.is_locked,
+                )
 
         self._logger.debug(log)
 
