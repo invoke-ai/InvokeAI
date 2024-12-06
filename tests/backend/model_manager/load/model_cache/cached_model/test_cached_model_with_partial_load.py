@@ -29,9 +29,6 @@ def test_cached_model_total_bytes(device: str):
     linear_numel = 10 * 10 + 10
     assert cached_model.total_bytes() == linear_numel * 4 * 2
 
-    cached_model.model.to(dtype=torch.float16)
-    assert cached_model.total_bytes() == linear_numel * 2 * 2
-
 
 @parameterize_mps_and_cuda
 def test_cached_model_cur_vram_bytes(device: str):
@@ -39,7 +36,8 @@ def test_cached_model_cur_vram_bytes(device: str):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     assert cached_model.cur_vram_bytes() == 0
 
-    cached_model.model.to(device=torch.device(device))
+    cached_model.full_load_to_vram()
+    assert cached_model.cur_vram_bytes() > 0
     assert cached_model.cur_vram_bytes() == cached_model.total_bytes()
 
 
