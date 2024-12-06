@@ -75,7 +75,7 @@ class LoadedModelWithoutConfig:
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
-        return self._cache_record.model
+        return self._cache_record.cached_model.model
 
 
 class LoadedModel(LoadedModelWithoutConfig):

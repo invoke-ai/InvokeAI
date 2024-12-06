@@ -219,9 +219,11 @@ class ModelCache:
             # self._print_cuda_stats()
         except torch.cuda.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
-            raise
-        finally:
             cache_entry.unlock()
+            raise
+        except Exception:
+            cache_entry.unlock()
+            raise
 
         # try:
         #     if self._lazy_offloading:
