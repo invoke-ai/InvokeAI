@@ -366,6 +366,12 @@ class CancelByQueueIDResult(CancelByBatchIDsResult):
     pass
 
 
+class CancelAllExceptCurrentResult(CancelByBatchIDsResult):
+    """Result of canceling all except current"""
+
+    pass
+
+
 class IsEmptyResult(BaseModel):
     """Result of checking if the session queue is empty"""
 

@@ -1102,6 +1102,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/cancel_all_except_current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cancel All Except Current
+         * @description Immediately cancels all queue items except in-processing items
+         */
+        put: operations["cancel_all_except_current"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/cancel_by_batch_ids": {
         parameters: {
             query?: never;
@@ -3326,6 +3346,17 @@ export type components = {
              * @enum {string}
              */
             type: "calculate_image_tiles_output";
+        };
+        /**
+         * CancelAllExceptCurrentResult
+         * @description Result of canceling all except current
+         */
+        CancelAllExceptCurrentResult: {
+            /**
+             * Canceled
+             * @description Number of queue items canceled
+             */
+            canceled: number;
         };
         /**
          * CancelByBatchIDsResult
@@ -21161,6 +21192,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionProcessorStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_all_except_current: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelAllExceptCurrentResult"];
                 };
             };
             /** @description Validation Error */
