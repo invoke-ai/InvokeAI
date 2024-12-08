@@ -98,7 +98,8 @@
         "close": "Schließen",
         "clipboard": "Zwischenablage",
         "generating": "Generieren",
-        "loadingModel": "Lade Modell"
+        "loadingModel": "Lade Modell",
+        "warnings": "Warnungen"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -601,7 +602,9 @@
         "hfTokenLabel": "HuggingFace-Token (für einige Modelle erforderlich)",
         "hfTokenHelperText": "Für die Nutzung einiger Modelle ist ein HF-Token erforderlich. Klicken Sie hier, um Ihr Token zu erstellen oder zu erhalten.",
         "hfForbidden": "Sie haben keinen Zugriff auf dieses HF-Modell",
-        "hfTokenInvalid": "Ungültiges oder fehlendes HF-Token"
+        "hfTokenInvalid": "Ungültiges oder fehlendes HF-Token",
+        "restoreDefaultSettings": "Klicken, um die Standardeinstellungen des Modells zu verwenden.",
+        "usingDefaultSettings": "Die Standardeinstellungen des Modells werden verwendet"
     },
     "parameters": {
         "images": "Bilder",
@@ -645,8 +648,19 @@
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), Skalierte Bbox-Breite ist {{width}}",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), Skalierte Bbox-Höhe ist {{height}}",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), Bbox-Breite ist {{width}}",
-            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), Bbox-Höhe ist {{height}}"
-        }
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), Bbox-Höhe ist {{height}}",
+            "noNodesInGraph": "Keine Knoten im Graphen",
+            "canvasIsTransforming": "Leinwand ist beschäftigt (wird transformiert)",
+            "canvasIsRasterizing": "Leinwand ist beschäftigt (wird gerastert)",
+            "canvasIsCompositing": "Leinwand ist beschäftigt (wird zusammengesetzt)",
+            "canvasIsFiltering": "Leinwand ist beschäftigt (wird gefiltert)",
+            "canvasIsSelectingObject": "Leinwand ist beschäftigt (wird Objekt ausgewählt)",
+            "noPrompts": "Keine Eingabeaufforderungen generiert"
+        },
+        "seed": "Seed",
+        "patchmatchDownScaleSize": "Herunterskalieren",
+        "seamlessXAxis": "Nahtlose X Achse",
+        "seamlessYAxis": "Nahtlose Y Achse"
     },
     "settings": {
         "displayInProgress": "Zwischenbilder anzeigen",
@@ -1101,6 +1115,18 @@
         },
         "paramHrf": {
             "heading": "High Resolution Fix aktivieren"
+        },
+        "seamlessTilingYAxis": {
+            "heading": "Nahtlose Kachelung Y Achse",
+            "paragraphs": [
+                "Nahtloses Kacheln eines Bildes entlang der vertikalen Achse."
+            ]
+        },
+        "seamlessTilingXAxis": {
+            "paragraphs": [
+                "Nahtloses Kacheln eines Bildes entlang der horizontalen Achse."
+            ],
+            "heading": "Nahtlose Kachelung X Achse"
         }
     },
     "invocationCache": {
