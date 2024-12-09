@@ -159,44 +159,6 @@ def test_apply_lora_sidecar_patches(device: str, num_layers: int):
     assert torch.allclose(output_before_patch, output_after_patch)
 
 
-@torch.no_grad()
-@pytest.mark.parametrize(["num_layers"], [(1,), (2,)])
-def test_apply_lora_sidecar_patches_matches_apply_lora_patches(num_layers: int):
-    """Test that apply_lora_sidecar_patches(...) produces the same model outputs as apply_lora_patches(...)."""
-    dtype = torch.float32
-    linear_in_features = 4
-    linear_out_features = 8
-    lora_rank = 2
-    model = DummyModule(linear_in_features, linear_out_features, device="cpu", dtype=dtype)
-
-    # Initialize num_layers LoRA models with weights of 0.5.
-    lora_weight = 0.5
-    lora_models: list[tuple[LoRAModelRaw, float]] = []
-    for _ in range(num_layers):
-        lora_layers = {
-            "linear_layer_1": LoRALayer.from_state_dict_values(
-                values={
-                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
-                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
-                },
-            )
-        }
-        lora = LoRAModelRaw(lora_layers)
-        lora_models.append((lora, lora_weight))
-
-    input = torch.randn(1, linear_in_features, device="cpu", dtype=dtype)
-
-    with LoRAPatcher.apply_lora_patches(model=model, patches=lora_models, prefix=""):
-        output_lora_patches = model(input)
-
-    with LoRAPatcher.apply_lora_sidecar_patches(model=model, patches=lora_models, prefix="", dtype=dtype):
-        output_lora_sidecar_patches = model(input)
-
-    # Note: We set atol=1e-5 because the test failed occasionally with the default atol=1e-8. Slight numerical
-    # differences are tolerable and expected due to the difference between sidecar vs. patching.
-    assert torch.allclose(output_lora_patches, output_lora_sidecar_patches, atol=1e-5)
-
-
 @pytest.mark.parametrize(
     ["device", "num_layers"],
     [
@@ -245,3 +207,45 @@ def test_apply_lora_wrapper_patches(device: str, num_layers: int):
 
     # Check that the output before patching is the same as the output after patching.
     assert torch.allclose(output_before_patch, output_after_patch)
+
+
+@torch.no_grad()
+@pytest.mark.parametrize(["num_layers"], [(1,), (2,)])
+def test_all_patching_methods_produce_same_output(num_layers: int):
+    """Test that apply_lora_wrapper_patches(...) produces the same model outputs as apply_lora_patches(...)."""
+    dtype = torch.float32
+    linear_in_features = 4
+    linear_out_features = 8
+    lora_rank = 2
+    model = DummyModule(linear_in_features, linear_out_features, device="cpu", dtype=dtype)
+
+    # Initialize num_layers LoRA models with weights of 0.5.
+    lora_weight = 0.5
+    lora_models: list[tuple[LoRAModelRaw, float]] = []
+    for _ in range(num_layers):
+        lora_layers = {
+            "linear_layer_1": LoRALayer.from_state_dict_values(
+                values={
+                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
+                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
+                },
+            )
+        }
+        lora = LoRAModelRaw(lora_layers)
+        lora_models.append((lora, lora_weight))
+
+    input = torch.randn(1, linear_in_features, device="cpu", dtype=dtype)
+
+    with LoRAPatcher.apply_lora_patches(model=model, patches=lora_models, prefix=""):
+        output_lora_patches = model(input)
+
+    with LoRAPatcher.apply_lora_sidecar_patches(model=model, patches=lora_models, prefix="", dtype=dtype):
+        output_lora_sidecar_patches = model(input)
+
+    with LoRAPatcher.apply_lora_wrapper_patches(model=model, patches=lora_models, prefix=""):
+        output_lora_wrapper_patches = model(input)
+
+    # Note: We set atol=1e-5 because the test failed occasionally with the default atol=1e-8. Slight numerical
+    # differences are tolerable and expected due to the difference between sidecar vs. patching.
+    assert torch.allclose(output_lora_patches, output_lora_sidecar_patches, atol=1e-5)
+    assert torch.allclose(output_lora_patches, output_lora_wrapper_patches, atol=1e-5)
