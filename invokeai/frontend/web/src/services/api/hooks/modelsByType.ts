@@ -23,6 +23,7 @@ import {
   isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
+  isStructuralLoRAModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
   isTIModelConfig,
@@ -58,6 +59,7 @@ export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
 export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
+export const useStructuralLoRAModel = buildModelsHook(isStructuralLoRAModelConfig);
 export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
 export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);

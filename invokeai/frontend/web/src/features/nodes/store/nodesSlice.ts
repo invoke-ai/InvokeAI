@@ -28,6 +28,7 @@ import type {
   SpandrelImageToImageModelFieldValue,
   StatefulFieldValue,
   StringFieldValue,
+  StructuralLoRAModelFieldValue,
   T2IAdapterModelFieldValue,
   T5EncoderModelFieldValue,
   VAEModelFieldValue,
@@ -55,6 +56,7 @@ import {
   zSpandrelImageToImageModelFieldValue,
   zStatefulFieldValue,
   zStringFieldValue,
+  zStructuralLoRAModelFieldValue,
   zT2IAdapterModelFieldValue,
   zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
@@ -369,6 +371,9 @@ export const nodesSlice = createSlice({
     fieldCLIPGEmbedValueChanged: (state, action: FieldValueAction<CLIPGEmbedModelFieldValue>) => {
       fieldValueReducer(state, action, zCLIPGEmbedModelFieldValue);
     },
+    fieldStructuralLoRAModelValueChanged: (state, action: FieldValueAction<StructuralLoRAModelFieldValue>) => {
+      fieldValueReducer(state, action, zStructuralLoRAModelFieldValue);
+    },
     fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
       fieldValueReducer(state, action, zFluxVAEModelFieldValue);
     },
@@ -438,6 +443,7 @@ export const {
   fieldCLIPEmbedValueChanged,
   fieldCLIPLEmbedValueChanged,
   fieldCLIPGEmbedValueChanged,
+  fieldStructuralLoRAModelValueChanged,
   fieldFluxVAEModelValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
