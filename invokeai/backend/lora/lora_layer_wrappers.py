@@ -10,6 +10,14 @@ class LoRAModuleWrapper(torch.nn.Module):
         self._lora_layers = lora_layers
         self._lora_weights = lora_weights
 
+    @property
+    def orig_module(self) -> torch.nn.Module:
+        return self._orig_module
+
+    def add_lora_layer(self, lora_layer: AnyLoRALayer, lora_weight: float):
+        self._lora_layers.append(lora_layer)
+        self._lora_weights.append(lora_weight)
+
     @torch.no_grad()
     def _get_lora_patched_parameters(self) -> dict[str, torch.Tensor]:
         out_params: dict[str, torch.Tensor] = {}
@@ -23,7 +31,10 @@ class LoRAModuleWrapper(torch.nn.Module):
                 if out_params[param_name].shape != param_weight.shape:
                     param_weight = param_weight.reshape(out_params[param_name].shape)
 
-                out_params[param_name] += param_weight * (lora_layer.scale() * lora_weight)
+                # NOTE: It is important that out_params[param_name] is not modified in-place, because we initialize it
+                # with the original parameter - which we don't want to modify. In other words,
+                # `out_params[param_name] += ...` would not work.
+                out_params[param_name] = out_params[param_name] + param_weight * (lora_layer.scale() * lora_weight)
 
         return out_params
 
