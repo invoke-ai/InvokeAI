@@ -13,8 +13,9 @@ from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils impo
     lora_model_from_flux_diffusers_state_dict,
 )
 from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import (
-    lora_model_from_flux_kohya_state_dict,
+    is_state_dict_likely_in_flux_kohya_format, lora_model_from_flux_kohya_state_dict,
 )
+from invokeai.backend.lora.conversions.flux_control_lora_utils import is_state_dict_likely_flux_control, lora_model_from_flux_control_state_dict
 from invokeai.backend.lora.conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.lora.conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.model_manager import (
@@ -32,6 +33,7 @@ from invokeai.backend.model_manager.load.model_loader_registry import ModelLoade
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.LyCORIS)
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.StructuralLoRa, format=ModelFormat.LyCORIS)
 class LoRALoader(ModelLoader):
     """Class to load LoRA models."""
 
@@ -75,7 +77,10 @@ class LoRALoader(ModelLoader):
                 # https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth_lora_flux.py#L1194
                 model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
             elif config.format == ModelFormat.LyCORIS:
-                model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
+                if is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
+                    model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
+                elif is_state_dict_likely_flux_control(state_dict=state_dict):
+                    model = lora_model_from_flux_control_state_dict(state_dict=state_dict)
             else:
                 raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:

@@ -178,6 +178,10 @@ const zCLIPGEmbedModelFieldType = zFieldTypeBase.extend({
   name: z.literal('CLIPGEmbedModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zStructuralLoRAModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('StructuralLoRAModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zFluxVAEModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxVAEModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -210,6 +214,7 @@ const zStatefulFieldType = z.union([
   zCLIPEmbedModelFieldType,
   zCLIPLEmbedModelFieldType,
   zCLIPGEmbedModelFieldType,
+  zStructuralLoRAModelFieldType,
   zFluxVAEModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
@@ -864,6 +869,29 @@ export const isCLIPGEmbedModelFieldInputTemplate = (val: unknown): val is CLIPGE
 
 // #endregion
 
+// #region StructuralLoRAModelField
+
+export const zStructuralLoRAModelFieldValue = zModelIdentifierField.optional();
+const zStructuralLoRAModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zStructuralLoRAModelFieldValue,
+});
+const zStructuralLoRAModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zStructuralLoRAModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zStructuralLoRAModelFieldValue,
+});
+
+export type StructuralLoRAModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldValue>;
+
+export type StructuralLoRAModelFieldInputInstance = z.infer<typeof zStructuralLoRAModelFieldInputInstance>;
+export type StructuralLoRAModelFieldInputTemplate = z.infer<typeof zStructuralLoRAModelFieldInputTemplate>;
+export const isStructuralLoRAModelFieldInputInstance = (val: unknown): val is StructuralLoRAModelFieldInputInstance =>
+  zStructuralLoRAModelFieldInputInstance.safeParse(val).success;
+export const isStructuralLoRAModelFieldInputTemplate = (val: unknown): val is StructuralLoRAModelFieldInputTemplate =>
+  zStructuralLoRAModelFieldInputTemplate.safeParse(val).success;
+
+// #endregion
+
 // #region SchedulerField
 
 export const zSchedulerFieldValue = zSchedulerField.optional();
@@ -959,6 +987,7 @@ export const zStatefulFieldValue = z.union([
   zCLIPEmbedModelFieldValue,
   zCLIPLEmbedModelFieldValue,
   zCLIPGEmbedModelFieldValue,
+  zStructuralLoRAModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
 ]);
@@ -1030,6 +1059,7 @@ const zStatefulFieldInputTemplate = z.union([
   zCLIPEmbedModelFieldInputTemplate,
   zCLIPLEmbedModelFieldInputTemplate,
   zCLIPGEmbedModelFieldInputTemplate,
+  zStructuralLoRAModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

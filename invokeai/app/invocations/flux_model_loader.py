@@ -81,8 +81,8 @@ class FluxModelLoaderInvocation(BaseInvocation):
         assert isinstance(transformer_config, CheckpointConfigBase)
 
         return FluxModelLoaderOutput(
-            transformer=TransformerField(transformer=transformer, loras=[]),
-            clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
+            transformer=TransformerField(transformer=transformer, loras=[], structural_loras=[]),
+            clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], structural_loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
             vae=VAEField(vae=vae),
             max_seq_len=max_seq_lengths[transformer_config.config_path],

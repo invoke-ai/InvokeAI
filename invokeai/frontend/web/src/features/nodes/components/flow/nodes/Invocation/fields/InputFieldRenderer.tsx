@@ -51,6 +51,8 @@ import {
   isSpandrelImageToImageModelFieldInputTemplate,
   isStringFieldInputInstance,
   isStringFieldInputTemplate,
+  isStructuralLoRAModelFieldInputInstance,
+  isStructuralLoRAModelFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
   isT2IAdapterModelFieldInputTemplate,
   isT5EncoderModelFieldInputInstance,
@@ -81,6 +83,7 @@ import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComp
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
+import StructuralLoRAModelFieldInputComponent from './inputs/StructuralLoraModelFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
@@ -154,6 +157,15 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isCLIPGEmbedModelFieldInputInstance(fieldInstance) && isCLIPGEmbedModelFieldInputTemplate(fieldTemplate)) {
     return <CLIPGEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (
+    isStructuralLoRAModelFieldInputInstance(fieldInstance) &&
+    isStructuralLoRAModelFieldInputTemplate(fieldTemplate)
+  ) {
+    return (
+      <StructuralLoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />
+    );
   }
 
   if (isFluxVAEModelFieldInputInstance(fieldInstance) && isFluxVAEModelFieldInputTemplate(fieldTemplate)) {

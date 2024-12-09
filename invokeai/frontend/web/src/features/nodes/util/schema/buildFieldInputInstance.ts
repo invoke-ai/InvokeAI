@@ -28,6 +28,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   CLIPEmbedModelField: undefined,
   CLIPLEmbedModelField: undefined,
   CLIPGEmbedModelField: undefined,
+  StructuralLoRAModelField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {

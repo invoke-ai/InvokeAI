@@ -28,6 +28,7 @@ import type {
   StatefulFieldType,
   StatelessFieldInputTemplate,
   StringFieldInputTemplate,
+  StructuralLoRAModelFieldInputTemplate,
   T2IAdapterModelFieldInputTemplate,
   T5EncoderModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
@@ -300,6 +301,20 @@ const buildCLIPGEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPGEmb
   return template;
 };
 
+const buildStructuralLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<StructuralLoRAModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: StructuralLoRAModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildFluxVAEModelFieldInputTemplate: FieldInputTemplateBuilder<FluxVAEModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -526,6 +541,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   CLIPLEmbedModelField: buildCLIPLEmbedModelFieldInputTemplate,
   CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
+  StructuralLoRAModelField: buildStructuralLoRAModelFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (

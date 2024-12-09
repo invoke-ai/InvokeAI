@@ -18,6 +18,7 @@ from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlab
 from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
 )
+from invokeai.backend.lora.conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.config import (
@@ -257,6 +258,18 @@ class ModelProbe(object):
 
         ckpt = checkpoint if checkpoint else read_checkpoint_meta(model_path, scan=True)
         ckpt = ckpt.get("state_dict", ckpt)
+
+        if isinstance(ckpt, dict) and "img_in.lora_A.weight" in ckpt and "img_in.lora_B.weight" in ckpt:
+            tensor_a, tensor_b = ckpt["img_in.lora_A.weight"], ckpt["img_in.lora_B.weight"]
+            if (
+                tensor_a is not None
+                and isinstance(tensor_a, torch.Tensor)
+                and tensor_a.shape[1] == 128
+                and tensor_b is not None
+                and isinstance(tensor_b, torch.Tensor)
+                and tensor_b.shape[0] == 3072
+            ):
+                return ModelType.StructuralLoRa
 
         for key in [str(k) for k in ckpt.keys()]:
             if key.startswith(
@@ -624,8 +637,10 @@ class LoRACheckpointProbe(CheckpointProbeBase):
         return ModelFormat.LyCORIS
 
     def get_base_type(self) -> BaseModelType:
-        if is_state_dict_likely_in_flux_kohya_format(self.checkpoint) or is_state_dict_likely_in_flux_diffusers_format(
-            self.checkpoint
+        if (
+            is_state_dict_likely_in_flux_kohya_format(self.checkpoint)
+            or is_state_dict_likely_in_flux_diffusers_format(self.checkpoint)
+            or is_state_dict_likely_flux_control(self.checkpoint)
         ):
             return BaseModelType.Flux
 
@@ -1046,6 +1061,7 @@ ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelI
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.LoRA, LoRACheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.StructuralLoRa, LoRACheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInversionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
