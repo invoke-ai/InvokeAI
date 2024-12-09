@@ -19,39 +19,40 @@ class LoRAModuleWrapper(torch.nn.Module):
         self._lora_weights.append(lora_weight)
 
     @torch.no_grad()
-    def _get_lora_patched_parameters(self) -> dict[str, torch.Tensor]:
-        out_params: dict[str, torch.Tensor] = {}
+    def _get_lora_patched_parameters(self, params: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         for lora_layer, lora_weight in zip(self._lora_layers, self._lora_weights, strict=True):
             layer_params = lora_layer.get_parameters(self._orig_module)
             for param_name, param_weight in layer_params.items():
-                # If the parameter already exists in out_params, use that one. Otherwise, use original parameter.
-                if param_name not in out_params:
-                    out_params[param_name] = self._orig_module.get_parameter(param_name)
+                if params[param_name].shape != param_weight.shape:
+                    param_weight = param_weight.reshape(params[param_name].shape)
 
-                if out_params[param_name].shape != param_weight.shape:
-                    param_weight = param_weight.reshape(out_params[param_name].shape)
-
-                # NOTE: It is important that out_params[param_name] is not modified in-place, because we initialize it
+                # NOTE: It is important that params[param_name] is not modified in-place, because we initialize it
                 # with the original parameter - which we don't want to modify. In other words,
                 # `out_params[param_name] += ...` would not work.
-                out_params[param_name] = out_params[param_name] + param_weight * (lora_layer.scale() * lora_weight)
+                params[param_name] = params[param_name] + param_weight * (lora_layer.scale() * lora_weight)
 
-        return out_params
+        return params
 
 
 class LoRALinearWrapper(LoRAModuleWrapper):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        params = self._get_lora_patched_parameters()
-        return torch.nn.functional.linear(input, params["weight"], params.get("bias", None))
+        params = self._get_lora_patched_parameters(
+            params={"weight": self._orig_module.weight, "bias": self._orig_module.bias}
+        )
+        return torch.nn.functional.linear(input, params["weight"], params["bias"])
 
 
 class LoRAConv1dWrapper(LoRAModuleWrapper):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        params = self._get_lora_patched_parameters()
-        return torch.nn.functional.conv1d(input, params["weight"], params.get("bias", None))
+        params = self._get_lora_patched_parameters(
+            params={"weight": self._orig_module.weight, "bias": self._orig_module.bias}
+        )
+        return torch.nn.functional.conv1d(input, params["weight"], params["bias"])
 
 
 class LoRAConv2dWrapper(LoRAModuleWrapper):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        params = self._get_lora_patched_parameters()
-        return torch.nn.functional.conv2d(input, params["weight"], params.get("bias", None))
+        params = self._get_lora_patched_parameters(
+            params={"weight": self._orig_module.weight, "bias": self._orig_module.bias}
+        )
+        return torch.nn.functional.conv2d(input, params["weight"], params["bias"])
