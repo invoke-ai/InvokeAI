@@ -30,6 +30,8 @@ def denoise(
     controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
     pos_ip_adapter_extensions: list[XLabsIPAdapterExtension],
     neg_ip_adapter_extensions: list[XLabsIPAdapterExtension],
+    # extra img tokens
+    img_cond: torch.Tensor | None = None,
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -71,7 +73,7 @@ def denoise(
         merged_controlnet_residuals = sum_controlnet_flux_outputs(controlnet_residuals)
 
         pred = model(
-            img=img,
+            img=torch.cat((img, img_cond), dim=-1) if img_cond is not None else img,
             img_ids=img_ids,
             txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
             txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,

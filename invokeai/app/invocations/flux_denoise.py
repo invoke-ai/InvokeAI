@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Tuple
+from typing import Callable, Iterator, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -7,6 +7,9 @@ import torch
 import torchvision.transforms as tv_transforms
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
+
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
+from invokeai.backend.flux.modules.lora import replace_linear_with_lora
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -22,7 +25,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.ip_adapter import IPAdapterField
-from invokeai.app.invocations.model import TransformerField, VAEField
+from invokeai.app.invocations.model import TransformerField, VAEField, StructuralLoRAField, LoRAField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
@@ -43,6 +46,8 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
+from invokeai.backend.flux.flux_tools_sampling_utils import prepare_control
+from invokeai.backend.flux.modules.conditioner import HFEncoder
 from invokeai.backend.flux.text_conditioning import FluxTextConditioning
 from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
@@ -284,12 +289,22 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
                 device=x.device,
             )
+            img_cond = None
+            for struct_lora in self.transformer.structural_loras:
+                # What should we do when we have multiple of these?
+                ae_info = context.models.load(struct_lora.vae.vae)
+                img = context.images.get_pil(struct_lora.img.image_name)
+                with ae_info as ae:
+                    assert isinstance(ae, AutoEncoder)
+                    img_cond = prepare_control(x, ae, img)
 
             # Load the transformer model.
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
             assert isinstance(transformer, Flux)
             config = transformer_info.config
             assert config is not None
+            if self.transformer.structural_loras:
+                replace_linear_with_lora(transformer, 128)
 
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
@@ -345,6 +360,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 controlnet_extensions=controlnet_extensions,
                 pos_ip_adapter_extensions=pos_ip_adapter_extensions,
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
+                img_cond=img_cond
             )
 
         x = unpack(x.float(), self.height, self.width)
@@ -682,7 +698,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return pos_ip_adapter_extensions, neg_ip_adapter_extensions
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
-        for lora in self.transformer.loras:
+        loras: list[Union[LoRAField, StructuralLoRAField]] = [*self.transformer.loras, *self.transformer.structural_loras]
+        for lora in loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, LoRAModelRaw)
             yield (lora_info.model, lora.weight)

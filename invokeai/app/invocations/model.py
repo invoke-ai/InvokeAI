@@ -1,5 +1,5 @@
 import copy
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +10,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType, ImageField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import (
@@ -65,11 +65,6 @@ class CLIPField(BaseModel):
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
-class TransformerField(BaseModel):
-    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
-    loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
-
-
 class T5EncoderField(BaseModel):
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
@@ -79,6 +74,15 @@ class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
 
+class StructuralLoRAField(LoRAField):
+    img: ImageField = Field(description="Image to use in structural conditioning")
+    vae: VAEField = Field(description="VAE To use with structural lora")
+
+
+class TransformerField(BaseModel):
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
+    structural_loras: List[StructuralLoRAField] = Field(description="Structural LoRAs to apply on model loading")
 
 @invocation_output("unet_output")
 class UNetOutput(BaseInvocationOutput):

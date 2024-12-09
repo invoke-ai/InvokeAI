@@ -24,6 +24,7 @@ export const ModelTypeFilter = memo(() => {
       ip_adapter: t('common.ipAdapter'),
       clip_vision: 'CLIP Vision',
       spandrel_image_to_image: t('modelManager.spandrelImageToImage'),
+      structural_lora: t('modelManager.structuralLora'),
     }),
     [t]
   );

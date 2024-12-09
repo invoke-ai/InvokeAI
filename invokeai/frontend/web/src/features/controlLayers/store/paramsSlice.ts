@@ -24,6 +24,7 @@ import type {
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
+  ParameterStructuralLoRAModel,
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
@@ -75,6 +76,7 @@ export type ParamsState = {
   clipEmbedModel: ParameterCLIPEmbedModel | null;
   clipLEmbedModel: ParameterCLIPLEmbedModel | null;
   clipGEmbedModel: ParameterCLIPGEmbedModel | null;
+  structuralLora: ParameterStructuralLoRAModel | null;
 };
 
 const initialState: ParamsState = {
@@ -121,6 +123,7 @@ const initialState: ParamsState = {
   clipEmbedModel: null,
   clipLEmbedModel: null,
   clipGEmbedModel: null,
+  structuralLora: null,
 };
 
 export const paramsSlice = createSlice({
@@ -194,6 +197,9 @@ export const paramsSlice = createSlice({
     },
     t5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
       state.t5EncoderModel = action.payload;
+    },
+    structuralLoRAModelSelected: (state, action: PayloadAction<ParameterStructuralLoRAModel | null>) => {
+      state.structuralLora = action.payload;
     },
     clipEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPEmbedModel | null>) => {
       state.clipEmbedModel = action.payload;

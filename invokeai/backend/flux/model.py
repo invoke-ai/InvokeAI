@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor, nn
+from typing import Optional
 
 from invokeai.backend.flux.custom_block_processor import (
     CustomDoubleStreamBlockProcessor,
@@ -19,6 +20,7 @@ from invokeai.backend.flux.modules.layers import (
     SingleStreamBlock,
     timestep_embedding,
 )
+from invokeai.backend.flux.modules.lora import replace_linear_with_lora
 
 
 @dataclass
@@ -35,6 +37,7 @@ class FluxParams:
     theta: int
     qkv_bias: bool
     guidance_embed: bool
+    out_channels: Optional[int] = None
 
 
 class Flux(nn.Module):
@@ -47,7 +50,7 @@ class Flux(nn.Module):
 
         self.params = params
         self.in_channels = params.in_channels
-        self.out_channels = self.in_channels
+        self.out_channels = params.out_channels or self.in_channels
         if params.hidden_size % params.num_heads != 0:
             raise ValueError(f"Hidden size {params.hidden_size} must be divisible by num_heads {params.num_heads}")
         pe_dim = params.hidden_size // params.num_heads

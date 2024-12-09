@@ -113,6 +113,11 @@ export const zParameterVAEModel = zModelIdentifierField;
 export type ParameterVAEModel = z.infer<typeof zParameterVAEModel>;
 // #endregion
 
+// #region Structural Lora Model
+export const zParameterStructuralLoRAModel = zModelIdentifierField;
+export type ParameterStructuralLoRAModel = z.infer<typeof zParameterStructuralLoRAModel>;
+// #endregion
+
 // #region T5Encoder Model
 export const zParameterT5EncoderModel = zModelIdentifierField;
 export type ParameterT5EncoderModel = z.infer<typeof zParameterT5EncoderModel>;

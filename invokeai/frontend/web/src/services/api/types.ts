@@ -44,6 +44,7 @@ export type BaseModelType = S['BaseModelType'];
 
 // Model Configs
 
+export type StructuralLoRAModelConfig = S['StructuralLoRALyCORISConfig'];
 // TODO(MM2): Can we make key required in the pydantic model?
 export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
@@ -63,6 +64,7 @@ export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
+  | StructuralLoRAModelConfig
   | LoRAModelConfig
   | VAEModelConfig
   | ControlNetModelConfig
@@ -112,6 +114,10 @@ const checkSubmodels = (identifiers: string[], config: AnyModelConfig): boolean 
 
 export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelConfig => {
   return config.type === 'lora';
+};
+
+export const isStructuralLoRAModelConfig = (config: AnyModelConfig): config is StructuralLoRAModelConfig => {
+  return config.type === 'structural_lora';
 };
 
 export const isVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {

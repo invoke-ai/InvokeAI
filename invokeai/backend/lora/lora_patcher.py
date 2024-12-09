@@ -6,6 +6,7 @@ import torch
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
+from invokeai.backend.lora.layers.set_weight_layer import SetWeightLayer
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.sidecar_layers.concatenated_lora.concatenated_lora_linear_sidecar_layer import (
     ConcatenatedLoRALinearSidecarLayer,
@@ -115,7 +116,8 @@ class LoRAPatcher:
 
                 if module_param.shape != lora_param_weight.shape:
                     lora_param_weight = lora_param_weight.reshape(module_param.shape)
-
+                if isinstance(layer, SetWeightLayer):
+                    module_param = lora_param_weight
                 lora_param_weight *= patch_weight * layer_scale
                 module_param += lora_param_weight.to(dtype=dtype)
 
