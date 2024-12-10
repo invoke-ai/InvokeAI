@@ -76,13 +76,11 @@ class VAEField(BaseModel):
 
 class StructuralLoRAField(LoRAField):
     img: ImageField = Field(description="Image to use in structural conditioning")
-    vae: VAEField = Field(description="VAE To use with structural lora")
-
 
 class TransformerField(BaseModel):
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
-    structural_loras: List[StructuralLoRAField] = Field(description="Structural LoRAs to apply on model loading")
+    structural_lora: Optional[StructuralLoRAField] = Field(description="Structural LoRAs to apply on model loading", default=None)
 
 @invocation_output("unet_output")
 class UNetOutput(BaseInvocationOutput):
