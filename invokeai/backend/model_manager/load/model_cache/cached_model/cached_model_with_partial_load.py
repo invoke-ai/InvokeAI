@@ -127,17 +127,21 @@ class CachedModelWithPartialLoad:
         """
         vram_bytes_freed = 0
 
-        # TODO(ryand): Iterate over buffers too?
-        for key, param in self._model.named_parameters():
+        for key, param in itertools.chain(self._model.named_parameters(), self._model.named_buffers()):
             if vram_bytes_freed >= vram_bytes_to_free:
                 break
 
             if param.device.type != self._compute_device.type:
                 continue
 
-            # Create a new parameter, but inject the existing CPU tensor into it.
-            out_param = torch.nn.Parameter(self._cpu_state_dict[key], requires_grad=param.requires_grad)
-            set_nested_attr(self._model, key, out_param)
+            if isinstance(param, torch.nn.Parameter):
+                # Create a new parameter, but inject the existing CPU tensor into it.
+                out_param = torch.nn.Parameter(self._cpu_state_dict[key], requires_grad=param.requires_grad)
+                set_nested_attr(self._model, key, out_param)
+            else:
+                # Handle buffers.
+                set_nested_attr(self._model, key, self._cpu_state_dict[key])
+
             vram_bytes_freed += calc_tensor_size(param)
 
         if self._cur_vram_bytes is not None:
