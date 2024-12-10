@@ -126,6 +126,7 @@ class LoRAPatcher:
         model: torch.nn.Module,
         patches: Iterable[Tuple[LoRAModelRaw, float]],
         prefix: str,
+        dtype: torch.dtype,
     ):
         """Apply one or more LoRA wrapper patches to a model within a context manager. Wrapper patches incur some
         runtime overhead compared to normal LoRA patching, but they enable:
@@ -149,6 +150,7 @@ class LoRAPatcher:
                     patch=patch,
                     patch_weight=patch_weight,
                     original_modules=original_modules,
+                    dtype=dtype,
                 )
             yield
         finally:
@@ -166,6 +168,7 @@ class LoRAPatcher:
         patch_weight: float,
         prefix: str,
         original_modules: dict[str, torch.nn.Module],
+        dtype: torch.dtype,
     ):
         """Apply a single LoRA wrapper patch to a model."""
 
@@ -201,7 +204,7 @@ class LoRAPatcher:
                 orig_module = module.orig_module
 
             # Move the LoRA layer to the same device/dtype as the orig module.
-            layer.to(device=orig_module.weight.device, dtype=orig_module.weight.dtype)
+            layer.to(device=orig_module.weight.device, dtype=dtype)
 
             # Add the LoRA wrapper layer to the LoRASidecarWrapper.
             lora_wrapper_layer.add_lora_layer(layer, patch_weight)
