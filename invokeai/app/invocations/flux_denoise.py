@@ -306,10 +306,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             if config.format in [ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
-                    LayerPatcher.apply_model_patches(
+                    LayerPatcher.apply_smart_model_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+                        dtype=inference_dtype,
                         cached_weights=cached_weights,
                     )
                 )
