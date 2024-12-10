@@ -233,10 +233,14 @@ class ModelCache:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
         vram_available = self._get_vram_available()
 
-        # The amount of additional VRAM that will be used if we fully load the model into VRAM.
+        # Calculate model_vram_needed, the amount of additional VRAM that will be used if we fully load the model into
+        # VRAM.
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
         model_total_bytes = cache_entry.cached_model.total_bytes()
         model_vram_needed = model_total_bytes - model_cur_vram_bytes
+
+        # The amount of VRAM that must be freed to make room for model_vram_needed.
+        vram_bytes_to_free = max(0, model_vram_needed - vram_available)
 
         self._logger.debug(
             f"Before unloading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
@@ -246,7 +250,7 @@ class ModelCache:
         # 1. If the model can fit entirely in VRAM, then make enough room for it to be loaded fully.
         # 2. If the model can't fit fully into VRAM, then unload all other models and load as much of the model as
         #    possible.
-        vram_bytes_freed = self._offload_unlocked_models(model_vram_needed)
+        vram_bytes_freed = self._offload_unlocked_models(vram_bytes_to_free)
         self._logger.debug(f"Unloaded models (if necessary): vram_bytes_freed={(vram_bytes_freed/MB):.2f}MB")
 
         # Check the updated vram_available after offloading.
