@@ -19,6 +19,114 @@ class LoRAPatcher:
     @staticmethod
     @torch.no_grad()
     @contextmanager
+    def apply_smart_lora_patches(
+        model: torch.nn.Module,
+        patches: Iterable[Tuple[LoRAModelRaw, float]],
+        prefix: str,
+        dtype: torch.dtype,
+        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
+    ):
+        """Apply 'smart' LoRA patching that chooses whether to use direct patching or a sidecar wrapper for each module."""
+
+        # original_weights are stored for unpatching layers that are directly patched.
+        original_weights = OriginalWeightsStorage(cached_weights)
+        # original_modules are stored for unpatching layers that are wrapped in a LoRASidecarWrapper.
+        original_modules: dict[str, torch.nn.Module] = {}
+        try:
+            for patch, patch_weight in patches:
+                LoRAPatcher._apply_smart_lora_patch(
+                    model=model,
+                    prefix=prefix,
+                    patch=patch,
+                    patch_weight=patch_weight,
+                    original_weights=original_weights,
+                    original_modules=original_modules,
+                    dtype=dtype,
+                )
+
+            yield
+        finally:
+            # Restore directly patched layers.
+            for param_key, weight in original_weights.get_changed_weights():
+                model.get_parameter(param_key).copy_(weight)
+
+            # Restore LoRASidecarWrapper modules.
+            # Note: This logic assumes no nested modules in original_modules.
+            for module_key, orig_module in original_modules.items():
+                module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
+                parent_module = model.get_submodule(module_parent_key)
+                LoRAPatcher._set_submodule(parent_module, module_name, orig_module)
+
+    @staticmethod
+    @torch.no_grad()
+    def _apply_smart_lora_patch(
+        model: torch.nn.Module,
+        prefix: str,
+        patch: LoRAModelRaw,
+        patch_weight: float,
+        original_weights: OriginalWeightsStorage,
+        original_modules: dict[str, torch.nn.Module],
+        dtype: torch.dtype,
+    ):
+        """Apply a single LoRA patch to a model using the 'smart' patching strategy that chooses whether to use direct
+        patching or a sidecar wrapper for each module.
+        """
+        if patch_weight == 0:
+            return
+
+        # If the layer keys contain a dot, then they are not flattened, and can be directly used to access model
+        # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
+        # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
+        # without searching, but some legacy code still uses flattened keys.
+        layer_keys_are_flattened = "." not in next(iter(patch.layers.keys()))
+
+        prefix_len = len(prefix)
+
+        for layer_key, layer in patch.layers.items():
+            if not layer_key.startswith(prefix):
+                continue
+
+            module_key, module = LoRAPatcher._get_submodule(
+                model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
+            )
+
+            # Decide whether to use direct patching or a sidecar wrapper.
+            # Direct patching is preferred, because it results in better runtime speed.
+            # Reasons to use sidecar patching:
+            # - The module is already wrapped in a LoRASidecarWrapper.
+            # - The module is quantized.
+            # - The module is on the CPU (and we don't want to store a second full copy of the original weights on the
+            #   CPU, since this would double the RAM usage)
+            # NOTE: For now, we don't check if the layer is quantized here. We assume that this is checked in the caller
+            # and that the caller will use the 'apply_lora_wrapper_patches' method if the layer is quantized.
+            # TODO(ryand): Handle the case where we are running without a GPU. Should we set a config flag that allows
+            # forcing full patching even on the CPU?
+            if isinstance(module, LoRASidecarWrapper) or LoRAPatcher._is_any_part_of_layer_on_cpu(module):
+                LoRAPatcher._apply_lora_layer_wrapper_patch(
+                    model=model,
+                    module_to_patch=module,
+                    module_to_patch_key=module_key,
+                    patch=layer,
+                    patch_weight=patch_weight,
+                    original_modules=original_modules,
+                    dtype=dtype,
+                )
+            else:
+                LoRAPatcher._apply_lora_layer_patch(
+                    module_to_patch=module,
+                    module_to_patch_key=module_key,
+                    patch=layer,
+                    patch_weight=patch_weight,
+                    original_weights=original_weights,
+                )
+
+    @staticmethod
+    def _is_any_part_of_layer_on_cpu(layer: torch.nn.Module) -> bool:
+        return any(p.device.type == "cpu" for p in layer.parameters())
+
+    @staticmethod
+    @torch.no_grad()
+    @contextmanager
     def apply_lora_patches(
         model: torch.nn.Module,
         patches: Iterable[Tuple[LoRAModelRaw, float]],
