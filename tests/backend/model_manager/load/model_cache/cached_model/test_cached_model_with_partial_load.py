@@ -87,7 +87,7 @@ def test_cached_model_partial_unload(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load(device: str):
+def test_cached_model_full_load_and_unload(device: str):
     model = DummyModule()
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
 
@@ -101,6 +101,13 @@ def test_cached_model_full_load(device: str):
     assert loaded_bytes == model_total_bytes
     assert loaded_bytes == cached_model.cur_vram_bytes()
     assert all(p.device.type == device for p in itertools.chain(model.parameters(), model.buffers()))
+
+    # Full unload the model from VRAM.
+    unloaded_bytes = cached_model.full_unload_from_vram()
+    assert unloaded_bytes > 0
+    assert unloaded_bytes == model_total_bytes
+    assert cached_model.cur_vram_bytes() == 0
+    assert all(p.device.type == "cpu" for p in itertools.chain(model.parameters(), model.buffers()))
 
 
 @parameterize_mps_and_cuda
