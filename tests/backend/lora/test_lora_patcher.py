@@ -30,7 +30,7 @@ class DummyModuleWithTwoLayers(torch.nn.Module):
 
 
 @pytest.mark.parametrize(
-    ["device", "num_layers"],
+    ["device", "num_loras"],
     [
         ("cpu", 1),
         pytest.param("cuda", 1, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
@@ -39,7 +39,7 @@ class DummyModuleWithTwoLayers(torch.nn.Module):
     ],
 )
 @torch.no_grad()
-def test_apply_lora_patches(device: str, num_layers: int):
+def test_apply_lora_patches(device: str, num_loras: int):
     """Test the basic behavior of ModelPatcher.apply_lora_patches(...). Check that patching and unpatching produce the
     correct result, and that model/LoRA tensors are moved between devices as expected.
     """
@@ -49,10 +49,10 @@ def test_apply_lora_patches(device: str, num_layers: int):
     lora_rank = 2
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device=device, dtype=torch.float16)
 
-    # Initialize num_layers LoRA models with weights of 0.5.
+    # Initialize num_loras LoRA models with weights of 0.5.
     lora_weight = 0.5
     lora_models: list[tuple[LoRAModelRaw, float]] = []
-    for _ in range(num_layers):
+    for _ in range(num_loras):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
                 values={
@@ -65,7 +65,7 @@ def test_apply_lora_patches(device: str, num_layers: int):
         lora_models.append((lora, lora_weight))
 
     orig_linear_weight = model.linear_layer_1.weight.data.detach().clone()
-    expected_patched_linear_weight = orig_linear_weight + (lora_rank * lora_weight * num_layers)
+    expected_patched_linear_weight = orig_linear_weight + (lora_rank * lora_weight * num_loras)
 
     with LoRAPatcher.apply_lora_patches(model=model, patches=lora_models, prefix=""):
         # After patching, all LoRA layer weights should have been moved back to the cpu.
@@ -124,7 +124,7 @@ def test_apply_lora_patches_change_device():
 
 
 @pytest.mark.parametrize(
-    ["device", "num_layers"],
+    ["device", "num_loras"],
     [
         ("cpu", 1),
         pytest.param("cuda", 1, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
@@ -132,7 +132,7 @@ def test_apply_lora_patches_change_device():
         pytest.param("cuda", 2, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
     ],
 )
-def test_apply_lora_wrapper_patches(device: str, num_layers: int):
+def test_apply_lora_wrapper_patches(device: str, num_loras: int):
     """Test the basic behavior of ModelPatcher.apply_lora_wrapper_patches(...). Check that unpatching works correctly."""
     dtype = torch.float16
     linear_in_features = 4
@@ -140,10 +140,10 @@ def test_apply_lora_wrapper_patches(device: str, num_layers: int):
     lora_rank = 2
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device=device, dtype=dtype)
 
-    # Initialize num_layers LoRA models with weights of 0.5.
+    # Initialize num_loras LoRA models with weights of 0.5.
     lora_weight = 0.5
     lora_models: list[tuple[LoRAModelRaw, float]] = []
-    for _ in range(num_layers):
+    for _ in range(num_loras):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
                 values={
@@ -174,7 +174,7 @@ def test_apply_lora_wrapper_patches(device: str, num_layers: int):
 
 
 @pytest.mark.parametrize(
-    ["device", "num_layers"],
+    ["device", "num_loras"],
     [
         ("cpu", 1),
         pytest.param("cuda", 1, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
@@ -183,7 +183,7 @@ def test_apply_lora_wrapper_patches(device: str, num_layers: int):
     ],
 )
 @torch.no_grad()
-def test_apply_smart_lora_patches(device: str, num_layers: int):
+def test_apply_smart_lora_patches(device: str, num_loras: int):
     """Test the basic behavior of ModelPatcher.apply_smart_lora_patches(...). Check that unpatching works correctly."""
     dtype = torch.float16
     linear_in_features = 4
@@ -191,10 +191,10 @@ def test_apply_smart_lora_patches(device: str, num_layers: int):
     lora_rank = 2
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device=device, dtype=dtype)
 
-    # Initialize num_layers LoRA models with weights of 0.5.
+    # Initialize num_loras LoRA models with weights of 0.5.
     lora_weight = 0.5
     lora_models: list[tuple[LoRAModelRaw, float]] = []
-    for _ in range(num_layers):
+    for _ in range(num_loras):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
                 values={
@@ -224,9 +224,9 @@ def test_apply_smart_lora_patches(device: str, num_layers: int):
     assert torch.allclose(output_before_patch, output_after_patch)
 
 
-@pytest.mark.parametrize(["num_layers"], [(1,), (2,)])
+@pytest.mark.parametrize(["num_loras"], [(1,), (2,)])
 @torch.no_grad()
-def test_apply_smart_lora_patches_to_partially_loaded_model(num_layers: int):
+def test_apply_smart_lora_patches_to_partially_loaded_model(num_loras: int):
     """Test the behavior of ModelPatcher.apply_smart_lora_patches(...) when it is applied to a
     CachedModelWithPartialLoad that is partially loaded into VRAM.
     """
@@ -250,10 +250,10 @@ def test_apply_smart_lora_patches_to_partially_loaded_model(num_layers: int):
     assert cached_model.model.linear_layer_1.weight.device.type == "cuda"
     assert cached_model.model.linear_layer_2.weight.device.type == "cpu"
 
-    # Initialize num_layers LoRA models with weights of 0.5.
+    # Initialize num_loras LoRA models with weights of 0.5.
     lora_weight = 0.5
     lora_models: list[tuple[LoRAModelRaw, float]] = []
-    for _ in range(num_layers):
+    for _ in range(num_loras):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
                 values={
@@ -294,8 +294,8 @@ def test_apply_smart_lora_patches_to_partially_loaded_model(num_layers: int):
 
 
 @torch.no_grad()
-@pytest.mark.parametrize(["num_layers"], [(1,), (2,)])
-def test_all_patching_methods_produce_same_output(num_layers: int):
+@pytest.mark.parametrize(["num_loras"], [(1,), (2,)])
+def test_all_patching_methods_produce_same_output(num_loras: int):
     """Test that apply_lora_wrapper_patches(...) produces the same model outputs as apply_lora_patches(...)."""
     dtype = torch.float32
     linear_in_features = 4
@@ -303,10 +303,10 @@ def test_all_patching_methods_produce_same_output(num_layers: int):
     lora_rank = 2
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=dtype)
 
-    # Initialize num_layers LoRA models with weights of 0.5.
+    # Initialize num_loras LoRA models with weights of 0.5.
     lora_weight = 0.5
     lora_models: list[tuple[LoRAModelRaw, float]] = []
-    for _ in range(num_layers):
+    for _ in range(num_loras):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
                 values={
