@@ -1,3 +1,5 @@
+import itertools
+
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_function_autocast_context import (
@@ -35,10 +37,9 @@ class CachedModelWithPartialLoad:
         # Monkey-patch the model to add autocasting to the model's forward method.
         add_autocast_to_module_forward(model, compute_device)
 
-        # TODO(ryand): Manage a read-only CPU copy of the model state dict.
-        # TODO(ryand): Add memoization for total_bytes and cur_vram_bytes?
-
-        self._total_bytes = sum(calc_tensor_size(p) for p in self._model.parameters())
+        self._total_bytes = sum(
+            calc_tensor_size(p) for p in itertools.chain(self._model.parameters(), self._model.buffers())
+        )
         self._cur_vram_bytes: int | None = None
 
     @property
@@ -58,7 +59,9 @@ class CachedModelWithPartialLoad:
         """Get the size (in bytes) of the weights that are currently in VRAM."""
         if self._cur_vram_bytes is None:
             self._cur_vram_bytes = sum(
-                calc_tensor_size(p) for p in self._model.parameters() if p.device.type == self._compute_device.type
+                calc_tensor_size(p)
+                for p in itertools.chain(self._model.parameters(), self._model.buffers())
+                if p.device.type == self._compute_device.type
             )
         return self._cur_vram_bytes
 
@@ -79,8 +82,7 @@ class CachedModelWithPartialLoad:
         """
         vram_bytes_loaded = 0
 
-        # TODO(ryand): Iterate over buffers too?
-        for key, param in self._model.named_parameters():
+        for key, param in itertools.chain(self._model.named_parameters(), self._model.named_buffers()):
             # Skip parameters that are already on the compute device.
             if param.device.type == self._compute_device.type:
                 continue
@@ -96,13 +98,18 @@ class CachedModelWithPartialLoad:
             # We use the 'overwrite' strategy from torch.nn.Module._apply().
             # TODO(ryand): For some edge cases (e.g. quantized models?), we may need to support other strategies (e.g.
             # swap).
-            assert isinstance(param, torch.nn.Parameter)
-            assert param.is_leaf
-            out_param = torch.nn.Parameter(param.to(self._compute_device, copy=True), requires_grad=param.requires_grad)
-            set_nested_attr(self._model, key, out_param)
-            # We did not port the param.grad handling from torch.nn.Module._apply(), because we do not expect to be
-            # handling gradients. We assert that this assumption is true.
-            assert param.grad is None
+            if isinstance(param, torch.nn.Parameter):
+                assert param.is_leaf
+                out_param = torch.nn.Parameter(
+                    param.to(self._compute_device, copy=True), requires_grad=param.requires_grad
+                )
+                set_nested_attr(self._model, key, out_param)
+                # We did not port the param.grad handling from torch.nn.Module._apply(), because we do not expect to be
+                # handling gradients. We assert that this assumption is true.
+                assert param.grad is None
+            else:
+                # Handle buffers.
+                set_nested_attr(self._model, key, param.to(self._compute_device, copy=True))
 
             vram_bytes_loaded += param_size
 
