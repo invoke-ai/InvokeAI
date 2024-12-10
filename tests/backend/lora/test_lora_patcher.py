@@ -146,7 +146,7 @@ def test_apply_lora_wrapper_patches(device: str, num_layers: int):
     output_before_patch = model(input)
 
     # Patch the model and run inference during the patch.
-    with LoRAPatcher.apply_lora_wrapper_patches(model=model, patches=lora_models, prefix=""):
+    with LoRAPatcher.apply_lora_wrapper_patches(model=model, patches=lora_models, prefix="", dtype=dtype):
         output_during_patch = model(input)
 
     # Run inference after unpatching.
@@ -189,7 +189,7 @@ def test_all_patching_methods_produce_same_output(num_layers: int):
     with LoRAPatcher.apply_lora_patches(model=model, patches=lora_models, prefix=""):
         output_lora_patches = model(input)
 
-    with LoRAPatcher.apply_lora_wrapper_patches(model=model, patches=lora_models, prefix=""):
+    with LoRAPatcher.apply_lora_wrapper_patches(model=model, patches=lora_models, prefix="", dtype=dtype):
         output_lora_wrapper_patches = model(input)
 
     # Note: We set atol=1e-5 because the test failed occasionally with the default atol=1e-8. Slight numerical
