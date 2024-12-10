@@ -10,7 +10,7 @@ from invokeai.backend.lora.lora_layer_wrappers import (
     LoRAConv1dWrapper,
     LoRAConv2dWrapper,
     LoRALinearWrapper,
-    LoRAModuleWrapper,
+    LoRASidecarWrapper,
 )
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.sidecar_layers.concatenated_lora.concatenated_lora_linear_sidecar_layer import (
@@ -213,8 +213,8 @@ class LoRAPatcher:
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            # Replace the original module with a LoRAModuleWrapper if it has not already been done.
-            if not isinstance(module, LoRAModuleWrapper):
+            # Replace the original module with a LoRASidecarWrapper if it has not already been done.
+            if not isinstance(module, LoRASidecarWrapper):
                 lora_wrapper_layer = LoRAPatcher._initialize_lora_wrapper_layer(module)
                 original_modules[module_key] = module
                 module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
@@ -228,7 +228,7 @@ class LoRAPatcher:
             # Move the LoRA layer to the same device/dtype as the orig module.
             layer.to(device=orig_module.weight.device, dtype=orig_module.weight.dtype)
 
-            # Add the LoRA wrapper layer to the LoRAModuleWrapper.
+            # Add the LoRA wrapper layer to the LoRASidecarWrapper.
             lora_wrapper_layer.add_lora_layer(layer, patch_weight)
 
     @staticmethod
