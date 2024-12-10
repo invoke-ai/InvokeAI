@@ -26,13 +26,16 @@ def is_state_dict_likely_flux_control(state_dict: Dict[str, Any]) -> bool:
     )
 
 def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:
-    state_dict = _convert_lora_bfl_control(state_dict=state_dict)
+    converted_state_dict = _convert_lora_bfl_control(state_dict=state_dict)
     # Group keys by layer.
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = {}
-    for key, value in state_dict.items():
+    for key, value in converted_state_dict.items():
         key_props = key.split(".")
-        layer_name = ".".join(key_props[:-1])
-        param_name = key_props[-1]
+        # Got it loading using lora_down and lora_up but it didn't seem to match this lora's structure
+        # Leaving this in since it doesn't hurt anything and may be better
+        layer_prop_size = -2 if any(prop in key for prop in ["lora_down", "lora_up"]) else -1
+        layer_name = ".".join(key_props[:layer_prop_size])
+        param_name = ".".join(key_props[layer_prop_size:])
         if layer_name not in grouped_state_dict:
             grouped_state_dict[layer_name] = {}
         grouped_state_dict[layer_name][param_name] = value
@@ -50,10 +53,11 @@ def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor])
 def _convert_lora_bfl_control(state_dict: dict[str, torch.Tensor])-> dict[str, torch.Tensor]:
     sd_out: dict[str, torch.Tensor] = {}
     for k in state_dict:
+        if k.endswith(".scale"): # TODO: Fix these patches
+            continue
         k_to = k.replace(".lora_B.bias", ".lora_B.diff_b")\
                 .replace(".lora_A.weight", ".lora_A.diff")\
-                .replace(".lora_B.weight", ".lora_B.diff")\
-                .replace("_norm.scale", "_norm.scale.set_weight")
+                .replace(".lora_B.weight", ".lora_B.diff")
         sd_out[k_to] = state_dict[k]
 
     # sd_out["img_in.reshape_weight"] = torch.tensor([state_dict["img_in.lora_B.weight"].shape[0], state_dict["img_in.lora_A.weight"].shape[1]])
