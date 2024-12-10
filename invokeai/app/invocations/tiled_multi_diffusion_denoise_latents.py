@@ -207,7 +207,9 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         with (
             ExitStack() as exit_stack,
             unet_info as unet,
-            LayerPatcher.apply_model_patches(model=unet, patches=_lora_loader(), prefix="lora_unet_"),
+            LayerPatcher.apply_smart_model_patches(
+                model=unet, patches=_lora_loader(), prefix="lora_unet_", dtype=unet.dtype
+            ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
             latents = latents.to(device=unet.device, dtype=unet.dtype)
