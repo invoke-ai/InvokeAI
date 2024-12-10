@@ -22,6 +22,7 @@ from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -111,10 +112,11 @@ class FluxTextEncoderInvocation(BaseInvocation):
             if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
-                    LoRAPatcher.apply_lora_patches(
+                    LoRAPatcher.apply_smart_lora_patches(
                         model=clip_text_encoder,
                         patches=self._clip_lora_iterator(context),
                         prefix=FLUX_LORA_CLIP_PREFIX,
+                        dtype=TorchDevice.choose_torch_dtype(),
                         cached_weights=cached_weights,
                     )
                 )
