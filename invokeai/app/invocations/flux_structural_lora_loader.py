@@ -41,7 +41,6 @@ class FluxStructuralLoRALoaderInvocation(BaseInvocation):
         input=Input.Connection,
         title="FLUX Transformer",
     )
-    vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection, ui_order=0)
     image: ImageField = InputField(
         description="The image to encode.",
     )
@@ -54,7 +53,7 @@ class FluxStructuralLoRALoaderInvocation(BaseInvocation):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
         # Check for existing LoRAs with the same key.
-        if self.transformer and any(lora.lora.key == lora_key for lora in self.transformer.structural_loras):
+        if self.transformer and self.transformer.structural_lora and self.transformer.structural_lora.lora.key == lora_key:
             raise ValueError(f'Structural LoRA "{lora_key}" already applied to transformer.')
 
         output = FluxStructuralLoRALoaderOutput()
@@ -62,13 +61,10 @@ class FluxStructuralLoRALoaderInvocation(BaseInvocation):
         # Attach LoRA layers to the models.
         if self.transformer is not None:
             output.transformer = self.transformer.model_copy(deep=True)
-            output.transformer.structural_loras.append(
-                StructuralLoRAField(
-                    lora=self.lora,
-                    vae=self.vae,
-                    img=self.image,
-                    weight=self.weight,
-                )
+            output.transformer.structural_lora = StructuralLoRAField(
+                lora=self.lora,
+                img=self.image,
+                weight=self.weight,
             )
 
         return output

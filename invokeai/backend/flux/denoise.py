@@ -71,9 +71,9 @@ def denoise(
         # controlnet_residuals datastructure is efficient in that it likely contains multiple references to the same
         # tensors. Calculating the sum materializes each tensor into its own instance.
         merged_controlnet_residuals = sum_controlnet_flux_outputs(controlnet_residuals)
-
+        pred_img = torch.cat((img, img_cond), dim=-1) if img_cond is not None else img
         pred = model(
-            img=torch.cat((img, img_cond), dim=-1) if img_cond is not None else img,
+            img=pred_img,
             img_ids=img_ids,
             txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
             txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,

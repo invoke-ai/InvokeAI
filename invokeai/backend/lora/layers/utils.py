@@ -30,7 +30,7 @@ def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> AnyLo
         return IA3Layer.from_state_dict_values(state_dict)
     elif "w_norm" in state_dict:
         return NormLayer.from_state_dict_values(state_dict)
-    elif "set_weight" in state_dict:
+    elif any(key in state_dict for key in ["set_weight", "set_bias", "set_scale"]):
         return SetWeightLayer.from_state_dict_values(state_dict)
     else:
         raise ValueError(f"Unsupported lora format: {state_dict.keys()}")

@@ -290,20 +290,22 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 device=x.device,
             )
             img_cond = None
-            for struct_lora in self.transformer.structural_loras:
+            if struct_lora := self.transformer.structural_lora:
                 # What should we do when we have multiple of these?
-                ae_info = context.models.load(struct_lora.vae.vae)
+                if not self.controlnet_vae:
+                    raise ValueError("controlnet_vae must be set when using a strutural lora")
+                ae_info = context.models.load(self.controlnet_vae.vae)
                 img = context.images.get_pil(struct_lora.img.image_name)
                 with ae_info as ae:
                     assert isinstance(ae, AutoEncoder)
-                    img_cond = prepare_control(x, ae, img)
+                    img_cond = prepare_control(self.height, self.width, self.seed, ae, img)
 
             # Load the transformer model.
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
             assert isinstance(transformer, Flux)
             config = transformer_info.config
             assert config is not None
-            if self.transformer.structural_loras:
+            if self.transformer.structural_lora:
                 replace_linear_with_lora(transformer, 128)
 
             # Apply LoRA models to the transformer.
@@ -698,7 +700,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return pos_ip_adapter_extensions, neg_ip_adapter_extensions
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
-        loras: list[Union[LoRAField, StructuralLoRAField]] = [*self.transformer.loras, *self.transformer.structural_loras]
+        loras: list[Union[LoRAField, StructuralLoRAField]] = [*self.transformer.loras]
+        if self.transformer.structural_lora:
+            loras.append(self.transformer.structural_lora)
         for lora in loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, LoRAModelRaw)
