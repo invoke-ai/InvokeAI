@@ -3,6 +3,7 @@ from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 
+from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.lora_layer_wrappers import (
     LoRAConv1dWrapper,
     LoRAConv2dWrapper,
@@ -38,7 +39,7 @@ class LoRAPatcher:
         original_weights = OriginalWeightsStorage(cached_weights)
         try:
             for patch, patch_weight in patches:
-                LoRAPatcher.apply_lora_patch(
+                LoRAPatcher._apply_lora_patch(
                     model=model,
                     prefix=prefix,
                     patch=patch,
@@ -54,7 +55,7 @@ class LoRAPatcher:
 
     @staticmethod
     @torch.no_grad()
-    def apply_lora_patch(
+    def _apply_lora_patch(
         model: torch.nn.Module,
         prefix: str,
         patch: LoRAModelRaw,
@@ -89,35 +90,52 @@ class LoRAPatcher:
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            # All of the LoRA weight calculations will be done on the same device as the module weight.
-            # (Performance will be best if this is a CUDA device.)
-            device = module.weight.device
-            dtype = module.weight.dtype
+            LoRAPatcher._apply_lora_layer_patch(
+                module_to_patch=module,
+                module_to_patch_key=module_key,
+                patch=layer,
+                patch_weight=patch_weight,
+                original_weights=original_weights,
+            )
 
-            layer_scale = layer.scale()
+    @staticmethod
+    @torch.no_grad()
+    def _apply_lora_layer_patch(
+        module_to_patch: torch.nn.Module,
+        module_to_patch_key: str,
+        patch: AnyLoRALayer,
+        patch_weight: float,
+        original_weights: OriginalWeightsStorage,
+    ):
+        # All of the LoRA weight calculations will be done on the same device as the module weight.
+        # (Performance will be best if this is a CUDA device.)
+        device = module_to_patch.weight.device
+        dtype = module_to_patch.weight.dtype
 
-            # We intentionally move to the target device first, then cast. Experimentally, this was found to
-            # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
-            # same thing in a single call to '.to(...)'.
-            layer.to(device=device)
-            layer.to(dtype=torch.float32)
+        layer_scale = patch.scale()
 
-            # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
-            # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-            for param_name, lora_param_weight in layer.get_parameters(module).items():
-                param_key = module_key + "." + param_name
-                module_param = module.get_parameter(param_name)
+        # We intentionally move to the target device first, then cast. Experimentally, this was found to
+        # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
+        # same thing in a single call to '.to(...)'.
+        patch.to(device=device)
+        patch.to(dtype=torch.float32)
 
-                # Save original weight
-                original_weights.save(param_key, module_param)
+        # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
+        # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
+        for param_name, lora_param_weight in patch.get_parameters(module_to_patch).items():
+            param_key = module_to_patch_key + "." + param_name
+            module_param = module_to_patch.get_parameter(param_name)
 
-                if module_param.shape != lora_param_weight.shape:
-                    lora_param_weight = lora_param_weight.reshape(module_param.shape)
+            # Save original weight
+            original_weights.save(param_key, module_param)
 
-                lora_param_weight *= patch_weight * layer_scale
-                module_param += lora_param_weight.to(dtype=dtype)
+            if module_param.shape != lora_param_weight.shape:
+                lora_param_weight = lora_param_weight.reshape(module_param.shape)
 
-            layer.to(device=TorchDevice.CPU_DEVICE)
+            lora_param_weight *= patch_weight * layer_scale
+            module_param += lora_param_weight.to(dtype=dtype)
+
+        patch.to(device=TorchDevice.CPU_DEVICE)
 
     @staticmethod
     @torch.no_grad()
@@ -191,23 +209,47 @@ class LoRAPatcher:
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            # Replace the original module with a LoRASidecarWrapper if it has not already been done.
-            if not isinstance(module, LoRASidecarWrapper):
-                lora_wrapper_layer = LoRAPatcher._initialize_lora_wrapper_layer(module)
-                original_modules[module_key] = module
-                module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
-                module_parent = model.get_submodule(module_parent_key)
-                LoRAPatcher._set_submodule(module_parent, module_name, lora_wrapper_layer)
-                orig_module = module
-            else:
-                lora_wrapper_layer = module
-                orig_module = module.orig_module
+            LoRAPatcher._apply_lora_layer_wrapper_patch(
+                model=model,
+                module_to_patch=module,
+                module_to_patch_key=module_key,
+                patch=layer,
+                patch_weight=patch_weight,
+                original_modules=original_modules,
+                dtype=dtype,
+            )
 
-            # Move the LoRA layer to the same device/dtype as the orig module.
-            layer.to(device=orig_module.weight.device, dtype=dtype)
+    @staticmethod
+    @torch.no_grad()
+    def _apply_lora_layer_wrapper_patch(
+        model: torch.nn.Module,
+        module_to_patch: torch.nn.Module,
+        module_to_patch_key: str,
+        patch: AnyLoRALayer,
+        patch_weight: float,
+        original_modules: dict[str, torch.nn.Module],
+        dtype: torch.dtype,
+    ):
+        """Apply a single LoRA wrapper patch to a model."""
 
-            # Add the LoRA wrapper layer to the LoRASidecarWrapper.
-            lora_wrapper_layer.add_lora_layer(layer, patch_weight)
+        # Replace the original module with a LoRASidecarWrapper if it has not already been done.
+        if not isinstance(module_to_patch, LoRASidecarWrapper):
+            lora_wrapper_layer = LoRAPatcher._initialize_lora_wrapper_layer(module_to_patch)
+            original_modules[module_to_patch_key] = module_to_patch
+            module_parent_key, module_name = LoRAPatcher._split_parent_key(module_to_patch_key)
+            module_parent = model.get_submodule(module_parent_key)
+            LoRAPatcher._set_submodule(module_parent, module_name, lora_wrapper_layer)
+            orig_module = module_to_patch
+        else:
+            assert module_to_patch_key in original_modules
+            lora_wrapper_layer = module_to_patch
+            orig_module = module_to_patch.orig_module
+
+        # Move the LoRA layer to the same device/dtype as the orig module.
+        patch.to(device=orig_module.weight.device, dtype=dtype)
+
+        # Add the LoRA wrapper layer to the LoRASidecarWrapper.
+        lora_wrapper_layer.add_lora_layer(patch, patch_weight)
 
     @staticmethod
     def _split_parent_key(module_key: str) -> tuple[str, str]:
