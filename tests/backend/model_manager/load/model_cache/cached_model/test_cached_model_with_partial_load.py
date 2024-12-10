@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 import torch
 
@@ -20,15 +22,11 @@ parameterize_mps_and_cuda = pytest.mark.parametrize(
 
 @parameterize_mps_and_cuda
 def test_cached_model_total_bytes(device: str):
-    if device == "cuda" and not torch.cuda.is_available():
-        pytest.skip("CUDA is not available.")
-    if device == "mps" and not torch.backends.mps.is_available():
-        pytest.skip("MPS is not available.")
-
     model = DummyModule()
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     linear_numel = 10 * 10 + 10
-    assert cached_model.total_bytes() == linear_numel * 4 * 2
+    buffer_numel = 10 * 10
+    assert cached_model.total_bytes() == (2 * linear_numel + buffer_numel) * 4
 
 
 @parameterize_mps_and_cuda
@@ -43,6 +41,7 @@ def test_cached_model_cur_vram_bytes(device: str):
     assert cached_model.cur_vram_bytes() > 0
     assert cached_model.cur_vram_bytes() == cached_model.total_bytes()
     assert all(p.device.type == device for p in model.parameters())
+    assert all(p.device.type == device for p in model.buffers())
 
 
 @parameterize_mps_and_cuda
@@ -59,7 +58,9 @@ def test_cached_model_partial_load(device: str):
     assert loaded_bytes > 0
     assert loaded_bytes < model_total_bytes
     assert loaded_bytes == cached_model.cur_vram_bytes()
-    assert loaded_bytes == sum(calc_tensor_size(p) for p in model.parameters() if p.device.type == device)
+    assert loaded_bytes == sum(
+        calc_tensor_size(p) for p in itertools.chain(model.parameters(), model.buffers()) if p.device.type == device
+    )
 
 
 @parameterize_mps_and_cuda
@@ -80,7 +81,9 @@ def test_cached_model_partial_unload(device: str):
     assert freed_bytes >= bytes_to_free
     assert freed_bytes < model_total_bytes
     assert freed_bytes == model_total_bytes - cached_model.cur_vram_bytes()
-    assert freed_bytes == sum(calc_tensor_size(p) for p in model.parameters() if p.device.type == "cpu")
+    assert freed_bytes == sum(
+        calc_tensor_size(p) for p in itertools.chain(model.parameters(), model.buffers()) if p.device.type == "cpu"
+    )
 
 
 @parameterize_mps_and_cuda
@@ -97,7 +100,7 @@ def test_cached_model_full_load(device: str):
     assert loaded_bytes > 0
     assert loaded_bytes == model_total_bytes
     assert loaded_bytes == cached_model.cur_vram_bytes()
-    assert all(p.device.type == device for p in model.parameters())
+    assert all(p.device.type == device for p in itertools.chain(model.parameters(), model.buffers()))
 
 
 @parameterize_mps_and_cuda
@@ -122,7 +125,7 @@ def test_cached_model_full_load_from_partial(device: str):
     assert loaded_bytes_2 < model_total_bytes
     assert loaded_bytes + loaded_bytes_2 == cached_model.cur_vram_bytes()
     assert loaded_bytes + loaded_bytes_2 == model_total_bytes
-    assert all(p.device.type == device for p in model.parameters())
+    assert all(p.device.type == device for p in itertools.chain(model.parameters(), model.buffers()))
 
 
 @parameterize_mps_and_cuda
@@ -146,7 +149,7 @@ def test_cached_model_full_unload_from_partial(device: str):
     assert unloaded_bytes > 0
     assert unloaded_bytes == loaded_bytes
     assert cached_model.cur_vram_bytes() == 0
-    assert all(p.device.type == "cpu" for p in model.parameters())
+    assert all(p.device.type == "cpu" for p in itertools.chain(model.parameters(), model.buffers()))
 
 
 @parameterize_mps_and_cuda

@@ -6,6 +6,7 @@ class DummyModule(torch.nn.Module):
         super().__init__()
         self.linear1 = torch.nn.Linear(10, 10)
         self.linear2 = torch.nn.Linear(10, 10)
+        self.register_buffer("buffer1", torch.ones(10, 10))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.linear1(x)
