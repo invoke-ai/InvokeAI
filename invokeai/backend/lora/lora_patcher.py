@@ -6,11 +6,13 @@ import torch
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
+from invokeai.backend.lora.layers.full_layer import FullLayer
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.sidecar_layers.concatenated_lora.concatenated_lora_linear_sidecar_layer import (
     ConcatenatedLoRALinearSidecarLayer,
 )
 from invokeai.backend.lora.sidecar_layers.lora.lora_linear_sidecar_layer import LoRALinearSidecarLayer
+from invokeai.backend.lora.sidecar_layers.lora.lora_full_linear_sidecar_layer import LoRAFullLinearSidecarLayer
 from invokeai.backend.lora.sidecar_layers.lora_sidecar_module import LoRASidecarModule
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
@@ -93,8 +95,9 @@ class LoRAPatcher:
 
             # All of the LoRA weight calculations will be done on the same device as the module weight.
             # (Performance will be best if this is a CUDA device.)
-            device = module.weight.device
-            dtype = module.weight.dtype
+            first_param = next(module.parameters())
+            device = first_param.device
+            dtype = first_param.dtype
 
             layer_scale = layer.scale()
 
@@ -114,7 +117,13 @@ class LoRAPatcher:
                 original_weights.save(param_key, module_param)
 
                 if module_param.shape != lora_param_weight.shape:
-                    lora_param_weight = lora_param_weight.reshape(module_param.shape)
+                    if module_param.nelement() == lora_param_weight.nelement():
+                        lora_param_weight = lora_param_weight.reshape(module_param.shape)
+                    else:
+                        expanded_weight = torch.zeros_like(lora_param_weight, device=module_param.device)
+                        slices = tuple(slice(0, dim) for dim in module_param.shape)
+                        expanded_weight[slices] = module_param
+                        setattr(module, param_name, expanded_weight)
                 lora_param_weight *= patch_weight * layer_scale
                 module_param += lora_param_weight.to(dtype=dtype)
 
@@ -244,6 +253,8 @@ class LoRAPatcher:
                 return LoRALinearSidecarLayer(lora_layer=lora_layer, weight=patch_weight)
             elif isinstance(lora_layer, ConcatenatedLoRALayer):
                 return ConcatenatedLoRALinearSidecarLayer(concatenated_lora_layer=lora_layer, weight=patch_weight)
+            elif isinstance(lora_layer, FullLayer):
+                return LoRAFullLinearSidecarLayer(lora_layer=lora_layer, weight=patch_weight)
             else:
                 raise ValueError(f"Unsupported Linear LoRA layer type: {type(lora_layer)}")
         else:

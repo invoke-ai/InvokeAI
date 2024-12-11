@@ -5,6 +5,9 @@ from typing import Any, Dict
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
+from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.lora.layers.lora_layer import LoRALayer
+from invokeai.backend.lora.layers.set_parameter_layer import SetParameterLayer
 
 
 # A regex pattern that matches all of the keys in the Flux Dev/Canny LoRA format.
@@ -26,14 +29,14 @@ def is_state_dict_likely_flux_control(state_dict: Dict[str, Any]) -> bool:
     )
 
 def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:
-    converted_state_dict = _convert_lora_bfl_control(state_dict=state_dict)
+    # converted_state_dict = _convert_lora_bfl_control(state_dict=state_dict)
     # Group keys by layer.
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = {}
-    for key, value in converted_state_dict.items():
+    for key, value in state_dict.items():
         key_props = key.split(".")
         # Got it loading using lora_down and lora_up but it didn't seem to match this lora's structure
         # Leaving this in since it doesn't hurt anything and may be better
-        layer_prop_size = -2 if any(prop in key for prop in ["lora_down", "lora_up"]) else -1
+        layer_prop_size = -2 if any(prop in key for prop in ["lora_B", "lora_A"]) else -1
         layer_name = ".".join(key_props[:layer_prop_size])
         param_name = ".".join(key_props[layer_prop_size:])
         if layer_name not in grouped_state_dict:
@@ -44,21 +47,19 @@ def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor])
     layers: dict[str, AnyLoRALayer] = {}
     for layer_key, layer_state_dict in grouped_state_dict.items():
         # Convert to a full layer diff
-        layers[layer_key] = any_lora_layer_from_state_dict(state_dict=layer_state_dict)
-
+        prefixed_key = f"{FLUX_LORA_TRANSFORMER_PREFIX}{layer_key}"
+        if all(k in layer_state_dict for k in ["lora_A.weight", "lora_B.bias", "lora_B.weight"]):
+            layers[prefixed_key] = LoRALayer(
+                layer_state_dict["lora_B.weight"],
+                None,
+                layer_state_dict["lora_A.weight"],
+                None,
+                layer_state_dict["lora_B.bias"]
+            )
+        elif "scale" in layer_state_dict:
+            layers[prefixed_key] = SetParameterLayer("scale", layer_state_dict["scale"])
+        else:
+            raise AssertionError(f"{layer_key} not expected")
     # Create and return the LoRAModelRaw.
     return LoRAModelRaw(layers=layers)
 
-
-def _convert_lora_bfl_control(state_dict: dict[str, torch.Tensor])-> dict[str, torch.Tensor]:
-    sd_out: dict[str, torch.Tensor] = {}
-    for k in state_dict:
-        if k.endswith(".scale"): # TODO: Fix these patches
-            continue
-        k_to = k.replace(".lora_B.bias", ".lora_B.diff_b")\
-                .replace(".lora_A.weight", ".lora_A.diff")\
-                .replace(".lora_B.weight", ".lora_B.diff")
-        sd_out[k_to] = state_dict[k]
-
-    # sd_out["img_in.reshape_weight"] = torch.tensor([state_dict["img_in.lora_B.weight"].shape[0], state_dict["img_in.lora_A.weight"].shape[1]])
-    return sd_out
