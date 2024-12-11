@@ -9,7 +9,6 @@ from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
-from invokeai.backend.flux.modules.lora import replace_linear_with_lora
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -305,8 +304,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             assert isinstance(transformer, Flux)
             config = transformer_info.config
             assert config is not None
-            if self.transformer.structural_lora:
-                replace_linear_with_lora(transformer, 128)
 
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.

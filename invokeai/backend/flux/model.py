@@ -20,7 +20,6 @@ from invokeai.backend.flux.modules.layers import (
     SingleStreamBlock,
     timestep_embedding,
 )
-from invokeai.backend.flux.modules.lora import replace_linear_with_lora
 
 
 @dataclass

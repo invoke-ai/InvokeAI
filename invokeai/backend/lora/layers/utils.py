@@ -9,7 +9,7 @@ from invokeai.backend.lora.layers.loha_layer import LoHALayer
 from invokeai.backend.lora.layers.lokr_layer import LoKRLayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.layers.norm_layer import NormLayer
-from invokeai.backend.lora.layers.set_weight_layer import SetWeightLayer
+from invokeai.backend.lora.layers.set_parameter_layer import SetParameterLayer
 
 
 def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> AnyLoRALayer:
@@ -30,7 +30,5 @@ def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> AnyLo
         return IA3Layer.from_state_dict_values(state_dict)
     elif "w_norm" in state_dict:
         return NormLayer.from_state_dict_values(state_dict)
-    elif any(key in state_dict for key in ["set_weight", "set_bias", "set_scale"]):
-        return SetWeightLayer.from_state_dict_values(state_dict)
     else:
         raise ValueError(f"Unsupported lora format: {state_dict.keys()}")
