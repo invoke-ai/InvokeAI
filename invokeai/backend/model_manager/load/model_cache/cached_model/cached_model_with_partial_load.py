@@ -2,9 +2,7 @@ import itertools
 
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_function_autocast_context import (
-    add_autocast_to_module_forward,
-)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast_context import add_autocast_to_modules
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
@@ -35,7 +33,9 @@ class CachedModelWithPartialLoad:
         self._cpu_state_dict: dict[str, torch.Tensor] = model.state_dict()
 
         # Monkey-patch the model to add autocasting to the model's forward method.
-        add_autocast_to_module_forward(model, compute_device)
+        # add_autocast_to_module_forward(model, compute_device)
+        # inject_custom_layers_into_module(model)
+        add_autocast_to_modules(model, compute_device)
 
         self._total_bytes = sum(
             calc_tensor_size(p) for p in itertools.chain(self._model.parameters(), self._model.buffers())

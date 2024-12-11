@@ -338,7 +338,8 @@ class ModelCache:
                 )
             vram_bytes_freed += cache_entry_bytes_freed
 
-        TorchDevice.empty_cache()
+        if vram_bytes_freed > 0:
+            TorchDevice.empty_cache()
         return vram_bytes_freed
 
     # def _move_model_to_device(self, cache_entry: CacheRecord, target_device: torch.device) -> None:
