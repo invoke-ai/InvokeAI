@@ -7,6 +7,6 @@ from invokeai.backend.lora.layers.loha_layer import LoHALayer
 from invokeai.backend.lora.layers.lokr_layer import LoKRLayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.layers.norm_layer import NormLayer
-from invokeai.backend.lora.layers.set_weight_layer import SetWeightLayer
+from invokeai.backend.lora.layers.set_parameter_layer import SetParameterLayer
 
-AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer, NormLayer, ConcatenatedLoRALayer, SetWeightLayer]
+AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer, NormLayer, ConcatenatedLoRALayer, SetParameterLayer]
