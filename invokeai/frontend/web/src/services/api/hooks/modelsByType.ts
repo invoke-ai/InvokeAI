@@ -11,6 +11,7 @@ import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
+  isControlLoRAModelConfig,
   isControlNetModelConfig,
   isControlNetOrT2IAdapterModelConfig,
   isFluxMainModelModelConfig,
@@ -23,7 +24,6 @@ import {
   isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
-  isControlLoRAModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
   isTIModelConfig,

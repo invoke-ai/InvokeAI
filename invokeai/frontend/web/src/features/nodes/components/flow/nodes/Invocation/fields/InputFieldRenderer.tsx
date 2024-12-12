@@ -15,6 +15,8 @@ import {
   isCLIPLEmbedModelFieldInputTemplate,
   isColorFieldInputInstance,
   isColorFieldInputTemplate,
+  isControlLoRAModelFieldInputInstance,
+  isControlLoRAModelFieldInputTemplate,
   isControlNetModelFieldInputInstance,
   isControlNetModelFieldInputTemplate,
   isEnumFieldInputInstance,
@@ -51,8 +53,6 @@ import {
   isSpandrelImageToImageModelFieldInputTemplate,
   isStringFieldInputInstance,
   isStringFieldInputTemplate,
-  isControlLoRAModelFieldInputInstance,
-  isControlLoRAModelFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
   isT2IAdapterModelFieldInputTemplate,
   isT5EncoderModelFieldInputInstance,
@@ -68,6 +68,7 @@ import CLIPEmbedModelFieldInputComponent from './inputs/CLIPEmbedModelFieldInput
 import CLIPGEmbedModelFieldInputComponent from './inputs/CLIPGEmbedModelFieldInputComponent';
 import CLIPLEmbedModelFieldInputComponent from './inputs/CLIPLEmbedModelFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
+import ControlLoRAModelFieldInputComponent from './inputs/ControlLoraModelFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import FluxMainModelFieldInputComponent from './inputs/FluxMainModelFieldInputComponent';
@@ -83,7 +84,6 @@ import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComp
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
-import ControlLoRAModelFieldInputComponent from './inputs/ControlLoraModelFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
@@ -159,13 +159,8 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     return <CLIPGEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (
-    isControlLoRAModelFieldInputInstance(fieldInstance) &&
-    isControlLoRAModelFieldInputTemplate(fieldTemplate)
-  ) {
-    return (
-      <ControlLoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />
-    );
+  if (isControlLoRAModelFieldInputInstance(fieldInstance) && isControlLoRAModelFieldInputTemplate(fieldTemplate)) {
+    return <ControlLoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isFluxVAEModelFieldInputInstance(fieldInstance) && isFluxVAEModelFieldInputTemplate(fieldTemplate)) {

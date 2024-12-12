@@ -11,6 +11,7 @@ import type {
   ParameterCLIPEmbedModel,
   ParameterCLIPGEmbedModel,
   ParameterCLIPLEmbedModel,
+  ParameterControlLoRAModel,
   ParameterGuidance,
   ParameterMaskBlurMethod,
   ParameterModel,
@@ -24,7 +25,6 @@ import type {
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
-  ParameterControlLoRAModel,
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
