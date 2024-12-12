@@ -108,8 +108,8 @@ def get_scheduler(
         scheduler_config["noise_sampler_seed"] = seed
 
     if scheduler_class is DPMSolverMultistepScheduler or scheduler_class is DPMSolverSinglestepScheduler:
-      if scheduler_config['_class_name'] == 'DEISMultistepScheduler' and scheduler_config["algorithm_type"] == 'deis':
-          scheduler_config["algorithm_type"] = 'dpmsolver++'
+        if scheduler_config["_class_name"] == "DEISMultistepScheduler" and scheduler_config["algorithm_type"] == "deis":
+            scheduler_config["algorithm_type"] = "dpmsolver++"
 
     scheduler = scheduler_class.from_config(scheduler_config)
 
