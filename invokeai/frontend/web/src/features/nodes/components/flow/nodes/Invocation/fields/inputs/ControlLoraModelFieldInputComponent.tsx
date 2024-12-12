@@ -1,34 +1,34 @@
 import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { fieldStructuralLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { fieldControlLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
-  StructuralLoRAModelFieldInputInstance,
-  StructuralLoRAModelFieldInputTemplate,
+  ControlLoRAModelFieldInputInstance,
+  ControlLoRAModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStructuralLoRAModel } from 'services/api/hooks/modelsByType';
-import { isStructuralLoRAModelConfig, type StructuralLoRAModelConfig } from 'services/api/types';
+import { useControlLoRAModel } from 'services/api/hooks/modelsByType';
+import { isControlLoRAModelConfig, type ControlLoRAModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
-type Props = FieldComponentProps<StructuralLoRAModelFieldInputInstance, StructuralLoRAModelFieldInputTemplate>;
+type Props = FieldComponentProps<ControlLoRAModelFieldInputInstance, ControlLoRAModelFieldInputTemplate>;
 
-const StructuralLoRAModelFieldInputComponent = (props: Props) => {
+const ControlLoRAModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const { t } = useTranslation();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
   const dispatch = useAppDispatch();
-  const [modelConfigs, { isLoading }] = useStructuralLoRAModel();
+  const [modelConfigs, { isLoading }] = useControlLoRAModel();
 
   const _onChange = useCallback(
-    (value: StructuralLoRAModelConfig | null) => {
+    (value: ControlLoRAModelConfig | null) => {
       if (!value) {
         return;
       }
       dispatch(
-        fieldStructuralLoRAModelValueChanged({
+        fieldControlLoRAModelValueChanged({
           nodeId,
           fieldName: field.name,
           value,
@@ -38,7 +38,7 @@ const StructuralLoRAModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs: modelConfigs.filter((config) => isStructuralLoRAModelConfig(config)),
+    modelConfigs: modelConfigs.filter((config) => isControlLoRAModelConfig(config)),
     onChange: _onChange,
     isLoading,
     selectedModel: field.value,
@@ -62,4 +62,4 @@ const StructuralLoRAModelFieldInputComponent = (props: Props) => {
   );
 };
 
-export default memo(StructuralLoRAModelFieldInputComponent);
+export default memo(ControlLoRAModelFieldInputComponent);

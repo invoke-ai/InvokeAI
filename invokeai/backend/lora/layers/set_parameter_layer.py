@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict
 
 import torch
 
@@ -17,7 +17,7 @@ class SetParameterLayer(LoRALayerBase):
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         return self.weight - orig_weight
-    
+
     def get_parameters(self, orig_module: torch.nn.Module) -> Dict[str, torch.Tensor]:
         return {self.param_name: self.get_weight(orig_module.get_parameter(self.param_name))}
 

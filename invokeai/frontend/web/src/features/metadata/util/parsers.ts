@@ -46,7 +46,7 @@ import type {
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
-  ParameterStructuralLoRAModel,
+  ParameterControlLoRAModel,
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
@@ -81,7 +81,7 @@ import {
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
-  isStructuralLoRAModelConfig,
+  isControlLoRAModelConfig,
   isT2IAdapterModelConfig,
   isVAEModelConfig,
 } from 'services/api/types';
@@ -228,10 +228,10 @@ const parseVAEModel: MetadataParseFunc<ParameterVAEModel> = async (metadata) => 
   return modelIdentifier;
 };
 
-const parseStructuralLoRAModel: MetadataParseFunc<ParameterStructuralLoRAModel> = async (metadata) => {
-  const slora = await getProperty(metadata, 'structural_lora', undefined);
-  const key = await getModelKey(slora, 'structural_lora');
-  const sloraModelConfig = await fetchModelConfigWithTypeGuard(key, isStructuralLoRAModelConfig);
+const parseControlLoRAModel: MetadataParseFunc<ParameterControlLoRAModel> = async (metadata) => {
+  const slora = await getProperty(metadata, 'control_lora', undefined);
+  const key = await getModelKey(slora, 'control_lora');
+  const sloraModelConfig = await fetchModelConfigWithTypeGuard(key, isControlLoRAModelConfig);
   const modelIdentifier = zModelIdentifierField.parse(sloraModelConfig);
   return modelIdentifier;
 };
@@ -681,7 +681,7 @@ export const parsers = {
   mainModel: parseMainModel,
   refinerModel: parseRefinerModel,
   vaeModel: parseVAEModel,
-  structuralLora: parseStructuralLoRAModel,
+  controlLora: parseControlLoRAModel,
   lora: parseLoRA,
   loras: parseAllLoRAs,
   controlNet: parseControlNet,

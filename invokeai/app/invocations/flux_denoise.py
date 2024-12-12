@@ -8,8 +8,6 @@ import torchvision.transforms as tv_transforms
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder
-
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
@@ -24,7 +22,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.ip_adapter import IPAdapterField
-from invokeai.app.invocations.model import TransformerField, VAEField, StructuralLoRAField, LoRAField
+from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
@@ -35,8 +33,10 @@ from invokeai.backend.flux.extensions.instantx_controlnet_extension import Insta
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
+from invokeai.backend.flux.flux_tools_sampling_utils import prepare_control
 from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterFlux
 from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
     generate_img_ids,
@@ -45,8 +45,6 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
-from invokeai.backend.flux.flux_tools_sampling_utils import prepare_control
-from invokeai.backend.flux.modules.conditioner import HFEncoder
 from invokeai.backend.flux.text_conditioning import FluxTextConditioning
 from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
@@ -92,6 +90,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.flux_model,
         input=Input.Connection,
         title="Transformer",
+    )
+    control_lora: Optional[ControlLoRAField] = InputField(
+        description=FieldDescriptions.control_lora_model, input=Input.Connection, title="Control Lora", default=None
     )
     positive_text_conditioning: FluxConditioningField | list[FluxConditioningField] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
@@ -198,7 +199,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         transformer_info = context.models.load(self.transformer.transformer)
-        is_schnell = "schnell" in transformer_info.config.config_path
+        is_schnell = "schnell" in getattr(transformer_info.config, "config_path", "")
 
         # Calculate the timestep schedule.
         timesteps = get_schedule(
@@ -289,12 +290,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 device=x.device,
             )
             img_cond = None
-            if struct_lora := self.transformer.structural_lora:
+            if self.control_lora:
                 # What should we do when we have multiple of these?
                 if not self.controlnet_vae:
                     raise ValueError("controlnet_vae must be set when using a strutural lora")
                 ae_info = context.models.load(self.controlnet_vae.vae)
-                img = context.images.get_pil(struct_lora.img.image_name)
+                img = context.images.get_pil(self.control_lora.img.image_name)
                 with ae_info as ae:
                     assert isinstance(ae, AutoEncoder)
                     img_cond = prepare_control(self.height, self.width, self.seed, ae, img)
@@ -359,7 +360,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 controlnet_extensions=controlnet_extensions,
                 pos_ip_adapter_extensions=pos_ip_adapter_extensions,
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
-                img_cond=img_cond
+                img_cond=img_cond,
             )
 
         x = unpack(x.float(), self.height, self.width)
@@ -697,9 +698,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return pos_ip_adapter_extensions, neg_ip_adapter_extensions
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
-        loras: list[Union[LoRAField, StructuralLoRAField]] = [*self.transformer.loras]
-        if self.transformer.structural_lora:
-            loras.append(self.transformer.structural_lora)
+        loras: list[Union[LoRAField, ControlLoRAField]] = [*self.transformer.loras]
+        if self.control_lora:
+            loras.append(self.control_lora)
         for lora in loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, LoRAModelRaw)

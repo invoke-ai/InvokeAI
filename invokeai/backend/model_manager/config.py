@@ -67,7 +67,7 @@ class ModelType(str, Enum):
     Main = "main"
     VAE = "vae"
     LoRA = "lora"
-    StructuralLoRa = "structural_lora"
+    ControlLoRa = "control_lora"
     ControlNet = "controlnet"  # used by model_probe
     TextualInversion = "embedding"
     IPAdapter = "ip_adapter"
@@ -274,16 +274,16 @@ class LoRALyCORISConfig(LoRAConfigBase):
         return Tag(f"{ModelType.LoRA.value}.{ModelFormat.LyCORIS.value}")
 
 
-class StructuralLoRALyCORISConfig(ModelConfigBase):
-    """Model config for Structural LoRA/Lycoris models."""
+class ControlLoRALyCORISConfig(ModelConfigBase):
+    """Model config for Control LoRA models."""
 
-    type: Literal[ModelType.StructuralLoRa] = ModelType.StructuralLoRa
+    type: Literal[ModelType.ControlLoRa] = ModelType.ControlLoRa
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
     format: Literal[ModelFormat.LyCORIS] = ModelFormat.LyCORIS
 
     @staticmethod
     def get_tag() -> Tag:
-        return Tag(f"{ModelType.StructuralLoRa.value}.{ModelFormat.LyCORIS.value}")
+        return Tag(f"{ModelType.ControlLoRa.value}.{ModelFormat.LyCORIS.value}")
 
 
 class LoRADiffusersConfig(LoRAConfigBase):
@@ -548,7 +548,7 @@ AnyModelConfig = Annotated[
         Annotated[ControlNetDiffusersConfig, ControlNetDiffusersConfig.get_tag()],
         Annotated[ControlNetCheckpointConfig, ControlNetCheckpointConfig.get_tag()],
         Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
-        Annotated[StructuralLoRALyCORISConfig, StructuralLoRALyCORISConfig.get_tag()],
+        Annotated[ControlLoRALyCORISConfig, ControlLoRALyCORISConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
         Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
         Annotated[T5EncoderBnbQuantizedLlmInt8bConfig, T5EncoderBnbQuantizedLlmInt8bConfig.get_tag()],
