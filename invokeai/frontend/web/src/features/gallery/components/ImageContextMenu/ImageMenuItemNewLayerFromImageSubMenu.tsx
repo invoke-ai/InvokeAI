@@ -77,7 +77,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, imageViewer, store, t]);
 
-  const onClickNewRegionalReferenceImageFromImage = useCallback(() => {
+  const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'reference_image', dispatch, getState });
     dispatch(sentImageToCanvas());
@@ -90,7 +90,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, imageViewer, store, t]);
 
-  const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
+  const onClickNewRegionalReferenceImageFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance_with_reference_image', dispatch, getState });
     dispatch(sentImageToCanvas());
