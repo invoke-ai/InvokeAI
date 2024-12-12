@@ -27,6 +27,7 @@ import { zControlField, zIPAdapterField, zModelIdentifierField, zT2IAdapterField
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
+  ParameterControlLoRAModel,
   ParameterGuidance,
   ParameterHeight,
   ParameterHRFEnabled,
@@ -46,7 +47,6 @@ import type {
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
-  ParameterControlLoRAModel,
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
@@ -76,12 +76,12 @@ import {
 import { get, isArray, isString } from 'lodash-es';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import {
+  isControlLoRAModelConfig,
   isControlNetModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
-  isControlLoRAModelConfig,
   isT2IAdapterModelConfig,
   isVAEModelConfig,
 } from 'services/api/types';

@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import {
   useCLIPEmbedModels,
   useCLIPVisionModels,
+  useControlLoRAModel,
   useControlNetModels,
   useEmbeddingModels,
   useIPAdapterModels,
@@ -18,7 +19,6 @@ import {
   useMainModels,
   useRefinerModels,
   useSpandrelImageToImageModels,
-  useControlLoRAModel,
   useT2IAdapterModels,
   useT5EncoderModels,
   useVAEModels,

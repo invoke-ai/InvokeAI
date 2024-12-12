@@ -9,7 +9,7 @@ import type {
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useControlLoRAModel } from 'services/api/hooks/modelsByType';
-import { isControlLoRAModelConfig, type ControlLoRAModelConfig } from 'services/api/types';
+import { type ControlLoRAModelConfig, isControlLoRAModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
