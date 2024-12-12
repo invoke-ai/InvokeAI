@@ -1,14 +1,13 @@
 import re
+from typing import Any, Dict
+
 import torch
 
-from typing import Any, Dict
-from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
-from invokeai.backend.lora.layers.utils import any_lora_layer_from_state_dict
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.layers.set_parameter_layer import SetParameterLayer
-
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 
 # A regex pattern that matches all of the keys in the Flux Dev/Canny LoRA format.
 # Example keys:
@@ -16,6 +15,7 @@ from invokeai.backend.lora.layers.set_parameter_layer import SetParameterLayer
 #   single_blocks.0.linear1.lora_A.weight
 #   double_blocks.0.img_attn.norm.key_norm.scale
 FLUX_STRUCTURAL_TRANSFORMER_KEY_REGEX = r"(final_layer|vector_in|txt_in|time_in|img_in|guidance_in|\w+_blocks)(\.(\d+))?\.(lora_(A|B)|(in|out)_layer|adaLN_modulation|img_attn|img_mlp|img_mod|txt_attn|txt_mlp|txt_mod|linear|linear1|linear2|modulation|norm)\.?(.*)"
+
 
 def is_state_dict_likely_flux_control(state_dict: Dict[str, Any]) -> bool:
     """Checks if the provided state dict is likely in the FLUX Control LoRA format.
@@ -27,6 +27,7 @@ def is_state_dict_likely_flux_control(state_dict: Dict[str, Any]) -> bool:
         re.match(FLUX_STRUCTURAL_TRANSFORMER_KEY_REGEX, k) or re.match(FLUX_STRUCTURAL_TRANSFORMER_KEY_REGEX, k)
         for k in state_dict.keys()
     )
+
 
 def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:
     # converted_state_dict = _convert_lora_bfl_control(state_dict=state_dict)
@@ -54,7 +55,7 @@ def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor])
                 None,
                 layer_state_dict["lora_A.weight"],
                 None,
-                layer_state_dict["lora_B.bias"]
+                layer_state_dict["lora_B.bias"],
             )
         elif "scale" in layer_state_dict:
             layers[prefixed_key] = SetParameterLayer("scale", layer_state_dict["scale"])
@@ -62,4 +63,3 @@ def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor])
             raise AssertionError(f"{layer_key} not expected")
     # Create and return the LoRAModelRaw.
     return LoRAModelRaw(layers=layers)
-

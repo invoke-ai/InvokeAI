@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import Optional
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -7,8 +7,8 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType, ImageField
-from invokeai.app.invocations.model import VAEField, StructuralLoRAField, ModelIdentifierField, TransformerField
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
+from invokeai.app.invocations.model import ModelIdentifierField, StructuralLoRAField, TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
@@ -53,7 +53,11 @@ class FluxStructuralLoRALoaderInvocation(BaseInvocation):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
         # Check for existing LoRAs with the same key.
-        if self.transformer and self.transformer.structural_lora and self.transformer.structural_lora.lora.key == lora_key:
+        if (
+            self.transformer
+            and self.transformer.structural_lora
+            and self.transformer.structural_lora.lora.key == lora_key
+        ):
             raise ValueError(f'Structural LoRA "{lora_key}" already applied to transformer.')
 
         output = FluxStructuralLoRALoaderOutput()

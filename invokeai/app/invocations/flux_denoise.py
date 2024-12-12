@@ -8,8 +8,6 @@ import torchvision.transforms as tv_transforms
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder
-
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
@@ -24,7 +22,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.ip_adapter import IPAdapterField
-from invokeai.app.invocations.model import TransformerField, VAEField, StructuralLoRAField, LoRAField
+from invokeai.app.invocations.model import LoRAField, StructuralLoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
@@ -35,8 +33,10 @@ from invokeai.backend.flux.extensions.instantx_controlnet_extension import Insta
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
+from invokeai.backend.flux.flux_tools_sampling_utils import prepare_control
 from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterFlux
 from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
     generate_img_ids,
@@ -45,8 +45,6 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
-from invokeai.backend.flux.flux_tools_sampling_utils import prepare_control
-from invokeai.backend.flux.modules.conditioner import HFEncoder
 from invokeai.backend.flux.text_conditioning import FluxTextConditioning
 from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
@@ -359,7 +357,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 controlnet_extensions=controlnet_extensions,
                 pos_ip_adapter_extensions=pos_ip_adapter_extensions,
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
-                img_cond=img_cond
+                img_cond=img_cond,
             )
 
         x = unpack(x.float(), self.height, self.width)

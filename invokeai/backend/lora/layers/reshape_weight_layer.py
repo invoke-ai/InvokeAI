@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Optional
 
 import torch
 
@@ -7,7 +7,7 @@ from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
 class ReshapeWeightLayer(LoRALayerBase):
-    # TODO: Just everything in this class 
+    # TODO: Just everything in this class
     def __init__(self, weight: Optional[torch.Tensor], bias: Optional[torch.Tensor], scale: Optional[torch.Tensor]):
         super().__init__(alpha=None, bias=bias)
         self.weight = torch.nn.Parameter(weight) if weight is not None else None

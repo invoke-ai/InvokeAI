@@ -1,10 +1,10 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 from torch import Tensor, nn
-from typing import Optional
 
 from invokeai.backend.flux.custom_block_processor import (
     CustomDoubleStreamBlockProcessor,

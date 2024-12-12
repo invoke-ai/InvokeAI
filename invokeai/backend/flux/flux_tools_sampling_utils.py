@@ -1,9 +1,10 @@
-import torch
 import numpy as np
-from PIL import Image
+import torch
 from einops import rearrange
+from PIL import Image
 
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
+
 
 def prepare_control(
     height: int,

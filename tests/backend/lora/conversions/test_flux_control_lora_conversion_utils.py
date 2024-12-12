@@ -23,6 +23,7 @@ def test_is_state_dict_likely_in_flux_control_format_true(sd_keys: dict[str, lis
 
     assert is_state_dict_likely_flux_control(state_dict)
 
+
 @pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys])
 def test_is_state_dict_likely_in_flux_control_format_false(sd_keys: dict[str, list[int]]):
     """Test that is_state_dict_likely_flux_control() returns False for a state dict that is in the Diffusers
