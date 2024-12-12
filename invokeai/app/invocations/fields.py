@@ -56,7 +56,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     CLIPLEmbedModel = "CLIPLEmbedModelField"
     CLIPGEmbedModel = "CLIPGEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
-    StructuralLoRAModel = "StructuralLoRAModelField"
+    ControlLoRAModel = "ControlLoRAModelField"
     # endregion
 
     # region Misc Field Types
@@ -144,7 +144,7 @@ class FieldDescriptions:
     controlnet_model = "ControlNet model to load"
     vae_model = "VAE model to load"
     lora_model = "LoRA model to load"
-    structural_lora_model = "Structural LoRA model to load"
+    control_lora_model = "Control LoRA model to load"
     main_model = "Main model (UNet, VAE, CLIP) to load"
     flux_model = "Flux model (Transformer) to load"
     sd3_model = "SD3 model (MMDiTX) to load"

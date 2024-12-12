@@ -51,8 +51,8 @@ import {
   isSpandrelImageToImageModelFieldInputTemplate,
   isStringFieldInputInstance,
   isStringFieldInputTemplate,
-  isStructuralLoRAModelFieldInputInstance,
-  isStructuralLoRAModelFieldInputTemplate,
+  isControlLoRAModelFieldInputInstance,
+  isControlLoRAModelFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
   isT2IAdapterModelFieldInputTemplate,
   isT5EncoderModelFieldInputInstance,
@@ -83,7 +83,7 @@ import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComp
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
-import StructuralLoRAModelFieldInputComponent from './inputs/StructuralLoraModelFieldInputComponent';
+import ControlLoRAModelFieldInputComponent from './inputs/ControlLoraModelFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
@@ -160,11 +160,11 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   }
 
   if (
-    isStructuralLoRAModelFieldInputInstance(fieldInstance) &&
-    isStructuralLoRAModelFieldInputTemplate(fieldTemplate)
+    isControlLoRAModelFieldInputInstance(fieldInstance) &&
+    isControlLoRAModelFieldInputTemplate(fieldTemplate)
   ) {
     return (
-      <StructuralLoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />
+      <ControlLoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />
     );
   }
 

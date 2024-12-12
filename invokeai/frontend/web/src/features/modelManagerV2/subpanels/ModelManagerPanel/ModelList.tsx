@@ -18,7 +18,7 @@ import {
   useMainModels,
   useRefinerModels,
   useSpandrelImageToImageModels,
-  useStructuralLoRAModel,
+  useControlLoRAModel,
   useT2IAdapterModels,
   useT5EncoderModels,
   useVAEModels,
@@ -93,10 +93,10 @@ const ModelList = () => {
     [t5EncoderModels, searchTerm, filteredModelType]
   );
 
-  const [structuralLoRAModels, { isLoading: isLoadingStructuralLoRAModels }] = useStructuralLoRAModel();
-  const filteredStructuralLoRAModels = useMemo(
-    () => modelsFilter(structuralLoRAModels, searchTerm, filteredModelType),
-    [structuralLoRAModels, searchTerm, filteredModelType]
+  const [controlLoRAModels, { isLoading: isLoadingControlLoRAModels }] = useControlLoRAModel();
+  const filteredControlLoRAModels = useMemo(
+    () => modelsFilter(controlLoRAModels, searchTerm, filteredModelType),
+    [controlLoRAModels, searchTerm, filteredModelType]
   );
 
   const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useCLIPEmbedModels({ excludeSubmodels: true });
@@ -126,7 +126,7 @@ const ModelList = () => {
       filteredSpandrelImageToImageModels.length +
       t5EncoderModels.length +
       clipEmbedModels.length +
-      structuralLoRAModels.length
+      controlLoRAModels.length
     );
   }, [
     filteredControlNetModels.length,
@@ -141,7 +141,7 @@ const ModelList = () => {
     filteredSpandrelImageToImageModels.length,
     t5EncoderModels.length,
     clipEmbedModels.length,
-    structuralLoRAModels.length,
+    controlLoRAModels.length,
   ]);
 
   return (
@@ -204,13 +204,13 @@ const ModelList = () => {
         {!isLoadingT5EncoderModels && filteredT5EncoderModels.length > 0 && (
           <ModelListWrapper title={t('modelManager.t5Encoder')} modelList={filteredT5EncoderModels} key="t5-encoder" />
         )}
-        {/* Structural Lora List */}
-        {isLoadingStructuralLoRAModels && <FetchingModelsLoader loadingMessage="Loading Structural Loras..." />}
-        {!isLoadingStructuralLoRAModels && filteredStructuralLoRAModels.length > 0 && (
+        {/* Control Lora List */}
+        {isLoadingControlLoRAModels && <FetchingModelsLoader loadingMessage="Loading Control Loras..." />}
+        {!isLoadingControlLoRAModels && filteredControlLoRAModels.length > 0 && (
           <ModelListWrapper
-            title={t('modelManager.structuralLora')}
-            modelList={filteredStructuralLoRAModels}
-            key="structural-lora"
+            title={t('modelManager.controlLora')}
+            modelList={filteredControlLoRAModels}
+            key="control-lora"
           />
         )}
         {/* Clip Embed List */}

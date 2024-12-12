@@ -9,7 +9,6 @@ from invokeai.backend.lora.layers.loha_layer import LoHALayer
 from invokeai.backend.lora.layers.lokr_layer import LoKRLayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.layers.norm_layer import NormLayer
-from invokeai.backend.lora.layers.set_parameter_layer import SetParameterLayer
 
 
 def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> AnyLoRALayer:

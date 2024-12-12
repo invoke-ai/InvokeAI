@@ -178,8 +178,8 @@ const zCLIPGEmbedModelFieldType = zFieldTypeBase.extend({
   name: z.literal('CLIPGEmbedModelField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zStructuralLoRAModelFieldType = zFieldTypeBase.extend({
-  name: z.literal('StructuralLoRAModelField'),
+const zControlLoRAModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('ControlLoRAModelField'),
   originalType: zStatelessFieldType.optional(),
 });
 const zFluxVAEModelFieldType = zFieldTypeBase.extend({
@@ -214,7 +214,7 @@ const zStatefulFieldType = z.union([
   zCLIPEmbedModelFieldType,
   zCLIPLEmbedModelFieldType,
   zCLIPGEmbedModelFieldType,
-  zStructuralLoRAModelFieldType,
+  zControlLoRAModelFieldType,
   zFluxVAEModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
@@ -869,26 +869,26 @@ export const isCLIPGEmbedModelFieldInputTemplate = (val: unknown): val is CLIPGE
 
 // #endregion
 
-// #region StructuralLoRAModelField
+// #region ControlLoRAModelField
 
-export const zStructuralLoRAModelFieldValue = zModelIdentifierField.optional();
-const zStructuralLoRAModelFieldInputInstance = zFieldInputInstanceBase.extend({
-  value: zStructuralLoRAModelFieldValue,
+export const zControlLoRAModelFieldValue = zModelIdentifierField.optional();
+const zControlLoRAModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zControlLoRAModelFieldValue,
 });
-const zStructuralLoRAModelFieldInputTemplate = zFieldInputTemplateBase.extend({
-  type: zStructuralLoRAModelFieldType,
+const zControlLoRAModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zControlLoRAModelFieldType,
   originalType: zFieldType.optional(),
-  default: zStructuralLoRAModelFieldValue,
+  default: zControlLoRAModelFieldValue,
 });
 
-export type StructuralLoRAModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldValue>;
+export type ControlLoRAModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldValue>;
 
-export type StructuralLoRAModelFieldInputInstance = z.infer<typeof zStructuralLoRAModelFieldInputInstance>;
-export type StructuralLoRAModelFieldInputTemplate = z.infer<typeof zStructuralLoRAModelFieldInputTemplate>;
-export const isStructuralLoRAModelFieldInputInstance = (val: unknown): val is StructuralLoRAModelFieldInputInstance =>
-  zStructuralLoRAModelFieldInputInstance.safeParse(val).success;
-export const isStructuralLoRAModelFieldInputTemplate = (val: unknown): val is StructuralLoRAModelFieldInputTemplate =>
-  zStructuralLoRAModelFieldInputTemplate.safeParse(val).success;
+export type ControlLoRAModelFieldInputInstance = z.infer<typeof zControlLoRAModelFieldInputInstance>;
+export type ControlLoRAModelFieldInputTemplate = z.infer<typeof zControlLoRAModelFieldInputTemplate>;
+export const isControlLoRAModelFieldInputInstance = (val: unknown): val is ControlLoRAModelFieldInputInstance =>
+  zControlLoRAModelFieldInputInstance.safeParse(val).success;
+export const isControlLoRAModelFieldInputTemplate = (val: unknown): val is ControlLoRAModelFieldInputTemplate =>
+  zControlLoRAModelFieldInputTemplate.safeParse(val).success;
 
 // #endregion
 
@@ -987,7 +987,7 @@ export const zStatefulFieldValue = z.union([
   zCLIPEmbedModelFieldValue,
   zCLIPLEmbedModelFieldValue,
   zCLIPGEmbedModelFieldValue,
-  zStructuralLoRAModelFieldValue,
+  zControlLoRAModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
 ]);
@@ -1059,7 +1059,7 @@ const zStatefulFieldInputTemplate = z.union([
   zCLIPEmbedModelFieldInputTemplate,
   zCLIPLEmbedModelFieldInputTemplate,
   zCLIPGEmbedModelFieldInputTemplate,
-  zStructuralLoRAModelFieldInputTemplate,
+  zControlLoRAModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

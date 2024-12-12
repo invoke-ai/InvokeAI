@@ -1,5 +1,5 @@
 import copy
-from typing import List, Optional, Literal
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +10,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType, ImageField
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import (
@@ -74,13 +74,15 @@ class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
 
-class StructuralLoRAField(LoRAField):
+
+class ControlLoRAField(LoRAField):
     img: ImageField = Field(description="Image to use in structural conditioning")
+
 
 class TransformerField(BaseModel):
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
-    structural_lora: Optional[StructuralLoRAField] = Field(description="Structural LoRAs to apply on model loading", default=None)
+
 
 @invocation_output("unet_output")
 class UNetOutput(BaseInvocationOutput):
