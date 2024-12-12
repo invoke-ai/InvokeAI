@@ -1,5 +1,3 @@
-import itertools
-
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_function_autocast_context import (
@@ -37,9 +35,7 @@ class CachedModelWithPartialLoad:
         # Monkey-patch the model to add autocasting to the model's forward method.
         add_autocast_to_module_forward(model, compute_device)
 
-        self._total_bytes = sum(
-            calc_tensor_size(p) for p in itertools.chain(self._model.parameters(), self._model.buffers())
-        )
+        self._total_bytes = sum(calc_tensor_size(p) for p in self._cpu_state_dict.values())
         self._cur_vram_bytes: int | None = None
 
     @property
@@ -58,10 +54,9 @@ class CachedModelWithPartialLoad:
     def cur_vram_bytes(self) -> int:
         """Get the size (in bytes) of the weights that are currently in VRAM."""
         if self._cur_vram_bytes is None:
+            cur_state_dict = self._model.state_dict()
             self._cur_vram_bytes = sum(
-                calc_tensor_size(p)
-                for p in itertools.chain(self._model.parameters(), self._model.buffers())
-                if p.device.type == self._compute_device.type
+                calc_tensor_size(p) for p in cur_state_dict.values() if p.device.type == self._compute_device.type
             )
         return self._cur_vram_bytes
 
@@ -80,38 +75,31 @@ class CachedModelWithPartialLoad:
         Returns:
             The number of bytes loaded into VRAM.
         """
+        # TODO(ryand): Handle the case where an exception is thrown while loading or unloading weights. At the very
+        # least, we should reset self._cur_vram_bytes to None.
+
         vram_bytes_loaded = 0
 
-        for key, param in itertools.chain(self._model.named_parameters(), self._model.named_buffers()):
-            # Skip parameters that are already on the compute device.
+        cur_state_dict = self._model.state_dict()
+
+        for key, param in cur_state_dict.items():
             if param.device.type == self._compute_device.type:
                 continue
 
-            # Check the size of the parameter.
             param_size = calc_tensor_size(param)
             if vram_bytes_loaded + param_size > vram_bytes_to_load:
                 # TODO(ryand): Should we just break here? If we couldn't fit this parameter into VRAM, is it really
                 # worth continuing to search for a smaller parameter that would fit?
                 continue
 
-            # Copy the parameter to the compute device.
-            # We use the 'overwrite' strategy from torch.nn.Module._apply().
-            # TODO(ryand): For some edge cases (e.g. quantized models?), we may need to support other strategies (e.g.
-            # swap).
-            if isinstance(param, torch.nn.Parameter):
-                assert param.is_leaf
-                out_param = torch.nn.Parameter(
-                    param.to(self._compute_device, copy=True), requires_grad=param.requires_grad
-                )
-                set_nested_attr(self._model, key, out_param)
-                # We did not port the param.grad handling from torch.nn.Module._apply(), because we do not expect to be
-                # handling gradients. We assert that this assumption is true.
-                assert param.grad is None
-            else:
-                # Handle buffers.
-                set_nested_attr(self._model, key, param.to(self._compute_device, copy=True))
-
+            cur_state_dict[key] = param.to(self._compute_device, copy=True)
             vram_bytes_loaded += param_size
+
+        if vram_bytes_loaded > 0:
+            # We load the entire state dict, not just the parameters that changed, in case there are modules that
+            # override _load_from_state_dict() and do some funky stuff that requires the entire state dict.
+            # Alternatively, in the future, grouping parameters by module could probably solve this problem.
+            self._model.load_state_dict(cur_state_dict, assign=True)
 
         if self._cur_vram_bytes is not None:
             self._cur_vram_bytes += vram_bytes_loaded
@@ -127,22 +115,20 @@ class CachedModelWithPartialLoad:
         """
         vram_bytes_freed = 0
 
-        for key, param in itertools.chain(self._model.named_parameters(), self._model.named_buffers()):
+        offload_device = "cpu"
+        cur_state_dict = self._model.state_dict()
+        for key, param in cur_state_dict.items():
             if vram_bytes_freed >= vram_bytes_to_free:
                 break
 
-            if param.device.type != self._compute_device.type:
+            if param.device.type == offload_device:
                 continue
 
-            if isinstance(param, torch.nn.Parameter):
-                # Create a new parameter, but inject the existing CPU tensor into it.
-                out_param = torch.nn.Parameter(self._cpu_state_dict[key], requires_grad=param.requires_grad)
-                set_nested_attr(self._model, key, out_param)
-            else:
-                # Handle buffers.
-                set_nested_attr(self._model, key, self._cpu_state_dict[key])
-
+            cur_state_dict[key] = self._cpu_state_dict[key]
             vram_bytes_freed += calc_tensor_size(param)
+
+        if vram_bytes_freed > 0:
+            self._model.load_state_dict(cur_state_dict, assign=True)
 
         if self._cur_vram_bytes is not None:
             self._cur_vram_bytes -= vram_bytes_freed
