@@ -13,7 +13,7 @@ import {
   isCLIPVisionModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
-  isControlNetOrT2IAdapterModelConfig,
+  isControlLayerModelConfig,
   isFluxMainModelModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
@@ -60,7 +60,7 @@ export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlLoRAModel = buildModelsHook(isControlLoRAModelConfig);
-export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
+export const useControlLayerModels = buildModelsHook(isControlLayerModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
 export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
 export const useT5EncoderModels = (args?: ModelHookArgs) =>

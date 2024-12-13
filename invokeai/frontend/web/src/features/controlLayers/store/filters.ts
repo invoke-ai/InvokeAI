@@ -2,7 +2,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
@@ -454,7 +454,7 @@ const PROCESSOR_TO_FILTER_MAP: Record<string, FilterType> = {
  * Gets the default filter for a control model. If the model has a default, it will be used, otherwise the default
  * filter for the model type will be used.
  */
-export const getFilterForModel = (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | null) => {
+export const getFilterForModel = (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig | null) => {
   if (!modelConfig) {
     // No model
     return null;

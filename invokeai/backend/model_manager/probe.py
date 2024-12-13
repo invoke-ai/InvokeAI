@@ -200,8 +200,8 @@ class ModelProbe(object):
         fields["default_settings"] = fields.get("default_settings")
 
         if not fields["default_settings"]:
-            if fields["type"] in {ModelType.ControlNet, ModelType.T2IAdapter}:
-                fields["default_settings"] = get_default_settings_controlnet_t2i_adapter(fields["name"])
+            if fields["type"] in {ModelType.ControlNet, ModelType.T2IAdapter, ModelType.ControlLoRa}:
+                fields["default_settings"] = get_default_settings_control_adapters(fields["name"])
             elif fields["type"] is ModelType.Main:
                 fields["default_settings"] = get_default_settings_main(fields["base"])
 
@@ -510,7 +510,7 @@ MODEL_NAME_TO_PREPROCESSOR = {
 }
 
 
-def get_default_settings_controlnet_t2i_adapter(model_name: str) -> Optional[ControlAdapterDefaultSettings]:
+def get_default_settings_control_adapters(model_name: str) -> Optional[ControlAdapterDefaultSettings]:
     for k, v in MODEL_NAME_TO_PREPROCESSOR.items():
         model_name_lower = model_name.lower()
         if k in model_name_lower:

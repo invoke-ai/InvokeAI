@@ -296,6 +296,12 @@ const zT2IAdapterConfig = z.object({
 });
 export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
 
+const zControlLoRAConfig = z.object({
+  type: z.literal('control_lora'),
+  model: zServerValidatedModelIdentifierField.nullable(),
+});
+export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
+
 export const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   type: z.literal('raster_layer'),
   position: zCoordinate,
@@ -307,7 +313,7 @@ export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
   type: z.literal('control_layer'),
   withTransparencyEffect: z.boolean(),
-  controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]),
+  controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig, zControlLoRAConfig]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
 

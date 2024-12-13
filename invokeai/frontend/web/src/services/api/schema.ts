@@ -4359,6 +4359,8 @@ export type components = {
          * @description Model config for Control LoRA models.
          */
         ControlLoRALyCORISConfig: {
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Key
              * @description A unique key for this model.
