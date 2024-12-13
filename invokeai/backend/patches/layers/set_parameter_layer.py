@@ -11,15 +11,15 @@ class SetParameterLayer(BaseLayerPatch):
 
     def __init__(self, param_name: str, weight: torch.Tensor):
         super().__init__()
-        self._weight = weight
-        self._param_name = param_name
+        self.weight = weight
+        self.param_name = param_name
 
     def get_parameters(self, orig_module: torch.nn.Module) -> dict[str, torch.Tensor]:
-        diff = self._weight - orig_module.get_parameter(self._param_name)
-        return {self._param_name: diff}
+        diff = self.weight - orig_module.get_parameter(self.param_name)
+        return {self.param_name: diff}
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
-        self._weight = self._weight.to(device=device, dtype=dtype)
+        self.weight = self.weight.to(device=device, dtype=dtype)
 
     def calc_size(self) -> int:
-        return calc_tensor_size(self._weight)
+        return calc_tensor_size(self.weight)

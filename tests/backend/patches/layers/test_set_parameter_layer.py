@@ -32,11 +32,11 @@ def test_set_parameter_layer_to(device: str):
     layer = SetParameterLayer(param_name="weight", weight=target_weight)
 
     # SetParameterLayer should be initialized on CPU.
-    assert layer._weight.device.type == "cpu"  # type: ignore
+    assert layer.weight.device.type == "cpu"  # type: ignore
 
     # Move to device.
     layer.to(device=torch.device(device))
-    assert layer._weight.device.type == device  # type: ignore
+    assert layer.weight.device.type == device  # type: ignore
 
 
 def test_set_parameter_layer_calc_size():
