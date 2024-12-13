@@ -3,10 +3,10 @@ from typing import Any, Dict
 
 import torch
 
-from invokeai.backend.patches.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.set_parameter_layer import SetParameterLayer
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
 
 # A regex pattern that matches all of the keys in the Flux Dev/Canny LoRA format.

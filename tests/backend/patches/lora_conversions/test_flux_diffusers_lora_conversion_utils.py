@@ -1,21 +1,21 @@
 import pytest
 import torch
 
-from invokeai.backend.patches.conversions.flux_diffusers_lora_conversion_utils import (
+from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
 )
-from invokeai.backend.patches.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
-from tests.backend.patches.conversions.lora_state_dicts.flux_lora_diffusers_format import (
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_format import (
     state_dict_keys as flux_diffusers_state_dict_keys,
 )
-from tests.backend.patches.conversions.lora_state_dicts.flux_lora_diffusers_no_proj_mlp_format import (
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_no_proj_mlp_format import (
     state_dict_keys as flux_diffusers_no_proj_mlp_state_dict_keys,
 )
-from tests.backend.patches.conversions.lora_state_dicts.flux_lora_kohya_format import (
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_kohya_format import (
     state_dict_keys as flux_kohya_state_dict_keys,
 )
-from tests.backend.patches.conversions.lora_state_dicts.utils import keys_to_mock_state_dict
+from tests.backend.patches.lora_conversions.lora_state_dicts.utils import keys_to_mock_state_dict
 
 
 @pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_diffusers_no_proj_mlp_state_dict_keys])

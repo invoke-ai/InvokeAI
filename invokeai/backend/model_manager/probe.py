@@ -39,11 +39,11 @@ from invokeai.backend.model_manager.util.model_util import (
     lora_token_vector_length,
     read_checkpoint_meta,
 )
-from invokeai.backend.patches.conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
-from invokeai.backend.patches.conversions.flux_diffusers_lora_conversion_utils import (
+from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
 )
-from invokeai.backend.patches.conversions.flux_kohya_lora_conversion_utils import (
+from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
     is_state_dict_likely_in_flux_kohya_format,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor

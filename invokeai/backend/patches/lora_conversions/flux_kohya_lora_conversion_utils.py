@@ -3,9 +3,12 @@ from typing import Any, Dict, TypeVar
 
 import torch
 
-from invokeai.backend.patches.conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX, FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
+    FLUX_LORA_CLIP_PREFIX,
+    FLUX_LORA_TRANSFORMER_PREFIX,
+)
 from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
 
 # A regex pattern that matches all of the transformer keys in the Kohya FLUX LoRA format.
