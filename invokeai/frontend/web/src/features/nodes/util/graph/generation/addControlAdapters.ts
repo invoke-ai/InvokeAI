@@ -109,6 +109,55 @@ export const addT2IAdapters = async ({
   return result;
 };
 
+type AddControlLoRAsArg = {
+  manager: CanvasManager;
+  entities: CanvasControlLayerState[];
+  g: Graph;
+  rect: Rect;
+  collector: Invocation<'collect'>;
+  model: ParameterModel;
+};
+
+type AddControlLoRAsResult = {
+  addedControlLoRAs: number;
+};
+
+export const addControlLoRAs = async ({
+  manager,
+  entities,
+  g,
+  rect,
+  collector,
+  model,
+}: AddControlLoRAsArg): Promise<AddControlLoRAsResult> => {
+  const validControlLayers = entities
+    .filter((entity) => entity.isEnabled)
+    .filter((entity) => entity.controlAdapter.type === 'control_lora')
+    .filter((entity) => getControlLayerWarnings(entity, model).length === 0);
+
+  const result: AddControlLoRAsResult = {
+    addedControlLoRAs: 0,
+  };
+
+  for (const layer of validControlLayers) {
+    const getImageDTOResult = await withResultAsync(() => {
+      const adapter = manager.adapters.controlLayers.get(layer.id);
+      assert(adapter, 'Adapter not found');
+      return adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [] }, bg: 'black' });
+    });
+    if (getImageDTOResult.isErr()) {
+      log.warn({ error: serializeError(getImageDTOResult.error) }, 'Error rasterizing control layer');
+      continue;
+    }
+
+    const imageDTO = getImageDTOResult.value;
+    addControlLoRAToGraph(g, layer, imageDTO, collector);
+    result.addedControlLoRAs++;
+  }
+
+  return result;
+};
+
 const addControlNetToGraph = (
   g: Graph,
   layer: CanvasControlLayerState,
@@ -159,4 +208,26 @@ const addT2IAdapterToGraph = (
   });
 
   g.addEdge(t2iAdapter, 't2i_adapter', collector, 'item');
+};
+
+const addControlLoRAToGraph = (
+  g: Graph,
+  layer: CanvasControlLayerState,
+  imageDTO: ImageDTO,
+  collector: Invocation<'collect'>
+) => {
+  const { id, controlAdapter } = layer;
+  assert(controlAdapter.type === 'control_lora');
+  const { model } = controlAdapter;
+  assert(model !== null);
+  const { image_name } = imageDTO;
+
+  const controlLoRA = g.addNode({
+    id: `control_lora_${id}`,
+    type: 'flux_control_lora_loader',
+    lora: model,
+    image: { image_name },
+  });
+
+  g.addEdge(controlLoRA, 'control_lora', collector, 'item');
 };
