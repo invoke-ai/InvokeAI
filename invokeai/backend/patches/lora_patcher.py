@@ -260,7 +260,9 @@ class LoRAPatcher:
             wrapped_module = module_to_patch
 
         # Move the LoRA layer to the same device/dtype as the orig module.
-        patch.to(device=wrapped_module.orig_module.weight.device, dtype=dtype)
+        first_param = next(module_to_patch.parameters())
+        device = first_param.device
+        patch.to(device=device, dtype=dtype)
 
         # Add the patch to the sidecar wrapper.
         wrapped_module.add_patch(patch, patch_weight)
