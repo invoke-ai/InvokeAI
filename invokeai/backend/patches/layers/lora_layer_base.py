@@ -23,6 +23,7 @@ class LoRALayerBase:
     def _parse_bias(
         cls, bias_indices: torch.Tensor | None, bias_values: torch.Tensor | None, bias_size: torch.Tensor | None
     ) -> torch.Tensor | None:
+        """Helper function to parse a bias tensor from a state dict in LyCORIS format."""
         assert (bias_indices is None) == (bias_values is None) == (bias_size is None)
 
         bias = None
