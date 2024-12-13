@@ -16,7 +16,7 @@ class IA3Layer(LoRALayerBase):
         self.weight = weight
         self.on_input = on_input
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
         return None
 
     @classmethod

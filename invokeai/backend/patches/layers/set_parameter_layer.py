@@ -12,7 +12,7 @@ class SetParameterLayer(LoRALayerBase):
         self.weight = weight
         self.param_name = param_name
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
         return None
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:

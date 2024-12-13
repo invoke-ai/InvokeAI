@@ -32,7 +32,7 @@ class LoHALayer(LoRALayerBase):
         self.t2 = t2
         assert (self.t1 is None) == (self.t2 is None)
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
         return self.w1_b.shape[0]
 
     @classmethod

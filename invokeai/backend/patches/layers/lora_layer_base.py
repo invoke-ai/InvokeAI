@@ -38,11 +38,14 @@ class LoRALayerBase:
     ) -> float | None:
         return alpha.item() if alpha is not None else None
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
+        """Return the rank of the LoRA-like layer. Or None if the layer does not have a rank. This value is used to
+        calculate the scale.
+        """
         raise NotImplementedError()
 
     def scale(self) -> float:
-        rank = self.rank()
+        rank = self._rank()
         if self._alpha is None or rank is None:
             return 1.0
         return self._alpha / rank

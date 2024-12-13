@@ -20,7 +20,7 @@ class NormLayer(LoRALayerBase):
         cls.warn_on_unhandled_keys(values, {"w_norm", "b_norm"})
         return layer
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
         return None
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:

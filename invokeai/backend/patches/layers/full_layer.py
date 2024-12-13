@@ -20,7 +20,7 @@ class FullLayer(LoRALayerBase):
         cls.warn_on_unhandled_keys(values=values, handled_keys={"diff", "diff_b"})
         return layer
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
         return None
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:

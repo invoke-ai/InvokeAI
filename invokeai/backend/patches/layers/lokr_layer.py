@@ -39,7 +39,7 @@ class LoKRLayer(LoRALayerBase):
         assert (self.w2 is None) != (self.w2_a is None)
         assert (self.w2_a is None) == (self.w2_b is None)
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
         if self.w1_b is not None:
             return self.w1_b.shape[0]
         elif self.w2_b is not None:

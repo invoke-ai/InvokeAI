@@ -55,7 +55,7 @@ class LoRALayer(LoRALayerBase):
 
         return layer
 
-    def rank(self) -> int:
+    def _rank(self) -> int:
         return self.down.shape[0]
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:

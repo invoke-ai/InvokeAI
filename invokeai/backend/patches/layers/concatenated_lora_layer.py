@@ -20,7 +20,7 @@ class ConcatenatedLoRALayer(LoRALayerBase):
         self.lora_layers = lora_layers
         self.concat_axis = concat_axis
 
-    def rank(self) -> int | None:
+    def _rank(self) -> int | None:
         return None
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
