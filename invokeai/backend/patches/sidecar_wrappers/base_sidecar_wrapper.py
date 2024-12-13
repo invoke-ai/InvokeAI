@@ -43,9 +43,10 @@ class BaseSidecarWrapper(torch.nn.Module):
             layer_params = patch.get_parameters(self._orig_module)
 
             for param_name, param_weight in layer_params.items():
+                orig_param = self._orig_module.get_parameter(param_name)
                 # TODO(ryand): Move shape handling down into the patch.
-                if params[param_name].shape != param_weight.shape:
-                    param_weight = param_weight.reshape(self._orig_module.get_parameter(param_name).shape)
+                if orig_param.shape != param_weight.shape:
+                    param_weight = param_weight.reshape(orig_param.shape)
 
                 # TODO(ryand): Move scale handling down into the patch.
                 scale = 1
