@@ -92,51 +92,71 @@ class LoRAPatcher:
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            # All of the LoRA weight calculations will be done on the same device as the module weight.
-            # (Performance will be best if this is a CUDA device.)
-            first_param = next(module.parameters())
-            device = first_param.device
-            dtype = first_param.dtype
+            LoRAPatcher._apply_lora_layer_patch(
+                module_to_patch=module,
+                module_to_patch_key=module_key,
+                patch=layer,
+                patch_weight=patch_weight,
+                original_weights=original_weights,
+            )
 
-            layer_scale = layer.scale()
+    @staticmethod
+    @torch.no_grad()
+    def _apply_lora_layer_patch(
+        module_to_patch: torch.nn.Module,
+        module_to_patch_key: str,
+        patch: BaseLayerPatch,
+        patch_weight: float,
+        original_weights: OriginalWeightsStorage,
+    ):
+        # All of the LoRA weight calculations will be done on the same device as the module weight.
+        # (Performance will be best if this is a CUDA device.)
+        first_param = next(module_to_patch.parameters())
+        device = first_param.device
+        dtype = first_param.dtype
 
-            # We intentionally move to the target device first, then cast. Experimentally, this was found to
-            # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
-            # same thing in a single call to '.to(...)'.
-            layer.to(device=device)
-            layer.to(dtype=torch.float32)
+        # TODO(ryand): Move this down into the patch.
+        patch_scale = 1.0
+        if hasattr(patch, "scale"):
+            patch_scale = patch.scale()
 
-            # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
-            # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-            for param_name, lora_param_weight in layer.get_parameters(module).items():
-                param_key = module_key + "." + param_name
-                module_param = module.get_parameter(param_name)
+        # We intentionally move to the target device first, then cast. Experimentally, this was found to
+        # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
+        # same thing in a single call to '.to(...)'.
+        patch.to(device=device)
+        patch.to(dtype=torch.float32)
 
-                # Save original weight
-                original_weights.save(param_key, module_param)
+        # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
+        # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
+        for param_name, param_weight in patch.get_parameters(module_to_patch).items():
+            param_key = module_to_patch_key + "." + param_name
+            module_param = module_to_patch.get_parameter(param_name)
 
-                if module_param.shape != lora_param_weight.shape:
-                    if module_param.nelement() == lora_param_weight.nelement():
-                        lora_param_weight = lora_param_weight.reshape(module_param.shape)
-                    else:
-                        # This condition was added to handle layers in FLUX control LoRAs.
-                        # TODO(ryand): Move the weight update into the LoRA layer so that the LoRAPatcher doesn't need
-                        # to worry about this?
-                        expanded_weight = torch.zeros_like(
-                            lora_param_weight, dtype=module_param.dtype, device=module_param.device
-                        )
-                        slices = tuple(slice(0, dim) for dim in module_param.shape)
-                        expanded_weight[slices] = module_param
-                        setattr(
-                            module,
-                            param_name,
-                            torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
-                        )
-                        module_param = expanded_weight
-                lora_param_weight *= patch_weight * layer_scale
-                module_param += lora_param_weight.to(dtype=dtype)
+            # Save original weight
+            original_weights.save(param_key, module_param)
 
-            layer.to(device=TorchDevice.CPU_DEVICE)
+            if module_param.shape != param_weight.shape:
+                if module_param.nelement() == param_weight.nelement():
+                    param_weight = param_weight.reshape(module_param.shape)
+                else:
+                    # This condition was added to handle layers in FLUX control LoRAs.
+                    # TODO(ryand): Move the weight update into the LoRA layer so that the LoRAPatcher doesn't need
+                    # to worry about this?
+                    expanded_weight = torch.zeros_like(
+                        param_weight, dtype=module_param.dtype, device=module_param.device
+                    )
+                    slices = tuple(slice(0, dim) for dim in module_param.shape)
+                    expanded_weight[slices] = module_param
+                    setattr(
+                        module_to_patch,
+                        param_name,
+                        torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
+                    )
+                    module_param = expanded_weight
+            param_weight *= patch_weight * patch_scale
+            module_param += param_weight.to(dtype=dtype)
+
+        patch.to(device=TorchDevice.CPU_DEVICE)
 
     @staticmethod
     @torch.no_grad()
@@ -211,28 +231,50 @@ class LoRAPatcher:
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            # Initialize the LoRA sidecar layer.
-            lora_sidecar_layer = LoRAPatcher._initialize_lora_sidecar_layer(module, layer, patch_weight)
+            LoRAPatcher._apply_lora_layer_wrapper_patch(
+                model=model,
+                module_to_patch=module,
+                module_to_patch_key=module_key,
+                patch=layer,
+                patch_weight=patch_weight,
+                original_modules=original_modules,
+                dtype=dtype,
+            )
 
-            # Replace the original module with a LoRASidecarModule if it has not already been done.
-            if module_key in original_modules:
-                # The module has already been patched with a LoRASidecarModule. Append to it.
-                assert isinstance(module, LoRASidecarModule)
-                lora_sidecar_module = module
-            else:
-                # The module has not yet been patched with a LoRASidecarModule. Create one.
-                lora_sidecar_module = LoRASidecarModule(module, [])
-                original_modules[module_key] = module
-                module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
-                module_parent = model.get_submodule(module_parent_key)
-                LoRAPatcher._set_submodule(module_parent, module_name, lora_sidecar_module)
+    @staticmethod
+    @torch.no_grad()
+    def _apply_lora_layer_wrapper_patch(
+        model: torch.nn.Module,
+        module_to_patch: torch.nn.Module,
+        module_to_patch_key: str,
+        patch: BaseLayerPatch,
+        patch_weight: float,
+        original_modules: dict[str, torch.nn.Module],
+        dtype: torch.dtype,
+    ):
+        """Apply a single LoRA wrapper patch to a model."""
+        # Initialize the LoRA sidecar layer.
+        lora_sidecar_layer = LoRAPatcher._initialize_lora_sidecar_layer(module_to_patch, patch, patch_weight)
 
-            # Move the LoRA sidecar layer to the same device/dtype as the orig module.
-            # TODO(ryand): Experiment with moving to the device first, then casting. This could be faster.
-            lora_sidecar_layer.to(device=lora_sidecar_module.orig_module.weight.device, dtype=dtype)
+        # Replace the original module with a LoRASidecarModule if it has not already been done.
+        if module_to_patch_key in original_modules:
+            # The module has already been patched with a LoRASidecarModule. Append to it.
+            assert isinstance(module_to_patch, LoRASidecarModule)
+            lora_sidecar_module = module_to_patch
+        else:
+            # The module has not yet been patched with a LoRASidecarModule. Create one.
+            lora_sidecar_module = LoRASidecarModule(module_to_patch, [])
+            original_modules[module_to_patch_key] = module_to_patch
+            module_parent_key, module_name = LoRAPatcher._split_parent_key(module_to_patch_key)
+            module_parent = model.get_submodule(module_parent_key)
+            LoRAPatcher._set_submodule(module_parent, module_name, lora_sidecar_module)
 
-            # Add the LoRA sidecar layer to the LoRASidecarModule.
-            lora_sidecar_module.add_lora_layer(lora_sidecar_layer)
+        # Move the LoRA sidecar layer to the same device/dtype as the orig module.
+        # TODO(ryand): Experiment with moving to the device first, then casting. This could be faster.
+        lora_sidecar_layer.to(device=lora_sidecar_module.orig_module.weight.device, dtype=dtype)
+
+        # Add the LoRA sidecar layer to the LoRASidecarModule.
+        lora_sidecar_module.add_lora_layer(lora_sidecar_layer)
 
     @staticmethod
     def _split_parent_key(module_key: str) -> tuple[str, str]:
