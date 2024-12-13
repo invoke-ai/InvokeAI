@@ -3,6 +3,7 @@ import copy
 import torch
 
 from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
+from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.sidecar_wrappers.linear_sidecar_wrapper import LinearSidecarWrapper
 
@@ -28,6 +29,52 @@ def test_linear_sidecar_wrapper_lora():
 
     # Create a LinearSidecarWrapper.
     lora_wrapped = LinearSidecarWrapper(linear, [(lora_layer, 1.0)])
+
+    # Run the LoRA-patched linear layer and the LinearSidecarWrapper and assert they are equal.
+    input = torch.randn(1, in_features)
+    output_patched = linear_patched(input)
+    output_wrapped = lora_wrapped(input)
+    assert torch.allclose(output_patched, output_wrapped, atol=1e-6)
+
+
+@torch.no_grad()
+def test_linear_sidecar_wrapper_multiple_loras():
+    # Create a linear layer.
+    in_features = 10
+    out_features = 20
+    linear = torch.nn.Linear(in_features, out_features)
+
+    # Create two LoRA layers.
+    rank = 4
+    lora_layer = LoRALayer(
+        up=torch.randn(out_features, rank),
+        mid=None,
+        down=torch.randn(rank, in_features),
+        alpha=1.0,
+        bias=torch.randn(out_features),
+    )
+    lora_layer_2 = LoRALayer(
+        up=torch.randn(out_features, rank),
+        mid=None,
+        down=torch.randn(rank, in_features),
+        alpha=1.0,
+        bias=torch.randn(out_features),
+    )
+    # We use different weights for the two LoRA layers to ensure this is working.
+    lora_weight = 1.0
+    lora_weight_2 = 0.5
+
+    # Patch the LoRA layers into the linear layer.
+    linear_patched = copy.deepcopy(linear)
+    linear_patched.weight.data += lora_layer.get_weight(linear_patched.weight) * (lora_layer.scale() * lora_weight)
+    linear_patched.bias.data += lora_layer.get_bias(linear_patched.bias) * (lora_layer.scale() * lora_weight)
+    linear_patched.weight.data += lora_layer_2.get_weight(linear_patched.weight) * (
+        lora_layer_2.scale() * lora_weight_2
+    )
+    linear_patched.bias.data += lora_layer_2.get_bias(linear_patched.bias) * (lora_layer_2.scale() * lora_weight_2)
+
+    # Create a LinearSidecarWrapper.
+    lora_wrapped = LinearSidecarWrapper(linear, [(lora_layer, lora_weight), (lora_layer_2, lora_weight_2)])
 
     # Run the LoRA-patched linear layer and the LinearSidecarWrapper and assert they are equal.
     input = torch.randn(1, in_features)
@@ -67,4 +114,28 @@ def test_linear_sidecar_wrapper_concatenated_lora():
     input = torch.randn(1, in_features)
     output_patched = linear_patched(input)
     output_wrapped = lora_wrapped(input)
+    assert torch.allclose(output_patched, output_wrapped, atol=1e-6)
+
+
+def test_linear_sidecar_wrapper_full_layer():
+    # Create a linear layer.
+    in_features = 10
+    out_features = 20
+    linear = torch.nn.Linear(in_features, out_features)
+
+    # Create a FullLayer.
+    full_layer = FullLayer(weight=torch.randn(out_features, in_features), bias=torch.randn(out_features))
+
+    # Patch the FullLayer into the linear layer.
+    linear_patched = copy.deepcopy(linear)
+    linear_patched.weight.data += full_layer.get_weight(linear_patched.weight)
+    linear_patched.bias.data += full_layer.get_bias(linear_patched.bias)
+
+    # Create a LinearSidecarWrapper.
+    full_wrapped = LinearSidecarWrapper(linear, [(full_layer, 1.0)])
+
+    # Run the FullLayer-patched linear layer and the LinearSidecarWrapper and assert they are equal.
+    input = torch.randn(1, in_features)
+    output_patched = linear_patched(input)
+    output_wrapped = full_wrapped(input)
     assert torch.allclose(output_patched, output_wrapped, atol=1e-6)
