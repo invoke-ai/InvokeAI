@@ -18,6 +18,7 @@ import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/se
 import type {
   CanvasEntityIdentifier,
   CanvasRegionalGuidanceState,
+  ControlLoRAConfig,
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
@@ -26,8 +27,13 @@ import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
-import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'services/api/types';
+import type {
+  ControlLoRAModelConfig,
+  ControlNetModelConfig,
+  IPAdapterModelConfig,
+  T2IAdapterModelConfig,
+} from 'services/api/types';
+import { isControlLayerModelConfig, isIPAdapterModelConfig } from 'services/api/types';
 
 /**
  * Selects the default control adapter configuration based on the model configurations and the base.
@@ -39,13 +45,13 @@ import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'ser
 export const selectDefaultControlAdapter = createSelector(
   selectModelConfigsQuery,
   selectBase,
-  (query, base): ControlNetConfig | T2IAdapterConfig => {
+  (query, base): ControlNetConfig | T2IAdapterConfig | ControlLoRAConfig => {
     const { data } = query;
-    let model: ControlNetModelConfig | T2IAdapterModelConfig | null = null;
+    let model: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig | null = null;
     if (data) {
       const modelConfigs = modelConfigsAdapterSelectors
         .selectAll(data)
-        .filter(isControlNetOrT2IAdapterModelConfig)
+        .filter(isControlLayerModelConfig)
         .sort((a) => (a.type === 'controlnet' ? -1 : 1)); // Prefer ControlNet models
       const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
       model = compatibleModels[0] ?? modelConfigs[0] ?? null;

@@ -34,7 +34,13 @@ import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/par
 import type { IRect } from 'konva/lib/types';
 import { merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
-import type { ControlLoRAModelConfig, ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type {
+  ControlLoRAModelConfig,
+  ControlNetModelConfig,
+  ImageDTO,
+  IPAdapterModelConfig,
+  T2IAdapterModelConfig,
+} from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type {
@@ -486,7 +492,7 @@ export const canvasSlice = createSlice({
     ) => {
       const { entityIdentifier, weight } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
-      if (!layer || !layer.controlAdapter) {
+      if (!layer || !layer.controlAdapter || layer.controlAdapter.type === 'control_lora') {
         return;
       }
       layer.controlAdapter.weight = weight;
@@ -497,7 +503,7 @@ export const canvasSlice = createSlice({
     ) => {
       const { entityIdentifier, beginEndStepPct } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
-      if (!layer || !layer.controlAdapter) {
+      if (!layer || !layer.controlAdapter || layer.controlAdapter.type === 'control_lora') {
         return;
       }
       layer.controlAdapter.beginEndStepPct = beginEndStepPct;

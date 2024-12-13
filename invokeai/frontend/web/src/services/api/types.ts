@@ -145,8 +145,10 @@ export const isControlNetModelConfig = (config: AnyModelConfig): config is Contr
   return config.type === 'controlnet';
 };
 
-export const isControlLayerModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig => {
-  return config.type === 'controlnet' || config.type === "t2i_adapter" || config.type === "control_lora";
+export const isControlLayerModelConfig = (
+  config: AnyModelConfig
+): config is ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig => {
+  return config.type === 'controlnet' || config.type === 't2i_adapter' || config.type === 'control_lora';
 };
 
 export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdapterModelConfig => {
@@ -205,12 +207,6 @@ export const isSpandrelImageToImageModelConfig = (
   config: AnyModelConfig
 ): config is SpandrelImageToImageModelConfig => {
   return config.type === 'spandrel_image_to_image';
-};
-
-export const isControlNetOrT2IAdapterModelConfig = (
-  config: AnyModelConfig
-): config is ControlNetModelConfig | T2IAdapterModelConfig => {
-  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config);
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

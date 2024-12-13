@@ -1,7 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { ControlNetOrT2IAdapterDefaultSettingsFormData } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/ControlNetOrT2IAdapterDefaultSettings';
+import type { ControlAdapterModelDefaultSettingsFormData } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/ControlAdapterModelDefaultSettings';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
 import { memo, useCallback, useMemo } from 'react';
@@ -26,9 +26,9 @@ const OPTIONS = [
   { label: 'None', value: 'none' },
 ] as const;
 
-type DefaultSchedulerType = ControlNetOrT2IAdapterDefaultSettingsFormData['preprocessor'];
+type DefaultSchedulerType = ControlAdapterModelDefaultSettingsFormData['preprocessor'];
 
-export const DefaultPreprocessor = memo((props: UseControllerProps<ControlNetOrT2IAdapterDefaultSettingsFormData>) => {
+export const DefaultPreprocessor = memo((props: UseControllerProps<ControlAdapterModelDefaultSettingsFormData>) => {
   const { t } = useTranslation();
   const { field } = useController(props);
 

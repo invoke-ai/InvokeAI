@@ -18,7 +18,7 @@ import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
-import { isControlNetOrT2IAdapterModelConfig } from 'services/api/types';
+import { isControlLayerModelConfig } from 'services/api/types';
 import stableHash from 'stable-hash';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -204,7 +204,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       // If the parent is a control layer adapter, we should check if the model has a default filter and set it if so
       const selectModelConfig = buildSelectModelConfig(
         this.parent.state.controlAdapter.model.key,
-        isControlNetOrT2IAdapterModelConfig
+        isControlLayerModelConfig
       );
       const modelConfig = this.manager.stateApi.runSelector(selectModelConfig);
       // This always returns a filter
