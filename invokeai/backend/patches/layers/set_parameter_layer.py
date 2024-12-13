@@ -1,29 +1,25 @@
-from typing import Dict
-
 import torch
 
-from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
-class SetParameterLayer(LoRALayerBase):
+class SetParameterLayer(BaseLayerPatch):
+    """A layer that sets a single parameter to a new target value.
+    (The diff between the target value and current value is calculated internally.)
+    """
+
     def __init__(self, param_name: str, weight: torch.Tensor):
-        super().__init__(None, None)
-        self.weight = weight
-        self.param_name = param_name
+        super().__init__()
+        self._weight = weight
+        self._param_name = param_name
 
-    def _rank(self) -> int | None:
-        return None
-
-    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
-        return self.weight - orig_weight
-
-    def get_parameters(self, orig_module: torch.nn.Module) -> Dict[str, torch.Tensor]:
-        return {self.param_name: self.get_weight(orig_module.get_parameter(self.param_name))}
+    def get_parameters(self, orig_module: torch.nn.Module) -> dict[str, torch.Tensor]:
+        diff = self._weight - orig_module.get_parameter(self._param_name)
+        return {self._param_name: diff}
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
-        super().to(device=device, dtype=dtype)
-        self.weight = self.weight.to(device=device, dtype=dtype)
+        self._weight = self._weight.to(device=device, dtype=dtype)
 
     def calc_size(self) -> int:
-        return super().calc_size() + calc_tensor_size(self.weight)
+        return calc_tensor_size(self._weight)

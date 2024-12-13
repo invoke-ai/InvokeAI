@@ -1,12 +1,13 @@
-from typing import Dict, Optional, Set
+from typing import Optional
 
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
-class LoRALayerBase:
+class LoRALayerBase(BaseLayerPatch):
     """Base class for all LoRA-like patching layers."""
 
     # Note: It is tempting to make this a torch.nn.Module sub-class and make all tensors 'torch.nn.Parameter's. Then we
@@ -56,7 +57,7 @@ class LoRALayerBase:
     def get_bias(self, orig_bias: torch.Tensor) -> Optional[torch.Tensor]:
         return self.bias
 
-    def get_parameters(self, orig_module: torch.nn.Module) -> Dict[str, torch.Tensor]:
+    def get_parameters(self, orig_module: torch.nn.Module) -> dict[str, torch.Tensor]:
         params = {"weight": self.get_weight(orig_module.weight)}
         bias = self.get_bias(orig_module.bias)
         if bias is not None:
@@ -64,7 +65,7 @@ class LoRALayerBase:
         return params
 
     @classmethod
-    def warn_on_unhandled_keys(cls, values: Dict[str, torch.Tensor], handled_keys: Set[str]):
+    def warn_on_unhandled_keys(cls, values: dict[str, torch.Tensor], handled_keys: set[str]):
         """Log a warning if values contains unhandled keys."""
         unknown_keys = set(values.keys()) - handled_keys
         if unknown_keys:
