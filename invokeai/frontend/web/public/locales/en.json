@@ -2110,6 +2110,7 @@
         },
         "logNamespaces": {
             "logNamespaces": "Log Namespaces",
+            "dnd": "Drag and Drop",
             "gallery": "Gallery",
             "models": "Models",
             "config": "Config",
