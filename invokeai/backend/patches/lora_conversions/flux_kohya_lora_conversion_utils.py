@@ -3,7 +3,7 @@ from typing import Any, Dict, TypeVar
 
 import torch
 
-from invokeai.backend.patches.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
     FLUX_LORA_CLIP_PREFIX,
@@ -64,7 +64,7 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
     clip_grouped_sd = _convert_flux_clip_kohya_state_dict_to_invoke_format(clip_grouped_sd)
 
     # Create LoRA layers.
-    layers: dict[str, AnyLoRALayer] = {}
+    layers: dict[str, BaseLayerPatch] = {}
     for layer_key, layer_state_dict in transformer_grouped_sd.items():
         layers[FLUX_LORA_TRANSFORMER_PREFIX + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
     for layer_key, layer_state_dict in clip_grouped_sd.items():

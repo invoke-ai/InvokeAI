@@ -3,7 +3,7 @@ from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 
-from invokeai.backend.patches.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
@@ -253,7 +253,7 @@ class LoRAPatcher:
             raise ValueError(f"Invalid module key: {module_key}")
 
     @staticmethod
-    def _initialize_lora_sidecar_layer(orig_layer: torch.nn.Module, lora_layer: AnyLoRALayer, patch_weight: float):
+    def _initialize_lora_sidecar_layer(orig_layer: torch.nn.Module, lora_layer: BaseLayerPatch, patch_weight: float):
         # TODO(ryand): Add support for more original layer types and LoRA layer types.
         if isinstance(orig_layer, torch.nn.Linear) or (
             isinstance(orig_layer, LoRASidecarModule) and isinstance(orig_layer.orig_module, torch.nn.Linear)

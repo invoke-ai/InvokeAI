@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 import torch
 
-from invokeai.backend.patches.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.set_parameter_layer import SetParameterLayer
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
@@ -55,7 +55,7 @@ def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor])
         grouped_state_dict[layer_name][param_name] = value
 
     # Create LoRA layers.
-    layers: dict[str, AnyLoRALayer] = {}
+    layers: dict[str, BaseLayerPatch] = {}
     for layer_key, layer_state_dict in grouped_state_dict.items():
         prefixed_key = f"{FLUX_LORA_TRANSFORMER_PREFIX}{layer_key}"
         if all(k in layer_state_dict for k in ["lora_A.weight", "lora_B.bias", "lora_B.weight"]):

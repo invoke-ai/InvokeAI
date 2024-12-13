@@ -2,7 +2,7 @@ from typing import Dict
 
 import torch
 
-from invokeai.backend.patches.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
@@ -49,7 +49,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
     mlp_ratio = 4.0
     mlp_hidden_dim = int(hidden_size * mlp_ratio)
 
-    layers: dict[str, AnyLoRALayer] = {}
+    layers: dict[str, BaseLayerPatch] = {}
 
     def add_lora_layer_if_present(src_key: str, dst_key: str) -> None:
         if src_key in grouped_state_dict:

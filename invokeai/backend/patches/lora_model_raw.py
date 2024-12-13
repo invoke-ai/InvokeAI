@@ -3,20 +3,17 @@ from typing import Mapping, Optional
 
 import torch
 
-from invokeai.backend.patches.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.raw_model import RawModel
 
 
-class LoRAModelRaw(RawModel):  # (torch.nn.Module):
-    def __init__(self, layers: Mapping[str, AnyLoRALayer]):
+class LoRAModelRaw(RawModel):
+    def __init__(self, layers: Mapping[str, BaseLayerPatch]):
         self.layers = layers
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
-        for _key, layer in self.layers.items():
+        for layer in self.layers.values():
             layer.to(device=device, dtype=dtype)
 
     def calc_size(self) -> int:
-        model_size = 0
-        for _, layer in self.layers.items():
-            model_size += layer.calc_size()
-        return model_size
+        return sum(layer.calc_size() for layer in self.layers.values())
