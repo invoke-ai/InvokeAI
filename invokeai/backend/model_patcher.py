@@ -13,9 +13,9 @@ from diffusers import UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
 
 

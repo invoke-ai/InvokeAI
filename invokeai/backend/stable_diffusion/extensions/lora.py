@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from diffusers import UNet2DConditionModel
 
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.lora.lora_patcher import LoRAPatcher
+from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.lora_patcher import LoRAPatcher
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 
 if TYPE_CHECKING:

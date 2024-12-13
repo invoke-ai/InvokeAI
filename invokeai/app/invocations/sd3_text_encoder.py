@@ -16,10 +16,10 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.patches.conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
+from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.lora_patcher import LoRAPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
 
 # The SD3 T5 Max Sequence Length set based on the default in diffusers.
