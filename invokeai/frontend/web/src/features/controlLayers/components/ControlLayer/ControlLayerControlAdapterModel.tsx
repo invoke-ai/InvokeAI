@@ -5,7 +5,12 @@ import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useControlLayerModels } from 'services/api/hooks/modelsByType';
-import type { AnyModelConfig, ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type {
+  AnyModelConfig,
+  ControlLoRAModelConfig,
+  ControlNetModelConfig,
+  T2IAdapterModelConfig,
+} from 'services/api/types';
 
 type Props = {
   modelKey: string | null;

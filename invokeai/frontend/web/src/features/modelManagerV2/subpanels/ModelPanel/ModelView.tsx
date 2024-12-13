@@ -1,5 +1,5 @@
 import { Box, Flex, SimpleGrid } from '@invoke-ai/ui-library';
-import { ControlNetOrT2IAdapterDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/ControlNetOrT2IAdapterDefaultSettings';
+import { ControlAdapterModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/ControlAdapterModelDefaultSettings';
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
@@ -21,7 +21,11 @@ export const ModelView = memo(({ modelConfig }: Props) => {
     if (modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner') {
       return true;
     }
-    if (modelConfig.type === 'controlnet' || modelConfig.type === 't2i_adapter') {
+    if (
+      modelConfig.type === 'controlnet' ||
+      modelConfig.type === 't2i_adapter' ||
+      modelConfig.type === 'control_lora'
+    ) {
       return true;
     }
     if (modelConfig.type === 'main' || modelConfig.type === 'lora') {
@@ -69,9 +73,9 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             {modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner' && (
               <MainModelDefaultSettings modelConfig={modelConfig} />
             )}
-            {(modelConfig.type === 'controlnet' || modelConfig.type === 't2i_adapter') && (
-              <ControlNetOrT2IAdapterDefaultSettings modelConfig={modelConfig} />
-            )}
+            {(modelConfig.type === 'controlnet' ||
+              modelConfig.type === 't2i_adapter' ||
+              modelConfig.type === 'control_lora') && <ControlAdapterModelDefaultSettings modelConfig={modelConfig} />}
             {(modelConfig.type === 'main' || modelConfig.type === 'lora') && (
               <TriggerPhrases modelConfig={modelConfig} />
             )}

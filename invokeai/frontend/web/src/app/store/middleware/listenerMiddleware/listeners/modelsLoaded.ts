@@ -30,7 +30,7 @@ import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
-  isControlNetOrT2IAdapterModelConfig,
+  isControlLayerModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
@@ -190,7 +190,7 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, log) => {
-  const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
+  const caModels = models.filter(isControlLayerModelConfig);
   selectCanvasSlice(state).controlLayers.entities.forEach((entity) => {
     const selectedControlAdapterModel = entity.controlAdapter.model;
     // `null` is a valid control adapter model - no need to do anything.

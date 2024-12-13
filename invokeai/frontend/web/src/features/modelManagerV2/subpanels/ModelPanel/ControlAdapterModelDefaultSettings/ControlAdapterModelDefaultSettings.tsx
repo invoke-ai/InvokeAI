@@ -1,6 +1,6 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
-import { useControlNetOrT2IAdapterDefaultSettings } from 'features/modelManagerV2/hooks/useControlNetOrT2IAdapterDefaultSettings';
-import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/DefaultPreprocessor';
+import { useControlAdapterModelDefaultSettings } from 'features/modelManagerV2/hooks/useControlAdapterModelDefaultSettings';
+import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
@@ -9,28 +9,28 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
-import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
-export type ControlNetOrT2IAdapterDefaultSettingsFormData = {
+export type ControlAdapterModelDefaultSettingsFormData = {
   preprocessor: FormField<string>;
 };
 
 type Props = {
-  modelConfig: ControlNetModelConfig | T2IAdapterModelConfig;
+  modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig;
 };
 
-export const ControlNetOrT2IAdapterDefaultSettings = memo(({ modelConfig }: Props) => {
+export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
 
-  const defaultSettingsDefaults = useControlNetOrT2IAdapterDefaultSettings(modelConfig);
+  const defaultSettingsDefaults = useControlAdapterModelDefaultSettings(modelConfig);
 
   const [updateModel, { isLoading: isLoadingUpdateModel }] = useUpdateModelMutation();
 
-  const { handleSubmit, control, formState, reset } = useForm<ControlNetOrT2IAdapterDefaultSettingsFormData>({
+  const { handleSubmit, control, formState, reset } = useForm<ControlAdapterModelDefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
   });
 
-  const onSubmit = useCallback<SubmitHandler<ControlNetOrT2IAdapterDefaultSettingsFormData>>(
+  const onSubmit = useCallback<SubmitHandler<ControlAdapterModelDefaultSettingsFormData>>(
     (data) => {
       const body = {
         preprocessor: data.preprocessor.isEnabled ? data.preprocessor.value : null,
@@ -85,4 +85,4 @@ export const ControlNetOrT2IAdapterDefaultSettings = memo(({ modelConfig }: Prop
   );
 });
 
-ControlNetOrT2IAdapterDefaultSettings.displayName = 'ControlNetOrT2IAdapterDefaultSettings';
+ControlAdapterModelDefaultSettings.displayName = 'ControlAdapterModelDefaultSettings';

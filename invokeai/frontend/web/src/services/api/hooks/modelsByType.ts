@@ -11,9 +11,9 @@ import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
+  isControlLayerModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
-  isControlLayerModelConfig,
   isFluxMainModelModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,

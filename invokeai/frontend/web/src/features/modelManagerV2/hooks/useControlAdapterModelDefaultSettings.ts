@@ -1,9 +1,9 @@
 import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
-import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
-export const useControlNetOrT2IAdapterDefaultSettings = (
-  modelConfig: ControlNetModelConfig | T2IAdapterModelConfig
+export const useControlAdapterModelDefaultSettings = (
+  modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig
 ) => {
   const defaultSettingsDefaults = useMemo(() => {
     return {
