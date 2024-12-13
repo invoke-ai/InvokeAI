@@ -10,7 +10,7 @@ from invokeai.backend.model_manager.probe import (
     CkptType,
     ModelProbe,
     VaeFolderProbe,
-    get_default_settings_controlnet_t2i_adapter,
+    get_default_settings_control_adapters,
     get_default_settings_main,
 )
 
@@ -40,12 +40,12 @@ def test_repo_variant(datadir: Path):
 
 
 def test_controlnet_t2i_default_settings():
-    assert get_default_settings_controlnet_t2i_adapter("some_canny_model").preprocessor == "canny_image_processor"
+    assert get_default_settings_control_adapters("some_canny_model").preprocessor == "canny_image_processor"
     assert (
-        get_default_settings_controlnet_t2i_adapter("some_depth_model").preprocessor == "depth_anything_image_processor"
+        get_default_settings_control_adapters("some_depth_model").preprocessor == "depth_anything_image_processor"
     )
-    assert get_default_settings_controlnet_t2i_adapter("some_pose_model").preprocessor == "dw_openpose_image_processor"
-    assert get_default_settings_controlnet_t2i_adapter("i like turtles") is None
+    assert get_default_settings_control_adapters("some_pose_model").preprocessor == "dw_openpose_image_processor"
+    assert get_default_settings_control_adapters("i like turtles") is None
 
 
 def test_default_settings_main():

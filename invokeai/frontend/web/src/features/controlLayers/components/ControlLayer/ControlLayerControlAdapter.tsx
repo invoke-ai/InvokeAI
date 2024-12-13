@@ -26,7 +26,7 @@ import { replaceCanvasEntityObjectsWithImage } from 'features/imageActions/actio
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiShootingStarFill, PiUploadBold } from 'react-icons/pi';
-import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlLoRAModelConfig, ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
 
 const buildSelectControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
   createMemoizedAppSelector(selectCanvasSlice, (canvas) => {
@@ -66,7 +66,7 @@ export const ControlLayerControlAdapter = memo(() => {
   );
 
   const onChangeModel = useCallback(
-    (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => {
+    (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig) => {
       dispatch(controlLayerModelChanged({ entityIdentifier, modelConfig }));
       // When we change the model, we need may need to start filtering w/ the simplified filter mode, and/or change the
       // filter config.

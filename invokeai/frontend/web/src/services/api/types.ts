@@ -145,6 +145,10 @@ export const isControlNetModelConfig = (config: AnyModelConfig): config is Contr
   return config.type === 'controlnet';
 };
 
+export const isControlLayerModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig => {
+  return config.type === 'controlnet' || config.type === "t2i_adapter" || config.type === "control_lora";
+};
+
 export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdapterModelConfig => {
   return config.type === 'ip_adapter';
 };

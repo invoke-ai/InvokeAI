@@ -34,7 +34,7 @@ import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/par
 import type { IRect } from 'konva/lib/types';
 import { merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
-import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlLoRAModelConfig, ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type {
@@ -436,7 +436,7 @@ export const canvasSlice = createSlice({
       action: PayloadAction<
         EntityIdentifierPayload<
           {
-            modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | null;
+            modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig | null;
           },
           'control_layer'
         >
