@@ -14,9 +14,9 @@ class SetParameterLayer(BaseLayerPatch):
         self.weight = weight
         self.param_name = param_name
 
-    def get_parameters(self, orig_module: torch.nn.Module) -> dict[str, torch.Tensor]:
+    def get_parameters(self, orig_module: torch.nn.Module, weight: float) -> dict[str, torch.Tensor]:
         diff = self.weight - orig_module.get_parameter(self.param_name)
-        return {self.param_name: diff}
+        return {self.param_name: diff * weight}
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.weight = self.weight.to(device=device, dtype=dtype)

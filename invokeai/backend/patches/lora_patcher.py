@@ -110,11 +110,6 @@ class LoRAPatcher:
         device = first_param.device
         dtype = first_param.dtype
 
-        # TODO(ryand): Move this down into the patch.
-        patch_scale = 1.0
-        if hasattr(patch, "scale"):
-            patch_scale = patch.scale()
-
         # We intentionally move to the target device first, then cast. Experimentally, this was found to
         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
         # same thing in a single call to '.to(...)'.
@@ -123,7 +118,7 @@ class LoRAPatcher:
 
         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        for param_name, param_weight in patch.get_parameters(module_to_patch).items():
+        for param_name, param_weight in patch.get_parameters(module_to_patch, weight=patch_weight).items():
             param_key = module_to_patch_key + "." + param_name
             module_param = module_to_patch.get_parameter(param_name)
 
@@ -148,7 +143,6 @@ class LoRAPatcher:
                         torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
                     )
                     module_param = expanded_weight
-            param_weight *= patch_weight * patch_scale
             module_param += param_weight.to(dtype=dtype)
 
         patch.to(device=TorchDevice.CPU_DEVICE)

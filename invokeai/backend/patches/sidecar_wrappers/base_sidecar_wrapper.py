@@ -40,7 +40,7 @@ class BaseSidecarWrapper(torch.nn.Module):
         for patch, patch_weight in patches_and_weights:
             # TODO(ryand): self._orig_module could be quantized. Depending on what the patch is doing with the original
             # module, this might fail or return incorrect results.
-            layer_params = patch.get_parameters(self._orig_module)
+            layer_params = patch.get_parameters(self._orig_module, weight=patch_weight)
 
             for param_name, param_weight in layer_params.items():
                 orig_param = self._orig_module.get_parameter(param_name)
@@ -48,15 +48,10 @@ class BaseSidecarWrapper(torch.nn.Module):
                 if orig_param.shape != param_weight.shape:
                     param_weight = param_weight.reshape(orig_param.shape)
 
-                # TODO(ryand): Move scale handling down into the patch.
-                scale = 1
-                if hasattr(patch, "scale"):
-                    scale = patch.scale()  # type: ignore
-
                 if param_name not in params:
-                    params[param_name] = param_weight * (scale * patch_weight)
+                    params[param_name] = param_weight
                 else:
-                    params[param_name] += param_weight * (scale * patch_weight)
+                    params[param_name] += param_weight
 
         return params
 

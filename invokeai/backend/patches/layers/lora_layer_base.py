@@ -57,11 +57,12 @@ class LoRALayerBase(BaseLayerPatch):
     def get_bias(self, orig_bias: torch.Tensor) -> Optional[torch.Tensor]:
         return self.bias
 
-    def get_parameters(self, orig_module: torch.nn.Module) -> dict[str, torch.Tensor]:
-        params = {"weight": self.get_weight(orig_module.weight)}
+    def get_parameters(self, orig_module: torch.nn.Module, weight: float) -> dict[str, torch.Tensor]:
+        scale = self.scale()
+        params = {"weight": self.get_weight(orig_module.weight) * (weight * scale)}
         bias = self.get_bias(orig_module.bias)
         if bias is not None:
-            params["bias"] = bias
+            params["bias"] = bias * (weight * scale)
         return params
 
     @classmethod
