@@ -40,7 +40,7 @@ class LinearSidecarWrapper(BaseSidecarWrapper):
         # NOTE: We slice the input to match the original weight shape in order to work with FluxControlLoRAs, which
         # change the linear layer's in_features.
         orig_input = input
-        input = orig_input[..., : self.orig_module.weight.shape[1]]
+        input = orig_input[..., : self.orig_module.in_features]
         output = self.orig_module(input)
 
         # Then, apply layers for which we have optimized implementations.
