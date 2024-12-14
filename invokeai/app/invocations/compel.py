@@ -21,7 +21,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.patches.model_patcher import ModelPatcher
+from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
@@ -82,7 +82,7 @@ class CompelInvocation(BaseInvocation):
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_model_patches(
+            LayerPatcher.apply_model_patches(
                 model=text_encoder,
                 patches=_lora_loader(),
                 prefix="lora_te_",
@@ -179,7 +179,7 @@ class SDXLPromptInvocationBase:
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_model_patches(
+            LayerPatcher.apply_model_patches(
                 text_encoder,
                 patches=_lora_loader(),
                 prefix=lora_prefix,
