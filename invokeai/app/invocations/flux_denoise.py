@@ -50,7 +50,7 @@ from invokeai.backend.flux.text_conditioning import FluxTextConditioning
 from invokeai.backend.model_manager.config import ModelFormat
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
-from invokeai.backend.patches.lora_patcher import LoRAPatcher
+from invokeai.backend.patches.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -306,7 +306,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             if config.format in [ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
-                    LoRAPatcher.apply_lora_patches(
+                    ModelPatcher.apply_lora_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix=FLUX_LORA_TRANSFORMER_PREFIX,
@@ -321,7 +321,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # The model is quantized, so apply the LoRA weights as sidecar layers. This results in slower inference,
                 # than directly patching the weights, but is agnostic to the quantization format.
                 exit_stack.enter_context(
-                    LoRAPatcher.apply_lora_sidecar_patches(
+                    ModelPatcher.apply_lora_sidecar_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix=FLUX_LORA_TRANSFORMER_PREFIX,

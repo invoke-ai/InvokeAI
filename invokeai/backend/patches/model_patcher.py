@@ -13,7 +13,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 
-class LoRAPatcher:
+class ModelPatcher:
     @staticmethod
     @torch.no_grad()
     @contextmanager
@@ -37,7 +37,7 @@ class LoRAPatcher:
         original_weights = OriginalWeightsStorage(cached_weights)
         try:
             for patch, patch_weight in patches:
-                LoRAPatcher.apply_lora_patch(
+                ModelPatcher.apply_lora_patch(
                     model=model,
                     prefix=prefix,
                     patch=patch,
@@ -85,11 +85,11 @@ class LoRAPatcher:
             if not layer_key.startswith(prefix):
                 continue
 
-            module_key, module = LoRAPatcher._get_submodule(
+            module_key, module = ModelPatcher._get_submodule(
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            LoRAPatcher._apply_lora_layer_patch(
+            ModelPatcher._apply_lora_layer_patch(
                 module_to_patch=module,
                 module_to_patch_key=module_key,
                 patch=layer,
@@ -169,7 +169,7 @@ class LoRAPatcher:
         original_modules: dict[str, torch.nn.Module] = {}
         try:
             for patch, patch_weight in patches:
-                LoRAPatcher._apply_lora_sidecar_patch(
+                ModelPatcher._apply_lora_sidecar_patch(
                     model=model,
                     prefix=prefix,
                     patch=patch,
@@ -182,9 +182,9 @@ class LoRAPatcher:
             # Restore original modules.
             # Note: This logic assumes no nested modules in original_modules.
             for module_key, orig_module in original_modules.items():
-                module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
+                module_parent_key, module_name = ModelPatcher._split_parent_key(module_key)
                 parent_module = model.get_submodule(module_parent_key)
-                LoRAPatcher._set_submodule(parent_module, module_name, orig_module)
+                ModelPatcher._set_submodule(parent_module, module_name, orig_module)
 
     @staticmethod
     def _apply_lora_sidecar_patch(
@@ -212,11 +212,11 @@ class LoRAPatcher:
             if not layer_key.startswith(prefix):
                 continue
 
-            module_key, module = LoRAPatcher._get_submodule(
+            module_key, module = ModelPatcher._get_submodule(
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            LoRAPatcher._apply_lora_layer_wrapper_patch(
+            ModelPatcher._apply_lora_layer_wrapper_patch(
                 model=model,
                 module_to_patch=module,
                 module_to_patch_key=module_key,
@@ -242,9 +242,9 @@ class LoRAPatcher:
         if not isinstance(module_to_patch, BaseSidecarWrapper):
             wrapped_module = wrap_module_with_sidecar_wrapper(orig_module=module_to_patch)
             original_modules[module_to_patch_key] = module_to_patch
-            module_parent_key, module_name = LoRAPatcher._split_parent_key(module_to_patch_key)
+            module_parent_key, module_name = ModelPatcher._split_parent_key(module_to_patch_key)
             module_parent = model.get_submodule(module_parent_key)
-            LoRAPatcher._set_submodule(module_parent, module_name, wrapped_module)
+            ModelPatcher._set_submodule(module_parent, module_name, wrapped_module)
         else:
             assert module_to_patch_key in original_modules
             wrapped_module = module_to_patch

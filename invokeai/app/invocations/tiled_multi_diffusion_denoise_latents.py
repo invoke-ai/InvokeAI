@@ -23,7 +23,7 @@ from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
-from invokeai.backend.patches.lora_patcher import LoRAPatcher
+from invokeai.backend.patches.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, PipelineIntermediateState
 from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
     MultiDiffusionPipeline,
@@ -207,7 +207,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         with (
             ExitStack() as exit_stack,
             unet_info as unet,
-            LoRAPatcher.apply_lora_patches(model=unet, patches=_lora_loader(), prefix="lora_unet_"),
+            ModelPatcher.apply_lora_patches(model=unet, patches=_lora_loader(), prefix="lora_unet_"),
         ):
             assert isinstance(unet, UNet2DConditionModel)
             latents = latents.to(device=unet.device, dtype=unet.dtype)

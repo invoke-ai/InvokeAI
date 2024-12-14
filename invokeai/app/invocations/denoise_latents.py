@@ -40,7 +40,7 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.model_manager import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
-from invokeai.backend.patches.lora_patcher import LoRAPatcher
+from invokeai.backend.patches.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
@@ -1003,7 +1003,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
             SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
-            LoRAPatcher.apply_lora_patches(
+            ModelPatcher.apply_lora_patches(
                 model=unet,
                 patches=_lora_loader(),
                 prefix="lora_unet_",
