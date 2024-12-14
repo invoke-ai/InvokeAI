@@ -2,6 +2,7 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
+from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.sidecar_wrappers.base_sidecar_wrapper import BaseSidecarWrapper
 
@@ -36,12 +37,19 @@ class LinearSidecarWrapper(BaseSidecarWrapper):
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         # First, apply the original linear layer.
+        # NOTE: We slice the input to match the original weight shape in order to work with FluxControlLoRAs, which
+        # change the linear layer's in_features.
+        orig_input = input
+        input = orig_input[..., : self.orig_module.weight.shape[1]]
         output = self.orig_module(input)
 
         # Then, apply layers for which we have optimized implementations.
         unprocessed_patches_and_weights: list[tuple[BaseLayerPatch, float]] = []
         for patch, patch_weight in self._patches_and_weights:
-            if isinstance(patch, LoRALayer):
+            if isinstance(patch, FluxControlLoRALayer):
+                # Note that we use the original input here, not the sliced input.
+                output += self._lora_forward(orig_input, patch, patch_weight)
+            elif isinstance(patch, LoRALayer):
                 output += self._lora_forward(input, patch, patch_weight)
             elif isinstance(patch, ConcatenatedLoRALayer):
                 output += self._concatenated_lora_forward(input, patch, patch_weight)

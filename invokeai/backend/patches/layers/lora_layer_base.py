@@ -63,6 +63,13 @@ class LoRALayerBase(BaseLayerPatch):
         bias = self.get_bias(orig_module.bias)
         if bias is not None:
             params["bias"] = bias * (weight * scale)
+
+        # Reshape all params to match the original module's shape.
+        for param_name, param_weight in params.items():
+            orig_param = orig_module.get_parameter(param_name)
+            if param_weight.shape != orig_param.shape:
+                params[param_name] = param_weight.reshape(orig_param.shape)
+
         return params
 
     @classmethod

@@ -4,7 +4,9 @@ from typing import Dict, Iterable, Optional, Tuple
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.patches.sidecar_wrappers.base_sidecar_wrapper import BaseSidecarWrapper
 from invokeai.backend.patches.sidecar_wrappers.utils import wrap_module_with_sidecar_wrapper
 from invokeai.backend.util.devices import TorchDevice
@@ -125,24 +127,18 @@ class LoRAPatcher:
             # Save original weight
             original_weights.save(param_key, module_param)
 
-            if module_param.shape != param_weight.shape:
-                if module_param.nelement() == param_weight.nelement():
-                    param_weight = param_weight.reshape(module_param.shape)
-                else:
-                    # This condition was added to handle layers in FLUX control LoRAs.
-                    # TODO(ryand): Move the weight update into the LoRA layer so that the LoRAPatcher doesn't need
-                    # to worry about this?
-                    expanded_weight = torch.zeros_like(
-                        param_weight, dtype=module_param.dtype, device=module_param.device
-                    )
-                    slices = tuple(slice(0, dim) for dim in module_param.shape)
-                    expanded_weight[slices] = module_param
-                    setattr(
-                        module_to_patch,
-                        param_name,
-                        torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
-                    )
-                    module_param = expanded_weight
+            # HACK(ryand): This condition is only necessary to handle layers in FLUX control LoRAs that change the
+            # shape of the original layer.
+            if module_param.nelement() != param_weight.nelement():
+                assert isinstance(patch, FluxControlLoRALayer)
+                expanded_weight = pad_with_zeros(module_param, param_weight.shape)
+                setattr(
+                    module_to_patch,
+                    param_name,
+                    torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
+                )
+                module_param = expanded_weight
+
             module_param += param_weight.to(dtype=dtype)
 
         patch.to(device=TorchDevice.CPU_DEVICE)
