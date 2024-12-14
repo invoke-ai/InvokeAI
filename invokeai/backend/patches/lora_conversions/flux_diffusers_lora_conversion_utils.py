@@ -6,7 +6,7 @@ from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
 def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Tensor]) -> bool:
@@ -30,7 +30,9 @@ def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Te
     return all_keys_in_peft_format and all_expected_keys_present
 
 
-def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float | None) -> LoRAModelRaw:
+def lora_model_from_flux_diffusers_state_dict(
+    state_dict: Dict[str, torch.Tensor], alpha: float | None
+) -> ModelPatchRaw:
     """Loads a state dict in the Diffusers FLUX LoRA format into a LoRAModelRaw object.
 
     This function is based on:
@@ -215,7 +217,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
 
     layers_with_prefix = {f"{FLUX_LORA_TRANSFORMER_PREFIX}{k}": v for k, v in layers.items()}
 
-    return LoRAModelRaw(layers=layers_with_prefix)
+    return ModelPatchRaw(layers=layers_with_prefix)
 
 
 def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:

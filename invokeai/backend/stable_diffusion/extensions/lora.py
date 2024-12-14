@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from diffusers import UNet2DConditionModel
 
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 
@@ -30,7 +30,7 @@ class LoRAExt(ExtensionBase):
     @contextmanager
     def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
         lora_model = self._node_context.models.load(self._model_id).model
-        assert isinstance(lora_model, LoRAModelRaw)
+        assert isinstance(lora_model, ModelPatchRaw)
         ModelPatcher.apply_model_patch(
             model=unet,
             prefix="lora_unet_",

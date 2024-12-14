@@ -8,7 +8,7 @@ from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlL
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.set_parameter_layer import SetParameterLayer
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 # A regex pattern that matches all of the keys in the Flux Dev/Canny LoRA format.
 # Example keys:
@@ -43,7 +43,7 @@ def is_state_dict_likely_flux_control(state_dict: Dict[str, Any]) -> bool:
     )
 
 
-def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:
+def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor]) -> ModelPatchRaw:
     # Group keys by layer.
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key, value in state_dict.items():
@@ -81,4 +81,4 @@ def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor])
         else:
             raise ValueError(f"{layer_key} not expected")
 
-    return LoRAModelRaw(layers=layers)
+    return ModelPatchRaw(layers=layers)

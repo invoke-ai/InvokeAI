@@ -5,7 +5,7 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.patches.sidecar_wrappers.base_sidecar_wrapper import BaseSidecarWrapper
 from invokeai.backend.patches.sidecar_wrappers.utils import wrap_module_with_sidecar_wrapper
@@ -19,7 +19,7 @@ class ModelPatcher:
     @contextmanager
     def apply_model_patches(
         model: torch.nn.Module,
-        patches: Iterable[Tuple[LoRAModelRaw, float]],
+        patches: Iterable[Tuple[ModelPatchRaw, float]],
         prefix: str,
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
     ):
@@ -57,7 +57,7 @@ class ModelPatcher:
     def apply_model_patch(
         model: torch.nn.Module,
         prefix: str,
-        patch: LoRAModelRaw,
+        patch: ModelPatchRaw,
         patch_weight: float,
         original_weights: OriginalWeightsStorage,
     ):
@@ -148,7 +148,7 @@ class ModelPatcher:
     @contextmanager
     def apply_model_sidecar_patches(
         model: torch.nn.Module,
-        patches: Iterable[Tuple[LoRAModelRaw, float]],
+        patches: Iterable[Tuple[ModelPatchRaw, float]],
         prefix: str,
         dtype: torch.dtype,
     ):
@@ -189,7 +189,7 @@ class ModelPatcher:
     @staticmethod
     def _apply_model_sidecar_patch(
         model: torch.nn.Module,
-        patch: LoRAModelRaw,
+        patch: ModelPatchRaw,
         patch_weight: float,
         prefix: str,
         original_modules: dict[str, torch.nn.Module],

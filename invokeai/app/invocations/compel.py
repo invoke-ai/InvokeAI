@@ -20,7 +20,7 @@ from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
@@ -66,10 +66,10 @@ class CompelInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.clip.tokenizer)
         text_encoder_info = context.models.load(self.clip.text_encoder)
 
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in self.clip.loras:
                 lora_info = context.models.load(lora.lora)
-                assert isinstance(lora_info.model, LoRAModelRaw)
+                assert isinstance(lora_info.model, ModelPatchRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
             return
@@ -162,11 +162,11 @@ class SDXLPromptInvocationBase:
                 c_pooled = None
             return c, c_pooled
 
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in clip_field.loras:
                 lora_info = context.models.load(lora.lora)
                 lora_model = lora_info.model
-                assert isinstance(lora_model, LoRAModelRaw)
+                assert isinstance(lora_model, ModelPatchRaw)
                 yield (lora_model, lora.weight)
                 del lora_info
             return

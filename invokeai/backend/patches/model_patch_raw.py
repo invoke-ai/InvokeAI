@@ -7,7 +7,7 @@ from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.raw_model import RawModel
 
 
-class LoRAModelRaw(RawModel):
+class ModelPatchRaw(RawModel):
     def __init__(self, layers: Mapping[str, BaseLayerPatch]):
         self.layers = layers
 

@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.model_patcher import ModelPatcher
 
 
@@ -37,7 +37,7 @@ def test_apply_lora_patches(device: str, num_layers: int):
 
     # Initialize num_layers LoRA models with weights of 0.5.
     lora_weight = 0.5
-    lora_models: list[tuple[LoRAModelRaw, float]] = []
+    lora_models: list[tuple[ModelPatchRaw, float]] = []
     for _ in range(num_layers):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
@@ -47,7 +47,7 @@ def test_apply_lora_patches(device: str, num_layers: int):
                 },
             )
         }
-        lora = LoRAModelRaw(lora_layers)
+        lora = ModelPatchRaw(lora_layers)
         lora_models.append((lora, lora_weight))
 
     orig_linear_weight = model.linear_layer_1.weight.data.detach().clone()
@@ -89,7 +89,7 @@ def test_apply_lora_patches_change_device():
             },
         )
     }
-    lora = LoRAModelRaw(lora_layers)
+    lora = ModelPatchRaw(lora_layers)
 
     orig_linear_weight = model.linear_layer_1.weight.data.detach().clone()
 
@@ -128,7 +128,7 @@ def test_apply_lora_sidecar_patches(device: str, num_layers: int):
 
     # Initialize num_layers LoRA models with weights of 0.5.
     lora_weight = 0.5
-    lora_models: list[tuple[LoRAModelRaw, float]] = []
+    lora_models: list[tuple[ModelPatchRaw, float]] = []
     for _ in range(num_layers):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
@@ -138,7 +138,7 @@ def test_apply_lora_sidecar_patches(device: str, num_layers: int):
                 },
             )
         }
-        lora = LoRAModelRaw(lora_layers)
+        lora = ModelPatchRaw(lora_layers)
         lora_models.append((lora, lora_weight))
 
     # Run inference before patching the model.
@@ -171,7 +171,7 @@ def test_apply_lora_sidecar_patches_matches_apply_lora_patches(num_layers: int):
 
     # Initialize num_layers LoRA models with weights of 0.5.
     lora_weight = 0.5
-    lora_models: list[tuple[LoRAModelRaw, float]] = []
+    lora_models: list[tuple[ModelPatchRaw, float]] = []
     for _ in range(num_layers):
         lora_layers = {
             "linear_layer_1": LoRALayer.from_state_dict_values(
@@ -181,7 +181,7 @@ def test_apply_lora_sidecar_patches_matches_apply_lora_patches(num_layers: int):
                 },
             )
         }
-        lora = LoRAModelRaw(lora_layers)
+        lora = ModelPatchRaw(lora_layers)
         lora_models.append((lora, lora_weight))
 
     input = torch.randn(1, linear_in_features, device="cpu", dtype=dtype)

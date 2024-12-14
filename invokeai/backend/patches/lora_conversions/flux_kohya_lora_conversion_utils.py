@@ -9,7 +9,7 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
     FLUX_LORA_CLIP_PREFIX,
     FLUX_LORA_TRANSFORMER_PREFIX,
 )
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 # A regex pattern that matches all of the transformer keys in the Kohya FLUX LoRA format.
 # Example keys:
@@ -39,7 +39,7 @@ def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> boo
     )
 
 
-def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:
+def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -> ModelPatchRaw:
     # Group keys by layer.
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key, value in state_dict.items():
@@ -71,7 +71,7 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
         layers[FLUX_LORA_CLIP_PREFIX + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
 
     # Create and return the LoRAModelRaw.
-    return LoRAModelRaw(layers=layers)
+    return ModelPatchRaw(layers=layers)
 
 
 T = TypeVar("T")

@@ -22,7 +22,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.patches.lora_model_raw import LoRAModelRaw
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, PipelineIntermediateState
 from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
@@ -194,10 +194,10 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             context.util.sd_step_callback(state, unet_config.base)
 
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in self.unet.loras:
                 lora_info = context.models.load(lora.lora)
-                assert isinstance(lora_info.model, LoRAModelRaw)
+                assert isinstance(lora_info.model, ModelPatchRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
 
