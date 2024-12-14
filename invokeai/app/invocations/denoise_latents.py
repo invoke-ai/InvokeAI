@@ -1003,7 +1003,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
             SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora_patches(
+            ModelPatcher.apply_model_patches(
                 model=unet,
                 patches=_lora_loader(),
                 prefix="lora_unet_",

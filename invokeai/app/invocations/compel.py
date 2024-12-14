@@ -82,7 +82,7 @@ class CompelInvocation(BaseInvocation):
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_lora_patches(
+            ModelPatcher.apply_model_patches(
                 model=text_encoder,
                 patches=_lora_loader(),
                 prefix="lora_te_",
@@ -179,7 +179,7 @@ class SDXLPromptInvocationBase:
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
             tokenizer_info as tokenizer,
-            ModelPatcher.apply_lora_patches(
+            ModelPatcher.apply_model_patches(
                 text_encoder,
                 patches=_lora_loader(),
                 prefix=lora_prefix,

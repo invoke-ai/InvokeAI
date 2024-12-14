@@ -306,7 +306,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             if config.format in [ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
-                    ModelPatcher.apply_lora_patches(
+                    ModelPatcher.apply_model_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix=FLUX_LORA_TRANSFORMER_PREFIX,
@@ -321,7 +321,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # The model is quantized, so apply the LoRA weights as sidecar layers. This results in slower inference,
                 # than directly patching the weights, but is agnostic to the quantization format.
                 exit_stack.enter_context(
-                    ModelPatcher.apply_lora_sidecar_patches(
+                    ModelPatcher.apply_model_sidecar_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix=FLUX_LORA_TRANSFORMER_PREFIX,
