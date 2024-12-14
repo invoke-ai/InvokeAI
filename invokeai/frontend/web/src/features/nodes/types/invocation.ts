@@ -34,6 +34,8 @@ export const zInvocationNodeData = z.object({
   isOpen: z.boolean(),
   isIntermediate: z.boolean(),
   useCache: z.boolean(),
+  isErrorNode: z.boolean().default(false),
+  fieldErrors: z.record(z.boolean()).default({}),
 });
 
 export const zNotesNodeData = z.object({
@@ -56,7 +58,7 @@ export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
 type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
 type AnyNodeData = z.infer<typeof zAnyNodeData>;
 
-export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
+export type InvocationNode = Node<InvocationNodeData & { isErrorNode?: boolean }, 'invocation'>;
 export type NotesNode = Node<NotesNodeData, 'notes'>;
 export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
 export type AnyNode = Node<AnyNodeData>;
