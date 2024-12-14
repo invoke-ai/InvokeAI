@@ -90,6 +90,7 @@ plugins:
         'installation/INSTALL_DOCKER.md': 'installation/docker.md'
         'installation/INSTALLING_MODELS.md': 'installation/models.md'
         'installation/INSTALL_PATCHMATCH.md': 'installation/patchmatch.md'
+        'installation/060_INSTALL_PATCHMATCH.md': 'installation/patchmatch.md'
   - mkdocstrings:
       handlers:
         python:
