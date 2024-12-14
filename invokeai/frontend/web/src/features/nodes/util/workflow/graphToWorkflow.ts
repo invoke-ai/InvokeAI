@@ -87,6 +87,8 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
         useCache: node.use_cache ?? true,
         nodePack: template.nodePack,
         inputs,
+        isErrorNode: false,
+        fieldErrors: {},
       },
     });
   });
