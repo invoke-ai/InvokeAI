@@ -3,7 +3,8 @@ import FieldResetToDefaultValueButton from 'features/nodes/components/flow/nodes
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { useReactFlow } from 'reactflow';
 
 import EditableFieldTitle from './EditableFieldTitle';
 import FieldHandle from './FieldHandle';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 const InputField = ({ nodeId, fieldName }: Props) => {
+  const { setNodes } = useReactFlow();
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
   const [isHovered, setIsHovered] = useState(false);
   const isInvalid = useFieldIsInvalid(nodeId, fieldName);
@@ -31,6 +33,30 @@ const InputField = ({ nodeId, fieldName }: Props) => {
   const onMouseLeave = useCallback(() => {
     setIsHovered(false);
   }, []);
+
+  useEffect(() => {
+    setNodes((nodes) =>
+      nodes.map((node) => {
+        if (node.id === nodeId) {
+          const fieldErrors = {
+            ...node.data.fieldErrors,
+            [fieldName]: isInvalid,
+          };
+
+          const isErrorNode = Object.values(fieldErrors).some((error) => error);
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              fieldErrors,
+              isErrorNode,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  }, [isInvalid, nodeId, fieldName, setNodes]);
 
   if (fieldTemplate.input === 'connection' || isConnected) {
     return (
