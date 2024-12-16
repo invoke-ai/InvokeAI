@@ -1,10 +1,12 @@
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional, Tuple, Union
 
+import einops
 import numpy as np
 import numpy.typing as npt
 import torch
 import torchvision.transforms as tv_transforms
+from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
@@ -21,6 +23,7 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
+from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
@@ -33,10 +36,8 @@ from invokeai.backend.flux.extensions.instantx_controlnet_extension import Insta
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
-from invokeai.backend.flux.flux_tools_sampling_utils import prepare_control
 from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterFlux
 from invokeai.backend.flux.model import Flux
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
     generate_img_ids,
@@ -92,7 +93,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         title="Transformer",
     )
     control_lora: Optional[ControlLoRAField] = InputField(
-        description=FieldDescriptions.control_lora_model, input=Input.Connection, title="Control Lora", default=None
+        description=FieldDescriptions.control_lora_model, input=Input.Connection, title="Control LoRA", default=None
     )
     positive_text_conditioning: FluxConditioningField | list[FluxConditioningField] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
@@ -239,6 +240,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         if len(timesteps) <= 1:
             return x
 
+        # Prepare the extra image conditioning tensor if a FLUX structural control image is provided.
+        img_cond = self._prep_structural_control_img_cond(context)
+
         inpaint_mask = self._prep_inpaint_mask(context, x)
 
         img_ids = generate_img_ids(h=latent_h, w=latent_w, batch_size=b, device=x.device, dtype=x.dtype)
@@ -246,6 +250,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
         inpaint_mask = pack(inpaint_mask) if inpaint_mask is not None else None
+        img_cond = pack(img_cond) if img_cond is not None else None
         noise = pack(noise)
         x = pack(x)
 
@@ -289,16 +294,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
                 device=x.device,
             )
-            img_cond = None
-            if self.control_lora:
-                # What should we do when we have multiple of these?
-                if not self.controlnet_vae:
-                    raise ValueError("controlnet_vae must be set when using a strutural lora")
-                ae_info = context.models.load(self.controlnet_vae.vae)
-                img = context.images.get_pil(self.control_lora.img.image_name)
-                with ae_info as ae:
-                    assert isinstance(ae, AutoEncoder)
-                    img_cond = prepare_control(self.height, self.width, self.seed, ae, img)
 
             # Load the transformer model.
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
@@ -590,6 +585,29 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise ValueError(f"Unsupported ControlNet model type: {type(model)}")
 
         return controlnet_extensions
+
+    def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor | None:
+        if self.control_lora is None:
+            return None
+
+        if not self.controlnet_vae:
+            raise ValueError("controlnet_vae must be set when using a FLUX Control LoRA.")
+
+        # Load the conditioning image and resize it to the target image size.
+        cond_img = context.images.get_pil(self.control_lora.img.image_name)
+        cond_img = cond_img.convert("RGB")
+        cond_img = cond_img.resize((self.width, self.height), Image.Resampling.BICUBIC)
+        cond_img = np.array(cond_img)
+
+        # Normalize the conditioning image to the range [-1, 1].
+        # This normalization is based on the original implementations here:
+        # https://github.com/black-forest-labs/flux/blob/805da8571a0b49b6d4043950bd266a65328c243b/src/flux/modules/image_embedders.py#L34
+        # https://github.com/black-forest-labs/flux/blob/805da8571a0b49b6d4043950bd266a65328c243b/src/flux/modules/image_embedders.py#L60
+        img_cond = torch.from_numpy(cond_img).float() / 127.5 - 1.0
+        img_cond = einops.rearrange(img_cond, "h w c -> 1 c h w")
+
+        vae_info = context.models.load(self.controlnet_vae.vae)
+        return FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=img_cond)
 
     def _normalize_ip_adapter_fields(self) -> list[IPAdapterField]:
         if self.ip_adapter is None:
