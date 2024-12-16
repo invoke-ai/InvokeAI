@@ -18,6 +18,7 @@ import type {
   CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
+  ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
   RegionalGuidanceReferenceImageState,
@@ -73,7 +74,9 @@ import {
   getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
+  initialControlNet,
   initialIPAdapter,
+  initialT2IAdapter,
 } from './util';
 
 const getInitialState = (): CanvasState => {
@@ -459,20 +462,43 @@ export const canvasSlice = createSlice({
       }
       layer.controlAdapter.model = zModelIdentifierField.parse(modelConfig);
 
-      // We may need to convert the CA to match the model
-      if (layer.controlAdapter.type === 't2i_adapter' && layer.controlAdapter.model.type === 'controlnet') {
-        // Converting from T2I Adapter to ControlNet - add `controlMode`
-        const controlNetConfig: ControlNetConfig = {
-          ...layer.controlAdapter,
-          type: 'controlnet',
-          controlMode: 'balanced',
-        };
-        layer.controlAdapter = controlNetConfig;
-      } else if (layer.controlAdapter.type === 'controlnet' && layer.controlAdapter.model.type === 't2i_adapter') {
-        // Converting from ControlNet to T2I Adapter - remove `controlMode`
-        const { controlMode: _, ...rest } = layer.controlAdapter;
-        const t2iAdapterConfig: T2IAdapterConfig = { ...rest, type: 't2i_adapter' };
-        layer.controlAdapter = t2iAdapterConfig;
+      switch (layer.controlAdapter.model.type) {
+        case 't2i_adapter': {
+          if (layer.controlAdapter.type === 'controlnet') {
+            const { controlMode: _, ...rest } = layer.controlAdapter;
+            const t2iAdapterConfig: T2IAdapterConfig = { ...rest, type: 't2i_adapter' };
+            layer.controlAdapter = t2iAdapterConfig;
+          } else if (layer.controlAdapter.type === 'control_lora') {
+            const t2iAdapterConfig: T2IAdapterConfig = { ...layer.controlAdapter, ...initialT2IAdapter };
+            layer.controlAdapter = t2iAdapterConfig;
+          }
+          break;
+        }
+
+        case 'controlnet': {
+          if (layer.controlAdapter.type === 't2i_adapter') {
+            const controlNetConfig: ControlNetConfig = {
+              ...layer.controlAdapter,
+              type: 'controlnet',
+              controlMode: initialControlNet.controlMode,
+            };
+            layer.controlAdapter = controlNetConfig;
+          } else if (layer.controlAdapter.type === 'control_lora') {
+            const controlNetConfig: ControlNetConfig = { ...layer.controlAdapter, ...initialControlNet };
+            layer.controlAdapter = controlNetConfig;
+          }
+          break;
+        }
+
+        case 'control_lora': {
+          const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, type: 'control_lora' };
+          layer.controlAdapter = controlLoraConfig;
+
+          break;
+        }
+
+        default:
+          break;
       }
     },
     controlLayerControlModeChanged: (
