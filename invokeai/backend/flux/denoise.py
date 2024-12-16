@@ -31,7 +31,7 @@ def denoise(
     pos_ip_adapter_extensions: list[XLabsIPAdapterExtension],
     neg_ip_adapter_extensions: list[XLabsIPAdapterExtension],
     # extra img tokens
-    img_cond: torch.Tensor | None = None,
+    img_cond: torch.Tensor | None,
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
