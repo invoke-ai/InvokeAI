@@ -718,6 +718,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
         loras: list[Union[LoRAField, ControlLoRAField]] = [*self.transformer.loras]
         if self.control_lora:
+            # Note: Since FLUX structural control LoRAs modify the shape of some weights, it is important that they are
+            # applied last.
             loras.append(self.control_lora)
         for lora in loras:
             lora_info = context.models.load(lora.lora)
