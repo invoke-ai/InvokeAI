@@ -1042,6 +1042,7 @@ class T2IAdapterFolderProbe(FolderProbeBase):
 ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.VAE, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LoRA, LoRAFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.ControlLoRa, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T5Encoder, T5EncoderFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
