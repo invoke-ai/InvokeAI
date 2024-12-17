@@ -26,6 +26,7 @@ import type {
 import { SAM_POINT_LABEL_NUMBER_TO_STRING } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { debounce } from 'lodash-es';
@@ -571,6 +572,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     );
 
     if (rasterizeResult.isErr()) {
+      toast({ status: 'error', title: 'Failed to select object' });
       this.log.error({ error: serializeError(rasterizeResult.error) }, 'Error rasterizing entity');
       this.$isProcessing.set(false);
       return;

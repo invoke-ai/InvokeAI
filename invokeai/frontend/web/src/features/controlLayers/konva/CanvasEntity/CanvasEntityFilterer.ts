@@ -11,6 +11,7 @@ import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import type { CanvasImageState, CanvasRenderableEntityType } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import { debounce } from 'lodash-es';
 import { atom, computed } from 'nanostores';
@@ -246,6 +247,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } })
     );
     if (rasterizeResult.isErr()) {
+      toast({ status: 'error', title: 'Failed to process filter' });
       this.log.error({ error: serializeError(rasterizeResult.error) }, 'Error rasterizing entity');
       this.$isProcessing.set(false);
       return;
