@@ -277,13 +277,19 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       this.log.warn({ rect, imageName: cachedImageName }, 'Cached image name not found, recompositing');
     }
 
-    const canvas = this.getCompositeCanvas(adapters, rect, compositingOptions);
+    const getCompositeCanvasResult = withResult(() => this.getCompositeCanvas(adapters, rect, compositingOptions));
+
+    if (getCompositeCanvasResult.isErr()) {
+      this.log.error({ error: serializeError(getCompositeCanvasResult.error) }, 'Failed to get composite canvas');
+      throw getCompositeCanvasResult.error;
+    }
 
     this.$isProcessing.set(true);
-    const blobResult = await withResultAsync(() => canvasToBlob(canvas));
+    const blobResult = await withResultAsync(() => canvasToBlob(getCompositeCanvasResult.value));
     this.$isProcessing.set(false);
 
     if (blobResult.isErr()) {
+      this.log.error({ error: serializeError(blobResult.error) }, 'Failed to convert composite canvas to blob');
       throw blobResult.error;
     }
     const blob = blobResult.value;
