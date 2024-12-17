@@ -74,7 +74,6 @@ import {
   getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
-  initialControlLoRA,
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
