@@ -51,6 +51,7 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [Retroize](#retroize)
     + [Size Stepper Nodes](#size-stepper-nodes)
     + [Simple Skin Detection](#simple-skin-detection)
+    + [Stereogram](#stereogram-nodes)
     + [Text font to Image](#text-font-to-image)
     + [Thresholding](#thresholding)
     + [Unsharp Mask](#unsharp-mask)
@@ -548,6 +549,15 @@ A third node is included, *Random Switch (Integers)*, which is just a generic ve
 
 **Example Usage:**
 </br><img src="https://raw.githubusercontent.com/dwringer/size-stepper-nodes/main/size_nodes_usage.jpg" width="500" />
+
+--------------------------------
+### Stereogram Nodes
+**Description:** A set of custom nodes for InvokeAI to create cross-view or parallel-view stereograms. Stereograms are 2D images that, when viewed properly, reveal a 3D scene. Check out [r/crossview](https://www.reddit.com/r/CrossView/) for tutorials.
+
+**Node Link:** https://github.com/simonfuhrmann/invokeai-stereo
+
+**Example Workflow and Output**
+</br><img src="https://github.com/simonfuhrmann/invokeai-stereo/blob/main/docs/example_promo_03.jpg" width="500" />
 
 --------------------------------
 ### Text font to Image
