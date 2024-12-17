@@ -13,6 +13,7 @@ import {
 } from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
+import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { clamp, debounce, get } from 'lodash-es';
@@ -779,6 +780,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       })
     );
     if (rasterizeResult.isErr()) {
+      toast({ status: 'error', title: 'Failed to apply transform' });
       this.log.error({ error: serializeError(rasterizeResult.error) }, 'Failed to rasterize entity');
     }
     this.requestRectCalculation();

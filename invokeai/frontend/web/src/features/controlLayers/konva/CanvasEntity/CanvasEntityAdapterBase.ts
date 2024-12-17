@@ -2,6 +2,7 @@ import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
@@ -29,6 +30,7 @@ import {
   isRasterLayerEntityIdentifier,
   type Rect,
 } from 'features/controlLayers/store/types';
+import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import { atom } from 'nanostores';
 import rafThrottle from 'raf-throttle';
@@ -574,9 +576,16 @@ export abstract class CanvasEntityAdapterBase<
     return stableHash(arg);
   };
 
-  cropToBbox = (): Promise<ImageDTO> => {
+  cropToBbox = async (): Promise<ImageDTO> => {
     const { rect } = this.manager.stateApi.getBbox();
-    return this.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } });
+    const rasterizeResult = await withResultAsync(() =>
+      this.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } })
+    );
+    if (rasterizeResult.isErr()) {
+      toast({ status: 'error', title: 'Failed to crop to bbox' });
+      throw rasterizeResult.error;
+    }
+    return rasterizeResult.value;
   };
 
   destroy = (): void => {
