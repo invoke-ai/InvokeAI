@@ -23,6 +23,8 @@ class LayerPatcher:
         prefix: str,
         dtype: torch.dtype,
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
+        force_direct_patching: bool = False,
+        force_sidecar_patching: bool = False,
     ):
         """Apply 'smart' model patching that chooses whether to use direct patching or a sidecar wrapper for each
         module.
@@ -34,7 +36,7 @@ class LayerPatcher:
         original_modules: dict[str, torch.nn.Module] = {}
         try:
             for patch, patch_weight in patches:
-                LayerPatcher._apply_smart_model_patch(
+                LayerPatcher.apply_smart_model_patch(
                     model=model,
                     prefix=prefix,
                     patch=patch,
@@ -42,6 +44,8 @@ class LayerPatcher:
                     original_weights=original_weights,
                     original_modules=original_modules,
                     dtype=dtype,
+                    force_direct_patching=force_direct_patching,
+                    force_sidecar_patching=force_sidecar_patching,
                 )
 
             yield
@@ -60,7 +64,7 @@ class LayerPatcher:
 
     @staticmethod
     @torch.no_grad()
-    def _apply_smart_model_patch(
+    def apply_smart_model_patch(
         model: torch.nn.Module,
         prefix: str,
         patch: ModelPatchRaw,
@@ -68,6 +72,8 @@ class LayerPatcher:
         original_weights: OriginalWeightsStorage,
         original_modules: dict[str, torch.nn.Module],
         dtype: torch.dtype,
+        force_direct_patching: bool,
+        force_sidecar_patching: bool,
     ):
         """Apply a single LoRA patch to a model using the 'smart' patching strategy that chooses whether to use direct
         patching or a sidecar wrapper for each module.
@@ -94,15 +100,27 @@ class LayerPatcher:
             # Decide whether to use direct patching or a sidecar wrapper.
             # Direct patching is preferred, because it results in better runtime speed.
             # Reasons to use sidecar patching:
+            # - The module is quantized, so the caller passed force_sidecar_patching=True.
             # - The module is already wrapped in a BaseSidecarWrapper.
-            # - The module is quantized.
             # - The module is on the CPU (and we don't want to store a second full copy of the original weights on the
             #   CPU, since this would double the RAM usage)
             # NOTE: For now, we don't check if the layer is quantized here. We assume that this is checked in the caller
-            # and that the caller will use the 'apply_model_sidecar_patches' method if the layer is quantized.
+            # and that the caller will set force_sidecar_patching=True if the layer is quantized.
             # TODO(ryand): Handle the case where we are running without a GPU. Should we set a config flag that allows
             # forcing full patching even on the CPU?
-            if isinstance(module, BaseSidecarWrapper) or LayerPatcher._is_any_part_of_layer_on_cpu(module):
+            use_sidecar_patching = False
+            if force_direct_patching and force_sidecar_patching:
+                raise ValueError("Cannot force both direct and sidecar patching.")
+            elif force_direct_patching:
+                use_sidecar_patching = False
+            elif force_sidecar_patching:
+                use_sidecar_patching = True
+            elif isinstance(module, BaseSidecarWrapper):
+                use_sidecar_patching = True
+            elif LayerPatcher._is_any_part_of_layer_on_cpu(module):
+                use_sidecar_patching = True
+
+            if use_sidecar_patching:
                 LayerPatcher._apply_model_layer_wrapper_patch(
                     model=model,
                     module_to_patch=module,
@@ -124,89 +142,6 @@ class LayerPatcher:
     @staticmethod
     def _is_any_part_of_layer_on_cpu(layer: torch.nn.Module) -> bool:
         return any(p.device.type == "cpu" for p in layer.parameters())
-
-    @staticmethod
-    @torch.no_grad()
-    @contextmanager
-    def apply_model_patches(
-        model: torch.nn.Module,
-        patches: Iterable[Tuple[ModelPatchRaw, float]],
-        prefix: str,
-        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
-    ):
-        """Apply one or more LoRA patches to a model within a context manager.
-
-        Args:
-            model (torch.nn.Module): The model to patch.
-            patches (Iterable[Tuple[LoRAModelRaw, float]]): An iterator that returns tuples of LoRA patches and
-                associated weights. An iterator is used so that the LoRA patches do not need to be loaded into memory
-                all at once.
-            prefix (str): The keys in the patches will be filtered to only include weights with this prefix.
-            cached_weights (Optional[Dict[str, torch.Tensor]], optional): Read-only copy of the model's state dict in
-                CPU RAM, for efficient unpatching purposes.
-        """
-        original_weights = OriginalWeightsStorage(cached_weights)
-        try:
-            for patch, patch_weight in patches:
-                LayerPatcher.apply_model_patch(
-                    model=model,
-                    prefix=prefix,
-                    patch=patch,
-                    patch_weight=patch_weight,
-                    original_weights=original_weights,
-                )
-                del patch
-
-            yield
-        finally:
-            for param_key, weight in original_weights.get_changed_weights():
-                cur_param = model.get_parameter(param_key)
-                cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
-
-    @staticmethod
-    @torch.no_grad()
-    def apply_model_patch(
-        model: torch.nn.Module,
-        prefix: str,
-        patch: ModelPatchRaw,
-        patch_weight: float,
-        original_weights: OriginalWeightsStorage,
-    ):
-        """Apply a single LoRA patch to a model.
-
-        Args:
-            model (torch.nn.Module): The model to patch.
-            prefix (str): A string prefix that precedes keys used in the LoRAs weight layers.
-            patch (LoRAModelRaw): The LoRA model to patch in.
-            patch_weight (float): The weight of the LoRA patch.
-            original_weights (OriginalWeightsStorage): Storage for the original weights of the model, for unpatching.
-        """
-        if patch_weight == 0:
-            return
-
-        # If the layer keys contain a dot, then they are not flattened, and can be directly used to access model
-        # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
-        # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
-        # without searching, but some legacy code still uses flattened keys.
-        layer_keys_are_flattened = "." not in next(iter(patch.layers.keys()))
-
-        prefix_len = len(prefix)
-
-        for layer_key, layer in patch.layers.items():
-            if not layer_key.startswith(prefix):
-                continue
-
-            module_key, module = LayerPatcher._get_submodule(
-                model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
-            )
-
-            LayerPatcher._apply_model_layer_patch(
-                module_to_patch=module,
-                module_to_patch_key=module_key,
-                patch=layer,
-                patch_weight=patch_weight,
-                original_weights=original_weights,
-            )
 
     @staticmethod
     @torch.no_grad()
@@ -253,89 +188,6 @@ class LayerPatcher:
             module_param += param_weight.to(dtype=dtype)
 
         patch.to(device=TorchDevice.CPU_DEVICE)
-
-    @staticmethod
-    @torch.no_grad()
-    @contextmanager
-    def apply_model_sidecar_patches(
-        model: torch.nn.Module,
-        patches: Iterable[Tuple[ModelPatchRaw, float]],
-        prefix: str,
-        dtype: torch.dtype,
-    ):
-        """Apply one or more LoRA sidecar patches to a model within a context manager. Sidecar patches incur some
-        overhead compared to normal LoRA patching, but they allow for LoRA layers to applied to base layers in any
-        quantization format.
-
-        Args:
-            model (torch.nn.Module): The model to patch.
-            patches (Iterable[Tuple[LoRAModelRaw, float]]): An iterator that returns tuples of LoRA patches and
-                associated weights. An iterator is used so that the LoRA patches do not need to be loaded into memory
-                all at once.
-            prefix (str): The keys in the patches will be filtered to only include weights with this prefix.
-            dtype (torch.dtype): The compute dtype of the sidecar layers. This cannot easily be inferred from the model,
-                since the sidecar layers are typically applied on top of quantized layers whose weight dtype is
-                different from their compute dtype.
-        """
-        original_modules: dict[str, torch.nn.Module] = {}
-        try:
-            for patch, patch_weight in patches:
-                LayerPatcher._apply_model_sidecar_patch(
-                    model=model,
-                    prefix=prefix,
-                    patch=patch,
-                    patch_weight=patch_weight,
-                    original_modules=original_modules,
-                    dtype=dtype,
-                )
-            yield
-        finally:
-            # Restore original modules.
-            # Note: This logic assumes no nested modules in original_modules.
-            for module_key, orig_module in original_modules.items():
-                module_parent_key, module_name = LayerPatcher._split_parent_key(module_key)
-                parent_module = model.get_submodule(module_parent_key)
-                LayerPatcher._set_submodule(parent_module, module_name, orig_module)
-
-    @staticmethod
-    def _apply_model_sidecar_patch(
-        model: torch.nn.Module,
-        patch: ModelPatchRaw,
-        patch_weight: float,
-        prefix: str,
-        original_modules: dict[str, torch.nn.Module],
-        dtype: torch.dtype,
-    ):
-        """Apply a single LoRA sidecar patch to a model."""
-
-        if patch_weight == 0:
-            return
-
-        # If the layer keys contain a dot, then they are not flattened, and can be directly used to access model
-        # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
-        # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
-        # without searching, but some legacy code still uses flattened keys.
-        layer_keys_are_flattened = "." not in next(iter(patch.layers.keys()))
-
-        prefix_len = len(prefix)
-
-        for layer_key, layer in patch.layers.items():
-            if not layer_key.startswith(prefix):
-                continue
-
-            module_key, module = LayerPatcher._get_submodule(
-                model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
-            )
-
-            LayerPatcher._apply_model_layer_wrapper_patch(
-                model=model,
-                module_to_patch=module,
-                module_to_patch_key=module_key,
-                patch=layer,
-                patch_weight=patch_weight,
-                original_modules=original_modules,
-                dtype=dtype,
-            )
 
     @staticmethod
     @torch.no_grad()

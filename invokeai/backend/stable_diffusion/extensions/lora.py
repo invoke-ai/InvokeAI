@@ -31,12 +31,16 @@ class LoRAExt(ExtensionBase):
     def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
         lora_model = self._node_context.models.load(self._model_id).model
         assert isinstance(lora_model, ModelPatchRaw)
-        LayerPatcher.apply_model_patch(
+        LayerPatcher.apply_smart_model_patch(
             model=unet,
             prefix="lora_unet_",
             patch=lora_model,
             patch_weight=self._weight,
             original_weights=original_weights,
+            original_modules={},
+            dtype=unet.dtype,
+            force_direct_patching=True,
+            force_sidecar_patching=False,
         )
         del lora_model
 
