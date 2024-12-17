@@ -48,9 +48,9 @@ from invokeai.backend.flux.sampling_utils import (
 )
 from invokeai.backend.flux.text_conditioning import FluxTextConditioning
 from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice

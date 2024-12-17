@@ -4,9 +4,9 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.patches.sidecar_wrappers.base_sidecar_wrapper import BaseSidecarWrapper
 
 

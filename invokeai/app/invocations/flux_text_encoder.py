@@ -18,9 +18,9 @@ from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
 from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 
