@@ -488,6 +488,22 @@ union_cnet_flux = StarterModel(
     type=ModelType.ControlNet,
 )
 # endregion
+# region Control LoRA
+flux_canny_control_lora = StarterModel(
+    name="Hard Edge Detection (Canny)",
+    base=BaseModelType.Flux,
+    source="black-forest-labs/FLUX.1-Canny-dev-lora::flux1-canny-dev-lora.safetensors",
+    description="Uses detected edges in the image to control composition.",
+    type=ModelType.ControlLoRa,
+)
+flux_depth_control_lora = StarterModel(
+    name="Depth Map",
+    base=BaseModelType.Flux,
+    source="black-forest-labs/FLUX.1-Depth-dev-lora::flux1-depth-dev-lora.safetensors",
+    description="Uses depth information in the image to control the depth in the generation.",
+    type=ModelType.ControlLoRa,
+)
+# endregion
 # region T2I Adapter
 t2i_canny_sd1 = StarterModel(
     name="Hard Edge Detection (canny)",
@@ -630,6 +646,8 @@ STARTER_MODELS: list[StarterModel] = [
     tile_sdxl,
     union_cnet_sdxl,
     union_cnet_flux,
+    flux_canny_control_lora,
+    flux_depth_control_lora,
     t2i_canny_sd1,
     t2i_sketch_sd1,
     t2i_depth_sd1,
@@ -688,6 +706,8 @@ flux_bundle: list[StarterModel] = [
     clip_l_encoder,
     union_cnet_flux,
     ip_adapter_flux,
+    flux_canny_control_lora,
+    flux_depth_control_lora,
 ]
 
 STARTER_BUNDLES: dict[str, list[StarterModel]] = {
