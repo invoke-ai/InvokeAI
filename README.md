@@ -32,49 +32,96 @@ Invoke is available in two editions:
 
 </div>
 
-## Quick Start
+## How to Install and Update Invoke Community Edition
 
-1. Download and unzip the installer from the bottom of the [latest release][latest release link].
-2. Run the installer script.
+Welcome to Invoke! Follow these steps to install, update, and get started with Invoke. 
 
-   - **Windows**: Double-click on the `install.bat` script.
-   - **macOS**: Open a Terminal window, drag the file `install.sh` from Finder into the Terminal, and press enter.
-   - **Linux**: Run `install.sh`.
+You can also follow out [installation documentation][installation docs].
 
-3. When prompted, enter a location for the install and select your GPU type.
-4. Once the install finishes, find the directory you selected during install. The default location is `C:\Users\Username\invokeai` for Windows or `~/invokeai` for Linux/macOS.
-5. Run the launcher script (`invoke.bat` for Windows, `invoke.sh` for macOS and Linux) the same way you ran the installer script in step 2.
-6. Select option 1 to start the application. Once it starts up, open your browser and go to <http://localhost:9090>.
-7. Open the model manager tab to install a starter model and then you'll be ready to generate.
+### Step 1: Confirm System Requirements
 
-More detail, including hardware requirements and manual install instructions, are available in the [installation documentation][installation docs].
+**Before you start, ensure your system meets the following requirements:**
 
-## Docker Container
+| **Minimum Requirements**                                                                                                      | 
+|----------------------------------------------------------------------------------------------------------------------------|
+|**Operating System:** Windows 10+, macOS 11.0+, or Linux (Ubuntu 20.04+ recommended).|
+|**GPU:** |
+|  - **NVIDIA:** GTX 1060 or higher (6GB VRAM), CUDA 11.3+. |
+|  - **AMD:** RX 5700 or higher, ROCm 5.4+ (Linux only).|
+|**RAM:** 8GB or more.|
+|**Disk Space:** 10GB free for installation (30GB+ recommended for models).|
 
-We publish official container images in Github Container Registry: https://github.com/invoke-ai/InvokeAI/pkgs/container/invokeai. Both CUDA and ROCm images are available. Check the above link for relevant tags.
+**Recommended for Best Performance**
+- **GPU:** NVIDIA RTX 20 Series or AMD RDNA2 GPUs with 8GB+ VRAM.
+- **RAM:** 16GB or more.
+- **Disk Space:** 100GB if working with multiple models.
 
-> [!IMPORTANT]
-> Ensure that Docker is set up to use the GPU. Refer to [NVIDIA][nvidia docker docs] or [AMD][amd docker docs] documentation.
+### Step 2: Download the Launcher
 
-### Generate!
+Download the most recent launcher for your operating system:
 
-Run the container, modifying the command as necessary:
+- [Download for Windows](https://download.invoke.ai/Invoke-Installer-windows-x64.exe)
+- [Download for macOS](https://download.invoke.ai/Invoke-Installer-mac-arm64.dmg)
+- [Download for Linux](https://download.invoke.ai/Invoke-Installer-linux-x86_64.AppImage)
 
-```bash
-docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
-```
+### Step 3: Install or Update Invoke
 
-Then open `http://localhost:9090` and install some models using the Model Manager tab to begin generating.
+Run the launcher you just downloaded. You’ll have two options:
 
-For ROCm, add `--device /dev/kfd --device /dev/dri` to the `docker run` command.
+1. **Launch / update from an existing installation:**
+   - If you installed Invoke previously, click *Select an existing installation* to connect to it. You'll be able to update or launch the existing installation.
+   
+2. **Launch from a fresh installation:**
+   - Click *Install* to set up a new instance of Invoke.
+   - Follow the on-screen instructions to complete the setup.
 
-### Persist your data
+### Step 4: Run Invoke from Your Browser
 
-You will likely want to persist your workspace outside of the container. Use the `--volume /home/myuser/invokeai:/invokeai` flag to mount some local directory (using its **absolute** path) to the `/invokeai` path inside the container. Your generated images and models will reside there. You can use this directory with other InvokeAI installations, or switch between runtime directories as needed.
+Once installed, click Finish, then Launch to start Invoke.
 
-### DIY
+- The very first run after an installation will take a few extra moments to get ready. It will be faster after the first run.
 
-Build your own image and customize the environment to match your needs using our `docker-compose` stack. See [README.md](./docker/README.md) in the [docker](./docker) directory.
+### Step 5: Install a Starter Model Pack or Locate Models On Your Hard Drive
+
+After launching Invoke:
+
+1. Go to the **Model Manager** tab.
+2. Install one of the suggested Starter Model packs. If you already have models installed on your hard drive, you can provide that folder location and Invoke will automatically add those models to your studio.
+
+You’re now ready to start creating!
+
+### Step 6: Learn the Basics
+
+We recommend watching the following resources to get started:
+
+[**Getting Started Playlist**](https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO)
+
+This playlist covers essential features and workflows, including:
+
+- Generating your first image.
+- Using control layers and reference guides.
+- Refining images with advanced workflows.
+
+---
+
+## Advanced Installation Options
+
+### Manual Installation
+
+For detailed instructions on manual setup, see our [Manual Installation Guide](https://invoke-ai.github.io/InvokeAI/installation/manual/).
+
+### Docker Installation
+
+Run Invoke in a containerized environment with our [Docker Installation Guide](https://invoke-ai.github.io/InvokeAI/installation/docker/).
+
+---
+
+## Need Help?
+
+- Visit our [Support Portal](https://support.invoke.ai).
+- Watch the [Getting Started Playlist](https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO).
+- Join the conversation on [Discord][discord link].
+
 
 ## Troubleshooting, FAQ and Support
 
