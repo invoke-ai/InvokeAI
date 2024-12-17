@@ -27,6 +27,7 @@ import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { throttle } from 'lodash-es';
 import type { Logger } from 'roarr';
+import { serializeError } from 'serialize-error';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -485,30 +486,36 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     this.log.trace({ rasterizeArgs }, 'Rasterizing entity');
     this.manager.stateApi.$rasterizingAdapter.set(this.parent);
 
-    const blob = await this.getBlob(rasterizeArgs);
-    if (this.manager._isDebugging) {
-      previewBlob(blob, 'Rasterized entity');
+    try {
+      const blob = await this.getBlob(rasterizeArgs);
+      if (this.manager._isDebugging) {
+        previewBlob(blob, 'Rasterized entity');
+      }
+      imageDTO = await uploadImage({
+        file: new File([blob], `${this.id}_rasterized.png`, { type: 'image/png' }),
+        image_category: 'other',
+        is_intermediate: true,
+        silent: true,
+      });
+      const imageObject = imageDTOToImageObject(imageDTO);
+      if (replaceObjects) {
+        await this.parent.bufferRenderer.setBuffer(imageObject);
+        this.parent.bufferRenderer.commitBuffer({ pushToState: false });
+      }
+      this.manager.stateApi.rasterizeEntity({
+        entityIdentifier: this.parent.entityIdentifier,
+        imageObject,
+        position: { x: Math.round(rect.x), y: Math.round(rect.y) },
+        replaceObjects,
+      });
+      this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
+      return imageDTO;
+    } catch (error) {
+      this.log.error({ rasterizeArgs, error: serializeError(error) }, 'Failed to rasterize entity');
+      throw error;
+    } finally {
+      this.manager.stateApi.$rasterizingAdapter.set(null);
     }
-    imageDTO = await uploadImage({
-      file: new File([blob], `${this.id}_rasterized.png`, { type: 'image/png' }),
-      image_category: 'other',
-      is_intermediate: true,
-      silent: true,
-    });
-    const imageObject = imageDTOToImageObject(imageDTO);
-    if (replaceObjects) {
-      await this.parent.bufferRenderer.setBuffer(imageObject);
-      this.parent.bufferRenderer.commitBuffer({ pushToState: false });
-    }
-    this.manager.stateApi.rasterizeEntity({
-      entityIdentifier: this.parent.entityIdentifier,
-      imageObject,
-      position: { x: Math.round(rect.x), y: Math.round(rect.y) },
-      replaceObjects,
-    });
-    this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
-    this.manager.stateApi.$rasterizingAdapter.set(null);
-    return imageDTO;
   };
 
   cloneObjectGroup = (arg: { attrs?: GroupConfig } = {}): Konva.Group => {
