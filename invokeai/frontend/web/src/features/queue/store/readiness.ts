@@ -278,20 +278,29 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
-  canvas.controlLayers.entities
-    .filter((controlLayer) => controlLayer.isEnabled)
-    .forEach((controlLayer, i) => {
-      const layerLiteral = i18n.t('controlLayers.layer_one');
-      const layerNumber = i + 1;
-      const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
-      const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getControlLayerWarnings(controlLayer, model);
+  const enabledControlLayers = canvas.controlLayers.entities.filter((controlLayer) => controlLayer.isEnabled);
 
-      if (problems.length) {
-        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
-        reasons.push({ prefix, content });
-      }
-    });
+  // FLUX only supports 1x Control LoRA at a time.
+  const controlLoRACount = enabledControlLayers.filter(
+    (controlLayer) => controlLayer.controlAdapter?.model?.type === 'control_lora'
+  ).length;
+
+  if (model?.base === 'flux' && controlLoRACount > 1) {
+    reasons.push({ content: i18n.t('parameters.invoke.fluxModelMultipleControlLoRAs') });
+  }
+
+  enabledControlLayers.forEach((controlLayer, i) => {
+    const layerLiteral = i18n.t('controlLayers.layer_one');
+    const layerNumber = i + 1;
+    const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
+    const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
+    const problems = getControlLayerWarnings(controlLayer, model);
+
+    if (problems.length) {
+      const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+      reasons.push({ prefix, content });
+    }
+  });
 
   canvas.referenceImages.entities
     .filter((entity) => entity.isEnabled)
