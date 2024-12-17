@@ -48,7 +48,8 @@ class LayerPatcher:
         finally:
             # Restore directly patched layers.
             for param_key, weight in original_weights.get_changed_weights():
-                model.get_parameter(param_key).copy_(weight)
+                cur_param = model.get_parameter(param_key)
+                cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
 
             # Restore LoRASidecarWrapper modules.
             # Note: This logic assumes no nested modules in original_modules.
