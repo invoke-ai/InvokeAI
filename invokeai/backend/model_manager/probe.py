@@ -259,17 +259,8 @@ class ModelProbe(object):
         ckpt = checkpoint if checkpoint else read_checkpoint_meta(model_path, scan=True)
         ckpt = ckpt.get("state_dict", ckpt)
 
-        if isinstance(ckpt, dict) and "img_in.lora_A.weight" in ckpt and "img_in.lora_B.weight" in ckpt:
-            tensor_a, tensor_b = ckpt["img_in.lora_A.weight"], ckpt["img_in.lora_B.weight"]
-            if (
-                tensor_a is not None
-                and isinstance(tensor_a, torch.Tensor)
-                and tensor_a.shape[1] == 128
-                and tensor_b is not None
-                and isinstance(tensor_b, torch.Tensor)
-                and tensor_b.shape[0] == 3072
-            ):
-                return ModelType.ControlLoRa
+        if isinstance(ckpt, dict) and is_state_dict_likely_flux_control(ckpt):
+            return ModelType.ControlLoRa
 
         for key in [str(k) for k in ckpt.keys()]:
             if key.startswith(
