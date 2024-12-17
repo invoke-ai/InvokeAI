@@ -7,6 +7,7 @@ import type {
   CanvasRasterLayerState,
   CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
+  ControlLoRAConfig,
   ControlNetConfig,
   ImageWithDims,
   IPAdapterConfig,
@@ -81,6 +82,11 @@ export const initialControlNet: ControlNetConfig = {
   weight: 0.75,
   beginEndStepPct: [0, 0.75],
   controlMode: 'balanced',
+};
+export const initialControlLoRA: ControlLoRAConfig = {
+  type: 'control_lora',
+  model: null,
+  weight: 0.75,
 };
 
 export const getReferenceImageState = (

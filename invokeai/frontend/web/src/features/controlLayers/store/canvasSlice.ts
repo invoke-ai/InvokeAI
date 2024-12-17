@@ -74,6 +74,7 @@ import {
   getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
+  initialControlLoRA,
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
@@ -491,9 +492,13 @@ export const canvasSlice = createSlice({
         }
 
         case 'control_lora': {
-          const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, type: 'control_lora' };
-          layer.controlAdapter = controlLoraConfig;
-
+          if (layer.controlAdapter.type === 'controlnet') {
+            const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, ...initialControlLoRA };
+            layer.controlAdapter = controlLoraConfig;
+          } else if (layer.controlAdapter.type === 't2i_adapter') {
+            const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, ...initialControlLoRA };
+            layer.controlAdapter = controlLoraConfig;
+          }
           break;
         }
 
@@ -518,7 +523,7 @@ export const canvasSlice = createSlice({
     ) => {
       const { entityIdentifier, weight } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
-      if (!layer || !layer.controlAdapter || layer.controlAdapter.type === 'control_lora') {
+      if (!layer || !layer.controlAdapter) {
         return;
       }
       layer.controlAdapter.weight = weight;
