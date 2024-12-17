@@ -67,5 +67,5 @@ def test_lora_model_from_flux_control_state_dict_extra_keys_error():
     state_dict["transformer.single_transformer_blocks.0.unexpected_key.lora_A.weight"] = torch.empty(1)
 
     # Check that an error is raised.
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         lora_model_from_flux_control_state_dict(state_dict)

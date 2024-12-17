@@ -36,10 +36,8 @@ class FluxControlLoRALoaderInvocation(BaseInvocation):
     image: ImageField = InputField(description="The image to encode.")
 
     def invoke(self, context: InvocationContext) -> FluxControlLoRALoaderOutput:
-        lora_key = self.lora.key
-
-        if not context.models.exists(lora_key):
-            raise ValueError(f"Unknown lora: {lora_key}!")
+        if not context.models.exists(self.lora.key):
+            raise ValueError(f"Unknown lora: {self.lora.key}!")
 
         return FluxControlLoRALoaderOutput(
             control_lora=ControlLoRAField(
