@@ -24,7 +24,7 @@ class FluxControlLoRALoaderOutput(BaseInvocationOutput):
     title="Flux Control LoRA",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class FluxControlLoRALoaderInvocation(BaseInvocation):
@@ -34,6 +34,7 @@ class FluxControlLoRALoaderInvocation(BaseInvocation):
         description=FieldDescriptions.control_lora_model, title="Control LoRA", ui_type=UIType.ControlLoRAModel
     )
     image: ImageField = InputField(description="The image to encode.")
+    weight: float = InputField(description="The weight of the LoRA.", default=1.0)
 
     def invoke(self, context: InvocationContext) -> FluxControlLoRALoaderOutput:
         if not context.models.exists(self.lora.key):
@@ -43,6 +44,6 @@ class FluxControlLoRALoaderInvocation(BaseInvocation):
             control_lora=ControlLoRAField(
                 lora=self.lora,
                 img=self.image,
-                weight=1,
+                weight=self.weight,
             )
         )

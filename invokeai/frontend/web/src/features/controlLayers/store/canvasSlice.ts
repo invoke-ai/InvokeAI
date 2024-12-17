@@ -74,6 +74,7 @@ import {
   getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
+  initialControlLoRA,
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
@@ -462,38 +463,64 @@ export const canvasSlice = createSlice({
       }
       layer.controlAdapter.model = zModelIdentifierField.parse(modelConfig);
 
+      // When converting between control layer types, we may need to add or remove properties. For example, ControlNet
+      // has a control mode, while T2I Adapter does not - otherwise they are the same.
+
       switch (layer.controlAdapter.model.type) {
+        // Converting to T2I adapter from...
         case 't2i_adapter': {
           if (layer.controlAdapter.type === 'controlnet') {
+            // T2I Adapters have all the ControlNet properties, minus control mode - strip it
             const { controlMode: _, ...rest } = layer.controlAdapter;
-            const t2iAdapterConfig: T2IAdapterConfig = { ...rest, type: 't2i_adapter' };
+            const t2iAdapterConfig: T2IAdapterConfig = { ...initialT2IAdapter, ...rest, type: 't2i_adapter' };
             layer.controlAdapter = t2iAdapterConfig;
           } else if (layer.controlAdapter.type === 'control_lora') {
-            const t2iAdapterConfig: T2IAdapterConfig = { ...layer.controlAdapter, ...initialT2IAdapter };
+            // Control LoRAs have only model and weight
+            const t2iAdapterConfig: T2IAdapterConfig = {
+              ...initialT2IAdapter,
+              ...layer.controlAdapter,
+              type: 't2i_adapter',
+            };
             layer.controlAdapter = t2iAdapterConfig;
           }
           break;
         }
 
+        // Converting to ControlNet from...
         case 'controlnet': {
           if (layer.controlAdapter.type === 't2i_adapter') {
+            // ControlNets have all the T2I Adapter properties, plus control mode
             const controlNetConfig: ControlNetConfig = {
+              ...initialControlNet,
               ...layer.controlAdapter,
               type: 'controlnet',
-              controlMode: initialControlNet.controlMode,
             };
             layer.controlAdapter = controlNetConfig;
           } else if (layer.controlAdapter.type === 'control_lora') {
-            const controlNetConfig: ControlNetConfig = { ...layer.controlAdapter, ...initialControlNet };
+            // ControlNets have all the Control LoRA properties, plus control mode and begin/end step pct
+            const controlNetConfig: ControlNetConfig = {
+              ...initialControlNet,
+              ...layer.controlAdapter,
+              type: 'controlnet',
+            };
             layer.controlAdapter = controlNetConfig;
           }
           break;
         }
 
+        // Converting to ControlLoRA from...
         case 'control_lora': {
-          const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, type: 'control_lora' };
-          layer.controlAdapter = controlLoraConfig;
-
+          if (layer.controlAdapter.type === 'controlnet') {
+            // We only need the model and weight for Control LoRA
+            const { model, weight } = layer.controlAdapter;
+            const controlNetConfig: ControlLoRAConfig = { ...initialControlLoRA, model, weight };
+            layer.controlAdapter = controlNetConfig;
+          } else if (layer.controlAdapter.type === 't2i_adapter') {
+            // We only need the model and weight for Control LoRA
+            const { model, weight } = layer.controlAdapter;
+            const t2iAdapterConfig: ControlLoRAConfig = { ...initialControlLoRA, model, weight };
+            layer.controlAdapter = t2iAdapterConfig;
+          }
           break;
         }
 
@@ -518,7 +545,7 @@ export const canvasSlice = createSlice({
     ) => {
       const { entityIdentifier, weight } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
-      if (!layer || !layer.controlAdapter || layer.controlAdapter.type === 'control_lora') {
+      if (!layer || !layer.controlAdapter) {
         return;
       }
       layer.controlAdapter.weight = weight;

@@ -162,7 +162,7 @@ export const ControlLayerControlAdapter = memo(() => {
         />
         <input {...uploadApi.getUploadInputProps()} />
       </Flex>
-      {controlAdapter.type !== 'control_lora' && <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />}
+      <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
       {controlAdapter.type !== 'control_lora' && (
         <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
       )}

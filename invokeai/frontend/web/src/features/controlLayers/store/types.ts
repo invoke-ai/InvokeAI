@@ -298,6 +298,7 @@ export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
 
 const zControlLoRAConfig = z.object({
   type: z.literal('control_lora'),
+  weight: z.number().gte(-1).lte(2),
   model: zServerValidatedModelIdentifierField.nullable(),
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;

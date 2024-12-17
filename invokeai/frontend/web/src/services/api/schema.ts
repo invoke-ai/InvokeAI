@@ -6709,6 +6709,12 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"];
             /**
+             * Weight
+             * @description The weight of the LoRA.
+             * @default 1
+             */
+            weight?: number;
+            /**
              * type
              * @default flux_control_lora_loader
              * @constant
@@ -6722,11 +6728,11 @@ export type components = {
          */
         FluxControlLoRALoaderOutput: {
             /**
-             * Flux Control Lora
+             * Flux Control LoRA
              * @description Control LoRAs to apply on model loading
              * @default null
              */
-            control_lora: components["schemas"]["ControlLoRAField"] | null;
+            control_lora: components["schemas"]["ControlLoRAField"];
             /**
              * type
              * @default flux_control_lora_loader_output
@@ -6926,7 +6932,7 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"];
             /**
-             * Control Lora
+             * Control LoRA
              * @description Control LoRA model to load
              * @default null
              */

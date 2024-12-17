@@ -207,7 +207,7 @@ const addControlLoRAToGraph = (
 ) => {
   const { id, controlAdapter } = layer;
   assert(controlAdapter.type === 'control_lora');
-  const { model } = controlAdapter;
+  const { model, weight } = controlAdapter;
   assert(model !== null);
   const { image_name } = imageDTO;
 
@@ -216,6 +216,7 @@ const addControlLoRAToGraph = (
     type: 'flux_control_lora_loader',
     lora: model,
     image: { image_name },
+    weight: weight,
   });
 
   g.addEdge(controlLoRA, 'control_lora', denoise, 'control_lora');
