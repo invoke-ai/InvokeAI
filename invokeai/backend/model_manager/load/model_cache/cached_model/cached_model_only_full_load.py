@@ -21,6 +21,7 @@ class CachedModelOnlyFullLoad:
         # model is often a torch.nn.Module, but could be any model type. Throughout this class, we handle both cases.
         self._model = model
         self._compute_device = compute_device
+        self._offload_device = torch.device("cpu")
         self._total_bytes = total_bytes
         self._is_in_vram = False
 
@@ -76,6 +77,6 @@ class CachedModelOnlyFullLoad:
             # Already in RAM.
             return 0
 
-        self._model.to("cpu")
+        self._model.to(self._offload_device)
         self._is_in_vram = False
         return self._total_bytes
