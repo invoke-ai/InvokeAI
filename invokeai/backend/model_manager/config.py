@@ -292,6 +292,18 @@ class ControlLoRALyCORISConfig(ModelConfigBase, ControlAdapterConfigBase):
         return Tag(f"{ModelType.ControlLoRa.value}.{ModelFormat.LyCORIS.value}")
 
 
+class ControlLoRADiffusersConfig(ModelConfigBase, ControlAdapterConfigBase):
+    """Model config for Control LoRA models."""
+
+    type: Literal[ModelType.ControlLoRa] = ModelType.ControlLoRa
+    trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.ControlLoRa.value}.{ModelFormat.Diffusers.value}")
+
+
 class LoRADiffusersConfig(LoRAConfigBase):
     """Model config for LoRA/Diffusers models."""
 
@@ -549,6 +561,7 @@ AnyModelConfig = Annotated[
         Annotated[ControlNetCheckpointConfig, ControlNetCheckpointConfig.get_tag()],
         Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
         Annotated[ControlLoRALyCORISConfig, ControlLoRALyCORISConfig.get_tag()],
+        Annotated[ControlLoRADiffusersConfig, ControlLoRADiffusersConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
         Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
         Annotated[T5EncoderBnbQuantizedLlmInt8bConfig, T5EncoderBnbQuantizedLlmInt8bConfig.get_tag()],
