@@ -19,9 +19,9 @@ from invokeai.app.invocations.model import CLIPField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
     ConditioningFieldData,
@@ -66,10 +66,10 @@ class CompelInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.clip.tokenizer)
         text_encoder_info = context.models.load(self.clip.text_encoder)
 
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in self.clip.loras:
                 lora_info = context.models.load(lora.lora)
-                assert isinstance(lora_info.model, LoRAModelRaw)
+                assert isinstance(lora_info.model, ModelPatchRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
             return
@@ -82,7 +82,7 @@ class CompelInvocation(BaseInvocation):
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
             tokenizer_info as tokenizer,
-            LoRAPatcher.apply_lora_patches(
+            LayerPatcher.apply_model_patches(
                 model=text_encoder,
                 patches=_lora_loader(),
                 prefix="lora_te_",
@@ -162,11 +162,11 @@ class SDXLPromptInvocationBase:
                 c_pooled = None
             return c, c_pooled
 
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in clip_field.loras:
                 lora_info = context.models.load(lora.lora)
                 lora_model = lora_info.model
-                assert isinstance(lora_model, LoRAModelRaw)
+                assert isinstance(lora_model, ModelPatchRaw)
                 yield (lora_model, lora.weight)
                 del lora_info
             return
@@ -179,7 +179,7 @@ class SDXLPromptInvocationBase:
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
             tokenizer_info as tokenizer,
-            LoRAPatcher.apply_lora_patches(
+            LayerPatcher.apply_model_patches(
                 text_encoder,
                 patches=_lora_loader(),
                 prefix=lora_prefix,

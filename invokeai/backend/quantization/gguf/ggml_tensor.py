@@ -52,6 +52,7 @@ GGML_TENSOR_OP_TABLE = {
     torch.ops.aten.t.default: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.addmm.default: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.mul.Tensor: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.add.Tensor: dequantize_and_run,  # pyright: ignore
 }
 
 if torch.backends.mps.is_available():

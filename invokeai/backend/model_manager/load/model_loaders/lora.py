@@ -9,19 +9,6 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.lora.conversions.flux_control_lora_utils import (
-    is_state_dict_likely_flux_control,
-    lora_model_from_flux_control_state_dict,
-)
-from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
-    lora_model_from_flux_diffusers_state_dict,
-)
-from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import (
-    is_state_dict_likely_in_flux_kohya_format,
-    lora_model_from_flux_kohya_state_dict,
-)
-from invokeai.backend.lora.conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
-from invokeai.backend.lora.conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -33,6 +20,19 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import (
+    is_state_dict_likely_flux_control,
+    lora_model_from_flux_control_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
+    lora_model_from_flux_diffusers_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_kohya_format,
+    lora_model_from_flux_kohya_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
+from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)

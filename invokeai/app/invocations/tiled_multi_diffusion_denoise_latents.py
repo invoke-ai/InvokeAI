@@ -22,8 +22,8 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.lora.lora_patcher import LoRAPatcher
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, PipelineIntermediateState
 from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
     MultiDiffusionPipeline,
@@ -194,10 +194,10 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             context.util.sd_step_callback(state, unet_config.base)
 
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in self.unet.loras:
                 lora_info = context.models.load(lora.lora)
-                assert isinstance(lora_info.model, LoRAModelRaw)
+                assert isinstance(lora_info.model, ModelPatchRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
 
@@ -207,7 +207,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         with (
             ExitStack() as exit_stack,
             unet_info as unet,
-            LoRAPatcher.apply_lora_patches(model=unet, patches=_lora_loader(), prefix="lora_unet_"),
+            LayerPatcher.apply_model_patches(model=unet, patches=_lora_loader(), prefix="lora_unet_"),
         ):
             assert isinstance(unet, UNet2DConditionModel)
             latents = latents.to(device=unet.device, dtype=unet.dtype)

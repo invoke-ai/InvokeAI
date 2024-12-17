@@ -47,10 +47,10 @@ from invokeai.backend.flux.sampling_utils import (
     unpack,
 )
 from invokeai.backend.flux.text_conditioning import FluxTextConditioning
-from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -306,7 +306,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             if config.format in [ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
-                    LoRAPatcher.apply_lora_patches(
+                    LayerPatcher.apply_model_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix=FLUX_LORA_TRANSFORMER_PREFIX,
@@ -321,7 +321,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # The model is quantized, so apply the LoRA weights as sidecar layers. This results in slower inference,
                 # than directly patching the weights, but is agnostic to the quantization format.
                 exit_stack.enter_context(
-                    LoRAPatcher.apply_lora_sidecar_patches(
+                    LayerPatcher.apply_model_sidecar_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix=FLUX_LORA_TRANSFORMER_PREFIX,
@@ -715,7 +715,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return pos_ip_adapter_extensions, neg_ip_adapter_extensions
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
         loras: list[Union[LoRAField, ControlLoRAField]] = [*self.transformer.loras]
         if self.control_lora:
             # Note: Since FLUX structural control LoRAs modify the shape of some weights, it is important that they are
@@ -723,7 +723,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             loras.append(self.control_lora)
         for lora in loras:
             lora_info = context.models.load(lora.lora)
-            assert isinstance(lora_info.model, LoRAModelRaw)
+            assert isinstance(lora_info.model, ModelPatchRaw)
             yield (lora_info.model, lora.weight)
             del lora_info
 

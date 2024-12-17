@@ -17,10 +17,10 @@ from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
-from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
-from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 
 
@@ -111,7 +111,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
             if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
-                    LoRAPatcher.apply_lora_patches(
+                    LayerPatcher.apply_model_patches(
                         model=clip_text_encoder,
                         patches=self._clip_lora_iterator(context),
                         prefix=FLUX_LORA_CLIP_PREFIX,
@@ -130,9 +130,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
         assert isinstance(pooled_prompt_embeds, torch.Tensor)
         return pooled_prompt_embeds
 
-    def _clip_lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
+    def _clip_lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
         for lora in self.clip.loras:
             lora_info = context.models.load(lora.lora)
-            assert isinstance(lora_info.model, LoRAModelRaw)
+            assert isinstance(lora_info.model, ModelPatchRaw)
             yield (lora_info.model, lora.weight)
             del lora_info
