@@ -273,10 +273,12 @@ class LoRALyCORISConfig(LoRAConfigBase):
     def get_tag() -> Tag:
         return Tag(f"{ModelType.LoRA.value}.{ModelFormat.LyCORIS.value}")
 
+
 class ControlAdapterConfigBase(BaseModel):
     default_settings: Optional[ControlAdapterDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
+
 
 class ControlLoRALyCORISConfig(ModelConfigBase, ControlAdapterConfigBase):
     """Model config for Control LoRA models."""
@@ -319,9 +321,6 @@ class VAEDiffusersConfig(ModelConfigBase):
     @staticmethod
     def get_tag() -> Tag:
         return Tag(f"{ModelType.VAE.value}.{ModelFormat.Diffusers.value}")
-
-
-
 
 
 class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase):
