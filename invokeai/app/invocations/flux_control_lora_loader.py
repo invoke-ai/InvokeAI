@@ -24,7 +24,7 @@ class FluxControlLoRALoaderOutput(BaseInvocationOutput):
     title="Flux Control LoRA",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class FluxControlLoRALoaderInvocation(BaseInvocation):
