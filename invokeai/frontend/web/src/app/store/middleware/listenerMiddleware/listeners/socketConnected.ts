@@ -17,8 +17,6 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
   startAppListening({
     actionCreator: socketConnected,
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
-      log.debug('Connected');
-
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
        *
