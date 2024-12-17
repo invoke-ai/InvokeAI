@@ -304,36 +304,32 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             config = transformer_info.config
             assert config is not None
 
-            # Apply LoRA models to the transformer.
-            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            # Determine if the model is quantized.
+            # If the model is quantized, then we need to apply the LoRA weights as sidecar layers. This results in
+            # slower inference than direct patching, but is agnostic to the quantization format.
             if config.format in [ModelFormat.Checkpoint]:
-                # The model is non-quantized, so we can apply the LoRA weights directly into the model.
-                exit_stack.enter_context(
-                    LayerPatcher.apply_smart_model_patches(
-                        model=transformer,
-                        patches=self._lora_iterator(context),
-                        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
-                        dtype=inference_dtype,
-                        cached_weights=cached_weights,
-                    )
-                )
+                model_is_quantized = False
             elif config.format in [
                 ModelFormat.BnbQuantizedLlmInt8b,
                 ModelFormat.BnbQuantizednf4b,
                 ModelFormat.GGUFQuantized,
             ]:
-                # The model is quantized, so apply the LoRA weights as sidecar layers. This results in slower inference,
-                # than directly patching the weights, but is agnostic to the quantization format.
-                exit_stack.enter_context(
-                    LayerPatcher.apply_model_sidecar_patches(
-                        model=transformer,
-                        patches=self._lora_iterator(context),
-                        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
-                        dtype=inference_dtype,
-                    )
-                )
+                model_is_quantized = True
             else:
                 raise ValueError(f"Unsupported model format: {config.format}")
+
+            # Apply LoRA models to the transformer.
+            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+                    dtype=inference_dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=model_is_quantized,
+                )
+            )
 
             # Prepare IP-Adapter extensions.
             pos_ip_adapter_extensions, neg_ip_adapter_extensions = self._prep_ip_adapter_extensions(
