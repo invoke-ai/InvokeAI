@@ -493,10 +493,10 @@ export const canvasSlice = createSlice({
 
         case 'control_lora': {
           if (layer.controlAdapter.type === 'controlnet') {
-            const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, ...initialControlLoRA };
+            const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, type: 'control_lora' };
             layer.controlAdapter = controlLoraConfig;
           } else if (layer.controlAdapter.type === 't2i_adapter') {
-            const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, ...initialControlLoRA };
+            const controlLoraConfig: ControlLoRAConfig = { ...layer.controlAdapter, type: 'control_lora' };
             layer.controlAdapter = controlLoraConfig;
           }
           break;
