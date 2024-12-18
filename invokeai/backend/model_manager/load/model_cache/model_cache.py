@@ -247,14 +247,7 @@ class ModelCache:
         )
 
         # Move as much of the model as possible into VRAM.
-        model_bytes_loaded = 0
-        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
-            model_bytes_loaded = cache_entry.cached_model.partial_load_to_vram(vram_available)
-        elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
-            # Partial load is not supported, so we have not choice but to try and fit it all into VRAM.
-            model_bytes_loaded = cache_entry.cached_model.full_load_to_vram()
-        else:
-            raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
+        model_bytes_loaded = self._move_model_to_vram(cache_entry, vram_available)
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
         vram_available = self._get_vram_available(working_mem_bytes)
@@ -269,6 +262,37 @@ class ModelCache:
         self._logger.debug(
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
+
+    def _move_model_to_vram(self, cache_entry: CacheRecord, vram_available: int) -> int:
+        try:
+            if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+                return cache_entry.cached_model.partial_load_to_vram(vram_available)
+            elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
+                # Partial load is not supported, so we have not choice but to try and fit it all into VRAM.
+                return cache_entry.cached_model.full_load_to_vram()
+            else:
+                raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
+        except Exception as e:
+            if isinstance(e, torch.cuda.OutOfMemoryError):
+                self._logger.warning("Insufficient GPU memory to load model. Aborting")
+            # If an exception occurs, the model could be left in a bad state, so we delete it from the cache entirely.
+            cache_entry.unlock()
+            self._delete_cache_entry(cache_entry)
+            raise
+
+    def _move_model_to_ram(self, cache_entry: CacheRecord, vram_bytes_to_free: int) -> int:
+        try:
+            if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+                return cache_entry.cached_model.partial_unload_from_vram(vram_bytes_to_free)
+            elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
+                return cache_entry.cached_model.full_unload_from_vram()
+            else:
+                raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
+        except Exception:
+            # If an exception occurs, the model could be left in a bad state, so we delete it from the cache entirely.
+            cache_entry.unlock()
+            self._delete_cache_entry(cache_entry)
+            raise
 
     def _get_vram_available(self, working_mem_bytes: Optional[int] = None) -> int:
         """Calculate the amount of additional VRAM available for the cache to use (takes into account the working
@@ -350,14 +374,7 @@ class ModelCache:
             if cache_entry.is_locked:
                 continue
 
-            if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
-                cache_entry_bytes_freed = cache_entry.cached_model.partial_unload_from_vram(
-                    vram_bytes_to_free - vram_bytes_freed
-                )
-            elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
-                cache_entry_bytes_freed = cache_entry.cached_model.full_unload_from_vram()
-            else:
-                raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
+            cache_entry_bytes_freed = self._move_model_to_ram(cache_entry, vram_bytes_to_free - vram_bytes_freed)
             if cache_entry_bytes_freed > 0:
                 self._logger.debug(
                     f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed/MB):.0f} MB."
