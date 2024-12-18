@@ -33,6 +33,8 @@ class CachedModelWithPartialLoad:
         # A CPU read-only copy of the model's state dict.
         self._cpu_state_dict: dict[str, torch.Tensor] = model.state_dict()
 
+        # TODO(ryand): Handle the case where the model sizes changes after initial load (e.g. due to dtype casting).
+        # Consider how we should handle this for both self._total_bytes and self._cur_vram_bytes.
         self._total_bytes = sum(calc_tensor_size(p) for p in self._cpu_state_dict.values())
         self._cur_vram_bytes: int | None = None
 

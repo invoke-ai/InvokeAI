@@ -22,6 +22,12 @@ class CachedModelOnlyFullLoad:
         self._model = model
         self._compute_device = compute_device
         self._offload_device = torch.device("cpu")
+
+        # A CPU read-only copy of the model's state dict.
+        self._cpu_state_dict: dict[str, torch.Tensor] | None = None
+        if isinstance(model, torch.nn.Module):
+            self._cpu_state_dict = model.state_dict()
+
         self._total_bytes = total_bytes
         self._is_in_vram = False
 
@@ -31,8 +37,8 @@ class CachedModelOnlyFullLoad:
 
     def get_cpu_state_dict(self) -> dict[str, torch.Tensor] | None:
         """Get a read-only copy of the model's state dict in RAM."""
-        # TODO(ryand): Document this better and implement it.
-        return None
+        # TODO(ryand): Document this better.
+        return self._cpu_state_dict
 
     def total_bytes(self) -> int:
         """Get the total size (in bytes) of all the weights in the model."""
@@ -63,7 +69,13 @@ class CachedModelOnlyFullLoad:
             # Model doesn't support moving to a device.
             return 0
 
+        if self._cpu_state_dict is not None:
+            new_state_dict: dict[str, torch.Tensor] = {}
+            for k, v in self._cpu_state_dict.items():
+                new_state_dict[k] = v.to(self._compute_device, copy=True)
+            self._model.load_state_dict(new_state_dict, assign=True)
         self._model.to(self._compute_device)
+
         self._is_in_vram = True
         return self._total_bytes
 
@@ -77,6 +89,9 @@ class CachedModelOnlyFullLoad:
             # Already in RAM.
             return 0
 
+        if self._cpu_state_dict is not None:
+            self._model.load_state_dict(self._cpu_state_dict, assign=True)
         self._model.to(self._offload_device)
+
         self._is_in_vram = False
         return self._total_bytes
