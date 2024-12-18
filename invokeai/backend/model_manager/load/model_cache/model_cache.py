@@ -72,6 +72,7 @@ class ModelCache:
     def __init__(
         self,
         execution_device_working_mem_gb: float,
+        enable_partial_loading: bool,
         execution_device: torch.device | str = "cuda",
         storage_device: torch.device | str = "cpu",
         lazy_offloading: bool = True,
@@ -91,6 +92,7 @@ class ModelCache:
         """
         # TODO(ryand): Think about what lazy_offloading should mean in the new model cache.
         self._lazy_offloading = lazy_offloading
+        self._enable_partial_loading = enable_partial_loading
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
         self._storage_device: torch.device = torch.device(storage_device)
@@ -127,7 +129,7 @@ class ModelCache:
         running_on_cpu = self._execution_device.type == "cpu"
 
         # Wrap model.
-        if isinstance(model, torch.nn.Module) and not running_on_cpu:
+        if isinstance(model, torch.nn.Module) and not running_on_cpu and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(model, self._execution_device)
         else:
             wrapped_model = CachedModelOnlyFullLoad(model, self._execution_device, size)

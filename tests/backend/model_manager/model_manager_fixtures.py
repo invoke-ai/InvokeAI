@@ -92,6 +92,7 @@ def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
 def mm2_loader(mm2_app_config: InvokeAIAppConfig) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         execution_device_working_mem_gb=mm2_app_config.device_working_mem_gb,
+        enable_partial_loading=mm2_app_config.enable_partial_loading,
         execution_device="cpu",
         logger=InvokeAILogger.get_logger(),
     )
