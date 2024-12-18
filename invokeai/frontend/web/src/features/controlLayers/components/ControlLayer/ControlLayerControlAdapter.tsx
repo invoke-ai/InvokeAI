@@ -102,12 +102,12 @@ export const ControlLayerControlAdapter = memo(() => {
       const filterConfig = defaultFilterForNewModel.buildDefaults();
       if (isFiltering) {
         adapter.filterer.$filterConfig.set(filterConfig);
+        // The user may have disabled auto-processing, so we should process the filter manually. This is essentially a
+        // no-op if auto-processing is already enabled, because the process method is debounced.
+        adapter.filterer.process();
       } else {
         adapter.filterer.start(filterConfig);
       }
-      // The user may have disabled auto-processing, so we should process the filter manually. This is essentially a
-      // no-op if auto-processing is already enabled, because the process method is debounced.
-      adapter.filterer.process();
     },
     [adapter.filterer, dispatch, entityIdentifier]
   );
