@@ -1697,8 +1697,7 @@
         "whatsNewInInvoke": "Quoi de neuf dans Invoke",
         "watchRecentReleaseVideos": "Regarder les vidéos des dernières versions",
         "items": [
-            "<StrongComponent>FLUX Guidage Régional (bêta)</StrongComponent> : Notre version bêta de FLUX Guidage Régional est en ligne pour le contrôle des prompt régionaux.",
-            "<StrongComponent>Améliorations diverses de l'UX</StrongComponent> : Un certain nombre de petites améliorations de l'UX et de la qualité de vie dans toute l'application."
+            "<StrongComponent>FLUX Guidage Régional (bêta)</StrongComponent> : Notre version bêta de FLUX Guidage Régional est en ligne pour le contrôle des prompt régionaux."
         ],
         "readReleaseNotes": "Notes de version",
         "watchUiUpdatesOverview": "Aperçu des mises à jour de l'interface utilisateur"

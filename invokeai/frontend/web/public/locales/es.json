@@ -507,8 +507,7 @@
         "watchUiUpdatesOverview": "Descripción general de las actualizaciones de la interfaz de usuario de Watch",
         "whatsNewInInvoke": "Novedades en Invoke",
         "items": [
-            "<StrongComponent>SD 3.5</StrongComponent>: compatibilidad con SD 3.5 Medium y Large.",
-            "<StrongComponent>Lienzo</StrongComponent>: Se ha simplificado el procesamiento de la capa de control y se ha mejorado la configuración predeterminada del control."
+            "<StrongComponent>SD 3.5</StrongComponent>: compatibilidad con SD 3.5 Medium y Large."
         ]
     },
     "invocationCache": {

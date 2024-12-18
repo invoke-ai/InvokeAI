@@ -2171,8 +2171,7 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>FLUX Regional Guidance (beta)</StrongComponent>: la nostra versione beta di FLUX Regional Guidance è attiva per il controllo dei prompt regionali.",
-            "<StrongComponent>Vari miglioramenti dell'esperienza utente</StrongComponent>: numerosi piccoli miglioramenti dell'esperienza utente e della qualità della vita in tutta l'app."
+            "<StrongComponent>FLUX Regional Guidance (beta)</StrongComponent>: la nostra versione beta di FLUX Regional Guidance è attiva per il controllo dei prompt regionali."
         ]
     },
     "system": {
