@@ -96,7 +96,9 @@
         "negativePrompt": "Prompt Négatif",
         "ok": "Ok",
         "close": "Fermer",
-        "clipboard": "Presse-papier"
+        "clipboard": "Presse-papier",
+        "loadingModel": "Chargement du modèle",
+        "generating": "En Génération"
     },
     "gallery": {
         "galleryImageSize": "Taille de l'image",
@@ -287,7 +289,20 @@
         "noDefaultSettings": "Aucun paramètre par défaut configuré pour ce modèle. Visitez le Gestionnaire de Modèles pour ajouter des paramètres par défaut.",
         "usingDefaultSettings": "Utilisation des paramètres par défaut du modèle",
         "defaultSettingsOutOfSync": "Certain paramètres ne correspondent pas aux valeurs par défaut du modèle :",
-        "restoreDefaultSettings": "Cliquez pour utiliser les paramètres par défaut du modèle."
+        "restoreDefaultSettings": "Cliquez pour utiliser les paramètres par défaut du modèle.",
+        "hfForbiddenErrorMessage": "Nous vous recommandons de visiter la page du modèle sur HuggingFace.com. Le propriétaire peut exiger l'acceptation des conditions pour pouvoir télécharger.",
+        "hfTokenRequired": "Vous essayez de télécharger un modèle qui nécessite un token HuggingFace valide.",
+        "clipLEmbed": "CLIP-L Embed",
+        "hfTokenSaved": "Token HF enregistré",
+        "hfTokenUnableToVerifyErrorMessage": "Impossible de vérifier le token HuggingFace. Cela est probablement dû à une erreur réseau. Veuillez réessayer plus tard.",
+        "clipGEmbed": "CLIP-G Embed",
+        "hfTokenUnableToVerify": "Impossible de vérifier le token HF",
+        "hfTokenInvalidErrorMessage": "Token HuggingFace invalide ou manquant.",
+        "hfTokenLabel": "Token HuggingFace (Requis pour certains modèles)",
+        "hfTokenHelperText": "Un token HF est requis pour utiliser certains modèles. Cliquez ici pour créer ou obtenir votre token.",
+        "hfTokenInvalid": "Token HF invalide ou manquant",
+        "hfForbidden": "Vous n'avez pas accès à ce modèle HF.",
+        "hfTokenInvalidErrorMessage2": "Mettre à jour dans le "
     },
     "parameters": {
         "images": "Images",
@@ -336,7 +351,11 @@
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la largeur de la bounding box est {{width}}",
             "noT5EncoderModelSelected": "Aucun modèle T5 Encoder sélectionné pour la génération FLUX",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la largeur de la bounding box mise à l'échelle est {{width}}",
-            "canvasIsCompositing": "La toile est en train de composer"
+            "canvasIsCompositing": "La toile est en train de composer",
+            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} collection vide",
+            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}} : trop peu d'éléments, minimum {{minItems}}",
+            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}} : trop d'éléments, maximum {{maxItems}}",
+            "canvasIsSelectingObject": "La toile est occupée (sélection d'objet)"
         },
         "negativePromptPlaceholder": "Prompt Négatif",
         "positivePromptPlaceholder": "Prompt Positif",
@@ -377,7 +396,9 @@
         "sendToUpscale": "Envoyer à Agrandir",
         "guidance": "Guidage",
         "postProcessing": "Post-traitement (Maj + U)",
-        "processImage": "Traiter l'image"
+        "processImage": "Traiter l'image",
+        "disabledNoRasterContent": "Désactivé (Aucun contenu raster)",
+        "recallMetadata": "Rappeler les métadonnées"
     },
     "settings": {
         "models": "Modèles",
@@ -415,7 +436,8 @@
         "confirmOnNewSession": "Confirmer lors d'une nouvelle session",
         "modelDescriptionsDisabledDesc": "Les descriptions des modèles dans les menus déroulants ont été désactivées. Activez-les dans les paramètres.",
         "enableModelDescriptions": "Activer les descriptions de modèle dans les menus déroulants",
-        "modelDescriptionsDisabled": "Descriptions de modèle dans les menus déroulants désactivés"
+        "modelDescriptionsDisabled": "Descriptions de modèle dans les menus déroulants désactivés",
+        "showDetailedInvocationProgress": "Afficher les détails de progression"
     },
     "toast": {
         "uploadFailed": "Importation échouée",
@@ -634,7 +656,8 @@
         "iterations_one": "Itération",
         "iterations_many": "Itérations",
         "iterations_other": "Itérations",
-        "back": "fin"
+        "back": "fin",
+        "batchSize": "Taille de lot"
     },
     "prompt": {
         "noMatchingTriggers": "Pas de déclancheurs correspondants",
@@ -1152,7 +1175,8 @@
             "heading": "Force de débruitage",
             "paragraphs": [
                 "Intensité du bruit ajouté à l'image d'entrée.",
-                "0 produira une image identique, tandis que 1 produira une image complètement différente."
+                "0 produira une image identique, tandis que 1 produira une image complètement différente.",
+                "Lorsque aucune couche raster avec du contenu visible n'est présente, ce paramètre est ignoré."
             ]
         },
         "lora": {
@@ -1447,7 +1471,9 @@
         "parsingFailed": "L'analyse a échoué",
         "recallParameter": "Rappeler {{label}}",
         "canvasV2Metadata": "Toile",
-        "guidance": "Guide"
+        "guidance": "Guide",
+        "seamlessXAxis": "Axe X sans bords",
+        "seamlessYAxis": "Axe Y sans bords"
     },
     "sdxl": {
         "freePromptStyle": "Écriture de Prompt manuelle",
@@ -1668,7 +1694,14 @@
         "delete": "Supprimer"
     },
     "whatsNew": {
-        "whatsNewInInvoke": "Quoi de neuf dans Invoke"
+        "whatsNewInInvoke": "Quoi de neuf dans Invoke",
+        "watchRecentReleaseVideos": "Regarder les vidéos des dernières versions",
+        "items": [
+            "<StrongComponent>FLUX Guidage Régional (bêta)</StrongComponent> : Notre version bêta de FLUX Guidage Régional est en ligne pour le contrôle des prompt régionaux.",
+            "<StrongComponent>Améliorations diverses de l'UX</StrongComponent> : Un certain nombre de petites améliorations de l'UX et de la qualité de vie dans toute l'application."
+        ],
+        "readReleaseNotes": "Notes de version",
+        "watchUiUpdatesOverview": "Aperçu des mises à jour de l'interface utilisateur"
     },
     "ui": {
         "tabs": {
@@ -1776,7 +1809,10 @@
             },
             "process": "Traiter",
             "apply": "Appliquer",
-            "cancel": "Annuler"
+            "cancel": "Annuler",
+            "advanced": "Avancé",
+            "processingLayerWith": "Calque de traitement avec le filtre {{type}}.",
+            "forMoreControl": "Pour plus de contrôle, cliquez sur Avancé ci-dessous."
         },
         "canvasContextMenu": {
             "saveToGalleryGroup": "Enregistrer dans la galerie",
@@ -2029,7 +2065,17 @@
         "convertInpaintMaskTo": "Convertir $t(controlLayers.inpaintMask) vers",
         "copyControlLayerTo": "Copier $t(controlLayers.controlLayer) vers",
         "newInpaintMask": "Nouveau $t(controlLayers.inpaintMask)",
-        "newRasterLayer": "Nouveau $t(controlLayers.rasterLayer)"
+        "newRasterLayer": "Nouveau $t(controlLayers.rasterLayer)",
+        "mergingLayers": "Fusionner les couches",
+        "resetCanvasLayers": "Réinitialiser les couches de la toile",
+        "resetGenerationSettings": "Réinitialiser les paramètres de génération",
+        "mergeDown": "Fusionner",
+        "controlLayerEmptyState": "<UploadButton>Télécharger une image</UploadButton>, faites glisser une image depuis la <GalleryButton>galerie</GalleryButton> sur ce calque, ou dessinez sur la toile pour commencer.",
+        "asRasterLayer": "En tant que $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "En tant que $t(controlLayers.rasterLayer) (Redimensionner)",
+        "asControlLayer": "En tant que $t(controlLayers.controlLayer)",
+        "asControlLayerResize": "En $t(controlLayers.controlLayer) (Redimensionner)",
+        "newSession": "Nouvelle session"
     },
     "upscaling": {
         "exceedsMaxSizeDetails": "La limite maximale d'agrandissement est de {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Veuillez essayer une image plus petite ou réduire votre sélection d'échelle.",
@@ -2047,7 +2093,9 @@
         "postProcessingModel": "Modèle de post-traitement",
         "missingUpscaleModel": "Modèle d'agrandissement manquant",
         "missingUpscaleInitialImage": "Image initiale manquante pour l'agrandissement",
-        "missingTileControlNetModel": "Aucun modèle ControlNet valide installé"
+        "missingTileControlNetModel": "Aucun modèle ControlNet valide installé",
+        "incompatibleBaseModelDesc": "L'upscaling est pris en charge uniquement pour les modèles d'architecture SD1.5 et SDXL. Changez le modèle principal pour activer l'upscaling.",
+        "incompatibleBaseModel": "Modèle principal non pris en charge pour l'upscaling"
     },
     "stylePresets": {
         "deleteTemplate": "Supprimer le template",
@@ -2133,5 +2181,62 @@
         "inviteTeammates": "Inviter des collègues",
         "professionalUpsell": "Disponible dans l'édition professionnelle d'Invoke. Cliquez ici ou visitez invoke.com/pricing pour plus de détails.",
         "professional": "Professionnel"
+    },
+    "supportVideos": {
+        "watch": "Regarder",
+        "videos": {
+            "upscaling": {
+                "description": "Comment améliorer la résolution des images avec les outils d'Invoke pour les agrandir.",
+                "title": "Upscaling"
+            },
+            "howDoIGenerateAndSaveToTheGallery": {
+                "description": "Étapes pour générer et enregistrer des images dans la galerie.",
+                "title": "Comment générer et enregistrer dans la galerie ?"
+            },
+            "usingControlLayersAndReferenceGuides": {
+                "title": "Utilisation des couche de contrôle et des guides de référence",
+                "description": "Apprenez à guider la création de vos images avec des couche de contrôle et des images de référence."
+            },
+            "exploringAIModelsAndConceptAdapters": {
+                "description": "Plongez dans les modèles d'IA et découvrez comment utiliser les adaptateurs de concepts pour un contrôle créatif.",
+                "title": "Exploration des modèles d'IA et des adaptateurs de concepts"
+            },
+            "howDoIUseControlNetsAndControlLayers": {
+                "title": "Comment utiliser les réseaux de contrôle et les couches de contrôle ?",
+                "description": "Apprenez à appliquer des couches de contrôle et des ControlNets à vos images."
+            },
+            "creatingAndComposingOnInvokesControlCanvas": {
+                "description": "Apprenez à composer des images en utilisant le canvas de contrôle d'Invoke.",
+                "title": "Créer et composer sur le canvas de contrôle d'Invoke"
+            },
+            "howDoIEditOnTheCanvas": {
+                "title": "Comment puis-je modifier sur la toile ?",
+                "description": "Guide pour éditer des images directement sur la toile."
+            },
+            "howDoIDoImageToImageTransformation": {
+                "title": "Comment effectuer une transformation d'image à image ?",
+                "description": "Tutoriel sur la réalisation de transformations d'image à image dans Invoke."
+            },
+            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
+                "title": "Comment utiliser les IP Adapters globaux et les images de référence ?",
+                "description": "Introduction à l'ajout d'images de référence et IP Adapters globaux."
+            },
+            "howDoIUseInpaintMasks": {
+                "title": "Comment utiliser les masques d'inpainting ?"
+            },
+            "creatingYourFirstImage": {
+                "title": "Créer votre première image",
+                "description": "Introduction à la création d'une image à partir de zéro en utilisant les outils d'Invoke."
+            },
+            "understandingImageToImageAndDenoising": {
+                "title": "Comprendre l'Image-à-Image et le Débruitage",
+                "description": "Aperçu des transformations d'image à image et du débruitage dans Invoke."
+            }
+        },
+        "gettingStarted": "Commencer",
+        "studioSessionsDesc1": "Consultez le <StudioSessionsPlaylistLink /> pour des approfondissements sur Invoke.",
+        "studioSessionsDesc2": "Rejoignez notre <DiscordLink /> pour participer aux sessions en direct et poser vos questions. Les sessions sont ajoutée dans la playlist la semaine suivante.",
+        "supportVideos": "Vidéos d'assistance",
+        "controlCanvas": "Contrôler la toile"
     }
 }
