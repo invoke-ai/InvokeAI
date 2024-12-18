@@ -70,14 +70,11 @@ class FluxTextEncoderInvocation(BaseInvocation):
         )
 
     def _t5_encode(self, context: InvocationContext) -> torch.Tensor:
-        t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer)
-        t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder)
-
         prompt = [self.prompt]
 
         with (
-            t5_text_encoder_info as t5_text_encoder,
-            t5_tokenizer_info as t5_tokenizer,
+            context.models.load(self.t5_encoder.text_encoder) as t5_text_encoder,
+            context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
         ):
             assert isinstance(t5_text_encoder, T5EncoderModel)
             assert isinstance(t5_tokenizer, T5Tokenizer)
@@ -91,14 +88,12 @@ class FluxTextEncoderInvocation(BaseInvocation):
         return prompt_embeds
 
     def _clip_encode(self, context: InvocationContext) -> torch.Tensor:
-        clip_tokenizer_info = context.models.load(self.clip.tokenizer)
-        clip_text_encoder_info = context.models.load(self.clip.text_encoder)
-
         prompt = [self.prompt]
+        clip_text_encoder_info = context.models.load(self.clip.text_encoder)
 
         with (
             clip_text_encoder_info.model_on_device() as (cached_weights, clip_text_encoder),
-            clip_tokenizer_info as clip_tokenizer,
+            context.models.load(self.clip.tokenizer) as clip_tokenizer,
             ExitStack() as exit_stack,
         ):
             assert isinstance(clip_text_encoder, CLIPTextModel)
