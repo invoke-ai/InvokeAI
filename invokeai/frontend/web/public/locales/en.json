@@ -2135,10 +2135,7 @@
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
-        "items": [
-            "<StrongComponent>FLUX Regional Guidance (beta)</StrongComponent>: Our beta release of FLUX Regional Guidance is live for regional prompt control.",
-            "<StrongComponent>Various UX Improvements</StrongComponent>: A number of small UX and Quality of Life improvements throughout the app."
-        ],
+        "items": ["<StrongComponent>FLUX</StrongComponent>: Support for FLUX Control LoRAs."],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"
