@@ -1,4 +1,6 @@
 import gc
+import logging
+import time
 from logging import Logger
 from typing import Dict, List, Optional
 
@@ -215,6 +217,7 @@ class ModelCache:
 
     def _load_locked_model(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int] = None) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
+        start_time = time.time()
         vram_available = self._get_vram_available(working_mem_bytes)
 
         # Calculate model_vram_needed, the amount of additional VRAM that will be used if we fully load the model into
@@ -255,6 +258,13 @@ class ModelCache:
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
         vram_available = self._get_vram_available(working_mem_bytes)
+        loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
+        self._logger.info(
+            f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
+            f"{self._execution_device.type} device in {(time.time() - start_time):.2f}s. "
+            f"Total model size: {model_total_bytes/MB:.2f}MB, "
+            f"VRAM: {model_cur_vram_bytes/MB:.2f}MB ({loaded_percent:.1%})"
+        )
         self._logger.debug(f"Loaded model onto execution device: model_bytes_loaded={(model_bytes_loaded/MB):.2f}MB, ")
         self._logger.debug(
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
@@ -430,6 +440,11 @@ class ModelCache:
     #             )
 
     def _log_cache_state(self, title: str = "Model cache state:", include_entry_details: bool = True):
+        if self._logger.getEffectiveLevel() > logging.DEBUG:
+            # Short circuit if the logger is not set to debug. Some of the data lookups could take a non-negligible
+            # amount of time.
+            return
+
         log = f"{title}\n"
 
         log_format = "  {:<30} Limit: {:>7.1f} MB, Used: {:>7.1f} MB ({:>5.1%}), Available: {:>7.1f} MB ({:>5.1%})\n"
