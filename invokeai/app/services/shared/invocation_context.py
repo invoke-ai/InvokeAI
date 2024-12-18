@@ -361,7 +361,10 @@ class ModelsInterface(InvocationContextInterface):
             return self._services.model_manager.store.exists(identifier.key)
 
     def load(
-        self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
+        self,
+        identifier: Union[str, "ModelIdentifierField"],
+        submodel_type: Optional[SubModelType] = None,
+        working_mem_bytes: Optional[int] = None,
     ) -> LoadedModel:
         """Load a model.
 
@@ -386,7 +389,7 @@ class ModelsInterface(InvocationContextInterface):
         if submodel_type:
             message += f" ({submodel_type.value})"
         self._util.signal_progress(message)
-        return self._services.model_manager.load.load_model(model, submodel_type)
+        return self._services.model_manager.load.load_model(model, submodel_type, working_mem_bytes)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None

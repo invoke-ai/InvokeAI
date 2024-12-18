@@ -177,8 +177,12 @@ class ModelCache:
 
         return cache_entry
 
-    def lock(self, key: str) -> None:
-        """Lock a model for use and move it into VRAM."""
+    def lock(self, key: str, working_mem_bytes: Optional[int]) -> None:
+        """Lock a model for use and move it into VRAM.
+
+        :param working_mem_bytes: The number of bytes of working memory to keep on the GPU while this model is loaded on
+            the GPU. If None, self._execution_device_working_mem_gb is used.
+        """
         cache_entry = self._cached_models[key]
         cache_entry.lock()
 
@@ -189,7 +193,7 @@ class ModelCache:
             return
 
         try:
-            self._load_locked_model(cache_entry)
+            self._load_locked_model(cache_entry, working_mem_bytes)
             self._logger.debug(
                 f"Finished locking model {key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
             )
@@ -209,9 +213,9 @@ class ModelCache:
         cache_entry.unlock()
         self._logger.debug(f"Unlocked model {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
 
-    def _load_locked_model(self, cache_entry: CacheRecord) -> None:
+    def _load_locked_model(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int] = None) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
-        vram_available = self._get_vram_available()
+        vram_available = self._get_vram_available(working_mem_bytes)
 
         # Calculate model_vram_needed, the amount of additional VRAM that will be used if we fully load the model into
         # VRAM.
@@ -234,7 +238,7 @@ class ModelCache:
         self._logger.debug(f"Unloaded models (if necessary): vram_bytes_freed={(vram_bytes_freed/MB):.2f}MB")
 
         # Check the updated vram_available after offloading.
-        vram_available = self._get_vram_available()
+        vram_available = self._get_vram_available(working_mem_bytes)
         self._logger.debug(
             f"After unloading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
@@ -250,16 +254,19 @@ class ModelCache:
             raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
-        vram_available = self._get_vram_available()
+        vram_available = self._get_vram_available(working_mem_bytes)
         self._logger.debug(f"Loaded model onto execution device: model_bytes_loaded={(model_bytes_loaded/MB):.2f}MB, ")
         self._logger.debug(
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
 
-    def _get_vram_available(self) -> int:
+    def _get_vram_available(self, working_mem_bytes: Optional[int] = None) -> int:
         """Calculate the amount of additional VRAM available for the cache to use (takes into account the working
         memory).
         """
+        working_mem_bytes_default = int(self._execution_device_working_mem_gb * GB)
+        working_mem_bytes = max(working_mem_bytes or working_mem_bytes_default, working_mem_bytes_default)
+
         if self._execution_device.type == "cuda":
             vram_reserved = torch.cuda.memory_reserved(self._execution_device)
             vram_free, _vram_total = torch.cuda.mem_get_info(self._execution_device)
@@ -272,7 +279,7 @@ class ModelCache:
         else:
             raise ValueError(f"Unsupported execution device: {self._execution_device.type}")
 
-        vram_total_available_to_cache = vram_available_to_process - int(self._execution_device_working_mem_gb * GB)
+        vram_total_available_to_cache = vram_available_to_process - working_mem_bytes
         vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()
         return vram_cur_available_to_cache
 

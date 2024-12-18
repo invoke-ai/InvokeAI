@@ -52,12 +52,13 @@ class LoadedModelWithoutConfig:
     do not have a state_dict, in which case this value will be None.
     """
 
-    def __init__(self, cache_record: CacheRecord, cache: ModelCache):
+    def __init__(self, cache_record: CacheRecord, cache: ModelCache, working_mem_bytes: Optional[int] = None):
         self._cache_record = cache_record
         self._cache = cache
+        self._working_mem_bytes = working_mem_bytes
 
     def __enter__(self) -> AnyModel:
-        self._cache.lock(self._cache_record.key)
+        self._cache.lock(self._cache_record.key, self._working_mem_bytes)
         return self.model
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
@@ -66,7 +67,7 @@ class LoadedModelWithoutConfig:
     @contextmanager
     def model_on_device(self) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
         """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
-        self._cache.lock(self._cache_record.key)
+        self._cache.lock(self._cache_record.key, self._working_mem_bytes)
         try:
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
         finally:
@@ -81,8 +82,14 @@ class LoadedModelWithoutConfig:
 class LoadedModel(LoadedModelWithoutConfig):
     """Context manager object that mediates transfer from RAM<->VRAM."""
 
-    def __init__(self, config: Optional[AnyModelConfig], cache_record: CacheRecord, cache: ModelCache):
-        super().__init__(cache_record=cache_record, cache=cache)
+    def __init__(
+        self,
+        config: Optional[AnyModelConfig],
+        cache_record: CacheRecord,
+        cache: ModelCache,
+        working_mem_bytes: Optional[int] = None,
+    ):
+        super().__init__(cache_record=cache_record, cache=cache, working_mem_bytes=working_mem_bytes)
         self.config = config
 
 
@@ -108,7 +115,12 @@ class ModelLoaderBase(ABC):
         pass
 
     @abstractmethod
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(
+        self,
+        model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+        working_mem_bytes: Optional[int] = None,
+    ) -> LoadedModel:
         """
         Return a model given its confguration.
 

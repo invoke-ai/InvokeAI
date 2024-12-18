@@ -38,7 +38,12 @@ class ModelLoader(ModelLoaderBase):
         self._torch_dtype = TorchDevice.choose_torch_dtype()
         self._torch_device = TorchDevice.choose_torch_device()
 
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(
+        self,
+        model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+        working_mem_bytes: Optional[int] = None,
+    ) -> LoadedModel:
         """
         Return a model given its configuration.
 
@@ -56,7 +61,9 @@ class ModelLoader(ModelLoaderBase):
 
         with skip_torch_weight_init():
             cache_record = self._load_and_cache(model_config, submodel_type)
-        return LoadedModel(config=model_config, cache_record=cache_record, cache=self._ram_cache)
+        return LoadedModel(
+            config=model_config, cache_record=cache_record, cache=self._ram_cache, working_mem_bytes=working_mem_bytes
+        )
 
     @property
     def ram_cache(self) -> ModelCache:

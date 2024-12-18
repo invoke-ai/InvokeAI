@@ -49,7 +49,12 @@ class ModelLoadService(ModelLoadServiceBase):
         """Return the RAM cache used by this loader."""
         return self._ram_cache
 
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(
+        self,
+        model_config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+        working_mem_bytes: Optional[int] = None,
+    ) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
@@ -67,7 +72,7 @@ class ModelLoadService(ModelLoadServiceBase):
             app_config=self._app_config,
             logger=self._logger,
             ram_cache=self._ram_cache,
-        ).load_model(model_config, submodel_type)
+        ).load_model(model_config, submodel_type, working_mem_bytes)
 
         if hasattr(self, "_invoker"):
             self._invoker.services.events.emit_model_load_complete(model_config, submodel_type)
