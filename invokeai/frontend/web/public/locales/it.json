@@ -2196,7 +2196,8 @@
             "events": "Eventi",
             "system": "Sistema",
             "metadata": "Metadati",
-            "logNamespaces": "Elementi del registro"
+            "logNamespaces": "Elementi del registro",
+            "dnd": "Trascina e rilascia"
         },
         "enableLogging": "Abilita la registrazione"
     },
