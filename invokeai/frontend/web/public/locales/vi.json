@@ -46,7 +46,7 @@
         "menuItemAutoAdd": "Tự động thêm cho Bảng này",
         "move": "Di Chuyển",
         "topMessage": "Bảng này chứa ảnh được dùng với những tính năng sau:",
-        "uncategorized": "Chưa Phân Loại",
+        "uncategorized": "Chưa Sắp Xếp",
         "archived": "Được Lưu Trữ",
         "loading": "Đang Tải...",
         "selectBoard": "Chọn Bảng",
@@ -91,7 +91,7 @@
         "sideBySide": "Cạnh Nhau",
         "alwaysShowImageSizeBadge": "Luôn Hiển Thị Kích Thước Ảnh",
         "autoAssignBoardOnClick": "Tự Động Gán Vào Bảng Khi Nhấp Chuột",
-        "jump": "Nhảy Vào",
+        "jump": "Nhảy Đến",
         "go": "Đi",
         "autoSwitchNewImages": "Tự Động Đổi Sang Hình Ảnh Mới",
         "featuresWillReset": "Nếu bạn xoá hình ảnh này, những tính năng đó sẽ lập tức được khởi động lại.",
@@ -133,7 +133,7 @@
         "alpha": "Alpha",
         "edit": "Sửa",
         "nodes": "Workflow",
-        "format": "định dạng",
+        "format": "Định Dạng",
         "delete": "Xoá",
         "details": "Chi Tiết",
         "imageFailedToLoad": "Không Thể Tải Hình Ảnh",
@@ -164,7 +164,7 @@
         "discordLabel": "Discord",
         "back": "Trở Về",
         "advanced": "Nâng Cao",
-        "batch": "Quản Lý Hàng Loạt",
+        "batch": "Quản Lý Lô",
         "modelManager": "Quản Lý Model",
         "dontShowMeThese": "Không hiển thị thứ này",
         "ok": "OK",
@@ -196,7 +196,7 @@
         "areYouSure": "Bạn chắc chứ?",
         "ai": "ai",
         "aboutDesc": "Sử dụng Invoke cho công việc? Xem thử:",
-        "aboutHeading": "Sở Hữu Khả Năng Sáng Tạo Cho Riêng Mình",
+        "aboutHeading": "Quyền Năng Sáng Tạo Của Riêng",
         "enabled": "Đã Bật",
         "close": "Đóng",
         "data": "Dữ Liệu",
@@ -232,24 +232,24 @@
         "enqueueing": "Xếp Vào Hàng Hàng Loạt",
         "prompts_other": "Lệnh",
         "iterations_other": "Lặp Lại",
-        "total": "Tổng Cộng",
+        "total": "Tổng",
         "pruneFailed": "Có Vấn Đề Khi Cắt Bớt Mục Khỏi Hàng",
         "clearSucceeded": "Hàng Đã Được Dọn Sạch",
         "cancel": "Huỷ Bỏ",
         "clearQueueAlertDialog2": "Bạn chắc chắn muốn dọn sạch hàng không?",
         "queueEmpty": "Hàng Trống",
         "queueBack": "Thêm Vào Hàng",
-        "batchFieldValues": "Giá Trị Vùng Hàng Loạt",
+        "batchFieldValues": "Giá Trị Vùng Theo Lô",
         "openQueue": "Mở Queue",
         "pause": "Dừng Lại",
         "pauseFailed": "Có Vấn Đề Khi Dừng Lại Bộ Xử Lý",
-        "batchQueued": "Hàng Loạt Đã Vào hàng",
-        "batchFailedToQueue": "Lỗi Khi Xếp Hàng Loạt Vào Hàng",
+        "batchQueued": "Lô Đã Vào Hàng",
+        "batchFailedToQueue": "Lỗi Khi Xếp Lô Vào Hàng",
         "next": "Tiếp Theo",
-        "in_progress": "Đang Tiến Hành",
+        "in_progress": "Đang Chạy",
         "failed": "Thất Bại",
         "canceled": "Bị Huỷ",
-        "cancelBatchFailed": "Có Vấn Đề Khi Huỷ Bỏ Hàng Loạt",
+        "cancelBatchFailed": "Có Vấn Đề Khi Huỷ Bỏ Lô",
         "workflows": "Workflow (Luồng làm việc)",
         "canvas": "Canvas (Vùng ảnh)",
         "upscaling": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)",
@@ -272,19 +272,19 @@
         "resumeTooltip": "Tiếp Tục Bộ Xử Lý",
         "clearFailed": "Có Vấn Đề Khi Dọn Dẹp Hàng",
         "generations_other": "Máy Tạo Sinh",
-        "cancelBatch": "Huỷ Bỏ Hàng Loạt",
+        "cancelBatch": "Huỷ Bỏ Lô",
         "status": "Trạng Thái",
         "pending": "Đang Chờ",
         "gallery": "Thư Viện",
         "front": "trước",
-        "batch": "Hàng Loạt",
+        "batch": "Lô",
         "origin": "Nguồn Gốc",
         "destination": "Điểm Đến",
         "other": "Khác",
         "graphFailedToQueue": "Lỗi Khi Xếp Đồ Thị Vào Hàng",
         "notReady": "Không Thể Xếp Hàng",
         "cancelItem": "Huỷ Bỏ Mục",
-        "cancelBatchSucceeded": "Mục Hàng Loạt Đã Huỷ Bỏ",
+        "cancelBatchSucceeded": "Lô Đã Huỷ Bỏ",
         "current": "Hiện Tại",
         "time": "Thời Gian",
         "completed": "Hoàn Tất",
@@ -294,7 +294,7 @@
         "completedIn": "Hoàn tất trong",
         "graphQueued": "Đồ Thị Đã Vào Hàng",
         "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng",
-        "batchSize": "Kích Thước Vùng Hàng Loạt"
+        "batchSize": "Kích Thước Lô"
     },
     "hotkeys": {
         "canvas": {
@@ -457,8 +457,8 @@
                 "title": "Gợi Lại Tất Cả Metadata"
             },
             "recallSeed": {
-                "title": "Gợi Lại Tham Số Hạt Giống",
-                "desc": "Gợi lại tham số hạt giống của ảnh hiện tại."
+                "title": "Gợi Lại Hạt Giống",
+                "desc": "Gợi lại hạt giống của ảnh hiện tại."
             },
             "useSize": {
                 "title": "Dùng Kích Thước",
@@ -490,7 +490,7 @@
                 "title": "Đổi Ảnh So Sánh"
             },
             "remix": {
-                "desc": "Gợi lại tất cả metadata cho tham số hạt giống của ảnh hiện tại.",
+                "desc": "Gợi lại tất cả metadata cho hạt giống của ảnh hiện tại.",
                 "title": "Phối Lại"
             },
             "runPostprocessing": {
@@ -633,7 +633,7 @@
         "modelManager": "Quản Lý Model",
         "name": "Tên",
         "noModelSelected": "Không Có Model Được Chọn",
-        "installQueue": "Tải Xuống Danh Sách Đợi",
+        "installQueue": "Danh Sách Tải Xuống",
         "modelDeleteFailed": "Xoá model thất bại",
         "inplaceInstallDesc": "Tải xuống model mà không sao chép toàn bộ tài nguyên. Khi sử dụng model, nó được sẽ tải từ vị trí được đặt. Nếu bị tắt, toàn bộ tài nguyên của model sẽ được sao chép vào thư mục quản lý model của Invoke trong quá trình tải xuống.",
         "modelType": "Loại Model",
@@ -705,7 +705,7 @@
         "spandrelImageToImage": "Hình Ảnh Sang Hình Ảnh (Spandrel)",
         "starterBundles": "Quà Tân Thủ",
         "vae": "VAE",
-        "urlOrLocalPath": "URL Hoặc Đường Dẫn Trên Máy Chủ",
+        "urlOrLocalPath": "URL / Đường Dẫn",
         "triggerPhrases": "Từ Ngữ Kích Hoạt",
         "variant": "Biến Thể",
         "urlOrLocalPathHelper": "Url cần chỉ vào một tệp duy nhất. Còn đường dẫn trên máy chủ có thể chỉ vào một tệp hoặc một thư mục cho chỉ một model diffusers.",
@@ -723,7 +723,7 @@
         "starterModels": "Model Khởi Đầu",
         "typePhraseHere": "Thêm từ ngữ ở đây",
         "upcastAttention": "Upcast Attention",
-        "vaePrecision": "VAE Precision",
+        "vaePrecision": "Độ Chuẩn VAE",
         "installingBundle": "Đang Tải Nguyên Bộ",
         "installingModel": "Đang Tải Model",
         "installingXModels_other": "Đang tải {{count}} model",
@@ -751,18 +751,18 @@
         "parameterSet": "Dữ liệu tham số {{parameter}}",
         "positivePrompt": "Lệnh Tích Cực",
         "recallParameter": "Gợi Nhớ {{label}}",
-        "seed": "Tham Số Hạt Giống",
+        "seed": "Hạt Giống",
         "negativePrompt": "Lệnh Tiêu Cực",
         "noImageDetails": "Không tìm thấy chí tiết ảnh",
         "strength": "Mức độ mạnh từ ảnh sang ảnh",
         "Threshold": "Ngưỡng Nhiễu",
         "width": "Chiều Rộng",
-        "steps": "Tham Số Bước",
+        "steps": "Số Bước",
         "vae": "VAE",
         "workflow": "Workflow",
         "seamlessXAxis": "Trục X Liền Mạch",
         "seamlessYAxis": "Trục Y Liền Mạch",
-        "cfgScale": "Thước Đo CFG",
+        "cfgScale": "Thang CFG",
         "allPrompts": "Tất Cả Lệnh",
         "generationMode": "Chế Độ Tạo Sinh",
         "height": "Chiều Dài",
@@ -776,7 +776,7 @@
     },
     "accordions": {
         "generation": {
-            "title": "Generation (Máy Tạo Sinh)"
+            "title": "Generation (Tạo Sinh)"
         },
         "image": {
             "title": "Hình Ảnh"
@@ -786,7 +786,7 @@
             "options": "Lựa Chọn $t(accordions.advanced.title)"
         },
         "compositing": {
-            "coherenceTab": "Coherence Pass (Lớp Kết Hợp)",
+            "coherenceTab": "Coherence Pass (Liên Kết)",
             "title": "Kết Hợp",
             "infillTab": "Infill (Lấp Đầy)"
         },
@@ -795,21 +795,21 @@
         }
     },
     "invocationCache": {
-        "disableSucceeded": "Bộ Nhớ Đệm Kích Hoạt Đã Tắt",
-        "disableFailed": "Có Vấn Đề Khi Tắt Bộ Nhớ Đệm Kích Hoạt",
-        "hits": "Truy Cập Bộ Nhớ Đệm",
-        "maxCacheSize": "Kích Thước Tối Đa Bộ Nhớ Đệm",
-        "cacheSize": "Kích Thước Bộ Nhớ Đệm",
-        "enableFailed": "Có Vấn Đề Khi Bật Bộ Nhớ Đệm Kích Hoạt",
+        "disableSucceeded": "Bộ Nhớ Đệm Đã Tắt",
+        "disableFailed": "Có Vấn Đề Khi Tắt Bộ Nhớ Đệm",
+        "hits": "Số Lần Trúng",
+        "maxCacheSize": "Tối Đa",
+        "cacheSize": "Tổng Cache",
+        "enableFailed": "Có Vấn Đề Khi Bật Bộ Nhớ Đệm",
         "disable": "Tắt",
-        "invocationCache": "Bộ Nhớ Đệm Kích Hoạt",
-        "clearSucceeded": "Bộ Nhớ Đệm Kích Hoạt Đã Được Dọn",
-        "enableSucceeded": "Bộ Nhớ Đệm Kích Hoạt Đã Bật",
+        "invocationCache": "Bộ Nhớ Đệm",
+        "clearSucceeded": "Bộ Nhớ Đệm Đã Được Dọn",
+        "enableSucceeded": "Bộ Nhớ Đệm Đã Bật",
         "useCache": "Dùng Bộ Nhớ Đệm",
         "enable": "Bật",
-        "misses": "Không Truy Cập Bộ Nhớ Đệm",
+        "misses": "Số Lần Trật",
         "clear": "Dọn Dẹp",
-        "clearFailed": "Có Vấn Đề Khi Dọn Dẹp Bộ Nhớ Đệm Kích Hoạt"
+        "clearFailed": "Có Vấn Đề Khi Dọn Dẹp Bộ Nhớ Đệm"
     },
     "hrf": {
         "metadata": {
@@ -964,9 +964,9 @@
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
-            "heading": "CFG Rescale Multiplier",
+            "heading": "Hệ Số Nhân Thang CFG",
             "paragraphs": [
-                "Hệ số nhân điều chỉnh cho hướng dẫn CFG, dùng cho model được huấn luyện bằng zero-terminal SNR (ztsnr).",
+                "Hệ số nhân điều chỉnh để hướng dẫn cho CFG, dùng cho model được huấn luyện bằng zero-terminal SNR (ztsnr).",
                 "Giá trị khuyến cáo là 0.7 cho những model này."
             ]
         },
@@ -978,10 +978,10 @@
             ]
         },
         "paramCFGScale": {
-            "heading": "Thước Đo CFG",
+            "heading": "Thang CFG",
             "paragraphs": [
                 "Điều khiển mức độ lệnh tác động lên quá trình tạo sinh.",
-                "Giá trị của Thước đo CFG quá cao có thể tạo độ bão hoà quá mức và khiến ảnh tạo sinh bị méo mó. "
+                "Giá trị của Thang CFG quá cao có thể tạo độ bão hoà quá mức và khiến ảnh tạo sinh bị méo mó. "
             ]
         },
         "paramScheduler": {
@@ -992,13 +992,13 @@
             ]
         },
         "compositingCoherencePass": {
-            "heading": "Coherence Pass (Lớp Kết Hợp)",
+            "heading": "Coherence Pass (Liên Kết)",
             "paragraphs": [
                 "Bước thứ hai trong quá trình khử nhiễu để hợp nhất với ảnh inpaint/outpaint."
             ]
         },
         "refinerNegativeAestheticScore": {
-            "heading": "Điểm Tiêu Cực Cho Tiêu Chuẩn",
+            "heading": "Điểm Khác Tiêu Chuẩn",
             "paragraphs": [
                 "Trọng lượng để tạo sinh ảnh giống với ảnh có điểm tiêu chuẩn thấp, dựa vào dữ liệu huấn luyện."
             ]
@@ -1006,26 +1006,26 @@
         "refinerCfgScale": {
             "paragraphs": [
                 "Điều khiển mức độ lệnh tác động lên quá trình tạo sinh.",
-                "Giống với thước đo CFG để tạo sinh."
+                "Giống với thang CFG để tạo sinh."
             ],
-            "heading": "Thước Đo CFG"
+            "heading": "Thang CFG"
         },
         "refinerSteps": {
-            "heading": "Tham Số Bước",
+            "heading": "Số Bước",
             "paragraphs": [
                 "Số bước diễn ra trong khi tinh chế các phần nhỏ của quá trình tạo sinh.",
-                "Giống với tham số bước để tạo sinh."
+                "Giống với số bước để tạo sinh."
             ]
         },
         "paramSteps": {
-            "heading": "Tham Số Bước",
+            "heading": "Số Bước",
             "paragraphs": [
                 "Số bước dùng để biểu diễn trong mỗi lần tạo sinh.",
                 "Số bước càng cao thường sẽ tạo ra ảnh tốt hơn nhưng ngốn nhiều thời gian hơn."
             ]
         },
         "paramWidth": {
-            "heading": "Chiều Rộng",
+            "heading": "Rộng",
             "paragraphs": [
                 "Chiều rộng của ảnh tạo sinh. Phải là bội số của 8."
             ]
@@ -1052,14 +1052,14 @@
             "paragraphs": [
                 "Trọng lượng để tạo sinh ảnh giống với ảnh có điểm tiêu chuẩn cao, dựa vào dữ liệu huấn luyện."
             ],
-            "heading": "Điểm Tích Cực Cho Tiêu Chuẩn"
+            "heading": "Điểm Giống Tiêu Chuẩn"
         },
         "paramVAEPrecision": {
             "paragraphs": [
                 "Độ chính xác dùng trong khi mã hoá và giải mã VAE.",
                 "Chính xác một nửa/Fp16 sẽ hiệu quả hơn, đổi lại cho những thay đổi nhỏ với ảnh."
             ],
-            "heading": "VAE Precision"
+            "heading": "Độ Chuẩn VAE"
         },
         "fluxDevLicense": {
             "heading": "Giấy Phép Phi Thương Mại",
@@ -1078,14 +1078,14 @@
             "paragraphs": [
                 "Chiều dài của ảnh tạo sinh. Phải là bội số của 8."
             ],
-            "heading": "Chiều Dài"
+            "heading": "Dài"
         },
         "paramRatio": {
             "paragraphs": [
                 "Tỉ lệ khung hình của kích thước của ảnh được tạo ra.",
                 "Kích thước ảnh (theo số lượng pixel) tương đương với 512x512 được khuyến nghị cho model SD1.5 và kích thước tương đương với 1024x1024 được khuyến nghị cho model SDXL."
             ],
-            "heading": "Tỉ Lệ Khung Hình"
+            "heading": "Tỉ Lệ"
         },
         "seamlessTilingYAxis": {
             "paragraphs": [
@@ -1140,19 +1140,19 @@
         },
         "compositingCoherenceMinDenoise": {
             "paragraphs": [
-                "Sức mạnh khử nhiễu nhỏ nhất cho chế độ kết hợp",
-                "Sức mạnh khử nhiễu nhỏ nhất cho vùng kết hợp khi inpaint/outpaint"
+                "Độ khử nhiễu nhỏ nhất cho chế độ liên kết",
+                "Sức mạnh khử nhiễu nhỏ nhất cho vùng liên kết khi inpaint/outpaint"
             ],
-            "heading": "Độ Khử Nhiễu Tối Thiểu"
+            "heading": "Min Khử Nhiễu"
         },
         "compositingCoherenceEdgeSize": {
             "paragraphs": [
-                "Kích thước cạnh cho lớp kết hợp."
+                "Kích cỡ cạnh dùng cho coherence pass."
             ],
-            "heading": "Kích Thước Cạnh"
+            "heading": "Kích Cỡ Cạnh"
         },
         "compositingMaskBlur": {
-            "heading": "Mask Blur",
+            "heading": "Độ Mờ Vùng",
             "paragraphs": [
                 "Độ mờ của phần được phủ."
             ]
@@ -1180,7 +1180,7 @@
         "noiseUseCPU": {
             "paragraphs": [
                 "Điều chỉnh độ nhiễu được tạo ra trên CPU hay GPU.",
-                "Với Độ nhiễu CPU được bật, một tham số hạt giống cụ thể sẽ tạo ra hình ảnh giống nhau trên mọi máy.",
+                "Với Độ nhiễu CPU được bật, một hạt giống cụ thể sẽ tạo ra hình ảnh giống nhau trên mọi máy.",
                 "Không có tác động nào đến hiệu suất khi bật Độ nhiễu CPU."
             ],
             "heading": "Dùng Độ Nhiễu CPU"
@@ -1210,7 +1210,7 @@
                 "• Bước Bắt Đầu (%): Chỉ định lúc bắt đầu áp dụng chỉ dẫn từ layer này trong quá trình tạo sinh.",
                 "• Bước Kết Thúc (%): Chỉ định lúc dừng áp dụng chỉ dẫn của layer này và trở về chỉ dẫn chung từ model và các thiết lập khác."
             ],
-            "heading": "Phần Trăm Tham Số Bước Khi Bắt Đầu/Kết Thúc"
+            "heading": "Phần Trăm Số Bước Khi Bắt Đầu/Kết Thúc"
         },
         "scale": {
             "heading": "Tỉ Lệ",
@@ -1232,12 +1232,12 @@
         },
         "dynamicPromptsSeedBehaviour": {
             "paragraphs": [
-                "Điều khiển cách tham số hạt giống được dùng khi tạo sinh từ lệnh.",
-                "Cứ mỗi lần lặp, một tham số hạt giống mới sẽ được dùng. Dùng nó để khám phá những biến thể từ lệnh trên mỗi tham số hạt giống.",
-                "Ví dụ, nếu bạn có 5 lệnh, mỗi ảnh sẽ dùng cùng tham số hạt giống.",
-                "Một tham số hạt giống mới sẽ được dùng cho từng ảnh. Nó tạo ra nhiều biến thể."
+                "Điều khiển cách hạt giống được dùng khi tạo sinh từ lệnh.",
+                "Cứ mỗi lần lặp, một hạt giống mới sẽ được dùng. Dùng nó để khám phá những biến thể từ lệnh trên mỗi hạt giống.",
+                "Ví dụ, nếu bạn có 5 lệnh, mỗi ảnh sẽ dùng cùng hạt giống.",
+                "Một hạt giống mới sẽ được dùng cho từng ảnh. Nó tạo ra nhiều biến thể."
             ],
-            "heading": "Hành Động Cho Tham Số Hạt Giống"
+            "heading": "Hành Vi Của Hạt Giống"
         },
         "paramGuidance": {
             "heading": "Hướng Dẫn",
@@ -1266,10 +1266,10 @@
         },
         "paramAspect": {
             "paragraphs": [
-                "Tỉ lệ khung hành của ảnh tạo sinh. Điều chỉnh tỉ lệ se cập nhật Chiều Rộng và Chiều Dài tương ứng.",
-                "\"Tối ưu hoá\" sẽ đặt Chiều Rộng và Chiều Dài vào kích thước tối ưu cho model được chọn."
+                "Tỉ lệ khung hành của ảnh tạo sinh. Điều chỉnh tỉ lệ sẽ cập nhật chiều rộng và chiều dài tương ứng.",
+                "\"Tối ưu hoá\" sẽ đặt chiều rộng và chiều dài vào kích thước tối ưu cho model được chọn."
             ],
-            "heading": "Khung Hình"
+            "heading": "Tỉ Lệ"
         },
         "paramNegativeConditioning": {
             "heading": "Lệnh Tiêu Cực",
@@ -1289,7 +1289,7 @@
                 "Nơi trong quá trình xử lý tạo sinh mà refiner bắt đầu được dùng.",
                 "0 nghĩa là bộ refiner sẽ được dùng trong toàn bộ quá trình tạo sinh , 0.8 nghĩa là refiner sẽ được dùng trong 20% cuối cùng quá trình tạo sinh."
             ],
-            "heading": "Nơi Bắt Đầu Refiner"
+            "heading": "Bắt Đầu Refiner"
         },
         "paramUpscaleMethod": {
             "paragraphs": [
@@ -1310,9 +1310,9 @@
             "heading": "Độ Cấu Trúc"
         },
         "infillMethod": {
-            "heading": "Cách Thức Infill",
+            "heading": "Cách Infill",
             "paragraphs": [
-                "Cách thức làm infill trong quá trình inpaint/outpaint."
+                "Cách thức infill trong quá trình inpaint/outpaint."
             ]
         },
         "paramDenoisingStrength": {
@@ -1341,7 +1341,7 @@
                 "Điều khiển độ nhiễu ban đầu được dùng để tạo sinh.",
                 "Tắt lựa chọn \"Ngẫu Nhiên\" để tạo ra kết quá y hệt nhau với cùng một thiết lập tạo sinh."
             ],
-            "heading": "Tham Số Hạt Giống"
+            "heading": "Hạt Giống"
         },
         "clipSkip": {
             "heading": "CLIP Skip",
@@ -1366,7 +1366,7 @@
         "compositingCoherenceMode": {
             "heading": "Chế Độ",
             "paragraphs": [
-                "Cách thức được dùng để kết hợp ảnh với vùng bao phủ vừa được tạo sinh."
+                "Cách thức được dùng để liên kết ảnh với vùng bao phủ vừa được tạo sinh."
             ]
         },
         "paramModel": {
@@ -1391,7 +1391,7 @@
     },
     "models": {
         "addLora": "Thêm LoRA",
-        "concepts": "Khái Niệm",
+        "concepts": "LoRA",
         "loading": "đang tải",
         "lora": "LoRA",
         "noMatchingLoRAs": "Không có LoRA phù hợp",
@@ -1406,7 +1406,7 @@
         "postProcessing": "Xử Lý Hậu Kỳ (Shift + U)",
         "symmetry": "Tính Đối Xứng",
         "type": "Loại",
-        "seed": "Tham Số Hạt Giống",
+        "seed": "Hạt Giống",
         "processImage": "Xử Lý Hình Ảnh",
         "useSize": "Dùng Kích Thước",
         "invoke": {
@@ -1435,19 +1435,19 @@
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: quá nhiều mục, tối đa {{maxItems}}",
             "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)"
         },
-        "cfgScale": "Thước Đo CFG",
-        "useSeed": "Dùng Tham Số Hạt Giống",
+        "cfgScale": "Thang CFG",
+        "useSeed": "Dùng Hạt Giống",
         "imageActions": "Hành Động Với Hình Ảnh",
-        "steps": "Tham Số Bước",
-        "aspect": "Khung Hình",
+        "steps": "Số Bước",
+        "aspect": "Tỉ Lệ",
         "coherenceMode": "Chế Độ",
-        "coherenceEdgeSize": "Kích Thước Cạnh",
-        "coherenceMinDenoise": "Tham Số Khử Nhiễu Nhỏ Nhất",
+        "coherenceEdgeSize": "Kích Cỡ Cạnh",
+        "coherenceMinDenoise": "Min Khử Nhiễu",
         "denoisingStrength": "Sức Mạnh Khử Nhiễu",
-        "infillMethod": "Cách Thức Infill",
+        "infillMethod": "Cách Infill",
         "setToOptimalSize": "Tối ưu hoá kích cỡ cho model",
-        "maskBlur": "Mask Blur",
-        "width": "Chiều Rộng",
+        "maskBlur": "Độ Mờ Vùng",
+        "width": "Rộng",
         "scale": "Tỉ Lệ",
         "recallMetadata": "Gợi Lại Metadata",
         "clipSkip": "CLIP Skip",
@@ -1455,7 +1455,7 @@
         "boxBlur": "Box Blur",
         "gaussianBlur": "Gaussian Blur",
         "staged": "Staged (Tăng khử nhiễu có hệ thống)",
-        "scaledHeight": "Tỉ Lệ Chiều Dài",
+        "scaledHeight": "Tỉ Lệ Dài",
         "cancel": {
             "cancel": "Huỷ"
         },
@@ -1463,12 +1463,12 @@
         "optimizedImageToImage": "Tối Ưu Hoá Hình Ảnh Sang Hình Ảnh",
         "sendToCanvas": "Gửi Vào Canvas",
         "sendToUpscale": "Gửi Vào Upscale",
-        "scaledWidth": "Tỉ Lệ Chiều Rộng",
+        "scaledWidth": "Tỉ Lệ Rộng",
         "scheduler": "Scheduler",
         "seamlessXAxis": "Trục X Liền Mạch",
         "seamlessYAxis": "Trục Y Liền Mạch",
         "guidance": "Hướng Dẫn",
-        "height": "Chiều Cao",
+        "height": "Dài",
         "noiseThreshold": "Ngưỡng Nhiễu",
         "negativePromptPlaceholder": "Lệnh Tiêu Cực",
         "iterations": "Lặp Lại",
@@ -1481,13 +1481,13 @@
         "useCpuNoise": "Dùng Độ Nhiễu CPU",
         "remixImage": "Phối Lại Hình Ảnh",
         "showOptionsPanel": "Hiển Thị Bảng Bên Cạnh (O hoặc T)",
-        "shuffle": "Xáo Trộn Tham Số Hạt Giống",
+        "shuffle": "Xáo Trộn",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (lớn quá)",
-        "cfgRescaleMultiplier": "CFG Rescale Multiplier",
+        "cfgRescaleMultiplier": "Hệ Số Nhân Thang CFG",
         "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (nhỏ quá)",
         "images": "Ảnh Ban Đầu",
         "controlNetControlMode": "Chế Độ Điều Khiển",
-        "lockAspectRatio": "Khoá Tỉ Lệ Khung Hình",
+        "lockAspectRatio": "Khoá Tỉ Lệ",
         "swapDimensions": "Hoán Đổi Kích Thước",
         "copyImage": "Sao Chép Hình Ảnh",
         "downloadImage": "Tải Xuống Hình Ảnh",
@@ -1500,11 +1500,11 @@
     },
     "dynamicPrompts": {
         "seedBehaviour": {
-            "perIterationDesc": "Sử dụng tham số hạt giống khác nhau cho mỗi lần lặp lại",
-            "perPromptDesc": "Sử dụng tham số hạt giống khác nhau cho mỗi hình ảnh",
-            "label": "Hành Động Cho Tham Số Hạt Giống",
-            "perPromptLabel": "Tham Số Hạt Giống Mỗi Hình Ảnh",
-            "perIterationLabel": "Tham Số Hạt Giống Mỗi Lần Lặp Lại"
+            "perIterationDesc": "Sử dụng hạt giống khác nhau cho mỗi lần lặp lại",
+            "perPromptDesc": "Sử dụng hạt giống khác nhau cho mỗi hình ảnh",
+            "label": "Hành Động Cho Hạt Giống",
+            "perPromptLabel": "Một Hạt Giống Mỗi Ảnh",
+            "perIterationLabel": "Hạt Giống Mỗi Lần Lặp Lại"
         },
         "loading": "Tạo Sinh Dùng Dynamic Prompt...",
         "showDynamicPrompts": "HIện Dynamic Prompt",
@@ -1515,9 +1515,9 @@
     "settings": {
         "beta": "Beta",
         "general": "Cài Đặt Chung",
-        "confirmOnDelete": "Chắp Nhận Xoá",
+        "confirmOnDelete": "Xác Nhận Khi Xoá",
         "developer": "Nhà Phát Triển",
-        "confirmOnNewSession": "Chắp Nhận Mở Phiên Mới",
+        "confirmOnNewSession": "Xác Nhận Khi Mở Phiên Mới",
         "antialiasProgressImages": "Xử Lý Khử Răng Cưa Hình Ảnh",
         "models": "Models",
         "informationalPopoversDisabledDesc": "Hộp thoại hỗ trợ thông tin đã tắt. Bật lại trong Cài đặt.",
@@ -1549,20 +1549,20 @@
     },
     "sdxl": {
         "loading": "Đang Tải...",
-        "posAestheticScore": "Điểm Tích Cực Cho Tiêu Chuẩn",
-        "steps": "Tham Số Bước",
-        "refinerSteps": "Tham Số Bước Refiner",
+        "posAestheticScore": "Điểm Giống Tiêu Chuẩn",
+        "steps": "Số Bước",
+        "refinerSteps": "Số Bước Refiner",
         "refinermodel": "Model Refiner",
-        "refinerStart": "Nơi Bắt Đầu Refiner",
+        "refinerStart": "Bắt Đầu Refiner",
         "denoisingStrength": "Sức Mạnh Khử Nhiễu",
         "posStylePrompt": "Điểm Tích Cực Cho Lệnh Phong Cách",
         "scheduler": "Scheduler",
         "refiner": "Refiner",
-        "cfgScale": "Thước Đo CFG",
+        "cfgScale": "Thang CFG",
         "concatPromptStyle": "Liên Kết Lệnh & Phong Cách",
         "freePromptStyle": "Viết Lệnh Thủ Công Cho Phong Cách",
         "negStylePrompt": "Điểm Tiêu Cực Cho Lệnh Phong Cách",
-        "negAestheticScore": "Điểm Tiêu Cực Cho Tiêu Chuẩn",
+        "negAestheticScore": "Điểm Khác Tiêu Chuẩn",
         "noModelsAvailable": "Không có sẵn model"
     },
     "controlLayers": {
@@ -1992,7 +1992,8 @@
             "generation": "Generation",
             "system": "Hệ Thống",
             "canvas": "Canvas",
-            "logNamespaces": "Nơi Được Log"
+            "logNamespaces": "Vùng Ghi Log",
+            "dnd": "Kéo Thả"
         },
         "logLevel": {
             "logLevel": "Cấp Độ Log",
