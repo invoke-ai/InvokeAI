@@ -22,7 +22,6 @@ class ModelCacheStatsSummary:
     """The stats for the model cache."""
 
     high_water_mark_gb: float
-    cache_size_gb: float
     total_usage_gb: float
     cache_hits: int
     cache_misses: int
@@ -79,7 +78,7 @@ class InvocationStatsSummary:
         _str += f"   Model cache misses: {self.model_cache_stats.cache_misses}\n"
         _str += f"   Models cached: {self.model_cache_stats.models_cached}\n"
         _str += f"   Models cleared from cache: {self.model_cache_stats.models_cleared}\n"
-        _str += f"   Cache high water mark: {self.model_cache_stats.high_water_mark_gb:4.2f}/{self.model_cache_stats.cache_size_gb:4.2f}G\n"
+        _str += f"   Cache high water mark: {self.model_cache_stats.high_water_mark_gb:4.2f}G\n"
 
         return _str
 
