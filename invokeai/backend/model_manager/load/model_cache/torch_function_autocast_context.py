@@ -12,7 +12,16 @@ def add_autocast_to_module_forward(m: torch.nn.Module, to_device: torch.device):
         with TorchFunctionAutocastDeviceContext(to_device):
             return old_forward(*args, **kwargs)
 
+    m.old_forward = old_forward  # type: ignore
     m.forward = new_forward
+
+
+def remove_autocast_from_module_forward(m: torch.nn.Module):
+    """Remove the autocast context from m.forward(...) and restore the old forward method."""
+    if not hasattr(m, "old_forward"):
+        return
+    m.forward = m.old_forward
+    del m.old_forward
 
 
 def _cast_to_device_and_run(

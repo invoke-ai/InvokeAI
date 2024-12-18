@@ -4,6 +4,7 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.torch_function_autocast_context import (
     TorchFunctionAutocastDeviceContext,
     add_autocast_to_module_forward,
+    remove_autocast_from_module_forward,
 )
 from tests.backend.model_manager.load.model_cache.dummy_module import DummyModule
 
@@ -28,6 +29,9 @@ def test_torch_function_autocast_device_context():
 
 
 def test_add_autocast_to_module_forward():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available.")
+
     model = DummyModule()
     assert all(p.device.type == "cpu" for p in model.parameters())
 
@@ -48,3 +52,25 @@ def test_add_autocast_to_module_forward():
     # So, attempting to perform an operation with comflicting devices should raise an error.
     with pytest.raises(RuntimeError):
         _ = torch.randn(10, device="cuda") * torch.randn(10, device="cpu")
+
+
+def test_remove_autocast_from_module_forward():
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available.")
+
+    model = DummyModule()
+    # Model parameters should start off on the CPU.
+    assert all(p.device.type == "cpu" for p in model.parameters())
+
+    add_autocast_to_module_forward(model, torch.device("cuda"))
+
+    # While the autocast context is active, we should be able to perform operations on the GPU.
+    x = torch.randn(10, 10, device="cuda")
+    y = model(x)
+    assert y.device.type == "cuda"
+
+    remove_autocast_from_module_forward(model)
+
+    # After removing the autocast context, we should no longer be able to run the model forward method with the GPU.
+    with pytest.raises(RuntimeError):
+        _ = model(x)
