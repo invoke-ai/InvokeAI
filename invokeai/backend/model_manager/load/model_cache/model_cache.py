@@ -303,6 +303,14 @@ class ModelCache:
         ram_total = virtual_memory.total
         ram_available = virtual_memory.available
         ram_used = ram_total - ram_available
+
+        # The total size of all the models in the cache will often be larger than the amount of RAM reported by psutil
+        # (due to lazy-loading and OS RAM caching behaviour). We could just rely on the psutil values, but it feels
+        # like a bad idea to over-fill the model cache. So, for now, we'll try to keep the total size of models in the
+        # cache under the total amount of system RAM.
+        cache_ram_used = self._get_ram_in_use()
+        ram_used = max(cache_ram_used, ram_used)
+
         # Aim to keep 10% of RAM free.
         return int(ram_total * 0.9) - ram_used
 
