@@ -240,6 +240,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         if len(timesteps) <= 1:
             return x
 
+        if is_schnell and self.control_lora:
+            raise ValueError("Control LoRAs cannot be used with FLUX Schnell")
+
         # Prepare the extra image conditioning tensor if a FLUX structural control image is provided.
         img_cond = self._prep_structural_control_img_cond(context)
 
