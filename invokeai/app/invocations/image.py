@@ -1055,3 +1055,19 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_dto = context.images.save(image=generated_image)
 
         return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "test_typegen_invocation",
+    title="Test Typegen Invocation",
+    tags=["image"],
+    category="image",
+    version="1.2.2",
+)
+class TestTypegenInvocation(BaseInvocation):
+    """Test typegen ci"""
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = Image.new("RGBA", (512, 512), (255, 0, 0, 255))
+        image_dto = context.images.save(image=image)
+        return ImageOutput.build(image_dto)
