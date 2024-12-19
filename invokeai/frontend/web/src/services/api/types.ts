@@ -44,7 +44,7 @@ export type BaseModelType = S['BaseModelType'];
 
 // Model Configs
 
-export type ControlLoRAModelConfig = S['ControlLoRALyCORISConfig'];
+export type ControlLoRAModelConfig = S['ControlLoRALyCORISConfig'] | S['ControlLoRADiffusersConfig'];
 // TODO(MM2): Can we make key required in the pydantic model?
 export type LoRAModelConfig = S['LoRADiffusersConfig'] | S['LoRALyCORISConfig'];
 // TODO(MM2): Can we rename this from Vae -> VAE
