@@ -34,7 +34,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.3.0",
+    version="1.3.1",
 )
 class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""
@@ -53,13 +53,32 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
     fp32: bool = InputField(default=False, description=FieldDescriptions.fp32)
 
+    def _estimate_working_memory(self, latents: torch.Tensor) -> int:
+        """Estimate the working memory required by the invocation in bytes."""
+        # It was found experimentally that the peak working memory scales linearly with the number of pixels and the
+        # element size (precision). This estimate is accurate for both SD1 and SDXL.
+        out_h = LATENT_SCALE_FACTOR * latents.shape[-2]
+        out_w = LATENT_SCALE_FACTOR * latents.shape[-1]
+        element_size = 4 if self.fp32 else 2
+        scaling_constant = 960  # Determined experimentally.
+        working_memory = out_h * out_w * element_size * scaling_constant
+
+        if self.fp32:
+            # If we are running in FP32, then we should account for the likely increase in model size (~250MB).
+            working_memory += 250 * 2**20
+
+        return working_memory
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
-        with SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes), vae_info as vae:
+        with (
+            SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
+            vae_info.model_on_device(working_mem_bytes=self._estimate_working_memory(latents)) as (_, vae),
+        ):
             context.util.signal_progress("Running VAE decoder")
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
             latents = latents.to(TorchDevice.choose_torch_device())
