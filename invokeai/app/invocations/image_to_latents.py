@@ -13,7 +13,7 @@ from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import DEFAULT_PRECISION, LATENT_SCALE_FACTOR
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -49,7 +49,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     # NOTE: tile_size = 0 is a special value. We use this rather than `int | None`, because the workflow UI does not
     # offer a way to directly set None values.
     tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
-    fp32: bool = InputField(default=DEFAULT_PRECISION == torch.float32, description=FieldDescriptions.fp32)
+    fp32: bool = InputField(default=False, description=FieldDescriptions.fp32)
 
     @staticmethod
     def vae_encode(
