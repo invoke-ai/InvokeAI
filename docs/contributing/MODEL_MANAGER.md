@@ -1364,7 +1364,6 @@ the in-memory loaded model:
 |----------------|-----------------|------------------|
 | `config`       | AnyModelConfig         | A copy of the model's configuration record for retrieving base type, etc. |
 | `model`        | AnyModel               | The instantiated model (details below) |
-| `locker`       | ModelLockerBase        | A context manager that mediates the movement of the model into VRAM |
 
 ### get_model_by_key(key, [submodel]) -> LoadedModel
 
