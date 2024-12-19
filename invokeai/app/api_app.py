@@ -59,11 +59,32 @@ logger.info(f"Using torch device: {torch_device_name}")
 
 loop = asyncio.new_event_loop()
 
+# We may change the port if the default is in use, this global variable is used to store the port so that we can log
+# the correct port when the server starts in the lifespan handler.
+port = app_config.port
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Add startup event to load dependencies
     ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, loop=loop, logger=logger)
+
+    # Log the server address when it starts - in case the network log level is not high enough to see the startup log
+    proto = "https" if app_config.ssl_certfile else "http"
+    msg = f"Invoke running on {proto}://{app_config.host}:{port} (Press CTRL+C to quit)"
+
+    # Logging this way ignores the logger's log level and _always_ logs the message
+    record = logger.makeRecord(
+        name=logger.name,
+        level=logging.INFO,
+        fn="",
+        lno=0,
+        msg=msg,
+        args=(),
+        exc_info=None,
+    )
+    logger.handle(record)
+
     yield
     # Shut down threads
     ApiDependencies.shutdown()
@@ -206,6 +227,7 @@ def invoke_api() -> None:
         else:
             jurigged.watch(logger=InvokeAILogger.get_logger(name="jurigged").info)
 
+    global port
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
@@ -217,18 +239,17 @@ def invoke_api() -> None:
         host=app_config.host,
         port=port,
         loop="asyncio",
-        log_level=app_config.log_level,
+        log_level=app_config.log_level_network,
         ssl_certfile=app_config.ssl_certfile,
         ssl_keyfile=app_config.ssl_keyfile,
     )
     server = uvicorn.Server(config)
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
-    for logname in ["uvicorn.access", "uvicorn"]:
-        log = InvokeAILogger.get_logger(logname)
-        log.handlers.clear()
-        for ch in logger.handlers:
-            log.addHandler(ch)
+    uvicorn_logger = InvokeAILogger.get_logger("uvicorn")
+    uvicorn_logger.handlers.clear()
+    for hdlr in logger.handlers:
+        uvicorn_logger.addHandler(hdlr)
 
     loop.run_until_complete(server.serve())
 
