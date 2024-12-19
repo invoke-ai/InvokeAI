@@ -52,7 +52,7 @@ dependencies = [
   "sentencepiece==0.2.0",
   "spandrel==0.3.4",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch<2.5.0",                # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torch~=2.4",                 # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchmetrics",
   "torchsde",
   "torchvision",
