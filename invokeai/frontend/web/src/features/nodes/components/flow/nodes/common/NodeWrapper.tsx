@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { useNode } from 'features/nodes/hooks/useNode';
 import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodes } from 'features/nodes/store/selectors';
 import { selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
@@ -21,11 +22,14 @@ type NodeWrapperProps = PropsWithChildren & {
 
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
+  const node = useNode(nodeId);
   const store = useAppStore();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
 
   const executionState = useExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
+  const isFailed = executionState?.status === zNodeStatus.enum.FAILED;
+  const isErrorNode = node.data?.isErrorNode || isFailed;
 
   const [nodeInProgress, shadowsXl, shadowsBase] = useToken('shadows', [
     'nodeInProgress',
@@ -71,6 +75,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       transitionDuration="0.1s"
       cursor="grab"
       opacity={opacity}
+      boxShadow={isErrorNode ? '0 0 10px 6px #7F3A41' : undefined}
     >
       <Box
         position="absolute"
