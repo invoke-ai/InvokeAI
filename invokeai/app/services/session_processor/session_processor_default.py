@@ -439,7 +439,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
-                    self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
+                    self._invoker.services.logger.info(
+                        f"Executing queue item {self._queue_item.item_id}, session {self._queue_item.session_id}"
+                    )
                     cancel_event.clear()
 
                     # Run the graph
