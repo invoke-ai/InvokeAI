@@ -42,7 +42,6 @@ class ModelLoader(ModelLoaderBase):
         self,
         model_config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
-        working_mem_bytes: Optional[int] = None,
     ) -> LoadedModel:
         """
         Return a model given its configuration.
@@ -61,9 +60,7 @@ class ModelLoader(ModelLoaderBase):
 
         with skip_torch_weight_init():
             cache_record = self._load_and_cache(model_config, submodel_type)
-        return LoadedModel(
-            config=model_config, cache_record=cache_record, cache=self._ram_cache, working_mem_bytes=working_mem_bytes
-        )
+        return LoadedModel(config=model_config, cache_record=cache_record, cache=self._ram_cache)
 
     @property
     def ram_cache(self) -> ModelCache:

@@ -52,22 +52,27 @@ class LoadedModelWithoutConfig:
     do not have a state_dict, in which case this value will be None.
     """
 
-    def __init__(self, cache_record: CacheRecord, cache: ModelCache, working_mem_bytes: Optional[int] = None):
+    def __init__(self, cache_record: CacheRecord, cache: ModelCache):
         self._cache_record = cache_record
         self._cache = cache
-        self._working_mem_bytes = working_mem_bytes
 
     def __enter__(self) -> AnyModel:
-        self._cache.lock(self._cache_record.key, self._working_mem_bytes)
+        self._cache.lock(self._cache_record.key, None)
         return self.model
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
         self._cache.unlock(self._cache_record.key)
 
     @contextmanager
-    def model_on_device(self) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
-        """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
-        self._cache.lock(self._cache_record.key, self._working_mem_bytes)
+    def model_on_device(
+        self, working_mem_bytes: Optional[int] = None
+    ) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
+        """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device.
+
+        :param working_mem_bytes: The amount of working memory to keep available on the compute device when loading the
+            model.
+        """
+        self._cache.lock(self._cache_record.key, working_mem_bytes)
         try:
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
         finally:
@@ -87,9 +92,8 @@ class LoadedModel(LoadedModelWithoutConfig):
         config: Optional[AnyModelConfig],
         cache_record: CacheRecord,
         cache: ModelCache,
-        working_mem_bytes: Optional[int] = None,
     ):
-        super().__init__(cache_record=cache_record, cache=cache, working_mem_bytes=working_mem_bytes)
+        super().__init__(cache_record=cache_record, cache=cache)
         self.config = config
 
 
@@ -119,7 +123,6 @@ class ModelLoaderBase(ABC):
         self,
         model_config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
-        working_mem_bytes: Optional[int] = None,
     ) -> LoadedModel:
         """
         Return a model given its confguration.

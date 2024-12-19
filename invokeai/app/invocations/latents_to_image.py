@@ -57,12 +57,15 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
+        vae_info = context.models.load(self.vae.vae)
+        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
         # Reserve 6GB of VRAM for the VAE.
         # Experimentally, this was found to be sufficient for decoding a 1024x1024 image.
         # TODO(ryand): Set the requested working memory dynamically based on the image size (and self.fp32).
-        vae_info = context.models.load(self.vae.vae, working_mem_bytes=6 * 2**30)
-        assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
-        with SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes), vae_info as vae:
+        with (
+            SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
+            vae_info.model_on_device(working_mem_bytes=6 * 2**30) as (_, vae),
+        ):
             context.util.signal_progress("Running VAE decoder")
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
             latents = latents.to(vae.device)
