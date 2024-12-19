@@ -128,10 +128,14 @@ class ModelCache:
         size = calc_model_size_by_data(self._logger, model)
         self.make_room(size)
 
-        running_on_cpu = self._execution_device.type == "cpu"
+        # Partial loading only makes sense on CUDA.
+        # - When running on CPU, there is no 'loading' to do.
+        # - When running on MPS, memory is shared with the CPU, so the default OS memory management already handles this
+        #   well.
+        running_with_cuda = self._execution_device.type == "cuda"
 
         # Wrap model.
-        if isinstance(model, torch.nn.Module) and not running_on_cpu and self._enable_partial_loading:
+        if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(model, self._execution_device)
         else:
             wrapped_model = CachedModelOnlyFullLoad(model, self._execution_device, size)
