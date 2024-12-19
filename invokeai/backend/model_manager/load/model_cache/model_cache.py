@@ -311,7 +311,6 @@ class ModelCache:
             if isinstance(e, torch.cuda.OutOfMemoryError):
                 self._logger.warning("Insufficient GPU memory to load model. Aborting")
             # If an exception occurs, the model could be left in a bad state, so we delete it from the cache entirely.
-            cache_entry.unlock()
             self._delete_cache_entry(cache_entry)
             raise
 
@@ -325,7 +324,6 @@ class ModelCache:
                 raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
         except Exception:
             # If an exception occurs, the model could be left in a bad state, so we delete it from the cache entirely.
-            cache_entry.unlock()
             self._delete_cache_entry(cache_entry)
             raise
 
@@ -369,7 +367,6 @@ class ModelCache:
             ram_total_available_to_cache = int(self._max_ram_cache_size_gb * GB)
             return ram_total_available_to_cache - self._get_ram_in_use()
 
-        virtual_memory = psutil.virtual_memory()
         virtual_memory = psutil.virtual_memory()
         ram_total = virtual_memory.total
         ram_available = virtual_memory.available
@@ -550,5 +547,6 @@ class ModelCache:
         self._log_cache_state(title="After dropping models:")
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
-        self._cache_stack.remove(cache_entry.key)
-        del self._cached_models[cache_entry.key]
+        """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
+        self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
+        self._cached_models.pop(cache_entry.key, None)
