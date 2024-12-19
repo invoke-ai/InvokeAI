@@ -7,6 +7,8 @@ from typing import Dict, List, Optional
 import psutil
 import torch
 
+from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterFlux
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
@@ -145,8 +147,24 @@ class ModelCache:
         #   well.
         running_with_cuda = self._execution_device.type == "cuda"
 
+        # Specific models that opt-out of partial loading.
+        partial_loading_opt_out_models = (
+            # The following models have multiple entrypoints. Our auto-casting context management is only applied to the
+            # forward method, so a partially loaded AutoEncoder could fail if another entrypoint is used. These models
+            # can be supported in the future by improving the autocast context management.
+            # AutoEncoder has three entrypoints: encode, decode, and forward.
+            AutoEncoder,
+            # XLabsIPAdapterFlux is a wrapper around two models that are called directly.
+            XlabsIpAdapterFlux,
+        )
+
         # Wrap model.
-        if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
+        if (
+            isinstance(model, torch.nn.Module)
+            and running_with_cuda
+            and self._enable_partial_loading
+            and not isinstance(model, partial_loading_opt_out_models)
+        ):
             wrapped_model = CachedModelWithPartialLoad(model, self._execution_device)
         else:
             wrapped_model = CachedModelOnlyFullLoad(model, self._execution_device, size)
@@ -262,6 +280,8 @@ class ModelCache:
         )
 
         # Move as much of the model as possible into VRAM.
+        # For testing, only allow 10% of the model to be loaded into VRAM.
+        # vram_available = int(model_vram_needed * 0.1)
         model_bytes_loaded = self._move_model_to_vram(cache_entry, vram_available)
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
