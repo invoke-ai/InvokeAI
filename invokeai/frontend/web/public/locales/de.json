@@ -271,7 +271,7 @@
                 "title": "Ansichts-Tool"
             },
             "quickSwitch": {
-                "title": "Ebenen schnell umschalten",
+                "title": "Ebenen Schnell-Umschalten",
                 "desc": "Wechseln Sie zwischen den beiden zuletzt gewählten Ebenen. Wenn eine Ebene mit einem Lesezeichen versehen ist, wird zwischen ihr und der letzten nicht markierten Ebene gewechselt."
             },
             "applyFilter": {
@@ -1338,7 +1338,15 @@
         "loadWorkflow": "Arbeitsablauf $t(common.load)",
         "updated": "Aktualisiert",
         "created": "Erstellt",
-        "descending": "Absteigend"
+        "descending": "Absteigend",
+        "edit": "Bearbeiten",
+        "loadFromGraph": "Arbeitsablauf aus dem Graph laden",
+        "delete": "Löschen",
+        "copyShareLinkForWorkflow": "Teilen-Link für Arbeitsablauf kopieren",
+        "autoLayout": "Auto Layout",
+        "copyShareLink": "Teilen-Link kopieren",
+        "download": "Herunterladen",
+        "convertGraph": "Graph konvertieren"
     },
     "sdxl": {
         "concatPromptStyle": "Verknüpfen von Prompt & Stil",
@@ -1588,7 +1596,8 @@
             "filters": "Filter",
             "filterType": "Filtertyp",
             "filter": "Filter"
-        }
+        },
+        "bookmark": "Lesezeichen für Schnell-Umschalten"
     },
     "upsell": {
         "shareAccess": "Zugang teilen",
