@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 import psutil
 import torch
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
 from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterFlux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
@@ -156,6 +157,7 @@ class ModelCache:
             AutoEncoder,
             # XLabsIPAdapterFlux is a wrapper around two models that are called directly.
             XlabsIpAdapterFlux,
+            AutoencoderKL,
         )
 
         # Wrap model.
