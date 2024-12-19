@@ -611,7 +611,8 @@
         "hfForbidden": "Non hai accesso a questo modello HF",
         "hfTokenLabel": "Gettone HuggingFace (richiesto per alcuni modelli)",
         "hfForbiddenErrorMessage": "Consigliamo di visitare la pagina del repository su HuggingFace.com. Il proprietario potrebbe richiedere l'accettazione dei termini per poter effettuare il download.",
-        "hfTokenInvalidErrorMessage2": "Aggiornalo in "
+        "hfTokenInvalidErrorMessage2": "Aggiornalo in ",
+        "controlLora": "Controllo LoRA"
     },
     "parameters": {
         "images": "Immagini",
@@ -679,7 +680,8 @@
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi elementi, massimo {{maxItems}}",
             "canvasIsSelectingObject": "La tela è occupata (selezione dell'oggetto)",
             "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi pochi elementi, minimo {{minItems}}",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} raccolta vuota"
+            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} raccolta vuota",
+            "fluxModelMultipleControlLoRAs": "È possibile utilizzare solo 1 Controllo LoRA alla volta"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -2171,7 +2173,7 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>FLUX Regional Guidance (beta)</StrongComponent>: la nostra versione beta di FLUX Regional Guidance è attiva per il controllo dei prompt regionali."
+            "<StrongComponent>Livelli di controllo Flux</StrongComponent>: nuovi modelli di controllo per il rilevamento dei bordi e la mappatura della profondità sono ora supportati per i modelli di Flux dev."
         ]
     },
     "system": {
