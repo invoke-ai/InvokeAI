@@ -361,7 +361,9 @@ class ModelsInterface(InvocationContextInterface):
             return self._services.model_manager.store.exists(identifier.key)
 
     def load(
-        self, identifier: Union[str, "ModelIdentifierField"], submodel_type: Optional[SubModelType] = None
+        self,
+        identifier: Union[str, "ModelIdentifierField"],
+        submodel_type: Optional[SubModelType] = None,
     ) -> LoadedModel:
         """Load a model.
 

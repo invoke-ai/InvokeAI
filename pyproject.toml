@@ -34,7 +34,7 @@ classifiers = [
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate==1.0.1",
-  "bitsandbytes==0.43.3; sys_platform!='darwin'",
+  "bitsandbytes==0.45.0; sys_platform!='darwin'",
   "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
@@ -52,7 +52,7 @@ dependencies = [
   "sentencepiece==0.2.0",
   "spandrel==0.3.4",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch<2.5.0",                # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torch~=2.4",                 # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchmetrics",
   "torchsde",
   "torchvision",
