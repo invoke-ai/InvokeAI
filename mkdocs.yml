@@ -87,6 +87,7 @@ plugins:
       enable_creation_date: true
   - redirects:
       redirect_maps:
+        'installation/index.md': 'installation/quick_start.md'
         'installation/INSTALL_AUTOMATED.md': 'installation/quick_start.md'
         'installation/installer.md': 'installation/quick_start.md'
         'installation/INSTALL_MANUAL.md': 'installation/manual.md'
@@ -115,7 +116,7 @@ extra:
     property: G-2X4JR4S4FB
 
 nav:
-  - Home: 'quick_start.md'
+  - Home: 'index.md'
   - Installation:
       - Quick Start: 'installation/quick_start.md'
       - Detailed Requirements: 'installation/requirements.md'
