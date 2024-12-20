@@ -57,7 +57,7 @@ def test_autocast_tensor_to_dtype(device: torch.device):
 
 
 @mps_and_cuda
-def test_autocast_tensor_in_load_state_dict(device: torch.device):
+def test_autocast_tensor_state_dict_roundtrip(device: torch.device):
     model = DummyModule()
     # Model parameters should start off on the CPU.
     assert all(p.device.type == "cpu" for p in model.parameters())
@@ -86,3 +86,7 @@ def test_autocast_tensor_in_load_state_dict(device: torch.device):
 
     # The result should be on the device.
     assert result.device.type == device.type
+
+    # Verify that we can extract the state dict from the model after adding the AutocastTensor wrappers.
+    state_dict = model.state_dict()
+    assert all(isinstance(v, AutocastTensor) for v in state_dict.values())
