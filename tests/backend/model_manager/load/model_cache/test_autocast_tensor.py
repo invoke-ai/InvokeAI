@@ -39,6 +39,24 @@ def test_autocast_tensor_multiply(device: torch.device):
 
 
 @mps_and_cuda
+def test_autocast_tensor_to_device(device: torch.device):
+    x = torch.randn(32, 64)
+    x_autocast = AutocastTensor(x, device)
+    with pytest.raises(RuntimeError):
+        x_autocast.to(device=device)
+
+
+@mps_and_cuda
+def test_autocast_tensor_to_dtype(device: torch.device):
+    x = torch.randn(32, 64)
+    x_autocast = AutocastTensor(x, device)
+    assert x_autocast.dtype == torch.float32
+    x_autocast_new = x_autocast.to(dtype=torch.float16)
+    assert isinstance(x_autocast_new, AutocastTensor)
+    assert x_autocast_new.dtype == torch.float16
+
+
+@mps_and_cuda
 def test_autocast_tensor_in_load_state_dict(device: torch.device):
     model = DummyModule()
     # Model parameters should start off on the CPU.

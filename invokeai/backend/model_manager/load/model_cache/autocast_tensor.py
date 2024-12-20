@@ -47,6 +47,7 @@ AUTOCAST_TENSOR_OP_TABLE = {
     torch.ops.aten.detach.default: apply_to_original_tensor,  # pyright: ignore
     torch.ops.aten.view.default: apply_to_original_tensor,  # pyright: ignore
     torch.ops.aten.copy_.default: apply_to_original_tensor,  # pyright: ignore
+    torch.ops.aten._to_copy.default: apply_to_original_tensor,  # pyright: ignore
 }
 
 
@@ -89,6 +90,14 @@ class AutocastTensor(torch.Tensor):
     @property
     def device(self):
         return self._target_device
+
+    def to(self, *args, **kwargs):
+        new = super().to(*args, **kwargs)
+        assert isinstance(new, AutocastTensor)
+        # We should never call .to(device=...) on an AutocastTensor.
+        if new._original_tensor.device != self._original_tensor.device:
+            raise RuntimeError("AutocastTensor.to() is not allowed to change the device of the wrapped tensor.")
+        return new
 
     @classmethod
     def __torch_dispatch__(
