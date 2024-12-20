@@ -1,4 +1,10 @@
-# Automatic Install & Updates
+# Legacy Scripts
+
+!!! warning "Legacy Scripts"
+
+    We recommend using the Invoke Launcher to install and update Invoke. It's a desktop application for Windows, macOS and Linux. It takes care of a lot of nitty gritty details for you.
+
+    Follow the [quick start guide](./quick_start.md) to get started.
 
 !!! tip "Use the installer to update"
 

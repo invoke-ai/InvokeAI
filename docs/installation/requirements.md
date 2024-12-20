@@ -1,90 +1,33 @@
 # Requirements
 
-## GPU
+Invoke runs on Windows 10+, macOS 14+ and Linux (Ubuntu 20.04+ is well-tested).
 
-!!! warning "Problematic Nvidia GPUs"
+## Hardware
 
-    We do not recommend these GPUs. They cannot operate with half precision, but have insufficient VRAM to generate 512x512 images at full precision.
+Hardware requirements vary significantly depending on model and image output size. The requirements below are rough guidelines.
 
-    - NVIDIA 10xx series cards such as the 1080 TI
-    - GTX 1650 series cards
-    - GTX 1660 series cards
+- All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
+- AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
 
-Invoke runs best with a dedicated GPU, but will fall back to running on CPU, albeit much slower. You'll need a beefier GPU for SDXL.
+!!! info "Hardware Requirements (Windows/Linux)"
 
-!!! example "Stable Diffusion 1.5"
+    === "SD1.5 - 512×512"
 
-    === "Nvidia"
+        - GPU: Nvidia 10xx series or later, 4GB+ VRAM.
+        - Memory: At least 8GB RAM.
+        - Disk: 10GB for base installation plus 30GB for models.
 
-        ```
-        Any GPU with at least 4GB VRAM.
-        ```
+    === "SDXL - 1024×1024"
 
-    === "AMD"
+        - GPU: Nvidia 20xx series or later, 8GB+ VRAM.
+        - Memory: At least 16GB RAM.
+        - Disk: 10GB for base installation plus 100GB for models.
 
-        ```
-        Any GPU with at least 4GB VRAM. Linux only.
-        ```
+    === "FLUX - 1024×1024"
 
-    === "Mac"
-
-        ```
-        Any Apple Silicon Mac with at least 8GB memory.
-        ```
-
-!!! example "Stable Diffusion XL"
-
-    === "Nvidia"
-
-        ```
-        Any GPU with at least 8GB VRAM.
-        ```
-
-    === "AMD"
-
-        ```
-        Any GPU with at least 16GB VRAM. Linux only.
-        ```
-
-    === "Mac"
-
-        ```
-        Any Apple Silicon Mac with at least 16GB memory.
-        ```
-
-## RAM
-
-At least 12GB of RAM.
-
-## Disk
-
-SSDs will, of course, offer the best performance.
-
-The base application disk usage depends on the torch backend.
-
-!!! example "Disk"
-
-    === "Nvidia (CUDA)"
-
-        ```
-        ~6.5GB
-        ```
-
-    === "AMD (ROCm)"
-
-        ```
-        ~12GB
-        ```
-
-    === "Mac (MPS)"
-
-        ```
-        ~3.5GB
-        ```
-
-You'll need to set aside some space for images, depending on how much you generate. A couple GB is enough to get started.
-
-You'll need a good chunk of space for models. Even if you only install the most popular models and the usual support models (ControlNet, IP Adapter ,etc), you will quickly hit 50GB of models.
+        - GPU: Nvidia 20xx series or later, 10GB+ VRAM.
+        - Memory: At least 32GB RAM.
+        - Disk: 10GB for base installation plus 200GB for models.
 
 !!! info "`tmpfs` on Linux"
 
@@ -92,26 +35,32 @@ You'll need a good chunk of space for models. Even if you only install the most 
 
 ## Python
 
+!!! tip "The launcher installs python for you"
+
+    You don't need to do this if you are installing with the [Invoke Launcher](./quick_start.md).
+
 Invoke requires python 3.10 or 3.11. If you don't already have one of these versions installed, we suggest installing 3.11, as it will be supported for longer.
 
-Check that your system has an up-to-date Python installed by running `python --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
+Check that your system has an up-to-date Python installed by running `python3 --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
 
-<h3>Installing Python (Windows)</h3>
+!!! info "Installing Python"
 
-- Install python 3.11 with [an official installer].
-- The installer includes an option to add python to your PATH. Be sure to enable this. If you missed it, re-run the installer, choose to modify an existing installation, and tick that checkbox.
-- You may need to install [Microsoft Visual C++ Redistributable].
+    === "Windows"
 
-<h3>Installing Python (macOS)</h3>
+        - Install python 3.11 with [an official installer].
+        - The installer includes an option to add python to your PATH. Be sure to enable this. If you missed it, re-run the installer, choose to modify an existing installation, and tick that checkbox.
+        - You may need to install [Microsoft Visual C++ Redistributable].
 
-- Install python 3.11 with [an official installer].
-- If model installs fail with a certificate error, you may need to run this command (changing the python version to match what you have installed): `/Applications/Python\ 3.10/Install\ Certificates.command`
-- If you haven't already, you will need to install the XCode CLI Tools by running `xcode-select --install` in a terminal.
+    === "macOS"
 
-<h3>Installing Python (Linux)</h3>
+        - Install python 3.11 with [an official installer].
+        - If model installs fail with a certificate error, you may need to run this command (changing the python version to match what you have installed): `/Applications/Python\ 3.10/Install\ Certificates.command`
+        - If you haven't already, you will need to install the XCode CLI Tools by running `xcode-select --install` in a terminal.
 
-- Follow the [linux install instructions], being sure to install python 3.11.
-- You'll need to install `libglib2.0-0` and `libgl1-mesa-glx` for OpenCV to work. For example, on a Debian system: `sudo apt update && sudo apt install -y libglib2.0-0 libgl1-mesa-glx`
+    === "Linux"
+
+        - Installing python varies depending on your system. On Ubuntu, you can use the [deadsnakes PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa).
+        - You'll need to install `libglib2.0-0` and `libgl1-mesa-glx` for OpenCV to work. For example, on a Debian system: `sudo apt update && sudo apt install -y libglib2.0-0 libgl1-mesa-glx`
 
 ## Drivers
 
@@ -175,7 +124,4 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [ROCm Documentation]: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/tutorial/quick-start.html
 [cuDNN support matrix]: https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html
 [Nvidia Container Runtime]: https://developer.nvidia.com/container-runtime
-[linux install instructions]: https://docs.python-guide.org/starting/install3/linux/
-[Microsoft Visual C++ Redistributable]: https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
-[an official installer]: https://www.python.org/downloads/
 [CUDA Toolkit Downloads]: https://developer.nvidia.com/cuda-downloads

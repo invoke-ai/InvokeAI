@@ -4,7 +4,7 @@
 
     **Python experience is mandatory.**
 
-    If you want to use Invoke locally, you should probably use the [installer](./installer.md).
+    If you want to use Invoke locally, you should probably use the [launcher](./quick_start.md).
 
     If you want to contribute to Invoke, instead follow the [dev environment](../contributing/dev-environment.md) guide.
 
@@ -84,15 +84,15 @@ Before you start, go through the [installation requirements](./requirements.md).
 
     - You may need to provide an [extra index URL](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-extra-index-url). Select your platform configuration using [this tool on the PyTorch website](https://pytorch.org/get-started/locally/). Copy the `--extra-index-url` string from this and append it to your install command.
 
-        ```bash
-        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
-        ```
+      ```bash
+      pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
+      ```
 
     - If you have a CUDA GPU and want to install with `xformers`, you need to add an option to the package name. Note that `xformers` is not strictly necessary. PyTorch includes an implementation of the SDP attention algorithm with similar performance for most GPUs.
 
-        ```bash
-        pip install "InvokeAI[xformers]" --use-pep517
-        ```
+      ```bash
+      pip install "InvokeAI[xformers]" --use-pep517
+      ```
 
 1. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:
 

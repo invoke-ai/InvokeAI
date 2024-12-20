@@ -50,11 +50,9 @@ title: Invoke
 
 ## Installation
 
-The [installer script](installation/installer.md) is the easiest way to install and update the application.
+The [Invoke Launcher](installation/quick_start.md) is the easiest way to install, update and run Invoke on Windows, macOS and Linux.
 
-You can also install Invoke as python package [via PyPI](installation/manual.md) or [docker](installation/docker.md).
-
-See the [installation section](./installation/index.md) for more information.
+You can also install Invoke as [python package](installation/manual.md) or with [docker](installation/docker.md).
 
 ## Help
 

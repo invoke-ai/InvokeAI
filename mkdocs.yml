@@ -17,6 +17,9 @@ copyright: Copyright &copy; 2022-2024 InvokeAI Team
 # Configuration
 theme:
   name: material
+  font:
+    text: 'Inter'
+    code: 'JetBrains Mono'
   logo: img/invoke-symbol-wht-lrg.svg
   icon:
     repo: fontawesome/brands/github
@@ -84,7 +87,8 @@ plugins:
       enable_creation_date: true
   - redirects:
       redirect_maps:
-        'installation/INSTALL_AUTOMATED.md': 'installation/installer.md'
+        'installation/INSTALL_AUTOMATED.md': 'installation/quick_start.md'
+        'installation/installer.md': 'installation/quick_start.md'
         'installation/INSTALL_MANUAL.md': 'installation/manual.md'
         'installation/INSTALL_SOURCE.md': 'installation/manual.md'
         'installation/INSTALL_DOCKER.md': 'installation/docker.md'
@@ -113,13 +117,13 @@ extra:
 nav:
   - Home: 'index.md'
   - Installation:
-      - Overview: 'installation/index.md'
-      - Requirements: 'installation/requirements.md'
-      - Installer: 'installation/installer.md'
+      - Quick Start: 'installation/quick_start.md'
+      - Detailed Requirements: 'installation/requirements.md'
       - Manual Install: 'installation/manual.md'
       - Docker: 'installation/docker.md'
       - PatchMatch: 'installation/patchmatch.md'
       - Models: 'installation/models.md'
+      - Legacy Scripts: 'installation/legacy_scripts.md'
   - Workflows & Nodes:
       - Nodes Overview: 'nodes/overview.md'
       - Workflow Editor Basics: 'nodes/NODES.md'
