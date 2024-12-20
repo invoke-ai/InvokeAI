@@ -4,7 +4,7 @@ title: Docker
 
 !!! warning "macOS users"
 
-    Docker can not access the GPU on macOS, so your generation speeds will be slow. Use the [installer](./installer.md) instead.
+    Docker can not access the GPU on macOS, so your generation speeds will be slow. Use the [launcher](./quick_start.md) instead.
 
 !!! tip "Linux and Windows Users"
 
