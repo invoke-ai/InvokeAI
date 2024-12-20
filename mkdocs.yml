@@ -115,7 +115,7 @@ extra:
     property: G-2X4JR4S4FB
 
 nav:
-  - Home: 'index.md'
+  - Home: 'quick_start.md'
   - Installation:
       - Quick Start: 'installation/quick_start.md'
       - Detailed Requirements: 'installation/requirements.md'
