@@ -1,10 +1,12 @@
 import itertools
 
+import gguf
 import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.autocast_tensor import AutocastTensor
 from tests.backend.model_manager.load.model_cache.dummy_module import DummyModule
+from tests.backend.quantization.gguf.test_ggml_tensor import quantize_tensor
 
 mps_and_cuda = pytest.mark.parametrize(
     "device",
@@ -90,3 +92,25 @@ def test_autocast_tensor_state_dict_roundtrip(device: torch.device):
     # Verify that we can extract the state dict from the model after adding the AutocastTensor wrappers.
     state_dict = model.state_dict()
     assert all(isinstance(v, AutocastTensor) for v in state_dict.values())
+
+
+@mps_and_cuda
+def test_autocast_tensor_wraps_ggml_tensor(device: torch.device):
+    generator = torch.Generator().manual_seed(123)
+
+    # Initialize two tensors on the CPU.
+    x1 = torch.randn(32, 64, generator=generator)
+    x2 = torch.randn(32, 64, generator=generator)
+
+    # Quantize.
+    x1_quantized = quantize_tensor(x1, gguf.GGMLQuantizationType.Q8_0)
+
+    # Wrap in AutocastTensor.
+    x1_quantized_autocast = AutocastTensor(x1_quantized, device)
+
+    # Perform the multiplication.
+    expected = x1 * x2
+    result = x1_quantized_autocast * x2.to(device)
+
+    assert result.device.type == device.type
+    assert torch.allclose(result, expected, atol=1e-1)

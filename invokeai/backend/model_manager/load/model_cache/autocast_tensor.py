@@ -61,7 +61,16 @@ class AutocastTensor(torch.Tensor):
         """The base torch.Tensor.__new__() method does some non-standard stuff to initialize the underlying tensor
         storage in C. We need to override it to ensure that it receives the expected arguments.
         """
-        return torch.Tensor._make_subclass(cls, data, data.requires_grad)
+        # return torch.Tensor._make_subclass(cls, data, data.requires_grad)
+        return torch.Tensor._make_wrapper_subclass(  # pyright: ignore
+            cls,
+            data.shape,
+            dtype=data.dtype,
+            layout=data.layout,
+            device=data.device,
+            strides=data.stride(),
+            storage_offset=data.storage_offset(),
+        )
 
     def __init__(
         self,
