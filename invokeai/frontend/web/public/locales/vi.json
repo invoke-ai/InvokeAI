@@ -739,7 +739,8 @@
         "width": "Chiều Rộng",
         "starterModelsInModelManager": "Model khởi đầu có thể tìm thấy ở Trình Quản Lý Model",
         "clipLEmbed": "CLIP-L Embed",
-        "clipGEmbed": "CLIP-G Embed"
+        "clipGEmbed": "CLIP-G Embed",
+        "controlLora": "LoRA Điều Khiển Được"
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -1433,7 +1434,8 @@
             "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} tài nguyên trống",
             "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: quá ít mục, tối thiểu {{minItems}}",
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: quá nhiều mục, tối đa {{maxItems}}",
-            "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)"
+            "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)",
+            "fluxModelMultipleControlLoRAs": "Chỉ có thể dùng 1 LoRA Điều Khiển Được"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
