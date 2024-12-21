@@ -6,6 +6,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
     remove_custom_layers_from_model,
 )
+from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt, quantize_model_llm_int8
 from tests.backend.quantization.gguf.test_ggml_tensor import quantize_tensor
 
 cuda_and_mps = pytest.mark.parametrize(
@@ -81,3 +82,33 @@ def test_torch_module_autocast_linear_layer(device: torch.device, model: torch.n
     # The results from all inference runs should be the same.
     assert torch.allclose(autocast_result.to("cpu"), expected, atol=1e-5)
     assert torch.allclose(after_result, expected, atol=1e-5)
+
+
+def test_torch_module_autocast_bnb_llm_int8_linear_layer():
+    if not torch.cuda.is_available():
+        pytest.skip("requires CUDA device")
+
+    model = ModelWithLinearLayer()
+    model = quantize_model_llm_int8(model, modules_to_not_convert=set())
+    # The act of moving the model to the CUDA device will trigger quantization.
+    model.to("cuda")
+    # Confirm that the layer is quantized.
+    assert isinstance(model.linear, InvokeLinear8bitLt)
+    assert model.linear.weight.CB is not None
+    assert model.linear.weight.SCB is not None
+
+    # Run inference on the GPU.
+    x = torch.randn(10, 32)
+    expected = model(x.to("cuda"))
+    assert expected.device.type == "cuda"
+
+    # Move the model back to the CPU and add the custom layers to the model.
+    model.to("cpu")
+    apply_custom_layers_to_model(model)
+
+    # Run inference with weights being streamed to the GPU.
+    autocast_result = model(x.to("cuda"))
+    assert autocast_result.device.type == "cuda"
+
+    # The results from all inference runs should be the same.
+    assert torch.allclose(autocast_result, expected, atol=1e-5)

@@ -5,8 +5,10 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.autoc
     CustomConv2d,
     CustomEmbedding,
     CustomGroupNorm,
+    CustomInvokeLinear8bitLt,
     CustomLinear,
 )
+from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
 
 AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]] = {
     torch.nn.Linear: CustomLinear,
@@ -14,6 +16,7 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.Conv2d: CustomConv2d,
     torch.nn.GroupNorm: CustomGroupNorm,
     torch.nn.Embedding: CustomEmbedding,
+    InvokeLinear8bitLt: CustomInvokeLinear8bitLt,
 }
 
 
