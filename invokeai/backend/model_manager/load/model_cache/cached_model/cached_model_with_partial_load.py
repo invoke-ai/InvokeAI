@@ -1,10 +1,9 @@
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_function_autocast_context import (
-    add_autocast_to_module_forward,
-)
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    AUTOCAST_MODULE_TYPE_MAPPING,
     apply_custom_layers_to_model,
+    remove_custom_layers_from_model,
 )
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from invokeai.backend.util.logging import InvokeAILogger
@@ -41,18 +40,22 @@ class CachedModelWithPartialLoad:
         self._total_bytes = sum(calc_tensor_size(p) for p in self._cpu_state_dict.values())
         self._cur_vram_bytes: int | None = None
 
-        apply_custom_layers_to_model(self._model)
-        # self._update_model_autocast_context()
+        self._modules_that_support_autocast = self._find_modules_that_support_autocast()
+        self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast()
 
-    # def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
-    #     """Find all modules that support autocasting."""
-    #     # Most modules would work with autocasting, but to be safe we maintain a whitelist of supported modules.
-    #     # This short whitelist covers most of the weights in large models.
-    #     supported_modules = (torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv2d, RMSNorm, torch.nn.Embedding)
-    #     modules_that_support_autocast = {
-    #         n: m for n, m in self._model.named_modules() if isinstance(m, supported_modules)
-    #     }
-    #     return modules_that_support_autocast
+    def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
+        """Find all modules that support autocasting."""
+        return {n: m for n, m in self._model.named_modules() if type(m) in AUTOCAST_MODULE_TYPE_MAPPING}
+
+    def _find_keys_in_modules_that_do_not_support_autocast(self) -> set[str]:
+        keys_in_modules_that_do_not_support_autocast = set()
+        for key in self._cpu_state_dict.keys():
+            for module_name in self._modules_that_support_autocast.keys():
+                if key.startswith(module_name):
+                    break
+            else:
+                keys_in_modules_that_do_not_support_autocast.add(key)
+        return keys_in_modules_that_do_not_support_autocast
 
     @property
     def model(self) -> torch.nn.Module:
@@ -98,6 +101,25 @@ class CachedModelWithPartialLoad:
 
         cur_state_dict = self._model.state_dict()
 
+        # First, process the keys *must* be loaded into VRAM.
+        for key in self._keys_in_modules_that_do_not_support_autocast:
+            param = cur_state_dict[key]
+            if param.device.type == self._compute_device.type:
+                continue
+
+            param_size = calc_tensor_size(param)
+            cur_state_dict[key] = param.to(self._compute_device, copy=True)
+            vram_bytes_loaded += param_size
+
+        if vram_bytes_loaded > vram_bytes_to_load:
+            logger = InvokeAILogger.get_logger()
+            logger.warning(
+                f"Loaded {vram_bytes_loaded / 2**20} MB into VRAM, but only {vram_bytes_to_load / 2**20} MB were "
+                "requested. This is the minimum set of weights in VRAM required to run the model."
+            )
+
+        # Next, process the keys that can optionally be loaded into VRAM.
+        fully_loaded = True
         for key, param in cur_state_dict.items():
             if param.device.type == self._compute_device.type:
                 continue
@@ -106,6 +128,7 @@ class CachedModelWithPartialLoad:
             if vram_bytes_loaded + param_size > vram_bytes_to_load:
                 # TODO(ryand): Should we just break here? If we couldn't fit this parameter into VRAM, is it really
                 # worth continuing to search for a smaller parameter that would fit?
+                fully_loaded = False
                 continue
 
             cur_state_dict[key] = param.to(self._compute_device, copy=True)
@@ -120,12 +143,13 @@ class CachedModelWithPartialLoad:
         if self._cur_vram_bytes is not None:
             self._cur_vram_bytes += vram_bytes_loaded
 
-        if self._cur_vram_bytes == self.total_bytes():
-            # HACK(ryand): The model should already be on the compute device, but we have to call this to ensure that
-            # all non-persistent buffers are moved (i.e. buffers that are not registered in the state dict).
-            self._model.to(self._compute_device)
+        if fully_loaded:
+            remove_custom_layers_from_model(self._model)
+            # TODO(ryand): Warn if the self.cur_vram_bytes() and self.total_bytes() are out of sync.
+        else:
+            apply_custom_layers_to_model(self._model)
 
-        # self._update_model_autocast_context()
+        # TODO(ryand): Handle non-persistent buffers.
         return vram_bytes_loaded
 
     @torch.no_grad()
@@ -155,25 +179,5 @@ class CachedModelWithPartialLoad:
         if self._cur_vram_bytes is not None:
             self._cur_vram_bytes -= vram_bytes_freed
 
-        # self._update_model_autocast_context()
+        apply_custom_layers_to_model(self._model)
         return vram_bytes_freed
-
-    def _update_model_autocast_context(self):
-        """A helper function that should be called whenever the model's VRAM usage changes to add/remove the autocast
-        context.
-        """
-        # if self.cur_vram_bytes() == self.total_bytes():
-        #     # We remove the autocast context when the model is fully loaded into VRAM, because the context causes some
-        #     # runtime overhead.
-        #     remove_autocast_from_module_forward(self._model)
-        # else:
-        #     # Monkey-patch the model to add autocasting to the model's forward method.
-        #     add_autocast_to_module_forward(self._model, self._compute_device)
-
-        # TODO(ryand): Make sure that enabling autocast context is a no-op on a given module if it's already enabled.
-
-        modules_that_support_autocast = self._find_modules_that_support_autocast()
-        logger = InvokeAILogger.get_logger()
-        logger.info(f"Enabling autocast context for {len(modules_that_support_autocast)} modules")
-        for _, module in modules_that_support_autocast.items():
-            add_autocast_to_module_forward(module, self._compute_device)
