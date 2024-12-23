@@ -81,11 +81,11 @@ def linear_nf4_layer():
 
     torch.manual_seed(1)
 
-    orig_layer = torch.nn.Linear(32, 64)
+    orig_layer = torch.nn.Linear(64, 16)
     orig_layer_state_dict = orig_layer.state_dict()
 
     # Prepare a quantized InvokeLinearNF4 layer.
-    quantized_layer = InvokeLinearNF4(input_features=32, output_features=64)
+    quantized_layer = InvokeLinearNF4(input_features=64, output_features=16)
     quantized_layer.load_state_dict(orig_layer_state_dict)
     quantized_layer.to("cuda")
 
@@ -98,7 +98,7 @@ def linear_nf4_layer():
 def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLinearNF4):
     """Test CustomInvokeLinearNF4 inference with all weights on the GPU."""
     # Run inference on the original layer.
-    x = torch.randn(1, 32).to("cuda")
+    x = torch.randn(1, 64).to("cuda")
     y_quantized = linear_nf4_layer(x)
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
@@ -109,10 +109,13 @@ def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLi
     assert torch.allclose(y_quantized, y_custom, atol=1e-5)
 
 
-def test_custom_invoke_linear_nf4_all_weights_on_cpu(linear_nf4_layer: InvokeLinearNF4):
+# We run with two different input dimensions, because the NF4 layer follows a different code path depending on the
+# input dimension, and this has caused issues in the past.
+@pytest.mark.parametrize("input_dim_0", [1, 2])
+def test_custom_invoke_linear_nf4_all_weights_on_cpu(linear_nf4_layer: InvokeLinearNF4, input_dim_0: int):
     """Test CustomInvokeLinearNF4 inference with all weights on the CPU (streaming to the GPU)."""
     # Run inference on the original layer.
-    x = torch.randn(1, 32).to(device="cuda")
+    x = torch.randn(input_dim_0, 64).to(device="cuda")
     y_quantized = linear_nf4_layer(x)
 
     # Copy the state dict to the CPU and reload it.

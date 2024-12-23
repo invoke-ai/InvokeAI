@@ -37,5 +37,9 @@ class CustomInvokeLinearNF4(InvokeLinearNF4):
         weight = cast_to_device(self.weight, x.device)
         self.weight.quant_state = old_quant_state
 
+        # For some reason, the quant_state.to(...) implementation fails to cast the quant_state.code field. We do this
+        # manually here.
+        weight.quant_state.code = cast_to_device(weight.quant_state.code, x.device)
+
         bias = cast_to_device(self.bias, x.device)
         return bnb.matmul_4bit(x, weight.t(), bias=bias, quant_state=weight.quant_state).to(inp_dtype)
