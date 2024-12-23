@@ -37,9 +37,9 @@ More detail on system requirements can be found [here](./requirements.md).
 
 Download the most launcher for your operating system:
 
-- [Download for Windows](https://download.invoke.ai/Invoke-Installer-windows-x64.exe)
-- [Download for macOS](https://download.invoke.ai/Invoke-Installer-mac-arm64.dmg)
-- [Download for Linux](https://download.invoke.ai/Invoke-Installer-linux-x86_64.AppImage)
+- [Download for Windows](https://download.invoke.ai/Invoke%20Community%20Edition.exe)
+- [Download for macOS](https://download.invoke.ai/Invoke%20Community%20Edition.dmg)
+- [Download for Linux](https://download.invoke.ai/Invoke%20Community%20Edition.AppImage)
 
 ## Step 3: Install or Update
 
