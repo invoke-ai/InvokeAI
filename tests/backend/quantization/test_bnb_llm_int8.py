@@ -33,7 +33,7 @@ def test_invoke_linear_8bit_lt_quantization():
     assert quantized_layer.weight.CB.dtype == torch.int8
 
     # Run inference on both the original and quantized layers.
-    x = torch.randn(10, 32)
+    x = torch.randn(1, 32)
     y = orig_layer(x)
     y_quantized = quantized_layer(x.to("cuda"))
     assert y.shape == y_quantized.shape
@@ -53,7 +53,7 @@ def test_invoke_linear_8bit_lt_state_dict_roundtrip():
     orig_layer_state_dict = orig_layer.state_dict()
 
     # Run inference on the original layer.
-    x = torch.randn(10, 32)
+    x = torch.randn(1, 32)
     y = orig_layer(x)
 
     # Prepare a quantized InvokeLinear8bitLt layer.

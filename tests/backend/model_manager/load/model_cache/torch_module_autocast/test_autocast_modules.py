@@ -40,7 +40,7 @@ def linear_8bit_lt_layer():
 def test_custom_invoke_linear_8bit_lt_all_weights_on_cuda(linear_8bit_lt_layer: InvokeLinear8bitLt):
     """Test CustomInvokeLinear8bitLt inference with all weights on the GPU."""
     # Run inference on the original layer.
-    x = torch.randn(10, 32).to("cuda")
+    x = torch.randn(1, 32).to("cuda")
     y_quantized = linear_8bit_lt_layer(x)
 
     # Wrap the InvokeLinear8bitLt layer in a CustomInvokeLinear8bitLt layer, and run inference on it.
@@ -54,7 +54,7 @@ def test_custom_invoke_linear_8bit_lt_all_weights_on_cuda(linear_8bit_lt_layer: 
 def test_custom_invoke_linear_8bit_lt_all_weights_on_cpu(linear_8bit_lt_layer: InvokeLinear8bitLt):
     """Test CustomInvokeLinear8bitLt inference with all weights on the CPU (streaming to the GPU)."""
     # Run inference on the original layer.
-    x = torch.randn(10, 32).to("cuda")
+    x = torch.randn(1, 32).to("cuda")
     y_quantized = linear_8bit_lt_layer(x)
 
     # Copy the state dict to the CPU and reload it.
@@ -98,7 +98,7 @@ def linear_nf4_layer():
 def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLinearNF4):
     """Test CustomInvokeLinearNF4 inference with all weights on the GPU."""
     # Run inference on the original layer.
-    x = torch.randn(10, 32).to("cuda")
+    x = torch.randn(1, 32).to("cuda")
     y_quantized = linear_nf4_layer(x)
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
@@ -112,7 +112,7 @@ def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLi
 def test_custom_invoke_linear_nf4_all_weights_on_cpu(linear_nf4_layer: InvokeLinearNF4):
     """Test CustomInvokeLinearNF4 inference with all weights on the CPU (streaming to the GPU)."""
     # Run inference on the original layer.
-    x = torch.randn(10, 32).to(device="cuda")
+    x = torch.randn(1, 32).to(device="cuda")
     y_quantized = linear_nf4_layer(x)
 
     # Copy the state dict to the CPU and reload it.

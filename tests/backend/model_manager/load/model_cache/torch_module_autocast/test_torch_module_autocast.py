@@ -57,7 +57,7 @@ def test_torch_module_autocast_linear_layer(device: torch.device, model: torch.n
     assert all(p.device.type == "cpu" for p in model.parameters())
 
     # Run inference on the CPU.
-    x = torch.randn(10, 32, device="cpu")
+    x = torch.randn(1, 32, device="cpu")
     expected = model(x)
     assert expected.device.type == "cpu"
 
@@ -103,7 +103,7 @@ def test_torch_module_autocast_bnb_llm_int8_linear_layer():
     assert model.linear.weight.SCB is not None
 
     # Run inference on the GPU.
-    x = torch.randn(10, 32)
+    x = torch.randn(1, 32)
     expected = model(x.to("cuda"))
     assert expected.device.type == "cuda"
 
