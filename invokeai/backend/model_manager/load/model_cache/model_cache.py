@@ -24,6 +24,7 @@ GB = 2**30
 MB = 2**20
 
 
+# TODO(ryand): Where should this go? The ModelCache shouldn't be concerned with submodels.
 def get_model_cache_key(model_key: str, submodel_type: Optional[SubModelType] = None) -> str:
     if submodel_type:
         return f"{model_key}:{submodel_type.value}"
