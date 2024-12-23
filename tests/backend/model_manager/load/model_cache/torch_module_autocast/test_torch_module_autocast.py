@@ -6,8 +6,13 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
     remove_custom_layers_from_model,
 )
-from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt, quantize_model_llm_int8
 from tests.backend.quantization.gguf.test_ggml_tensor import quantize_tensor
+
+try:
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt, quantize_model_llm_int8
+except ImportError:
+    # This is expected to fail on MacOS
+    pass
 
 cuda_and_mps = pytest.mark.parametrize(
     "device",

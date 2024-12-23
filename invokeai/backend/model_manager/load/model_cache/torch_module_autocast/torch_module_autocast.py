@@ -5,10 +5,8 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.autoc
     CustomConv2d,
     CustomEmbedding,
     CustomGroupNorm,
-    CustomInvokeLinear8bitLt,
     CustomLinear,
 )
-from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
 
 AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]] = {
     torch.nn.Linear: CustomLinear,
@@ -16,8 +14,23 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.Conv2d: CustomConv2d,
     torch.nn.GroupNorm: CustomGroupNorm,
     torch.nn.Embedding: CustomEmbedding,
-    InvokeLinear8bitLt: CustomInvokeLinear8bitLt,
 }
+
+try:
+    # These dependencies are not expected to be present on MacOS.
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_invoke_linear_8_bit_lt import (
+        CustomInvokeLinear8bitLt,
+    )
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_invoke_linear_nf4 import (
+        CustomInvokeLinearNF4,
+    )
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
+    from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
+
+    AUTOCAST_MODULE_TYPE_MAPPING[InvokeLinear8bitLt] = CustomInvokeLinear8bitLt
+    AUTOCAST_MODULE_TYPE_MAPPING[InvokeLinearNF4] = CustomInvokeLinearNF4
+except ImportError:
+    pass
 
 
 def apply_custom_layers_to_model(model: torch.nn.Module):

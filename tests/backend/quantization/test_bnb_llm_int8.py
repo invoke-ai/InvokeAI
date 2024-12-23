@@ -1,7 +1,10 @@
 import pytest
 import torch
 
-from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
+try:
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
+except ImportError:
+    pass
 
 
 def test_invoke_linear_8bit_lt_quantization():
