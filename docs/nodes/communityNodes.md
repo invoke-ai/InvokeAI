@@ -49,6 +49,7 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [BriaAI Background Remove](#briaai-remove-background)
     + [Remove Background](#remove-background)    
     + [Retroize](#retroize)
+    + [Stereogram](#stereogram-nodes)
     + [Size Stepper Nodes](#size-stepper-nodes)
     + [Simple Skin Detection](#simple-skin-detection)
     + [Text font to Image](#text-font-to-image)
@@ -525,6 +526,16 @@ View:
 **Retroize Output Examples**
 
 <img src="https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974" width="500" />
+
+--------------------------------
+### Stereogram Nodes
+
+**Description:** A set of custom nodes for InvokeAI to create cross-view or parallel-view stereograms. Stereograms are 2D images that, when viewed properly, reveal a 3D scene. Check out [r/crossview](https://www.reddit.com/r/CrossView/) for tutorials.
+
+**Node Link:** https://github.com/simonfuhrmann/invokeai-stereo
+
+**Example Workflow and Output**
+</br><img src="https://github.com/simonfuhrmann/invokeai-stereo/blob/main/docs/example_promo_03.jpg" width="500" />
 
 --------------------------------
 ### Simple Skin Detection
