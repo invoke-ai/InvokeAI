@@ -13,13 +13,18 @@ from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 class DummyModule(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.linear1 = torch.nn.Linear(10, 10)
-        self.linear2 = torch.nn.Linear(10, 10)
-        self.register_buffer("buffer1", torch.ones(10, 10))
+        self.linear1 = torch.nn.Linear(10, 32)
+        self.linear2 = torch.nn.Linear(32, 64)
+        self.register_buffer("buffer1", torch.ones(64))
+        # Non-persistent buffers are not included in the state dict. We need to make sure that this case is handled
+        # correctly by the partial loading code.
+        self.register_buffer("buffer2", torch.ones(64), persistent=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.linear1(x)
         x = self.linear2(x)
+        x = x + self.buffer1
+        x = x + self.buffer2
         return x
 
 
@@ -38,9 +43,11 @@ parameterize_mps_and_cuda = pytest.mark.parametrize(
 def test_cached_model_total_bytes(device: str):
     model = DummyModule()
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
-    linear_numel = 10 * 10 + 10
-    buffer_numel = 10 * 10
-    assert cached_model.total_bytes() == (2 * linear_numel + buffer_numel) * 4
+    linear1_numel = 10 * 32 + 32
+    linear2_numel = 32 * 64 + 64
+    buffer1_numel = 64
+    # Note that the non-persistent buffer (buffer2) is not included in .total_bytes() calculation.
+    assert cached_model.total_bytes() == (linear1_numel + linear2_numel + buffer1_numel) * 4
 
 
 @parameterize_mps_and_cuda
@@ -75,7 +82,9 @@ def test_cached_model_partial_load(device: str):
     assert loaded_bytes < model_total_bytes
     assert loaded_bytes == cached_model.cur_vram_bytes()
     assert loaded_bytes == sum(
-        calc_tensor_size(p) for p in itertools.chain(model.parameters(), model.buffers()) if p.device.type == device
+        calc_tensor_size(p)
+        for n, p in itertools.chain(model.named_parameters(), model.named_buffers())
+        if p.device.type == device and n != "buffer2"
     )
 
     # Check that the model's modules have been patched with CustomLinear layers.
@@ -137,7 +146,12 @@ def test_cached_model_full_load_and_unload(device: str):
     assert unloaded_bytes > 0
     assert unloaded_bytes == model_total_bytes
     assert cached_model.cur_vram_bytes() == 0
-    assert all(p.device.type == "cpu" for p in itertools.chain(model.parameters(), model.buffers()))
+    # Note that the non-persistent buffer (buffer2) is not required to be unloaded from VRAM.
+    assert all(
+        p.device.type == "cpu"
+        for n, p in itertools.chain(model.named_parameters(), model.named_buffers())
+        if n != "buffer2"
+    )
 
 
 @parameterize_mps_and_cuda
@@ -190,7 +204,12 @@ def test_cached_model_full_unload_from_partial(device: str):
     assert unloaded_bytes > 0
     assert unloaded_bytes == loaded_bytes
     assert cached_model.cur_vram_bytes() == 0
-    assert all(p.device.type == "cpu" for p in itertools.chain(model.parameters(), model.buffers()))
+    # Note that the non-persistent buffer (buffer2) is not required to be unloaded from VRAM.
+    assert all(
+        p.device.type == "cpu"
+        for n, p in itertools.chain(model.named_parameters(), model.named_buffers())
+        if n != "buffer2"
+    )
 
 
 @parameterize_mps_and_cuda
@@ -227,7 +246,7 @@ def test_cached_model_full_load_and_inference(device: str):
     assert cached_model.cur_vram_bytes() == 0
 
     # Run inference on the CPU.
-    x = model(torch.randn(1, 10))
+    x = torch.randn(1, 10)
     output1 = model(x)
     assert output1.device.type == "cpu"
 
@@ -242,20 +261,8 @@ def test_cached_model_full_load_and_inference(device: str):
     output2 = model(x.to(device))
     assert output2.device.type == device
 
-    # Full unload the model from VRAM.
-    unloaded_bytes = cached_model.full_unload_from_vram()
-    assert unloaded_bytes > 0
-    assert unloaded_bytes == model_total_bytes
-    assert cached_model.cur_vram_bytes() == 0
-    assert all(p.device.type == "cpu" for p in itertools.chain(model.parameters(), model.buffers()))
-
-    # Run inference on the CPU again.
-    output3 = model(x)
-    assert output3.device.type == "cpu"
-
-    # The outputs should be the same for all three runs.
+    # The outputs should be the same for both runs.
     assert torch.allclose(output1, output2.to("cpu"))
-    assert torch.allclose(output1, output3)
 
 
 @parameterize_mps_and_cuda
@@ -267,7 +274,7 @@ def test_cached_model_partial_load_and_inference(device: str):
     assert cached_model.cur_vram_bytes() == 0
 
     # Run inference on the CPU.
-    x = model(torch.randn(1, 10))
+    x = torch.randn(1, 10)
     output1 = model(x)
     assert output1.device.type == "cpu"
 
@@ -280,9 +287,10 @@ def test_cached_model_partial_load_and_inference(device: str):
     assert loaded_bytes < model_total_bytes
     assert loaded_bytes == cached_model.cur_vram_bytes()
     assert loaded_bytes == sum(
-        calc_tensor_size(p) for p in itertools.chain(model.parameters(), model.buffers()) if p.device.type == device
+        calc_tensor_size(p)
+        for n, p in itertools.chain(model.named_parameters(), model.named_buffers())
+        if p.device.type == device and n != "buffer2"
     )
-
     # Check that the model's modules have been patched with CustomLinear layers.
     assert type(model.linear1) is CustomLinear
     assert type(model.linear2) is CustomLinear

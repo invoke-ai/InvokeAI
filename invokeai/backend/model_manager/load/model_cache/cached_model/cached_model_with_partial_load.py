@@ -57,6 +57,19 @@ class CachedModelWithPartialLoad:
                 keys_in_modules_that_do_not_support_autocast.add(key)
         return keys_in_modules_that_do_not_support_autocast
 
+    def _move_non_persistent_buffers_to_device(self, device: torch.device):
+        """Move the non-persistent buffers to the target device. These buffers are not included in the state dict,
+        so we need to move them manually.
+        """
+        # HACK(ryand): Typically, non-persistent buffers are moved when calling module.to(device). We don't move entire
+        # modules, because we manage the devices of individual tensors using the state dict. Since non-persistent
+        # buffers are not included in the state dict, we need to handle them manually. The only way to do this is by
+        # using private torch.nn.Module attributes.
+        for module in self._model.modules():
+            for name, buffer in module.named_buffers():
+                if name in module._non_persistent_buffers_set:
+                    module._buffers[name] = buffer.to(device, copy=True)
+
     @property
     def model(self) -> torch.nn.Module:
         return self._model
@@ -149,7 +162,10 @@ class CachedModelWithPartialLoad:
         else:
             apply_custom_layers_to_model(self._model)
 
-        # TODO(ryand): Handle non-persistent buffers.
+        # Move all non-persistent buffers to the compute device. These are a weird edge case and do not participate in
+        # the vram_bytes_loaded tracking.
+        self._move_non_persistent_buffers_to_device(self._compute_device)
+
         return vram_bytes_loaded
 
     @torch.no_grad()
@@ -179,5 +195,7 @@ class CachedModelWithPartialLoad:
         if self._cur_vram_bytes is not None:
             self._cur_vram_bytes -= vram_bytes_freed
 
+        # We may have gone from a fully-loaded model to a partially-loaded model, so we need to reapply the custom
+        # layers.
         apply_custom_layers_to_model(self._model)
         return vram_bytes_freed
