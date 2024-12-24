@@ -5,7 +5,9 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.autocast_modules import CustomLinear
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
+    CustomLinear,
+)
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule, parameterize_mps_and_cuda
 

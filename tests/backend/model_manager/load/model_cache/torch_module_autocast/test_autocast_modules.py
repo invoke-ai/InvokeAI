@@ -4,10 +4,10 @@ import torch
 if not torch.cuda.is_available():
     pytest.skip("CUDA is not available", allow_module_level=True)
 else:
-    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_invoke_linear_8_bit_lt import (
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_8_bit_lt import (
         CustomInvokeLinear8bitLt,
     )
-    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_invoke_linear_nf4 import (
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_nf4 import (
         CustomInvokeLinearNF4,
     )
     from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
