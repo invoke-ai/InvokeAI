@@ -207,31 +207,33 @@ class LoRALoaderInvocation(BaseInvocation):
         if not context.models.exists(lora_key):
             raise Exception(f"Unkown lora: {lora_key}!")
 
-        if self.unet is not None and any(lora.lora.key == lora_key for lora in self.unet.loras):
-            raise Exception(f'LoRA "{lora_key}" already applied to unet')
-
-        if self.clip is not None and any(lora.lora.key == lora_key for lora in self.clip.loras):
-            raise Exception(f'LoRA "{lora_key}" already applied to clip')
-
         output = LoRALoaderOutput()
 
         if self.unet is not None:
             output.unet = self.unet.model_copy(deep=True)
-            output.unet.loras.append(
-                LoRAField(
-                    lora=self.lora,
-                    weight=self.weight,
+
+            if any(lora.lora.key == lora_key for lora in self.unet.loras):
+                context.logger.warning(f'LoRA "{lora_key}" already applied to UNet, skipping')
+            else:
+                output.unet.loras.append(
+                    LoRAField(
+                        lora=self.lora,
+                        weight=self.weight,
+                    )
                 )
-            )
 
         if self.clip is not None:
             output.clip = self.clip.model_copy(deep=True)
-            output.clip.loras.append(
-                LoRAField(
-                    lora=self.lora,
-                    weight=self.weight,
+
+            if any(lora.lora.key == lora_key for lora in self.clip.loras):
+                context.logger.warning(f'LoRA "{lora_key}" already applied to CLIP, skipping')
+            else:
+                output.clip.loras.append(
+                    LoRAField(
+                        lora=self.lora,
+                        weight=self.weight,
+                    )
                 )
-            )
 
         return output
 
@@ -283,6 +285,7 @@ class LoRACollectionLoader(BaseInvocation):
 
         for lora in loras:
             if lora.lora.key in added_loras:
+                context.logger.warning(f'LoRA "{lora.lora.key}" already applied, skipping')
                 continue
 
             if not context.models.exists(lora.lora.key):
@@ -353,43 +356,46 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
         if not context.models.exists(lora_key):
             raise Exception(f"Unknown lora: {lora_key}!")
 
-        if self.unet is not None and any(lora.lora.key == lora_key for lora in self.unet.loras):
-            raise Exception(f'LoRA "{lora_key}" already applied to unet')
-
-        if self.clip is not None and any(lora.lora.key == lora_key for lora in self.clip.loras):
-            raise Exception(f'LoRA "{lora_key}" already applied to clip')
-
-        if self.clip2 is not None and any(lora.lora.key == lora_key for lora in self.clip2.loras):
-            raise Exception(f'LoRA "{lora_key}" already applied to clip2')
-
         output = SDXLLoRALoaderOutput()
 
         if self.unet is not None:
             output.unet = self.unet.model_copy(deep=True)
-            output.unet.loras.append(
-                LoRAField(
-                    lora=self.lora,
-                    weight=self.weight,
+
+            if any(lora.lora.key == lora_key for lora in self.unet.loras):
+                context.logger.warning(f'LoRA "{lora_key}" already applied to UNet, skipping')
+            else:
+                output.unet.loras.append(
+                    LoRAField(
+                        lora=self.lora,
+                        weight=self.weight,
+                    )
                 )
-            )
 
         if self.clip is not None:
             output.clip = self.clip.model_copy(deep=True)
-            output.clip.loras.append(
-                LoRAField(
-                    lora=self.lora,
-                    weight=self.weight,
+
+            if any(lora.lora.key == lora_key for lora in self.clip.loras):
+                context.logger.warning(f'LoRA "{lora_key}" already applied to CLIP, skipping')
+            else:
+                output.clip.loras.append(
+                    LoRAField(
+                        lora=self.lora,
+                        weight=self.weight,
+                    )
                 )
-            )
 
         if self.clip2 is not None:
             output.clip2 = self.clip2.model_copy(deep=True)
-            output.clip2.loras.append(
-                LoRAField(
-                    lora=self.lora,
-                    weight=self.weight,
+
+            if any(lora.lora.key == lora_key for lora in self.clip2.loras):
+                context.logger.warning(f'LoRA "{lora_key}" already applied to CLIP2, skipping')
+            else:
+                output.clip2.loras.append(
+                    LoRAField(
+                        lora=self.lora,
+                        weight=self.weight,
+                    )
                 )
-            )
 
         return output
 
@@ -433,6 +439,7 @@ class SDXLLoRACollectionLoader(BaseInvocation):
 
         for lora in loras:
             if lora.lora.key in added_loras:
+                context.logger.warning(f'LoRA "{lora.lora.key}" already applied, skipping')
                 continue
 
             if not context.models.exists(lora.lora.key):
