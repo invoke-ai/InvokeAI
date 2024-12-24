@@ -23,6 +23,7 @@ import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModa
 import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
+import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
@@ -97,6 +98,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
+      <CancelAllExceptCurrentQueueItemConfirmationAlertDialog />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
