@@ -25,12 +25,9 @@ class InvokeInt8Params(bnb.nn.Int8Params):
             self.CB = self.data
             self.SCB = self.SCB.cuda()
         else:
-            # we store the 8-bit rows-major weight
-            # we convert this weight to the turning/ampere weight during the first inference pass
+            # We quantize the weight and store in 8bit row-major
             B = self.data.contiguous().half().cuda(device)
-            CB, CBt, SCB, SCBt, coo_tensorB = bnb.functional.double_quant(B)
-            del CBt
-            del SCBt
+            CB, SCB, _ = bnb.functional.int8_vectorwise_quant(B)
             self.data = CB
             self.CB = CB
             self.SCB = SCB
@@ -55,9 +52,10 @@ class InvokeLinear8bitLt(bnb.nn.Linear8bitLt):
         # See `bnb.nn.Linear8bitLt._save_to_state_dict()` for the serialization logic of SCB and weight_format.
         scb = state_dict.pop(prefix + "SCB", None)
 
-        # Currently, we only support weight_format=0.
         weight_format = state_dict.pop(prefix + "weight_format", None)
-        assert weight_format == 0
+        if weight_format is not None:
+            # Currently, we only support weight_format=0.
+            assert weight_format == 0
 
         # TODO(ryand): Technically, we should be using `strict`, `missing_keys`, `unexpected_keys`, and `error_msgs`
         # rather than raising an exception to correctly implement this API.
@@ -98,6 +96,27 @@ class InvokeLinear8bitLt(bnb.nn.Linear8bitLt):
         new_state.has_fp16_weights = False
         new_state.use_pool = self.state.use_pool
         self.state = new_state
+
+    def forward(self, x: torch.Tensor):
+        # The state management in the base bnb.nn.Linear8bitLt is very convoluted. We override the forward method to
+        # try to simplify the state management a bit. We initialize a new MatmulLtState object for each forward pass.
+        # By avoiding persistent state, it is easier to move the layer between devices without worrying about keeping
+        # references to weights on the old device (e.g. self.state.CB).
+        matmul_state = bnb.MatmulLtState()
+        matmul_state.threshold = self.state.threshold
+        matmul_state.has_fp16_weights = self.state.has_fp16_weights
+        matmul_state.use_pool = self.state.use_pool
+        matmul_state.is_training = self.training
+        # The underlying InvokeInt8Params weight must already be quantized.
+        assert self.weight.CB is not None
+        matmul_state.CB = self.weight.CB
+        matmul_state.SCB = self.weight.SCB
+
+        # weights are cast automatically as Int8Params, but the bias has to be cast manually.
+        if self.bias is not None and self.bias.dtype != x.dtype:
+            self.bias.data = self.bias.data.to(x.dtype)
+
+        return bnb.matmul(x, self.weight, bias=self.bias, state=matmul_state)
 
 
 def _convert_linear_layers_to_llm_8bit(
