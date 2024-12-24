@@ -37,7 +37,7 @@ from invokeai.backend.model_manager.config import (
     ModelFormat,
     ModelType,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import CacheStats
+from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch

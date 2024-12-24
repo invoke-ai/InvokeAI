@@ -5,7 +5,6 @@ Base class for model loading in InvokeAI.
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, Generator, Optional, Tuple
@@ -18,19 +17,17 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
+from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 
 
-@dataclass
 class LoadedModelWithoutConfig:
-    """
-    Context manager object that mediates transfer from RAM<->VRAM.
+    """Context manager object that mediates transfer from RAM<->VRAM.
 
     This is a context manager object that has two distinct APIs:
 
     1. Older API (deprecated):
-    Use the LoadedModel object directly as a context manager.
-    It will move the model into VRAM (on CUDA devices), and
+    Use the LoadedModel object directly as a context manager.  It will move the model into VRAM (on CUDA devices), and
     return the model in a form suitable for passing to torch.
     Example:
     ```
@@ -40,13 +37,9 @@ class LoadedModelWithoutConfig:
     ```
 
     2. Newer API (recommended):
-    Call the LoadedModel's `model_on_device()` method in a
-    context. It returns a tuple consisting of a copy of
-    the model's state dict in CPU RAM followed by a copy
-    of the model in VRAM. The state dict is provided to allow
-    LoRAs and other model patchers to return the model to
-    its unpatched state without expensive copy and restore
-    operations.
+    Call the LoadedModel's `model_on_device()` method in a context. It returns a tuple consisting of a copy of the
+    model's state dict in CPU RAM followed by a copy of the model in VRAM. The state dict is provided to allow LoRAs and
+    other model patchers to return the model to its unpatched state without expensive copy and restore operations.
 
     Example:
     ```
@@ -55,43 +48,42 @@ class LoadedModelWithoutConfig:
         image = vae.decode(latents)[0]
     ```
 
-    The state_dict should be treated as a read-only object and
-    never modified. Also be aware that some loadable models do
-    not have a state_dict, in which case this value will be None.
+    The state_dict should be treated as a read-only object and never modified. Also be aware that some loadable models
+    do not have a state_dict, in which case this value will be None.
     """
 
-    _locker: ModelLockerBase
+    def __init__(self, cache_record: CacheRecord, cache: ModelCache):
+        self._cache_record = cache_record
+        self._cache = cache
 
     def __enter__(self) -> AnyModel:
-        """Context entry."""
-        self._locker.lock()
+        self._cache.lock(self._cache_record.key)
         return self.model
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
-        """Context exit."""
-        self._locker.unlock()
+        self._cache.unlock(self._cache_record.key)
 
     @contextmanager
     def model_on_device(self) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
         """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
-        locked_model = self._locker.lock()
+        self._cache.lock(self._cache_record.key)
         try:
-            state_dict = self._locker.get_state_dict()
-            yield (state_dict, locked_model)
+            yield (self._cache_record.state_dict, self._cache_record.model)
         finally:
-            self._locker.unlock()
+            self._cache.unlock(self._cache_record.key)
 
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
-        return self._locker.model
+        return self._cache_record.model
 
 
-@dataclass
 class LoadedModel(LoadedModelWithoutConfig):
     """Context manager object that mediates transfer from RAM<->VRAM."""
 
-    config: Optional[AnyModelConfig] = None
+    def __init__(self, config: Optional[AnyModelConfig], cache_record: CacheRecord, cache: ModelCache):
+        super().__init__(cache_record=cache_record, cache=cache)
+        self.config = config
 
 
 # TODO(MM2):
@@ -110,7 +102,7 @@ class ModelLoaderBase(ABC):
         self,
         app_config: InvokeAIAppConfig,
         logger: Logger,
-        ram_cache: ModelCacheBase[AnyModel],
+        ram_cache: ModelCache,
     ):
         """Initialize the loader."""
         pass
@@ -138,6 +130,6 @@ class ModelLoaderBase(ABC):
 
     @property
     @abstractmethod
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the ram cache associated with this loader."""
         pass

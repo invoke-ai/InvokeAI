@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.load import (
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -30,7 +30,7 @@ class ModelLoadService(ModelLoadServiceBase):
     def __init__(
         self,
         app_config: InvokeAIAppConfig,
-        ram_cache: ModelCacheBase[AnyModel],
+        ram_cache: ModelCache,
         registry: Optional[Type[ModelLoaderRegistryBase]] = ModelLoaderRegistry,
     ):
         """Initialize the model load service."""
@@ -45,7 +45,7 @@ class ModelLoadService(ModelLoadServiceBase):
         self._invoker = invoker
 
     @property
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the RAM cache used by this loader."""
         return self._ram_cache
 
@@ -78,9 +78,8 @@ class ModelLoadService(ModelLoadServiceBase):
         self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
     ) -> LoadedModelWithoutConfig:
         cache_key = str(model_path)
-        ram_cache = self.ram_cache
         try:
-            return LoadedModelWithoutConfig(_locker=ram_cache.get(key=cache_key))
+            return LoadedModelWithoutConfig(cache_record=self._ram_cache.get(key=cache_key), cache=self._ram_cache)
         except IndexError:
             pass
 
@@ -109,5 +108,5 @@ class ModelLoadService(ModelLoadServiceBase):
         )
         assert loader is not None
         raw_model = loader(model_path)
-        ram_cache.put(key=cache_key, model=raw_model)
-        return LoadedModelWithoutConfig(_locker=ram_cache.get(key=cache_key))
+        self._ram_cache.put(key=cache_key, model=raw_model)
+        return LoadedModelWithoutConfig(cache_record=self._ram_cache.get(key=cache_key), cache=self._ram_cache)

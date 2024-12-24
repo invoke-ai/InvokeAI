@@ -16,7 +16,8 @@ from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBas
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
-from invokeai.backend.model_manager.load import ModelCache, ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 

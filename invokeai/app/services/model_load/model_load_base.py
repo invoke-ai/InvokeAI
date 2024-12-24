@@ -7,7 +7,7 @@ from typing import Callable, Optional
 
 from invokeai.backend.model_manager import AnyModel, AnyModelConfig, SubModelType
 from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
-from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 
 
 class ModelLoadServiceBase(ABC):
@@ -24,7 +24,7 @@ class ModelLoadServiceBase(ABC):
 
     @property
     @abstractmethod
-    def ram_cache(self) -> ModelCacheBase[AnyModel]:
+    def ram_cache(self) -> ModelCache:
         """Return the RAM cache used by this loader."""
 
     @abstractmethod
