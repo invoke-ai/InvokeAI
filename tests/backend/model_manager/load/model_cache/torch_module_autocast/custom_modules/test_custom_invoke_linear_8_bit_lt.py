@@ -68,6 +68,7 @@ def test_custom_invoke_linear_8bit_lt_all_weights_on_cpu(linear_8bit_lt_layer: I
 
     # Wrap the InvokeLinear8bitLt layer in a CustomInvokeLinear8bitLt layer, and run inference on it.
     linear_8bit_lt_layer.__class__ = CustomInvokeLinear8bitLt
+    linear_8bit_lt_layer.set_device_autocasting_enabled(True)
     y_custom = linear_8bit_lt_layer(x)
 
     # Assert that the quantized and custom layers produce the same output.

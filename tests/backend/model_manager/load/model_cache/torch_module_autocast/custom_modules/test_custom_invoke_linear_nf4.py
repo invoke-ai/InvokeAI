@@ -40,6 +40,7 @@ def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLi
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
     linear_nf4_layer.__class__ = CustomInvokeLinearNF4
+    linear_nf4_layer.set_device_autocasting_enabled(True)
     y_custom = linear_nf4_layer(x)
 
     # Assert that the quantized and custom layers produce the same output.
@@ -66,6 +67,7 @@ def test_custom_invoke_linear_nf4_all_weights_on_cpu(linear_nf4_layer: InvokeLin
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
     linear_nf4_layer.__class__ = CustomInvokeLinearNF4
+    linear_nf4_layer.set_device_autocasting_enabled(True)
     y_custom = linear_nf4_layer(x)
 
     # Assert that the state dict (and the tensors that it references) are still on the CPU.

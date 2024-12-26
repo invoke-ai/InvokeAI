@@ -215,7 +215,13 @@ def test_inference_autocast_from_cpu_to_device(device: str, layer_under_test: La
     custom_layer = copy.deepcopy(orig_layer)
     apply_custom_layers_to_model(custom_layer)
 
+    # Inference should still fail with autocasting disabled.
+    custom_layer.set_device_autocasting_enabled(False)
+    with pytest.raises(RuntimeError):
+        _ = custom_layer(x)
+
     # Run inference with the wrapped layer on the device.
+    custom_layer.set_device_autocasting_enabled(True)
     custom_output = custom_layer(x)
     assert custom_output.device.type == device
 

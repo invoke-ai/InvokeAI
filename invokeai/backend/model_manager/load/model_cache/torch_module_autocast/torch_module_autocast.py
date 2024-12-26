@@ -46,6 +46,8 @@ def apply_custom_layers_to_model(model: torch.nn.Module):
         override_type = AUTOCAST_MODULE_TYPE_MAPPING.get(type(module), None)
         if override_type is not None:
             module.__class__ = override_type
+            # TODO(ryand): In the future, we should manage this flag on a per-module basis.
+            module.set_device_autocasting_enabled(True)
 
     # model.apply(...) calls apply_custom_layers(...) on each module in the model.
     model.apply(apply_custom_layers)
