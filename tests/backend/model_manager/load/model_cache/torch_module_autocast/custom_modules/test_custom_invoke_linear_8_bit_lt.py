@@ -10,8 +10,7 @@ else:
     from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
 
 
-@pytest.fixture
-def linear_8bit_lt_layer():
+def build_linear_8bit_lt_layer():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
@@ -31,6 +30,11 @@ def linear_8bit_lt_layer():
     assert quantized_layer.weight.CB.dtype == torch.int8
 
     return quantized_layer
+
+
+@pytest.fixture
+def linear_8bit_lt_layer():
+    return build_linear_8bit_lt_layer()
 
 
 def test_custom_invoke_linear_8bit_lt_all_weights_on_cuda(linear_8bit_lt_layer: InvokeLinear8bitLt):

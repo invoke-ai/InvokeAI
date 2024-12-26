@@ -7,8 +7,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
 
 
-@pytest.fixture
-def linear_nf4_layer():
+def build_linear_nf4_layer():
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
@@ -26,6 +25,11 @@ def linear_nf4_layer():
     assert quantized_layer.weight.bnb_quantized
 
     return quantized_layer
+
+
+@pytest.fixture
+def linear_nf4_layer():
+    return build_linear_nf4_layer()
 
 
 def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLinearNF4):

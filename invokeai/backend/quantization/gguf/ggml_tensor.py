@@ -48,11 +48,13 @@ GGML_TENSOR_OP_TABLE = {
     # Ops to run on the quantized tensor.
     torch.ops.aten.detach.default: apply_to_quantized_tensor,  # pyright: ignore
     torch.ops.aten._to_copy.default: apply_to_quantized_tensor,  # pyright: ignore
+    torch.ops.aten.clone.default: apply_to_quantized_tensor,  # pyright: ignore
     # Ops to run on dequantized tensors.
     torch.ops.aten.t.default: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.addmm.default: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.mul.Tensor: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.add.Tensor: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.allclose.default: dequantize_and_run,  # pyright: ignore
 }
 
 if torch.backends.mps.is_available():
