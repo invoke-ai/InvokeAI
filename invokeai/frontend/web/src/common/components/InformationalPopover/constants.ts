@@ -129,7 +129,7 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
     href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   scaleBeforeProcessing: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000158841',
+    href: 'https://support.invoke.ai/support/solutions/articles/151000179777-scale-before-processing',
   },
   paramCFGScale: {
     href: 'https://www.youtube.com/watch?v=1OeHEJrsTpI',
