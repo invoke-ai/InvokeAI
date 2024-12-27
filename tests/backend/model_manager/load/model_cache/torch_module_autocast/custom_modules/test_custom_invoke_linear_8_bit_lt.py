@@ -14,17 +14,20 @@ else:
     from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
 
 
-def build_linear_8bit_lt_layer():
+def build_linear_8bit_lt_layer(orig_layer: torch.nn.Linear | None = None):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
     torch.manual_seed(1)
 
-    orig_layer = torch.nn.Linear(32, 64)
+    if orig_layer is None:
+        orig_layer = torch.nn.Linear(32, 64)
     orig_layer_state_dict = orig_layer.state_dict()
 
     # Prepare a quantized InvokeLinear8bitLt layer.
-    quantized_layer = InvokeLinear8bitLt(input_features=32, output_features=64, has_fp16_weights=False)
+    quantized_layer = InvokeLinear8bitLt(
+        input_features=orig_layer.in_features, output_features=orig_layer.out_features, has_fp16_weights=False
+    )
     quantized_layer.load_state_dict(orig_layer_state_dict)
     quantized_layer.to("cuda")
 

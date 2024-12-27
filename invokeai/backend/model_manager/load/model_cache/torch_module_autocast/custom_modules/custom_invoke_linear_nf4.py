@@ -4,6 +4,9 @@ import bitsandbytes as bnb
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
+    autocast_linear_forward_sidecar_patches,
+)
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
@@ -11,6 +14,9 @@ from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
 
 
 class CustomInvokeLinearNF4(InvokeLinearNF4, CustomModuleMixin):
+    def _autocast_forward_with_patches(self, x: torch.Tensor) -> torch.Tensor:
+        return autocast_linear_forward_sidecar_patches(self, x, self._patches_and_weights)
+
     def _autocast_forward(self, x: torch.Tensor) -> torch.Tensor:
         bnb.nn.modules.fix_4bit_weight_quant_state_from_module(self)
 
@@ -48,7 +54,9 @@ class CustomInvokeLinearNF4(InvokeLinearNF4, CustomModuleMixin):
         return bnb.matmul_4bit(x, weight.t(), bias=bias, quant_state=weight.quant_state).to(inp_dtype)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self._device_autocasting_enabled:
+        if len(self._patches_and_weights) > 0:
+            return self._autocast_forward_with_patches(x)
+        elif self._device_autocasting_enabled:
             return self._autocast_forward(x)
         else:
             return super().forward(x)

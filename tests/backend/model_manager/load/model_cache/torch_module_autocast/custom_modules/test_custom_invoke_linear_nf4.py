@@ -10,17 +10,19 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
 
 
-def build_linear_nf4_layer():
+def build_linear_nf4_layer(orig_layer: torch.nn.Linear | None = None):
     if not torch.cuda.is_available():
         pytest.skip("CUDA is not available")
 
     torch.manual_seed(1)
 
-    orig_layer = torch.nn.Linear(64, 16)
+    if orig_layer is None:
+        orig_layer = torch.nn.Linear(64, 16)
+
     orig_layer_state_dict = orig_layer.state_dict()
 
     # Prepare a quantized InvokeLinearNF4 layer.
-    quantized_layer = InvokeLinearNF4(input_features=64, output_features=16)
+    quantized_layer = InvokeLinearNF4(input_features=orig_layer.in_features, output_features=orig_layer.out_features)
     quantized_layer.load_state_dict(orig_layer_state_dict)
     quantized_layer.to("cuda")
 
