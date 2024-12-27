@@ -15,6 +15,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     CustomLinear,
 )
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
+    CustomModuleMixin,
+)
 
 AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]] = {
     torch.nn.Linear: CustomLinear,
@@ -41,26 +44,52 @@ except ImportError:
     pass
 
 
-def apply_custom_layers_to_model(model: torch.nn.Module):
-    def apply_custom_layers(module: torch.nn.Module):
-        override_type = AUTOCAST_MODULE_TYPE_MAPPING.get(type(module), None)
+AUTOCAST_MODULE_TYPE_MAPPING_INVERSE = {v: k for k, v in AUTOCAST_MODULE_TYPE_MAPPING.items()}
+
+
+def wrap_custom_layer(module_to_wrap: torch.nn.Module, custom_layer_type: type[torch.nn.Module]):
+    # HACK(ryand): We use custom initialization logic so that we can initialize a new custom layer instance from an
+    # existing layer instance without calling __init__() on the original layer class. We achieve this by copying
+    # the attributes from the original layer instance to the new instance.
+    custom_layer = custom_layer_type.__new__(custom_layer_type)
+    # Note that we share the __dict__.
+    # TODO(ryand): In the future, we may want to do a shallow copy of the __dict__.
+    custom_layer.__dict__ = module_to_wrap.__dict__
+
+    # Initialize the CustomModuleMixin fields.
+    CustomModuleMixin.__init__(custom_layer)  # type: ignore
+    return custom_layer
+
+
+def unwrap_custom_layer(custom_layer: torch.nn.Module, original_layer_type: type[torch.nn.Module]):
+    # HACK(ryand): We use custom initialization logic so that we can initialize a new custom layer instance from an
+    # existing layer instance without calling __init__() on the original layer class. We achieve this by copying
+    # the attributes from the original layer instance to the new instance.
+    original_layer = original_layer_type.__new__(original_layer_type)
+    # Note that we share the __dict__.
+    # TODO(ryand): In the future, we may want to do a shallow copy of the __dict__ and strip out the CustomModuleMixin
+    # fields.
+    original_layer.__dict__ = custom_layer.__dict__
+    return original_layer
+
+
+def apply_custom_layers_to_model(module: torch.nn.Module):
+    for name, submodule in module.named_children():
+        override_type = AUTOCAST_MODULE_TYPE_MAPPING.get(type(submodule), None)
         if override_type is not None:
-            module.__class__ = override_type
+            custom_layer = wrap_custom_layer(submodule, override_type)
             # TODO(ryand): In the future, we should manage this flag on a per-module basis.
-            module.set_device_autocasting_enabled(True)
+            custom_layer.set_device_autocasting_enabled(True)
+            setattr(module, name, custom_layer)
+        else:
+            # Recursively apply to submodules
+            apply_custom_layers_to_model(submodule)
 
-    # model.apply(...) calls apply_custom_layers(...) on each module in the model.
-    model.apply(apply_custom_layers)
 
-
-def remove_custom_layers_from_model(model: torch.nn.Module):
-    # Invert AUTOCAST_MODULE_TYPE_MAPPING.
-    original_module_type_mapping = {v: k for k, v in AUTOCAST_MODULE_TYPE_MAPPING.items()}
-
-    def remove_custom_layers(module: torch.nn.Module):
-        override_type = original_module_type_mapping.get(type(module), None)
+def remove_custom_layers_from_model(module: torch.nn.Module):
+    for name, submodule in module.named_children():
+        override_type = AUTOCAST_MODULE_TYPE_MAPPING_INVERSE.get(type(submodule), None)
         if override_type is not None:
-            module.__class__ = override_type
-
-    # model.apply(...) calls remove_custom_layers(...) on each module in the model.
-    model.apply(remove_custom_layers)
+            setattr(module, name, unwrap_custom_layer(submodule, override_type))
+        else:
+            remove_custom_layers_from_model(submodule)

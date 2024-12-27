@@ -4,6 +4,9 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_nf4 import (
     CustomInvokeLinearNF4,
 )
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    wrap_custom_layer,
+)
 from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
 
 
@@ -39,9 +42,9 @@ def test_custom_invoke_linear_nf4_all_weights_on_cuda(linear_nf4_layer: InvokeLi
     y_quantized = linear_nf4_layer(x)
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
-    linear_nf4_layer.__class__ = CustomInvokeLinearNF4
-    linear_nf4_layer.set_device_autocasting_enabled(True)
-    y_custom = linear_nf4_layer(x)
+    custom_linear_nf4_layer = wrap_custom_layer(linear_nf4_layer, CustomInvokeLinearNF4)
+    custom_linear_nf4_layer.set_device_autocasting_enabled(True)
+    y_custom = custom_linear_nf4_layer(x)
 
     # Assert that the quantized and custom layers produce the same output.
     assert torch.allclose(y_quantized, y_custom, atol=1e-5)
@@ -66,18 +69,18 @@ def test_custom_invoke_linear_nf4_all_weights_on_cpu(linear_nf4_layer: InvokeLin
         linear_nf4_layer(x)
 
     # Wrap the InvokeLinearNF4 layer in a CustomInvokeLinearNF4 layer, and run inference on it.
-    linear_nf4_layer.__class__ = CustomInvokeLinearNF4
-    linear_nf4_layer.set_device_autocasting_enabled(True)
-    y_custom = linear_nf4_layer(x)
+    custom_linear_nf4_layer = wrap_custom_layer(linear_nf4_layer, CustomInvokeLinearNF4)
+    custom_linear_nf4_layer.set_device_autocasting_enabled(True)
+    y_custom = custom_linear_nf4_layer(x)
 
     # Assert that the state dict (and the tensors that it references) are still on the CPU.
     assert all(v.device == torch.device("cpu") for v in state_dict.values())
 
     # Assert that the weight, bias, and quant_state are all on the CPU.
-    assert linear_nf4_layer.weight.device == torch.device("cpu")
-    assert linear_nf4_layer.bias.device == torch.device("cpu")
-    assert linear_nf4_layer.weight.quant_state.absmax.device == torch.device("cpu")
-    assert linear_nf4_layer.weight.quant_state.code.device == torch.device("cpu")
+    assert custom_linear_nf4_layer.weight.device == torch.device("cpu")
+    assert custom_linear_nf4_layer.bias.device == torch.device("cpu")
+    assert custom_linear_nf4_layer.weight.quant_state.absmax.device == torch.device("cpu")
+    assert custom_linear_nf4_layer.weight.quant_state.code.device == torch.device("cpu")
 
     # Assert that the quantized and custom layers produce the same output.
     assert torch.allclose(y_quantized, y_custom, atol=1e-5)

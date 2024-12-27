@@ -1,6 +1,10 @@
 import pytest
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    wrap_custom_layer,
+)
+
 if not torch.cuda.is_available():
     pytest.skip("CUDA is not available", allow_module_level=True)
 else:
@@ -44,8 +48,8 @@ def test_custom_invoke_linear_8bit_lt_all_weights_on_cuda(linear_8bit_lt_layer: 
     y_quantized = linear_8bit_lt_layer(x)
 
     # Wrap the InvokeLinear8bitLt layer in a CustomInvokeLinear8bitLt layer, and run inference on it.
-    linear_8bit_lt_layer.__class__ = CustomInvokeLinear8bitLt
-    y_custom = linear_8bit_lt_layer(x)
+    custom_linear_8bit_lt_layer = wrap_custom_layer(linear_8bit_lt_layer, CustomInvokeLinear8bitLt)
+    y_custom = custom_linear_8bit_lt_layer(x)
 
     # Assert that the quantized and custom layers produce the same output.
     assert torch.allclose(y_quantized, y_custom, atol=1e-5)
@@ -67,9 +71,9 @@ def test_custom_invoke_linear_8bit_lt_all_weights_on_cpu(linear_8bit_lt_layer: I
         linear_8bit_lt_layer(x)
 
     # Wrap the InvokeLinear8bitLt layer in a CustomInvokeLinear8bitLt layer, and run inference on it.
-    linear_8bit_lt_layer.__class__ = CustomInvokeLinear8bitLt
-    linear_8bit_lt_layer.set_device_autocasting_enabled(True)
-    y_custom = linear_8bit_lt_layer(x)
+    custom_linear_8bit_lt_layer = wrap_custom_layer(linear_8bit_lt_layer, CustomInvokeLinear8bitLt)
+    custom_linear_8bit_lt_layer.set_device_autocasting_enabled(True)
+    y_custom = custom_linear_8bit_lt_layer(x)
 
     # Assert that the quantized and custom layers produce the same output.
     assert torch.allclose(y_quantized, y_custom, atol=1e-5)

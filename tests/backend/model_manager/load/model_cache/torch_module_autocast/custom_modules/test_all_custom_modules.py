@@ -5,7 +5,10 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
-    apply_custom_layers_to_model,
+    AUTOCAST_MODULE_TYPE_MAPPING,
+    AUTOCAST_MODULE_TYPE_MAPPING_INVERSE,
+    unwrap_custom_layer,
+    wrap_custom_layer,
 )
 from tests.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.test_custom_invoke_linear_8_bit_lt import (
     build_linear_8bit_lt_layer,
@@ -98,15 +101,45 @@ def layer_to_device_via_state_dict(layer: torch.nn.Module, device: str):
     layer.load_state_dict(state_dict, assign=True)
 
 
+def wrap_single_custom_layer(layer: torch.nn.Module):
+    custom_layer_type = AUTOCAST_MODULE_TYPE_MAPPING[type(layer)]
+    return wrap_custom_layer(layer, custom_layer_type)
+
+
+def unwrap_single_custom_layer(layer: torch.nn.Module):
+    orig_layer_type = AUTOCAST_MODULE_TYPE_MAPPING_INVERSE[type(layer)]
+    return unwrap_custom_layer(layer, orig_layer_type)
+
+
 def test_isinstance(layer_under_test: LayerUnderTest):
     """Test that isinstance() and type() behave as expected after wrapping a layer in a custom layer."""
     orig_layer, _, _ = layer_under_test
     orig_type = type(orig_layer)
 
-    apply_custom_layers_to_model(orig_layer)
+    custom_layer = wrap_single_custom_layer(orig_layer)
 
-    assert isinstance(orig_layer, orig_type)
-    assert type(orig_layer) is not orig_type
+    assert isinstance(custom_layer, orig_type)
+    assert type(custom_layer) is not orig_type
+
+
+def test_wrap_and_unwrap(layer_under_test: LayerUnderTest):
+    """Test that wrapping and unwrapping a layer behaves as expected."""
+    orig_layer, _, _ = layer_under_test
+    orig_type = type(orig_layer)
+
+    # Wrap the original layer and assert that attributes of the custom layer can be accessed.
+    custom_layer = wrap_single_custom_layer(orig_layer)
+    custom_layer.set_device_autocasting_enabled(True)
+    assert custom_layer._device_autocasting_enabled
+
+    # Unwrap the custom layer.
+    # Assert that the methods of the wrapped layer are no longer accessible.
+    unwrapped_layer = unwrap_single_custom_layer(custom_layer)
+    with pytest.raises(AttributeError):
+        _ = unwrapped_layer.set_device_autocasting_enabled(True)
+    # For now, we have chosen to allow attributes to persist. We may revisit this in the future.
+    assert unwrapped_layer._device_autocasting_enabled
+    assert type(unwrapped_layer) is orig_type
 
 
 @parameterize_all_devices
@@ -120,7 +153,7 @@ def test_state_dict(device: str, layer_under_test: LayerUnderTest):
 
     # Wrap the original layer.
     custom_layer = copy.deepcopy(orig_layer)
-    apply_custom_layers_to_model(custom_layer)
+    custom_layer = wrap_single_custom_layer(custom_layer)
 
     custom_state_dict = custom_layer.state_dict()
 
@@ -140,7 +173,7 @@ def test_load_state_dict(device: str, layer_under_test: LayerUnderTest):
     orig_layer.to(device)
 
     custom_layer = copy.deepcopy(orig_layer)
-    apply_custom_layers_to_model(custom_layer)
+    custom_layer = wrap_single_custom_layer(custom_layer)
 
     # Do a state dict roundtrip.
     orig_state_dict = orig_layer.state_dict()
@@ -174,7 +207,7 @@ def test_inference_on_device(device: str, layer_under_test: LayerUnderTest):
     layer_to_device_via_state_dict(orig_layer, device)
 
     custom_layer = copy.deepcopy(orig_layer)
-    apply_custom_layers_to_model(custom_layer)
+    custom_layer = wrap_single_custom_layer(custom_layer)
 
     # Run inference with the original layer.
     x = layer_input.to(device)
@@ -213,7 +246,7 @@ def test_inference_autocast_from_cpu_to_device(device: str, layer_under_test: La
 
     # Wrap the original layer.
     custom_layer = copy.deepcopy(orig_layer)
-    apply_custom_layers_to_model(custom_layer)
+    custom_layer = wrap_single_custom_layer(custom_layer)
 
     # Inference should still fail with autocasting disabled.
     custom_layer.set_device_autocasting_enabled(False)
