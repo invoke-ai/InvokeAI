@@ -10,6 +10,8 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     unwrap_custom_layer,
     wrap_custom_layer,
 )
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from tests.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.test_custom_invoke_linear_8_bit_lt import (
     build_linear_8bit_lt_layer,
 )
@@ -259,3 +261,62 @@ def test_inference_autocast_from_cpu_to_device(device: str, layer_under_test: La
     assert custom_output.device.type == device
 
     assert torch.allclose(orig_output, custom_output)
+
+
+LayerAndPatchUnderTest = tuple[torch.nn.Module, BaseLayerPatch, torch.Tensor, bool]
+
+
+@pytest.fixture(
+    params=[
+        "linear_lora",
+    ]
+)
+def layer_and_patch_under_test(request: pytest.FixtureRequest) -> LayerAndPatchUnderTest:
+    """A fixture that returns a tuple of (layer, input, supports_cpu_inference) for the layer under test."""
+    layer_type = request.param
+    if layer_type == "linear_lora":
+        # Create a linear layer.
+        in_features = 10
+        out_features = 20
+        layer = torch.nn.Linear(in_features, out_features)
+
+        # Create a LoRA layer.
+        rank = 4
+        down = torch.randn(rank, in_features)
+        up = torch.randn(out_features, rank)
+        bias = torch.randn(out_features)
+        lora_layer = LoRALayer(up=up, mid=None, down=down, alpha=1.0, bias=bias)
+
+        input = torch.randn(1, in_features)
+        return (layer, lora_layer, input, True)
+    else:
+        raise ValueError(f"Unsupported layer_type: {layer_type}")
+
+
+@parameterize_all_devices
+def test_sidecar_patches(device: str, layer_and_patch_under_test: LayerAndPatchUnderTest):
+    layer, patch, input, supports_cpu_inference = layer_and_patch_under_test
+
+    if device == "cpu" and not supports_cpu_inference:
+        pytest.skip("Layer does not support CPU inference.")
+
+    # Move the layer, patch, and input to the device.
+    layer_to_device_via_state_dict(layer, device)
+    patch.to(torch.device(device))
+    input = input.to(torch.device(device))
+
+    # Patch the LoRA layer into the linear layer.
+    weight = 0.7
+    layer_patched = copy.deepcopy(layer)
+    parameters = patch.get_parameters(layer_patched, weight=weight)
+    for param_name, param_weight in parameters.items():
+        getattr(layer_patched, param_name).data += param_weight
+
+    # Wrap the original layer in a custom layer and add the patch to it as a sidecar.
+    custom_layer = wrap_single_custom_layer(layer)
+    custom_layer.add_patch(patch, weight)
+
+    # Run inference with the original layer and the patched layer and assert they are equal.
+    output_patched = layer_patched(input)
+    output_custom = custom_layer(input)
+    assert torch.allclose(output_patched, output_custom)
