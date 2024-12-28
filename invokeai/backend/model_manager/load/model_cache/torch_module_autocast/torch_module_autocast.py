@@ -1,5 +1,6 @@
 import torch
 
+from invokeai.backend.flux.modules.layers import RMSNorm
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_conv1d import (
     CustomConv1d,
 )
@@ -8,6 +9,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_embedding import (
     CustomEmbedding,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_flux_rms_norm import (
+    CustomFluxRMSNorm,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_group_norm import (
     CustomGroupNorm,
@@ -25,6 +29,7 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.Conv2d: CustomConv2d,
     torch.nn.GroupNorm: CustomGroupNorm,
     torch.nn.Embedding: CustomEmbedding,
+    RMSNorm: CustomFluxRMSNorm,
 }
 
 try:

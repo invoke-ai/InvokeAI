@@ -4,6 +4,7 @@ import gguf
 import pytest
 import torch
 
+from invokeai.backend.flux.modules.layers import RMSNorm
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     AUTOCAST_MODULE_TYPE_MAPPING,
     AUTOCAST_MODULE_TYPE_MAPPING_INVERSE,
@@ -68,6 +69,7 @@ LayerUnderTest = tuple[torch.nn.Module, torch.Tensor, bool]
         "conv2d",
         "group_norm",
         "embedding",
+        "flux_rms_norm",
         "linear_with_ggml_quantized_tensor",
         "invoke_linear_8_bit_lt",
         "invoke_linear_nf4",
@@ -86,6 +88,8 @@ def layer_under_test(request: pytest.FixtureRequest) -> LayerUnderTest:
         return (torch.nn.GroupNorm(2, 8), torch.randn(1, 8, 5), True)
     elif layer_type == "embedding":
         return (torch.nn.Embedding(4, 8), torch.tensor([0, 1], dtype=torch.long), True)
+    elif layer_type == "flux_rms_norm":
+        return (RMSNorm(8), torch.randn(1, 8), True)
     elif layer_type == "linear_with_ggml_quantized_tensor":
         return (build_linear_layer_with_ggml_quantized_tensor(), torch.randn(1, 32), True)
     elif layer_type == "invoke_linear_8_bit_lt":
@@ -351,7 +355,7 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
 
 
 @parameterize_all_devices
-def test_linear_sidecar_patches(device: str, layer_type: str, patch_under_test: PatchUnderTest):
+def test_linear_sidecar_patches(device: str, patch_under_test: PatchUnderTest):
     patches, input = patch_under_test
 
     # Build the base layer under test.
