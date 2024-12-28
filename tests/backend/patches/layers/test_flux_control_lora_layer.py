@@ -18,7 +18,7 @@ def test_flux_control_lora_layer_get_parameters():
     orig_module = torch.nn.Linear(small_in_features, out_features)
 
     # Test that get_parameters() behaves as expected in spite of the difference in in_features shapes.
-    params = layer.get_parameters(orig_module, weight=1.0)
+    params = layer.get_parameters(dict(orig_module.named_parameters(recurse=False)), weight=1.0)
     assert "weight" in params
     assert params["weight"].shape == (out_features, big_in_features)
     assert params["weight"].allclose(torch.ones(out_features, big_in_features) * alpha)

@@ -10,7 +10,7 @@ def test_set_parameter_layer_get_parameters():
     target_weight = torch.randn(8, 4)
     layer = SetParameterLayer(param_name="weight", weight=target_weight)
 
-    params = layer.get_parameters(orig_module, weight=1.0)
+    params = layer.get_parameters(dict(orig_module.named_parameters(recurse=False)), weight=1.0)
     assert len(params) == 1
     new_weight = orig_module.weight + params["weight"]
     assert torch.allclose(new_weight, target_weight)

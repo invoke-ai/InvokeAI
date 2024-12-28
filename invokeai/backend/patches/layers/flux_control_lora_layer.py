@@ -8,11 +8,11 @@ class FluxControlLoRALayer(LoRALayer):
     shapes don't match.
     """
 
-    def get_parameters(self, orig_module: torch.nn.Module, weight: float) -> dict[str, torch.Tensor]:
+    def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         """This overrides the base class behavior to skip the reshaping step."""
         scale = self.scale()
-        params = {"weight": self.get_weight(orig_module.weight) * (weight * scale)}
-        bias = self.get_bias(orig_module.bias)
+        params = {"weight": self.get_weight(orig_parameters["weight"]) * (weight * scale)}
+        bias = self.get_bias(orig_parameters.get("bias", None))
         if bias is not None:
             params["bias"] = bias * (weight * scale)
 

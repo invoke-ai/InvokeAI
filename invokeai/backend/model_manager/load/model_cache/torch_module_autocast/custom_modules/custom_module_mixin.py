@@ -32,9 +32,9 @@ class CustomModuleMixin:
         params: dict[str, torch.Tensor] = {}
 
         for patch, patch_weight in patches_and_weights:
-            # TODO(ryand): self._orig_module could be quantized. Depending on what the patch is doing with the original
-            # module, this might fail or return incorrect results.
-            layer_params = patch.get_parameters(self, weight=patch_weight)
+            # TODO(ryand): `self` could be a quantized module. Depending on what the patch is doing with the original
+            # parameters, this might fail or return incorrect results.
+            layer_params = patch.get_parameters(dict(self.named_parameters(recurse=False)), weight=patch_weight)  # type: ignore
 
             for param_name, param_weight in layer_params.items():
                 if param_name not in params:

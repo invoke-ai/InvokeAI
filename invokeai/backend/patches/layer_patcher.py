@@ -166,7 +166,9 @@ class LayerPatcher:
 
         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        for param_name, param_weight in patch.get_parameters(module_to_patch, weight=patch_weight).items():
+        for param_name, param_weight in patch.get_parameters(
+            dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight
+        ).items():
             param_key = module_to_patch_key + "." + param_name
             module_param = module_to_patch.get_parameter(param_name)
 
