@@ -1,3 +1,5 @@
+from typing import TypeVar
+
 import torch
 
 from invokeai.backend.flux.modules.layers import RMSNorm
@@ -52,7 +54,10 @@ except ImportError:
 AUTOCAST_MODULE_TYPE_MAPPING_INVERSE = {v: k for k, v in AUTOCAST_MODULE_TYPE_MAPPING.items()}
 
 
-def wrap_custom_layer(module_to_wrap: torch.nn.Module, custom_layer_type: type[torch.nn.Module]):
+T = TypeVar("T", bound=torch.nn.Module)
+
+
+def wrap_custom_layer(module_to_wrap: torch.nn.Module, custom_layer_type: type[T]) -> T:
     # HACK(ryand): We use custom initialization logic so that we can initialize a new custom layer instance from an
     # existing layer instance without calling __init__() on the original layer class. We achieve this by copying
     # the attributes from the original layer instance to the new instance.
