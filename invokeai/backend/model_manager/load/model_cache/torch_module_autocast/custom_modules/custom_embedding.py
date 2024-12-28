@@ -20,6 +20,9 @@ class CustomEmbedding(torch.nn.Embedding, CustomModuleMixin):
         )
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
+        if len(self._patches_and_weights) > 0:
+            raise RuntimeError("Embedding layers do not support patches")
+
         if self._device_autocasting_enabled:
             return self._autocast_forward(input)
         else:

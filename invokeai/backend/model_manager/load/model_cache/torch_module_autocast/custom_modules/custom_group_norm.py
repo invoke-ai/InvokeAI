@@ -13,6 +13,9 @@ class CustomGroupNorm(torch.nn.GroupNorm, CustomModuleMixin):
         return torch.nn.functional.group_norm(input, self.num_groups, weight, bias, self.eps)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
+        if len(self._patches_and_weights) > 0:
+            raise RuntimeError("GroupNorm layers do not support patches")
+
         if self._device_autocasting_enabled:
             return self._autocast_forward(input)
         else:
