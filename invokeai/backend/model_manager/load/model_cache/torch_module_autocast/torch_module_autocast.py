@@ -83,17 +83,17 @@ def unwrap_custom_layer(custom_layer: torch.nn.Module, original_layer_type: type
     return original_layer
 
 
-def apply_custom_layers_to_model(module: torch.nn.Module):
+def apply_custom_layers_to_model(module: torch.nn.Module, device_autocasting_enabled: bool = False):
     for name, submodule in module.named_children():
         override_type = AUTOCAST_MODULE_TYPE_MAPPING.get(type(submodule), None)
         if override_type is not None:
             custom_layer = wrap_custom_layer(submodule, override_type)
             # TODO(ryand): In the future, we should manage this flag on a per-module basis.
-            custom_layer.set_device_autocasting_enabled(True)
+            custom_layer.set_device_autocasting_enabled(device_autocasting_enabled)
             setattr(module, name, custom_layer)
         else:
             # Recursively apply to submodules
-            apply_custom_layers_to_model(submodule)
+            apply_custom_layers_to_model(submodule, device_autocasting_enabled)
 
 
 def remove_custom_layers_from_model(module: torch.nn.Module):

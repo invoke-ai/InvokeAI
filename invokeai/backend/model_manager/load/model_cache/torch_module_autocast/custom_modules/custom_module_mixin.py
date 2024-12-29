@@ -17,13 +17,21 @@ class CustomModuleMixin:
         """
         self._device_autocasting_enabled = enabled
 
+    def is_device_autocasting_enabled(self) -> bool:
+        """Check if device autocasting is enabled for the module."""
+        return self._device_autocasting_enabled
+
     def add_patch(self, patch: BaseLayerPatch, patch_weight: float):
-        """Add a patch to the sidecar wrapper."""
+        """Add a patch to the module."""
         self._patches_and_weights.append((patch, patch_weight))
 
     def clear_patches(self):
-        """Clear all patches from the sidecar wrapper."""
+        """Clear all patches from the module."""
         self._patches_and_weights = []
+
+    def get_num_patches(self) -> int:
+        """Get the number of patches in the module."""
+        return len(self._patches_and_weights)
 
     def _aggregate_patch_parameters(
         self, patches_and_weights: list[tuple[BaseLayerPatch, float]]

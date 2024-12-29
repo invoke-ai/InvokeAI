@@ -13,6 +13,9 @@ from invokeai.backend.model_manager import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -142,6 +145,10 @@ class ModelCache:
             return
         size = calc_model_size_by_data(self._logger, model)
         self.make_room(size)
+
+        # Inject custom modules into the model.
+        if isinstance(model, torch.nn.Module):
+            apply_custom_layers_to_model(model)
 
         running_on_cpu = self._execution_device == torch.device("cpu")
         state_dict = model.state_dict() if isinstance(model, torch.nn.Module) and not running_on_cpu else None

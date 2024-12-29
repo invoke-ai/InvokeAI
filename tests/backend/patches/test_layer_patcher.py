@@ -4,10 +4,12 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.patches.sidecar_wrappers.base_sidecar_wrapper import BaseSidecarWrapper
 
 
 class DummyModuleWithOneLayer(torch.nn.Module):
@@ -50,6 +52,7 @@ def test_apply_smart_model_patches(
     linear_out_features = 8
     lora_rank = 2
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device=device, dtype=dtype)
+    apply_custom_layers_to_model(model)
 
     # Initialize num_loras LoRA models with weights of 0.5.
     lora_weight = 0.5
@@ -89,11 +92,11 @@ def test_apply_smart_model_patches(
         force_sidecar_patching=force_sidecar_patching,
     ):
         if expect_sidecar_wrappers:
-            # There should be sidecar wrappers in the model.
-            assert isinstance(model.linear_layer_1, BaseSidecarWrapper)
+            # There should be sidecar patches in the model.
+            assert model.linear_layer_1.get_num_patches() == num_loras
         else:
-            # There should be no sidecar wrappers in the model.
-            assert not isinstance(model.linear_layer_1, BaseSidecarWrapper)
+            # There should be no sidecar patches in the model.
+            assert model.linear_layer_1.get_num_patches() == 0
             torch.testing.assert_close(model.linear_layer_1.weight.data, expected_patched_linear_weight)
 
             # After patching, the patched model should still be on its original device.
@@ -132,6 +135,7 @@ def test_apply_smart_lora_patches_to_partially_loaded_model(num_loras: int):
     linear_out_features = 8
     lora_rank = 2
     model = DummyModuleWithTwoLayers(linear_in_features, linear_out_features, device="cpu", dtype=dtype)
+    apply_custom_layers_to_model(model)
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device("cuda"))
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == 0
@@ -169,9 +173,9 @@ def test_apply_smart_lora_patches_to_partially_loaded_model(num_loras: int):
 
     # Patch the model and run inference during the patch.
     with LayerPatcher.apply_smart_model_patches(model=cached_model.model, patches=lora_models, prefix="", dtype=dtype):
-        # Check that the second layer is wrapped in a LoRASidecarWrapper, but the first layer is not.
-        assert not isinstance(cached_model.model.linear_layer_1, BaseSidecarWrapper)
-        assert isinstance(cached_model.model.linear_layer_2, BaseSidecarWrapper)
+        # Check that the second layer has sidecar patches, but the first layer does not.
+        assert cached_model.model.linear_layer_1.get_num_patches() == 0
+        assert cached_model.model.linear_layer_2.get_num_patches() == num_loras
 
         output_during_patch = cached_model.model(input)
 
@@ -194,6 +198,7 @@ def test_all_patching_methods_produce_same_output(num_loras: int):
     linear_out_features = 8
     lora_rank = 2
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=dtype)
+    apply_custom_layers_to_model(model)
 
     # Initialize num_loras LoRA models with weights of 0.5.
     lora_weight = 0.5
@@ -242,6 +247,7 @@ def test_apply_smart_model_patches_change_device():
     lora_dim = 2
     # Initialize the model on the CPU.
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=torch.float16)
+    apply_custom_layers_to_model(model)
 
     lora_layers = {
         "linear_layer_1": LoRALayer.from_state_dict_values(
@@ -265,8 +271,8 @@ def test_apply_smart_model_patches_change_device():
         # After patching, the patched model should still be on the CPU.
         assert model.linear_layer_1.weight.data.device.type == "cpu"
 
-        # There should be no sidecar wrappers in the model.
-        assert not isinstance(model.linear_layer_1, BaseSidecarWrapper)
+        # There should be no sidecar patches in the model.
+        assert model.linear_layer_1.get_num_patches() == 0
 
         # Move the model to the GPU.
         assert model.to("cuda")
@@ -284,6 +290,8 @@ def test_apply_smart_model_patches_force_sidecar_and_direct_patching():
     linear_out_features = 8
     lora_rank = 2
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=torch.float16)
+    apply_custom_layers_to_model(model)
+
     lora_layers = {
         "linear_layer_1": LoRALayer.from_state_dict_values(
             values={

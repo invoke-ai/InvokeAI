@@ -388,6 +388,43 @@ def test_linear_sidecar_patches(device: str, patch_under_test: PatchUnderTest):
     assert torch.allclose(output_patched, output_custom, atol=1e-6)
 
 
+@parameterize_cuda_and_mps
+# def test_linear_sidecar_patches_with_autocast_from_cpu_to_device(device: str, patch_under_test: PatchUnderTest):
+#     patches, input = patch_under_test
+
+#     # Build the base layer under test.
+#     layer = torch.nn.Linear(32, 64)
+
+#     # Move the layer and input to the device.
+#     layer_to_device_via_state_dict(layer, device)
+#     input = input.to(torch.device(device))
+
+#     # Wrap the original layer in a custom layer and add the patch to it.
+#     custom_layer = wrap_single_custom_layer(layer)
+#     for patch, weight in patches:
+#         patch.to(torch.device(device))
+#         custom_layer.add_patch(patch, weight)
+
+#     # Run inference with the custom layer on the device.
+#     expected_output = custom_layer(input)
+
+#     # Move the custom layer to the CPU.
+#     layer_to_device_via_state_dict(custom_layer, "cpu")
+
+#     # Move the patches to the CPU.
+#     custom_layer.clear_patches()
+#     for patch, weight in patches:
+#         patch.to(torch.device("cpu"))
+#         custom_layer.add_patch(patch, weight)
+
+#     # Run inference with an input on the device, and all layer weights on the CPU. The weights should be autocasted to
+#     # the device.
+#     autocast_output = custom_layer(input)
+#     assert autocast_output.device.type == device
+
+#     assert torch.allclose(expected_output, autocast_output, atol=1e-6)
+
+
 @pytest.fixture(
     params=[
         "linear_ggml_quantized",

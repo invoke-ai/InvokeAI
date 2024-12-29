@@ -7,8 +7,6 @@ from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
-from invokeai.backend.patches.sidecar_wrappers.base_sidecar_wrapper import BaseSidecarWrapper
-from invokeai.backend.patches.sidecar_wrappers.utils import wrap_module_with_sidecar_wrapper
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
@@ -32,7 +30,7 @@ class LayerPatcher:
 
         # original_weights are stored for unpatching layers that are directly patched.
         original_weights = OriginalWeightsStorage(cached_weights)
-        # original_modules are stored for unpatching layers that are wrapped in a LoRASidecarWrapper.
+        # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
         try:
             for patch, patch_weight in patches:
@@ -55,12 +53,10 @@ class LayerPatcher:
                 cur_param = model.get_parameter(param_key)
                 cur_param.data = weight.to(dtype=cur_param.dtype, device=cur_param.device, copy=True)
 
-            # Restore LoRASidecarWrapper modules.
+            # Clear patches from all patched modules.
             # Note: This logic assumes no nested modules in original_modules.
-            for module_key, orig_module in original_modules.items():
-                module_parent_key, module_name = LayerPatcher._split_parent_key(module_key)
-                parent_module = model.get_submodule(module_parent_key)
-                LayerPatcher._set_submodule(parent_module, module_name, orig_module)
+            for orig_module in original_modules.values():
+                orig_module.clear_patches()
 
     @staticmethod
     @torch.no_grad()
@@ -97,11 +93,11 @@ class LayerPatcher:
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
-            # Decide whether to use direct patching or a sidecar wrapper.
+            # Decide whether to use direct patching or a sidecar patch.
             # Direct patching is preferred, because it results in better runtime speed.
             # Reasons to use sidecar patching:
             # - The module is quantized, so the caller passed force_sidecar_patching=True.
-            # - The module is already wrapped in a BaseSidecarWrapper.
+            # - The module already has sidecar patches.
             # - The module is on the CPU (and we don't want to store a second full copy of the original weights on the
             #   CPU, since this would double the RAM usage)
             # NOTE: For now, we don't check if the layer is quantized here. We assume that this is checked in the caller
@@ -115,14 +111,13 @@ class LayerPatcher:
                 use_sidecar_patching = False
             elif force_sidecar_patching:
                 use_sidecar_patching = True
-            elif isinstance(module, BaseSidecarWrapper):
+            elif module.get_num_patches() > 0:
                 use_sidecar_patching = True
             elif LayerPatcher._is_any_part_of_layer_on_cpu(module):
                 use_sidecar_patching = True
 
             if use_sidecar_patching:
                 LayerPatcher._apply_model_layer_wrapper_patch(
-                    model=model,
                     module_to_patch=module,
                     module_to_patch_key=module_key,
                     patch=layer,
@@ -194,7 +189,6 @@ class LayerPatcher:
     @staticmethod
     @torch.no_grad()
     def _apply_model_layer_wrapper_patch(
-        model: torch.nn.Module,
         module_to_patch: torch.nn.Module,
         module_to_patch_key: str,
         patch: BaseLayerPatch,
@@ -202,25 +196,16 @@ class LayerPatcher:
         original_modules: dict[str, torch.nn.Module],
         dtype: torch.dtype,
     ):
-        """Apply a single LoRA wrapper patch to a model."""
-        # Replace the original module with a BaseSidecarWrapper if it has not already been done.
-        if not isinstance(module_to_patch, BaseSidecarWrapper):
-            wrapped_module = wrap_module_with_sidecar_wrapper(orig_module=module_to_patch)
-            original_modules[module_to_patch_key] = module_to_patch
-            module_parent_key, module_name = LayerPatcher._split_parent_key(module_to_patch_key)
-            module_parent = model.get_submodule(module_parent_key)
-            LayerPatcher._set_submodule(module_parent, module_name, wrapped_module)
-        else:
-            assert module_to_patch_key in original_modules
-            wrapped_module = module_to_patch
-
+        """Apply a single LoRA wrapper patch to a module."""
         # Move the LoRA layer to the same device/dtype as the orig module.
         first_param = next(module_to_patch.parameters())
         device = first_param.device
         patch.to(device=device, dtype=dtype)
 
-        # Add the patch to the sidecar wrapper.
-        wrapped_module.add_patch(patch, patch_weight)
+        if module_to_patch_key not in original_modules:
+            original_modules[module_to_patch_key] = module_to_patch
+
+        module_to_patch.add_patch(patch, patch_weight)
 
     @staticmethod
     def _split_parent_key(module_key: str) -> tuple[str, str]:

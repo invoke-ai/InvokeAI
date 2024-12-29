@@ -1,9 +1,7 @@
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
-    AUTOCAST_MODULE_TYPE_MAPPING,
-    apply_custom_layers_to_model,
-    remove_custom_layers_from_model,
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
+    CustomModuleMixin,
 )
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from invokeai.backend.util.logging import InvokeAILogger
@@ -45,10 +43,10 @@ class CachedModelWithPartialLoad:
 
     def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
         """Find all modules that support autocasting."""
-        return {n: m for n, m in self._model.named_modules() if type(m) in AUTOCAST_MODULE_TYPE_MAPPING}
+        return {n: m for n, m in self._model.named_modules() if isinstance(m, CustomModuleMixin)}  # type: ignore
 
     def _find_keys_in_modules_that_do_not_support_autocast(self) -> set[str]:
-        keys_in_modules_that_do_not_support_autocast = set()
+        keys_in_modules_that_do_not_support_autocast: set[str] = set()
         for key in self._cpu_state_dict.keys():
             for module_name in self._modules_that_support_autocast.keys():
                 if key.startswith(module_name):
@@ -69,6 +67,11 @@ class CachedModelWithPartialLoad:
             for name, buffer in module.named_buffers():
                 if name in module._non_persistent_buffers_set:
                     module._buffers[name] = buffer.to(device, copy=True)
+
+    def _set_autocast_enabled_in_all_modules(self, enabled: bool):
+        """Set autocast_enabled flag in all modules that support device autocasting."""
+        for module in self._modules_that_support_autocast.values():
+            module.set_device_autocasting_enabled(enabled)
 
     @property
     def model(self) -> torch.nn.Module:
@@ -114,7 +117,7 @@ class CachedModelWithPartialLoad:
 
         cur_state_dict = self._model.state_dict()
 
-        # First, process the keys *must* be loaded into VRAM.
+        # First, process the keys that *must* be loaded into VRAM.
         for key in self._keys_in_modules_that_do_not_support_autocast:
             param = cur_state_dict[key]
             if param.device.type == self._compute_device.type:
@@ -157,10 +160,10 @@ class CachedModelWithPartialLoad:
             self._cur_vram_bytes += vram_bytes_loaded
 
         if fully_loaded:
-            remove_custom_layers_from_model(self._model)
+            self._set_autocast_enabled_in_all_modules(False)
             # TODO(ryand): Warn if the self.cur_vram_bytes() and self.total_bytes() are out of sync.
         else:
-            apply_custom_layers_to_model(self._model)
+            self._set_autocast_enabled_in_all_modules(True)
 
         # Move all non-persistent buffers to the compute device. These are a weird edge case and do not participate in
         # the vram_bytes_loaded tracking.
@@ -197,5 +200,5 @@ class CachedModelWithPartialLoad:
 
         # We may have gone from a fully-loaded model to a partially-loaded model, so we need to reapply the custom
         # layers.
-        apply_custom_layers_to_model(self._model)
+        self._set_autocast_enabled_in_all_modules(True)
         return vram_bytes_freed
