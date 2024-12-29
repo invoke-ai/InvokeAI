@@ -92,8 +92,8 @@ def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
 def mm2_loader(mm2_app_config: InvokeAIAppConfig) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
-        max_cache_size=mm2_app_config.ram,
-        max_vram_cache_size=mm2_app_config.vram,
+        max_ram_cache_size_gb=mm2_app_config.ram,
+        max_vram_cache_size_gb=mm2_app_config.vram,
     )
     return ModelLoadService(
         app_config=mm2_app_config,
