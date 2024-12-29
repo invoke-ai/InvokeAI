@@ -1,3 +1,5 @@
+import copy
+
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
@@ -55,6 +57,10 @@ def autocast_linear_forward_sidecar_patches(
     # Then, apply layers for which we have optimized implementations.
     unprocessed_patches_and_weights: list[tuple[BaseLayerPatch, float]] = []
     for patch, patch_weight in patches_and_weights:
+        # Shallow copy the patch so that we can cast it to the target device without modifying the original patch.
+        patch = copy.copy(patch)
+        patch.to(input.device)
+
         if isinstance(patch, FluxControlLoRALayer):
             # Note that we use the original input here, not the sliced input.
             output += linear_lora_forward(orig_input, patch, patch_weight)
@@ -67,7 +73,14 @@ def autocast_linear_forward_sidecar_patches(
 
     # Finally, apply any remaining patches.
     if len(unprocessed_patches_and_weights) > 0:
-        aggregated_param_residuals = orig_module._aggregate_patch_parameters(unprocessed_patches_and_weights)
+        # Prepare the original parameters for the patch aggregation.
+        orig_params = {"weight": orig_module.weight, "bias": orig_module.bias}
+        # Filter out None values.
+        orig_params = {k: v for k, v in orig_params.items() if v is not None}
+
+        aggregated_param_residuals = orig_module._aggregate_patch_parameters(
+            unprocessed_patches_and_weights, orig_params=orig_params, device=input.device
+        )
         output += torch.nn.functional.linear(
             input, aggregated_param_residuals["weight"], aggregated_param_residuals.get("bias", None)
         )

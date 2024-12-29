@@ -389,40 +389,44 @@ def test_linear_sidecar_patches(device: str, patch_under_test: PatchUnderTest):
 
 
 @parameterize_cuda_and_mps
-# def test_linear_sidecar_patches_with_autocast_from_cpu_to_device(device: str, patch_under_test: PatchUnderTest):
-#     patches, input = patch_under_test
+def test_linear_sidecar_patches_with_autocast_from_cpu_to_device(device: str, patch_under_test: PatchUnderTest):
+    """Test that the output of a linear layer with sidecar patches is the same when the layer is on the device and
+    when the layer is on the CPU and the patches are autocasted to the device.
+    """
+    patches, input = patch_under_test
 
-#     # Build the base layer under test.
-#     layer = torch.nn.Linear(32, 64)
+    # Build the base layer under test.
+    layer = torch.nn.Linear(32, 64)
 
-#     # Move the layer and input to the device.
-#     layer_to_device_via_state_dict(layer, device)
-#     input = input.to(torch.device(device))
+    # Move the layer and input to the device.
+    layer_to_device_via_state_dict(layer, device)
+    input = input.to(torch.device(device))
 
-#     # Wrap the original layer in a custom layer and add the patch to it.
-#     custom_layer = wrap_single_custom_layer(layer)
-#     for patch, weight in patches:
-#         patch.to(torch.device(device))
-#         custom_layer.add_patch(patch, weight)
+    # Wrap the original layer in a custom layer and add the patch to it.
+    custom_layer = wrap_single_custom_layer(layer)
+    for patch, weight in patches:
+        patch.to(torch.device(device))
+        custom_layer.add_patch(patch, weight)
 
-#     # Run inference with the custom layer on the device.
-#     expected_output = custom_layer(input)
+    # Run inference with the custom layer on the device.
+    expected_output = custom_layer(input)
 
-#     # Move the custom layer to the CPU.
-#     layer_to_device_via_state_dict(custom_layer, "cpu")
+    # Move the custom layer to the CPU.
+    layer_to_device_via_state_dict(custom_layer, "cpu")
 
-#     # Move the patches to the CPU.
-#     custom_layer.clear_patches()
-#     for patch, weight in patches:
-#         patch.to(torch.device("cpu"))
-#         custom_layer.add_patch(patch, weight)
+    # Move the patches to the CPU.
+    custom_layer.clear_patches()
+    for patch, weight in patches:
+        patch.to(torch.device("cpu"))
+        custom_layer.add_patch(patch, weight)
 
-#     # Run inference with an input on the device, and all layer weights on the CPU. The weights should be autocasted to
-#     # the device.
-#     autocast_output = custom_layer(input)
-#     assert autocast_output.device.type == device
+    # Run inference with an input on the device, and all layer weights on the CPU. The weights should be autocasted to
+    # the device.
+    autocast_output = custom_layer(input)
+    assert autocast_output.device.type == device
 
-#     assert torch.allclose(expected_output, autocast_output, atol=1e-6)
+    # Assert that the outputs with and without autocasting are the same.
+    assert torch.allclose(expected_output, autocast_output, atol=1e-6)
 
 
 @pytest.fixture(

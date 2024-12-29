@@ -16,10 +16,12 @@ class CustomFluxRMSNorm(RMSNorm, CustomModuleMixin):
         assert isinstance(patch, SetParameterLayer)
         assert patch.param_name == "scale"
 
+        scale = cast_to_device(patch.weight, x.device)
+
         # Apply the patch.
         # NOTE(ryand): Currently, we ignore the patch weight when running as a sidecar. It's not clear how this should
         # be handled.
-        return torch.nn.functional.rms_norm(x, patch.weight.shape, patch.weight, eps=1e-6)
+        return torch.nn.functional.rms_norm(x, scale.shape, scale, eps=1e-6)
 
     def _autocast_forward(self, x: torch.Tensor) -> torch.Tensor:
         scale = cast_to_device(self.scale, x.device)

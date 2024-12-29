@@ -1,3 +1,5 @@
+import copy
+
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
@@ -34,15 +36,23 @@ class CustomModuleMixin:
         return len(self._patches_and_weights)
 
     def _aggregate_patch_parameters(
-        self, patches_and_weights: list[tuple[BaseLayerPatch, float]]
-    ) -> dict[str, torch.Tensor]:
+        self,
+        patches_and_weights: list[tuple[BaseLayerPatch, float]],
+        orig_params: dict[str, torch.Tensor],
+        device: torch.device | None = None,
+    ):
         """Helper function that aggregates the parameters from all patches into a single dict."""
         params: dict[str, torch.Tensor] = {}
 
         for patch, patch_weight in patches_and_weights:
+            if device is not None:
+                # Shallow copy the patch so that we can cast it to the target device without modifying the original patch.
+                patch = copy.copy(patch)
+                patch.to(device)
+
             # TODO(ryand): `self` could be a quantized module. Depending on what the patch is doing with the original
             # parameters, this might fail or return incorrect results.
-            layer_params = patch.get_parameters(dict(self.named_parameters(recurse=False)), weight=patch_weight)  # type: ignore
+            layer_params = patch.get_parameters(orig_params, weight=patch_weight)
 
             for param_name, param_weight in layer_params.items():
                 if param_name not in params:
