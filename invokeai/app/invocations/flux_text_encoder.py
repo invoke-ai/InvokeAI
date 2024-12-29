@@ -22,7 +22,6 @@ from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
-from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -116,7 +115,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
                         model=clip_text_encoder,
                         patches=self._clip_lora_iterator(context),
                         prefix=FLUX_LORA_CLIP_PREFIX,
-                        dtype=TorchDevice.choose_torch_dtype(),
+                        dtype=clip_text_encoder.dtype,
                         cached_weights=cached_weights,
                     )
                 )

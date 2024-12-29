@@ -86,7 +86,7 @@ class CompelInvocation(BaseInvocation):
                 model=text_encoder,
                 patches=_lora_loader(),
                 prefix="lora_te_",
-                dtype=TorchDevice.choose_torch_dtype(),
+                dtype=text_encoder.dtype,
                 cached_weights=cached_weights,
             ),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
@@ -184,7 +184,7 @@ class SDXLPromptInvocationBase:
                 model=text_encoder,
                 patches=_lora_loader(),
                 prefix=lora_prefix,
-                dtype=TorchDevice.choose_torch_dtype(),
+                dtype=text_encoder.dtype,
                 cached_weights=cached_weights,
             ),
             # Apply CLIP Skip after LoRA to prevent LoRA application from failing on skipped layers.
