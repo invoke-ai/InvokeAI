@@ -1,13 +1,17 @@
 import pytest
 import torch
 
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_nf4 import (
-    CustomInvokeLinearNF4,
-)
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     wrap_custom_layer,
 )
-from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
+
+if not torch.cuda.is_available():
+    pytest.skip("CUDA is not available", allow_module_level=True)
+else:
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_nf4 import (
+        CustomInvokeLinearNF4,
+    )
+    from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
 
 
 def build_linear_nf4_layer(orig_layer: torch.nn.Linear | None = None):
