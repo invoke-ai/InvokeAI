@@ -76,6 +76,7 @@ class ModelCache:
         self,
         max_ram_cache_size_gb: float,
         max_vram_cache_size_gb: float,
+        enable_partial_loading: bool,
         execution_device: torch.device | str = "cuda",
         storage_device: torch.device | str = "cpu",
         log_memory_usage: bool = False,
@@ -102,6 +103,7 @@ class ModelCache:
 
         self._max_ram_cache_size_gb = max_ram_cache_size_gb
         self._max_vram_cache_size_gb = max_vram_cache_size_gb
+        self._enable_partial_loading = enable_partial_loading
 
         self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
         self._log_memory_usage = log_memory_usage
@@ -142,7 +144,7 @@ class ModelCache:
         running_with_cuda = self._execution_device.type == "cuda"
 
         # Wrap model.
-        if isinstance(model, torch.nn.Module) and running_with_cuda:
+        if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(model, self._execution_device)
         else:
             wrapped_model = CachedModelOnlyFullLoad(model, self._execution_device, size)
