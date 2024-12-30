@@ -84,6 +84,7 @@ class ModelManagerService(ModelManagerServiceBase):
         ram_cache = ModelCache(
             max_ram_cache_size_gb=app_config.ram,
             max_vram_cache_size_gb=app_config.vram,
+            enable_partial_loading=app_config.enable_partial_loading,
             logger=logger,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
         )
