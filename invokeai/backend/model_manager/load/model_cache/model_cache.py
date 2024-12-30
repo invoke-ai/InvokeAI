@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.prefix_logger_adapter import PrefixedLoggerAdapter
 
 # Size of a GB in bytes.
 GB = 2**30
@@ -105,7 +106,9 @@ class ModelCache:
         self._max_vram_cache_size_gb = max_vram_cache_size_gb
         self._enable_partial_loading = enable_partial_loading
 
-        self._logger = logger or InvokeAILogger.get_logger(self.__class__.__name__)
+        self._logger = PrefixedLoggerAdapter(
+            logger or InvokeAILogger.get_logger(self.__class__.__name__), "MODEL CACHE"
+        )
         self._log_memory_usage = log_memory_usage
         self._stats: Optional[CacheStats] = None
 
