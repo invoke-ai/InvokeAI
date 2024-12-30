@@ -7,18 +7,6 @@ from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from invokeai.backend.util.logging import InvokeAILogger
 
 
-def set_nested_attr(obj: object, attr: str, value: object):
-    """A helper function that extends setattr() to support nested attributes.
-
-    Example:
-        set_nested_attr(model, "module.encoder.conv1.weight", new_conv1_weight)
-    """
-    attrs = attr.split(".")
-    for attr in attrs[:-1]:
-        obj = getattr(obj, attr)
-    setattr(obj, attrs[-1], value)
-
-
 class CachedModelWithPartialLoad:
     """A wrapper around a PyTorch model to handle partial loads and unloads between the CPU and the compute device.
 
