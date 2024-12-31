@@ -200,7 +200,7 @@ class ModelCache:
         self._logger.debug(f"Cache hit: {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
         return cache_entry
 
-    def lock(self, key: str) -> None:
+    def lock(self, key: str, working_mem_bytes: Optional[int]) -> None:
         """Lock a model for use and move it into VRAM."""
         cache_entry = self._cached_models[key]
         cache_entry.lock()
@@ -212,7 +212,7 @@ class ModelCache:
             return
 
         try:
-            self._load_locked_model(cache_entry)
+            self._load_locked_model(cache_entry, working_mem_bytes)
             self._logger.debug(
                 f"Finished locking model {key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
             )
