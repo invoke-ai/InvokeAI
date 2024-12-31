@@ -19,6 +19,7 @@ from invokeai.backend.image_util.util import (
     pil_to_np,
     resize_image_to_resolution,
 )
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 
 
 class UnetGenerator(nn.Module):
@@ -171,7 +172,7 @@ class LineartAnimeProcessor:
         Returns:
             The detected lineart.
         """
-        device = next(iter(self.model.parameters())).device
+        device = get_effective_device(self.model)
         np_image = pil_to_np(input_image)
 
         np_image = normalize_image_channel_count(np_image)
@@ -239,7 +240,7 @@ class LineartAnimeEdgeDetector:
 
     def run(self, image: Image.Image) -> Image.Image:
         """Processes an image and returns the detected edges."""
-        device = next(iter(self.model.parameters())).device
+        device = get_effective_device(self.model)
 
         np_image = pil_to_np(image)
 
