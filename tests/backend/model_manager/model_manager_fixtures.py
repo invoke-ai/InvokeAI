@@ -91,10 +91,11 @@ def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
 @pytest.fixture
 def mm2_loader(mm2_app_config: InvokeAIAppConfig) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
-        logger=InvokeAILogger.get_logger(),
+        execution_device_working_mem_gb=mm2_app_config.device_working_mem_gb,
+        enable_partial_loading=mm2_app_config.enable_partial_loading,
         max_ram_cache_size_gb=mm2_app_config.ram,
         max_vram_cache_size_gb=mm2_app_config.vram,
-        enable_partial_loading=mm2_app_config.enable_partial_loading,
+        logger=InvokeAILogger.get_logger(),
     )
     return ModelLoadService(
         app_config=mm2_app_config,

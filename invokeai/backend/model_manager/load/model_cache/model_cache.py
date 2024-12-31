@@ -4,6 +4,7 @@ import time
 from logging import Logger
 from typing import Dict, List, Optional
 
+import psutil
 import torch
 
 from invokeai.backend.model_manager import AnyModel, SubModelType
@@ -75,9 +76,10 @@ class ModelCache:
 
     def __init__(
         self,
-        max_ram_cache_size_gb: float,
-        max_vram_cache_size_gb: float,
+        execution_device_working_mem_gb: float,
         enable_partial_loading: bool,
+        max_ram_cache_size_gb: float | None = None,
+        max_vram_cache_size_gb: float | None = None,
         execution_device: torch.device | str = "cuda",
         storage_device: torch.device | str = "cpu",
         log_memory_usage: bool = False,
@@ -85,6 +87,9 @@ class ModelCache:
     ):
         """Initialize the model RAM cache.
 
+        :param execution_device_working_mem_gb: The amount of working memory to keep on the GPU (in GB) i.e. non-model
+            VRAM.
+        :param enable_partial_loading: Whether to enable partial loading of models.
         :param max_ram_cache_size_gb: The maximum amount of CPU RAM to use for model caching in GB. This parameter is
             kept to maintain compatibility with previous versions of the model cache, but should be deprecated in the
             future. If set, this parameter overrides the default cache size logic.
@@ -99,12 +104,13 @@ class ModelCache:
             behaviour.
         :param logger: InvokeAILogger to use (otherwise creates one)
         """
+        self._enable_partial_loading = enable_partial_loading
+        self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
         self._storage_device: torch.device = torch.device(storage_device)
 
         self._max_ram_cache_size_gb = max_ram_cache_size_gb
         self._max_vram_cache_size_gb = max_vram_cache_size_gb
-        self._enable_partial_loading = enable_partial_loading
 
         self._logger = PrefixedLoggerAdapter(
             logger or InvokeAILogger.get_logger(self.__class__.__name__), "MODEL CACHE"
@@ -244,7 +250,7 @@ class ModelCache:
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
 
-    def _load_locked_model(self, cache_entry: CacheRecord) -> None:
+    def _load_locked_model(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int] = None) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""
         start_time = time.time()
 
@@ -254,7 +260,7 @@ class ModelCache:
         model_total_bytes = cache_entry.cached_model.total_bytes()
         model_vram_needed = model_total_bytes - model_cur_vram_bytes
 
-        vram_available = self._get_vram_available()
+        vram_available = self._get_vram_available(working_mem_bytes)
         self._logger.debug(
             f"Before unloading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
@@ -267,7 +273,7 @@ class ModelCache:
         self._logger.debug(f"Unloaded models (if necessary): vram_bytes_freed={(vram_bytes_freed/MB):.2f}MB")
 
         # Check the updated vram_available after offloading.
-        vram_available = self._get_vram_available()
+        vram_available = self._get_vram_available(working_mem_bytes)
         self._logger.debug(
             f"After unloading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
@@ -280,7 +286,7 @@ class ModelCache:
         model_bytes_loaded = self._move_model_to_vram(cache_entry, vram_available + MB)
 
         model_cur_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
-        vram_available = self._get_vram_available()
+        vram_available = self._get_vram_available(working_mem_bytes)
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         self._logger.info(
             f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
@@ -298,7 +304,7 @@ class ModelCache:
             if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
                 return cache_entry.cached_model.partial_load_to_vram(vram_available)
             elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
-                # Partial load is not supported, so we have no choice but to try and fit it all into VRAM.
+                # Partial load is not supported, so we have not choice but to try and fit it all into VRAM.
                 return cache_entry.cached_model.full_load_to_vram()
             else:
                 raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
@@ -322,10 +328,33 @@ class ModelCache:
             self._delete_cache_entry(cache_entry)
             raise
 
-    def _get_vram_available(self) -> int:
-        """Calculate the amount of additional VRAM available for the cache to use."""
-        vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB)
-        return vram_total_available_to_cache - self._get_vram_in_use()
+    def _get_vram_available(self, working_mem_bytes: Optional[int] = None) -> int:
+        """Calculate the amount of additional VRAM available for the cache to use (takes into account the working
+        memory).
+        """
+        # If self._max_vram_cache_size_gb is set, then it overrides the default logic.
+        if self._max_vram_cache_size_gb is not None:
+            vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB)
+            return vram_total_available_to_cache - self._get_vram_in_use()
+
+        working_mem_bytes_default = int(self._execution_device_working_mem_gb * GB)
+        working_mem_bytes = max(working_mem_bytes or working_mem_bytes_default, working_mem_bytes_default)
+
+        if self._execution_device.type == "cuda":
+            vram_reserved = torch.cuda.memory_reserved(self._execution_device)
+            vram_free, _vram_total = torch.cuda.mem_get_info(self._execution_device)
+            vram_available_to_process = vram_free + vram_reserved
+        elif self._execution_device.type == "mps":
+            vram_reserved = torch.mps.driver_allocated_memory()
+            # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
+            vram_free = psutil.virtual_memory().available
+            vram_available_to_process = vram_free + vram_reserved
+        else:
+            raise ValueError(f"Unsupported execution device: {self._execution_device.type}")
+
+        vram_total_available_to_cache = vram_available_to_process - working_mem_bytes
+        vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()
+        return vram_cur_available_to_cache
 
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
@@ -341,8 +370,25 @@ class ModelCache:
     def _get_ram_available(self) -> int:
         """Get the amount of RAM available for the cache to use, while keeping memory pressure under control."""
 
-        ram_total_available_to_cache = int(self._max_ram_cache_size_gb * GB)
-        return ram_total_available_to_cache - self._get_ram_in_use()
+        # If self._max_ram_cache_size_gb is set, then it overrides the default logic.
+        if self._max_ram_cache_size_gb is not None:
+            ram_total_available_to_cache = int(self._max_ram_cache_size_gb * GB)
+            return ram_total_available_to_cache - self._get_ram_in_use()
+
+        virtual_memory = psutil.virtual_memory()
+        ram_total = virtual_memory.total
+        ram_available = virtual_memory.available
+        ram_used = ram_total - ram_available
+
+        # The total size of all the models in the cache will often be larger than the amount of RAM reported by psutil
+        # (due to lazy-loading and OS RAM caching behaviour). We could just rely on the psutil values, but it feels
+        # like a bad idea to over-fill the model cache. So, for now, we'll try to keep the total size of models in the
+        # cache under the total amount of system RAM.
+        cache_ram_used = self._get_ram_in_use()
+        ram_used = max(cache_ram_used, ram_used)
+
+        # Aim to keep 10% of RAM free.
+        return int(ram_total * 0.9) - ram_used
 
     def _get_ram_in_use(self) -> int:
         """Get the amount of RAM currently in use."""
