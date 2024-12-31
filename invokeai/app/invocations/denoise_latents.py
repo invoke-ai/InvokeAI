@@ -86,7 +86,7 @@ def get_scheduler(
     scheduler_info: ModelIdentifierField,
     scheduler_name: str,
     seed: int,
-    unet_config: AnyModelConfig | None = None,
+    unet_config: AnyModelConfig,
 ) -> Scheduler:
     """Load a scheduler and apply some scheduler-specific overrides."""
     # TODO(ryand): Silently falling back to ddim seems like a bad idea. Look into why this was added and remove if
@@ -105,7 +105,7 @@ def get_scheduler(
         "_backup": scheduler_config,
     }
 
-    if unet_config is not None:
+    if hasattr(unet_config, "prediction_type"):
         scheduler_config["prediction_type"] = unet_config.prediction_type
 
     # make dpmpp_sde reproducable(seed can be passed only in initializer)
