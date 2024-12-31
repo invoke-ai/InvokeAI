@@ -54,19 +54,19 @@ class LoRALayerBase(BaseLayerPatch):
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
 
-    def get_bias(self, orig_bias: torch.Tensor) -> Optional[torch.Tensor]:
+    def get_bias(self, orig_bias: torch.Tensor | None) -> Optional[torch.Tensor]:
         return self.bias
 
-    def get_parameters(self, orig_module: torch.nn.Module, weight: float) -> dict[str, torch.Tensor]:
+    def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         scale = self.scale()
-        params = {"weight": self.get_weight(orig_module.weight) * (weight * scale)}
-        bias = self.get_bias(orig_module.bias)
+        params = {"weight": self.get_weight(orig_parameters["weight"]) * (weight * scale)}
+        bias = self.get_bias(orig_parameters.get("bias", None))
         if bias is not None:
             params["bias"] = bias * (weight * scale)
 
         # Reshape all params to match the original module's shape.
         for param_name, param_weight in params.items():
-            orig_param = orig_module.get_parameter(param_name)
+            orig_param = orig_parameters[param_name]
             if param_weight.shape != orig_param.shape:
                 params[param_name] = param_weight.reshape(orig_param.shape)
 

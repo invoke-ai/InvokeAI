@@ -1,18 +1,27 @@
 import itertools
 
+import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
-from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.autocast_modules import CustomLinear
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule, parameterize_mps_and_cuda
 
 
-@parameterize_mps_and_cuda
-def test_cached_model_total_bytes(device: str):
+@pytest.fixture
+def model():
     model = DummyModule()
+    apply_custom_layers_to_model(model)
+    return model
+
+
+@parameterize_mps_and_cuda
+def test_cached_model_total_bytes(device: str, model: DummyModule):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     linear1_numel = 10 * 32 + 32
     linear2_numel = 32 * 64 + 64
@@ -22,8 +31,7 @@ def test_cached_model_total_bytes(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_cur_vram_bytes(device: str):
-    model = DummyModule()
+def test_cached_model_cur_vram_bytes(device: str, model: DummyModule):
     # Model starts in CPU memory.
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     assert cached_model.cur_vram_bytes() == 0
@@ -37,8 +45,7 @@ def test_cached_model_cur_vram_bytes(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_partial_load(device: str):
-    model = DummyModule()
+def test_cached_model_partial_load(device: str, model: DummyModule):
     # Model starts in CPU memory.
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     model_total_bytes = cached_model.total_bytes()
@@ -58,14 +65,13 @@ def test_cached_model_partial_load(device: str):
         if p.device.type == device and n != "buffer2"
     )
 
-    # Check that the model's modules have been patched with CustomLinear layers.
-    assert type(model.linear1) is CustomLinear
-    assert type(model.linear2) is CustomLinear
+    # Check that the model's modules have device autocasting enabled.
+    assert model.linear1.is_device_autocasting_enabled()
+    assert model.linear2.is_device_autocasting_enabled()
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_partial_unload(device: str):
-    model = DummyModule()
+def test_cached_model_partial_unload(device: str, model: DummyModule):
     # Model starts in CPU memory.
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     model_total_bytes = cached_model.total_bytes()
@@ -87,14 +93,13 @@ def test_cached_model_partial_unload(device: str):
         calc_tensor_size(p) for p in itertools.chain(model.parameters(), model.buffers()) if p.device.type == "cpu"
     )
 
-    # Check that the model's modules are still patched with CustomLinear layers.
-    assert type(model.linear1) is CustomLinear
-    assert type(model.linear2) is CustomLinear
+    # Check that the model's modules still have device autocasting enabled.
+    assert model.linear1.is_device_autocasting_enabled()
+    assert model.linear2.is_device_autocasting_enabled()
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_and_unload(device: str):
-    model = DummyModule()
+def test_cached_model_full_load_and_unload(device: str, model: DummyModule):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
 
     # Model starts in CPU memory.
@@ -107,8 +112,8 @@ def test_cached_model_full_load_and_unload(device: str):
     assert loaded_bytes == model_total_bytes
     assert loaded_bytes == cached_model.cur_vram_bytes()
     assert all(p.device.type == device for p in itertools.chain(model.parameters(), model.buffers()))
-    assert type(model.linear1) is torch.nn.Linear
-    assert type(model.linear2) is torch.nn.Linear
+    assert not model.linear1.is_device_autocasting_enabled()
+    assert not model.linear2.is_device_autocasting_enabled()
 
     # Full unload the model from VRAM.
     unloaded_bytes = cached_model.full_unload_from_vram()
@@ -126,8 +131,7 @@ def test_cached_model_full_load_and_unload(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_from_partial(device: str):
-    model = DummyModule()
+def test_cached_model_full_load_from_partial(device: str, model: DummyModule):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
 
     # Model starts in CPU memory.
@@ -140,8 +144,8 @@ def test_cached_model_full_load_from_partial(device: str):
     assert loaded_bytes > 0
     assert loaded_bytes < model_total_bytes
     assert loaded_bytes == cached_model.cur_vram_bytes()
-    assert type(model.linear1) is CustomLinear
-    assert type(model.linear2) is CustomLinear
+    assert model.linear1.is_device_autocasting_enabled()
+    assert model.linear2.is_device_autocasting_enabled()
 
     # Full load the rest of the model into VRAM.
     loaded_bytes_2 = cached_model.full_load_to_vram()
@@ -150,13 +154,12 @@ def test_cached_model_full_load_from_partial(device: str):
     assert loaded_bytes + loaded_bytes_2 == cached_model.cur_vram_bytes()
     assert loaded_bytes + loaded_bytes_2 == model_total_bytes
     assert all(p.device.type == device for p in itertools.chain(model.parameters(), model.buffers()))
-    assert type(model.linear1) is torch.nn.Linear
-    assert type(model.linear2) is torch.nn.Linear
+    assert not model.linear1.is_device_autocasting_enabled()
+    assert not model.linear2.is_device_autocasting_enabled()
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_unload_from_partial(device: str):
-    model = DummyModule()
+def test_cached_model_full_unload_from_partial(device: str, model: DummyModule):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
 
     # Model starts in CPU memory.
@@ -184,8 +187,7 @@ def test_cached_model_full_unload_from_partial(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_get_cpu_state_dict(device: str):
-    model = DummyModule()
+def test_cached_model_get_cpu_state_dict(device: str, model: DummyModule):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
 
     # Model starts in CPU memory.
@@ -209,8 +211,7 @@ def test_cached_model_get_cpu_state_dict(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_and_inference(device: str):
-    model = DummyModule()
+def test_cached_model_full_load_and_inference(device: str, model: DummyModule):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     # Model starts in CPU memory.
     model_total_bytes = cached_model.total_bytes()
@@ -237,8 +238,7 @@ def test_cached_model_full_load_and_inference(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_partial_load_and_inference(device: str):
-    model = DummyModule()
+def test_cached_model_partial_load_and_inference(device: str, model: DummyModule):
     # Model starts in CPU memory.
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
     model_total_bytes = cached_model.total_bytes()
@@ -262,9 +262,9 @@ def test_cached_model_partial_load_and_inference(device: str):
         for n, p in itertools.chain(model.named_parameters(), model.named_buffers())
         if p.device.type == device and n != "buffer2"
     )
-    # Check that the model's modules have been patched with CustomLinear layers.
-    assert type(model.linear1) is CustomLinear
-    assert type(model.linear2) is CustomLinear
+    # Check that the model's modules have device autocasting enabled.
+    assert model.linear1.is_device_autocasting_enabled()
+    assert model.linear2.is_device_autocasting_enabled()
 
     # Run inference on the GPU.
     output2 = model(x.to(device))

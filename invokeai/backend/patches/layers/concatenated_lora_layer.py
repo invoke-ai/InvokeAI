@@ -30,7 +30,7 @@ class ConcatenatedLoRALayer(LoRALayerBase):
         layer_weights = [lora_layer.get_weight(None) * lora_layer.scale() for lora_layer in self.lora_layers]  # pyright: ignore[reportArgumentType]
         return torch.cat(layer_weights, dim=self.concat_axis)
 
-    def get_bias(self, orig_bias: torch.Tensor) -> Optional[torch.Tensor]:
+    def get_bias(self, orig_bias: torch.Tensor | None) -> Optional[torch.Tensor]:
         # TODO(ryand): Currently, we pass orig_bias=None to the sub-layers. If we want to support sub-layers that
         # require this value, we will need to implement chunking of the original bias tensor here.
         # Note that we must apply the sub-layer scales here.

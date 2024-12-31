@@ -5,7 +5,7 @@ import torch
 
 class BaseLayerPatch(ABC):
     @abstractmethod
-    def get_parameters(self, orig_module: torch.nn.Module, weight: float) -> dict[str, torch.Tensor]:
+    def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         """Get the parameter residual updates that should be applied to the original parameters. Parameters omitted
         from the returned dict are not updated.
         """

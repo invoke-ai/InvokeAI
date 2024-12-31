@@ -14,10 +14,10 @@ class SetParameterLayer(BaseLayerPatch):
         self.weight = weight
         self.param_name = param_name
 
-    def get_parameters(self, orig_module: torch.nn.Module, weight: float) -> dict[str, torch.Tensor]:
+    def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
         # Note: We intentionally ignore the weight parameter here. This matches the behavior in the official FLUX
         # Control LoRA implementation.
-        diff = self.weight - orig_module.get_parameter(self.param_name)
+        diff = self.weight - orig_parameters[self.param_name]
         return {self.param_name: diff}
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):

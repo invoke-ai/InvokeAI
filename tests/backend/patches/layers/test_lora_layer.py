@@ -107,7 +107,7 @@ def test_lora_layer_get_parameters():
     # Create mock original module
     orig_module = torch.nn.Linear(in_features, out_features)
 
-    params = layer.get_parameters(orig_module, weight=1.0)
+    params = layer.get_parameters(dict(orig_module.named_parameters(recurse=False)), weight=1.0)
     assert "weight" in params
     assert params["weight"].shape == orig_module.weight.shape
     assert params["weight"].allclose(torch.ones(out_features, in_features) * alpha)

@@ -17,9 +17,9 @@ from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.patches.model_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
 
 # The SD3 T5 Max Sequence Length set based on the default in diffusers.
@@ -150,10 +150,11 @@ class Sd3TextEncoderInvocation(BaseInvocation):
             if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
-                    LayerPatcher.apply_model_patches(
+                    LayerPatcher.apply_smart_model_patches(
                         model=clip_text_encoder,
                         patches=self._clip_lora_iterator(context, clip_model),
                         prefix=FLUX_LORA_CLIP_PREFIX,
+                        dtype=clip_text_encoder.dtype,
                         cached_weights=cached_weights,
                     )
                 )

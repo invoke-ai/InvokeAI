@@ -72,7 +72,7 @@ def test_torch_module_autocast_linear_layer(device: torch.device, model: torch.n
     assert expected.device.type == "cpu"
 
     # Apply the custom layers to the model.
-    apply_custom_layers_to_model(model)
+    apply_custom_layers_to_model(model, device_autocasting_enabled=True)
 
     # Run the model on the device.
     autocast_result = model(x.to(device))
@@ -122,7 +122,7 @@ def test_torch_module_autocast_bnb_llm_int8_linear_layer():
 
     # Move the model back to the CPU and add the custom layers to the model.
     model.to("cpu")
-    apply_custom_layers_to_model(model)
+    apply_custom_layers_to_model(model, device_autocasting_enabled=True)
 
     # Run inference with weights being streamed to the GPU.
     autocast_result = model(x.to("cuda"))
