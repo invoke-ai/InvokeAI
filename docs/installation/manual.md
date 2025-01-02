@@ -8,7 +8,7 @@
 
     If you want to contribute to Invoke, instead follow the [dev environment](../contributing/dev-environment.md) guide.
 
-InvokeAI is distributed as a python package on PyPI, installable with `pip`. There are a few things that are handled by the installer and launcher that you'll need to manage manually, described in this guide.
+InvokeAI is distributed as a python package on PyPI, installable with `pip`. There are a few things that are handled by the launcher that you'll need to manage manually, described in this guide.
 
 ## Requirements
 
@@ -16,43 +16,39 @@ Before you start, go through the [installation requirements](./requirements.md).
 
 ## Walkthrough
 
-1. Create a directory to contain your InvokeAI library, configuration files, and models. This is known as the "runtime" or "root" directory, and typically lives in your home directory under the name `invokeai`.
+We'll use [`uv`](https://github.com/astral-sh/uv) to install python and create a virtual environment, then install the `invokeai` package. `uv` is a modern, very fast alternative to `pip`.
+
+The following commands vary depending on the version of Invoke being installed and the system onto which it is being installed.
+
+1. Install `uv` as described in its [docs](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer). We suggest using the standalone installer method.
+
+    Run `uv --version` to confirm that `uv` is installed and working. After installation, you may need to restart your terminal to get access to `uv`.
+
+2. Create a directory for your installation, typically in your home directory (e.g. `~/invokeai` or `$Home/invokeai`):
 
     === "Linux/macOS"
 
         ```bash
         mkdir ~/invokeai
+        cd ~/invokeai
         ```
 
     === "Windows (PowerShell)"
 
         ```bash
         mkdir $Home/invokeai
-        ```
-
-1. Enter the root directory and create a virtual Python environment within it named `.venv`.
-
-    !!! warning "Virtual Environment Location"
-
-        While you may create the virtual environment anywhere in the file system, we recommend that you create it within the root directory as shown here. This allows the application to automatically detect its data directories.
-
-        If you choose a different location for the venv, then you _must_ set the `INVOKEAI_ROOT` environment variable or specify the root directory using the `--root` CLI arg.
-
-    === "Linux/macOS"
-
-        ```bash
-        cd ~/invokeai
-        python3 -m venv .venv --prompt InvokeAI
-        ```
-
-    === "Windows (PowerShell)"
-
-        ```bash
         cd $Home/invokeai
-        python3 -m venv .venv --prompt InvokeAI
         ```
 
-1. Activate the new environment:
+3. Create a virtual environment in that directory:
+
+    ```sh
+    uv venv --relocatable --prompt invoke --python 3.11 --python-preference only-managed .venv
+    ```
+
+    This command creates a portable virtual environment at `.venv` complete with a portable python 3.11. It doesn't matter if your system has no python installed, or has a different version - `uv` will handle everything.
+
+4. Activate the virtual environment:
 
     === "Linux/macOS"
 
@@ -60,41 +56,48 @@ Before you start, go through the [installation requirements](./requirements.md).
         source .venv/bin/activate
         ```
 
-    === "Windows"
+    === "Windows (PowerShell)"
 
         ```ps
         .venv\Scripts\activate
         ```
 
-    !!! info "Permissions Error (Windows)"
+5. Choose a version to install. Review the [GitHub releases page](https://github.com/invoke-ai/InvokeAI/releases).
 
-        If you get a permissions error at this point, run this command and try again.
+6. Determine the package package specifier to use when installing. This is a performance optimization.
 
-        `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+    - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
+    - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
 
-    The command-line prompt should change to to show `(InvokeAI)`, indicating the venv is active.
+7. Determine the `PyPI` index URL to use for installation, if any. This is necessary to get the right version of torch installed.
 
-1. Make sure that pip is installed in your virtual environment and up to date:
+    === "Invoke v5 or later"
 
-    ```bash
-    python3 -m pip install --upgrade pip
+        - If you are on Windows with an Nvidia GPU, use `https://download.pytorch.org/whl/cu124`.
+        - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
+        - If you are on Linux with an AMD GPU, use `https://download.pytorch.org/whl/rocm62`.
+        - **In all other cases, do not use an index.**
+
+    === "Invoke v4"
+
+        - If you are on Windows with an Nvidia GPU, use `https://download.pytorch.org/whl/cu124`.
+        - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
+        - If you are on Linux with an AMD GPU, use `https://download.pytorch.org/whl/rocm52`.
+        - **In all other cases, do not use an index.**
+
+8. Install the `invokeai` package. Substitute the package specifier and version.
+
+    ```sh
+    uv pip install <PACKAGE_SPECIFIER>=<VERSION> --python 3.11 --python-preference only-managed --force-reinstall
     ```
 
-1. Install the InvokeAI Package. The base command is `pip install InvokeAI --use-pep517`, but you may need to change this depending on your system and the desired features.
+    If you determined you needed to use a `PyPI` index URL in the previous step, you'll need to add `--index=<INDEX_URL>` like this:
 
-    - You may need to provide an [extra index URL](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-extra-index-url). Select your platform configuration using [this tool on the PyTorch website](https://pytorch.org/get-started/locally/). Copy the `--extra-index-url` string from this and append it to your install command.
+    ```sh
+    uv pip install <PACKAGE_SPECIFIER>=<VERSION> --python 3.11 --python-preference only-managed --index=<INDEX_URL> --force-reinstall
+    ```
 
-      ```bash
-      pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
-      ```
-
-    - If you have a CUDA GPU and want to install with `xformers`, you need to add an option to the package name. Note that `xformers` is not strictly necessary. PyTorch includes an implementation of the SDP attention algorithm with similar performance for most GPUs.
-
-      ```bash
-      pip install "InvokeAI[xformers]" --use-pep517
-      ```
-
-1. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:
+9. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:
 
     === "Linux/macOS"
 
@@ -102,17 +105,31 @@ Before you start, go through the [installation requirements](./requirements.md).
         deactivate && source .venv/bin/activate
         ```
 
-    === "Windows"
+    === "Windows (PowerShell)"
 
         ```ps
         deactivate
         .venv\Scripts\activate
         ```
 
-1. Run the application:
+10. Run the application, specifying the directory you created earlier as the root directory:
 
-    Run `invokeai-web` to start the UI. You must activate the virtual environment before running the app.
+    === "Linux/macOS"
 
-    !!! warning
+        ```bash
+        invokeai-web --root ~/invokeai
+        ```
 
-        If the virtual environment is _not_ inside the root directory, then you _must_ specify the path to the root directory with `--root \path\to\invokeai` or the `INVOKEAI_ROOT` environment variable.
+    === "Windows (PowerShell)"
+
+        ```bash
+        invokeai-web --root $Home/invokeai
+        ```
+
+## Headless Install and Launch Scripts
+
+If you run Invoke on a headless server, you might want to install and run Invoke on the command line.
+
+We do not plan to maintain scripts to do this moving forward, instead focusing our dev resources on the GUI [launcher](../installation/quick_start.md).
+
+You can create your own scripts for this by copying the handful of commands in this guide. `uv`'s [`pip` interface docs](https://docs.astral.sh/uv/reference/cli/#uv-pip-install) may be useful.
