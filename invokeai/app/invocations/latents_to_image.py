@@ -69,10 +69,12 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 assert isinstance(tile_size, int)
             out_h = tile_size
             out_w = tile_size
-            # We add 50% to the working memory estimate when tiling is enabled to account for factors like tile overlap
+            working_memory = out_h * out_w * element_size * scaling_constant
+
+            # We add 25% to the working memory estimate when tiling is enabled to account for factors like tile overlap
             # and number of tiles. We could make this more precise in the future, but this should be good enough for
             # most use cases.
-            working_memory = int(out_h * out_w * element_size * scaling_constant * 1.5)
+            working_memory = working_memory * 1.25
         else:
             out_h = LATENT_SCALE_FACTOR * latents.shape[-2]
             out_w = LATENT_SCALE_FACTOR * latents.shape[-1]
@@ -82,6 +84,8 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             # If we are running in FP32, then we should account for the likely increase in model size (~250MB).
             working_memory += 250 * 2**20
 
+        # We add 20% to the working memory estimate to be safe.
+        working_memory = int(working_memory * 1.2)
         return working_memory
 
     @torch.no_grad()

@@ -52,7 +52,9 @@ class SD3LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         scaling_constant = 960  # Determined experimentally.
         working_memory = out_h * out_w * element_size * scaling_constant
 
-        return working_memory
+        # We add a 20% buffer to the working memory estimate to be safe.
+        working_memory = working_memory * 1.2
+        return int(working_memory)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:

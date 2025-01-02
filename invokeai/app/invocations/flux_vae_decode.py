@@ -49,7 +49,9 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         scaling_constant = 1090  # Determined experimentally.
         working_memory = out_h * out_w * element_size * scaling_constant
 
-        return working_memory
+        # We add a 20% buffer to the working memory estimate to be safe.
+        working_memory = working_memory * 1.2
+        return int(working_memory)
 
     def _vae_decode(self, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
         estimated_working_memory = self._estimate_working_memory(latents, vae_info.model)
