@@ -44,12 +44,11 @@ class SD3LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _estimate_working_memory(self, latents: torch.Tensor, vae: AutoencoderKL) -> int:
         """Estimate the working memory required by the invocation in bytes."""
         # It was found experimentally that the peak working memory scales linearly with the number of pixels and the
-        # element size (precision). This estimate is accurate for both SD1 and SDXL.
+        # element size (precision).
         out_h = LATENT_SCALE_FACTOR * latents.shape[-2]
         out_w = LATENT_SCALE_FACTOR * latents.shape[-1]
         element_size = next(vae.parameters()).element_size()
-        # TODO(ryand): Need to tune this value, it was copied from the SD1 implementation.
-        scaling_constant = 960  # Determined experimentally.
+        scaling_constant = 1230  # Determined experimentally.
         working_memory = out_h * out_w * element_size * scaling_constant
 
         # We add a 20% buffer to the working memory estimate to be safe.
