@@ -31,7 +31,7 @@ class DeleteBoardResult(BaseModel):
     response_model=BoardDTO,
 )
 async def create_board(
-    board_name: str = Query(description="The name of the board to create"),
+    board_name: str = Query(description="The name of the board to create", max_length=300),
     is_private: bool = Query(default=False, description="Whether the board is private"),
 ) -> BoardDTO:
     """Creates a board"""

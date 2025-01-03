@@ -57,7 +57,7 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
 
 
 class BoardChanges(BaseModel, extra="forbid"):
-    board_name: Optional[str] = Field(default=None, description="The board's new name.")
+    board_name: Optional[str] = Field(default=None, description="The board's new name.", max_length=300)
     cover_image_name: Optional[str] = Field(default=None, description="The name of the board's new cover image.")
     archived: Optional[bool] = Field(default=None, description="Whether or not the board is archived")
 
