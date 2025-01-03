@@ -3,7 +3,7 @@ import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui-libra
 import { nanoid } from 'features/controlLayers/konva/util';
 import { map } from 'nanostores';
 
-const toastApi = createStandaloneToast({
+export const toastApi = createStandaloneToast({
   theme: theme,
   defaultOptions: TOAST_OPTIONS.defaultOptions,
 }).toast;

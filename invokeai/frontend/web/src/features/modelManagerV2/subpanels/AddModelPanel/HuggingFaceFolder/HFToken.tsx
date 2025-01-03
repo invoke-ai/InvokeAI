@@ -7,10 +7,10 @@ import {
   FormHelperText,
   FormLabel,
   Input,
-  useToast,
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +23,6 @@ export const HFToken = () => {
   const [token, setToken] = useState('');
   const { currentData } = useGetHFTokenStatusQuery(isHFTokenEnabled ? undefined : skipToken);
   const [trigger, { isLoading, isUninitialized }] = useSetHFTokenMutation();
-  const toast = useToast();
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setToken(e.target.value);
   }, []);
@@ -41,7 +40,7 @@ export const HFToken = () => {
           });
         }
       });
-  }, [t, toast, token, trigger]);
+  }, [t, token, trigger]);
 
   const error = useMemo(() => {
     if (!currentData || isUninitialized || isLoading) {

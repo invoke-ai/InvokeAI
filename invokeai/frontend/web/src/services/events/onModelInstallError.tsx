@@ -1,11 +1,11 @@
-import { Button, ExternalLink, Spinner, Text, useToast } from '@invoke-ai/ui-library';
+import { Button, ExternalLink, Spinner, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { toast } from 'features/toast/toast';
+import { toast, toastApi } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { t } from 'i18next';
 import { useCallback } from 'react';
@@ -151,12 +151,11 @@ const HFUnauthorizedToastDescription = () => {
 
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const toast = useToast();
 
   const onClick = useCallback(() => {
     dispatch(setActiveTab('models'));
-    toast.close(UNAUTHORIZED_TOAST_ID);
-  }, [dispatch, toast]);
+    toastApi.close(UNAUTHORIZED_TOAST_ID);
+  }, [dispatch]);
 
   if (!data) {
     return <Spinner />;
