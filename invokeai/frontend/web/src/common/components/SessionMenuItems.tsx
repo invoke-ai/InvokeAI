@@ -4,7 +4,7 @@ import {
   useNewCanvasSession,
   useNewGallerySession,
 } from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
-import { canvasReset } from 'features/controlLayers/store/actions';
+import { allEntitiesDeleted } from 'features/controlLayers/store/canvasSlice';
 import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ export const SessionMenuItems = memo(() => {
   const { newGallerySessionWithDialog } = useNewGallerySession();
   const { newCanvasSessionWithDialog } = useNewCanvasSession();
   const resetCanvasLayers = useCallback(() => {
-    dispatch(canvasReset());
+    dispatch(allEntitiesDeleted());
   }, [dispatch]);
   const resetGenerationSettings = useCallback(() => {
     dispatch(paramsReset());
