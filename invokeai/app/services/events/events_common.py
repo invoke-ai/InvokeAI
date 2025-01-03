@@ -4,6 +4,7 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
 from pydantic import BaseModel, ConfigDict, Field
 
+from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
@@ -18,7 +19,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
-    from invokeai.app.services.model_install.model_install_common import ModelInstallJob
+    from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 
 
 class EventBase(BaseModel):
@@ -422,7 +423,7 @@ class ModelInstallDownloadStartedEvent(ModelEventBase):
     __event_name__ = "model_install_download_started"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     local_path: str = Field(description="Where model is downloading to")
     bytes: int = Field(description="Number of bytes downloaded so far")
     total_bytes: int = Field(description="Total size of download, including all files")
@@ -443,7 +444,7 @@ class ModelInstallDownloadStartedEvent(ModelEventBase):
         ]
         return cls(
             id=job.id,
-            source=str(job.source),
+            source=job.source,
             local_path=job.local_path.as_posix(),
             parts=parts,
             bytes=job.bytes,
@@ -458,7 +459,7 @@ class ModelInstallDownloadProgressEvent(ModelEventBase):
     __event_name__ = "model_install_download_progress"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     local_path: str = Field(description="Where model is downloading to")
     bytes: int = Field(description="Number of bytes downloaded so far")
     total_bytes: int = Field(description="Total size of download, including all files")
@@ -479,7 +480,7 @@ class ModelInstallDownloadProgressEvent(ModelEventBase):
         ]
         return cls(
             id=job.id,
-            source=str(job.source),
+            source=job.source,
             local_path=job.local_path.as_posix(),
             parts=parts,
             bytes=job.bytes,
@@ -494,11 +495,11 @@ class ModelInstallDownloadsCompleteEvent(ModelEventBase):
     __event_name__ = "model_install_downloads_complete"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallDownloadsCompleteEvent":
-        return cls(id=job.id, source=str(job.source))
+        return cls(id=job.id, source=job.source)
 
 
 @payload_schema.register
@@ -508,11 +509,11 @@ class ModelInstallStartedEvent(ModelEventBase):
     __event_name__ = "model_install_started"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallStartedEvent":
-        return cls(id=job.id, source=str(job.source))
+        return cls(id=job.id, source=job.source)
 
 
 @payload_schema.register
@@ -522,14 +523,14 @@ class ModelInstallCompleteEvent(ModelEventBase):
     __event_name__ = "model_install_complete"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     key: str = Field(description="Model config record key")
     total_bytes: Optional[int] = Field(description="Size of the model (may be None for installation of a local path)")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCompleteEvent":
         assert job.config_out is not None
-        return cls(id=job.id, source=str(job.source), key=(job.config_out.key), total_bytes=job.total_bytes)
+        return cls(id=job.id, source=job.source, key=(job.config_out.key), total_bytes=job.total_bytes)
 
 
 @payload_schema.register
@@ -539,11 +540,11 @@ class ModelInstallCancelledEvent(ModelEventBase):
     __event_name__ = "model_install_cancelled"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
 
     @classmethod
     def build(cls, job: "ModelInstallJob") -> "ModelInstallCancelledEvent":
-        return cls(id=job.id, source=str(job.source))
+        return cls(id=job.id, source=job.source)
 
 
 @payload_schema.register
@@ -553,7 +554,7 @@ class ModelInstallErrorEvent(ModelEventBase):
     __event_name__ = "model_install_error"
 
     id: int = Field(description="The ID of the install job")
-    source: str = Field(description="Source of the model; local path, repo_id or url")
+    source: ModelSource = Field(description="Source of the model; local path, repo_id or url")
     error_type: str = Field(description="The name of the exception")
     error: str = Field(description="A text description of the exception")
 
@@ -561,7 +562,7 @@ class ModelInstallErrorEvent(ModelEventBase):
     def build(cls, job: "ModelInstallJob") -> "ModelInstallErrorEvent":
         assert job.error_type is not None
         assert job.error is not None
-        return cls(id=job.id, source=str(job.source), error_type=job.error_type, error=job.error)
+        return cls(id=job.id, source=job.source, error_type=job.error_type, error=job.error)
 
 
 class BulkDownloadEventBase(EventBase):

@@ -9,7 +9,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import yaml
@@ -20,7 +20,6 @@ from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDownloadJob
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_install.model_install_common import (
@@ -56,6 +55,10 @@ from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.util import slugify
+
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
+
 
 TMPDIR_PREFIX = "tmpinstall_"
 

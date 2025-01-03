@@ -3,17 +3,19 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueServiceBase
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig
+
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
 
 
 class ModelInstallServiceBase(ABC):
