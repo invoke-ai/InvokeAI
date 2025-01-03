@@ -6,8 +6,6 @@ import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { $isHFForbiddenToastOpen } from 'features/modelManagerV2/hooks/useHFForbiddenToast';
-import { $isHFLoginToastOpen } from 'features/modelManagerV2/hooks/useHFLoginToast';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
@@ -19,6 +17,7 @@ import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
+import { buildOnModelInstallError } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
@@ -291,36 +290,8 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(api.util.invalidateTags([{ type: 'ModelScanFolderResults', id: LIST_TAG }]));
   });
 
-  socket.on('model_install_error', (data) => {
-    log.error({ data }, 'Model install error');
-
-    const { id, error, error_type } = data;
-    const installs = selectModelInstalls(getState()).data;
-
-    if (error === 'Unauthorized') {
-      $isHFLoginToastOpen.set(true);
-    }
-
-    if (error === 'Forbidden') {
-      $isHFForbiddenToastOpen.set({ isEnabled: true, source: data.source });
-    }
-
-    if (!installs?.find((install) => install.id === id)) {
-      dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
-    } else {
-      dispatch(
-        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
-          const modelImport = draft.find((m) => m.id === id);
-          if (modelImport) {
-            modelImport.status = 'error';
-            modelImport.error_reason = error_type;
-            modelImport.error = error;
-          }
-          return draft;
-        })
-      );
-    }
-  });
+  const onModelInstallError = buildOnModelInstallError(getState, dispatch);
+  socket.on('model_install_error', onModelInstallError);
 
   socket.on('model_install_cancelled', (data) => {
     log.warn({ data }, 'Model install cancelled');
