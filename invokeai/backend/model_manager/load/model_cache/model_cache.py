@@ -341,9 +341,13 @@ class ModelCache:
         working_mem_bytes = max(working_mem_bytes or working_mem_bytes_default, working_mem_bytes_default)
 
         if self._execution_device.type == "cuda":
-            vram_reserved = torch.cuda.memory_reserved(self._execution_device)
+            # TODO(ryand): It is debatable whether we should use memory_reserved() or memory_allocated() here.
+            # memory_reserved() includes memory reserved by the torch CUDA memory allocator that may or may not be
+            # re-used for future allocations. For now, we use memory_allocated() to be conservative.
+            # vram_reserved = torch.cuda.memory_reserved(self._execution_device)
+            vram_allocated = torch.cuda.memory_allocated(self._execution_device)
             vram_free, _vram_total = torch.cuda.mem_get_info(self._execution_device)
-            vram_available_to_process = vram_free + vram_reserved
+            vram_available_to_process = vram_free + vram_allocated
         elif self._execution_device.type == "mps":
             vram_reserved = torch.mps.driver_allocated_memory()
             # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
@@ -369,7 +373,6 @@ class ModelCache:
 
     def _get_ram_available(self) -> int:
         """Get the amount of RAM available for the cache to use, while keeping memory pressure under control."""
-
         # If self._max_ram_cache_size_gb is set, then it overrides the default logic.
         if self._max_ram_cache_size_gb is not None:
             ram_total_available_to_cache = int(self._max_ram_cache_size_gb * GB)
@@ -388,7 +391,16 @@ class ModelCache:
         ram_used = max(cache_ram_used, ram_used)
 
         # Aim to keep 10% of RAM free.
-        return int(ram_total * 0.9) - ram_used
+        ram_available_based_on_memory_usage = int(ram_total * 0.9) - ram_used
+
+        # If we are running out of RAM, then there's an increased likelihood that we will run into this issue:
+        # https://github.com/invoke-ai/InvokeAI/issues/7513
+        # To keep things running smoothly, there's a minimum RAM cache size that we always allow (even if this means
+        # using swap).
+        min_ram_cache_size_bytes = 4 * GB
+        ram_available_based_on_min_cache_size = min_ram_cache_size_bytes - cache_ram_used
+
+        return max(ram_available_based_on_memory_usage, ram_available_based_on_min_cache_size)
 
     def _get_ram_in_use(self) -> int:
         """Get the amount of RAM currently in use."""
