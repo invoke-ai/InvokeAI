@@ -80,6 +80,9 @@ import {
   initialT2IAdapter,
 } from './util';
 
+/**
+ * Gets a fresh canvas initial state with no references in memory to existing objects.
+ */
 const getInitialState = (): CanvasState => {
   const initialInpaintMaskState = getInpaintMaskState(getPrefixedId('inpaint_mask'));
   const initialState: CanvasState = {
@@ -1497,6 +1500,15 @@ export const canvasSlice = createSlice({
           break;
       }
     },
+    allEntitiesDeleted: (state) => {
+      // Deleting all entities is equivalent to resetting the state for each entity type
+      const initialState = getInitialState();
+      state.rasterLayers = initialState.rasterLayers;
+      state.controlLayers = initialState.controlLayers;
+      state.inpaintMasks = initialState.inpaintMasks;
+      state.regionalGuidance = initialState.regionalGuidance;
+      state.referenceImages = initialState.referenceImages;
+    },
     canvasMetadataRecalled: (state, action: PayloadAction<CanvasMetadata>) => {
       const { controlLayers, inpaintMasks, rasterLayers, referenceImages, regionalGuidance } = action.payload;
       state.controlLayers.entities = controlLayers;
@@ -1593,7 +1605,7 @@ export const {
   entityArrangedToBack,
   entityOpacityChanged,
   entitiesReordered,
-  // allEntitiesDeleted, // currently unused
+  allEntitiesDeleted,
   allEntitiesOfTypeIsHiddenToggled,
   // bbox
   bboxChangedFromCanvas,
