@@ -547,7 +547,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         for single_ip_adapter in ip_adapters:
             with context.models.load(single_ip_adapter.ip_adapter_model) as ip_adapter_model:
                 assert isinstance(ip_adapter_model, IPAdapter)
-                image_encoder_model_info = context.models.load(single_ip_adapter.image_encoder_model)
                 # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
                 single_ipa_image_fields = single_ip_adapter.image
                 if not isinstance(single_ipa_image_fields, list):
@@ -556,7 +555,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 single_ipa_images = [
                     context.images.get_pil(image.image_name, mode="RGB") for image in single_ipa_image_fields
                 ]
-                with image_encoder_model_info as image_encoder_model:
+                with context.models.load(single_ip_adapter.image_encoder_model) as image_encoder_model:
                     assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
                     # Get image embeddings from CLIP and ImageProjModel.
                     image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
@@ -621,7 +620,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
         t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
             t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
-            t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model)
             image = context.images.get_pil(t2i_adapter_field.image.image_name, mode="RGB")
 
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
@@ -637,7 +635,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 raise ValueError(f"Unexpected T2I-Adapter base model type: '{t2i_adapter_model_config.base}'.")
 
             t2i_adapter_model: T2IAdapter
-            with t2i_adapter_loaded_model as t2i_adapter_model:
+            with context.models.load(t2i_adapter_field.t2i_adapter_model) as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
 
                 # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
@@ -926,10 +924,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
-            unet_info = context.models.load(self.unet.unet)
-            assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
-                unet_info.model_on_device() as (cached_weights, unet),
+                context.models.load(self.unet.unet).model_on_device() as (cached_weights, unet),
                 ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
                 # ext: controlnet
                 ext_manager.patch_extensions(denoise_ctx),
@@ -995,11 +991,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 del lora_info
             return
 
-        unet_info = context.models.load(self.unet.unet)
-        assert isinstance(unet_info.model, UNet2DConditionModel)
         with (
             ExitStack() as exit_stack,
-            unet_info.model_on_device() as (cached_weights, unet),
+            context.models.load(self.unet.unet).model_on_device() as (cached_weights, unet),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
             SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.

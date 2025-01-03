@@ -63,9 +63,6 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.models.load(self.clip.tokenizer)
-        text_encoder_info = context.models.load(self.clip.text_encoder)
-
         def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in self.clip.loras:
                 lora_info = context.models.load(lora.lora)
@@ -76,12 +73,13 @@ class CompelInvocation(BaseInvocation):
 
         # loras = [(context.models.get(**lora.dict(exclude={"weight"})).context.model, lora.weight) for lora in self.clip.loras]
 
+        text_encoder_info = context.models.load(self.clip.text_encoder)
         ti_list = generate_ti_list(self.prompt, text_encoder_info.config.base, context)
 
         with (
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
-            tokenizer_info as tokenizer,
+            context.models.load(self.clip.tokenizer) as tokenizer,
             LayerPatcher.apply_smart_model_patches(
                 model=text_encoder,
                 patches=_lora_loader(),
@@ -140,9 +138,7 @@ class SDXLPromptInvocationBase:
         lora_prefix: str,
         zero_on_empty: bool,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        tokenizer_info = context.models.load(clip_field.tokenizer)
         text_encoder_info = context.models.load(clip_field.text_encoder)
-
         # return zero on empty
         if prompt == "" and zero_on_empty:
             cpu_text_encoder = text_encoder_info.model
@@ -180,7 +176,7 @@ class SDXLPromptInvocationBase:
         with (
             # apply all patches while the model is on the target device
             text_encoder_info.model_on_device() as (cached_weights, text_encoder),
-            tokenizer_info as tokenizer,
+            context.models.load(clip_field.tokenizer) as tokenizer,
             LayerPatcher.apply_smart_model_patches(
                 model=text_encoder,
                 patches=_lora_loader(),
@@ -226,7 +222,6 @@ class SDXLPromptInvocationBase:
 
         del tokenizer
         del text_encoder
-        del tokenizer_info
         del text_encoder_info
 
         c = c.detach().to("cpu")
