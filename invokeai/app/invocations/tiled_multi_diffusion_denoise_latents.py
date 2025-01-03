@@ -201,12 +201,9 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 yield (lora_info.model, lora.weight)
                 del lora_info
 
-        # Load the UNet model.
-        unet_info = context.models.load(self.unet.unet)
-
         with (
             ExitStack() as exit_stack,
-            unet_info as unet,
+            context.models.load(self.unet.unet) as unet,
             LayerPatcher.apply_smart_model_patches(
                 model=unet, patches=_lora_loader(), prefix="lora_unet_", dtype=unet.dtype
             ),

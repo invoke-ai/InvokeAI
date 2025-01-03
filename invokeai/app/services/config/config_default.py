@@ -13,7 +13,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-import psutil
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -25,8 +24,6 @@ from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
-DEFAULT_RAM_CACHE = 10.0
-DEFAULT_VRAM_CACHE = 0.25
 DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
@@ -34,24 +31,6 @@ ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 CONFIG_SCHEMA_VERSION = "4.0.2"
-
-
-def get_default_ram_cache_size() -> float:
-    """Run a heuristic for the default RAM cache based on installed RAM."""
-
-    # On some machines, psutil.virtual_memory().total gives a value that is slightly less than the actual RAM, so the
-    # limits are set slightly lower than than what we expect the actual RAM to be.
-
-    GB = 1024**3
-    max_ram = psutil.virtual_memory().total / GB
-
-    if max_ram >= 60:
-        return 15.0
-    if max_ram >= 30:
-        return 7.5
-    if max_ram >= 14:
-        return 4.0
-    return 2.1  # 2.1 is just large enough for sd 1.5 ;-)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -103,11 +82,12 @@ class InvokeAIAppConfig(BaseSettings):
         profile_graphs: Enable graph profiling using `cProfile`.
         profile_prefix: An optional prefix for profile output files.
         profiles_dir: Path to profiles output directory.
-        ram: Maximum memory amount used by memory model cache for rapid switching (GB).
-        vram: Amount of VRAM reserved for model storage (GB).
-        lazy_offload: Keep models in VRAM until their space is needed.
+        ram: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+        vram: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
+        lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behaviour is out of beta.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
-        enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. Partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM. If enabling this setting, make sure that your ram and vram cache limits are properly tuned.
+        device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
+        enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
@@ -175,11 +155,12 @@ class InvokeAIAppConfig(BaseSettings):
     profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
-    ram:                           float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
-    vram:                          float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
-    lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
+    ram:                Optional[float] = Field(default=None, gt=0,         description="The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.")
+    vram:               Optional[float] = Field(default=None, ge=0,         description="The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.")
+    lazy_offload:                  bool = Field(default=True,               description="DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behaviour is out of beta.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
-    enable_partial_loading:        bool = Field(default=False,              description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. Partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM. If enabling this setting, make sure that your ram and vram cache limits are properly tuned.")
+    device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
+    enable_partial_loading:        bool = Field(default=False,              description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
 
     # DEVICE
     device:                      DEVICE = Field(default="auto",             description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.")

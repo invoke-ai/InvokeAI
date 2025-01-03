@@ -4,7 +4,6 @@
 import contextlib
 import io
 import pathlib
-import shutil
 import traceback
 from copy import deepcopy
 from enum import Enum
@@ -21,7 +20,6 @@ from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.config import get_config
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
@@ -846,74 +844,6 @@ async def get_starter_models() -> StarterModelResponse:
             model.dependencies = missing_deps
 
     return StarterModelResponse(starter_models=starter_models, starter_bundles=starter_bundles)
-
-
-@model_manager_router.get(
-    "/model_cache",
-    operation_id="get_cache_size",
-    response_model=float,
-    summary="Get maximum size of model manager RAM or VRAM cache.",
-)
-async def get_cache_size(cache_type: CacheType = Query(description="The cache type", default=CacheType.RAM)) -> float:
-    """Return the current RAM or VRAM cache size setting (in GB)."""
-    cache = ApiDependencies.invoker.services.model_manager.load.ram_cache
-    value = 0.0
-    if cache_type == CacheType.RAM:
-        value = cache.max_cache_size
-    elif cache_type == CacheType.VRAM:
-        value = cache.max_vram_cache_size
-    return value
-
-
-@model_manager_router.put(
-    "/model_cache",
-    operation_id="set_cache_size",
-    response_model=float,
-    summary="Set maximum size of model manager RAM or VRAM cache, optionally writing new value out to invokeai.yaml config file.",
-)
-async def set_cache_size(
-    value: float = Query(description="The new value for the maximum cache size"),
-    cache_type: CacheType = Query(description="The cache type", default=CacheType.RAM),
-    persist: bool = Query(description="Write new value out to invokeai.yaml", default=False),
-) -> float:
-    """Set the current RAM or VRAM cache size setting (in GB). ."""
-    cache = ApiDependencies.invoker.services.model_manager.load.ram_cache
-    app_config = get_config()
-    # Record initial state.
-    vram_old = app_config.vram
-    ram_old = app_config.ram
-
-    # Prepare target state.
-    vram_new = vram_old
-    ram_new = ram_old
-    if cache_type == CacheType.RAM:
-        ram_new = value
-    elif cache_type == CacheType.VRAM:
-        vram_new = value
-    else:
-        raise ValueError(f"Unexpected {cache_type=}.")
-
-    config_path = app_config.config_file_path
-    new_config_path = config_path.with_suffix(".yaml.new")
-
-    try:
-        # Try to apply the target state.
-        cache.max_vram_cache_size = vram_new
-        cache.max_cache_size = ram_new
-        app_config.ram = ram_new
-        app_config.vram = vram_new
-        if persist:
-            app_config.write_file(new_config_path)
-            shutil.move(new_config_path, config_path)
-    except Exception as e:
-        # If there was a failure, restore the initial state.
-        cache.max_cache_size = ram_old
-        cache.max_vram_cache_size = vram_old
-        app_config.ram = ram_old
-        app_config.vram = vram_old
-
-        raise RuntimeError("Failed to update cache size") from e
-    return value
 
 
 @model_manager_router.get(
