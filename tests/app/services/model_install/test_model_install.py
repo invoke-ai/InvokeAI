@@ -157,8 +157,8 @@ def test_background_install(
     assert len(bus.events) == 2
     assert isinstance(bus.events[0], ModelInstallStartedEvent)
     assert isinstance(bus.events[1], ModelInstallCompleteEvent)
-    assert Path(bus.events[0].source) == source
-    assert Path(bus.events[1].source) == source
+    assert Path(bus.events[0].source.path) == source
+    assert Path(bus.events[1].source.path) == source
     key = bus.events[1].key
     assert key is not None
 
