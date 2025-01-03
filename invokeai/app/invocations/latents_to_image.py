@@ -62,7 +62,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         with SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes), vae_info as vae:
             context.util.signal_progress("Running VAE decoder")
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
-            latents = latents.to(vae.device)
+            latents = latents.to(TorchDevice.choose_torch_device())
             if self.fp32:
                 vae.to(dtype=torch.float32)
 

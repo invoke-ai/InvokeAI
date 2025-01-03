@@ -2,6 +2,7 @@ from typing import Dict, Optional
 
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
 from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
 
 
@@ -50,7 +51,7 @@ class IA3Layer(LoRALayerBase):
         weight = self.weight
         if not self.on_input:
             weight = weight.reshape(-1, 1)
-        return orig_weight * weight
+        return cast_to_device(orig_weight, weight.device) * weight
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         super().to(device, dtype)

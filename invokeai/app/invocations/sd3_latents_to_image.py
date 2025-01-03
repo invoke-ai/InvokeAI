@@ -49,7 +49,7 @@ class SD3LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         with SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes), vae_info as vae:
             context.util.signal_progress("Running VAE")
             assert isinstance(vae, (AutoencoderKL))
-            latents = latents.to(vae.device)
+            latents = latents.to(TorchDevice.choose_torch_device())
 
             vae.disable_tiling()
 

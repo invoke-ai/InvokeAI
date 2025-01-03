@@ -13,6 +13,7 @@ from PIL import Image
 
 from invokeai.backend.image_util.normal_bae.nets.NNET import NNET
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np, resize_to_multiple
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 
 
 class NormalMapDetector:
@@ -64,7 +65,7 @@ class NormalMapDetector:
     def run(self, image: Image.Image):
         """Processes an image and returns the detected normal map."""
 
-        device = next(iter(self.model.parameters())).device
+        device = get_effective_device(self.model)
         np_image = pil_to_np(image)
 
         height, width, _channels = np_image.shape
