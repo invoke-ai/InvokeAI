@@ -114,6 +114,10 @@ remote_api_tokens:
 
 The provided token will be added as a `Bearer` token to the network requests to download the model files. As far as we know, this works for all model marketplaces that require authorization.
 
+!!! tip "HuggingFace Models"
+
+    If you get an error when installing a HF model using a URL instead of repo id, you may need to [set up a HF API token](https://huggingface.co/settings/tokens) and add an entry for it under `remote_api_tokens`. Use `huggingface.co` for `url_regex`.
+
 #### Model Hashing
 
 Models are hashed during installation, providing a stable identifier for models across all platforms. Hashing is a one-time operation.
