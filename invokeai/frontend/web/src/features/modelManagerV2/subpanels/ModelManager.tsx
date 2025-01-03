@@ -1,7 +1,5 @@
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useHFForbiddenToast } from 'features/modelManagerV2/hooks/useHFForbiddenToast';
-import { useHFLoginToast } from 'features/modelManagerV2/hooks/useHFLoginToast';
 import { selectSelectedModelKey, setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,9 +15,6 @@ export const ModelManager = memo(() => {
     dispatch(setSelectedModelKey(null));
   }, [dispatch]);
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
-
-  useHFLoginToast();
-  useHFForbiddenToast();
 
   return (
     <Flex flexDir="column" layerStyle="first" p={4} gap={4} borderRadius="base" w="50%" h="full">
