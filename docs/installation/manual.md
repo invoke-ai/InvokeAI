@@ -6,7 +6,7 @@
 
     If you want to use Invoke locally, you should probably use the [launcher](./quick_start.md).
 
-    If you want to contribute to Invoke, instead follow the [dev environment](../contributing/dev-environment.md) guide.
+    If you want to contribute to Invoke or run the app on the latest dev branch, instead follow the [dev environment](../contributing/dev-environment.md) guide.
 
 InvokeAI is distributed as a python package on PyPI, installable with `pip`. There are a few things that are handled by the launcher that you'll need to manage manually, described in this guide.
 
