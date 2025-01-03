@@ -25,6 +25,7 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
         result.name.toLowerCase(),
         result.type.toLowerCase().replaceAll('_', ' '),
         result.description.toLowerCase(),
+        result.base.toLowerCase(),
       ];
       if (result.type === 'spandrel_image_to_image') {
         matchStrings.push('upscale');
