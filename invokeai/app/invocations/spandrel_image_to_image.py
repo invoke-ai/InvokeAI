@@ -157,9 +157,6 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         # revisit this.
         image = context.images.get_pil(self.image.image_name, mode="RGB")
 
-        # Load the model.
-        spandrel_model_info = context.models.load(self.image_to_image_model)
-
         def step_callback(step: int, total_steps: int) -> None:
             context.util.signal_progress(
                 message=f"Processing tile {step}/{total_steps}",
@@ -167,7 +164,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             )
 
         # Do the upscaling.
-        with spandrel_model_info as spandrel_model:
+        with context.models.load(self.image_to_image_model) as spandrel_model:
             assert isinstance(spandrel_model, SpandrelImageToImageModel)
 
             # Upscale the image
@@ -206,9 +203,6 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
         # revisit this.
         image = context.images.get_pil(self.image.image_name, mode="RGB")
 
-        # Load the model.
-        spandrel_model_info = context.models.load(self.image_to_image_model)
-
         # The target size of the image, determined by the provided scale. We'll run the upscaler until we hit this size.
         # Later, we may mutate this value if the model doesn't upscale the image or if the user requested a multiple of 8.
         target_width = int(image.width * self.scale)
@@ -221,7 +215,7 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
             )
 
         # Do the upscaling.
-        with spandrel_model_info as spandrel_model:
+        with context.models.load(self.image_to_image_model) as spandrel_model:
             assert isinstance(spandrel_model, SpandrelImageToImageModel)
 
             iteration = 1
