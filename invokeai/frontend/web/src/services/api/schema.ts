@@ -13581,7 +13581,7 @@ export type components = {
              * Source
              * @description Source of the model; local path, repo_id or url
              */
-            source: string;
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
         };
         /**
          * ModelInstallCompleteEvent
@@ -13602,7 +13602,7 @@ export type components = {
              * Source
              * @description Source of the model; local path, repo_id or url
              */
-            source: string;
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
             /**
              * Key
              * @description Model config record key
@@ -13633,7 +13633,7 @@ export type components = {
              * Source
              * @description Source of the model; local path, repo_id or url
              */
-            source: string;
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
             /**
              * Local Path
              * @description Where model is downloading to
@@ -13676,7 +13676,7 @@ export type components = {
              * Source
              * @description Source of the model; local path, repo_id or url
              */
-            source: string;
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
             /**
              * Local Path
              * @description Where model is downloading to
@@ -13719,7 +13719,7 @@ export type components = {
              * Source
              * @description Source of the model; local path, repo_id or url
              */
-            source: string;
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
         };
         /**
          * ModelInstallErrorEvent
@@ -13740,7 +13740,7 @@ export type components = {
              * Source
              * @description Source of the model; local path, repo_id or url
              */
-            source: string;
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
             /**
              * Error Type
              * @description The name of the exception
@@ -13848,7 +13848,7 @@ export type components = {
              * Source
              * @description Source of the model; local path, repo_id or url
              */
-            source: string;
+            source: components["schemas"]["LocalModelSource"] | components["schemas"]["HFModelSource"] | components["schemas"]["URLModelSource"];
         };
         /**
          * ModelLoadCompleteEvent
