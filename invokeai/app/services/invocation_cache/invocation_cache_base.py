@@ -54,7 +54,7 @@ class InvocationCacheBase(ABC):
 
     @abstractmethod
     def enable(self) -> None:
-        """Enables the cache, letting the the max cache size take effect"""
+        """Enables the cache, letting the max cache size take effect"""
         pass
 
     @abstractmethod
