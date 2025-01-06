@@ -57,20 +57,20 @@ class LoadedModelWithoutConfig:
         self._cache = cache
 
     def __enter__(self) -> AnyModel:
-        self._cache.lock(self._cache_record.key)
+        self._cache.lock(self._cache_record)
         return self.model
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
-        self._cache.unlock(self._cache_record.key)
+        self._cache.unlock(self._cache_record)
 
     @contextmanager
     def model_on_device(self) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
         """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
-        self._cache.lock(self._cache_record.key)
+        self._cache.lock(self._cache_record)
         try:
             yield (self._cache_record.state_dict, self._cache_record.model)
         finally:
-            self._cache.unlock(self._cache_record.key)
+            self._cache.unlock(self._cache_record)
 
     @property
     def model(self) -> AnyModel:
