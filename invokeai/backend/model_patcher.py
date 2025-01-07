@@ -14,6 +14,7 @@ from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokeniz
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
+from invokeai.backend.util.devices import TorchDevice
 
 
 class ModelPatcher:
@@ -122,7 +123,7 @@ class ModelPatcher:
                         )
 
                     model_embeddings.weight.data[token_id] = embedding.to(
-                        device=text_encoder.device, dtype=text_encoder.dtype
+                        device=TorchDevice.choose_torch_device(), dtype=text_encoder.dtype
                     )
                     ti_tokens.append(token_id)
 

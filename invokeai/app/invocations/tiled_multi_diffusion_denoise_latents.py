@@ -201,6 +201,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 yield (lora_info.model, lora.weight)
                 del lora_info
 
+        device = TorchDevice.choose_torch_device()
         with (
             ExitStack() as exit_stack,
             context.models.load(self.unet.unet) as unet,
@@ -209,9 +210,9 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=unet.device, dtype=unet.dtype)
+            latents = latents.to(device=device, dtype=unet.dtype)
             if noise is not None:
-                noise = noise.to(device=unet.device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=unet.dtype)
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
@@ -225,7 +226,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 context=context,
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
-                device=unet.device,
+                device=device,
                 dtype=unet.dtype,
                 latent_height=latent_tile_height,
                 latent_width=latent_tile_width,
@@ -238,6 +239,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 context=context,
                 control_input=self.control,
                 latents_shape=list(latents.shape),
+                device=device,
                 # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
                 do_classifier_free_guidance=True,
                 exit_stack=exit_stack,
@@ -263,7 +265,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
 
             timesteps, init_timestep, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
                 scheduler,
-                device=unet.device,
+                device=device,
                 steps=self.steps,
                 denoising_start=self.denoising_start,
                 denoising_end=self.denoising_end,

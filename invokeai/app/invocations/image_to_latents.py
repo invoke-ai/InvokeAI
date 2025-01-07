@@ -26,6 +26,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -98,7 +99,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                 )
 
             # non_noised_latents_from_image
-            image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
+            image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
             with torch.inference_mode(), tiling_context:
                 latents = ImageToLatentsInvocation._encode_to_tensor(vae, image_tensor)
 
