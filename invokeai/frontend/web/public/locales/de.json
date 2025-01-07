@@ -604,7 +604,12 @@
         "hfForbidden": "Sie haben keinen Zugriff auf dieses HF-Modell",
         "hfTokenInvalid": "Ungültiges oder fehlendes HF-Token",
         "restoreDefaultSettings": "Klicken, um die Standardeinstellungen des Modells zu verwenden.",
-        "usingDefaultSettings": "Die Standardeinstellungen des Modells werden verwendet"
+        "usingDefaultSettings": "Die Standardeinstellungen des Modells werden verwendet",
+        "hfTokenInvalidErrorMessage": "Ungültiges oder fehlendes HuggingFace-Token.",
+        "hfTokenUnableToVerify": "HF-Token kann nicht überprüft werden",
+        "hfTokenUnableToVerifyErrorMessage": "HuggingFace-Token kann nicht überprüft werden. Dies ist wahrscheinlich auf einen Netzwerkfehler zurückzuführen. Bitte versuchen Sie es später erneut.",
+        "hfTokenSaved": "HF-Token gespeichert",
+        "hfTokenRequired": "Sie versuchen, ein Modell herunterzuladen, für das ein gültiges HuggingFace-Token erforderlich ist."
     },
     "parameters": {
         "images": "Bilder",
@@ -655,12 +660,23 @@
             "canvasIsCompositing": "Leinwand ist beschäftigt (wird zusammengesetzt)",
             "canvasIsFiltering": "Leinwand ist beschäftigt (wird gefiltert)",
             "canvasIsSelectingObject": "Leinwand ist beschäftigt (wird Objekt ausgewählt)",
-            "noPrompts": "Keine Eingabeaufforderungen generiert"
+            "noPrompts": "Keine Eingabeaufforderungen generiert",
+            "noModelSelected": "Kein Modell ausgewählt"
         },
         "seed": "Seed",
         "patchmatchDownScaleSize": "Herunterskalieren",
         "seamlessXAxis": "Nahtlose X Achse",
-        "seamlessYAxis": "Nahtlose Y Achse"
+        "seamlessYAxis": "Nahtlose Y Achse",
+        "coherenceEdgeSize": "Kantengröße",
+        "infillColorValue": "Füllfarbe",
+        "controlNetControlMode": "Kontrollmodus",
+        "cancel": {
+            "cancel": "Abbrechen"
+        },
+        "iterations": "Iterationen",
+        "guidance": "Führung",
+        "coherenceMode": "Modus",
+        "recallMetadata": "Metadaten abrufen"
     },
     "settings": {
         "displayInProgress": "Zwischenbilder anzeigen",
@@ -1127,6 +1143,12 @@
                 "Nahtloses Kacheln eines Bildes entlang der horizontalen Achse."
             ],
             "heading": "Nahtlose Kachelung X Achse"
+        },
+        "compositingCoherenceEdgeSize": {
+            "paragraphs": [
+                "Die Kantengröße des Kohärenzdurchlaufs."
+            ],
+            "heading": "Kantengröße"
         }
     },
     "invocationCache": {
