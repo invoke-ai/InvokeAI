@@ -610,9 +610,13 @@
         "hfTokenSaved": "Gettone HF salvato",
         "hfForbidden": "Non hai accesso a questo modello HF",
         "hfTokenLabel": "Gettone HuggingFace (richiesto per alcuni modelli)",
-        "hfForbiddenErrorMessage": "Consigliamo di visitare la pagina del repository su HuggingFace.com. Il proprietario potrebbe richiedere l'accettazione dei termini per poter effettuare il download.",
+        "hfForbiddenErrorMessage": "Consigliamo di visitare la pagina del repository. Il proprietario potrebbe richiedere l'accettazione dei termini per poter effettuare il download.",
         "hfTokenInvalidErrorMessage2": "Aggiornalo in ",
-        "controlLora": "Controllo LoRA"
+        "controlLora": "Controllo LoRA",
+        "urlUnauthorizedErrorMessage2": "Scopri come qui.",
+        "urlForbidden": "Non hai accesso a questo modello",
+        "urlForbiddenErrorMessage": "Potrebbe essere necessario richiedere l'autorizzazione al sito che distribuisce il modello.",
+        "urlUnauthorizedErrorMessage": "Potrebbe essere necessario configurare un gettone API per accedere a questo modello."
     },
     "parameters": {
         "images": "Immagini",
