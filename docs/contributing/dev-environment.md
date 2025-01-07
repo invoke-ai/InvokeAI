@@ -22,7 +22,7 @@ If you just want to use Invoke, you should use the [launcher][launcher link].
 
 4. Follow the [manual install][manual install link] guide, with some modifications to the install command:
 
-      - Use `.` instead of `invokeai` to install from the current directory.
+      - Use `.` instead of `invokeai` to install from the current directory. You don't need to specify the version.
 
       - Add `-e` after the `install` operation to make this an [editable install][editable install link]. That means your changes to the python code will be reflected when you restart the Invoke server.
 
