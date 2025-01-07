@@ -151,7 +151,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return pil_image
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Images are converted to RGB, because most models don't support an alpha channel. In the future, we may want to
         # revisit this.
@@ -197,7 +197,7 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
         description="If true, the output image will be resized to the nearest multiple of 8 in both dimensions.",
     )
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Images are converted to RGB, because most models don't support an alpha channel. In the future, we may want to
         # revisit this.
