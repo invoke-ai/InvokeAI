@@ -87,14 +87,11 @@ class Sd3TextEncoderInvocation(BaseInvocation):
 
     def _t5_encode(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:
         assert self.t5_encoder is not None
-        t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer)
-        t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder)
-
         prompt = [self.prompt]
 
         with (
-            t5_text_encoder_info as t5_text_encoder,
-            t5_tokenizer_info as t5_tokenizer,
+            context.models.load(self.t5_encoder.text_encoder) as t5_text_encoder,
+            context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
         ):
             context.util.signal_progress("Running T5 encoder")
             assert isinstance(t5_text_encoder, T5EncoderModel)
@@ -129,14 +126,12 @@ class Sd3TextEncoderInvocation(BaseInvocation):
     def _clip_encode(
         self, context: InvocationContext, clip_model: CLIPField, tokenizer_max_length: int = 77
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        clip_tokenizer_info = context.models.load(clip_model.tokenizer)
-        clip_text_encoder_info = context.models.load(clip_model.text_encoder)
-
         prompt = [self.prompt]
 
+        clip_text_encoder_info = context.models.load(clip_model.text_encoder)
         with (
             clip_text_encoder_info.model_on_device() as (cached_weights, clip_text_encoder),
-            clip_tokenizer_info as clip_tokenizer,
+            context.models.load(clip_model.tokenizer) as clip_tokenizer,
             ExitStack() as exit_stack,
         ):
             context.util.signal_progress("Running CLIP encoder")

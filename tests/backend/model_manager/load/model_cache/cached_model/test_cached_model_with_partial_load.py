@@ -99,6 +99,37 @@ def test_cached_model_partial_unload(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
+def test_cached_model_partial_unload_keep_required_weights_in_vram(device: str, model: DummyModule):
+    # Model starts in CPU memory.
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+    model_total_bytes = cached_model.total_bytes()
+    assert cached_model.cur_vram_bytes() == 0
+
+    # Full load the model into VRAM.
+    cached_model.full_load_to_vram()
+    assert cached_model.cur_vram_bytes() == model_total_bytes
+
+    # Partially unload the model from VRAM, but request the required weights to be kept in VRAM.
+    bytes_to_free = int(model_total_bytes)
+    freed_bytes = cached_model.partial_unload_from_vram(bytes_to_free, keep_required_weights_in_vram=True)
+
+    # Check that the model is partially unloaded from VRAM.
+    assert freed_bytes < model_total_bytes
+    assert freed_bytes == model_total_bytes - cached_model.cur_vram_bytes()
+    assert freed_bytes == sum(
+        calc_tensor_size(p) for p in itertools.chain(model.parameters(), model.buffers()) if p.device.type == "cpu"
+    )
+    # The parameters should be offloaded to the CPU, because they are in Linear layers.
+    assert all(p.device.type == "cpu" for p in model.parameters())
+    # The buffer should still be on the device, because it is in a layer that does not support autocast.
+    assert all(p.device.type == device for p in model.buffers())
+
+    # Check that the model's modules still have device autocasting enabled.
+    assert model.linear1.is_device_autocasting_enabled()
+    assert model.linear2.is_device_autocasting_enabled()
+
+
+@parameterize_mps_and_cuda
 def test_cached_model_full_load_and_unload(device: str, model: DummyModule):
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
 

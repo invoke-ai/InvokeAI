@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.config import (
     VAEDiffusersConfig,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
     HFTestLoraMetadata,
@@ -91,10 +92,12 @@ def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
 @pytest.fixture
 def mm2_loader(mm2_app_config: InvokeAIAppConfig) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
-        logger=InvokeAILogger.get_logger(),
+        execution_device_working_mem_gb=mm2_app_config.device_working_mem_gb,
+        enable_partial_loading=mm2_app_config.enable_partial_loading,
         max_ram_cache_size_gb=mm2_app_config.ram,
         max_vram_cache_size_gb=mm2_app_config.vram,
-        enable_partial_loading=mm2_app_config.enable_partial_loading,
+        execution_device=TorchDevice.choose_torch_device(),
+        logger=InvokeAILogger.get_logger(),
     )
     return ModelLoadService(
         app_config=mm2_app_config,

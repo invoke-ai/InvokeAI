@@ -300,30 +300,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v2/models/model_cache": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get maximum size of model manager RAM or VRAM cache.
-         * @description Return the current RAM or VRAM cache size setting (in GB).
-         */
-        get: operations["get_cache_size"];
-        /**
-         * Set maximum size of model manager RAM or VRAM cache, optionally writing new value out to invokeai.yaml config file.
-         * @description Set the current RAM or VRAM cache size setting (in GB). .
-         */
-        put: operations["set_cache_size"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v2/models/stats": {
         parameters: {
             query?: never;
@@ -3126,12 +3102,6 @@ export type components = {
                 [key: string]: number;
             };
         };
-        /**
-         * CacheType
-         * @description Cache type - one of vram or ram.
-         * @enum {string}
-         */
-        CacheType: "RAM" | "VRAM";
         /**
          * Calculate Image Tiles Even Split
          * @description Calculate the coordinates and overlaps of tiles that cover a target image shape.
@@ -19762,74 +19732,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StarterModelResponse"];
-                };
-            };
-        };
-    };
-    get_cache_size: {
-        parameters: {
-            query?: {
-                /** @description The cache type */
-                cache_type?: components["schemas"]["CacheType"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": number;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_cache_size: {
-        parameters: {
-            query: {
-                /** @description The new value for the maximum cache size */
-                value: number;
-                /** @description The cache type */
-                cache_type?: components["schemas"]["CacheType"];
-                /** @description Write new value out to invokeai.yaml */
-                persist?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": number;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

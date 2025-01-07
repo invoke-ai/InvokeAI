@@ -166,13 +166,17 @@ class CachedModelWithPartialLoad:
         return vram_bytes_loaded
 
     @torch.no_grad()
-    def partial_unload_from_vram(self, vram_bytes_to_free: int) -> int:
+    def partial_unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
         """Unload weights from VRAM until vram_bytes_to_free bytes are freed. Or the entire model is unloaded.
+
+        :param keep_required_weights_in_vram: If True, any weights that must be kept in VRAM to run the model will be
+            kept in VRAM.
 
         Returns:
             The number of bytes unloaded from VRAM.
         """
         vram_bytes_freed = 0
+        required_weights_in_vram = 0
 
         offload_device = "cpu"
         cur_state_dict = self._model.state_dict()
@@ -181,6 +185,10 @@ class CachedModelWithPartialLoad:
                 break
 
             if param.device.type == offload_device:
+                continue
+
+            if keep_required_weights_in_vram and key in self._keys_in_modules_that_do_not_support_autocast:
+                required_weights_in_vram += self._state_dict_bytes[key]
                 continue
 
             cur_state_dict[key] = self._cpu_state_dict[key]

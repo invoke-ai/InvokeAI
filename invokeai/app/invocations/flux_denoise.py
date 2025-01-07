@@ -199,8 +199,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             else None
         )
 
-        transformer_info = context.models.load(self.transformer.transformer)
-        is_schnell = "schnell" in getattr(transformer_info.config, "config_path", "")
+        transformer_config = context.models.get_config(self.transformer.transformer)
+        is_schnell = "schnell" in getattr(transformer_config, "config_path", "")
 
         # Calculate the timestep schedule.
         timesteps = get_schedule(
@@ -299,9 +299,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             )
 
             # Load the transformer model.
-            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            (cached_weights, transformer) = exit_stack.enter_context(
+                context.models.load(self.transformer.transformer).model_on_device()
+            )
             assert isinstance(transformer, Flux)
-            config = transformer_info.config
+            config = transformer_config
             assert config is not None
 
             # Determine if the model is quantized.
@@ -512,15 +514,18 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # before loading the models. Then make sure that all VAE encoding is done before loading the ControlNets to
         # minimize peak memory.
 
-        # First, load the ControlNet models so that we can determine the ControlNet types.
-        controlnet_models = [context.models.load(controlnet.control_model) for controlnet in controlnets]
-
         # Calculate the controlnet conditioning tensors.
         # We do this before loading the ControlNet models because it may require running the VAE, and we are trying to
         # keep peak memory down.
         controlnet_conds: list[torch.Tensor] = []
-        for controlnet, controlnet_model in zip(controlnets, controlnet_models, strict=True):
+        for controlnet in controlnets:
             image = context.images.get_pil(controlnet.image.image_name)
+
+            # HACK(ryand): We have to load the ControlNet model to determine whether the VAE needs to be run. We really
+            # shouldn't have to load the model here. There's a risk that the model will be dropped from the model cache
+            # before we load it into VRAM and thus we'll have to load it again (context:
+            # https://github.com/invoke-ai/InvokeAI/issues/7513).
+            controlnet_model = context.models.load(controlnet.control_model)
             if isinstance(controlnet_model.model, InstantXControlNetFlux):
                 if self.controlnet_vae is None:
                     raise ValueError("A ControlNet VAE is required when using an InstantX FLUX ControlNet.")
@@ -550,10 +555,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Finally, load the ControlNet models and initialize the ControlNet extensions.
         controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension] = []
-        for controlnet, controlnet_cond, controlnet_model in zip(
-            controlnets, controlnet_conds, controlnet_models, strict=True
-        ):
-            model = exit_stack.enter_context(controlnet_model)
+        for controlnet, controlnet_cond in zip(controlnets, controlnet_conds, strict=True):
+            model = exit_stack.enter_context(context.models.load(controlnet.control_model))
 
             if isinstance(model, XLabsControlNetFlux):
                 controlnet_extensions.append(
