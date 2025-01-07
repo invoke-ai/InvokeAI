@@ -22,6 +22,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
 from invokeai.backend.tiles.utils import TBLR, Tile
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation("spandrel_image_to_image", title="Image-to-Image", tags=["upscale"], category="upscale", version="1.3.0")
@@ -102,7 +103,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             (height * scale, width * scale, channels), dtype=torch.uint8, device=torch.device("cpu")
         )
 
-        image_tensor = image_tensor.to(device=spandrel_model.device, dtype=spandrel_model.dtype)
+        image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=spandrel_model.dtype)
 
         # Run the model on each tile.
         pbar = tqdm(list(zip(tiles, scaled_tiles, strict=True)), desc="Upscaling Tiles")
@@ -116,9 +117,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise CanceledException
 
             # Extract the current tile from the input tensor.
-            input_tile = image_tensor[
-                :, :, tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right
-            ].to(device=spandrel_model.device, dtype=spandrel_model.dtype)
+            input_tile = image_tensor[:, :, tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right]
 
             # Run the model on the tile.
             output_tile = spandrel_model.run(input_tile)

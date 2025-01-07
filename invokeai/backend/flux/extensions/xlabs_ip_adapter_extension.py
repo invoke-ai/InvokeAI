@@ -8,6 +8,7 @@ from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterFlux
 from invokeai.backend.flux.modules.layers import DoubleStreamBlock
+from invokeai.backend.util.devices import TorchDevice
 
 
 class XLabsIPAdapterExtension:
@@ -45,7 +46,7 @@ class XLabsIPAdapterExtension:
     ) -> torch.Tensor:
         clip_image_processor = CLIPImageProcessor()
         clip_image: torch.Tensor = clip_image_processor(images=pil_image, return_tensors="pt").pixel_values
-        clip_image = clip_image.to(device=image_encoder.device, dtype=image_encoder.dtype)
+        clip_image = clip_image.to(device=TorchDevice.choose_torch_device(), dtype=image_encoder.dtype)
         clip_image_embeds = image_encoder(clip_image).image_embeds
         return clip_image_embeds
 
