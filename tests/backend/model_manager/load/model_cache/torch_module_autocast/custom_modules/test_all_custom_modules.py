@@ -358,6 +358,8 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
 def test_linear_sidecar_patches(device: str, patch_under_test: PatchUnderTest):
     patches, input = patch_under_test
 
+    torch.manual_seed(0)
+
     # Build the base layer under test.
     layer = torch.nn.Linear(32, 64)
 

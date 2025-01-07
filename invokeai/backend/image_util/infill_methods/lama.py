@@ -7,6 +7,7 @@ from PIL import Image
 
 import invokeai.backend.util.logging as logger
 from invokeai.backend.model_manager.config import AnyModel
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 
 
 def norm_img(np_img):
@@ -31,7 +32,7 @@ class LaMA:
         mask = norm_img(mask)
         mask = (mask > 0) * 1
 
-        device = next(self._model.buffers()).device
+        device = get_effective_device(self._model)
         image = torch.from_numpy(image).unsqueeze(0).to(device)
         mask = torch.from_numpy(mask).unsqueeze(0).to(device)
 

@@ -11,6 +11,7 @@ from PIL import Image
 
 from invokeai.backend.image_util.pidi.model import PiDiNet, pidinet
 from invokeai.backend.image_util.util import nms, normalize_image_channel_count, np_to_pil, pil_to_np, safe_step
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 
 
 class PIDINetDetector:
@@ -45,7 +46,7 @@ class PIDINetDetector:
     ) -> Image.Image:
         """Processes an image and returns the detected edges."""
 
-        device = next(iter(self.model.parameters())).device
+        device = get_effective_device(self.model)
 
         np_img = pil_to_np(image)
         np_img = normalize_image_channel_count(np_img)

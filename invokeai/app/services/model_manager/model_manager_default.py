@@ -82,9 +82,9 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.setLevel(app_config.log_level.upper())
 
         ram_cache = ModelCache(
-            max_cache_size=app_config.ram,
-            max_vram_cache_size=app_config.vram,
-            lazy_offloading=app_config.lazy_offload,
+            max_ram_cache_size_gb=app_config.ram,
+            max_vram_cache_size_gb=app_config.vram,
+            enable_partial_loading=app_config.enable_partial_loading,
             logger=logger,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
         )

@@ -14,6 +14,8 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
+
 
 def deccode_output_score_and_ptss(tpMap, topk_n = 200, ksize = 5):
     '''
@@ -49,7 +51,7 @@ def pred_lines(image, model,
                dist_thr=20.0):
     h, w, _ = image.shape
 
-    device = next(iter(model.parameters())).device
+    device = get_effective_device(model)
     h_ratio, w_ratio = [h / input_shape[0], w / input_shape[1]]
 
     resized_image = np.concatenate([cv2.resize(image, (input_shape[1], input_shape[0]), interpolation=cv2.INTER_AREA),
@@ -108,7 +110,7 @@ def pred_squares(image,
     '''
     h, w, _ = image.shape
     original_shape = [h, w]
-    device = next(iter(model.parameters())).device
+    device = get_effective_device(model)
 
     resized_image = np.concatenate([cv2.resize(image, (input_shape[0], input_shape[1]), interpolation=cv2.INTER_AREA),
                                     np.ones([input_shape[0], input_shape[1], 1])], axis=-1)

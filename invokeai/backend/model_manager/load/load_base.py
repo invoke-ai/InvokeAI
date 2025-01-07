@@ -68,14 +68,14 @@ class LoadedModelWithoutConfig:
         """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device."""
         self._cache.lock(self._cache_record)
         try:
-            yield (self._cache_record.state_dict, self._cache_record.model)
+            yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
         finally:
             self._cache.unlock(self._cache_record)
 
     @property
     def model(self) -> AnyModel:
         """Return the model without locking it."""
-        return self._cache_record.model
+        return self._cache_record.cached_model.model
 
 
 class LoadedModel(LoadedModelWithoutConfig):
