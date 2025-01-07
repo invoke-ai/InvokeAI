@@ -194,9 +194,15 @@ class ModelCache:
 
         return cache_entry
 
-    def lock(self, key: str) -> None:
+    def lock(self, cache_entry: CacheRecord) -> None:
         """Lock a model for use and move it into VRAM."""
-        cache_entry = self._cached_models[key]
+        if cache_entry.key not in self._cached_models:
+            self._logger.info(
+                f"Locking model cache entry {cache_entry.key} ({cache_entry.model.__class__.__name__}), but it has "
+                "already been dropped from the RAM cache. This is a sign that the model loading order is non-optimal "
+                "in the invocation code (See https://github.com/invoke-ai/InvokeAI/issues/7513)."
+            )
+        # cache_entry = self._cached_models[key]
         cache_entry.lock()
 
         try:
@@ -214,9 +220,15 @@ class ModelCache:
             cache_entry.unlock()
             raise
 
-    def unlock(self, key: str) -> None:
+    def unlock(self, cache_entry: CacheRecord) -> None:
         """Unlock a model."""
-        cache_entry = self._cached_models[key]
+        if cache_entry.key not in self._cached_models:
+            self._logger.info(
+                f"Unlocking model cache entry {cache_entry.key} ({cache_entry.model.__class__.__name__}), but it has "
+                "already been dropped from the RAM cache. This is a sign that the model loading order is non-optimal "
+                "in the invocation code (See https://github.com/invoke-ai/InvokeAI/issues/7513)."
+            )
+        # cache_entry = self._cached_models[key]
         cache_entry.unlock()
         if not self._lazy_offloading:
             self._offload_unlocked_models(0)
