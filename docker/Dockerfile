@@ -50,7 +50,10 @@ RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
-        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm6.1"; \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm6.2"; \
+    elif [ "$GPU_DRIVER" = "rocm57" ]; then \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.7 \
+		torch==2.3.1+rocm5.7 torchvision==0.18.1+rocm5.7 torchaudio==2.3.1+rocm5.7"; \
     else \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu124"; \
     fi && \
