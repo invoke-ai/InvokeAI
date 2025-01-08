@@ -117,7 +117,7 @@ export const AppContent = memo(() => {
   });
 
   return (
-    <Flex id="invoke-app-tabs" w="full" h="full" gap={4} p={4}>
+    <Flex id="invoke-app-tabs" w="full" h="full" gap={4} p={4} overflow="hidden">
       <VerticalNavBar />
       <PanelGroup
         ref={imperativePanelGroupRef}

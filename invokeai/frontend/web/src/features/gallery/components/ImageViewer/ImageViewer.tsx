@@ -46,6 +46,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       left={0}
       alignItems="center"
       justifyContent="center"
+      overflow="hidden"
     >
       {hasImageToCompare && <CompareToolbar />}
       {!hasImageToCompare && <ViewerToolbar closeButton={closeButton} />}
