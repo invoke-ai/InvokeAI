@@ -70,7 +70,7 @@ But, if your GPU has enough VRAM to hold models fully, you might get a perf boos
 # Set the RAM cache size to as large as possible, leaving a few GB free for the rest of your system and Invoke.
 # For example, if your system has 32GB RAM, 28GB is a good value.
 max_cache_ram_gb: 28
-# Set the VRAM cache size to be just large enough to hold the models you want to use.
+# Set the VRAM cache size to be as large as possible while leaving enough room for the working memory of the tasks you will be doing.
 # For example, on a 24GB GPU that will be running unquantized FLUX without any auxiliary models,
 # 18GB is a good value.
 max_cache_vram_gb: 18
