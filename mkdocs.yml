@@ -137,6 +137,7 @@ nav:
       - Invocation API: 'nodes/invocation-api.md'
   - Configuration: 'configuration.md'
   - Features:
+      - Low VRAM mode: 'features/low-vram.md'
       - Database: 'features/database.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
   - Contributing:
