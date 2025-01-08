@@ -24,7 +24,7 @@ mkdir -p /home/${USER}
 chown ${USER} /home/${USER}
 
 # Add ${USER} in render group when required
-if [ -f /dev/kfd ]
+if [ -c /dev/kfd ]
 then
 	RENDER_GID=$(stat -c %g /dev/kfd)
 	_=$(getent group ${RENDER_GID} 2>&1) || groupadd -g ${RENDER_GID} render
@@ -32,7 +32,7 @@ then
 fi
 
 # Add ${USER} in video group when required
-if [ -f /dev/dri/card0 ]
+if [ -c /dev/dri/card0 ]
 then
 	VIDEO_GID=$(stat -c %g /dev/dri/card0)
 	_=$(getent group ${VIDEO_GID} 2>&1) || groupadd ${VIDEO_GID} video
