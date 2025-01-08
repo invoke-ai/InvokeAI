@@ -39,7 +39,7 @@ It has two sections - one for internal use and one for user settings:
 
 ```yaml
 # Internal metadata - do not edit:
-schema_version: 4
+schema_version: 4.0.2
 
 # Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:
 host: 0.0.0.0 # serve the app on your local network
