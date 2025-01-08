@@ -13,7 +13,7 @@ run() {
 
   # parse .env file for build args
   build_args=$(awk '$1 ~ /=[^$]/ && $0 !~ /^#/ {print "--build-arg " $0 " "}' .env) &&
-  profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env)"
+  profile="$(awk -F '=' '/GPU_DRIVER/ {print $2}' .env |tr -d '\n')"
 
   # default to 'cuda' profile
   [[ -z "$profile" ]] && profile="cuda"
