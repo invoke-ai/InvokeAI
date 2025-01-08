@@ -14,7 +14,9 @@ To enable Low-VRAM mode, add this line to your `invokeai.yaml` configuration fil
 enable_partial_loading: true
 ```
 
-For most users, this is all that is needed, but it is possible to fine-tune the settings for best performance or if you still get out-of-memory errors (OOMs).
+**Windows users should also [disable the Nvidia sysmem fallback](#disabling-nvidia-sysmem-fallback-windows-only)**.
+
+It is possible to fine-tune the settings for best performance or if you still get out-of-memory errors (OOMs).
 
 !!! tip "How to find `invokeai.yaml`"
 
@@ -106,3 +108,22 @@ device_working_mem_gb: 4
     During this decoding step, Invoke calculates how much VRAM will be required to decode and requests that much VRAM from the model manager. If the amount exceeds the working memory size, the model manager will offload cached model layers from VRAM until there's enough VRAM to decode.
 
     Once decoding completes, the model manager "reclaims" the extra VRAM allocated as working memory for future model loading operations.
+
+### Disabling Nvidia sysmem fallback (Windows only)
+
+On Windows, Nvidia GPUs are able to use system RAM when their VRAM fills up via **sysmem fallback**. While it sounds like a good idea on the surface, in practice it causes massive slowdowns during generation.
+
+It is strongly suggested to disable this feature:
+
+- Open the **NVIDIA Control Panel** app.
+- Expand **3D Settings** on the left panel.
+- Click **Manage 3D Settings** in the left panel.
+- Find **CUDA - Sysmem Fallback Policy** in the right panel and set it to **Prefer No Sysmem Fallback**.
+
+![cuda-sysmem-fallback](./cuda-sysmem-fallback.png)
+
+!!! tip "Invoke does the same thing, but better"
+
+    If the sysmem fallback feature sounds familiar, that's because Invoke's partial model loading strategy is conceptually very similar - use VRAM when there's room, else fall back to RAM.
+
+    Unfortunately, the Nvidia implementation is not optimized for applications like Invoke and does more harm than good.
