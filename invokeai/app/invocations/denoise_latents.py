@@ -10,7 +10,9 @@ import torchvision.transforms as T
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.adapter import T2IAdapter
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
+from diffusers.schedulers.scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
 from diffusers.schedulers.scheduling_dpmsolver_sde import DPMSolverSDEScheduler
+from diffusers.schedulers.scheduling_dpmsolver_singlestep import DPMSolverSinglestepScheduler
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
 from PIL import Image
@@ -89,6 +91,7 @@ def get_scheduler(
     # possible.
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
     orig_scheduler_info = context.models.load(scheduler_info)
+
     with orig_scheduler_info as orig_scheduler:
         scheduler_config = orig_scheduler.config
 
@@ -103,6 +106,10 @@ def get_scheduler(
     # make dpmpp_sde reproducable(seed can be passed only in initializer)
     if scheduler_class is DPMSolverSDEScheduler:
         scheduler_config["noise_sampler_seed"] = seed
+
+    if scheduler_class is DPMSolverMultistepScheduler or scheduler_class is DPMSolverSinglestepScheduler:
+        if scheduler_config["_class_name"] == "DEISMultistepScheduler" and scheduler_config["algorithm_type"] == "deis":
+            scheduler_config["algorithm_type"] = "dpmsolver++"
 
     scheduler = scheduler_class.from_config(scheduler_config)
 
@@ -411,6 +418,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         control_input: ControlField | list[ControlField] | None,
         latents_shape: List[int],
+        device: torch.device,
         exit_stack: ExitStack,
         do_classifier_free_guidance: bool = True,
     ) -> list[ControlNetData] | None:
@@ -452,7 +460,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 height=control_height_resize,
                 # batch_size=batch_size * num_images_per_prompt,
                 # num_images_per_prompt=num_images_per_prompt,
-                device=control_model.device,
+                device=device,
                 dtype=control_model.dtype,
                 control_mode=control_info.control_mode,
                 resize_mode=control_info.resize_mode,
@@ -605,6 +613,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         t2i_adapter: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
         latents_shape: list[int],
+        device: torch.device,
         do_classifier_free_guidance: bool,
     ) -> Optional[list[T2IAdapterData]]:
         if t2i_adapter is None:
@@ -655,7 +664,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     width=control_width_resize,
                     height=control_height_resize,
                     num_channels=t2i_adapter_model.config["in_channels"],  # mypy treats this as a FrozenDict
-                    device=t2i_adapter_model.device,
+                    device=device,
                     dtype=t2i_adapter_model.dtype,
                     resize_mode=t2i_adapter_field.resize_mode,
                 )
@@ -946,6 +955,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def _old_invoke(self, context: InvocationContext) -> LatentsOutput:
+        device = TorchDevice.choose_torch_device()
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
@@ -960,6 +970,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             context,
             self.t2i_adapter,
             latents.shape,
+            device=device,
             do_classifier_free_guidance=True,
         )
 
@@ -1006,13 +1017,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=unet.device, dtype=unet.dtype)
+            latents = latents.to(device=device, dtype=unet.dtype)
             if noise is not None:
-                noise = noise.to(device=unet.device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=unet.dtype)
             if mask is not None:
-                mask = mask.to(device=unet.device, dtype=unet.dtype)
+                mask = mask.to(device=device, dtype=unet.dtype)
             if masked_latents is not None:
-                masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
+                masked_latents = masked_latents.to(device=device, dtype=unet.dtype)
 
             scheduler = get_scheduler(
                 context=context,
@@ -1028,7 +1039,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 context=context,
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
-                device=unet.device,
+                device=device,
                 dtype=unet.dtype,
                 latent_height=latent_height,
                 latent_width=latent_width,
@@ -1041,6 +1052,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 context=context,
                 control_input=self.control,
                 latents_shape=latents.shape,
+                device=device,
                 # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
                 do_classifier_free_guidance=True,
                 exit_stack=exit_stack,
@@ -1058,7 +1070,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                 scheduler,
-                device=unet.device,
+                device=device,
                 steps=self.steps,
                 denoising_start=self.denoising_start,
                 denoising_end=self.denoising_end,

@@ -276,7 +276,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # TODO(ryand): We should really do this in a separate invocation to benefit from caching.
         ip_adapter_fields = self._normalize_ip_adapter_fields()
         pos_image_prompt_clip_embeds, neg_image_prompt_clip_embeds = self._prep_ip_adapter_image_prompt_clip_embeds(
-            ip_adapter_fields, context
+            ip_adapter_fields, context, device=x.device
         )
 
         cfg_scale = self.prep_cfg_scale(
@@ -626,6 +626,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self,
         ip_adapter_fields: list[IPAdapterField],
         context: InvocationContext,
+        device: torch.device,
     ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         """Run the IPAdapter CLIPVisionModel, returning image prompt embeddings."""
         clip_image_processor = CLIPImageProcessor()
@@ -665,11 +666,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
 
                 clip_image: torch.Tensor = clip_image_processor(images=pos_images, return_tensors="pt").pixel_values
-                clip_image = clip_image.to(device=image_encoder_model.device, dtype=image_encoder_model.dtype)
+                clip_image = clip_image.to(device=device, dtype=image_encoder_model.dtype)
                 pos_clip_image_embeds = image_encoder_model(clip_image).image_embeds
 
                 clip_image = clip_image_processor(images=neg_images, return_tensors="pt").pixel_values
-                clip_image = clip_image.to(device=image_encoder_model.device, dtype=image_encoder_model.dtype)
+                clip_image = clip_image.to(device=device, dtype=image_encoder_model.dtype)
                 neg_clip_image_embeds = image_encoder_model(clip_image).image_embeds
 
             pos_image_prompt_clip_embeds.append(pos_clip_image_embeds)
