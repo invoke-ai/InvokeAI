@@ -28,7 +28,7 @@ It is possible to fine-tune the settings for best performance or if you still ge
 
 ## Details and fine-tuning
 
-Low-VRAM mode involves 3 features, each of with can be configured or fine-tuned:
+Low-VRAM mode involves 3 features, each of which can be configured or fine-tuned:
 
 - Partial model loading
 - Dynamic RAM and VRAM cache sizes
