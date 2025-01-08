@@ -1,15 +1,5 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  Button,
-  Divider,
-  Flex,
-  Icon,
-  Link,
-  Spinner,
-  Text,
-} from '@invoke-ai/ui-library';
+import type { ButtonProps } from '@invoke-ai/ui-library';
+import { Alert, AlertDescription, AlertIcon, Button, Divider, Flex, Link, Spinner, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
@@ -71,20 +61,19 @@ const LoadingSpinner = () => {
   );
 };
 
-const ExternalLink = (props: PropsWithChildren<{ href: string }>) => {
+export const ExternalLink = (props: ButtonProps & { href: string }) => {
   return (
     <Button
       as={Link}
-      variant="link"
+      variant="unstyled"
       isExternal
       display="inline-flex"
       alignItems="center"
-      href={props.href}
+      rightIcon={<PiArrowSquareOutBold />}
       color="base.50"
-    >
-      {props.children}
-      <Icon display="inline" verticalAlign="middle" marginInlineStart={2} as={PiArrowSquareOutBold} />
-    </Button>
+      mt={-1}
+      {...props}
+    />
   );
 };
 
