@@ -61,12 +61,12 @@ export const NoContentForViewer = memo(() => {
   }
 
   return (
-    <Flex flexDir="column" gap={4} alignItems="center" textAlign="center" maxW="600px">
-      <InvokeLogoIcon w={40} h={40} />
+    <Flex flexDir="column" gap={8} alignItems="center" textAlign="center" maxW="600px">
+      <InvokeLogoIcon w={32} h={32} />
       <Flex flexDir="column" gap={8} alignItems="center" textAlign="center">
         {isLocal ? (
           <>
-            <Text fontSize="md" color="base.200" pt={16}>
+            <Text fontSize="md" color="base.200">
               <Trans
                 i18nKey="newUserExperience.toGetStartedLocal"
                 components={{
@@ -84,7 +84,7 @@ export const NoContentForViewer = memo(() => {
             </Text>
           </>
         ) : (
-          <Text fontSize="md" color="base.200" pt={16}>
+          <Text fontSize="md" color="base.200">
             <Trans
               i18nKey="newUserExperience.toGetStarted"
               components={{
