@@ -218,6 +218,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 scheduler_info=self.unet.scheduler,
                 scheduler_name=self.scheduler,
                 seed=seed,
+                unet_config=unet_config,
             )
             pipeline = self.create_pipeline(unet=unet, scheduler=scheduler)
 
