@@ -535,7 +535,7 @@ View:
 **Node Link:** https://github.com/simonfuhrmann/invokeai-stereo
 
 **Example Workflow and Output**
-</br><img src="https://github.com/simonfuhrmann/invokeai-stereo/blob/main/docs/example_promo_03.jpg" width="500" />
+</br><img src="https://raw.githubusercontent.com/simonfuhrmann/invokeai-stereo/refs/heads/main/docs/example_promo_03.jpg" width="600" />
 
 --------------------------------
 ### Simple Skin Detection
