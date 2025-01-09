@@ -9,6 +9,7 @@ const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: stri
   return (
     <Tooltip
       closeOnScroll
+      openDelay={0}
       label={
         presetImageUrl && (
           <Image
