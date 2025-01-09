@@ -33,14 +33,18 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
       const data: Batch['data'] = [];
 
-      // Skip edges from batch nodes - these should not be in the graph, they exist only in the UI
+      // Grab image batch nodes for special handling
       const imageBatchNodes = nodes.nodes.filter(isInvocationNode).filter((node) => node.data.type === 'image_batch');
+
       for (const node of imageBatchNodes) {
+        // Satisfy TS
         const images = node.data.inputs['images'];
         if (!isImageFieldCollectionInputInstance(images)) {
           log.warn({ nodeId: node.id }, 'Image batch images field is not an image collection');
           break;
         }
+
+        // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
         const edgesFromImageBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'image');
         const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
         for (const edge of edgesFromImageBatch) {
