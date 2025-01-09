@@ -135,7 +135,7 @@ const ImageGridItemContent = memo(
     }
 
     if (!query.data) {
-      return <IAINoContentFallback icon={<PiExclamationMarkBold />} />;
+      return <IAINoContentFallback icon={PiExclamationMarkBold} />;
     }
 
     return (
