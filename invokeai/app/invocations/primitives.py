@@ -544,7 +544,7 @@ class BoundingBoxInvocation(BaseInvocation):
 @invocation(
     "image_batch",
     title="Image Batch",
-    tags=["primitives", "image", "batch", "internal"],
+    tags=["primitives", "image", "batch", "special"],
     category="primitives",
     version="1.0.0",
     classification=Classification.Special,
@@ -558,4 +558,24 @@ class ImageBatchInvocation(BaseInvocation):
         raise NotImplementedError("This class should never be executed or instantiated directly.")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+
+@invocation(
+    "string_batch",
+    title="String Batch",
+    tags=["primitives", "string", "batch", "special"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class StringBatchInvocation(BaseInvocation):
+    """Create a batched generation, where the workflow is executed once for each string in the batch."""
+
+    strings: list[str] = InputField(min_length=1, description="The strings to batch over", input=Input.Direct)
+
+    def __init__(self):
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
         raise NotImplementedError("This class should never be executed or instantiated directly.")
