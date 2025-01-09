@@ -414,7 +414,7 @@ const zImageFieldCollectionInputTemplate = zFieldInputTemplateBase
       }
       return true;
     },
-    { message: 'maxLength must be greater than or equal to minLength' }
+    { message: 'maxItems must be greater than or equal to minItems' }
   );
 
 const zImageFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
