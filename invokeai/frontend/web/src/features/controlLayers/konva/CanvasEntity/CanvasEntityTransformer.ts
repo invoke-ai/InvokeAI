@@ -10,6 +10,7 @@ import {
   getKonvaNodeDebugAttrs,
   getPrefixedId,
   offsetCoord,
+  roundRect,
 } from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
@@ -773,7 +774,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const rect = this.getRelativeRect();
     const rasterizeResult = await withResultAsync(() =>
       this.parent.renderer.rasterize({
-        rect,
+        rect: roundRect(rect),
         replaceObjects: true,
         ignoreCache: true,
         attrs: { opacity: 1, filters: [] },
