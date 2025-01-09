@@ -131,33 +131,40 @@ export const addOutpaint = async ({
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
 
+    // Resize the output image back to the original size
+    const resizeOutputImageToOriginalSize = g.addNode({
+      id: getPrefixedId('resize_image_to_original_size'),
+      type: 'img_resize',
+      ...originalSize,
+    });
+    const resizeOutputMaskToOriginalSize = g.addNode({
+      id: getPrefixedId('resize_mask_to_original_size'),
+      type: 'img_resize',
+      ...originalSize,
+    });
     const canvasPasteBack = g.addNode({
       id: getPrefixedId('canvas_v2_mask_and_crop'),
       type: 'canvas_v2_mask_and_crop',
       mask_blur: params.maskBlur,
     });
-    const resizeOutput = g.addNode({
-      id: getPrefixedId('resize_output'),
-      type: 'img_resize',
-      ...originalSize,
-    });
 
     // Resize initial image and mask to scaled size, feed into to gradient mask
 
-    // Paste the generated masked image back onto the original image
-    g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
-    g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
+    // After denoising, resize the image and mask back to original size
+    g.addEdge(l2i, 'image', resizeOutputImageToOriginalSize, 'image');
+    g.addEdge(createGradientMask, 'expanded_mask_area', resizeOutputMaskToOriginalSize, 'image');
 
-    // Finally, resize the output back to the original size
-    g.addEdge(canvasPasteBack, 'image', resizeOutput, 'image');
+    // Finally, paste the generated masked image back onto the original image
+    g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
+    g.addEdge(resizeOutputMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
 
     // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
     // to canvas but not outputting only masked regions
     if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
-      g.addEdge(resizeInputImageToScaledSize, 'image', canvasPasteBack, 'source_image');
+      canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 
-    return resizeOutput;
+    return canvasPasteBack;
   } else {
     infill.image = { image_name: initialImage.image_name };
     // No scale before processing, much simpler
