@@ -90,7 +90,7 @@ export const ImageFieldCollectionInputComponent = memo(
             isError={isInvalid}
             onUpload={onUpload}
             fontSize={24}
-            variant="outline"
+            variant="ghost"
           />
         )}
         {field.value && field.value.length > 0 && (
