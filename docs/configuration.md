@@ -39,7 +39,7 @@ It has two sections - one for internal use and one for user settings:
 
 ```yaml
 # Internal metadata - do not edit:
-schema_version: 4
+schema_version: 4.0.2
 
 # Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:
 host: 0.0.0.0 # serve the app on your local network
@@ -82,6 +82,10 @@ A subset of settings may be specified using CLI args:
 
 - `--root`: specify the root directory
 - `--config`: override the default `invokeai.yaml` file location
+
+### Low-VRAM Mode
+
+See the [Low-VRAM mode docs][low-vram] for details on enabling this feature.
 
 ### All Settings
 
@@ -185,3 +189,4 @@ The `log_format` option provides several alternative formats:
 
 [basic guide to yaml files]: https://circleci.com/blog/what-is-yaml-a-beginner-s-guide/
 [Model Marketplace API Keys]: #model-marketplace-api-keys
+[low-vram]: ./features/low-vram.md

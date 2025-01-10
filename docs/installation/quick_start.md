@@ -54,7 +54,7 @@ If you have an existing Invoke installation, you can select it and let the launc
     - Open the **Invoke-Installer-mac-arm64.dmg** file.
     - Drag the launcher to **Applications**.
     - Open a terminal.
-    - Run `xattr -cr /Applications/Invoke-Installer.app`.
+    - Run `xattr -d 'com.apple.quarantine' /Applications/Invoke\ Community\ Edition.app`.
 
     You should now be able to run the launcher.
 

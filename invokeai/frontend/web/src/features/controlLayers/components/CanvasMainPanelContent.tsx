@@ -57,6 +57,7 @@ export const CanvasMainPanelContent = memo(() => {
       gap={2}
       alignItems="center"
       justifyContent="center"
+      overflow="hidden"
     >
       <CanvasManagerProviderGate>
         <CanvasToolbar />
@@ -70,6 +71,7 @@ export const CanvasMainPanelContent = memo(() => {
             h="full"
             bg={dynamicGrid ? 'base.850' : 'base.900'}
             borderRadius="base"
+            overflow="hidden"
           >
             <InvokeCanvasComponent />
             <CanvasManagerProviderGate>

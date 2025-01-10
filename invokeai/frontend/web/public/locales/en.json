@@ -1185,6 +1185,7 @@
         "modelAddedSimple": "Model Added to Queue",
         "modelImportCanceled": "Model Import Canceled",
         "outOfMemoryError": "Out of Memory Error",
+        "outOfMemoryErrorDescLocal": "Follow our <LinkComponent>Low VRAM guide</LinkComponent> to reduce OOMs.",
         "outOfMemoryErrorDesc": "Your current generation settings exceed system capacity. Please adjust your settings and try again.",
         "parameters": "Parameters",
         "parameterSet": "Parameter Recalled",
@@ -2133,9 +2134,8 @@
         "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio.",
-        "downloadStarterModels": "Download Starter Models",
-        "importModels": "Import Models",
-        "noModelsInstalled": "It looks like you don't have any models installed"
+        "lowVRAMMode": "For best performance, follow our <LinkComponent>Low VRAM guide</LinkComponent>.",
+        "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>."
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
