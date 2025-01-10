@@ -16,6 +16,9 @@ const filterNonExecutableNodes = (node: InvocationNode) => {
   if (node.data.type === 'string_batch') {
     return false;
   }
+  if (node.data.type === 'integer_batch') {
+    return false;
+  }
   return true;
 };
 
