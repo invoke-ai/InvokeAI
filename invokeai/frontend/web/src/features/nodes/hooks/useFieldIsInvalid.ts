@@ -11,7 +11,11 @@ import {
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
-import { isNil } from 'lodash-es';
+import {
+  validateImageFieldCollectionValue,
+  validateIntegerFieldCollectionValue,
+  validateStringFieldCollectionValue,
+} from 'features/nodes/types/fieldValidators';
 import { useMemo } from 'react';
 
 export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
@@ -44,62 +48,21 @@ export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
 
       // Else special handling for individual field types
 
-      // Image collections may have min or max item counts
       if (isImageFieldCollectionInputInstance(field) && isImageFieldCollectionInputTemplate(template)) {
-        if (template.minItems !== undefined && field.value.length < template.minItems) {
-          return true;
-        }
-
-        if (template.maxItems !== undefined && field.value.length > template.maxItems) {
+        if (validateImageFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
       }
 
-      // String collections may have min or max item counts
       if (isStringFieldCollectionInputInstance(field) && isStringFieldCollectionInputTemplate(template)) {
-        if (template.minItems !== undefined && field.value.length < template.minItems) {
+        if (validateStringFieldCollectionValue(field.value, template).length > 0) {
           return true;
-        }
-
-        if (template.maxItems !== undefined && field.value.length > template.maxItems) {
-          return true;
-        }
-        if (field.value) {
-          for (const str of field.value) {
-            if (!isNil(template.maxLength) && str.length > template.maxLength) {
-              return true;
-            }
-            if (!isNil(template.minLength) && str.length < template.minLength) {
-              return true;
-            }
-          }
         }
       }
 
-      // Integer collections may have min or max item counts
       if (isIntegerFieldCollectionInputInstance(field) && isIntegerFieldCollectionInputTemplate(template)) {
-        if (template.minItems !== undefined && field.value.length < template.minItems) {
+        if (validateIntegerFieldCollectionValue(field.value, template).length > 0) {
           return true;
-        }
-
-        if (template.maxItems !== undefined && field.value.length > template.maxItems) {
-          return true;
-        }
-        if (field.value) {
-          for (const int of field.value) {
-            if (!isNil(template.maximum) && int > template.maximum) {
-              return true;
-            }
-            if (!isNil(template.exclusiveMaximum) && int >= template.exclusiveMaximum) {
-              return true;
-            }
-            if (!isNil(template.minimum) && int < template.minimum) {
-              return true;
-            }
-            if (!isNil(template.exclusiveMinimum) && int <= template.exclusiveMinimum) {
-              return true;
-            }
-          }
         }
       }
 
