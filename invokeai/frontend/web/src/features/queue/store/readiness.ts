@@ -19,6 +19,8 @@ import type { NodesState, Templates } from 'features/nodes/store/types';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import {
+  isFloatFieldCollectionInputInstance,
+  isFloatFieldCollectionInputTemplate,
   isImageFieldCollectionInputInstance,
   isImageFieldCollectionInputTemplate,
   isIntegerFieldCollectionInputInstance,
@@ -28,7 +30,7 @@ import {
 } from 'features/nodes/types/field';
 import {
   validateImageFieldCollectionValue,
-  validateIntegerFieldCollectionValue,
+  validateNumberFieldCollectionValue,
   validateStringFieldCollectionValue,
 } from 'features/nodes/types/fieldValidators';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -126,7 +128,14 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
           isIntegerFieldCollectionInputInstance(field) &&
           isIntegerFieldCollectionInputTemplate(fieldTemplate)
         ) {
-          const errors = validateIntegerFieldCollectionValue(field.value, fieldTemplate);
+          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
+        } else if (
+          field.value &&
+          isFloatFieldCollectionInputInstance(field) &&
+          isFloatFieldCollectionInputTemplate(fieldTemplate)
+        ) {
+          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
           reasons.push(...errors.map((error) => ({ prefix, content: error })));
         }
       });
