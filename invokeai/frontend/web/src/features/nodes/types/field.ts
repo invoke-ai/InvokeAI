@@ -91,6 +91,15 @@ const zFloatFieldType = zFieldTypeBase.extend({
   name: z.literal('FloatField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zFloatCollectionFieldType = z.object({
+  name: z.literal('FloatField'),
+  cardinality: z.literal(COLLECTION),
+  originalType: zStatelessFieldType.optional(),
+});
+export const isFloatCollectionFieldType = (
+  fieldType: FieldType
+): fieldType is z.infer<typeof zFloatCollectionFieldType> => zFloatCollectionFieldType.safeParse(fieldType).success;
+
 const zStringFieldType = zFieldTypeBase.extend({
   name: z.literal('StringField'),
   originalType: zStatelessFieldType.optional(),
@@ -344,6 +353,46 @@ export const isFloatFieldInputInstance = (val: unknown): val is FloatFieldInputI
   zFloatFieldInputInstance.safeParse(val).success;
 export const isFloatFieldInputTemplate = (val: unknown): val is FloatFieldInputTemplate =>
   zFloatFieldInputTemplate.safeParse(val).success;
+// #endregion
+
+// #region FloatField Collection
+export const zFloatFieldCollectionValue = z.array(zFloatFieldValue).optional();
+const zFloatFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
+  value: zFloatFieldCollectionValue,
+});
+const zFloatFieldCollectionInputTemplate = zFieldInputTemplateBase
+  .extend({
+    type: zFloatCollectionFieldType,
+    originalType: zFieldType.optional(),
+    default: zFloatFieldCollectionValue,
+    maxItems: z.number().int().gte(0).optional(),
+    minItems: z.number().int().gte(0).optional(),
+    multipleOf: z.number().int().optional(),
+    maximum: z.number().optional(),
+    exclusiveMaximum: z.number().optional(),
+    minimum: z.number().optional(),
+    exclusiveMinimum: z.number().optional(),
+  })
+  .refine(
+    (val) => {
+      if (val.maxItems !== undefined && val.minItems !== undefined) {
+        return val.maxItems >= val.minItems;
+      }
+      return true;
+    },
+    { message: 'maxItems must be greater than or equal to minItems' }
+  );
+
+const zFloatFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zFloatCollectionFieldType,
+});
+export type FloatFieldCollectionValue = z.infer<typeof zFloatFieldCollectionValue>;
+export type FloatFieldCollectionInputInstance = z.infer<typeof zFloatFieldCollectionInputInstance>;
+export type FloatFieldCollectionInputTemplate = z.infer<typeof zFloatFieldCollectionInputTemplate>;
+export const isFloatFieldCollectionInputInstance = (val: unknown): val is FloatFieldCollectionInputInstance =>
+  zFloatFieldCollectionInputInstance.safeParse(val).success;
+export const isFloatFieldCollectionInputTemplate = (val: unknown): val is FloatFieldCollectionInputTemplate =>
+  zFloatFieldCollectionInputTemplate.safeParse(val).success;
 // #endregion
 
 // #region StringField
@@ -1069,6 +1118,7 @@ export const zStatefulFieldValue = z.union([
   zIntegerFieldValue,
   zIntegerFieldCollectionValue,
   zFloatFieldValue,
+  zFloatFieldCollectionValue,
   zStringFieldValue,
   zStringFieldCollectionValue,
   zBooleanFieldValue,
@@ -1108,6 +1158,7 @@ const zStatefulFieldInputInstance = z.union([
   zIntegerFieldInputInstance,
   zIntegerFieldCollectionInputInstance,
   zFloatFieldInputInstance,
+  zFloatFieldCollectionInputInstance,
   zStringFieldInputInstance,
   zStringFieldCollectionInputInstance,
   zBooleanFieldInputInstance,
@@ -1145,6 +1196,7 @@ const zStatefulFieldInputTemplate = z.union([
   zIntegerFieldInputTemplate,
   zIntegerFieldCollectionInputTemplate,
   zFloatFieldInputTemplate,
+  zFloatFieldCollectionInputTemplate,
   zStringFieldInputTemplate,
   zStringFieldCollectionInputTemplate,
   zBooleanFieldInputTemplate,
@@ -1186,6 +1238,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zIntegerFieldOutputTemplate,
   zIntegerFieldCollectionOutputTemplate,
   zFloatFieldOutputTemplate,
+  zFloatFieldCollectionOutputTemplate,
   zStringFieldOutputTemplate,
   zStringFieldCollectionOutputTemplate,
   zBooleanFieldOutputTemplate,

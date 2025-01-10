@@ -4,6 +4,8 @@ import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store/selectors';
 import {
+  isFloatFieldCollectionInputInstance,
+  isFloatFieldCollectionInputTemplate,
   isImageFieldCollectionInputInstance,
   isImageFieldCollectionInputTemplate,
   isIntegerFieldCollectionInputInstance,
@@ -13,7 +15,7 @@ import {
 } from 'features/nodes/types/field';
 import {
   validateImageFieldCollectionValue,
-  validateIntegerFieldCollectionValue,
+  validateNumberFieldCollectionValue,
   validateStringFieldCollectionValue,
 } from 'features/nodes/types/fieldValidators';
 import { useMemo } from 'react';
@@ -61,7 +63,13 @@ export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
       }
 
       if (isIntegerFieldCollectionInputInstance(field) && isIntegerFieldCollectionInputTemplate(template)) {
-        if (validateIntegerFieldCollectionValue(field.value, template).length > 0) {
+        if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
+          return true;
+        }
+      }
+
+      if (isFloatFieldCollectionInputInstance(field) && isFloatFieldCollectionInputTemplate(template)) {
+        if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
       }
