@@ -2,11 +2,13 @@ import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
+import type { ImageField } from 'features/nodes/types/common';
 import {
   isImageFieldCollectionInputInstance,
   isIntegerFieldCollectionInputInstance,
   isStringFieldCollectionInputInstance,
 } from 'features/nodes/types/field';
+import type { InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
@@ -37,6 +39,23 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
       const data: Batch['data'] = [];
 
+      const addBatchDataCollectionItem = (edges: InvocationNodeEdge[], items?: ImageField[] | string[] | number[]) => {
+        const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
+        for (const edge of edges) {
+          if (!edge.targetHandle) {
+            break;
+          }
+          batchDataCollectionItem.push({
+            node_path: edge.target,
+            field_name: edge.targetHandle,
+            items,
+          });
+        }
+        if (batchDataCollectionItem.length > 0) {
+          data.push(batchDataCollectionItem);
+        }
+      };
+
       // Grab image batch nodes for special handling
       const imageBatchNodes = nodes.nodes.filter(isInvocationNode).filter((node) => node.data.type === 'image_batch');
 
@@ -50,20 +69,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
         // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
         const edgesFromImageBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'image');
-        const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
-        for (const edge of edgesFromImageBatch) {
-          if (!edge.targetHandle) {
-            break;
-          }
-          batchDataCollectionItem.push({
-            node_path: edge.target,
-            field_name: edge.targetHandle,
-            items: images.value,
-          });
-        }
-        if (batchDataCollectionItem.length > 0) {
-          data.push(batchDataCollectionItem);
-        }
+        addBatchDataCollectionItem(edgesFromImageBatch, images.value);
       }
 
       // Grab string batch nodes for special handling
@@ -78,20 +84,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
         // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
         const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
-        const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
-        for (const edge of edgesFromStringBatch) {
-          if (!edge.targetHandle) {
-            break;
-          }
-          batchDataCollectionItem.push({
-            node_path: edge.target,
-            field_name: edge.targetHandle,
-            items: strings.value,
-          });
-        }
-        if (batchDataCollectionItem.length > 0) {
-          data.push(batchDataCollectionItem);
-        }
+        addBatchDataCollectionItem(edgesFromStringBatch, strings.value);
       }
 
       // Grab integer batch nodes for special handling
@@ -108,20 +101,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
         // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
         const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
-        const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
-        for (const edge of edgesFromStringBatch) {
-          if (!edge.targetHandle) {
-            break;
-          }
-          batchDataCollectionItem.push({
-            node_path: edge.target,
-            field_name: edge.targetHandle,
-            items: integers.value,
-          });
-        }
-        if (batchDataCollectionItem.length > 0) {
-          data.push(batchDataCollectionItem);
-        }
+        addBatchDataCollectionItem(edgesFromStringBatch, integers.value);
       }
 
       const batchConfig: BatchConfig = {
