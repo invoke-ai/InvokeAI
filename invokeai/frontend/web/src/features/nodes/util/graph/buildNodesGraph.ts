@@ -1,11 +1,23 @@
 import { logger } from 'app/logging/logger';
 import type { NodesState } from 'features/nodes/store/types';
+import type { InvocationNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { omit, reduce } from 'lodash-es';
 import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('workflows');
+
+// These nodes are not executable, they exist for the frontend only
+const filterNonExecutableNodes = (node: InvocationNode) => {
+  if (node.data.type === 'image_batch') {
+    return false;
+  }
+  if (node.data.type === 'string_batch') {
+    return false;
+  }
+  return true;
+};
 
 /**
  * Builds a graph from the node editor state.
@@ -14,7 +26,7 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   const { nodes, edges } = nodesState;
 
   // Exclude all batch nodes - we will handle these in the batch setup in a diff function
-  const filteredNodes = nodes.filter(isInvocationNode).filter((node) => node.data.type !== 'image_batch');
+  const filteredNodes = nodes.filter(isInvocationNode).filter(filterNonExecutableNodes);
 
   // Reduce the node editor nodes into invocation graph nodes
   const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>((nodesAccumulator, node) => {
