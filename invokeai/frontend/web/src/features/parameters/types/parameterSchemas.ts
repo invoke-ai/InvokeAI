@@ -20,7 +20,7 @@ import { z } from 'zod';
  * @param schema The zod schema to create a type guard from.
  * @returns A type guard function for the schema.
  */
-const buildTypeGuard = <T extends z.ZodTypeAny>(schema: T) => {
+export const buildTypeGuard = <T extends z.ZodTypeAny>(schema: T) => {
   return (val: unknown): val is z.infer<T> => schema.safeParse(val).success;
 };
 
