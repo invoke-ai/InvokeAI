@@ -72,7 +72,7 @@ export const validateNumberFieldCollectionValue = (
   template: IntegerFieldCollectionInputTemplate | FloatFieldCollectionInputTemplate
 ): string[] => {
   const reasons: string[] = [];
-  const { minItems, maxItems, minimum, maximum, exclusiveMinimum, exclusiveMaximum } = template;
+  const { minItems, maxItems, minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf } = template;
   const count = value.length;
 
   // Image collections may have min or max items to validate
@@ -88,18 +88,21 @@ export const validateNumberFieldCollectionValue = (
     reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
   }
 
-  for (const int of value) {
-    if (maximum !== undefined && int > maximum) {
+  for (const num of value) {
+    if (maximum !== undefined && num > maximum) {
       reasons.push(t('parameters.invoke.collectionNumberGTMax', { value, maximum }));
     }
-    if (minimum !== undefined && int < minimum) {
+    if (minimum !== undefined && num < minimum) {
       reasons.push(t('parameters.invoke.collectionNumberLTMin', { value, minimum }));
     }
-    if (exclusiveMaximum !== undefined && int >= exclusiveMaximum) {
+    if (exclusiveMaximum !== undefined && num >= exclusiveMaximum) {
       reasons.push(t('parameters.invoke.collectionNumberGTExclusiveMax', { value, exclusiveMaximum }));
     }
-    if (exclusiveMinimum !== undefined && int <= exclusiveMinimum) {
+    if (exclusiveMinimum !== undefined && num <= exclusiveMinimum) {
       reasons.push(t('parameters.invoke.collectionNumberLTExclusiveMin', { value, exclusiveMinimum }));
+    }
+    if (multipleOf !== undefined && num % multipleOf !== 0) {
+      reasons.push(t('parameters.invoke.collectionNumberNotMultipleOf', { value, multipleOf }));
     }
   }
 
