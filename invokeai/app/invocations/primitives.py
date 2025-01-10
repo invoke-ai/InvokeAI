@@ -599,3 +599,23 @@ class IntegerBatchInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+
+@invocation(
+    "float_batch",
+    title="Float Batch",
+    tags=["primitives", "float", "number", "batch", "special"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class FloatBatchInvocation(BaseInvocation):
+    """Create a batched generation, where the workflow is executed once for each float in the batch."""
+
+    floats: list[float] = InputField(min_length=1, description="The floats to batch over", input=Input.Direct)
+
+    def __init__(self):
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+    def invoke(self, context: InvocationContext) -> FloatOutput:
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
