@@ -72,7 +72,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         // Satisfy TS
         const strings = node.data.inputs['strings'];
         if (!isStringFieldCollectionInputInstance(strings)) {
-          log.warn({ nodeId: node.id }, 'String batch strings field is not a astring collection');
+          log.warn({ nodeId: node.id }, 'String batch strings field is not a string collection');
           break;
         }
 
@@ -102,7 +102,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         // Satisfy TS
         const integers = node.data.inputs['integers'];
         if (!isIntegerFieldCollectionInputInstance(integers)) {
-          log.warn({ nodeId: node.id }, 'String batch strings field is not a integers collection');
+          log.warn({ nodeId: node.id }, 'Integer batch integers field is not an integer collection');
           break;
         }
 
