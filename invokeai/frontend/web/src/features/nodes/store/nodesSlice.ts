@@ -28,6 +28,7 @@ import type {
   SDXLRefinerModelFieldValue,
   SpandrelImageToImageModelFieldValue,
   StatefulFieldValue,
+  StringFieldCollectionValue,
   StringFieldValue,
   T2IAdapterModelFieldValue,
   T5EncoderModelFieldValue,
@@ -56,6 +57,7 @@ import {
   zSDXLRefinerModelFieldValue,
   zSpandrelImageToImageModelFieldValue,
   zStatefulFieldValue,
+  zStringFieldCollectionValue,
   zStringFieldValue,
   zT2IAdapterModelFieldValue,
   zT5EncoderModelFieldValue,
@@ -311,6 +313,9 @@ export const nodesSlice = createSlice({
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
     },
+    fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zStringFieldCollectionValue);
+    },
     fieldNumberValueChanged: (state, action: FieldValueAction<IntegerFieldValue | FloatFieldValue>) => {
       fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
     },
@@ -438,6 +443,7 @@ export const {
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
+  fieldStringCollectionValueChanged,
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
   fieldCLIPEmbedValueChanged,
@@ -549,6 +555,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
+  fieldStringCollectionValueChanged,
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
   fieldCLIPEmbedValueChanged,
