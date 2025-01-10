@@ -2,7 +2,11 @@ import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
-import { isImageFieldCollectionInputInstance, isStringFieldCollectionInputInstance } from 'features/nodes/types/field';
+import {
+  isImageFieldCollectionInputInstance,
+  isIntegerFieldCollectionInputInstance,
+  isStringFieldCollectionInputInstance,
+} from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
@@ -83,6 +87,36 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
             node_path: edge.target,
             field_name: edge.targetHandle,
             items: strings.value,
+          });
+        }
+        if (batchDataCollectionItem.length > 0) {
+          data.push(batchDataCollectionItem);
+        }
+      }
+
+      // Grab integer batch nodes for special handling
+      const integerBatchNodes = nodes.nodes
+        .filter(isInvocationNode)
+        .filter((node) => node.data.type === 'integer_batch');
+      for (const node of integerBatchNodes) {
+        // Satisfy TS
+        const integers = node.data.inputs['integers'];
+        if (!isIntegerFieldCollectionInputInstance(integers)) {
+          log.warn({ nodeId: node.id }, 'String batch strings field is not a integers collection');
+          break;
+        }
+
+        // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
+        const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
+        const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
+        for (const edge of edgesFromStringBatch) {
+          if (!edge.targetHandle) {
+            break;
+          }
+          batchDataCollectionItem.push({
+            node_path: edge.target,
+            field_name: edge.targetHandle,
+            items: integers.value,
           });
         }
         if (batchDataCollectionItem.length > 0) {

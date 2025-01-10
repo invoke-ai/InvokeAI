@@ -16,6 +16,7 @@ import type {
   FluxVAEModelFieldInputTemplate,
   ImageFieldCollectionInputTemplate,
   ImageFieldInputTemplate,
+  IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
   IPAdapterModelFieldInputTemplate,
   LoRAModelFieldInputTemplate,
@@ -36,6 +37,7 @@ import type {
 } from 'features/nodes/types/field';
 import {
   isImageCollectionFieldType,
+  isIntegerCollectionFieldType,
   isStatefulFieldType,
   isStringCollectionFieldType,
 } from 'features/nodes/types/field';
@@ -58,6 +60,48 @@ const buildIntegerFieldInputTemplate: FieldInputTemplateBuilder<IntegerFieldInpu
     type: fieldType,
     default: schemaObject.default ?? 0,
   };
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
+const buildIntegerFieldCollectionInputTemplate: FieldInputTemplateBuilder<IntegerFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: IntegerFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
 
   if (schemaObject.multipleOf !== undefined) {
     template.multipleOf = schemaObject.multipleOf;
@@ -611,6 +655,12 @@ export const buildFieldInputTemplate = (
       });
     } else if (isStringCollectionFieldType(fieldType)) {
       return buildStringFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isIntegerCollectionFieldType(fieldType)) {
+      return buildIntegerFieldCollectionInputTemplate({
         schemaObject: fieldSchema,
         baseField,
         fieldType,

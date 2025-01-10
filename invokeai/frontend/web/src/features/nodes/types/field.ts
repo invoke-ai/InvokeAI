@@ -78,6 +78,15 @@ const zIntegerFieldType = zFieldTypeBase.extend({
   name: z.literal('IntegerField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zIntegerCollectionFieldType = z.object({
+  name: z.literal('IntegerField'),
+  cardinality: z.literal(COLLECTION),
+  originalType: zStatelessFieldType.optional(),
+});
+export const isIntegerCollectionFieldType = (
+  fieldType: FieldType
+): fieldType is z.infer<typeof zIntegerCollectionFieldType> => zIntegerCollectionFieldType.safeParse(fieldType).success;
+
 const zFloatFieldType = zFieldTypeBase.extend({
   name: z.literal('FloatField'),
   originalType: zStatelessFieldType.optional(),
@@ -267,6 +276,46 @@ export const isIntegerFieldInputInstance = (val: unknown): val is IntegerFieldIn
   zIntegerFieldInputInstance.safeParse(val).success;
 export const isIntegerFieldInputTemplate = (val: unknown): val is IntegerFieldInputTemplate =>
   zIntegerFieldInputTemplate.safeParse(val).success;
+// #endregion
+
+// #region IntegerField Collection
+export const zIntegerFieldCollectionValue = z.array(zIntegerFieldValue).optional();
+const zIntegerFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
+  value: zIntegerFieldCollectionValue,
+});
+const zIntegerFieldCollectionInputTemplate = zFieldInputTemplateBase
+  .extend({
+    type: zIntegerCollectionFieldType,
+    originalType: zFieldType.optional(),
+    default: zIntegerFieldCollectionValue,
+    maxItems: z.number().int().gte(0).optional(),
+    minItems: z.number().int().gte(0).optional(),
+    multipleOf: z.number().int().optional(),
+    maximum: z.number().int().optional(),
+    exclusiveMaximum: z.number().int().optional(),
+    minimum: z.number().int().optional(),
+    exclusiveMinimum: z.number().int().optional(),
+  })
+  .refine(
+    (val) => {
+      if (val.maxItems !== undefined && val.minItems !== undefined) {
+        return val.maxItems >= val.minItems;
+      }
+      return true;
+    },
+    { message: 'maxItems must be greater than or equal to minItems' }
+  );
+
+const zIntegerFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zIntegerCollectionFieldType,
+});
+export type IntegerFieldCollectionValue = z.infer<typeof zIntegerFieldCollectionValue>;
+export type IntegerFieldCollectionInputInstance = z.infer<typeof zIntegerFieldCollectionInputInstance>;
+export type IntegerFieldCollectionInputTemplate = z.infer<typeof zIntegerFieldCollectionInputTemplate>;
+export const isIntegerFieldCollectionInputInstance = (val: unknown): val is IntegerFieldCollectionInputInstance =>
+  zIntegerFieldCollectionInputInstance.safeParse(val).success;
+export const isIntegerFieldCollectionInputTemplate = (val: unknown): val is IntegerFieldCollectionInputTemplate =>
+  zIntegerFieldCollectionInputTemplate.safeParse(val).success;
 // #endregion
 
 // #region FloatField
@@ -1018,6 +1067,7 @@ export type StatelessFieldInputTemplate = z.infer<typeof zStatelessFieldInputTem
 // #region StatefulFieldValue & FieldValue
 export const zStatefulFieldValue = z.union([
   zIntegerFieldValue,
+  zIntegerFieldCollectionValue,
   zFloatFieldValue,
   zStringFieldValue,
   zStringFieldCollectionValue,
@@ -1056,6 +1106,7 @@ export type FieldValue = z.infer<typeof zFieldValue>;
 // #region StatefulFieldInputInstance & FieldInputInstance
 const zStatefulFieldInputInstance = z.union([
   zIntegerFieldInputInstance,
+  zIntegerFieldCollectionInputInstance,
   zFloatFieldInputInstance,
   zStringFieldInputInstance,
   zStringFieldCollectionInputInstance,
@@ -1092,6 +1143,7 @@ export const isFieldInputInstance = (val: unknown): val is FieldInputInstance =>
 // #region StatefulFieldInputTemplate & FieldInputTemplate
 const zStatefulFieldInputTemplate = z.union([
   zIntegerFieldInputTemplate,
+  zIntegerFieldCollectionInputTemplate,
   zFloatFieldInputTemplate,
   zStringFieldInputTemplate,
   zStringFieldCollectionInputTemplate,
@@ -1132,6 +1184,7 @@ export const isFieldInputTemplate = (val: unknown): val is FieldInputTemplate =>
 // #region StatefulFieldOutputTemplate & FieldOutputTemplate
 const zStatefulFieldOutputTemplate = z.union([
   zIntegerFieldOutputTemplate,
+  zIntegerFieldCollectionOutputTemplate,
   zFloatFieldOutputTemplate,
   zStringFieldOutputTemplate,
   zStringFieldCollectionOutputTemplate,
