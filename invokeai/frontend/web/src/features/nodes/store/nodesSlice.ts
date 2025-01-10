@@ -15,6 +15,7 @@ import type {
   ControlNetModelFieldValue,
   EnumFieldValue,
   FieldValue,
+  FloatFieldCollectionValue,
   FloatFieldValue,
   FluxVAEModelFieldValue,
   ImageFieldCollectionValue,
@@ -322,7 +323,10 @@ export const nodesSlice = createSlice({
     fieldNumberValueChanged: (state, action: FieldValueAction<IntegerFieldValue | FloatFieldValue>) => {
       fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
     },
-    fieldNumberCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
+    fieldNumberCollectionValueChanged: (
+      state,
+      action: FieldValueAction<IntegerFieldCollectionValue | FloatFieldCollectionValue>
+    ) => {
       fieldValueReducer(state, action, zIntegerFieldCollectionValue.or(zFloatFieldCollectionValue));
     },
     fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
