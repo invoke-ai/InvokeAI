@@ -8,6 +8,7 @@ import type {
   StringFieldCollectionInputTemplate,
   StringFieldCollectionValue,
 } from 'features/nodes/types/field';
+import { numberStartStepCountGenerator } from 'features/nodes/types/generators';
 import { t } from 'i18next';
 
 export const validateImageFieldCollectionValue = (
@@ -67,12 +68,24 @@ export const validateStringFieldCollectionValue = (
   return reasons;
 };
 
+export const getNumberFieldCollectionValue = (
+  fieldValue: NonNullable<IntegerFieldCollectionValue> | NonNullable<FloatFieldCollectionValue>
+): number[] => {
+  if (Array.isArray(fieldValue)) {
+    return fieldValue;
+  }
+  return numberStartStepCountGenerator(fieldValue);
+};
+
 export const validateNumberFieldCollectionValue = (
-  value: NonNullable<IntegerFieldCollectionValue> | NonNullable<FloatFieldCollectionValue>,
+  fieldValue: NonNullable<IntegerFieldCollectionValue> | NonNullable<FloatFieldCollectionValue>,
   template: IntegerFieldCollectionInputTemplate | FloatFieldCollectionInputTemplate
 ): string[] => {
   const reasons: string[] = [];
   const { minItems, maxItems, minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf } = template;
+
+  const value = getNumberFieldCollectionValue(fieldValue);
+
   const count = value.length;
 
   // Image collections may have min or max items to validate
