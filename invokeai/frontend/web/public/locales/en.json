@@ -1029,6 +1029,8 @@
             "collectionEmpty": "empty collection",
             "collectionTooFewItems": "too few items, minimum {{minItems}}",
             "collectionTooManyItems": "too many items, maximum {{maxItems}}",
+            "collectionStringTooLong": "too long, max {{maxLength}}",
+            "collectionStringTooShort": "too short, min {{minLength}}",
             "collectionNumberGTMax": "{{value}} > {{maximum}} (inc max)",
             "collectionNumberLTMin": "{{value}} < {{minimum}} (inc min)",
             "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (exc max)",
