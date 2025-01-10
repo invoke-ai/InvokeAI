@@ -189,6 +189,26 @@ def test_cannot_create_bad_batch_items_type(batch_graph):
         )
 
 
+def test_number_type_interop(batch_graph):
+    # integers and floats can be mixed, should not throw an error
+    Batch(
+        graph=batch_graph,
+        data=[
+            [
+                BatchDatum(node_path="1", field_name="prompt", items=[1, 1.5]),
+            ]
+        ],
+    )
+    Batch(
+        graph=batch_graph,
+        data=[
+            [
+                BatchDatum(node_path="1", field_name="prompt", items=[1.5, 1]),
+            ]
+        ],
+    )
+
+
 def test_cannot_create_bad_batch_unique_ids(batch_graph):
     with pytest.raises(ValidationError, match="Each batch data must have unique node_id and field_name"):
         Batch(

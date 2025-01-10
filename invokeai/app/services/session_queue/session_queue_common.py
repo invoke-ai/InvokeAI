@@ -108,8 +108,16 @@ class Batch(BaseModel):
             return v
         for batch_data_list in v:
             for datum in batch_data_list:
+                if not datum.items:
+                    continue
+
+                # Special handling for numbers - they can be mixed
+                # TODO(psyche): Update BatchDatum to have a `type` field to specify the type of the items, then we can have strict float and int fields
+                if all(isinstance(item, (int, float)) for item in datum.items):
+                    continue
+
                 # Get the type of the first item in the list
-                first_item_type = type(datum.items[0]) if datum.items else None
+                first_item_type = type(datum.items[0])
                 for item in datum.items:
                     if type(item) is not first_item_type:
                         raise BatchItemsTypeError("All items in a batch must have the same type")
