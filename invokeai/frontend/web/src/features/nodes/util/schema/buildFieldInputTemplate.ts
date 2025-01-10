@@ -11,6 +11,7 @@ import type {
   EnumFieldInputTemplate,
   FieldInputTemplate,
   FieldType,
+  FloatFieldCollectionInputTemplate,
   FloatFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
   FluxVAEModelFieldInputTemplate,
@@ -36,6 +37,7 @@ import type {
   VAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import {
+  isFloatCollectionFieldType,
   isImageCollectionFieldType,
   isIntegerCollectionFieldType,
   isStatefulFieldType,
@@ -136,6 +138,48 @@ const buildFloatFieldInputTemplate: FieldInputTemplateBuilder<FloatFieldInputTem
     type: fieldType,
     default: schemaObject.default ?? 0,
   };
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
+const buildFloatFieldCollectionInputTemplate: FieldInputTemplateBuilder<FloatFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FloatFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
 
   if (schemaObject.multipleOf !== undefined) {
     template.multipleOf = schemaObject.multipleOf;
@@ -661,6 +705,12 @@ export const buildFieldInputTemplate = (
       });
     } else if (isIntegerCollectionFieldType(fieldType)) {
       return buildIntegerFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isFloatCollectionFieldType(fieldType)) {
+      return buildFloatFieldCollectionInputTemplate({
         schemaObject: fieldSchema,
         baseField,
         fieldType,

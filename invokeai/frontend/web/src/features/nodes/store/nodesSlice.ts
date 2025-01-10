@@ -45,6 +45,7 @@ import {
   zControlLoRAModelFieldValue,
   zControlNetModelFieldValue,
   zEnumFieldValue,
+  zFloatFieldCollectionValue,
   zFloatFieldValue,
   zFluxVAEModelFieldValue,
   zImageFieldCollectionValue,
@@ -322,7 +323,7 @@ export const nodesSlice = createSlice({
       fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
     },
     fieldNumberCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
-      fieldValueReducer(state, action, zIntegerFieldCollectionValue);
+      fieldValueReducer(state, action, zIntegerFieldCollectionValue.or(zFloatFieldCollectionValue));
     },
     fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
       fieldValueReducer(state, action, zBooleanFieldValue);

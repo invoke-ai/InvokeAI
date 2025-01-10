@@ -6,6 +6,8 @@ import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/comp
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { fieldNumberCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
+  FloatFieldCollectionInputInstance,
+  FloatFieldCollectionInputTemplate,
   IntegerFieldCollectionInputInstance,
   IntegerFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
@@ -28,7 +30,11 @@ const sx = {
 } satisfies SystemStyleObject;
 
 export const NumberFieldCollectionInputComponent = memo(
-  (props: FieldComponentProps<IntegerFieldCollectionInputInstance, IntegerFieldCollectionInputTemplate>) => {
+  (
+    props:
+      | FieldComponentProps<IntegerFieldCollectionInputInstance, IntegerFieldCollectionInputTemplate>
+      | FieldComponentProps<FloatFieldCollectionInputInstance, FloatFieldCollectionInputTemplate>
+  ) => {
     const { nodeId, field, fieldTemplate } = props;
     const store = useAppStore();
 

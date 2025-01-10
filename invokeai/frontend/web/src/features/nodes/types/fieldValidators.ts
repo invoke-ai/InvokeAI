@@ -1,4 +1,6 @@
 import type {
+  FloatFieldCollectionInputTemplate,
+  FloatFieldCollectionValue,
   ImageFieldCollectionInputTemplate,
   ImageFieldCollectionValue,
   IntegerFieldCollectionInputTemplate,
@@ -56,9 +58,9 @@ export const validateStringFieldCollectionValue = (
   return reasons;
 };
 
-export const validateIntegerFieldCollectionValue = (
-  value: NonNullable<IntegerFieldCollectionValue>,
-  template: IntegerFieldCollectionInputTemplate
+export const validateNumberFieldCollectionValue = (
+  value: NonNullable<IntegerFieldCollectionValue> | NonNullable<FloatFieldCollectionValue>,
+  template: IntegerFieldCollectionInputTemplate | FloatFieldCollectionInputTemplate
 ): string[] => {
   const reasons: string[] = [];
   const { minItems, maxItems, minimum, maximum, exclusiveMinimum, exclusiveMaximum } = template;

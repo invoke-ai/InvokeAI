@@ -104,6 +104,21 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         addBatchDataCollectionItem(edgesFromStringBatch, integers.value);
       }
 
+      // Grab float batch nodes for special handling
+      const floatBatchNodes = nodes.nodes.filter(isInvocationNode).filter((node) => node.data.type === 'float_batch');
+      for (const node of floatBatchNodes) {
+        // Satisfy TS
+        const floats = node.data.inputs['floats'];
+        if (!isIntegerFieldCollectionInputInstance(floats)) {
+          log.warn({ nodeId: node.id }, 'Integer batch floats field is not a float collection');
+          break;
+        }
+
+        // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
+        const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
+        addBatchDataCollectionItem(edgesFromStringBatch, floats.value);
+      }
+
       const batchConfig: BatchConfig = {
         batch: {
           graph,
