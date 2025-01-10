@@ -1,5 +1,6 @@
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
+import { NumberFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/NumberFieldCollectionInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
@@ -32,6 +33,8 @@ import {
   isImageFieldCollectionInputTemplate,
   isImageFieldInputInstance,
   isImageFieldInputTemplate,
+  isIntegerFieldCollectionInputInstance,
+  isIntegerFieldCollectionInputTemplate,
   isIntegerFieldInputInstance,
   isIntegerFieldInputTemplate,
   isIPAdapterModelFieldInputInstance,
@@ -117,6 +120,9 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     (isFloatFieldInputInstance(fieldInstance) && isFloatFieldInputTemplate(fieldTemplate))
   ) {
     return <NumberFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+  if (isIntegerFieldCollectionInputInstance(fieldInstance) && isIntegerFieldCollectionInputTemplate(fieldTemplate)) {
+    return <NumberFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isEnumFieldInputInstance(fieldInstance) && isEnumFieldInputTemplate(fieldTemplate)) {

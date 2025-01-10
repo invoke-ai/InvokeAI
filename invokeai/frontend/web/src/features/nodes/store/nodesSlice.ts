@@ -19,6 +19,7 @@ import type {
   FluxVAEModelFieldValue,
   ImageFieldCollectionValue,
   ImageFieldValue,
+  IntegerFieldCollectionValue,
   IntegerFieldValue,
   IPAdapterModelFieldValue,
   LoRAModelFieldValue,
@@ -48,6 +49,7 @@ import {
   zFluxVAEModelFieldValue,
   zImageFieldCollectionValue,
   zImageFieldValue,
+  zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIPAdapterModelFieldValue,
   zLoRAModelFieldValue,
@@ -319,6 +321,9 @@ export const nodesSlice = createSlice({
     fieldNumberValueChanged: (state, action: FieldValueAction<IntegerFieldValue | FloatFieldValue>) => {
       fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
     },
+    fieldNumberCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zIntegerFieldCollectionValue);
+    },
     fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
       fieldValueReducer(state, action, zBooleanFieldValue);
     },
@@ -440,6 +445,7 @@ export const {
   fieldModelIdentifierValueChanged,
   fieldMainModelValueChanged,
   fieldNumberValueChanged,
+  fieldNumberCollectionValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
@@ -552,6 +558,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldLoRAModelValueChanged,
   fieldMainModelValueChanged,
   fieldNumberValueChanged,
+  fieldNumberCollectionValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,

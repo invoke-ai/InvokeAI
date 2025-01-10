@@ -6,6 +6,8 @@ import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store
 import {
   isImageFieldCollectionInputInstance,
   isImageFieldCollectionInputTemplate,
+  isIntegerFieldCollectionInputInstance,
+  isIntegerFieldCollectionInputTemplate,
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
@@ -54,6 +56,17 @@ export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
 
       // String collections may have min or max item counts
       if (isStringFieldCollectionInputInstance(field) && isStringFieldCollectionInputTemplate(template)) {
+        if (template.minItems !== undefined && field.value.length < template.minItems) {
+          return true;
+        }
+
+        if (template.maxItems !== undefined && field.value.length > template.maxItems) {
+          return true;
+        }
+      }
+
+      // Integer collections may have min or max item counts
+      if (isIntegerFieldCollectionInputInstance(field) && isIntegerFieldCollectionInputTemplate(template)) {
         if (template.minItems !== undefined && field.value.length < template.minItems) {
           return true;
         }
