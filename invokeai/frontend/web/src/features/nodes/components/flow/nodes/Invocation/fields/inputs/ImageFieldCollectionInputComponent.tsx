@@ -10,9 +10,9 @@ import { addImagesToNodeImageFieldCollectionDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { removeImageFromNodeImageFieldCollectionAction } from 'features/imageActions/actions';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
+import type { ImageField } from 'features/nodes/types/common';
 import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
@@ -61,15 +61,12 @@ export const ImageFieldCollectionInputComponent = memo(
     );
 
     const onRemoveImage = useCallback(
-      (imageName: string) => {
-        removeImageFromNodeImageFieldCollectionAction({
-          imageName,
-          fieldIdentifier: { nodeId, fieldName: field.name },
-          dispatch: store.dispatch,
-          getState: store.getState,
-        });
+      (index: number) => {
+        const newValue = field.value ? [...field.value] : [];
+        newValue.splice(index, 1);
+        store.dispatch(fieldImageCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
       },
-      [field.name, nodeId, store.dispatch, store.getState]
+      [field.name, field.value, nodeId, store]
     );
 
     return (
@@ -102,9 +99,9 @@ export const ImageFieldCollectionInputComponent = memo(
               options={overlayscrollbarsOptions}
             >
               <Grid w="full" h="full" templateColumns="repeat(4, 1fr)" gap={1}>
-                {field.value.map(({ image_name }) => (
-                  <GridItem key={image_name} position="relative" className="nodrag">
-                    <ImageGridItemContent imageName={image_name} onRemoveImage={onRemoveImage} />
+                {field.value.map((value, index) => (
+                  <GridItem key={index} position="relative" className="nodrag">
+                    <ImageGridItemContent value={value} index={index} onRemoveImage={onRemoveImage} />
                   </GridItem>
                 ))}
               </Grid>
@@ -124,11 +121,11 @@ export const ImageFieldCollectionInputComponent = memo(
 ImageFieldCollectionInputComponent.displayName = 'ImageFieldCollectionInputComponent';
 
 const ImageGridItemContent = memo(
-  ({ imageName, onRemoveImage }: { imageName: string; onRemoveImage: (imageName: string) => void }) => {
-    const query = useGetImageDTOQuery(imageName);
+  ({ value, index, onRemoveImage }: { value: ImageField; index: number; onRemoveImage: (index: number) => void }) => {
+    const query = useGetImageDTOQuery(value.image_name);
     const onClickRemove = useCallback(() => {
-      onRemoveImage(imageName);
-    }, [imageName, onRemoveImage]);
+      onRemoveImage(index);
+    }, [index, onRemoveImage]);
 
     if (query.isLoading) {
       return <IAINoContentFallbackWithSpinner />;
