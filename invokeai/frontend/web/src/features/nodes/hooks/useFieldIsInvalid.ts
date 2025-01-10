@@ -85,6 +85,22 @@ export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
         if (template.maxItems !== undefined && field.value.length > template.maxItems) {
           return true;
         }
+        if (field.value) {
+          for (const int of field.value) {
+            if (!isNil(template.maximum) && int > template.maximum) {
+              return true;
+            }
+            if (!isNil(template.exclusiveMaximum) && int >= template.exclusiveMaximum) {
+              return true;
+            }
+            if (!isNil(template.minimum) && int < template.minimum) {
+              return true;
+            }
+            if (!isNil(template.exclusiveMinimum) && int <= template.exclusiveMinimum) {
+              return true;
+            }
+          }
+        }
       }
 
       // Field looks OK
