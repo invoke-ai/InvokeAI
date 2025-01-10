@@ -4,6 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { ImageField } from 'features/nodes/types/common';
 import {
+  isFloatFieldCollectionInputInstance,
   isImageFieldCollectionInputInstance,
   isIntegerFieldCollectionInputInstance,
   isStringFieldCollectionInputInstance,
@@ -98,6 +99,10 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           log.warn({ nodeId: node.id }, 'Integer batch integers field is not an integer collection');
           break;
         }
+        if (!integers.value) {
+          log.warn({ nodeId: node.id }, 'Integer batch integers field is empty');
+          break;
+        }
 
         // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
         const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
@@ -109,8 +114,12 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
       for (const node of floatBatchNodes) {
         // Satisfy TS
         const floats = node.data.inputs['floats'];
-        if (!isIntegerFieldCollectionInputInstance(floats)) {
-          log.warn({ nodeId: node.id }, 'Integer batch floats field is not a float collection');
+        if (!isFloatFieldCollectionInputInstance(floats)) {
+          log.warn({ nodeId: node.id }, 'Float batch floats field is not a float collection');
+          break;
+        }
+        if (!floats.value) {
+          log.warn({ nodeId: node.id }, 'Float batch floats field is empty');
           break;
         }
 
