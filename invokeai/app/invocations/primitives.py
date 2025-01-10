@@ -579,3 +579,23 @@ class StringBatchInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> StringOutput:
         raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+
+@invocation(
+    "integer_batch",
+    title="Integer Batch",
+    tags=["primitives", "integer", "number", "batch", "special"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class IntegerBatchInvocation(BaseInvocation):
+    """Create a batched generation, where the workflow is executed once for each integer in the batch."""
+
+    integers: list[int] = InputField(min_length=1, description="The integers to batch over", input=Input.Direct)
+
+    def __init__(self):
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
