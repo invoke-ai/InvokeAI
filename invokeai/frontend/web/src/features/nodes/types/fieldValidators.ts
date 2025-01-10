@@ -39,7 +39,7 @@ export const validateStringFieldCollectionValue = (
   template: StringFieldCollectionInputTemplate
 ): string[] => {
   const reasons: string[] = [];
-  const { minItems, maxItems } = template;
+  const { minItems, maxItems, minLength, maxLength } = template;
   const count = value.length;
 
   // Image collections may have min or max items to validate
@@ -53,6 +53,15 @@ export const validateStringFieldCollectionValue = (
 
   if (maxItems !== undefined && count > maxItems) {
     reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
+  }
+
+  for (const str of value) {
+    if (maxLength !== undefined && str.length > maxLength) {
+      reasons.push(t('parameters.invoke.collectionStringTooLong', { value, maxLength }));
+    }
+    if (minLength !== undefined && str.length < minLength) {
+      reasons.push(t('parameters.invoke.collectionStringTooShort', { value, minLength }));
+    }
   }
 
   return reasons;
