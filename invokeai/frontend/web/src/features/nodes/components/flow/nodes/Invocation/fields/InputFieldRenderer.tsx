@@ -1,5 +1,6 @@
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
+import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import {
@@ -51,6 +52,8 @@ import {
   isSDXLRefinerModelFieldInputTemplate,
   isSpandrelImageToImageModelFieldInputInstance,
   isSpandrelImageToImageModelFieldInputTemplate,
+  isStringFieldCollectionInputInstance,
+  isStringFieldCollectionInputTemplate,
   isStringFieldInputInstance,
   isStringFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
@@ -96,6 +99,10 @@ type InputFieldProps = {
 const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   const fieldInstance = useFieldInputInstance(nodeId, fieldName);
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
+
+  if (isStringFieldCollectionInputInstance(fieldInstance) && isStringFieldCollectionInputTemplate(fieldTemplate)) {
+    return <StringFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
 
   if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
     return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;

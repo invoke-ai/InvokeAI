@@ -18,7 +18,12 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
-import { isImageFieldCollectionInputInstance, isImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
+import {
+  isImageFieldCollectionInputInstance,
+  isImageFieldCollectionInputTemplate,
+  isStringFieldCollectionInputInstance,
+  isStringFieldCollectionInputTemplate,
+} from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
@@ -105,6 +110,37 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
           isImageFieldCollectionInputTemplate(fieldTemplate)
         ) {
           // Image collections may have min or max items to validate
+          // TODO(psyche): generalize this to other collection types
+          if (fieldTemplate.minItems !== undefined && fieldTemplate.minItems > 0 && field.value.length === 0) {
+            reasons.push({ content: i18n.t('parameters.invoke.collectionEmpty', baseTKeyOptions) });
+            return;
+          }
+          if (fieldTemplate.minItems !== undefined && field.value.length < fieldTemplate.minItems) {
+            reasons.push({
+              content: i18n.t('parameters.invoke.collectionTooFewItems', {
+                ...baseTKeyOptions,
+                size: field.value.length,
+                minItems: fieldTemplate.minItems,
+              }),
+            });
+            return;
+          }
+          if (fieldTemplate.maxItems !== undefined && field.value.length > fieldTemplate.maxItems) {
+            reasons.push({
+              content: i18n.t('parameters.invoke.collectionTooManyItems', {
+                ...baseTKeyOptions,
+                size: field.value.length,
+                maxItems: fieldTemplate.maxItems,
+              }),
+            });
+            return;
+          }
+        } else if (
+          field.value &&
+          isStringFieldCollectionInputInstance(field) &&
+          isStringFieldCollectionInputTemplate(fieldTemplate)
+        ) {
+          // String collections may have min or max items to validate
           // TODO(psyche): generalize this to other collection types
           if (fieldTemplate.minItems !== undefined && fieldTemplate.minItems > 0 && field.value.length === 0) {
             reasons.push({ content: i18n.t('parameters.invoke.collectionEmpty', baseTKeyOptions) });
