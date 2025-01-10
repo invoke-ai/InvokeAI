@@ -26,6 +26,11 @@ import {
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
+import {
+  validateImageFieldCollectionValue,
+  validateIntegerFieldCollectionValue,
+  validateStringFieldCollectionValue,
+} from 'features/nodes/types/fieldValidators';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
@@ -98,107 +103,31 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
           return;
         }
 
-        const baseTKeyOptions = {
-          nodeLabel: node.data.label || nodeTemplate.title,
-          fieldLabel: field.label || fieldTemplate.title,
-        };
+        const prefix = `${node.data.label || nodeTemplate.title} -> ${field.label || fieldTemplate.title}`;
 
         if (fieldTemplate.required && field.value === undefined && !hasConnection) {
-          reasons.push({ content: i18n.t('parameters.invoke.missingInputForField', baseTKeyOptions) });
-          return;
+          reasons.push({ prefix, content: i18n.t('parameters.invoke.missingInputForField') });
         } else if (
           field.value &&
           isImageFieldCollectionInputInstance(field) &&
           isImageFieldCollectionInputTemplate(fieldTemplate)
         ) {
-          // Image collections may have min or max items to validate
-          // TODO(psyche): generalize this to other collection types
-          if (fieldTemplate.minItems !== undefined && fieldTemplate.minItems > 0 && field.value.length === 0) {
-            reasons.push({ content: i18n.t('parameters.invoke.collectionEmpty', baseTKeyOptions) });
-            return;
-          }
-          if (fieldTemplate.minItems !== undefined && field.value.length < fieldTemplate.minItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooFewItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                minItems: fieldTemplate.minItems,
-              }),
-            });
-            return;
-          }
-          if (fieldTemplate.maxItems !== undefined && field.value.length > fieldTemplate.maxItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooManyItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                maxItems: fieldTemplate.maxItems,
-              }),
-            });
-            return;
-          }
+          const errors = validateImageFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
         } else if (
           field.value &&
           isStringFieldCollectionInputInstance(field) &&
           isStringFieldCollectionInputTemplate(fieldTemplate)
         ) {
-          // String collections may have min or max items to validate
-          // TODO(psyche): generalize this to other collection types
-          if (fieldTemplate.minItems !== undefined && fieldTemplate.minItems > 0 && field.value.length === 0) {
-            reasons.push({ content: i18n.t('parameters.invoke.collectionEmpty', baseTKeyOptions) });
-            return;
-          }
-          if (fieldTemplate.minItems !== undefined && field.value.length < fieldTemplate.minItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooFewItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                minItems: fieldTemplate.minItems,
-              }),
-            });
-            return;
-          }
-          if (fieldTemplate.maxItems !== undefined && field.value.length > fieldTemplate.maxItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooManyItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                maxItems: fieldTemplate.maxItems,
-              }),
-            });
-            return;
-          }
+          const errors = validateStringFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
         } else if (
           field.value &&
           isIntegerFieldCollectionInputInstance(field) &&
           isIntegerFieldCollectionInputTemplate(fieldTemplate)
         ) {
-          // Integer collections may have min or max items to validate
-          // TODO(psyche): generalize this to other collection types
-          if (fieldTemplate.minItems !== undefined && fieldTemplate.minItems > 0 && field.value.length === 0) {
-            reasons.push({ content: i18n.t('parameters.invoke.collectionEmpty', baseTKeyOptions) });
-            return;
-          }
-          if (fieldTemplate.minItems !== undefined && field.value.length < fieldTemplate.minItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooFewItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                minItems: fieldTemplate.minItems,
-              }),
-            });
-            return;
-          }
-          if (fieldTemplate.maxItems !== undefined && field.value.length > fieldTemplate.maxItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooManyItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                maxItems: fieldTemplate.maxItems,
-              }),
-            });
-            return;
-          }
+          const errors = validateIntegerFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
         }
       });
     });
