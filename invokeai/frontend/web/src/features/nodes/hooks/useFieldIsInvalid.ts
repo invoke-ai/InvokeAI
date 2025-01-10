@@ -11,6 +11,7 @@ import {
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
+import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
 
 export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
@@ -62,6 +63,16 @@ export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
 
         if (template.maxItems !== undefined && field.value.length > template.maxItems) {
           return true;
+        }
+        if (field.value) {
+          for (const str of field.value) {
+            if (!isNil(template.maxLength) && str.length > template.maxLength) {
+              return true;
+            }
+            if (!isNil(template.minLength) && str.length < template.minLength) {
+              return true;
+            }
+          }
         }
       }
 
