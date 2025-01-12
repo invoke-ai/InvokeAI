@@ -305,14 +305,60 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
     blur_type: Literal["gaussian", "box"] = InputField(default="gaussian", description="The type of blur")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
 
+        # Split the image into RGBA channels
+        r, g, b, a = image.split()
+
+        # Convert to float using NumPy
+        r = numpy.array(r, dtype=numpy.float32)
+        g = numpy.array(g, dtype=numpy.float32)
+        b = numpy.array(b, dtype=numpy.float32)
+        a = numpy.array(a, dtype=numpy.float32) / 255.0  # Normalize alpha to [0, 1]
+
+        # Premultiply RGB channels by alpha
+        r *= a
+        g *= a
+        b *= a
+
+        # Convert back to PIL images
+        r = Image.fromarray(numpy.uint8(r))
+        g = Image.fromarray(numpy.uint8(g))
+        b = Image.fromarray(numpy.uint8(b))
+        a = Image.fromarray(numpy.uint8(a * 255))  # Denormalize alpha back to [0, 255]
+
+        # Merge back into a single image
+        premultiplied_image = Image.merge("RGBA", (r, g, b, a))
+
+        # Apply the blur
         blur = (
             ImageFilter.GaussianBlur(self.radius) if self.blur_type == "gaussian" else ImageFilter.BoxBlur(self.radius)
         )
-        blur_image = image.filter(blur)
+        blurred_image = premultiplied_image.filter(blur)
 
-        image_dto = context.images.save(image=blur_image)
+        # Split the blurred image back into RGBA channels
+        r, g, b, a_orig = blurred_image.split()
+
+        # Convert to float using NumPy
+        r = numpy.array(r, dtype=numpy.float32)
+        g = numpy.array(g, dtype=numpy.float32)
+        b = numpy.array(b, dtype=numpy.float32)
+        a = numpy.array(a_orig, dtype=numpy.float32) / 255.0  # Normalize alpha to [0, 1]
+
+        # Unpremultiply RGB channels by alpha
+        r /= (a + 1e-6)  # Add a small epsilon to avoid division by zero
+        g /= (a + 1e-6)
+        b /= (a + 1e-6)
+
+        # Convert back to PIL images
+        r = Image.fromarray(numpy.uint8(numpy.clip(r, 0, 255)))
+        g = Image.fromarray(numpy.uint8(numpy.clip(g, 0, 255)))
+        b = Image.fromarray(numpy.uint8(numpy.clip(b, 0, 255)))
+
+        # Merge back into a single image
+        result_image = Image.merge("RGBA", (r, g, b, a_orig))
+
+        image_dto = context.images.save(image=result_image)
 
         return ImageOutput.build(image_dto)
 
