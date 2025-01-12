@@ -25,6 +25,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
+from invokeai.app.util.misc import SEED_MAX
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.1")
@@ -1087,5 +1088,62 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             generated_image = context.images.get_pil(self.generated_image.image_name)
             generated_image.putalpha(mask)
             image_dto = context.images.save(image=generated_image)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "image_noise",
+    title="Add Image Noise",
+    tags=["image", "noise"],
+    category="image",
+    version="1.0.2",
+)
+class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Add noise to an image"""
+
+    image: ImageField = InputField(description="The image to add noise to")
+    seed: int = InputField(
+        default=0,
+        ge=0,
+        le=SEED_MAX,
+        description=FieldDescriptions.seed,
+    )
+    noise_type: Literal["gaussian", "salt_and_pepper"] = InputField(
+        default="gaussian",
+        description="The type of noise to add",
+    )
+    amount: float = InputField(default=0.1, ge=0, le=1, description="The amount of noise to add")
+    color: bool = InputField(default=False, description="Whether to add color noise")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+
+        # Save out the alpha channel
+        alpha = image.getchannel("A")
+
+        # Set the seed for numpy random
+        rs = numpy.random.RandomState(numpy.random.MT19937(numpy.random.SeedSequence(self.seed)))
+
+        if self.noise_type == "gaussian":
+            if self.color:
+                noise = rs.normal(0, 1, (image.height, image.width, 3)) * 255
+            else:
+                noise = rs.normal(0, 1, (image.height, image.width)) * 255
+                noise = numpy.stack([noise] * 3, axis=-1)
+        elif self.noise_type == "salt_and_pepper":
+            if self.color:
+                noise = rs.choice([0, 255], (image.height, image.width, 3), p=[1 - self.amount, self.amount])
+            else:
+                noise = rs.choice([0, 255], (image.height, image.width), p=[1 - self.amount, self.amount])
+                noise = numpy.stack([noise] * 3, axis=-1)
+
+        noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB")
+        noisy_image = Image.blend(image.convert("RGB"), noise, self.amount).convert("RGBA")
+
+        # Paste back the alpha channel
+        noisy_image.putalpha(alpha)
+
+        image_dto = context.images.save(image=noisy_image)
 
         return ImageOutput.build(image_dto)
