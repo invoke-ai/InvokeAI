@@ -310,25 +310,9 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Split the image into RGBA channels
         r, g, b, a = image.split()
 
-        # Convert to float using NumPy
-        r = numpy.array(r, dtype=numpy.float32)
-        g = numpy.array(g, dtype=numpy.float32)
-        b = numpy.array(b, dtype=numpy.float32)
-        a = numpy.array(a, dtype=numpy.float32) / 255.0  # Normalize alpha to [0, 1]
-
         # Premultiply RGB channels by alpha
-        r *= a
-        g *= a
-        b *= a
-
-        # Convert back to PIL images
-        r = Image.fromarray(numpy.uint8(r))
-        g = Image.fromarray(numpy.uint8(g))
-        b = Image.fromarray(numpy.uint8(b))
-        a = Image.fromarray(numpy.uint8(a * 255))  # Denormalize alpha back to [0, 255]
-
-        # Merge back into a single image
-        premultiplied_image = Image.merge("RGBA", (r, g, b, a))
+        premultiplied_image = ImageChops.multiply(image, a.convert("RGBA"))
+        premultiplied_image.putalpha(a)
 
         # Apply the blur
         blur = (
@@ -336,10 +320,10 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         blurred_image = premultiplied_image.filter(blur)
 
-        # Split the blurred image back into RGBA channels
+        # Split the blurred image into RGBA channels
         r, g, b, a_orig = blurred_image.split()
 
-        # Convert to float using NumPy
+        # Convert to float using NumPy. float 32/64 division are much faster than float 16
         r = numpy.array(r, dtype=numpy.float32)
         g = numpy.array(g, dtype=numpy.float32)
         b = numpy.array(b, dtype=numpy.float32)
