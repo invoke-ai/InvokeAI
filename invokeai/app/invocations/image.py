@@ -161,12 +161,12 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     crop: bool = InputField(default=False, description="Crop to base image dimensions")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        base_image = context.images.get_pil(self.base_image.image_name)
-        image = context.images.get_pil(self.image.image_name)
+        base_image = context.images.get_pil(self.base_image.image_name, mode="RGBA")
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
         mask = None
         if self.mask is not None:
-            mask = context.images.get_pil(self.mask.image_name)
-            mask = ImageOps.invert(mask.convert("L"))
+            mask = context.images.get_pil(self.mask.image_name, mode="L")
+            mask = ImageOps.invert(mask)
         # TODO: probably shouldn't invert mask here... should user be required to do it?
 
         min_x = min(0, self.x)
@@ -176,7 +176,11 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
         new_image.paste(base_image, (abs(min_x), abs(min_y)))
-        new_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+
+        # Create a temporary image to paste the image with transparency
+        temp_image = Image.new("RGBA", new_image.size)
+        temp_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+        new_image = Image.alpha_composite(new_image, temp_image)
 
         if self.crop:
             base_w, base_h = base_image.size
