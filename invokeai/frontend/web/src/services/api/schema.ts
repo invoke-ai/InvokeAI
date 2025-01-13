@@ -6463,8 +6463,9 @@ export type components = {
             /**
              * Floats
              * @description The floats to batch over
+             * @default []
              */
-            floats: number[];
+            floats?: number[];
             /**
              * type
              * @default float_batch
@@ -8399,8 +8400,9 @@ export type components = {
             /**
              * Images
              * @description The images to batch over
+             * @default []
              */
-            images: components["schemas"]["ImageField"][];
+            images?: components["schemas"]["ImageField"][];
             /**
              * type
              * @default image_batch
@@ -10093,8 +10095,9 @@ export type components = {
             /**
              * Integers
              * @description The integers to batch over
+             * @default []
              */
-            integers: number[];
+            integers?: number[];
             /**
              * type
              * @default integer_batch
@@ -17174,8 +17177,9 @@ export type components = {
             /**
              * Strings
              * @description The strings to batch over
+             * @default []
              */
-            strings: string[];
+            strings?: string[];
             /**
              * type
              * @default string_batch
