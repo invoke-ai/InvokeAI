@@ -222,7 +222,9 @@ const NumberListItemContent = memo(
     return (
       <>
         <GridItem>
-          <FormLabel ps={1} m={0}>{index + 1}.</FormLabel>
+          <FormLabel ps={1} m={0}>
+            {index + 1}.
+          </FormLabel>
         </GridItem>
         <GridItem>
           <CompositeNumberInput
