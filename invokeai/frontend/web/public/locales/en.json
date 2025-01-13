@@ -1948,7 +1948,8 @@
                 "noise_amount": "Amount",
                 "gaussian_type": "Gaussian",
                 "salt_and_pepper_type": "Salt and Pepper",
-                "noise_color": "Colored Noise"
+                "noise_color": "Colored Noise",
+                "size": "Noise Size"
             }
         },
         "transform": {
