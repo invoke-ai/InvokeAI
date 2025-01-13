@@ -34,6 +34,7 @@ import {
   validateStringFieldCollectionValue,
 } from 'features/nodes/types/fieldValidators';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { filterNonExecutableNodes } from 'features/nodes/util/graph/buildNodesGraph';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
@@ -75,11 +76,13 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
   }
 
   if (workflowSettings.shouldValidateGraph) {
-    if (!nodes.nodes.length) {
+    const nodesToCheck = nodes.nodes.filter(isInvocationNode).filter(filterNonExecutableNodes);
+
+    if (!nodesToCheck.length) {
       reasons.push({ content: i18n.t('parameters.invoke.noNodesInGraph') });
     }
 
-    nodes.nodes.forEach((node) => {
+    nodesToCheck.forEach((node) => {
       if (!isInvocationNode(node)) {
         return;
       }
