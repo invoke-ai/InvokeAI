@@ -279,17 +279,7 @@ export const isIntegerFieldInputTemplate = buildTypeGuard(zIntegerFieldInputTemp
 // #endregion
 
 // #region IntegerField Collection
-const zIntegerStartStepCountGenerator = z.object({
-  type: z.literal('integer-start-step-count-generator'),
-  start: z.number().int(),
-  step: z.number().int(),
-  count: z.number().int().gte(1),
-});
-export type IntegerStartStepCountGenerator = z.infer<typeof zIntegerStartStepCountGenerator>;
-export const isIntegerStartStepCountGenerator = buildTypeGuard(zIntegerStartStepCountGenerator);
-export const zIntegerFieldCollectionValue = z
-  .union([z.array(zIntegerFieldValue), zIntegerStartStepCountGenerator])
-  .optional();
+export const zIntegerFieldCollectionValue = z.array(zIntegerFieldValue).optional();
 const zIntegerFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
   value: zIntegerFieldCollectionValue,
 });
@@ -327,6 +317,7 @@ export const isIntegerFieldCollectionInputTemplate = buildTypeGuard(zIntegerFiel
 // #endregion
 
 // #region FloatField
+
 export const zFloatFieldValue = z.number();
 const zFloatFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zFloatFieldValue,
@@ -352,17 +343,7 @@ export const isFloatFieldInputTemplate = buildTypeGuard(zFloatFieldInputTemplate
 // #endregion
 
 // #region FloatField Collection
-const zFloatStartStepCountGenerator = z.object({
-  type: z.literal('float-start-step-count-generator'),
-  start: z.number(),
-  step: z.number(),
-  count: z.number().gte(1),
-});
-export type FloatStartStepCountGenerator = z.infer<typeof zFloatStartStepCountGenerator>;
-export const isFloatStartStepCountGenerator = buildTypeGuard(zFloatStartStepCountGenerator);
-export const zFloatFieldCollectionValue = z
-  .union([z.array(zFloatFieldValue), zFloatStartStepCountGenerator])
-  .optional();
+export const zFloatFieldCollectionValue = z.array(zFloatFieldValue).optional();
 const zFloatFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
   value: zFloatFieldCollectionValue,
 });
