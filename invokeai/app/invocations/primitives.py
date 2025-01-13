@@ -552,7 +552,9 @@ class BoundingBoxInvocation(BaseInvocation):
 class ImageBatchInvocation(BaseInvocation):
     """Create a batched generation, where the workflow is executed once for each image in the batch."""
 
-    images: list[ImageField] = InputField(min_length=1, description="The images to batch over", input=Input.Direct)
+    images: list[ImageField] = InputField(
+        default=[], min_length=1, description="The images to batch over", input=Input.Direct
+    )
 
     def __init__(self):
         raise NotImplementedError("This class should never be executed or instantiated directly.")
@@ -572,7 +574,9 @@ class ImageBatchInvocation(BaseInvocation):
 class StringBatchInvocation(BaseInvocation):
     """Create a batched generation, where the workflow is executed once for each string in the batch."""
 
-    strings: list[str] = InputField(min_length=1, description="The strings to batch over", input=Input.Direct)
+    strings: list[str] = InputField(
+        default=[], min_length=1, description="The strings to batch over", input=Input.Direct
+    )
 
     def __init__(self):
         raise NotImplementedError("This class should never be executed or instantiated directly.")
@@ -592,7 +596,9 @@ class StringBatchInvocation(BaseInvocation):
 class IntegerBatchInvocation(BaseInvocation):
     """Create a batched generation, where the workflow is executed once for each integer in the batch."""
 
-    integers: list[int] = InputField(min_length=1, description="The integers to batch over", input=Input.Direct)
+    integers: list[int] = InputField(
+        default=[], min_length=1, description="The integers to batch over", input=Input.Direct
+    )
 
     def __init__(self):
         raise NotImplementedError("This class should never be executed or instantiated directly.")
@@ -612,7 +618,9 @@ class IntegerBatchInvocation(BaseInvocation):
 class FloatBatchInvocation(BaseInvocation):
     """Create a batched generation, where the workflow is executed once for each float in the batch."""
 
-    floats: list[float] = InputField(min_length=1, description="The floats to batch over", input=Input.Direct)
+    floats: list[float] = InputField(
+        default=[], min_length=1, description="The floats to batch over", input=Input.Direct
+    )
 
     def __init__(self):
         raise NotImplementedError("This class should never be executed or instantiated directly.")
