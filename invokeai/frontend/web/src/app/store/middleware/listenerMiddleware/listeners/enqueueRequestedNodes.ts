@@ -9,7 +9,6 @@ import {
   isIntegerFieldCollectionInputInstance,
   isStringFieldCollectionInputInstance,
 } from 'features/nodes/types/field';
-import { getNumberFieldCollectionValue } from 'features/nodes/types/fieldValidators';
 import type { InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
@@ -107,7 +106,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
         // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
         const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
-        addBatchDataCollectionItem(edgesFromStringBatch, getNumberFieldCollectionValue(integers.value));
+        addBatchDataCollectionItem(edgesFromStringBatch, integers.value);
       }
 
       // Grab float batch nodes for special handling
@@ -126,7 +125,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
         // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
         const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
-        addBatchDataCollectionItem(edgesFromStringBatch, getNumberFieldCollectionValue(floats.value));
+        addBatchDataCollectionItem(edgesFromStringBatch, floats.value);
       }
 
       const batchConfig: BatchConfig = {
