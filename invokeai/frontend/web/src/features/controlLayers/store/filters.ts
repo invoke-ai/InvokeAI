@@ -105,6 +105,17 @@ const zBlurFilterConfig = z.object({
 });
 export type BlurFilterConfig = z.infer<typeof zBlurFilterConfig>;
 
+const zNoiseTypes = z.enum(['gaussian', 'salt_and_pepper']);
+export type NoiseTypes = z.infer<typeof zNoiseTypes>;
+export const isNoiseTypes = (v: unknown): v is NoiseTypes => zNoiseTypes.safeParse(v).success;
+const zNoiseFilterConfig = z.object({
+  type: z.literal('img_noise'),
+  noise_type: zNoiseTypes,
+  amount: z.number().gte(0).lte(1),
+  noise_color: z.boolean(),
+});
+export type NoiseFilterConfig = z.infer<typeof zNoiseFilterConfig>;
+
 const zFilterConfig = z.discriminatedUnion('type', [
   zCannyEdgeDetectionFilterConfig,
   zColorMapFilterConfig,
@@ -120,6 +131,7 @@ const zFilterConfig = z.discriminatedUnion('type', [
   zDWOpenposeDetectionFilterConfig,
   zSpandrelFilterConfig,
   zBlurFilterConfig,
+  zNoiseFilterConfig,
 ]);
 export type FilterConfig = z.infer<typeof zFilterConfig>;
 
@@ -138,6 +150,7 @@ const zFilterType = z.enum([
   'dw_openpose_detection',
   'spandrel_filter',
   'img_blur',
+  'img_noise',
 ]);
 export type FilterType = z.infer<typeof zFilterType>;
 export const isFilterType = (v: unknown): v is FilterType => zFilterType.safeParse(v).success;
@@ -457,6 +470,38 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
         blur_type: blur_type,
         radius: radius,
       });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
+  },
+  img_noise: {
+    type: 'img_noise',
+    buildDefaults: () => ({
+      type: 'img_noise',
+      noise_type: 'gaussian',
+      amount: 0.3,
+      noise_color: true,
+    }),
+    buildGraph: ({ image_name }, { noise_type, amount, noise_color }) => {
+      const graph = new Graph(getPrefixedId('img_noise'));
+      const node = graph.addNode({
+        id: getPrefixedId('img_noise'),
+        type: 'img_noise',
+        image: { image_name },
+        noise_type: noise_type,
+        amount: amount,
+        noise_color: noise_color,
+      });
+      const rand = graph.addNode({
+        id: getPrefixedId('rand_int'),
+        use_cache: false,
+        type: 'rand_int',
+        low: 0,
+        high: 2147483647,
+      });
+      graph.addEdge(rand, 'value', node, 'seed');
       return {
         graph,
         outputNodeId: node.id,

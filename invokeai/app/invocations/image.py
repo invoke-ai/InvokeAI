@@ -1093,11 +1093,11 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
-    "image_noise",
+    "img_noise",
     title="Add Image Noise",
     tags=["image", "noise"],
     category="image",
-    version="1.0.2",
+    version="1.0.0",
 )
 class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add noise to an image"""
@@ -1114,7 +1114,7 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="The type of noise to add",
     )
     amount: float = InputField(default=0.1, ge=0, le=1, description="The amount of noise to add")
-    color: bool = InputField(default=False, description="Whether to add color noise")
+    noise_color: bool = InputField(default=True, description="Whether to add colored noise")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, mode="RGBA")
@@ -1126,13 +1126,13 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         rs = numpy.random.RandomState(numpy.random.MT19937(numpy.random.SeedSequence(self.seed)))
 
         if self.noise_type == "gaussian":
-            if self.color:
+            if self.noise_color:
                 noise = rs.normal(0, 1, (image.height, image.width, 3)) * 255
             else:
                 noise = rs.normal(0, 1, (image.height, image.width)) * 255
                 noise = numpy.stack([noise] * 3, axis=-1)
         elif self.noise_type == "salt_and_pepper":
-            if self.color:
+            if self.noise_color:
                 noise = rs.choice([0, 255], (image.height, image.width, 3), p=[1 - self.amount, self.amount])
             else:
                 noise = rs.choice([0, 255], (image.height, image.width), p=[1 - self.amount, self.amount])

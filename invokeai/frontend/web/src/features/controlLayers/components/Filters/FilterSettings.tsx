@@ -9,6 +9,7 @@ import { FilterHEDEdgeDetection } from 'features/controlLayers/components/Filter
 import { FilterLineartEdgeDetection } from 'features/controlLayers/components/Filters/FilterLineartEdgeDetection';
 import { FilterMediaPipeFaceDetection } from 'features/controlLayers/components/Filters/FilterMediaPipeFaceDetection';
 import { FilterMLSDDetection } from 'features/controlLayers/components/Filters/FilterMLSDDetection';
+import { FilterNoise } from 'features/controlLayers/components/Filters/FilterNoise';
 import { FilterPiDiNetEdgeDetection } from 'features/controlLayers/components/Filters/FilterPiDiNetEdgeDetection';
 import { FilterSpandrel } from 'features/controlLayers/components/Filters/FilterSpandrel';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
@@ -62,6 +63,10 @@ export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
 
   if (filterConfig.type === 'pidi_edge_detection') {
     return <FilterPiDiNetEdgeDetection config={filterConfig} onChange={onChange} />;
+  }
+
+  if (filterConfig.type === 'img_noise') {
+    return <FilterNoise config={filterConfig} onChange={onChange} />;
   }
 
   if (filterConfig.type === 'spandrel_filter') {
