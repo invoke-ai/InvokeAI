@@ -1932,6 +1932,14 @@
                 "description": "Generates an edge map from the selected layer using the PiDiNet edge detection model.",
                 "scribble": "Scribble",
                 "quantize_edges": "Quantize Edges"
+            },
+            "img_blur": {
+                "label": "Blur Image",
+                "description": "Blurs the selected layer.",
+                "blur_type": "Blur Type",
+                "blur_radius": "Radius",
+                "gaussian_type": "Gaussian",
+                "box_type": "Box"
             }
         },
         "transform": {

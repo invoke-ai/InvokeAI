@@ -1,4 +1,5 @@
 import type {
+  BlurFilterConfig,
   CannyEdgeDetectionFilterConfig,
   ColorMapFilterConfig,
   ContentShuffleFilterConfig,
@@ -54,6 +55,7 @@ describe('Control Adapter Types', () => {
   });
   test('Processor Configs', () => {
     // Types derived from OpenAPI
+    type _BlurFilterConfig = Required<Pick<Invocation<'img_blur'>, 'type' | 'radius' | 'blur_type'>>;
     type _CannyEdgeDetectionFilterConfig = Required<
       Pick<Invocation<'canny_edge_detection'>, 'type' | 'low_threshold' | 'high_threshold'>
     >;
@@ -81,6 +83,7 @@ describe('Control Adapter Types', () => {
 
     // The processor configs are manually modeled zod schemas. This test ensures that the inferred types are correct.
     // The types prefixed with `_` are types generated from OpenAPI, while the types without the prefix are manually modeled.
+    assert<Equals<_BlurFilterConfig, BlurFilterConfig>>();
     assert<Equals<_CannyEdgeDetectionFilterConfig, CannyEdgeDetectionFilterConfig>>();
     assert<Equals<_ColorMapFilterConfig, ColorMapFilterConfig>>();
     assert<Equals<_ContentShuffleFilterConfig, ContentShuffleFilterConfig>>();
