@@ -53,7 +53,7 @@ export const FilterBlur = memo(({ onChange, config }: Props) => {
           onChange={handleRadiusChange}
           min={1}
           max={64}
-          step={1}
+          step={0.1}
           marks
         />
         <CompositeNumberInput
@@ -62,7 +62,7 @@ export const FilterBlur = memo(({ onChange, config }: Props) => {
           onChange={handleRadiusChange}
           min={1}
           max={4096}
-          step={1}
+          step={0.1}
         />
       </FormControl>
     </>

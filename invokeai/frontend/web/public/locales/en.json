@@ -1940,6 +1940,15 @@
                 "blur_radius": "Radius",
                 "gaussian_type": "Gaussian",
                 "box_type": "Box"
+            },
+            "img_noise": {
+                "label": "Noise Image",
+                "description": "Adds noise to the selected layer.",
+                "noise_type": "Noise Type",
+                "noise_amount": "Amount",
+                "gaussian_type": "Gaussian",
+                "salt_and_pepper_type": "Salt and Pepper",
+                "noise_color": "Colored Noise"
             }
         },
         "transform": {
