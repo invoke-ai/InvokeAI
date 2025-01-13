@@ -244,8 +244,7 @@ const NumberListItemContent = memo(
             alignSelf="stretch"
             onClick={onClickRemove}
             icon={<PiXBold />}
-            aria-label={t('common.remove')}
-            tooltip={t('common.remove')}
+            aria-label={t('common.delete')}
           />
         </GridItem>
       </>
