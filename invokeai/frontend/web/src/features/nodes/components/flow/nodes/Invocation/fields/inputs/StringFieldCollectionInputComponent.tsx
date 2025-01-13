@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Grid, GridItem, IconButton, Textarea } from '@invoke-ai/ui-library';
+import { Box, Flex, Grid, GridItem, IconButton, Input } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
@@ -129,14 +129,14 @@ const StringListItemContent = memo(({ value, index, onRemoveString, onChangeStri
     onRemoveString(index);
   }, [index, onRemoveString]);
   const onChange = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       onChangeString(index, e.target.value);
     },
     [index, onChangeString]
   );
   return (
     <Flex alignItems="center" gap={1}>
-      <Textarea size="xs" resize="none" value={value} onChange={onChange} />
+      <Input size="xs" resize="none" value={value} onChange={onChange} />
       <IconButton
         size="sm"
         variant="link"
