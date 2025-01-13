@@ -113,6 +113,7 @@ const zNoiseFilterConfig = z.object({
   noise_type: zNoiseTypes,
   amount: z.number().gte(0).lte(1),
   noise_color: z.boolean(),
+  size: z.number().int().gte(1),
 });
 export type NoiseFilterConfig = z.infer<typeof zNoiseFilterConfig>;
 
@@ -483,8 +484,9 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       noise_type: 'gaussian',
       amount: 0.3,
       noise_color: true,
+      size: 1,
     }),
-    buildGraph: ({ image_name }, { noise_type, amount, noise_color }) => {
+    buildGraph: ({ image_name }, { noise_type, amount, noise_color, size }) => {
       const graph = new Graph(getPrefixedId('img_noise'));
       const node = graph.addNode({
         id: getPrefixedId('img_noise'),
@@ -493,6 +495,7 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
         noise_type: noise_type,
         amount: amount,
         noise_color: noise_color,
+        size: size,
       });
       const rand = graph.addNode({
         id: getPrefixedId('rand_int'),

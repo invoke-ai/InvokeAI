@@ -37,6 +37,13 @@ export const FilterNoise = memo(({ onChange, config }: Props) => {
     [config, onChange]
   );
 
+  const handleSizeChange = useCallback(
+    (v: number) => {
+      onChange({ ...config, size: v });
+    },
+    [config, onChange]
+  );
+
   const options: { label: string; value: NoiseTypes }[] = useMemo(
     () => [
       { label: t('controlLayers.filter.img_noise.gaussian_type'), value: 'gaussian' },
@@ -71,6 +78,26 @@ export const FilterNoise = memo(({ onChange, config }: Props) => {
           min={0}
           max={1}
           step={0.01}
+        />
+      </FormControl>
+      <FormControl>
+        <FormLabel m={0}>{t('controlLayers.filter.img_noise.size')}</FormLabel>
+        <CompositeSlider
+          value={config.size}
+          defaultValue={DEFAULTS.size}
+          onChange={handleSizeChange}
+          min={1}
+          max={16}
+          step={1}
+          marks
+        />
+        <CompositeNumberInput
+          value={config.size}
+          defaultValue={DEFAULTS.size}
+          onChange={handleSizeChange}
+          min={1}
+          max={256}
+          step={1}
         />
       </FormControl>
       <FormControl w="max-content">

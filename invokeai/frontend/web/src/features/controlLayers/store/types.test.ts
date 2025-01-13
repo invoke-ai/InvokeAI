@@ -74,7 +74,9 @@ describe('Control Adapter Types', () => {
     type _MLSDDetectionFilterConfig = Required<
       Pick<Invocation<'mlsd_detection'>, 'type' | 'score_threshold' | 'distance_threshold'>
     >;
-    type _NoiseFilterConfig = Required<Pick<Invocation<'img_noise'>, 'type' | 'noise_type' | 'amount' | 'noise_color'>>;
+    type _NoiseFilterConfig = Required<
+      Pick<Invocation<'img_noise'>, 'type' | 'noise_type' | 'amount' | 'noise_color' | 'size'>
+    >;
     type _NormalMapFilterConfig = Required<Pick<Invocation<'normal_map'>, 'type'>>;
     type _DWOpenposeDetectionFilterConfig = Required<
       Pick<Invocation<'dw_openpose_detection'>, 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>

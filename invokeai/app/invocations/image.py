@@ -1097,7 +1097,7 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Add Image Noise",
     tags=["image", "noise"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add noise to an image"""
@@ -1115,6 +1115,7 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
     amount: float = InputField(default=0.1, ge=0, le=1, description="The amount of noise to add")
     noise_color: bool = InputField(default=True, description="Whether to add colored noise")
+    size: int = InputField(default=1, ge=1, description="The size of the noise points")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, mode="RGBA")
@@ -1127,18 +1128,18 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         if self.noise_type == "gaussian":
             if self.noise_color:
-                noise = rs.normal(0, 1, (image.height, image.width, 3)) * 255
+                noise = rs.normal(0, 1, (image.height // self.size, image.width // self.size, 3)) * 255
             else:
-                noise = rs.normal(0, 1, (image.height, image.width)) * 255
+                noise = rs.normal(0, 1, (image.height // self.size, image.width // self.size)) * 255
                 noise = numpy.stack([noise] * 3, axis=-1)
         elif self.noise_type == "salt_and_pepper":
             if self.noise_color:
-                noise = rs.choice([0, 255], (image.height, image.width, 3), p=[1 - self.amount, self.amount])
+                noise = rs.choice([0, 255], (image.height // self.size, image.width // self.size, 3), p=[1 - self.amount, self.amount])
             else:
-                noise = rs.choice([0, 255], (image.height, image.width), p=[1 - self.amount, self.amount])
+                noise = rs.choice([0, 255], (image.height // self.size, image.width // self.size), p=[1 - self.amount, self.amount])
                 noise = numpy.stack([noise] * 3, axis=-1)
 
-        noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB")
+        noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB").resize((image.width, image.height), Image.Resampling.NEAREST)
         noisy_image = Image.blend(image.convert("RGB"), noise, self.amount).convert("RGBA")
 
         # Paste back the alpha channel

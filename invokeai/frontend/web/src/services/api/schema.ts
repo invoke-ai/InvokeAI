@@ -8495,6 +8495,12 @@ export type components = {
              */
             noise_color?: boolean;
             /**
+             * Size
+             * @description The size of the noise
+             * @default 1
+             */
+            size?: number;
+            /**
              * type
              * @default img_noise
              * @constant
