@@ -1,4 +1,5 @@
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { FilterBlur } from 'features/controlLayers/components/Filters/FilterBlur';
 import { FilterCannyEdgeDetection } from 'features/controlLayers/components/Filters/FilterCannyEdgeDetection';
 import { FilterColorMap } from 'features/controlLayers/components/Filters/FilterColorMap';
 import { FilterContentShuffle } from 'features/controlLayers/components/Filters/FilterContentShuffle';
@@ -18,6 +19,10 @@ type Props = { filterConfig: FilterConfig; onChange: (filterConfig: FilterConfig
 
 export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
   const { t } = useTranslation();
+
+  if (filterConfig.type === 'img_blur') {
+    return <FilterBlur config={filterConfig} onChange={onChange} />;
+  }
 
   if (filterConfig.type === 'canny_edge_detection') {
     return <FilterCannyEdgeDetection config={filterConfig} onChange={onChange} />;

@@ -95,6 +95,16 @@ const zSpandrelFilterConfig = z.object({
 });
 export type SpandrelFilterConfig = z.infer<typeof zSpandrelFilterConfig>;
 
+const zBlurTypes = z.enum(['gaussian', 'box']);
+export type BlurTypes = z.infer<typeof zBlurTypes>;
+export const isBlurTypes = (v: unknown): v is BlurTypes => zBlurTypes.safeParse(v).success;
+const zBlurFilterConfig = z.object({
+  type: z.literal('img_blur'),
+  blur_type: zBlurTypes,
+  radius: z.number().gte(0),
+});
+export type BlurFilterConfig = z.infer<typeof zBlurFilterConfig>;
+
 const zFilterConfig = z.discriminatedUnion('type', [
   zCannyEdgeDetectionFilterConfig,
   zColorMapFilterConfig,
@@ -109,6 +119,7 @@ const zFilterConfig = z.discriminatedUnion('type', [
   zPiDiNetEdgeDetectionFilterConfig,
   zDWOpenposeDetectionFilterConfig,
   zSpandrelFilterConfig,
+  zBlurFilterConfig,
 ]);
 export type FilterConfig = z.infer<typeof zFilterConfig>;
 
@@ -126,6 +137,7 @@ const zFilterType = z.enum([
   'pidi_edge_detection',
   'dw_openpose_detection',
   'spandrel_filter',
+  'img_blur',
 ]);
 export type FilterType = z.infer<typeof zFilterType>;
 export const isFilterType = (v: unknown): v is FilterType => zFilterType.safeParse(v).success;
@@ -427,6 +439,28 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
         return false;
       }
       return true;
+    },
+  },
+  img_blur: {
+    type: 'img_blur',
+    buildDefaults: () => ({
+      type: 'img_blur',
+      blur_type: 'gaussian',
+      radius: 8,
+    }),
+    buildGraph: ({ image_name }, { blur_type, radius }) => {
+      const graph = new Graph(getPrefixedId('img_blur'));
+      const node = graph.addNode({
+        id: getPrefixedId('img_blur'),
+        type: 'img_blur',
+        image: { image_name },
+        blur_type: blur_type,
+        radius: radius,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
     },
   },
 } as const;
