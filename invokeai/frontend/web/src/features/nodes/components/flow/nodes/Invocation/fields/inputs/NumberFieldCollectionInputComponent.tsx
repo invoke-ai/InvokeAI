@@ -221,13 +221,7 @@ const ManualEntry = ({
     (index: number) => {
       const newValue = [...value];
       newValue.splice(index, 1);
-      dispatch(
-        fieldNumberCollectionValueChanged({
-          nodeId,
-          fieldName,
-          value: newValue.length > 0 ? newValue : undefined,
-        })
-      );
+      dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName, value: newValue }));
     },
     [value, dispatch, nodeId, fieldName]
   );
