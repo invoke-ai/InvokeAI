@@ -85,42 +85,6 @@ export const NumberFieldCollectionInputComponent = memo(
       store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
     }, [field.value, field.name, store, nodeId]);
 
-    const min = useMemo(() => {
-      let min = -NUMPY_RAND_MAX;
-      if (!isNil(fieldTemplate.minimum)) {
-        min = fieldTemplate.minimum;
-      }
-      if (!isNil(fieldTemplate.exclusiveMinimum)) {
-        min = fieldTemplate.exclusiveMinimum + 0.01;
-      }
-      return min;
-    }, [fieldTemplate.exclusiveMinimum, fieldTemplate.minimum]);
-
-    const max = useMemo(() => {
-      let max = NUMPY_RAND_MAX;
-      if (!isNil(fieldTemplate.maximum)) {
-        max = fieldTemplate.maximum;
-      }
-      if (!isNil(fieldTemplate.exclusiveMaximum)) {
-        max = fieldTemplate.exclusiveMaximum - 0.01;
-      }
-      return max;
-    }, [fieldTemplate.exclusiveMaximum, fieldTemplate.maximum]);
-
-    const step = useMemo(() => {
-      if (isNil(fieldTemplate.multipleOf)) {
-        return isIntegerField ? 1 : 0.1;
-      }
-      return fieldTemplate.multipleOf;
-    }, [fieldTemplate.multipleOf, isIntegerField]);
-
-    const fineStep = useMemo(() => {
-      if (isNil(fieldTemplate.multipleOf)) {
-        return isIntegerField ? 1 : 0.01;
-      }
-      return fieldTemplate.multipleOf;
-    }, [fieldTemplate.multipleOf, isIntegerField]);
-
     return (
       <Flex
         className="nodrag"
@@ -168,28 +132,10 @@ export const NumberFieldCollectionInputComponent = memo(
           />
         </Flex>
         {field.value && !Array.isArray(field.value) && (
-          <GeneratorEntry
-            nodeId={nodeId}
-            fieldName={field.name}
-            value={field.value}
-            fieldTemplate={fieldTemplate}
-            min={min}
-            max={max}
-            step={step}
-            fineStep={fineStep}
-          />
+          <GeneratorEntry nodeId={nodeId} fieldName={field.name} value={field.value} fieldTemplate={fieldTemplate} />
         )}
         {field.value && Array.isArray(field.value) && field.value.length > 0 && (
-          <ManualEntry
-            nodeId={nodeId}
-            fieldName={field.name}
-            value={field.value}
-            fieldTemplate={fieldTemplate}
-            min={min}
-            max={max}
-            step={step}
-            fineStep={fineStep}
-          />
+          <ManualEntry nodeId={nodeId} fieldName={field.name} value={field.value} fieldTemplate={fieldTemplate} />
         )}
       </Flex>
     );
@@ -199,22 +145,18 @@ export const NumberFieldCollectionInputComponent = memo(
 NumberFieldCollectionInputComponent.displayName = 'NumberFieldCollectionInputComponent';
 
 const GeneratorEntry = ({
-  step,
-  fineStep,
   nodeId,
   fieldName,
   value,
+  fieldTemplate,
 }: {
-  min: number;
-  max: number;
-  step: number;
-  fineStep: number;
   nodeId: string;
   fieldName: string;
   value: IntegerStartStepCountGenerator | FloatStartStepCountGenerator;
   fieldTemplate: IntegerFieldCollectionInputTemplate | FloatFieldCollectionInputTemplate;
 }) => {
   const dispatch = useAppDispatch();
+  const isIntegerField = useMemo(() => fieldTemplate.type.name === 'IntegerField', [fieldTemplate.type]);
   const onChangeStart = useCallback(
     (v: number) => {
       const newValue = { ...value, start: v };
@@ -241,14 +183,7 @@ const GeneratorEntry = ({
     <Flex gap={2}>
       <FormControl>
         <FormLabel m={0}>Start</FormLabel>
-        <CompositeNumberInput
-          value={value.start}
-          onChange={onChangeStart}
-          min={-Infinity}
-          max={Infinity}
-          step={step}
-          fineStep={fineStep}
-        />
+        <CompositeNumberInput value={value.start} onChange={onChangeStart} min={-Infinity} max={Infinity} />
       </FormControl>
       <FormControl>
         <FormLabel m={0}>Count</FormLabel>
@@ -261,8 +196,7 @@ const GeneratorEntry = ({
           onChange={onChangeStep}
           min={-Infinity}
           max={Infinity}
-          step={step}
-          fineStep={fineStep}
+          step={isIntegerField ? 1 : 0.1}
         />
       </FormControl>
     </Flex>
@@ -270,19 +204,11 @@ const GeneratorEntry = ({
 };
 
 const ManualEntry = ({
-  min,
-  max,
-  step,
-  fineStep,
   nodeId,
   fieldName,
   value,
   fieldTemplate,
 }: {
-  min: number;
-  max: number;
-  step: number;
-  fineStep: number;
   nodeId: string;
   fieldName: string;
   value: number[];
@@ -308,6 +234,42 @@ const ManualEntry = ({
     },
     [value, dispatch, nodeId, fieldName]
   );
+
+  const min = useMemo(() => {
+    let min = -NUMPY_RAND_MAX;
+    if (!isNil(fieldTemplate.minimum)) {
+      min = fieldTemplate.minimum;
+    }
+    if (!isNil(fieldTemplate.exclusiveMinimum)) {
+      min = fieldTemplate.exclusiveMinimum + 0.01;
+    }
+    return min;
+  }, [fieldTemplate.exclusiveMinimum, fieldTemplate.minimum]);
+
+  const max = useMemo(() => {
+    let max = NUMPY_RAND_MAX;
+    if (!isNil(fieldTemplate.maximum)) {
+      max = fieldTemplate.maximum;
+    }
+    if (!isNil(fieldTemplate.exclusiveMaximum)) {
+      max = fieldTemplate.exclusiveMaximum - 0.01;
+    }
+    return max;
+  }, [fieldTemplate.exclusiveMaximum, fieldTemplate.maximum]);
+
+  const step = useMemo(() => {
+    if (isNil(fieldTemplate.multipleOf)) {
+      return isIntegerField ? 1 : 0.1;
+    }
+    return fieldTemplate.multipleOf;
+  }, [fieldTemplate.multipleOf, isIntegerField]);
+
+  const fineStep = useMemo(() => {
+    if (isNil(fieldTemplate.multipleOf)) {
+      return isIntegerField ? 1 : 0.01;
+    }
+    return fieldTemplate.multipleOf;
+  }, [fieldTemplate.multipleOf, isIntegerField]);
 
   return (
     <Box w="full" h="full">
