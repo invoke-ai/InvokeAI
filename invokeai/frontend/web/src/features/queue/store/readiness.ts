@@ -33,13 +33,12 @@ import {
   validateNumberFieldCollectionValue,
   validateStringFieldCollectionValue,
 } from 'features/nodes/types/fieldValidators';
-import { isInvocationNode } from 'features/nodes/types/invocation';
-import { filterNonExecutableNodes } from 'features/nodes/util/graph/buildNodesGraph';
+import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import i18n from 'i18next';
-import { forEach, upperFirst } from 'lodash-es';
+import { forEach, negate, upperFirst } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 
 /**
@@ -76,7 +75,7 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
   }
 
   if (workflowSettings.shouldValidateGraph) {
-    const nodesToCheck = nodes.nodes.filter(isInvocationNode).filter(filterNonExecutableNodes);
+    const nodesToCheck = nodes.nodes.filter(isInvocationNode).filter(negate(isBatchNode));
 
     if (!nodesToCheck.length) {
       reasons.push({ content: i18n.t('parameters.invoke.noNodesInGraph') });
