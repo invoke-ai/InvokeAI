@@ -34,15 +34,6 @@ import type { FieldComponentProps } from './types';
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
 
-const isGenerator = (
-  value: IntegerFieldCollectionInputInstance['value'] | FloatFieldCollectionInputInstance['value']
-): value is IntegerStartStepCountGenerator | FloatStartStepCountGenerator => {
-  if (!value || Array.isArray(value)) {
-    return false;
-  }
-  return true;
-};
-
 const sx = {
   borderWidth: 1,
   '&[data-error=true]': {
@@ -62,8 +53,23 @@ export const NumberFieldCollectionInputComponent = memo(
     const isInvalid = useFieldIsInvalid(nodeId, field.name);
     const isIntegerField = useMemo(() => fieldTemplate.type.name === 'IntegerField', [fieldTemplate.type]);
 
+    const entryMode = useMemo(() => {
+      if (!field.value) {
+        return 'manual';
+      }
+      if (Array.isArray(field.value)) {
+        return 'manual';
+      }
+      return 'step';
+    }, [field.value]);
+
     const toggleEntryMode = useCallback(() => {
-      if (isGenerator(field.value)) {
+      if (!field.value || Array.isArray(field.value)) {
+        const newValue: IntegerStartStepCountGenerator | FloatStartStepCountGenerator = isIntegerField
+          ? { type: 'integer-start-step-count-generator', start: 0, step: 1, count: 1 }
+          : { type: 'float-start-step-count-generator', start: 0, step: 1, count: 1 };
+        store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
+      } else {
         store.dispatch(
           fieldNumberCollectionValueChanged({
             nodeId,
@@ -71,11 +77,6 @@ export const NumberFieldCollectionInputComponent = memo(
             value: [0],
           })
         );
-      } else {
-        const newValue: IntegerStartStepCountGenerator | FloatStartStepCountGenerator = isIntegerField
-          ? { type: 'integer-start-step-count-generator', start: 0, step: 1, count: 1 }
-          : { type: 'float-start-step-count-generator', start: 0, step: 1, count: 1 };
-        store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
       }
     }, [field.name, field.value, isIntegerField, nodeId, store]);
 
@@ -139,20 +140,21 @@ export const NumberFieldCollectionInputComponent = memo(
         data-error={isInvalid}
       >
         <Flex gap={2} w="full" alignItems="center">
-          {!isGenerator(field.value) && (
-            <>
-              <Text flexGrow={1}>Manual</Text>
-              <IconButton
-                w="full"
-                onClick={onAddNumber}
-                aria-label="Add Item"
-                icon={<PiPlusBold />}
-                variant="ghost"
-                size="sm"
-              />
-            </>
-          )}
-          {isGenerator(field.value) && (
+          {!field.value ||
+            (Array.isArray(field.value) && (
+              <>
+                <Text flexGrow={1}>Manual</Text>
+                <IconButton
+                  w="full"
+                  onClick={onAddNumber}
+                  aria-label="Add Item"
+                  icon={<PiPlusBold />}
+                  variant="ghost"
+                  size="sm"
+                />
+              </>
+            ))}
+          {field.value && !Array.isArray(field.value) && (
             <>
               <Text flexGrow={1}>Generator</Text>
             </>
@@ -160,12 +162,12 @@ export const NumberFieldCollectionInputComponent = memo(
           <IconButton
             onClick={toggleEntryMode}
             aria-label="Toggle Entry Mode"
-            icon={isGenerator(field.value) ? <PiPencilSimpleFill /> : <PiLightbulbFill />}
+            icon={entryMode === 'manual' ? <PiLightbulbFill /> : <PiPencilSimpleFill />}
             variant="ghost"
             size="sm"
           />
         </Flex>
-        {isGenerator(field.value) && (
+        {field.value && !Array.isArray(field.value) && (
           <GeneratorEntry
             nodeId={nodeId}
             fieldName={field.name}
@@ -177,7 +179,7 @@ export const NumberFieldCollectionInputComponent = memo(
             fineStep={fineStep}
           />
         )}
-        {field.value && !isGenerator(field.value) && (
+        {field.value && Array.isArray(field.value) && field.value.length > 0 && (
           <ManualEntry
             nodeId={nodeId}
             fieldName={field.name}
@@ -393,7 +395,6 @@ const NumberListItemContent = memo(
           icon={<PiXBold />}
           aria-label={t('common.remove')}
           tooltip={t('common.remove')}
-          tabIndex={-1}
         />
       </Flex>
     );
