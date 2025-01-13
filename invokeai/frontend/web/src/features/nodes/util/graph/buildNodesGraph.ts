@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 const log = logger('workflows');
 
 // These nodes are not executable, they exist for the frontend only
-const filterNonExecutableNodes = (node: InvocationNode) => {
+export const filterNonExecutableNodes = (node: InvocationNode) => {
   if (node.data.type === 'image_batch') {
     return false;
   }
