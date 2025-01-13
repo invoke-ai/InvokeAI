@@ -22,6 +22,8 @@ import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicP
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import { FloatRangeGeneratorModal } from 'features/nodes/components/FloatRangeGeneratorModal';
+import { IntegerRangeGeneratorModal } from 'features/nodes/components/IntegerRangeGeneratorModal';
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
@@ -110,6 +112,8 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <ImageContextMenu />
       <FullscreenDropzone />
       <VideosModal />
+      <FloatRangeGeneratorModal />
+      <IntegerRangeGeneratorModal />
     </ErrorBoundary>
   );
 };

@@ -1,8 +1,20 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, CompositeNumberInput, Flex, Grid, GridItem, IconButton } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  CompositeNumberInput,
+  Divider,
+  Flex,
+  FormLabel,
+  Grid,
+  GridItem,
+  IconButton,
+} from '@invoke-ai/ui-library';
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
+import { openFloatRangeGeneratorModal } from 'features/nodes/components/FloatRangeGeneratorModal';
+import { openIntegerRangeGeneratorModal } from 'features/nodes/components/IntegerRangeGeneratorModal';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { fieldNumberCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
@@ -15,7 +27,7 @@ import { isNil } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold, PiXBold } from 'react-icons/pi';
+import { PiXBold } from 'react-icons/pi';
 
 import type { FieldComponentProps } from './types';
 
@@ -37,6 +49,7 @@ export const NumberFieldCollectionInputComponent = memo(
   ) => {
     const { nodeId, field, fieldTemplate } = props;
     const store = useAppStore();
+    const { t } = useTranslation();
 
     const isInvalid = useFieldIsInvalid(nodeId, field.name);
     const isIntegerField = useMemo(() => fieldTemplate.type.name === 'IntegerField', [fieldTemplate.type]);
@@ -63,6 +76,17 @@ export const NumberFieldCollectionInputComponent = memo(
       const newValue = field.value ? [...field.value, 0] : [0];
       store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
     }, [field.name, field.value, nodeId, store]);
+
+    const onOpenGenerator = useCallback(() => {
+      const onSave = (values: number[]) => {
+        store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: values }));
+      };
+      if (isIntegerField) {
+        openIntegerRangeGeneratorModal(onSave);
+      } else {
+        openFloatRangeGeneratorModal(onSave);
+      }
+    }, [field.name, isIntegerField, nodeId, store]);
 
     const min = useMemo(() => {
       let min = -NUMPY_RAND_MAX;
@@ -105,57 +129,52 @@ export const NumberFieldCollectionInputComponent = memo(
         className="nodrag"
         position="relative"
         w="full"
-        h="full"
+        h="auto"
         maxH={64}
         alignItems="stretch"
         justifyContent="center"
+        p={1}
+        sx={sx}
+        data-error={isInvalid}
+        borderRadius="base"
+        flexDir="column"
+        gap={1}
       >
-        {(!field.value || field.value.length === 0) && (
-          <Box w="full" sx={sx} data-error={isInvalid} borderRadius="base">
-            <IconButton
-              w="full"
-              onClick={onAddNumber}
-              aria-label="Add Item"
-              icon={<PiPlusBold />}
-              variant="ghost"
-              size="sm"
-            />
-          </Box>
-        )}
+        <ButtonGroup isAttached={false} size="sm" w="full" gap={1}>
+          <Button onClick={onAddNumber} variant="ghost" w="50%">
+            {t('nodes.addItem')}
+          </Button>
+          <Button onClick={onOpenGenerator} variant="ghost" w="50%">
+            {t('nodes.generateValues')}
+          </Button>
+        </ButtonGroup>
         {field.value && field.value.length > 0 && (
-          <Box w="full" h="auto" p={1} sx={sx} data-error={isInvalid} borderRadius="base">
+          <>
+            <Divider />
             <OverlayScrollbarsComponent
               className="nowheel"
               defer
               style={overlayScrollbarsStyles}
               options={overlayscrollbarsOptions}
             >
-              <Grid w="full" h="full" templateColumns="repeat(1, 1fr)" gap={1}>
-                <IconButton
-                  onClick={onAddNumber}
-                  aria-label="Add Item"
-                  icon={<PiPlusBold />}
-                  variant="ghost"
-                  size="sm"
-                />
+              <Grid gap={1} gridTemplateColumns="auto 1fr auto" alignItems="center">
                 {field.value.map((value, index) => (
-                  <GridItem key={index} position="relative" className="nodrag">
-                    <NumberListItemContent
-                      value={value}
-                      index={index}
-                      min={min}
-                      max={max}
-                      step={step}
-                      fineStep={fineStep}
-                      isIntegerField={isIntegerField}
-                      onRemoveNumber={onRemoveNumber}
-                      onChangeNumber={onChangeNumber}
-                    />
-                  </GridItem>
+                  <NumberListItemContent
+                    key={index}
+                    value={value}
+                    index={index}
+                    min={min}
+                    max={max}
+                    step={step}
+                    fineStep={fineStep}
+                    isIntegerField={isIntegerField}
+                    onRemoveNumber={onRemoveNumber}
+                    onChangeNumber={onChangeNumber}
+                  />
                 ))}
               </Grid>
             </OverlayScrollbarsComponent>
-          </Box>
+          </>
         )}
       </Flex>
     );
@@ -201,27 +220,35 @@ const NumberListItemContent = memo(
     );
 
     return (
-      <Flex alignItems="center" gap={1} w="full">
-        <CompositeNumberInput
-          onChange={onChange}
-          value={value}
-          min={min}
-          max={max}
-          step={step}
-          fineStep={fineStep}
-          className="nodrag"
-          flexGrow={1}
-        />
-        <IconButton
-          size="sm"
-          variant="link"
-          alignSelf="stretch"
-          onClick={onClickRemove}
-          icon={<PiXBold />}
-          aria-label={t('common.remove')}
-          tooltip={t('common.remove')}
-        />
-      </Flex>
+      <>
+        <GridItem>
+          <FormLabel m={0}>{index + 1}.</FormLabel>
+        </GridItem>
+        <GridItem>
+          <CompositeNumberInput
+            onChange={onChange}
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            fineStep={fineStep}
+            className="nodrag"
+            flexGrow={1}
+          />
+        </GridItem>
+        <GridItem>
+          <IconButton
+            tabIndex={-1}
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            onClick={onClickRemove}
+            icon={<PiXBold />}
+            aria-label={t('common.remove')}
+            tooltip={t('common.remove')}
+          />
+        </GridItem>
+      </>
     );
   }
 );

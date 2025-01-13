@@ -177,7 +177,11 @@
         "none": "None",
         "new": "New",
         "generating": "Generating",
-        "warnings": "Warnings"
+        "warnings": "Warnings",
+        "start": "Start",
+        "count": "Count",
+        "step": "Step",
+        "values": "Values"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -989,7 +993,11 @@
         "imageAccessError": "Unable to find image {{image_name}}, resetting to default",
         "boardAccessError": "Unable to find board {{board_id}}, resetting to default",
         "modelAccessError": "Unable to find model {{key}}, resetting to default",
-        "saveToGallery": "Save To Gallery"
+        "saveToGallery": "Save To Gallery",
+        "addItem": "Add Item",
+        "generateValues": "Generate Values",
+        "floatRangeGenerator": "Float Range Generator",
+        "integerRangeGenerator": "Integer Range Generator"
     },
     "parameters": {
         "aspect": "Aspect",
