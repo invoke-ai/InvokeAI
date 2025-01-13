@@ -339,17 +339,16 @@ class ModelCache:
             self._delete_cache_entry(cache_entry)
             raise
 
-    def _get_vram_available(self, working_mem_bytes: Optional[int]) -> int:
-        """Calculate the amount of additional VRAM available for the cache to use (takes into account the working
-        memory).
+    def _get_total_vram_available_to_cache(self, working_mem_bytes: Optional[int]) -> int:
+        """Calculate the total amount of VRAM available for storing models. I.e. the amount of VRAM available to the
+        process minus the amount of VRAM to keep for working memory.
         """
         # If self._max_vram_cache_size_gb is set, then it overrides the default logic.
         if self._max_vram_cache_size_gb is not None:
-            vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB)
-            return vram_total_available_to_cache - self._get_vram_in_use()
+            return int(self._max_vram_cache_size_gb * GB)
 
         working_mem_bytes_default = int(self._execution_device_working_mem_gb * GB)
-        working_mem_bytes = max(working_mem_bytes or working_mem_bytes_default, working_mem_bytes_default)
+        working_mem_bytes = max(working_mem_bytes or 0, working_mem_bytes_default)
 
         if self._execution_device.type == "cuda":
             # TODO(ryand): It is debatable whether we should use memory_reserved() or memory_allocated() here.
@@ -360,19 +359,28 @@ class ModelCache:
             vram_free, _vram_total = torch.cuda.mem_get_info(self._execution_device)
             vram_available_to_process = vram_free + vram_allocated
         elif self._execution_device.type == "mps":
-            vram_reserved = torch.mps.driver_allocated_memory()
+            vram_allocated = torch.mps.driver_allocated_memory()
             # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
             vram_free = psutil.virtual_memory().available
-            vram_available_to_process = vram_free + vram_reserved
+            vram_available_to_process = vram_free + vram_allocated
         else:
             raise ValueError(f"Unsupported execution device: {self._execution_device.type}")
 
-        vram_total_available_to_cache = vram_available_to_process - working_mem_bytes
-        vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()
-        return vram_cur_available_to_cache
+        return vram_available_to_process - working_mem_bytes
+
+    def _get_vram_available(self, working_mem_bytes: Optional[int]) -> int:
+        """Calculate the amount of additional VRAM available for the model cache to use (takes into account the working
+        memory).
+        """
+        return self._get_total_vram_available_to_cache(working_mem_bytes) - self._get_vram_in_use()
 
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
+        # NOTE(ryand): To be conservative, we are treating the amount of VRAM allocated by torch as entirely being used
+        # by the model cache. In reality, some of this allocated memory is being used as working memory. This is a
+        # reasonable conservative assumption, because this function is typically called before (not during)
+        # working-memory-intensive operations. This conservative definition also helps to handle models whose size
+        # increased after initial load (e.g. a model whose precision was upcast by application code).
         if self._execution_device.type == "cuda":
             return torch.cuda.memory_allocated()
         elif self._execution_device.type == "mps":
@@ -389,29 +397,71 @@ class ModelCache:
             ram_total_available_to_cache = int(self._max_ram_cache_size_gb * GB)
             return ram_total_available_to_cache - self._get_ram_in_use()
 
+        # We have 3 strategies for calculating the amount of RAM available to the cache. We calculate all 3 options and
+        # then use a heuristic to decide which one to use.
+        # - Strategy 1: Match RAM cache size to VRAM cache size
+        # - Strategy 2: Aim to keep at least 10% of RAM free
+        # - Strategy 3: Use a minimum RAM cache size of 4GB
+
+        # ---------------------
+        # Calculate Strategy 1
+        # ---------------------
+        # Under Strategy 1, the RAM cache size is equal to the total VRAM available to the cache. The RAM cache size
+        # should **roughly** match the VRAM cache size for the following reasons:
+        # - Setting it much larger than the VRAM cache size means that we would accumulate mmap'ed model files for
+        #   models that are 0% loaded onto the GPU. Accumulating a large amount of virtual memory causes issues -
+        #   particularly on Windows. Instead, we should drop these extra models from the cache and rely on the OS's
+        #   disk caching behavior to make reloading them fast (if there is enough RAM for disk caching to be possible).
+        # - Setting it much smaller than the VRAM cache size would increase the likelihood that we drop models from the
+        #   cache even if they are partially loaded onto the GPU.
+        #
+        # TODO(ryand): In the future, we should re-think this strategy. Setting the RAM cache size like this doesn't
+        # really make sense, and is done primarily for consistency with legacy behavior. We should be relying on the
+        # OS's caching behavior more and make decisions about whether to drop models from the cache based primarily on
+        # how much of the model can be kept in VRAM.
+        cache_ram_used = self._get_ram_in_use()
+        if self._execution_device.type == "cpu":
+            # Strategy 1 is not applicable for CPU.
+            ram_available_based_on_default_ram_cache_size = 0
+        else:
+            default_ram_cache_size_bytes = self._get_total_vram_available_to_cache(None)
+            ram_available_based_on_default_ram_cache_size = default_ram_cache_size_bytes - cache_ram_used
+
+        # ---------------------
+        # Calculate Strategy 2
+        # ---------------------
+        # If RAM memory pressure is high, then we want to be more conservative with the RAM cache size.
         virtual_memory = psutil.virtual_memory()
         ram_total = virtual_memory.total
         ram_available = virtual_memory.available
         ram_used = ram_total - ram_available
-
-        # The total size of all the models in the cache will often be larger than the amount of RAM reported by psutil
-        # (due to lazy-loading and OS RAM caching behaviour). We could just rely on the psutil values, but it feels
-        # like a bad idea to over-fill the model cache. So, for now, we'll try to keep the total size of models in the
-        # cache under the total amount of system RAM.
-        cache_ram_used = self._get_ram_in_use()
-        ram_used = max(cache_ram_used, ram_used)
-
-        # Aim to keep 10% of RAM free.
+        # We aim to keep at least 10% of RAM free.
         ram_available_based_on_memory_usage = int(ram_total * 0.9) - ram_used
 
-        # If we are running out of RAM, then there's an increased likelihood that we will run into this issue:
+        # ---------------------
+        # Calculate Strategy 3
+        # ---------------------
+        # If the RAM cache is very small, then there's an increased likelihood that we will run into this issue:
         # https://github.com/invoke-ai/InvokeAI/issues/7513
         # To keep things running smoothly, there's a minimum RAM cache size that we always allow (even if this means
         # using swap).
         min_ram_cache_size_bytes = 4 * GB
         ram_available_based_on_min_cache_size = min_ram_cache_size_bytes - cache_ram_used
 
-        return max(ram_available_based_on_memory_usage, ram_available_based_on_min_cache_size)
+        # ----------------------------
+        # Decide which strategy to use
+        # ----------------------------
+        # First, take the minimum of strategies 1 and 2.
+        ram_available = min(ram_available_based_on_default_ram_cache_size, ram_available_based_on_memory_usage)
+        # Then, apply strategy 3 as the lower bound.
+        ram_available = max(ram_available, ram_available_based_on_min_cache_size)
+        self._logger.debug(
+            f"Calculated RAM available: {ram_available/MB:.2f} MB. Strategies considered (1,2,3): "
+            f"{ram_available_based_on_default_ram_cache_size/MB:.2f}, "
+            f"{ram_available_based_on_memory_usage/MB:.2f}, "
+            f"{ram_available_based_on_min_cache_size/MB:.2f}"
+        )
+        return ram_available
 
     def _get_ram_in_use(self) -> int:
         """Get the amount of RAM currently in use."""
