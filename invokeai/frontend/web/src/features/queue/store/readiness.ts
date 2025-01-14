@@ -85,10 +85,10 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
     }
 
     if (batchNodes.length > 1) {
-      const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['link_id']?.value);
-      for (const [linkId, batchNodes] of Object.entries(groupedBatchNodes)) {
-        if (!linkId) {
-          // No link ID implies ungrouped batch nodes, their collection sizes can be different
+      const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['batch_group_id']?.value);
+      for (const [batchGroupId, batchNodes] of Object.entries(groupedBatchNodes)) {
+        if (!batchGroupId) {
+          // No batch group ID implies ungrouped batch nodes, their collection sizes can be different
           continue;
         }
 
@@ -112,7 +112,9 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
         }
 
         if (collectionSizes.some((count) => count !== collectionSizes[0])) {
-          reasons.push({ content: i18n.t('parameters.invoke.batchNodeCollectionSizeMismatch', { linkId }) });
+          reasons.push({
+            content: i18n.t('parameters.invoke.batchNodeCollectionSizeMismatch', { batchGroupId }),
+          });
         }
       }
     }
