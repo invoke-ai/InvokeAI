@@ -46,10 +46,30 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
       // Handle zipping batch nodes. First group the batch nodes by their link_id
       const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['link_id']?.value);
 
+      const addProductBatchDataCollectionItem = (
+        edges: InvocationNodeEdge[],
+        items?: ImageField[] | string[] | number[]
+      ) => {
+        const productBatchDataCollectionItems: NonNullable<Batch['data']>[number] = [];
+        for (const edge of edges) {
+          if (!edge.targetHandle) {
+            break;
+          }
+          productBatchDataCollectionItems.push({
+            node_path: edge.target,
+            field_name: edge.targetHandle,
+            items,
+          });
+        }
+        if (productBatchDataCollectionItems.length > 0) {
+          data.push(productBatchDataCollectionItems);
+        }
+      };
+
       // Then, we will create a batch data collection item for each group
-      for (const [_linkId, batchNodes] of Object.entries(groupedBatchNodes)) {
-        const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
-        const addBatchDataCollectionItem = (
+      for (const [linkId, batchNodes] of Object.entries(groupedBatchNodes)) {
+        const zippedBatchDataCollectionItems: NonNullable<Batch['data']>[number] = [];
+        const addZippedBatchDataCollectionItem = (
           edges: InvocationNodeEdge[],
           items?: ImageField[] | string[] | number[]
         ) => {
@@ -57,7 +77,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
             if (!edge.targetHandle) {
               break;
             }
-            batchDataCollectionItem.push({
+            zippedBatchDataCollectionItems.push({
               node_path: edge.target,
               field_name: edge.targetHandle,
               items,
@@ -78,7 +98,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
           // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
           const edgesFromImageBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'image');
-          addBatchDataCollectionItem(edgesFromImageBatch, images.value);
+          if (linkId) {
+            addZippedBatchDataCollectionItem(edgesFromImageBatch, images.value);
+          } else {
+            addProductBatchDataCollectionItem(edgesFromImageBatch, images.value);
+          }
         }
 
         // Grab string batch nodes for special handling
@@ -93,7 +117,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
           // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
           const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
-          addBatchDataCollectionItem(edgesFromStringBatch, strings.value);
+          if (linkId) {
+            addZippedBatchDataCollectionItem(edgesFromStringBatch, strings.value);
+          } else {
+            addProductBatchDataCollectionItem(edgesFromStringBatch, strings.value);
+          }
         }
 
         // Grab integer batch nodes for special handling
@@ -112,7 +140,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
           // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
           const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
-          addBatchDataCollectionItem(edgesFromStringBatch, integers.value);
+          if (linkId) {
+            addZippedBatchDataCollectionItem(edgesFromStringBatch, integers.value);
+          } else {
+            addProductBatchDataCollectionItem(edgesFromStringBatch, integers.value);
+          }
         }
 
         // Grab float batch nodes for special handling
@@ -131,12 +163,16 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
           // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
           const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
-          addBatchDataCollectionItem(edgesFromStringBatch, floats.value);
+          if (linkId) {
+            addZippedBatchDataCollectionItem(edgesFromStringBatch, floats.value);
+          } else {
+            addProductBatchDataCollectionItem(edgesFromStringBatch, floats.value);
+          }
         }
 
         // Finally, if this batch data collection item has any items, add it to the data array
-        if (batchDataCollectionItem.length > 0) {
-          data.push(batchDataCollectionItem);
+        if (linkId && zippedBatchDataCollectionItems.length > 0) {
+          data.push(zippedBatchDataCollectionItems);
         }
       }
 
