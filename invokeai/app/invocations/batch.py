@@ -23,6 +23,13 @@ BATCH_GROUP_IDS = Literal[
 ]
 
 
+class NotExecutableNodeError(Exception):
+    def __init__(self, message: str = "This class should never be executed or instantiated directly."):
+        super().__init__(message)
+
+    pass
+
+
 class BaseBatchInvocation(BaseInvocation):
     batch_group_id: BATCH_GROUP_IDS = InputField(
         default="None",
@@ -32,7 +39,7 @@ class BaseBatchInvocation(BaseInvocation):
     )
 
     def __init__(self):
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
+        raise NotExecutableNodeError()
 
 
 @invocation(
@@ -51,7 +58,7 @@ class ImageBatchInvocation(BaseBatchInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
+        raise NotExecutableNodeError()
 
 
 @invocation(
@@ -70,7 +77,7 @@ class StringBatchInvocation(BaseBatchInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
+        raise NotExecutableNodeError()
 
 
 @invocation(
@@ -89,7 +96,7 @@ class IntegerBatchInvocation(BaseBatchInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
+        raise NotExecutableNodeError()
 
 
 @invocation(
@@ -108,4 +115,4 @@ class FloatBatchInvocation(BaseBatchInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
+        raise NotExecutableNodeError()
