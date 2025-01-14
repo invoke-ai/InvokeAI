@@ -854,6 +854,7 @@
         "defaultVAE": "Default VAE"
     },
     "nodes": {
+        "noBatchGroup": "no group",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
         "addLinearView": "Add to Linear View",
