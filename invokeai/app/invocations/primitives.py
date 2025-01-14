@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 
@@ -540,10 +540,19 @@ class BoundingBoxInvocation(BaseInvocation):
 
 # endregion
 
+BATCH_GROUP_IDS = Literal[
+    "None",
+    "Group 1",
+    "Group 2",
+    "Group 3",
+    "Group 4",
+    "Group 5",
+]
+
 
 class BaseBatchInvocation(BaseInvocation):
-    batch_group_id: str | None = InputField(
-        default=None,
+    batch_group_id: BATCH_GROUP_IDS = InputField(
+        default="None",
         description="The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.",
         input=Input.Direct,
     )
