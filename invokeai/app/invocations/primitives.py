@@ -542,7 +542,11 @@ class BoundingBoxInvocation(BaseInvocation):
 
 
 class BaseBatchInvocation(BaseInvocation):
-    link_id: str = InputField(default="", description="The zipped data ID", input=Input.Direct)
+    batch_group_id: str | None = InputField(
+        default=None,
+        description="The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.",
+        input=Input.Direct,
+    )
 
     def __init__(self):
         raise NotImplementedError("This class should never be executed or instantiated directly.")
