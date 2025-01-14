@@ -6463,9 +6463,10 @@ export type components = {
             /**
              * Batch Group Id
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
-             * @default null
+             * @default None
+             * @enum {string}
              */
-            batch_group_id?: string | null;
+            batch_group_id?: "None" | "Group 1" | "Group 2" | "Group 3" | "Group 4" | "Group 5";
             /**
              * Floats
              * @description The floats to batch over
@@ -8406,9 +8407,10 @@ export type components = {
             /**
              * Batch Group Id
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
-             * @default null
+             * @default None
+             * @enum {string}
              */
-            batch_group_id?: string | null;
+            batch_group_id?: "None" | "Group 1" | "Group 2" | "Group 3" | "Group 4" | "Group 5";
             /**
              * Images
              * @description The images to batch over
@@ -10107,9 +10109,10 @@ export type components = {
             /**
              * Batch Group Id
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
-             * @default null
+             * @default None
+             * @enum {string}
              */
-            batch_group_id?: string | null;
+            batch_group_id?: "None" | "Group 1" | "Group 2" | "Group 3" | "Group 4" | "Group 5";
             /**
              * Integers
              * @description The integers to batch over
@@ -17195,9 +17198,10 @@ export type components = {
             /**
              * Batch Group Id
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
-             * @default null
+             * @default None
+             * @enum {string}
              */
-            batch_group_id?: string | null;
+            batch_group_id?: "None" | "Group 1" | "Group 2" | "Group 3" | "Group 4" | "Group 5";
             /**
              * Strings
              * @description The strings to batch over
