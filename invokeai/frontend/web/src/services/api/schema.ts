@@ -6461,7 +6461,7 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Batch Group Id
+             * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
              * @enum {string}
@@ -8405,7 +8405,7 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Batch Group Id
+             * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
              * @enum {string}
@@ -10107,7 +10107,7 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Batch Group Id
+             * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
              * @enum {string}
@@ -17196,7 +17196,7 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Batch Group Id
+             * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
              * @enum {string}
