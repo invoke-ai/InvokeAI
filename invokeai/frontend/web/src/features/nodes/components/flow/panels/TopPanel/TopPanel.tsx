@@ -13,7 +13,6 @@ const TopCenterPanel = () => {
   const name = useAppSelector(selectWorkflowName);
   return (
     <Flex gap={2} top={2} left={2} right={2} position="absolute" alignItems="flex-start" pointerEvents="none">
-      <Flex flexDir="column" gap="2">
       <Flex gap="2">
         <AddNodeButton />
         <UpdateNodesButton />
