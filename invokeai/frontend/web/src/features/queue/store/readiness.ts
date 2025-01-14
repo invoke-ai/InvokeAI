@@ -572,12 +572,12 @@ const buildSelectGroupBatchSizes = (batchGroupId: string) =>
       .map(getBatchCollectionSize);
   });
 
-export const selectUngroupedBatchSizes = buildSelectGroupBatchSizes('None');
-export const selectGroup1BatchSizes = buildSelectGroupBatchSizes('Group 1');
-export const selectGroup2BatchSizes = buildSelectGroupBatchSizes('Group 2');
-export const selectGroup3BatchSizes = buildSelectGroupBatchSizes('Group 3');
-export const selectGroup4BatchSizes = buildSelectGroupBatchSizes('Group 4');
-export const selectGroup5BatchSizes = buildSelectGroupBatchSizes('Group 5');
+const selectUngroupedBatchSizes = buildSelectGroupBatchSizes('None');
+const selectGroup1BatchSizes = buildSelectGroupBatchSizes('Group 1');
+const selectGroup2BatchSizes = buildSelectGroupBatchSizes('Group 2');
+const selectGroup3BatchSizes = buildSelectGroupBatchSizes('Group 3');
+const selectGroup4BatchSizes = buildSelectGroupBatchSizes('Group 4');
+const selectGroup5BatchSizes = buildSelectGroupBatchSizes('Group 5');
 
 export const selectWorkflowsBatchSize = createSelector(
   selectUngroupedBatchSizes,
