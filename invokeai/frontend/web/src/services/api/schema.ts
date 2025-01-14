@@ -6461,6 +6461,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Link Id
+             * @description The zipped data ID
+             * @default
+             */
+            link_id?: string;
+            /**
              * Floats
              * @description The floats to batch over
              * @default []
@@ -8398,6 +8404,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Link Id
+             * @description The zipped data ID
+             * @default
+             */
+            link_id?: string;
+            /**
              * Images
              * @description The images to batch over
              * @default []
@@ -10092,6 +10104,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Link Id
+             * @description The zipped data ID
+             * @default
+             */
+            link_id?: string;
             /**
              * Integers
              * @description The integers to batch over
@@ -17174,6 +17192,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Link Id
+             * @description The zipped data ID
+             * @default
+             */
+            link_id?: string;
             /**
              * Strings
              * @description The strings to batch over
