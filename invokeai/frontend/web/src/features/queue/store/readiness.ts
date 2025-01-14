@@ -86,6 +86,12 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
       reasons.push({ content: i18n.t('parameters.invoke.noNodesInGraph') });
     }
 
+    for (const node of batchNodes) {
+      if (nodes.edges.find((e) => e.source === node.id) === undefined) {
+        reasons.push({ content: i18n.t('parameters.invoke.batchNodeNotConnected', { label: node.data.label }) });
+      }
+    }
+
     if (batchNodes.length > 1) {
       const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['batch_group_id']?.value);
       for (const [batchGroupId, batchNodes] of Object.entries(groupedBatchNodes)) {
