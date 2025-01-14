@@ -1036,6 +1036,7 @@
             "missingInputForField": "missing input",
             "missingNodeTemplate": "Missing node template",
             "collectionEmpty": "empty collection",
+            "batchNodeNotConnected": "Batch node not connected: {{label}}",
             "collectionTooFewItems": "too few items, minimum {{minItems}}",
             "collectionTooManyItems": "too many items, maximum {{maxItems}}",
             "collectionStringTooLong": "too long, max {{maxLength}}",
