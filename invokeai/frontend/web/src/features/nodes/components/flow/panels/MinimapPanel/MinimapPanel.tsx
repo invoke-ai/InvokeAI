@@ -20,7 +20,7 @@ const MinimapPanel = () => {
   const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
 
   return (
-    <Flex gap={2} position="absolute" bottom={0} insetInlineEnd={0}>
+    <Flex gap={2} position="absolute" bottom={2} insetInlineEnd={2}>
       {shouldShowMinimapPanel && (
         <ChakraMiniMap
           pannable
