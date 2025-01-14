@@ -154,7 +154,7 @@ class ModelCache:
 
         # Wrap model.
         if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
-            wrapped_model = CachedModelWithPartialLoad(model, self._execution_device)
+            wrapped_model = CachedModelWithPartialLoad(model, self._execution_device, keep_ram_copy=False)
         else:
             wrapped_model = CachedModelOnlyFullLoad(model, self._execution_device, size)
 

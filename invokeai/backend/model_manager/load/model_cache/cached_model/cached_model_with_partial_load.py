@@ -14,33 +14,37 @@ class CachedModelWithPartialLoad:
     MPS memory, etc.
     """
 
-    def __init__(self, model: torch.nn.Module, compute_device: torch.device):
+    def __init__(self, model: torch.nn.Module, compute_device: torch.device, keep_ram_copy: bool = False):
         self._model = model
         self._compute_device = compute_device
 
-        # A CPU read-only copy of the model's state dict.
-        self._cpu_state_dict: dict[str, torch.Tensor] = model.state_dict()
+        model_state_dict = model.state_dict()
+        # A CPU read-only copy of the model's state dict. Used for faster model unloads from VRAM, and to speed up LoRA
+        # patching. Set to `None` if keep_ram_copy is False.
+        self._cpu_state_dict: dict[str, torch.Tensor] | None = model_state_dict if keep_ram_copy else None
 
         # A dictionary of the size of each tensor in the state dict.
         # HACK(ryand): We use this dictionary any time we are doing byte tracking calculations. We do this for
         # consistency in case the application code has modified the model's size (e.g. by casting to a different
         # precision). Of course, this means that we are making model cache load/unload decisions based on model size
         # data that may not be fully accurate.
-        self._state_dict_bytes = {k: calc_tensor_size(v) for k, v in self._cpu_state_dict.items()}
+        self._state_dict_bytes = {k: calc_tensor_size(v) for k, v in model_state_dict.items()}
 
         self._total_bytes = sum(self._state_dict_bytes.values())
         self._cur_vram_bytes: int | None = None
 
         self._modules_that_support_autocast = self._find_modules_that_support_autocast()
-        self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast()
+        self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast(
+            model_state_dict
+        )
 
     def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
         """Find all modules that support autocasting."""
         return {n: m for n, m in self._model.named_modules() if isinstance(m, CustomModuleMixin)}  # type: ignore
 
-    def _find_keys_in_modules_that_do_not_support_autocast(self) -> set[str]:
+    def _find_keys_in_modules_that_do_not_support_autocast(self, state_dict: dict[str, torch.Tensor]) -> set[str]:
         keys_in_modules_that_do_not_support_autocast: set[str] = set()
-        for key in self._cpu_state_dict.keys():
+        for key in state_dict.keys():
             for module_name in self._modules_that_support_autocast.keys():
                 if key.startswith(module_name):
                     break
@@ -191,7 +195,11 @@ class CachedModelWithPartialLoad:
                 required_weights_in_vram += self._state_dict_bytes[key]
                 continue
 
-            cur_state_dict[key] = self._cpu_state_dict[key]
+            if self._cpu_state_dict is not None:
+                cur_state_dict[key] = self._cpu_state_dict[key]
+            else:
+                cur_state_dict[key] = param.to("cpu")
+
             vram_bytes_freed += self._state_dict_bytes[key]
 
         if vram_bytes_freed > 0:
