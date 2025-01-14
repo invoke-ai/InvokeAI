@@ -26,7 +26,7 @@ const EnumFieldInputComponent = (props: FieldComponentProps<EnumFieldInputInstan
   );
 
   return (
-    <Select className="nowheel nodrag" onChange={handleValueChanged} value={field.value}>
+    <Select className="nowheel nodrag" onChange={handleValueChanged} value={field.value} size="sm">
       {fieldTemplate.options.map((option) => (
         <option key={option} value={option}>
           {fieldTemplate.ui_choice_labels ? fieldTemplate.ui_choice_labels[option] : option}
