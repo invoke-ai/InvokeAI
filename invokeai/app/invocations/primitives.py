@@ -541,6 +541,13 @@ class BoundingBoxInvocation(BaseInvocation):
 # endregion
 
 
+class BaseBatchInvocation(BaseInvocation):
+    link_id: str = InputField(default="", description="The zipped data ID", input=Input.Direct)
+
+    def __init__(self):
+        raise NotImplementedError("This class should never be executed or instantiated directly.")
+
+
 @invocation(
     "image_batch",
     title="Image Batch",
@@ -549,15 +556,12 @@ class BoundingBoxInvocation(BaseInvocation):
     version="1.0.0",
     classification=Classification.Special,
 )
-class ImageBatchInvocation(BaseInvocation):
+class ImageBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each image in the batch."""
 
     images: list[ImageField] = InputField(
         default=[], min_length=1, description="The images to batch over", input=Input.Direct
     )
-
-    def __init__(self):
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         raise NotImplementedError("This class should never be executed or instantiated directly.")
@@ -571,15 +575,12 @@ class ImageBatchInvocation(BaseInvocation):
     version="1.0.0",
     classification=Classification.Special,
 )
-class StringBatchInvocation(BaseInvocation):
+class StringBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each string in the batch."""
 
     strings: list[str] = InputField(
         default=[], min_length=1, description="The strings to batch over", input=Input.Direct
     )
-
-    def __init__(self):
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
 
     def invoke(self, context: InvocationContext) -> StringOutput:
         raise NotImplementedError("This class should never be executed or instantiated directly.")
@@ -593,15 +594,12 @@ class StringBatchInvocation(BaseInvocation):
     version="1.0.0",
     classification=Classification.Special,
 )
-class IntegerBatchInvocation(BaseInvocation):
+class IntegerBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each integer in the batch."""
 
     integers: list[int] = InputField(
         default=[], min_length=1, description="The integers to batch over", input=Input.Direct
     )
-
-    def __init__(self):
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         raise NotImplementedError("This class should never be executed or instantiated directly.")
@@ -615,15 +613,12 @@ class IntegerBatchInvocation(BaseInvocation):
     version="1.0.0",
     classification=Classification.Special,
 )
-class FloatBatchInvocation(BaseInvocation):
+class FloatBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each float in the batch."""
 
     floats: list[float] = InputField(
         default=[], min_length=1, description="The floats to batch over", input=Input.Direct
     )
-
-    def __init__(self):
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
         raise NotImplementedError("This class should never be executed or instantiated directly.")
