@@ -6,7 +6,7 @@ from typing import Optional
 
 import accelerate
 import torch
-from safetensors.torch import load_file
+from safetensors.torch import load, load_file
 from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.services.config.config_default import get_config
@@ -82,7 +82,8 @@ class FluxVAELoader(ModelLoader):
 
         with SilenceWarnings():
             model = AutoEncoder(ae_params[config.config_path])
-            sd = load_file(model_path)
+            # sd = load_file(model_path)
+            sd = load(open(model_path, "rb").read())
             model.load_state_dict(sd, assign=True)
             # VAE is broken in float16, which mps defaults to
             if self._torch_dtype == torch.float16:
@@ -219,7 +220,8 @@ class FluxCheckpointModel(ModelLoader):
 
         with SilenceWarnings():
             model = Flux(params[config.config_path])
-            sd = load_file(model_path)
+            # sd = load_file(model_path)
+            sd = load(open(model_path, "rb").read())
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             new_sd_size = sum([ten.nelement() * torch.bfloat16.itemsize for ten in sd.values()])
