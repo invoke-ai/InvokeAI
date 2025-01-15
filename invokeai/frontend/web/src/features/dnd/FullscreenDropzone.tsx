@@ -20,7 +20,7 @@ import { z } from 'zod';
 
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpg', 'image/jpeg'];
 const ACCEPTED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
-const log = logger('paste');
+const log = logger('gallery');
 
 // const MAX_IMAGE_SIZE = 4; //In MegaBytes
 // const sizeInMB = (sizeInBytes: number, decimalsNum = 2) => {
@@ -107,7 +107,7 @@ export const FullscreenDropzone = memo(() => {
 
       uploadImages(uploadArgs);
     },
-    [maxImageUploadCount, t]
+    [t]
   );
 
   useEffect(() => {
