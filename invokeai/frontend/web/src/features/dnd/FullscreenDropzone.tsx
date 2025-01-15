@@ -4,7 +4,6 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Heading } from '@invoke-ai/ui-library';
-import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
@@ -21,8 +20,6 @@ import { z } from 'zod';
 
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpg', 'image/jpeg'];
 const ACCEPTED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
-
-const log = logger('generation');
 
 // const MAX_IMAGE_SIZE = 4; //In MegaBytes
 // const sizeInMB = (sizeInBytes: number, decimalsNum = 2) => {
@@ -77,11 +74,9 @@ export const FullscreenDropzone = memo(() => {
 
   const validateAndUploadFiles = useCallback(
     (files: File[]) => {
-      log.info('validateAndUploadFiles');
       const { getState } = getStore();
       const uploadFilesSchema = getFilesSchema(maxImageUploadCount);
       const parseResult = uploadFilesSchema.safeParse(files);
-      log.info('parseResult');
 
       if (!parseResult.success) {
         const description =
@@ -114,10 +109,7 @@ export const FullscreenDropzone = memo(() => {
 
   const onPaste = useCallback(
     (e: ClipboardEvent) => {
-      log.info('in paste');
-      log.info(`clipboardData: ${JSON.stringify(e.clipboardData)}`);
       if (!e.clipboardData?.files) {
-        log.info('no files');
         return;
       }
       const files = Array.from(e.clipboardData.files);
@@ -162,18 +154,10 @@ export const FullscreenDropzone = memo(() => {
   }, [validateAndUploadFiles]);
 
   useEffect(() => {
-    log.info('use effect');
-    // const controller = new AbortController();
-    try {
-      window.addEventListener('paste', onPaste);
-    } catch (error) {
-      log.info(`error: ${JSON.stringify(error)}`);
-    }
+    window.addEventListener('paste', onPaste);
 
     return () => {
-      log.info('abort');
       window.removeEventListener('paste', onPaste);
-      // controller.abort();
     };
   }, [onPaste]);
 
