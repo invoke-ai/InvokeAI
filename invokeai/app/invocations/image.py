@@ -23,9 +23,9 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
-from invokeai.app.util.misc import SEED_MAX
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.1")
@@ -331,9 +331,9 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
         a = numpy.array(a_orig, dtype=numpy.float32) / 255.0  # Normalize alpha to [0, 1]
 
         # Unpremultiply RGB channels by alpha
-        r /= (a + 1e-6)  # Add a small epsilon to avoid division by zero
-        g /= (a + 1e-6)
-        b /= (a + 1e-6)
+        r /= a + 1e-6  # Add a small epsilon to avoid division by zero
+        g /= a + 1e-6
+        b /= a + 1e-6
 
         # Convert back to PIL images
         r = Image.fromarray(numpy.uint8(numpy.clip(r, 0, 255)))
@@ -1134,12 +1134,18 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 noise = numpy.stack([noise] * 3, axis=-1)
         elif self.noise_type == "salt_and_pepper":
             if self.noise_color:
-                noise = rs.choice([0, 255], (image.height // self.size, image.width // self.size, 3), p=[1 - self.amount, self.amount])
+                noise = rs.choice(
+                    [0, 255], (image.height // self.size, image.width // self.size, 3), p=[1 - self.amount, self.amount]
+                )
             else:
-                noise = rs.choice([0, 255], (image.height // self.size, image.width // self.size), p=[1 - self.amount, self.amount])
+                noise = rs.choice(
+                    [0, 255], (image.height // self.size, image.width // self.size), p=[1 - self.amount, self.amount]
+                )
                 noise = numpy.stack([noise] * 3, axis=-1)
 
-        noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB").resize((image.width, image.height), Image.Resampling.NEAREST)
+        noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB").resize(
+            (image.width, image.height), Image.Resampling.NEAREST
+        )
         noisy_image = Image.blend(image.convert("RGB"), noise, self.amount).convert("RGBA")
 
         # Paste back the alpha channel
