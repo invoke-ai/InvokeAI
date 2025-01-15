@@ -146,7 +146,7 @@ export const FullscreenDropzone = memo(() => {
   useEffect(() => {
     const controller = new AbortController();
 
-    document.addEventListener(
+    window.addEventListener(
       'paste',
       (e) => {
         if (!e.clipboardData?.files) {
