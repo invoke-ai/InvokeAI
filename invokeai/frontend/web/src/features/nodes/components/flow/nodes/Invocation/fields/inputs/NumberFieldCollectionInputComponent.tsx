@@ -1,33 +1,45 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Button,
-  ButtonGroup,
   CompositeNumberInput,
   Divider,
   Flex,
+  FormControl,
   FormLabel,
   Grid,
   GridItem,
   IconButton,
+  Switch,
+  Text,
 } from '@invoke-ai/ui-library';
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { openFloatRangeGeneratorModal } from 'features/nodes/components/FloatRangeGeneratorModal';
-import { openIntegerRangeGeneratorModal } from 'features/nodes/components/IntegerRangeGeneratorModal';
+import { FloatRangeGenerator } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatRangeGenerator';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
-import { fieldNumberCollectionValueChanged } from 'features/nodes/store/nodesSlice';
+import {
+  fieldNumberCollectionGeneratorCommitted,
+  fieldNumberCollectionGeneratorStateChanged,
+  fieldNumberCollectionGeneratorToggled,
+  fieldNumberCollectionLockLinearViewToggled,
+  fieldNumberCollectionValueChanged,
+} from 'features/nodes/store/nodesSlice';
 import type {
   FloatFieldCollectionInputInstance,
   FloatFieldCollectionInputTemplate,
   IntegerFieldCollectionInputInstance,
   IntegerFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
-import { isNil } from 'lodash-es';
+import { resolveNumberFieldCollectionValue } from 'features/nodes/types/fieldValidators';
+import type {
+  FloatRangeStartStepCountGenerator,
+  IntegerRangeStartStepCountGenerator,
+} from 'features/nodes/types/generators';
+import { isNil, round } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiLockSimpleFill, PiLockSimpleOpenFill, PiXBold } from 'react-icons/pi';
 
 import type { FieldComponentProps } from './types';
 
@@ -47,7 +59,7 @@ export const NumberFieldCollectionInputComponent = memo(
       | FieldComponentProps<IntegerFieldCollectionInputInstance, IntegerFieldCollectionInputTemplate>
       | FieldComponentProps<FloatFieldCollectionInputInstance, FloatFieldCollectionInputTemplate>
   ) => {
-    const { nodeId, field, fieldTemplate } = props;
+    const { nodeId, field, fieldTemplate, isLinearView } = props;
     const store = useAppStore();
     const { t } = useTranslation();
 
@@ -76,17 +88,6 @@ export const NumberFieldCollectionInputComponent = memo(
       const newValue = field.value ? [...field.value, 0] : [0];
       store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
     }, [field.name, field.value, nodeId, store]);
-
-    const onOpenGenerator = useCallback(() => {
-      const onSave = (values: number[]) => {
-        store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: values }));
-      };
-      if (isIntegerField) {
-        openIntegerRangeGeneratorModal(onSave);
-      } else {
-        openFloatRangeGeneratorModal(onSave);
-      }
-    }, [field.name, isIntegerField, nodeId, store]);
 
     const min = useMemo(() => {
       let min = -NUMPY_RAND_MAX;
@@ -124,6 +125,32 @@ export const NumberFieldCollectionInputComponent = memo(
       return fieldTemplate.multipleOf;
     }, [fieldTemplate.multipleOf, isIntegerField]);
 
+    const toggleGenerator = useCallback(() => {
+      store.dispatch(fieldNumberCollectionGeneratorToggled({ nodeId, fieldName: field.name }));
+    }, [field.name, nodeId, store]);
+
+    const onChangeGenerator = useCallback(
+      (generatorState: FloatRangeStartStepCountGenerator | IntegerRangeStartStepCountGenerator) => {
+        store.dispatch(fieldNumberCollectionGeneratorStateChanged({ nodeId, fieldName: field.name, generatorState }));
+      },
+      [field.name, nodeId, store]
+    );
+
+    const onCommitGenerator = useCallback(() => {
+      store.dispatch(fieldNumberCollectionGeneratorCommitted({ nodeId, fieldName: field.name }));
+    }, [field.name, nodeId, store]);
+
+    const onToggleLockLinearView = useCallback(() => {
+      store.dispatch(fieldNumberCollectionLockLinearViewToggled({ nodeId, fieldName: field.name }));
+    }, [field.name, nodeId, store]);
+
+    const valuesAsString = useMemo(() => {
+      const resolvedValue = resolveNumberFieldCollectionValue(field);
+      return resolvedValue ? resolvedValue.map((val) => round(val, 2)).join(', ') : '';
+    }, [field]);
+
+    const isLockedOnLinearView = !(field.lockLinearView && isLinearView);
+
     return (
       <Flex
         className="nodrag"
@@ -140,17 +167,48 @@ export const NumberFieldCollectionInputComponent = memo(
         flexDir="column"
         gap={1}
       >
-        <ButtonGroup isAttached={false} size="sm" w="full" gap={1}>
-          <Button onClick={onAddNumber} variant="ghost" w="50%">
-            {t('nodes.addItem')}
-          </Button>
-          <Button onClick={onOpenGenerator} variant="ghost" w="50%">
-            {t('nodes.generateValues')}
-          </Button>
-        </ButtonGroup>
-        {field.value && field.value.length > 0 && (
+        <Flex w="full" gap={2}>
+          {!field.generator && (
+            <Button onClick={onAddNumber} variant="ghost" flexGrow={1} size="sm">
+              {t('nodes.addValue')}
+            </Button>
+          )}
+          {field.generator && isLockedOnLinearView && (
+            <Button
+              tooltip={
+                <Flex p={1} flexDir="column">
+                  <Text fontWeight="semibold">{t('nodes.generatedValues')}:</Text>
+                  <Text fontFamily="monospace">{valuesAsString}</Text>
+                </Flex>
+              }
+              onClick={onCommitGenerator}
+              variant="ghost"
+              flexGrow={1}
+              size="sm"
+            >
+              {t('nodes.commitValues')}
+            </Button>
+          )}
+          {isLockedOnLinearView && (
+            <FormControl w="min-content" pe={isLinearView ? 2 : undefined}>
+              <FormLabel m={0}>{t('nodes.generator')}</FormLabel>
+              <Switch onChange={toggleGenerator} isChecked={Boolean(field.generator)} size="sm" />
+            </FormControl>
+          )}
+          {!isLinearView && (
+            <IconButton
+              onClick={onToggleLockLinearView}
+              tooltip={field.lockLinearView ? t('nodes.unlockLinearView') : t('nodes.lockLinearView')}
+              aria-label={field.lockLinearView ? t('nodes.unlockLinearView') : t('nodes.lockLinearView')}
+              icon={field.lockLinearView ? <PiLockSimpleFill /> : <PiLockSimpleOpenFill />}
+              variant="ghost"
+              size="sm"
+            />
+          )}
+        </Flex>
+        {!field.generator && field.value && field.value.length > 0 && (
           <>
-            <Divider />
+            {!(field.lockLinearView && isLinearView) && <Divider />}
             <OverlayScrollbarsComponent
               className="nowheel"
               defer
@@ -174,6 +232,12 @@ export const NumberFieldCollectionInputComponent = memo(
                 ))}
               </Grid>
             </OverlayScrollbarsComponent>
+          </>
+        )}
+        {field.generator && field.generator.type === 'float-range-generator-start-step-count' && (
+          <>
+            {!(field.lockLinearView && isLinearView) && <Divider />}
+            <FloatRangeGenerator state={field.generator} onChange={onChangeGenerator} />
           </>
         )}
       </Flex>

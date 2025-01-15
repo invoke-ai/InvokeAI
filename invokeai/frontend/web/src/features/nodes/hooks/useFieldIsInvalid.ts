@@ -63,13 +63,13 @@ export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
       }
 
       if (isIntegerFieldCollectionInputInstance(field) && isIntegerFieldCollectionInputTemplate(template)) {
-        if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
+        if (validateNumberFieldCollectionValue(field, template).length > 0) {
           return true;
         }
       }
 
       if (isFloatFieldCollectionInputInstance(field) && isFloatFieldCollectionInputTemplate(template)) {
-        if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
+        if (validateNumberFieldCollectionValue(field, template).length > 0) {
           return true;
         }
       }

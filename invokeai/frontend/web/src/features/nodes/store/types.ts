@@ -1,8 +1,8 @@
 import type {
   FieldIdentifier,
+  FieldInputInstance,
   FieldInputTemplate,
   FieldOutputTemplate,
-  StatefulFieldValue,
 } from 'features/nodes/types/field';
 import type {
   AnyNode,
@@ -31,15 +31,15 @@ export type NodesState = {
 };
 
 export type WorkflowMode = 'edit' | 'view';
-export type FieldIdentifierWithValue = FieldIdentifier & {
-  value: StatefulFieldValue;
+export type FieldIdentifierWithInstance = FieldIdentifier & {
+  field: FieldInputInstance;
 };
 
 export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
-  _version: 1;
+  _version: 2;
   isTouched: boolean;
   mode: WorkflowMode;
-  originalExposedFieldValues: FieldIdentifierWithValue[];
+  originalExposedFieldValues: FieldIdentifierWithInstance[];
   searchTerm: string;
   orderBy?: WorkflowRecordOrderBy;
   orderDirection: SQLiteDirection;

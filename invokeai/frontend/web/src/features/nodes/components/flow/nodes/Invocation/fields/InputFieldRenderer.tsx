@@ -99,109 +99,285 @@ import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
 type InputFieldProps = {
   nodeId: string;
   fieldName: string;
+  isLinearView: boolean;
 };
 
-const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
+const InputFieldRenderer = ({ nodeId, fieldName, isLinearView }: InputFieldProps) => {
   const fieldInstance = useFieldInputInstance(nodeId, fieldName);
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
 
   if (isStringFieldCollectionInputInstance(fieldInstance) && isStringFieldCollectionInputTemplate(fieldTemplate)) {
-    return <StringFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <StringFieldCollectionInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
-    return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <StringFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isBooleanFieldInputInstance(fieldInstance) && isBooleanFieldInputTemplate(fieldTemplate)) {
-    return <BooleanFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <BooleanFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isIntegerFieldInputInstance(fieldInstance) && isIntegerFieldInputTemplate(fieldTemplate)) {
-    return <NumberFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <NumberFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isFloatFieldInputInstance(fieldInstance) && isFloatFieldInputTemplate(fieldTemplate)) {
-    return <NumberFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <NumberFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isIntegerFieldCollectionInputInstance(fieldInstance) && isIntegerFieldCollectionInputTemplate(fieldTemplate)) {
-    return <NumberFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <NumberFieldCollectionInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isFloatFieldCollectionInputInstance(fieldInstance) && isFloatFieldCollectionInputTemplate(fieldTemplate)) {
-    return <NumberFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <NumberFieldCollectionInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isEnumFieldInputInstance(fieldInstance) && isEnumFieldInputTemplate(fieldTemplate)) {
-    return <EnumFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <EnumFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isImageFieldCollectionInputInstance(fieldInstance) && isImageFieldCollectionInputTemplate(fieldTemplate)) {
-    return <ImageFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ImageFieldCollectionInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isImageFieldInputInstance(fieldInstance) && isImageFieldInputTemplate(fieldTemplate)) {
-    return <ImageFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ImageFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isBoardFieldInputInstance(fieldInstance) && isBoardFieldInputTemplate(fieldTemplate)) {
-    return <BoardFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <BoardFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isMainModelFieldInputInstance(fieldInstance) && isMainModelFieldInputTemplate(fieldTemplate)) {
-    return <MainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <MainModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isModelIdentifierFieldInputInstance(fieldInstance) && isModelIdentifierFieldInputTemplate(fieldTemplate)) {
-    return <ModelIdentifierFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ModelIdentifierFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isSDXLRefinerModelFieldInputInstance(fieldInstance) && isSDXLRefinerModelFieldInputTemplate(fieldTemplate)) {
-    return <RefinerModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <RefinerModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isVAEModelFieldInputInstance(fieldInstance) && isVAEModelFieldInputTemplate(fieldTemplate)) {
-    return <VAEModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <VAEModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isT5EncoderModelFieldInputInstance(fieldInstance) && isT5EncoderModelFieldInputTemplate(fieldTemplate)) {
-    return <T5EncoderModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <T5EncoderModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
   if (isCLIPEmbedModelFieldInputInstance(fieldInstance) && isCLIPEmbedModelFieldInputTemplate(fieldTemplate)) {
-    return <CLIPEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <CLIPEmbedModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isCLIPLEmbedModelFieldInputInstance(fieldInstance) && isCLIPLEmbedModelFieldInputTemplate(fieldTemplate)) {
-    return <CLIPLEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <CLIPLEmbedModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isCLIPGEmbedModelFieldInputInstance(fieldInstance) && isCLIPGEmbedModelFieldInputTemplate(fieldTemplate)) {
-    return <CLIPGEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <CLIPGEmbedModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isControlLoRAModelFieldInputInstance(fieldInstance) && isControlLoRAModelFieldInputTemplate(fieldTemplate)) {
-    return <ControlLoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ControlLoRAModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isFluxVAEModelFieldInputInstance(fieldInstance) && isFluxVAEModelFieldInputTemplate(fieldTemplate)) {
-    return <FluxVAEModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <FluxVAEModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isLoRAModelFieldInputInstance(fieldInstance) && isLoRAModelFieldInputTemplate(fieldTemplate)) {
-    return <LoRAModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <LoRAModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isControlNetModelFieldInputInstance(fieldInstance) && isControlNetModelFieldInputTemplate(fieldTemplate)) {
-    return <ControlNetModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ControlNetModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isIPAdapterModelFieldInputInstance(fieldInstance) && isIPAdapterModelFieldInputTemplate(fieldTemplate)) {
-    return <IPAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <IPAdapterModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isT2IAdapterModelFieldInputInstance(fieldInstance) && isT2IAdapterModelFieldInputTemplate(fieldTemplate)) {
-    return <T2IAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <T2IAdapterModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (
@@ -213,28 +389,64 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
         nodeId={nodeId}
         field={fieldInstance}
         fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
       />
     );
   }
 
   if (isColorFieldInputInstance(fieldInstance) && isColorFieldInputTemplate(fieldTemplate)) {
-    return <ColorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <ColorFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isFluxMainModelFieldInputInstance(fieldInstance) && isFluxMainModelFieldInputTemplate(fieldTemplate)) {
-    return <FluxMainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <FluxMainModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isSD3MainModelFieldInputInstance(fieldInstance) && isSD3MainModelFieldInputTemplate(fieldTemplate)) {
-    return <SD3MainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <SD3MainModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isSDXLMainModelFieldInputInstance(fieldInstance) && isSDXLMainModelFieldInputTemplate(fieldTemplate)) {
-    return <SDXLMainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <SDXLMainModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (isSchedulerFieldInputInstance(fieldInstance) && isSchedulerFieldInputTemplate(fieldTemplate)) {
-    return <SchedulerFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return (
+      <SchedulerFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+        isLinearView={isLinearView}
+      />
+    );
   }
 
   if (fieldTemplate) {

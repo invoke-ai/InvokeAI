@@ -43,7 +43,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
                 {fieldNames.connectionFields.map((fieldName, i) => (
                   <GridItem gridColumnStart={1} gridRowStart={i + 1} key={`${nodeId}.${fieldName}.input-field`}>
                     <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
-                      <InputField nodeId={nodeId} fieldName={fieldName} />
+                      <InputField nodeId={nodeId} fieldName={fieldName} isLinearView={false} />
                     </InvocationInputFieldCheck>
                   </GridItem>
                 ))}
@@ -59,7 +59,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
                   nodeId={nodeId}
                   fieldName={fieldName}
                 >
-                  <InputField nodeId={nodeId} fieldName={fieldName} />
+                  <InputField nodeId={nodeId} fieldName={fieldName} isLinearView={false} />
                 </InvocationInputFieldCheck>
               ))}
               {fieldNames.missingFields.map((fieldName) => (
@@ -68,7 +68,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
                   nodeId={nodeId}
                   fieldName={fieldName}
                 >
-                  <InputField nodeId={nodeId} fieldName={fieldName} />
+                  <InputField nodeId={nodeId} fieldName={fieldName} isLinearView={false} />
                 </InvocationInputFieldCheck>
               ))}
             </Flex>

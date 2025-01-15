@@ -46,7 +46,7 @@ const WorkflowFieldInternal = ({ nodeId, fieldName }: Props) => {
           </Flex>
         </Tooltip>
       </Flex>
-      <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+      <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} isLinearView={true} />
     </Flex>
   );
 };

@@ -1,13 +1,17 @@
 import type {
+  FloatFieldCollectionInputInstance,
   FloatFieldCollectionInputTemplate,
-  FloatFieldCollectionValue,
   ImageFieldCollectionInputTemplate,
   ImageFieldCollectionValue,
+  IntegerFieldCollectionInputInstance,
   IntegerFieldCollectionInputTemplate,
-  IntegerFieldCollectionValue,
   StringFieldCollectionInputTemplate,
   StringFieldCollectionValue,
 } from 'features/nodes/types/field';
+import {
+  floatRangeStartStepCountGenerator,
+  integerRangeStartStepCountGenerator,
+} from 'features/nodes/types/generators';
 import { t } from 'i18next';
 
 export const validateImageFieldCollectionValue = (
@@ -67,12 +71,31 @@ export const validateStringFieldCollectionValue = (
   return reasons;
 };
 
+export const resolveNumberFieldCollectionValue = (
+  field: IntegerFieldCollectionInputInstance | FloatFieldCollectionInputInstance
+): number[] | undefined => {
+  if (field.generator?.type === 'float-range-generator-start-step-count') {
+    return floatRangeStartStepCountGenerator(field.generator);
+  } else if (field.generator?.type === 'integer-range-generator-start-step-count') {
+    return integerRangeStartStepCountGenerator(field.generator);
+  } else {
+    return field.value;
+  }
+};
+
 export const validateNumberFieldCollectionValue = (
-  value: NonNullable<IntegerFieldCollectionValue> | NonNullable<FloatFieldCollectionValue>,
+  field: IntegerFieldCollectionInputInstance | FloatFieldCollectionInputInstance,
   template: IntegerFieldCollectionInputTemplate | FloatFieldCollectionInputTemplate
 ): string[] => {
   const reasons: string[] = [];
   const { minItems, maxItems, minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf } = template;
+  const value = resolveNumberFieldCollectionValue(field);
+
+  if (value === undefined) {
+    reasons.push(t('parameters.invoke.collectionEmpty'));
+    return reasons;
+  }
+
   const count = value.length;
 
   // Image collections may have min or max items to validate

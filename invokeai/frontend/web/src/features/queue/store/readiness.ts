@@ -30,6 +30,7 @@ import {
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
 import {
+  resolveNumberFieldCollectionValue,
   validateImageFieldCollectionValue,
   validateNumberFieldCollectionValue,
   validateStringFieldCollectionValue,
@@ -176,14 +177,14 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
           isIntegerFieldCollectionInputInstance(field) &&
           isIntegerFieldCollectionInputTemplate(fieldTemplate)
         ) {
-          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
+          const errors = validateNumberFieldCollectionValue(field, fieldTemplate);
           reasons.push(...errors.map((error) => ({ prefix, content: error })));
         } else if (
           field.value &&
           isFloatFieldCollectionInputInstance(field) &&
           isFloatFieldCollectionInputTemplate(fieldTemplate)
         ) {
-          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
+          const errors = validateNumberFieldCollectionValue(field, fieldTemplate);
           reasons.push(...errors.map((error) => ({ prefix, content: error })));
         }
       });
@@ -555,10 +556,10 @@ const getBatchCollectionSize = (batchNode: InvocationNode) => {
     return batchNode.data.inputs.strings.value?.length ?? 0;
   } else if (batchNode.data.type === 'float_batch') {
     assert(isFloatFieldCollectionInputInstance(batchNode.data.inputs.floats));
-    return batchNode.data.inputs.floats.value?.length ?? 0;
+    return resolveNumberFieldCollectionValue(batchNode.data.inputs.floats)?.length ?? 0;
   } else if (batchNode.data.type === 'integer_batch') {
     assert(isIntegerFieldCollectionInputInstance(batchNode.data.inputs.integers));
-    return batchNode.data.inputs.integers.value?.length ?? 0;
+    return resolveNumberFieldCollectionValue(batchNode.data.inputs.integers)?.length ?? 0;
   }
   return 0;
 };

@@ -97,7 +97,11 @@ const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
               icon={<PiTrashSimpleBold />}
             />
           </Flex>
-          <InputFieldRenderer nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
+          <InputFieldRenderer
+            nodeId={fieldIdentifier.nodeId}
+            fieldName={fieldIdentifier.fieldName}
+            isLinearView={true}
+          />
         </Flex>
       </Flex>
       <DndListDropIndicator dndState={dndListState} />

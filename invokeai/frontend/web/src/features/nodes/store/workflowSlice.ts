@@ -5,7 +5,7 @@ import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
 import type {
-  FieldIdentifierWithValue,
+  FieldIdentifierWithInstance,
   WorkflowMode,
   WorkflowsState as WorkflowState,
 } from 'features/nodes/store/types';
@@ -31,7 +31,7 @@ const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
 };
 
 const initialWorkflowState: WorkflowState = {
-  _version: 1,
+  _version: 2,
   isTouched: false,
   mode: 'view',
   originalExposedFieldValues: [],
@@ -62,7 +62,7 @@ export const workflowSlice = createSlice({
       const { id, isOpen } = action.payload;
       state.categorySections[id] = isOpen;
     },
-    workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifierWithValue>) => {
+    workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifierWithInstance>) => {
       state.exposedFields = uniqBy(
         state.exposedFields.concat(omit(action.payload, 'value')),
         (field) => `${field.nodeId}-${field.fieldName}`
@@ -128,25 +128,25 @@ export const workflowSlice = createSlice({
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes, edges: _edges, ...workflowExtra } = action.payload;
 
-      const originalExposedFieldValues: FieldIdentifierWithValue[] = [];
+      const originalExposedFieldValues: FieldIdentifierWithInstance[] = [];
 
-      workflowExtra.exposedFields.forEach((field) => {
-        const node = nodes.find((n) => n.id === field.nodeId);
+      workflowExtra.exposedFields.forEach(({ nodeId, fieldName }) => {
+        const node = nodes.find((n) => n.id === nodeId);
 
         if (!isInvocationNode(node)) {
           return;
         }
 
-        const input = node.data.inputs[field.fieldName];
+        const field = node.data.inputs[fieldName];
 
-        if (!input) {
+        if (!field) {
           return;
         }
 
         const originalExposedFieldValue = {
-          nodeId: field.nodeId,
-          fieldName: field.fieldName,
-          value: input.value,
+          nodeId,
+          fieldName,
+          field,
         };
         originalExposedFieldValues.push(originalExposedFieldValue);
       });
@@ -242,6 +242,9 @@ export const {
 const migrateWorkflowState = (state: any): any => {
   if (!('_version' in state)) {
     state._version = 1;
+  }
+  if (state._version === 1) {
+    return deepClone(initialWorkflowState);
   }
   return state;
 };

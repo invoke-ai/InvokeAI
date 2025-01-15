@@ -1,5 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { NodesState } from 'features/nodes/store/types';
+import { isFloatFieldCollectionInputInstance, isIntegerFieldCollectionInputInstance } from 'features/nodes/types/field';
+import { resolveNumberFieldCollectionValue } from 'features/nodes/types/fieldValidators';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { negate, omit, reduce } from 'lodash-es';
 import type { AnyInvocation, Graph } from 'services/api/types';
@@ -25,7 +27,11 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
     const transformedInputs = reduce(
       inputs,
       (inputsAccumulator, input, name) => {
-        inputsAccumulator[name] = input.value;
+        if (isFloatFieldCollectionInputInstance(input) || isIntegerFieldCollectionInputInstance(input)) {
+          inputsAccumulator[name] = resolveNumberFieldCollectionValue(input);
+        } else {
+          inputsAccumulator[name] = input.value;
+        }
 
         return inputsAccumulator;
       },

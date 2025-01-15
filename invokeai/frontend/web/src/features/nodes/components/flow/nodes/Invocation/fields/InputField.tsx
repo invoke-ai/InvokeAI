@@ -14,9 +14,10 @@ import { InputFieldWrapper } from './InputFieldWrapper';
 interface Props {
   nodeId: string;
   fieldName: string;
+  isLinearView: boolean;
 }
 
-const InputField = ({ nodeId, fieldName }: Props) => {
+const InputField = ({ nodeId, fieldName, isLinearView }: Props) => {
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
   const [isHovered, setIsHovered] = useState(false);
   const isInvalid = useFieldIsInvalid(nodeId, fieldName);
@@ -69,12 +70,12 @@ const InputField = ({ nodeId, fieldName }: Props) => {
         px={2}
       >
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
-          <Flex gap={1}>
+          <Flex gap={1} alignItems="center">
             <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" isInvalid={isInvalid} withTooltip />
             {isHovered && <FieldResetToDefaultValueButton nodeId={nodeId} fieldName={fieldName} />}
             {isHovered && <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} />}
           </Flex>
-          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} isLinearView={isLinearView} />
         </Flex>
       </FormControl>
 

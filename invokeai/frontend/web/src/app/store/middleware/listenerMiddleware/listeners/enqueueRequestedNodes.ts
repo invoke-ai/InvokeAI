@@ -9,6 +9,7 @@ import {
   isIntegerFieldCollectionInputInstance,
   isStringFieldCollectionInputInstance,
 } from 'features/nodes/types/field';
+import { resolveNumberFieldCollectionValue } from 'features/nodes/types/fieldValidators';
 import type { InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
@@ -140,10 +141,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
           // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
           const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
+          const resolvedValue = resolveNumberFieldCollectionValue(integers);
           if (batchGroupId !== 'None') {
-            addZippedBatchDataCollectionItem(edgesFromStringBatch, integers.value);
+            addZippedBatchDataCollectionItem(edgesFromStringBatch, resolvedValue);
           } else {
-            addProductBatchDataCollectionItem(edgesFromStringBatch, integers.value);
+            addProductBatchDataCollectionItem(edgesFromStringBatch, resolvedValue);
           }
         }
 
@@ -163,10 +165,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
           // Find outgoing edges from the batch node, we will remove these from the graph and create batch data collection items from them instead
           const edgesFromStringBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'value');
+          const resolvedValue = resolveNumberFieldCollectionValue(floats);
           if (batchGroupId !== 'None') {
-            addZippedBatchDataCollectionItem(edgesFromStringBatch, floats.value);
+            addZippedBatchDataCollectionItem(edgesFromStringBatch, resolvedValue);
           } else {
-            addProductBatchDataCollectionItem(edgesFromStringBatch, floats.value);
+            addProductBatchDataCollectionItem(edgesFromStringBatch, resolvedValue);
           }
         }
 

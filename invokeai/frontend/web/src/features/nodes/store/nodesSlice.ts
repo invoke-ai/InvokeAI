@@ -36,6 +36,8 @@ import type {
   VAEModelFieldValue,
 } from 'features/nodes/types/field';
 import {
+  isFloatFieldCollectionInputInstance,
+  isIntegerFieldCollectionInputInstance,
   zBoardFieldValue,
   zBooleanFieldValue,
   zCLIPEmbedModelFieldValue,
@@ -66,6 +68,16 @@ import {
   zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
+import type {
+  FloatRangeStartStepCountGenerator,
+  IntegerRangeStartStepCountGenerator,
+} from 'features/nodes/types/generators';
+import {
+  floatRangeStartStepCountGenerator,
+  getDefaultFloatRangeStartStepCountGenerator,
+  getDefaultIntegerRangeStartStepCountGenerator,
+  integerRangeStartStepCountGenerator,
+} from 'features/nodes/types/generators';
 import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import { atom, computed } from 'nanostores';
@@ -83,11 +95,22 @@ const initialNodesState: NodesState = {
   edges: [],
 };
 
-type FieldValueAction<T extends FieldValue> = PayloadAction<{
-  nodeId: string;
-  fieldName: string;
-  value: T;
-}>;
+type FieldValueAction<T extends FieldValue, U = unknown> = PayloadAction<
+  {
+    nodeId: string;
+    fieldName: string;
+    value: T;
+  } & U
+>;
+
+const selectField = (state: NodesState, nodeId: string, fieldName: string) => {
+  const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+  const node = state.nodes?.[nodeIndex];
+  if (!isInvocationNode(node)) {
+    return;
+  }
+  return node.data?.inputs[fieldName];
+};
 
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
@@ -95,17 +118,24 @@ const fieldValueReducer = <T extends FieldValue>(
   schema: z.ZodTypeAny
 ) => {
   const { nodeId, fieldName, value } = action.payload;
-  const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-  const node = state.nodes?.[nodeIndex];
-  if (!isInvocationNode(node)) {
-    return;
-  }
-  const input = node.data?.inputs[fieldName];
+  const field = selectField(state, nodeId, fieldName);
   const result = schema.safeParse(value);
-  if (!input || nodeIndex < 0 || !result.success) {
+  if (!field || !result.success) {
     return;
   }
-  input.value = result.data;
+  field.value = result.data;
+  // Special handling if the field value is being reset
+  if (result.data === undefined) {
+    if (isFloatFieldCollectionInputInstance(field)) {
+      if (field.lockLinearView && field.generator) {
+        field.generator = getDefaultFloatRangeStartStepCountGenerator();
+      }
+    } else if (isIntegerFieldCollectionInputInstance(field)) {
+      if (field.lockLinearView && field.generator) {
+        field.generator = getDefaultIntegerRangeStartStepCountGenerator();
+      }
+    }
+  }
 };
 
 export const nodesSlice = createSlice({
@@ -310,8 +340,31 @@ export const nodesSlice = createSlice({
       }
       node.data.notes = notes;
     },
-    fieldValueReset: (state, action: FieldValueAction<StatefulFieldValue>) => {
-      fieldValueReducer(state, action, zStatefulFieldValue);
+    fieldValueReset: (
+      state,
+      action: FieldValueAction<
+        StatefulFieldValue,
+        { generator?: IntegerRangeStartStepCountGenerator | FloatRangeStartStepCountGenerator }
+      >
+    ) => {
+      const { nodeId, fieldName, value, generator } = action.payload;
+      const field = selectField(state, nodeId, fieldName);
+      const result = zStatefulFieldValue.safeParse(value);
+
+      if (!field || !result.success) {
+        return;
+      }
+
+      field.value = result.data;
+
+      if (isFloatFieldCollectionInputInstance(field) && generator?.type === 'float-range-generator-start-step-count') {
+        field.generator = generator;
+      } else if (
+        isIntegerFieldCollectionInputInstance(field) &&
+        generator?.type === 'integer-range-generator-start-step-count'
+      ) {
+        field.generator = generator;
+      }
     },
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
@@ -324,6 +377,85 @@ export const nodesSlice = createSlice({
     },
     fieldNumberCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
       fieldValueReducer(state, action, zIntegerFieldCollectionValue.or(zFloatFieldCollectionValue));
+    },
+    fieldNumberCollectionGeneratorToggled: (state, action: PayloadAction<{ nodeId: string; fieldName: string }>) => {
+      const { nodeId, fieldName } = action.payload;
+      const field = selectField(state, nodeId, fieldName);
+      if (!field) {
+        return;
+      }
+      if (isFloatFieldCollectionInputInstance(field)) {
+        field.generator = field.generator ? undefined : getDefaultFloatRangeStartStepCountGenerator();
+      } else if (isIntegerFieldCollectionInputInstance(field)) {
+        field.generator = field.generator ? undefined : getDefaultIntegerRangeStartStepCountGenerator();
+      } else {
+        // This should never happen
+      }
+    },
+    fieldNumberCollectionGeneratorStateChanged: (
+      state,
+      action: PayloadAction<{
+        nodeId: string;
+        fieldName: string;
+        generatorState: FloatRangeStartStepCountGenerator | IntegerRangeStartStepCountGenerator;
+      }>
+    ) => {
+      const { nodeId, fieldName, generatorState } = action.payload;
+      const field = selectField(state, nodeId, fieldName);
+      if (!field) {
+        return;
+      }
+      if (
+        isFloatFieldCollectionInputInstance(field) &&
+        generatorState.type === 'float-range-generator-start-step-count'
+      ) {
+        field.generator = generatorState;
+      } else if (
+        isIntegerFieldCollectionInputInstance(field) &&
+        generatorState.type === 'integer-range-generator-start-step-count'
+      ) {
+        field.generator = generatorState;
+      } else {
+        // This should never happen
+      }
+    },
+    fieldNumberCollectionGeneratorCommitted: (state, action: PayloadAction<{ nodeId: string; fieldName: string }>) => {
+      const { nodeId, fieldName } = action.payload;
+      const field = selectField(state, nodeId, fieldName);
+      if (!field) {
+        return;
+      }
+      if (
+        isFloatFieldCollectionInputInstance(field) &&
+        field.generator &&
+        field.generator.type === 'float-range-generator-start-step-count'
+      ) {
+        field.value = floatRangeStartStepCountGenerator(field.generator);
+        field.generator = undefined;
+      } else if (
+        isIntegerFieldCollectionInputInstance(field) &&
+        field.generator &&
+        field.generator.type === 'integer-range-generator-start-step-count'
+      ) {
+        field.value = integerRangeStartStepCountGenerator(field.generator);
+        field.generator = undefined;
+      } else {
+        // This should never happen
+      }
+    },
+    fieldNumberCollectionLockLinearViewToggled: (
+      state,
+      action: PayloadAction<{ nodeId: string; fieldName: string }>
+    ) => {
+      const { nodeId, fieldName } = action.payload;
+      const field = selectField(state, nodeId, fieldName);
+      if (!field) {
+        return;
+      }
+      if (!isFloatFieldCollectionInputInstance(field) && !isIntegerFieldCollectionInputInstance(field)) {
+        return;
+      }
+      field.lockLinearView = !field.lockLinearView;
     },
     fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
       fieldValueReducer(state, action, zBooleanFieldValue);
@@ -447,6 +579,10 @@ export const {
   fieldMainModelValueChanged,
   fieldNumberValueChanged,
   fieldNumberCollectionValueChanged,
+  fieldNumberCollectionGeneratorToggled,
+  fieldNumberCollectionGeneratorStateChanged,
+  fieldNumberCollectionGeneratorCommitted,
+  fieldNumberCollectionLockLinearViewToggled,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,

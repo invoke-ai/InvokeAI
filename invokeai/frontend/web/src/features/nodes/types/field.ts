@@ -1,3 +1,7 @@
+import {
+  zFloatRangeStartStepCountGenerator,
+  zIntegerRangeStartStepCountGenerator,
+} from 'features/nodes/types/generators';
 import { buildTypeGuard } from 'features/parameters/types/parameterSchemas';
 import { z } from 'zod';
 
@@ -282,6 +286,8 @@ export const isIntegerFieldInputTemplate = buildTypeGuard(zIntegerFieldInputTemp
 export const zIntegerFieldCollectionValue = z.array(zIntegerFieldValue).optional();
 const zIntegerFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
   value: zIntegerFieldCollectionValue,
+  generator: zIntegerRangeStartStepCountGenerator.optional(),
+  lockLinearView: z.boolean().default(false),
 });
 const zIntegerFieldCollectionInputTemplate = zFieldInputTemplateBase
   .extend({
@@ -343,9 +349,12 @@ export const isFloatFieldInputTemplate = buildTypeGuard(zFloatFieldInputTemplate
 // #endregion
 
 // #region FloatField Collection
+
 export const zFloatFieldCollectionValue = z.array(zFloatFieldValue).optional();
 const zFloatFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
   value: zFloatFieldCollectionValue,
+  generator: zFloatRangeStartStepCountGenerator.optional(),
+  lockLinearView: z.boolean().default(false),
 });
 const zFloatFieldCollectionInputTemplate = zFieldInputTemplateBase
   .extend({
@@ -373,7 +382,6 @@ const zFloatFieldCollectionInputTemplate = zFieldInputTemplateBase
 const zFloatFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zFloatCollectionFieldType,
 });
-export type FloatFieldCollectionValue = z.infer<typeof zFloatFieldCollectionValue>;
 export type FloatFieldCollectionInputInstance = z.infer<typeof zFloatFieldCollectionInputInstance>;
 export type FloatFieldCollectionInputTemplate = z.infer<typeof zFloatFieldCollectionInputTemplate>;
 export const isFloatFieldCollectionInputInstance = buildTypeGuard(zFloatFieldCollectionInputInstance);
