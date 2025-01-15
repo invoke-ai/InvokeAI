@@ -12,7 +12,7 @@ import type { DndTargetState } from 'features/dnd/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { uploadImages } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
@@ -75,12 +75,11 @@ export const FullscreenDropzone = memo(() => {
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
   const [dndState, setDndState] = useState<DndTargetState>('idle');
 
-  const uploadFilesSchema = useMemo(() => getFilesSchema(maxImageUploadCount), [maxImageUploadCount]);
-
   const validateAndUploadFiles = useCallback(
     (files: File[]) => {
       log.info('validateAndUploadFiles');
       const { getState } = getStore();
+      const uploadFilesSchema = getFilesSchema(maxImageUploadCount);
       const parseResult = uploadFilesSchema.safeParse(files);
       log.info('parseResult');
 
@@ -110,7 +109,21 @@ export const FullscreenDropzone = memo(() => {
 
       uploadImages(uploadArgs);
     },
-    [maxImageUploadCount, t, uploadFilesSchema]
+    [maxImageUploadCount, t]
+  );
+
+  const onPaste = useCallback(
+    (e: ClipboardEvent) => {
+      log.info('in paste');
+      log.info(`clipboardData: ${JSON.stringify(e.clipboardData)}`);
+      if (!e.clipboardData?.files) {
+        log.info('no files');
+        return;
+      }
+      const files = Array.from(e.clipboardData.files);
+      validateAndUploadFiles(files);
+    },
+    [validateAndUploadFiles]
   );
 
   useEffect(() => {
@@ -150,31 +163,19 @@ export const FullscreenDropzone = memo(() => {
 
   useEffect(() => {
     log.info('use effect');
-    const controller = new AbortController();
+    // const controller = new AbortController();
     try {
-      window.addEventListener(
-        'paste',
-        (e) => {
-          log.info('in paste');
-          log.info(`clipboardData: ${JSON.stringify(e.clipboardData)}`);
-          if (!e.clipboardData?.files) {
-            log.info('no files');
-            return;
-          }
-          const files = Array.from(e.clipboardData.files);
-          validateAndUploadFiles(files);
-        },
-        { signal: controller.signal }
-      );
+      window.addEventListener('paste', onPaste);
     } catch (error) {
       log.info(`error: ${JSON.stringify(error)}`);
     }
 
     return () => {
       log.info('abort');
-      controller.abort();
+      window.removeEventListener('paste', onPaste);
+      // controller.abort();
     };
-  }, [validateAndUploadFiles]);
+  }, [onPaste]);
 
   return (
     <Box ref={ref} data-dnd-state={dndState} sx={sx}>
