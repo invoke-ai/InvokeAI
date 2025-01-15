@@ -185,6 +185,14 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return didRender;
   };
 
+  hideObjects = () => {
+    this.konva.objectGroup.hide();
+  };
+
+  showObjects = () => {
+    this.konva.objectGroup.show();
+  };
+
   adoptObjectRenderer = (renderer: AnyObjectRenderer) => {
     this.renderers.set(renderer.id, renderer);
     renderer.konva.group.moveTo(this.konva.objectGroup);
