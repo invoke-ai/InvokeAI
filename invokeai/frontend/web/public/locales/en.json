@@ -857,9 +857,9 @@
         "defaultVAE": "Default VAE"
     },
     "nodes": {
-        "startEndStep": "Start, End, Step",
-        "startCountStep": "Start, Count, Step",
-        "random": "Random",
+        "arithmeticSequence": "Arithmetic Sequence",
+        "linearDistribution": "Linear Distribution",
+        "uniformRandomDistribution": "Uniform Random Distribution",
         "noBatchGroup": "no group",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",

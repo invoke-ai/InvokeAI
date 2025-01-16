@@ -30,6 +30,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   CLIPGEmbedModelField: undefined,
   ControlLoRAModelField: undefined,
   FloatGeneratorField: undefined,
+  IntegerGeneratorField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {

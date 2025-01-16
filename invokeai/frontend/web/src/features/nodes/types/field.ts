@@ -1012,58 +1012,67 @@ export const isSchedulerFieldInputTemplate = buildTypeGuard(zSchedulerFieldInput
 // #endregion
 
 // #region FloatGeneratorField
-const zFloatGeneratorStartEndStep = z.object({
-  type: z.literal('float_generator_start_end_step').default('float_generator_start_end_step'),
-  start: z.number().default(0),
-  end: z.number().default(1),
-  step: z.number().default(0.1),
-  values: z.array(z.number()).nullish(),
-});
-export type FloatGeneratorStartEndStep = z.infer<typeof zFloatGeneratorStartEndStep>;
-export const getFloatGeneratorStartEndStepDefaults = () => zFloatGeneratorStartEndStep.parse({});
-export const getFloatGeneratorStartEndStepValues = ({ start, end, step }: FloatGeneratorStartEndStep) => {
-  if (step === 0) {
-    return [];
-  }
-  const values = Array.from({ length: Math.floor((end - start) / step) + 1 }, (_, i) => start + i * step);
-  return values;
-};
-
-const zFloatGeneratorStartCountStep = z.object({
-  type: z.literal('float_generator_start_count_step').default('float_generator_start_count_step'),
+export const FloatGeneratorArithmeticSequenceType = 'float_generator_arithmetic_sequence';
+const zFloatGeneratorArithmeticSequence = z.object({
+  type: z.literal(FloatGeneratorArithmeticSequenceType).default(FloatGeneratorArithmeticSequenceType),
   start: z.number().default(0),
   step: z.number().default(0.1),
   count: z.number().int().default(10),
   values: z.array(z.number()).nullish(),
 });
-export type FloatGeneratorStartCountStep = z.infer<typeof zFloatGeneratorStartCountStep>;
-export const getFloatGeneratorStartCountStepDefaults = () => zFloatGeneratorStartCountStep.parse({});
-export const getFloatGeneratorStartCountStepValues = ({ start, count, step }: FloatGeneratorStartCountStep) => {
+export type FloatGeneratorArithmeticSequence = z.infer<typeof zFloatGeneratorArithmeticSequence>;
+export const getFloatGeneratorArithmeticSequenceDefaults = () => zFloatGeneratorArithmeticSequence.parse({});
+export const getFloatGeneratorArithmeticSequenceValues = (generator: FloatGeneratorArithmeticSequence) => {
+  const { start, step, count } = generator;
   if (step === 0) {
-    return [];
+    return [start];
   }
   const values = Array.from({ length: count }, (_, i) => start + i * step);
   return values;
 };
 
-const zFloatGeneratorRandom = z.object({
-  type: z.literal('float_generator_random').default('float_generator_random'),
+export const FloatGeneratorLinearDistributionType = 'float_generator_linear_distribution';
+const zFloatGeneratorLinearDistribution = z.object({
+  type: z.literal(FloatGeneratorLinearDistributionType).default(FloatGeneratorLinearDistributionType),
+  start: z.number().default(0),
+  end: z.number().default(1),
+  count: z.number().int().default(10),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorLinearDistribution = z.infer<typeof zFloatGeneratorLinearDistribution>;
+export const getFloatGeneratorLinearDistributionDefaults = () => zFloatGeneratorLinearDistribution.parse({});
+export const getFloatGeneratorLinearDistributionValues = (generator: FloatGeneratorLinearDistribution) => {
+  const { start, end, count } = generator;
+  if (count === 1) {
+    return [start];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + (end - start) * (i / (count - 1)));
+  return values;
+};
+
+export const FloatGeneratorUniformRandomDistributionType = 'float_generator_random_distribution_uniform';
+const zFloatGeneratorUniformRandomDistribution = z.object({
+  type: z.literal(FloatGeneratorUniformRandomDistributionType).default(FloatGeneratorUniformRandomDistributionType),
   min: z.number().default(0),
   max: z.number().default(1),
   count: z.number().int().default(10),
   values: z.array(z.number()).nullish(),
 });
-export type FloatGeneratorRandom = z.infer<typeof zFloatGeneratorRandom>;
-export const getFloatGeneratorRandomDefaults = () => zFloatGeneratorRandom.parse({});
-export const getFloatGeneratorRandomValues = ({ min, max, count }: FloatGeneratorRandom) => {
+export type FloatGeneratorUniformRandomDistribution = z.infer<typeof zFloatGeneratorUniformRandomDistribution>;
+export const getFloatGeneratorUniformRandomDistributionDefaults = () =>
+  zFloatGeneratorUniformRandomDistribution.parse({});
+export const getFloatGeneratorUniformRandomDistributionValues = (
+  generator: FloatGeneratorUniformRandomDistribution
+) => {
+  const { min, max, count } = generator;
   const values = Array.from({ length: count }, () => Math.random() * (max - min) + min);
   return values;
 };
 
 export const zFloatGeneratorFieldValue = z.union([
-  zFloatGeneratorStartEndStep,
-  zFloatGeneratorStartCountStep,
-  zFloatGeneratorRandom,
+  zFloatGeneratorArithmeticSequence,
+  zFloatGeneratorLinearDistribution,
+  zFloatGeneratorUniformRandomDistribution,
 ]);
 const zFloatGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zFloatGeneratorFieldValue,
@@ -1085,72 +1094,81 @@ export const resolveFloatGeneratorField = ({ value }: FloatGeneratorFieldInputIn
   if (value.values) {
     return value.values;
   }
-  if (value.type === 'float_generator_start_end_step') {
-    return getFloatGeneratorStartEndStepValues(value);
+  if (value.type === FloatGeneratorArithmeticSequenceType) {
+    return getFloatGeneratorArithmeticSequenceValues(value);
   }
-  if (value.type === 'float_generator_start_count_step') {
-    return getFloatGeneratorStartCountStepValues(value);
+  if (value.type === FloatGeneratorLinearDistributionType) {
+    return getFloatGeneratorLinearDistributionValues(value);
   }
-  if (value.type === 'float_generator_random') {
-    return getFloatGeneratorRandomValues(value);
+  if (value.type === FloatGeneratorUniformRandomDistributionType) {
+    return getFloatGeneratorUniformRandomDistributionValues(value);
   }
   assert(false, 'Invalid float generator type');
 };
 // #endregion
 
 // #region IntegerGeneratorField
-const zIntegerGeneratorStartEndStep = z.object({
-  type: z.literal('integer_generator_start_end_step').default('integer_generator_start_end_step'),
-  start: z.number().int().default(0),
-  end: z.number().int().default(10),
-  step: z.number().int().default(1),
-  values: z.array(z.number().int()).nullish(),
-});
-export type IntegerGeneratorStartEndStep = z.infer<typeof zIntegerGeneratorStartEndStep>;
-export const getIntegerGeneratorStartEndStepDefaults = () => zIntegerGeneratorStartEndStep.parse({});
-export const getIntegerGeneratorStartEndStepValues = ({ start, end, step }: IntegerGeneratorStartEndStep) => {
-  if (step === 0) {
-    return [];
-  }
-  const values = Array.from({ length: Math.floor((end - start) / step) + 1 }, (_, i) => start + i * step);
-  return values;
-};
-
-const zIntegerGeneratorStartCountStep = z.object({
-  type: z.literal('integer_generator_start_count_step').default('integer_generator_start_count_step'),
+export const IntegerGeneratorArithmeticSequenceType = 'integer_generator_arithmetic_sequence';
+const zIntegerGeneratorArithmeticSequence = z.object({
+  type: z.literal(IntegerGeneratorArithmeticSequenceType).default(IntegerGeneratorArithmeticSequenceType),
   start: z.number().int().default(0),
   step: z.number().int().default(1),
   count: z.number().int().default(10),
   values: z.array(z.number().int()).nullish(),
 });
-export type IntegerGeneratorStartCountStep = z.infer<typeof zIntegerGeneratorStartCountStep>;
-export const getIntegerGeneratorStartCountStepDefaults = () => zIntegerGeneratorStartCountStep.parse({});
-export const getIntegerGeneratorStartCountStepValues = ({ start, count, step }: IntegerGeneratorStartCountStep) => {
+export type IntegerGeneratorArithmeticSequence = z.infer<typeof zIntegerGeneratorArithmeticSequence>;
+export const getIntegerGeneratorArithmeticSequenceDefaults = () => zIntegerGeneratorArithmeticSequence.parse({});
+export const getIntegerGeneratorArithmeticSequenceValues = (generator: IntegerGeneratorArithmeticSequence) => {
+  const { start, step, count } = generator;
   if (step === 0) {
-    return [];
+    return [start];
   }
   const values = Array.from({ length: count }, (_, i) => start + i * step);
   return values;
 };
 
-const zIntegerGeneratorRandom = z.object({
-  type: z.literal('integer_generator_random').default('integer_generator_random'),
+export const IntegerGeneratorLinearDistributionType = 'integer_generator_linear_distribution';
+const zIntegerGeneratorLinearDistribution = z.object({
+  type: z.literal(IntegerGeneratorLinearDistributionType).default(IntegerGeneratorLinearDistributionType),
+  start: z.number().int().default(0),
+  end: z.number().int().default(10),
+  count: z.number().int().default(10),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorLinearDistribution = z.infer<typeof zIntegerGeneratorLinearDistribution>;
+export const getIntegerGeneratorLinearDistributionDefaults = () => zIntegerGeneratorLinearDistribution.parse({});
+export const getIntegerGeneratorLinearDistributionValues = (generator: IntegerGeneratorLinearDistribution) => {
+  const { start, end, count } = generator;
+  if (count === 1) {
+    return [start];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + Math.round((end - start) * (i / (count - 1))));
+  return values;
+};
+
+export const IntegerGeneratorUniformRandomDistributionType = 'integer_generator_random_distribution_uniform';
+const zIntegerGeneratorUniformRandomDistribution = z.object({
+  type: z.literal(IntegerGeneratorUniformRandomDistributionType).default(IntegerGeneratorUniformRandomDistributionType),
   min: z.number().int().default(0),
   max: z.number().int().default(10),
   count: z.number().int().default(10),
   values: z.array(z.number().int()).nullish(),
 });
-export type IntegerGeneratorRandom = z.infer<typeof zIntegerGeneratorRandom>;
-export const getIntegerGeneratorRandomDefaults = () => zIntegerGeneratorRandom.parse({});
-export const getIntegerGeneratorRandomValues = ({ min, max, count }: IntegerGeneratorRandom) => {
-  const values = Array.from({ length: count }, () => Math.floor(Math.random() * (max - min + 1) + min));
+export type IntegerGeneratorUniformRandomDistribution = z.infer<typeof zIntegerGeneratorUniformRandomDistribution>;
+export const getIntegerGeneratorUniformRandomDistributionDefaults = () =>
+  zIntegerGeneratorUniformRandomDistribution.parse({});
+export const getIntegerGeneratorUniformRandomDistributionValues = (
+  generator: IntegerGeneratorUniformRandomDistribution
+) => {
+  const { min, max, count } = generator;
+  const values = Array.from({ length: count }, () => Math.floor(Math.random() * (max - min + 1)) + min);
   return values;
 };
 
 export const zIntegerGeneratorFieldValue = z.union([
-  zIntegerGeneratorStartEndStep,
-  zIntegerGeneratorStartCountStep,
-  zIntegerGeneratorRandom,
+  zIntegerGeneratorArithmeticSequence,
+  zIntegerGeneratorLinearDistribution,
+  zIntegerGeneratorUniformRandomDistribution,
 ]);
 const zIntegerGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zIntegerGeneratorFieldValue,
@@ -1172,14 +1190,14 @@ export const resolveIntegerGeneratorField = ({ value }: IntegerGeneratorFieldInp
   if (value.values) {
     return value.values;
   }
-  if (value.type === 'integer_generator_start_end_step') {
-    return getIntegerGeneratorStartEndStepValues(value);
+  if (value.type === IntegerGeneratorArithmeticSequenceType) {
+    return getIntegerGeneratorArithmeticSequenceValues(value);
   }
-  if (value.type === 'integer_generator_start_count_step') {
-    return getIntegerGeneratorStartCountStepValues(value);
+  if (value.type === IntegerGeneratorLinearDistributionType) {
+    return getIntegerGeneratorLinearDistributionValues(value);
   }
-  if (value.type === 'integer_generator_random') {
-    return getIntegerGeneratorRandomValues(value);
+  if (value.type === IntegerGeneratorUniformRandomDistributionType) {
+    return getIntegerGeneratorUniformRandomDistributionValues(value);
   }
   assert(false, 'Invalid integer generator type');
 };
