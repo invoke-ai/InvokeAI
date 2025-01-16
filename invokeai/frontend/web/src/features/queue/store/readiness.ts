@@ -146,26 +146,35 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
     }
 
     if (batchNodes.length > 1) {
+      const batchSizes: number[] = [];
       const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['batch_group_id']?.value);
       for (const [batchGroupId, batchNodes] of Object.entries(groupedBatchNodes)) {
-        if (batchGroupId === 'None') {
-          // Ungrouped batch nodes may have differing collection sizes
-          continue;
-        }
-
         // But grouped batch nodes must have the same collection size
-        const collectionSizes: number[] = [];
+        const groupBatchSizes: number[] = [];
 
         for (const node of batchNodes) {
-          const collection = resolveBatchValue(node, invocationNodes, nodes.edges);
-          collectionSizes.push(collection.length);
+          const size = resolveBatchValue(node, invocationNodes, nodes.edges).length;
+          if (batchGroupId === 'None') {
+            // Ungrouped batch nodes may have differing collection sizes
+            batchSizes.push(size);
+          } else {
+            groupBatchSizes.push(size);
+          }
         }
 
-        if (collectionSizes.some((count) => count !== collectionSizes[0])) {
+        if (groupBatchSizes.some((count) => count !== groupBatchSizes[0])) {
           reasons.push({
             content: i18n.t('parameters.invoke.batchNodeCollectionSizeMismatch', { batchGroupId }),
           });
         }
+
+        if (groupBatchSizes[0] !== undefined) {
+          batchSizes.push(groupBatchSizes[0]);
+        }
+      }
+
+      if (batchSizes.some((size) => size === 0)) {
+        reasons.push({ content: i18n.t('parameters.invoke.batchNodeEmptyCollection') });
       }
     }
 
@@ -618,7 +627,7 @@ export const selectWorkflowsBatchSize = createSelector(
     group3BatchSizes,
     group4BatchSizes,
     group5BatchSizes
-  ): number | 'INVALID' | 'NO_BATCHES' => {
+  ): number | 'EMPTY_BATCHES' | 'NO_BATCHES' => {
     // All batch nodes _must_ have a populated collection
 
     const allBatchSizes = [
@@ -637,7 +646,7 @@ export const selectWorkflowsBatchSize = createSelector(
 
     // All batch nodes must have a populated collection
     if (allBatchSizes.some((size) => size === 0)) {
-      return 'INVALID';
+      return 'EMPTY_BATCHES';
     }
 
     for (const group of [group1BatchSizes, group2BatchSizes, group3BatchSizes, group4BatchSizes, group5BatchSizes]) {
@@ -647,7 +656,7 @@ export const selectWorkflowsBatchSize = createSelector(
       }
       // Grouped batch nodes must have the same collection size
       if (group.some((size) => size !== group[0])) {
-        return 'INVALID';
+        return 'EMPTY_BATCHES';
       }
     }
 
