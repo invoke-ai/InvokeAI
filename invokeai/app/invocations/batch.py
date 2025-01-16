@@ -102,7 +102,9 @@ class IntegerBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each integer in the batch."""
 
     integers: list[int] = InputField(
-        default=[], min_length=1, description="The integers to batch over", input=Input.Direct
+        default=[],
+        min_length=1,
+        description="The integers to batch over",
     )
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
@@ -112,15 +114,6 @@ class IntegerBatchInvocation(BaseBatchInvocation):
 @invocation_output("integer_generator_output")
 class IntegerGeneratorOutput(BaseInvocationOutput):
     integers: list[int] = OutputField(description="The generated integers")
-
-
-default_integer_generator = {
-    "type": "integer_generator_start_end_step",
-    "start": 0,
-    "end": 10,
-    "step": 1,
-    "values": None,
-}
 
 
 class IntegerGeneratorField(BaseModel):
@@ -139,7 +132,6 @@ class IntegerGenerator(BaseInvocation):
     """Generated a range of integers for use in a batched generation"""
 
     generator: IntegerGeneratorField = InputField(
-        default=default_integer_generator,
         description="The integer generator.",
         input=Input.Direct,
         title="Generator Type",
@@ -180,15 +172,6 @@ class FloatGeneratorOutput(BaseInvocationOutput):
     floats: list[float] = OutputField(description="The generated floats")
 
 
-default_float_generator = {
-    "type": "float_generator_start_end_step",
-    "start": 0.0,
-    "end": 1.0,
-    "step": 0.1,
-    "values": None,
-}
-
-
 class FloatGeneratorField(BaseModel):
     pass
 
@@ -205,7 +188,6 @@ class FloatGenerator(BaseInvocation):
     """Generated a range of floats for use in a batched generation"""
 
     generator: FloatGeneratorField = InputField(
-        default=default_float_generator,
         description="The float generator.",
         input=Input.Direct,
         title="Generator Type",
