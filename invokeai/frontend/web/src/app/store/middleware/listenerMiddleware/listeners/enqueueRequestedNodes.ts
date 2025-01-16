@@ -1,4 +1,3 @@
-import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -9,8 +8,6 @@ import { resolveBatchValue } from 'features/queue/store/readiness';
 import { groupBy } from 'lodash-es';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, BatchConfig } from 'services/api/types';
-
-const log = logger('workflows');
 
 export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
   startAppListening({
