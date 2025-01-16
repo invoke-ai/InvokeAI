@@ -1,5 +1,5 @@
 import { CompositeNumberInput, Flex, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
-import type { FloatGeneratorStartEndStep } from 'features/nodes/types/field';
+import { type FloatGeneratorStartEndStep,getFloatGeneratorStartEndStepDefaults } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
@@ -31,8 +31,8 @@ export const FloatGeneratorStartEndStepSettings = memo(
       [onChange, state]
     );
     const onReset = useCallback(() => {
-      onChange({ ...state, start: 0, end: 1, step: 0.1 });
-    }, [onChange, state]);
+      onChange(getFloatGeneratorStartEndStepDefaults());
+    }, [onChange]);
 
     return (
       <Flex gap={2} alignItems="flex-end">
