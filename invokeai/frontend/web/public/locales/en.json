@@ -181,6 +181,9 @@
         "start": "Start",
         "count": "Count",
         "step": "Step",
+        "end": "End",
+        "min": "Min",
+        "max": "Max",
         "values": "Values"
     },
     "hrf": {
@@ -854,6 +857,9 @@
         "defaultVAE": "Default VAE"
     },
     "nodes": {
+        "floatGeneratorStartEndStep": "Start, End, Step",
+        "floatGeneratorStartCountStep": "Start, Count Step",
+        "floatGeneratorRandom": "Random",
         "noBatchGroup": "no group",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",

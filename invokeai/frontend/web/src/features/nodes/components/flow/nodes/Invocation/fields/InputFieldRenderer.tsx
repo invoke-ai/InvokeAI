@@ -1,3 +1,4 @@
+import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
 import { NumberFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/NumberFieldCollectionInputComponent';
@@ -27,6 +28,8 @@ import {
   isFloatFieldCollectionInputTemplate,
   isFloatFieldInputInstance,
   isFloatFieldInputTemplate,
+  isFloatGeneratorFieldInputInstance,
+  isFloatGeneratorFieldInputTemplate,
   isFluxMainModelFieldInputInstance,
   isFluxMainModelFieldInputTemplate,
   isFluxVAEModelFieldInputInstance,
@@ -235,6 +238,10 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isSchedulerFieldInputInstance(fieldInstance) && isSchedulerFieldInputTemplate(fieldTemplate)) {
     return <SchedulerFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isFloatGeneratorFieldInputInstance(fieldInstance) && isFloatGeneratorFieldInputTemplate(fieldTemplate)) {
+    return <FloatGeneratorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (fieldTemplate) {

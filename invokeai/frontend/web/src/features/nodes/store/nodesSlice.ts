@@ -16,6 +16,7 @@ import type {
   EnumFieldValue,
   FieldValue,
   FloatFieldValue,
+  FloatGeneratorFieldValue,
   FluxVAEModelFieldValue,
   ImageFieldCollectionValue,
   ImageFieldValue,
@@ -47,6 +48,7 @@ import {
   zEnumFieldValue,
   zFloatFieldCollectionValue,
   zFloatFieldValue,
+  zFloatGeneratorFieldValue,
   zFluxVAEModelFieldValue,
   zImageFieldCollectionValue,
   zImageFieldValue,
@@ -394,6 +396,9 @@ export const nodesSlice = createSlice({
     fieldSchedulerValueChanged: (state, action: FieldValueAction<SchedulerFieldValue>) => {
       fieldValueReducer(state, action, zSchedulerFieldValue);
     },
+    fieldFloatGeneratorValueChanged: (state, action: FieldValueAction<FloatGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zFloatGeneratorFieldValue);
+    },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -458,6 +463,7 @@ export const {
   fieldCLIPGEmbedValueChanged,
   fieldControlLoRAModelValueChanged,
   fieldFluxVAEModelValueChanged,
+  fieldFloatGeneratorValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

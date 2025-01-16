@@ -49,6 +49,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
       return {
         name: 'EnumField',
         cardinality: 'SINGLE',
+        batch: false,
       };
     }
     if (!schemaObject.type) {
@@ -65,6 +66,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
           return {
             name,
             cardinality: 'SINGLE',
+            batch: false,
           };
         }
       } else if (schemaObject.anyOf) {
@@ -88,6 +90,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
             return {
               name,
               cardinality: 'SINGLE',
+              batch: false,
             };
           } else if (isSchemaObject(filteredAnyOf[0])) {
             return parseFieldType(filteredAnyOf[0]);
@@ -141,6 +144,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
           return {
             name: OPENAPI_TO_FIELD_TYPE_MAP[firstType] ?? firstType,
             cardinality: 'SINGLE_OR_COLLECTION',
+            batch: false,
           };
         }
 
@@ -155,6 +159,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
       return {
         name: 'EnumField',
         cardinality: 'SINGLE',
+        batch: false,
       };
     } else if (schemaObject.type) {
       if (schemaObject.type === 'array') {
@@ -181,6 +186,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
           return {
             name,
             cardinality: 'COLLECTION',
+            batch: false,
           };
         }
 
@@ -192,6 +198,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
         return {
           name,
           cardinality: 'COLLECTION',
+          batch: false,
         };
       } else if (!isArray(schemaObject.type)) {
         // This is an OpenAPI primitive - 'null', 'object', 'array', 'integer', 'number', 'string', 'boolean'
@@ -207,6 +214,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
         return {
           name,
           cardinality: 'SINGLE',
+          batch: false,
         };
       }
     }
@@ -218,6 +226,7 @@ export const parseFieldType = (schemaObject: OpenAPIV3_1SchemaOrRef): FieldType 
     return {
       name,
       cardinality: 'SINGLE',
+      batch: false,
     };
   }
   throw new FieldParseError(t('nodes.unableToParseFieldType'));

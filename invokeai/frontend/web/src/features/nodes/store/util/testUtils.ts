@@ -34,6 +34,7 @@ export const add: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -48,6 +49,7 @@ export const add: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -61,6 +63,7 @@ export const add: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -89,6 +92,7 @@ export const sub: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -103,6 +107,7 @@ export const sub: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 0,
     },
@@ -116,6 +121,7 @@ export const sub: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -145,6 +151,7 @@ export const collect: InvocationTemplate = {
       type: {
         name: 'CollectionItemField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
   },
@@ -157,6 +164,7 @@ export const collect: InvocationTemplate = {
       type: {
         name: 'CollectionField',
         cardinality: 'COLLECTION',
+        batch: false,
       },
       ui_hidden: false,
       ui_type: 'CollectionField',
@@ -187,10 +195,11 @@ const scheduler: InvocationTemplate = {
       type: {
         name: 'SchedulerField',
         cardinality: 'SINGLE',
-
+        batch: false,
         originalType: {
           name: 'EnumField',
           cardinality: 'SINGLE',
+          batch: false,
         },
       },
       default: 'euler',
@@ -205,10 +214,12 @@ const scheduler: InvocationTemplate = {
       type: {
         name: 'SchedulerField',
         cardinality: 'SINGLE',
+        batch: false,
 
         originalType: {
           name: 'EnumField',
           cardinality: 'SINGLE',
+          batch: false,
         },
       },
       ui_hidden: false,
@@ -240,10 +251,12 @@ export const main_model_loader: InvocationTemplate = {
       type: {
         name: 'MainModelField',
         cardinality: 'SINGLE',
+        batch: false,
 
         originalType: {
           name: 'ModelIdentifierField',
           cardinality: 'SINGLE',
+          batch: false,
         },
       },
     },
@@ -257,6 +270,7 @@ export const main_model_loader: InvocationTemplate = {
       type: {
         name: 'VAEField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -268,6 +282,7 @@ export const main_model_loader: InvocationTemplate = {
       type: {
         name: 'CLIPField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -279,6 +294,7 @@ export const main_model_loader: InvocationTemplate = {
       type: {
         name: 'UNetField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -307,6 +323,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'BoardField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
     metadata: {
@@ -320,6 +337,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'MetadataField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
     image: {
@@ -333,6 +351,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'ImageField',
         cardinality: 'SINGLE',
+        batch: false,
       },
     },
     width: {
@@ -346,6 +365,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 512,
       exclusiveMinimum: 0,
@@ -361,6 +381,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       default: 512,
       exclusiveMinimum: 0,
@@ -376,6 +397,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'EnumField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       options: ['nearest', 'box', 'bilinear', 'hamming', 'bicubic', 'lanczos'],
       default: 'bicubic',
@@ -390,6 +412,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'ImageField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -401,6 +424,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -412,6 +436,7 @@ export const img_resize: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -441,6 +466,7 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'CollectionField',
         cardinality: 'COLLECTION',
+        batch: false,
       },
     },
   },
@@ -453,6 +479,7 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'CollectionItemField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
       ui_type: 'CollectionItemField',
@@ -465,6 +492,7 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },
@@ -476,6 +504,7 @@ const iterate: InvocationTemplate = {
       type: {
         name: 'IntegerField',
         cardinality: 'SINGLE',
+        batch: false,
       },
       ui_hidden: false,
     },

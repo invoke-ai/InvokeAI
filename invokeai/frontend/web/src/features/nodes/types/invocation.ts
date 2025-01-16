@@ -103,3 +103,16 @@ export const isBatchNode = (node: InvocationNode) => {
       return false;
   }
 };
+
+export const isGeneratorNode = (node: InvocationNode) => {
+  switch (node.data.type) {
+    case 'float_generator':
+      return true;
+    default:
+      return false;
+  }
+};
+
+export const isExecutableNode = (node: InvocationNode) => {
+  return !isBatchNode(node) && !isGeneratorNode(node);
+};

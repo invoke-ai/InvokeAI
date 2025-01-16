@@ -22,25 +22,27 @@ import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettin
 import {
   isFloatFieldCollectionInputInstance,
   isFloatFieldCollectionInputTemplate,
+  isFloatGeneratorFieldInputInstance,
   isImageFieldCollectionInputInstance,
   isImageFieldCollectionInputTemplate,
   isIntegerFieldCollectionInputInstance,
   isIntegerFieldCollectionInputTemplate,
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
+  resolveFloatGeneratorField,
 } from 'features/nodes/types/field';
 import {
   validateImageFieldCollectionValue,
   validateNumberFieldCollectionValue,
   validateStringFieldCollectionValue,
 } from 'features/nodes/types/fieldValidators';
-import type { InvocationNode } from 'features/nodes/types/invocation';
-import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
+import type { InvocationNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import i18n from 'i18next';
-import { forEach, groupBy, negate, upperFirst } from 'lodash-es';
+import { forEach, groupBy, upperFirst } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
 import { assert } from 'tsafe';
 
@@ -64,6 +66,38 @@ export type Reason = { prefix?: string; content: string };
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
+export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNode[], edges: InvocationNodeEdge[]) => {
+  if (batchNode.data.type === 'image_batch') {
+    assert(isImageFieldCollectionInputInstance(batchNode.data.inputs.images));
+    const ownValue = batchNode.data.inputs.images.value ?? [];
+    // no generators for images yet
+    return ownValue;
+  } else if (batchNode.data.type === 'string_batch') {
+    assert(isStringFieldCollectionInputInstance(batchNode.data.inputs.strings));
+    const ownValue = batchNode.data.inputs.strings.value ?? [];
+    // no generators for strings yet
+    return ownValue;
+  } else if (batchNode.data.type === 'float_batch') {
+    assert(isFloatFieldCollectionInputInstance(batchNode.data.inputs.floats));
+    const ownValue = batchNode.data.inputs.floats.value;
+    const edgeToFloats = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'floats');
+    if (!edgeToFloats) {
+      return ownValue ?? [];
+    }
+    const generator = nodes.find((node) => node.id === edgeToFloats.source);
+    assert(generator, 'Missing edge from float generator to float batch');
+    assert(isFloatGeneratorFieldInputInstance(generator.data.inputs['generator']), 'Invalid float generator');
+    const generatorValue = resolveFloatGeneratorField(generator.data.inputs['generator']);
+    return generatorValue;
+  } else if (batchNode.data.type === 'integer_batch') {
+    assert(isIntegerFieldCollectionInputInstance(batchNode.data.inputs.integers));
+    const ownValue = batchNode.data.inputs.integers.value;
+    // no generators for integers yet
+    return ownValue ?? [];
+  }
+  assert(false, 'Invalid batch node type');
+};
+
 const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
   isConnected: boolean;
   nodes: NodesState;
@@ -80,9 +114,9 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
   if (workflowSettings.shouldValidateGraph) {
     const invocationNodes = nodes.nodes.filter(isInvocationNode);
     const batchNodes = invocationNodes.filter(isBatchNode);
-    const nonBatchNodes = invocationNodes.filter(negate(isBatchNode));
+    const executableNodes = invocationNodes.filter(isExecutableNode);
 
-    if (!nonBatchNodes.length) {
+    if (!executableNodes.length) {
       reasons.push({ content: i18n.t('parameters.invoke.noNodesInGraph') });
     }
 
@@ -104,19 +138,8 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
         const collectionSizes: number[] = [];
 
         for (const node of batchNodes) {
-          if (node.data.type === 'image_batch') {
-            assert(isImageFieldCollectionInputInstance(node.data.inputs.images));
-            collectionSizes.push(node.data.inputs.images.value?.length ?? 0);
-          } else if (node.data.type === 'string_batch') {
-            assert(isStringFieldCollectionInputInstance(node.data.inputs.strings));
-            collectionSizes.push(node.data.inputs.strings.value?.length ?? 0);
-          } else if (node.data.type === 'float_batch') {
-            assert(isFloatFieldCollectionInputInstance(node.data.inputs.floats));
-            collectionSizes.push(node.data.inputs.floats.value?.length ?? 0);
-          } else if (node.data.type === 'integer_batch') {
-            assert(isIntegerFieldCollectionInputInstance(node.data.inputs.integers));
-            collectionSizes.push(node.data.inputs.integers.value?.length ?? 0);
-          }
+          const collection = resolveBatchValue(node, invocationNodes, nodes.edges);
+          collectionSizes.push(collection.length);
         }
 
         if (collectionSizes.some((count) => count !== collectionSizes[0])) {
@@ -127,7 +150,7 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
       }
     }
 
-    nonBatchNodes.forEach((node) => {
+    executableNodes.forEach((node) => {
       if (!isInvocationNode(node)) {
         return;
       }
