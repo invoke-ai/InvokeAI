@@ -3,18 +3,19 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { IntegerGeneratorArithmeticSequenceSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorArithmeticSequenceSettings';
 import { IntegerGeneratorLinearDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorLinearDistributionSettings';
+import { IntegerGeneratorParseStringSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorParseStringSettings';
 import { IntegerGeneratorUniformRandomDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorUniformRandomDistributionSettings';
+import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { fieldIntegerGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   IntegerGeneratorFieldInputInstance,
   IntegerGeneratorFieldInputTemplate,
 } from 'features/nodes/types/field';
 import {
-  getIntegerGeneratorArithmeticSequenceDefaults,
-  getIntegerGeneratorLinearDistributionDefaults,
-  getIntegerGeneratorUniformRandomDistributionDefaults,
+  getIntegerGeneratorDefaults,
   IntegerGeneratorArithmeticSequenceType,
   IntegerGeneratorLinearDistributionType,
+  IntegerGeneratorParseStringType,
   IntegerGeneratorUniformRandomDistributionType,
   resolveIntegerGeneratorField,
 } from 'features/nodes/types/field';
@@ -23,23 +24,9 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import type { FieldComponentProps } from './types';
+import { useDebounce } from 'use-debounce';
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
-
-const getDefaultValue = (generatorType: string) => {
-  if (generatorType === IntegerGeneratorArithmeticSequenceType) {
-    return getIntegerGeneratorArithmeticSequenceDefaults();
-  }
-  if (generatorType === IntegerGeneratorLinearDistributionType) {
-    return getIntegerGeneratorLinearDistributionDefaults();
-  }
-  if (generatorType === IntegerGeneratorUniformRandomDistributionType) {
-    return getIntegerGeneratorUniformRandomDistributionDefaults();
-  }
-  return null;
-};
 
 export const IntegerGeneratorFieldInputComponent = memo(
   (props: FieldComponentProps<IntegerGeneratorFieldInputInstance, IntegerGeneratorFieldInputTemplate>) => {
@@ -62,10 +49,9 @@ export const IntegerGeneratorFieldInputComponent = memo(
 
     const onChangeGeneratorType = useCallback(
       (e: ChangeEvent<HTMLSelectElement>) => {
-        const value = getDefaultValue(e.target.value);
-        if (!value) {
-          return;
-        }
+        const value = getIntegerGeneratorDefaults(
+          e.target.value as IntegerGeneratorFieldInputInstance['value']['type']
+        );
         dispatch(
           fieldIntegerGeneratorValueChanged({
             nodeId,
@@ -77,7 +63,8 @@ export const IntegerGeneratorFieldInputComponent = memo(
       [dispatch, field.name, nodeId]
     );
 
-    const resolvedValues = useMemo(() => resolveIntegerGeneratorField(field), [field]);
+    const [debouncedField] = useDebounce(field, 300);
+    const resolvedValues = useMemo(() => resolveIntegerGeneratorField(debouncedField), [debouncedField]);
     const resolvedValuesAsString = useMemo(() => {
       if (resolvedValues.length === 0) {
         return '<empty>';
@@ -92,6 +79,7 @@ export const IntegerGeneratorFieldInputComponent = memo(
           <option value={IntegerGeneratorArithmeticSequenceType}>{t('nodes.arithmeticSequence')}</option>
           <option value={IntegerGeneratorLinearDistributionType}>{t('nodes.linearDistribution')}</option>
           <option value={IntegerGeneratorUniformRandomDistributionType}>{t('nodes.uniformRandomDistribution')}</option>
+          <option value={IntegerGeneratorParseStringType}>{t('nodes.parseString')}</option>
         </Select>
         {field.value.type === IntegerGeneratorArithmeticSequenceType && (
           <IntegerGeneratorArithmeticSequenceSettings state={field.value} onChange={onChange} />
@@ -101,6 +89,9 @@ export const IntegerGeneratorFieldInputComponent = memo(
         )}
         {field.value.type === IntegerGeneratorUniformRandomDistributionType && (
           <IntegerGeneratorUniformRandomDistributionSettings state={field.value} onChange={onChange} />
+        )}
+        {field.value.type === IntegerGeneratorParseStringType && (
+          <IntegerGeneratorParseStringSettings state={field.value} onChange={onChange} />
         )}
         {/* We don't show previews for random generators, bc they are non-deterministic */}
         {field.value.type !== IntegerGeneratorUniformRandomDistributionType && (

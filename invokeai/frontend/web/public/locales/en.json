@@ -184,7 +184,8 @@
         "end": "End",
         "min": "Min",
         "max": "Max",
-        "values": "Values"
+        "values": "Values",
+        "resetToDefaults": "Reset to Defaults"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -860,6 +861,8 @@
         "arithmeticSequence": "Arithmetic Sequence",
         "linearDistribution": "Linear Distribution",
         "uniformRandomDistribution": "Uniform Random Distribution",
+        "parseString": "Parse String",
+        "splitOn": "Split On",
         "noBatchGroup": "no group",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",

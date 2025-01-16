@@ -1,4 +1,5 @@
 import { buildTypeGuard } from 'features/parameters/types/parameterSchemas';
+import { trim } from 'lodash-es';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
@@ -1069,10 +1070,31 @@ export const getFloatGeneratorUniformRandomDistributionValues = (
   return values;
 };
 
+export const FloatGeneratorParseStringType = 'float_generator_parse_string';
+const zFloatGeneratorParseString = z.object({
+  type: z.literal(FloatGeneratorParseStringType).default(FloatGeneratorParseStringType),
+  input: z.string().default('0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1'),
+  splitOn: z.string().default(','),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorParseString = z.infer<typeof zFloatGeneratorParseString>;
+export const getFloatGeneratorParseStringDefaults = () => zFloatGeneratorParseString.parse({});
+export const getFloatGeneratorParseStringValues = (generator: FloatGeneratorParseString) => {
+  const { input, splitOn } = generator;
+  const values = input
+    .split(splitOn)
+    .map(trim)
+    .filter((s) => s.length > 0)
+    .map((s) => parseFloat(s))
+    .filter((n) => !isNaN(n));
+  return values;
+};
+
 export const zFloatGeneratorFieldValue = z.union([
   zFloatGeneratorArithmeticSequence,
   zFloatGeneratorLinearDistribution,
   zFloatGeneratorUniformRandomDistribution,
+  zFloatGeneratorParseString,
 ]);
 const zFloatGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zFloatGeneratorFieldValue,
@@ -1103,8 +1125,28 @@ export const resolveFloatGeneratorField = ({ value }: FloatGeneratorFieldInputIn
   if (value.type === FloatGeneratorUniformRandomDistributionType) {
     return getFloatGeneratorUniformRandomDistributionValues(value);
   }
+  if (value.type === FloatGeneratorParseStringType) {
+    return getFloatGeneratorParseStringValues(value);
+  }
   assert(false, 'Invalid float generator type');
 };
+
+export const getFloatGeneratorDefaults = (type: FloatGeneratorFieldValue['type']) => {
+  if (type === FloatGeneratorArithmeticSequenceType) {
+    return getFloatGeneratorArithmeticSequenceDefaults();
+  }
+  if (type === FloatGeneratorLinearDistributionType) {
+    return getFloatGeneratorLinearDistributionDefaults();
+  }
+  if (type === FloatGeneratorUniformRandomDistributionType) {
+    return getFloatGeneratorUniformRandomDistributionDefaults();
+  }
+  if (type === FloatGeneratorParseStringType) {
+    return getFloatGeneratorParseStringDefaults();
+  }
+  assert(false, 'Invalid float generator type');
+};
+
 // #endregion
 
 // #region IntegerGeneratorField
@@ -1165,10 +1207,31 @@ export const getIntegerGeneratorUniformRandomDistributionValues = (
   return values;
 };
 
+export const IntegerGeneratorParseStringType = 'integer_generator_parse_string';
+const zIntegerGeneratorParseString = z.object({
+  type: z.literal(IntegerGeneratorParseStringType).default(IntegerGeneratorParseStringType),
+  input: z.string().default('1,2,3,4,5,6,7,8,9,10'),
+  splitOn: z.string().default(','),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorParseString = z.infer<typeof zIntegerGeneratorParseString>;
+export const getIntegerGeneratorParseStringDefaults = () => zIntegerGeneratorParseString.parse({});
+export const getIntegerGeneratorParseStringValues = (generator: IntegerGeneratorParseString) => {
+  const { input, splitOn } = generator;
+  const values = input
+    .split(splitOn)
+    .map(trim)
+    .filter((s) => s.length > 0)
+    .map((s) => parseInt(s, 10))
+    .filter((n) => !isNaN(n));
+  return values;
+};
+
 export const zIntegerGeneratorFieldValue = z.union([
   zIntegerGeneratorArithmeticSequence,
   zIntegerGeneratorLinearDistribution,
   zIntegerGeneratorUniformRandomDistribution,
+  zIntegerGeneratorParseString,
 ]);
 const zIntegerGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zIntegerGeneratorFieldValue,
@@ -1198,6 +1261,24 @@ export const resolveIntegerGeneratorField = ({ value }: IntegerGeneratorFieldInp
   }
   if (value.type === IntegerGeneratorUniformRandomDistributionType) {
     return getIntegerGeneratorUniformRandomDistributionValues(value);
+  }
+  if (value.type === IntegerGeneratorParseStringType) {
+    return getIntegerGeneratorParseStringValues(value);
+  }
+  assert(false, 'Invalid integer generator type');
+};
+export const getIntegerGeneratorDefaults = (type: IntegerGeneratorFieldValue['type']) => {
+  if (type === IntegerGeneratorArithmeticSequenceType) {
+    return getIntegerGeneratorArithmeticSequenceDefaults();
+  }
+  if (type === IntegerGeneratorLinearDistributionType) {
+    return getIntegerGeneratorLinearDistributionDefaults();
+  }
+  if (type === IntegerGeneratorUniformRandomDistributionType) {
+    return getIntegerGeneratorUniformRandomDistributionDefaults();
+  }
+  if (type === IntegerGeneratorParseStringType) {
+    return getIntegerGeneratorParseStringDefaults();
   }
   assert(false, 'Invalid integer generator type');
 };
