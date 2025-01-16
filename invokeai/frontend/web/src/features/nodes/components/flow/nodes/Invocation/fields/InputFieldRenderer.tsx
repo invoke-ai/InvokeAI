@@ -1,5 +1,6 @@
 import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
+import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorFieldComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
 import { NumberFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/NumberFieldCollectionInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
@@ -42,6 +43,8 @@ import {
   isIntegerFieldCollectionInputTemplate,
   isIntegerFieldInputInstance,
   isIntegerFieldInputTemplate,
+  isIntegerGeneratorFieldInputInstance,
+  isIntegerGeneratorFieldInputTemplate,
   isIPAdapterModelFieldInputInstance,
   isIPAdapterModelFieldInputTemplate,
   isLoRAModelFieldInputInstance,
@@ -242,6 +245,10 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isFloatGeneratorFieldInputInstance(fieldInstance) && isFloatGeneratorFieldInputTemplate(fieldTemplate)) {
     return <FloatGeneratorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isIntegerGeneratorFieldInputInstance(fieldInstance) && isIntegerGeneratorFieldInputTemplate(fieldTemplate)) {
+    return <IntegerGeneratorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (fieldTemplate) {
