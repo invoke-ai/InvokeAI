@@ -1,4 +1,4 @@
-import { Flex, IconButton, Select, Text } from '@invoke-ai/ui-library';
+import { Flex, Select, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { IntegerGeneratorRandomSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorRandomSettings';
@@ -18,7 +18,6 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPencilSimpleFill } from 'react-icons/pi';
 
 import type { FieldComponentProps } from './types';
 
@@ -84,14 +83,11 @@ export const IntegerGeneratorFieldInputComponent = memo(
 
     return (
       <Flex flexDir="column" gap={2}>
-        <Flex gap={2}>
-          <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
-            <option value="integer_generator_start_end_step">{t('nodes.startEndStep')}</option>
-            <option value="integer_generator_start_count_step">{t('nodes.startCountStep')}</option>
-            <option value="integer_generator_random">{t('nodes.random')}</option>
-          </Select>
-          <IconButton aria-label="Reset" icon={<PiPencilSimpleFill />} variant="ghost" />
-        </Flex>
+        <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
+          <option value="integer_generator_start_end_step">{t('nodes.startEndStep')}</option>
+          <option value="integer_generator_start_count_step">{t('nodes.startCountStep')}</option>
+          <option value="integer_generator_random">{t('nodes.random')}</option>
+        </Select>
         {field.value.type === 'integer_generator_start_end_step' && (
           <IntegerGeneratorStartEndStepSettings state={field.value} onChange={onChange} />
         )}
