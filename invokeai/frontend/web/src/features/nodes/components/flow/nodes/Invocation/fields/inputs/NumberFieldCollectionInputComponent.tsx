@@ -1,7 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Button,
-  ButtonGroup,
   CompositeNumberInput,
   Divider,
   Flex,
@@ -13,8 +12,6 @@ import {
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { openFloatRangeGeneratorModal } from 'features/nodes/components/FloatRangeGeneratorModal';
-import { openIntegerRangeGeneratorModal } from 'features/nodes/components/IntegerRangeGeneratorModal';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { fieldNumberCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
@@ -77,17 +74,6 @@ export const NumberFieldCollectionInputComponent = memo(
       store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
     }, [field.name, field.value, nodeId, store]);
 
-    const onOpenGenerator = useCallback(() => {
-      const onSave = (values: number[]) => {
-        store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: values }));
-      };
-      if (isIntegerField) {
-        openIntegerRangeGeneratorModal(onSave);
-      } else {
-        openFloatRangeGeneratorModal(onSave);
-      }
-    }, [field.name, isIntegerField, nodeId, store]);
-
     const min = useMemo(() => {
       let min = -NUMPY_RAND_MAX;
       if (!isNil(fieldTemplate.minimum)) {
@@ -140,14 +126,9 @@ export const NumberFieldCollectionInputComponent = memo(
         flexDir="column"
         gap={1}
       >
-        <ButtonGroup isAttached={false} size="sm" w="full" gap={1}>
-          <Button onClick={onAddNumber} variant="ghost" w="50%">
-            {t('nodes.addItem')}
-          </Button>
-          <Button onClick={onOpenGenerator} variant="ghost" w="50%">
-            {t('nodes.generateValues')}
-          </Button>
-        </ButtonGroup>
+        <Button onClick={onAddNumber} variant="ghost">
+          {t('nodes.addItem')}
+        </Button>
         {field.value && field.value.length > 0 && (
           <>
             <Divider />
