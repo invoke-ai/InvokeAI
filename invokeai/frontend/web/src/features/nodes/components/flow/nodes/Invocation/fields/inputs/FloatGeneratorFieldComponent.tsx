@@ -1,16 +1,19 @@
 import { Flex, Select, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { FloatGeneratorRandomSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorRandomSettings';
-import { FloatGeneratorStartCountStepSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorStartCountStepSettings';
-import { FloatGeneratorStartEndStepSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorStartEndStepSettings';
+import { FloatGeneratorArithmeticSequenceSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorArithmeticSequenceSettings';
+import { FloatGeneratorLinearDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorLinearDistributionSettings';
+import { FloatGeneratorUniformRandomDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorUniformRandomDistributionSettings';
 import { fieldFloatGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
 import {
+  FloatGeneratorArithmeticSequenceType,
   type FloatGeneratorFieldInputInstance,
   type FloatGeneratorFieldInputTemplate,
-  getFloatGeneratorRandomDefaults,
-  getFloatGeneratorStartCountStepDefaults,
-  getFloatGeneratorStartEndStepDefaults,
+  FloatGeneratorLinearDistributionType,
+  FloatGeneratorUniformRandomDistributionType,
+  getFloatGeneratorArithmeticSequenceDefaults,
+  getFloatGeneratorLinearDistributionDefaults,
+  getFloatGeneratorUniformRandomDistributionDefaults,
   resolveFloatGeneratorField,
 } from 'features/nodes/types/field';
 import { round } from 'lodash-es';
@@ -24,14 +27,14 @@ import type { FieldComponentProps } from './types';
 const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
 
 const getDefaultValue = (generatorType: string) => {
-  if (generatorType === 'float_generator_start_end_step') {
-    return getFloatGeneratorStartEndStepDefaults();
+  if (generatorType === FloatGeneratorArithmeticSequenceType) {
+    return getFloatGeneratorArithmeticSequenceDefaults();
   }
-  if (generatorType === 'float_generator_start_count_step') {
-    return getFloatGeneratorStartCountStepDefaults();
+  if (generatorType === FloatGeneratorLinearDistributionType) {
+    return getFloatGeneratorLinearDistributionDefaults();
   }
-  if (generatorType === 'float_generator_random') {
-    return getFloatGeneratorRandomDefaults();
+  if (generatorType === FloatGeneratorUniformRandomDistributionType) {
+    return getFloatGeneratorUniformRandomDistributionDefaults();
   }
   return null;
 };
@@ -84,21 +87,21 @@ export const FloatGeneratorFieldInputComponent = memo(
     return (
       <Flex flexDir="column" gap={2}>
         <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
-          <option value="float_generator_start_end_step">{t('nodes.startEndStep')}</option>
-          <option value="float_generator_start_count_step">{t('nodes.startCountStep')}</option>
-          <option value="float_generator_random">{t('nodes.random')}</option>
+          <option value={FloatGeneratorArithmeticSequenceType}>{t('nodes.arithmeticSequence')}</option>
+          <option value={FloatGeneratorLinearDistributionType}>{t('nodes.linearDistribution')}</option>
+          <option value={FloatGeneratorUniformRandomDistributionType}>{t('nodes.uniformRandomDistribution')}</option>
         </Select>
-        {field.value.type === 'float_generator_start_end_step' && (
-          <FloatGeneratorStartEndStepSettings state={field.value} onChange={onChange} />
+        {field.value.type === FloatGeneratorArithmeticSequenceType && (
+          <FloatGeneratorArithmeticSequenceSettings state={field.value} onChange={onChange} />
         )}
-        {field.value.type === 'float_generator_start_count_step' && (
-          <FloatGeneratorStartCountStepSettings state={field.value} onChange={onChange} />
+        {field.value.type === FloatGeneratorLinearDistributionType && (
+          <FloatGeneratorLinearDistributionSettings state={field.value} onChange={onChange} />
         )}
-        {field.value.type === 'float_generator_random' && (
-          <FloatGeneratorRandomSettings state={field.value} onChange={onChange} />
+        {field.value.type === FloatGeneratorUniformRandomDistributionType && (
+          <FloatGeneratorUniformRandomDistributionSettings state={field.value} onChange={onChange} />
         )}
         {/* We don't show previews for random generators, bc they are non-deterministic */}
-        {field.value.type !== 'float_generator_random' && (
+        {field.value.type !== FloatGeneratorUniformRandomDistributionType && (
           <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
             <Flex w="full" h="auto">
               <OverlayScrollbarsComponent

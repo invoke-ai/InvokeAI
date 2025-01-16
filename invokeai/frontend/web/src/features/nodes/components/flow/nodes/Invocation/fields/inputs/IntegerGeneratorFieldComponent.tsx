@@ -1,16 +1,21 @@
 import { Flex, Select, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { IntegerGeneratorRandomSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorRandomSettings';
-import { IntegerGeneratorStartCountStepSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorStartCountStepSettings';
-import { IntegerGeneratorStartEndStepSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorStartEndStepSettings';
+import { IntegerGeneratorArithmeticSequenceSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorArithmeticSequenceSettings';
+import { IntegerGeneratorLinearDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorLinearDistributionSettings';
+import { IntegerGeneratorUniformRandomDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorUniformRandomDistributionSettings';
 import { fieldIntegerGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
+import type {
+  IntegerGeneratorFieldInputInstance,
+  IntegerGeneratorFieldInputTemplate,
+} from 'features/nodes/types/field';
 import {
-  getIntegerGeneratorRandomDefaults,
-  getIntegerGeneratorStartCountStepDefaults,
-  getIntegerGeneratorStartEndStepDefaults,
-  type IntegerGeneratorFieldInputInstance,
-  type IntegerGeneratorFieldInputTemplate,
+  getIntegerGeneratorArithmeticSequenceDefaults,
+  getIntegerGeneratorLinearDistributionDefaults,
+  getIntegerGeneratorUniformRandomDistributionDefaults,
+  IntegerGeneratorArithmeticSequenceType,
+  IntegerGeneratorLinearDistributionType,
+  IntegerGeneratorUniformRandomDistributionType,
   resolveIntegerGeneratorField,
 } from 'features/nodes/types/field';
 import { round } from 'lodash-es';
@@ -24,14 +29,14 @@ import type { FieldComponentProps } from './types';
 const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
 
 const getDefaultValue = (generatorType: string) => {
-  if (generatorType === 'integer_generator_start_end_step') {
-    return getIntegerGeneratorStartEndStepDefaults();
+  if (generatorType === IntegerGeneratorArithmeticSequenceType) {
+    return getIntegerGeneratorArithmeticSequenceDefaults();
   }
-  if (generatorType === 'integer_generator_start_count_step') {
-    return getIntegerGeneratorStartCountStepDefaults();
+  if (generatorType === IntegerGeneratorLinearDistributionType) {
+    return getIntegerGeneratorLinearDistributionDefaults();
   }
-  if (generatorType === 'integer_generator_random') {
-    return getIntegerGeneratorRandomDefaults();
+  if (generatorType === IntegerGeneratorUniformRandomDistributionType) {
+    return getIntegerGeneratorUniformRandomDistributionDefaults();
   }
   return null;
 };
@@ -84,21 +89,21 @@ export const IntegerGeneratorFieldInputComponent = memo(
     return (
       <Flex flexDir="column" gap={2}>
         <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
-          <option value="integer_generator_start_end_step">{t('nodes.startEndStep')}</option>
-          <option value="integer_generator_start_count_step">{t('nodes.startCountStep')}</option>
-          <option value="integer_generator_random">{t('nodes.random')}</option>
+          <option value={IntegerGeneratorArithmeticSequenceType}>{t('nodes.arithmeticSequence')}</option>
+          <option value={IntegerGeneratorLinearDistributionType}>{t('nodes.linearDistribution')}</option>
+          <option value={IntegerGeneratorUniformRandomDistributionType}>{t('nodes.uniformRandomDistribution')}</option>
         </Select>
-        {field.value.type === 'integer_generator_start_end_step' && (
-          <IntegerGeneratorStartEndStepSettings state={field.value} onChange={onChange} />
+        {field.value.type === IntegerGeneratorArithmeticSequenceType && (
+          <IntegerGeneratorArithmeticSequenceSettings state={field.value} onChange={onChange} />
         )}
-        {field.value.type === 'integer_generator_start_count_step' && (
-          <IntegerGeneratorStartCountStepSettings state={field.value} onChange={onChange} />
+        {field.value.type === IntegerGeneratorLinearDistributionType && (
+          <IntegerGeneratorLinearDistributionSettings state={field.value} onChange={onChange} />
         )}
-        {field.value.type === 'integer_generator_random' && (
-          <IntegerGeneratorRandomSettings state={field.value} onChange={onChange} />
+        {field.value.type === IntegerGeneratorUniformRandomDistributionType && (
+          <IntegerGeneratorUniformRandomDistributionSettings state={field.value} onChange={onChange} />
         )}
         {/* We don't show previews for random generators, bc they are non-deterministic */}
-        {field.value.type !== 'integer_generator_random' && (
+        {field.value.type !== IntegerGeneratorUniformRandomDistributionType && (
           <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
             <Flex w="full" h="auto">
               <OverlayScrollbarsComponent

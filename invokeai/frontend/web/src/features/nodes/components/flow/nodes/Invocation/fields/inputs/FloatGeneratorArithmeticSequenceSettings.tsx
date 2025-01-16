@@ -1,15 +1,16 @@
 import { CompositeNumberInput, Flex, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
-import { type FloatGeneratorStartCountStep,getFloatGeneratorStartCountStepDefaults } from 'features/nodes/types/field';
+import type { FloatGeneratorArithmeticSequence } from 'features/nodes/types/field';
+import { getFloatGeneratorArithmeticSequenceDefaults } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
-type FloatGeneratorStartCountStepSettingsProps = {
-  state: FloatGeneratorStartCountStep;
-  onChange: (state: FloatGeneratorStartCountStep) => void;
+type FloatGeneratorArithmeticSequenceSettingsProps = {
+  state: FloatGeneratorArithmeticSequence;
+  onChange: (state: FloatGeneratorArithmeticSequence) => void;
 };
-export const FloatGeneratorStartCountStepSettings = memo(
-  ({ state, onChange }: FloatGeneratorStartCountStepSettingsProps) => {
+export const FloatGeneratorArithmeticSequenceSettings = memo(
+  ({ state, onChange }: FloatGeneratorArithmeticSequenceSettingsProps) => {
     const { t } = useTranslation();
 
     const onChangeStart = useCallback(
@@ -31,7 +32,7 @@ export const FloatGeneratorStartCountStepSettings = memo(
       [onChange, state]
     );
     const onReset = useCallback(() => {
-      onChange(getFloatGeneratorStartCountStepDefaults());
+      onChange(getFloatGeneratorArithmeticSequenceDefaults());
     }, [onChange]);
 
     return (
@@ -47,16 +48,16 @@ export const FloatGeneratorStartCountStepSettings = memo(
           />
         </FormControl>
         <FormControl orientation="vertical">
-          <FormLabel>{t('common.count')}</FormLabel>
-          <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={Infinity} step={1} />
-        </FormControl>
-        <FormControl orientation="vertical">
           <FormLabel>{t('common.step')}</FormLabel>
           <CompositeNumberInput value={state.step} onChange={onChangeStep} min={-Infinity} max={Infinity} step={0.01} />
+        </FormControl>
+        <FormControl orientation="vertical">
+          <FormLabel>{t('common.count')}</FormLabel>
+          <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={Infinity} />
         </FormControl>
         <IconButton aria-label="Reset" icon={<PiArrowCounterClockwiseBold />} onClick={onReset} variant="ghost" />
       </Flex>
     );
   }
 );
-FloatGeneratorStartCountStepSettings.displayName = 'FloatGeneratorStartCountStepSettings';
+FloatGeneratorArithmeticSequenceSettings.displayName = 'FloatGeneratorArithmeticSequenceSettings';

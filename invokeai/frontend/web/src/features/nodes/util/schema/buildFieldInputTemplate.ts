@@ -39,6 +39,8 @@ import type {
   VAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import {
+  getFloatGeneratorArithmeticSequenceDefaults,
+  getIntegerGeneratorArithmeticSequenceDefaults,
   isFloatCollectionFieldType,
   isImageCollectionFieldType,
   isIntegerCollectionFieldType,
@@ -647,13 +649,7 @@ const buildFloatGeneratorFieldInputTemplate: FieldInputTemplateBuilder<FloatGene
   const template: FloatGeneratorFieldInputTemplate = {
     ...baseField,
     type: fieldType,
-    default: {
-      type: 'float_generator_start_end_step',
-      start: 0,
-      end: 1,
-      step: 0.1,
-      values: undefined,
-    },
+    default: getFloatGeneratorArithmeticSequenceDefaults(),
   };
 
   return template;
@@ -667,13 +663,7 @@ const buildIntegerGeneratorFieldInputTemplate: FieldInputTemplateBuilder<Integer
   const template: IntegerGeneratorFieldInputTemplate = {
     ...baseField,
     type: fieldType,
-    default: {
-      type: 'integer_generator_start_end_step',
-      start: 0,
-      end: 10,
-      step: 1,
-      values: undefined,
-    },
+    default: getIntegerGeneratorArithmeticSequenceDefaults(),
   };
 
   return template;
