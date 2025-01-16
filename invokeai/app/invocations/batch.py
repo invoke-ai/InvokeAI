@@ -109,6 +109,49 @@ class IntegerBatchInvocation(BaseBatchInvocation):
         raise NotExecutableNodeError()
 
 
+@invocation_output("integer_generator_output")
+class IntegerGeneratorOutput(BaseInvocationOutput):
+    integers: list[int] = OutputField(description="The generated integers")
+
+
+default_integer_generator = {
+    "type": "integer_generator_start_end_step",
+    "start": 0,
+    "end": 10,
+    "step": 1,
+    "values": None,
+}
+
+
+class IntegerGeneratorField(BaseModel):
+    pass
+
+
+@invocation(
+    "integer_generator",
+    title="Integer Generator",
+    tags=["primitives", "int", "number", "batch", "special"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class IntegerGenerator(BaseInvocation):
+    """Generated a range of integers for use in a batched generation"""
+
+    generator: IntegerGeneratorField = InputField(
+        default=default_integer_generator,
+        description="The integer generator.",
+        input=Input.Direct,
+        title="Generator Type",
+    )
+
+    def __init__(self):
+        raise NotExecutableNodeError()
+
+    def invoke(self, context: InvocationContext) -> IntegerGeneratorOutput:
+        raise NotExecutableNodeError()
+
+
 @invocation(
     "float_batch",
     title="Float Batch",
