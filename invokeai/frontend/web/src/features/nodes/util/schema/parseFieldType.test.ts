@@ -19,42 +19,42 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
   {
     name: 'SINGLE IntegerField',
     schema: { type: 'integer' },
-    expected: { name: 'IntegerField', cardinality: 'SINGLE' },
+    expected: { name: 'IntegerField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'SINGLE FloatField',
     schema: { type: 'number' },
-    expected: { name: 'FloatField', cardinality: 'SINGLE' },
+    expected: { name: 'FloatField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'SINGLE StringField',
     schema: { type: 'string' },
-    expected: { name: 'StringField', cardinality: 'SINGLE' },
+    expected: { name: 'StringField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'SINGLE BooleanField',
     schema: { type: 'boolean' },
-    expected: { name: 'BooleanField', cardinality: 'SINGLE' },
+    expected: { name: 'BooleanField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'COLLECTION IntegerField',
     schema: { items: { type: 'integer' }, type: 'array' },
-    expected: { name: 'IntegerField', cardinality: 'COLLECTION' },
+    expected: { name: 'IntegerField', cardinality: 'COLLECTION', batch: false },
   },
   {
     name: 'COLLECTION FloatField',
     schema: { items: { type: 'number' }, type: 'array' },
-    expected: { name: 'FloatField', cardinality: 'COLLECTION' },
+    expected: { name: 'FloatField', cardinality: 'COLLECTION', batch: false },
   },
   {
     name: 'COLLECTION StringField',
     schema: { items: { type: 'string' }, type: 'array' },
-    expected: { name: 'StringField', cardinality: 'COLLECTION' },
+    expected: { name: 'StringField', cardinality: 'COLLECTION', batch: false },
   },
   {
     name: 'COLLECTION BooleanField',
     schema: { items: { type: 'boolean' }, type: 'array' },
-    expected: { name: 'BooleanField', cardinality: 'COLLECTION' },
+    expected: { name: 'BooleanField', cardinality: 'COLLECTION', batch: false },
   },
   {
     name: 'SINGLE_OR_COLLECTION IntegerField',
@@ -71,7 +71,7 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'IntegerField', cardinality: 'SINGLE_OR_COLLECTION' },
+    expected: { name: 'IntegerField', cardinality: 'SINGLE_OR_COLLECTION', batch: false },
   },
   {
     name: 'SINGLE_OR_COLLECTION FloatField',
@@ -88,7 +88,7 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'FloatField', cardinality: 'SINGLE_OR_COLLECTION' },
+    expected: { name: 'FloatField', cardinality: 'SINGLE_OR_COLLECTION', batch: false },
   },
   {
     name: 'SINGLE_OR_COLLECTION StringField',
@@ -105,7 +105,7 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'StringField', cardinality: 'SINGLE_OR_COLLECTION' },
+    expected: { name: 'StringField', cardinality: 'SINGLE_OR_COLLECTION', batch: false },
   },
   {
     name: 'SINGLE_OR_COLLECTION BooleanField',
@@ -122,7 +122,7 @@ const primitiveTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'BooleanField', cardinality: 'SINGLE_OR_COLLECTION' },
+    expected: { name: 'BooleanField', cardinality: 'SINGLE_OR_COLLECTION', batch: false },
   },
 ];
 
@@ -136,7 +136,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', cardinality: 'SINGLE' },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'Nullable SINGLE ConditioningField',
@@ -150,7 +150,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', cardinality: 'SINGLE' },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'COLLECTION ConditioningField',
@@ -164,7 +164,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', cardinality: 'COLLECTION' },
+    expected: { name: 'ConditioningField', cardinality: 'COLLECTION', batch: false },
   },
   {
     name: 'Nullable Collection ConditioningField',
@@ -181,7 +181,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', cardinality: 'COLLECTION' },
+    expected: { name: 'ConditioningField', cardinality: 'COLLECTION', batch: false },
   },
   {
     name: 'SINGLE_OR_COLLECTION ConditioningField',
@@ -198,7 +198,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', cardinality: 'SINGLE_OR_COLLECTION' },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE_OR_COLLECTION', batch: false },
   },
   {
     name: 'Nullable SINGLE_OR_COLLECTION ConditioningField',
@@ -218,7 +218,7 @@ const complexTypes: ParseFieldTypeTestCase[] = [
         },
       ],
     },
-    expected: { name: 'ConditioningField', cardinality: 'SINGLE_OR_COLLECTION' },
+    expected: { name: 'ConditioningField', cardinality: 'SINGLE_OR_COLLECTION', batch: false },
   },
 ];
 
@@ -229,14 +229,14 @@ const specialCases: ParseFieldTypeTestCase[] = [
       type: 'string',
       enum: ['large', 'base', 'small'],
     },
-    expected: { name: 'EnumField', cardinality: 'SINGLE' },
+    expected: { name: 'EnumField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'String EnumField with one value',
     schema: {
       const: 'Some Value',
     },
-    expected: { name: 'EnumField', cardinality: 'SINGLE' },
+    expected: { name: 'EnumField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'Explicit ui_type (SchedulerField)',
@@ -245,7 +245,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'SchedulerField',
     },
-    expected: { name: 'EnumField', cardinality: 'SINGLE' },
+    expected: { name: 'EnumField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'Explicit ui_type (AnyField)',
@@ -254,7 +254,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'AnyField',
     },
-    expected: { name: 'EnumField', cardinality: 'SINGLE' },
+    expected: { name: 'EnumField', cardinality: 'SINGLE', batch: false },
   },
   {
     name: 'Explicit ui_type (CollectionField)',
@@ -263,7 +263,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
       enum: ['ddim', 'ddpm', 'deis'],
       ui_type: 'CollectionField',
     },
-    expected: { name: 'EnumField', cardinality: 'SINGLE' },
+    expected: { name: 'EnumField', cardinality: 'SINGLE', batch: false },
   },
 ];
 

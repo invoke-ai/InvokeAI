@@ -1,4 +1,5 @@
 import { buildTypeGuard } from 'features/parameters/types/parameterSchemas';
+import { assert } from 'tsafe';
 import { z } from 'zod';
 
 import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
@@ -30,7 +31,7 @@ import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedule
 /** */
 
 // #region Base schemas & misc
-const zFieldInput = z.enum(['connection', 'direct', 'any']);
+const zFieldInput = z.enum(['connection', 'direct', 'any', 'batch']);
 const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
 const zFieldInputInstanceBase = z.object({
   name: z.string().trim().min(1),
@@ -62,6 +63,7 @@ const zCardinality = z.enum([SINGLE, COLLECTION, SINGLE_OR_COLLECTION]);
 
 const zFieldTypeBase = z.object({
   cardinality: zCardinality,
+  batch: z.boolean(),
 });
 
 export const zFieldIdentifier = z.object({
@@ -79,7 +81,7 @@ const zIntegerFieldType = zFieldTypeBase.extend({
   name: z.literal('IntegerField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zIntegerCollectionFieldType = z.object({
+const zIntegerCollectionFieldType = zFieldTypeBase.extend({
   name: z.literal('IntegerField'),
   cardinality: z.literal(COLLECTION),
   originalType: zStatelessFieldType.optional(),
@@ -90,7 +92,7 @@ const zFloatFieldType = zFieldTypeBase.extend({
   name: z.literal('FloatField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zFloatCollectionFieldType = z.object({
+const zFloatCollectionFieldType = zFieldTypeBase.extend({
   name: z.literal('FloatField'),
   cardinality: z.literal(COLLECTION),
   originalType: zStatelessFieldType.optional(),
@@ -101,7 +103,7 @@ const zStringFieldType = zFieldTypeBase.extend({
   name: z.literal('StringField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zStringCollectionFieldType = z.object({
+const zStringCollectionFieldType = zFieldTypeBase.extend({
   name: z.literal('StringField'),
   cardinality: z.literal(COLLECTION),
   originalType: zStatelessFieldType.optional(),
@@ -120,7 +122,7 @@ const zImageFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zImageCollectionFieldType = z.object({
+const zImageCollectionFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   cardinality: z.literal(COLLECTION),
   originalType: zStatelessFieldType.optional(),
@@ -210,6 +212,10 @@ const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zFloatGeneratorFieldType = zFieldTypeBase.extend({
+  name: z.literal('FloatGeneratorField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
@@ -238,6 +244,7 @@ const zStatefulFieldType = z.union([
   zFluxVAEModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
+  zFloatGeneratorFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -999,6 +1006,93 @@ export const isSchedulerFieldInputInstance = buildTypeGuard(zSchedulerFieldInput
 export const isSchedulerFieldInputTemplate = buildTypeGuard(zSchedulerFieldInputTemplate);
 // #endregion
 
+// #region FloatGeneratorField
+const zFloatGeneratorStartEndStep = z.object({
+  type: z.literal('float_generator_start_end_step').default('float_generator_start_end_step'),
+  start: z.number().default(0),
+  end: z.number().default(1),
+  step: z.number().default(0.1),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorStartEndStep = z.infer<typeof zFloatGeneratorStartEndStep>;
+export const getFloatGeneratorStartEndStepDefaults = () => zFloatGeneratorStartEndStep.parse({});
+export const getFloatGeneratorStartEndStepValues = ({ start, end, step }: FloatGeneratorStartEndStep) => {
+  if (step === 0) {
+    return [];
+  }
+  const values = Array.from({ length: Math.floor((end - start) / step) + 1 }, (_, i) => start + i * step);
+  return values;
+};
+
+const zFloatGeneratorStartCountStep = z.object({
+  type: z.literal('float_generator_start_count_step').default('float_generator_start_count_step'),
+  start: z.number().default(0),
+  step: z.number().default(0.1),
+  count: z.number().int().default(10),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorStartCountStep = z.infer<typeof zFloatGeneratorStartCountStep>;
+export const getFloatGeneratorStartCountStepDefaults = () => zFloatGeneratorStartCountStep.parse({});
+export const getFloatGeneratorStartCountStepValues = ({ start, count, step }: FloatGeneratorStartCountStep) => {
+  if (step === 0) {
+    return [];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + i * step);
+  return values;
+};
+
+const zFloatGeneratorRandom = z.object({
+  type: z.literal('float_generator_random').default('float_generator_random'),
+  min: z.number().default(0),
+  max: z.number().default(1),
+  count: z.number().int().default(10),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorRandom = z.infer<typeof zFloatGeneratorRandom>;
+export const getFloatGeneratorRandomDefaults = () => zFloatGeneratorRandom.parse({});
+export const getFloatGeneratorRandomValues = ({ min, max, count }: FloatGeneratorRandom) => {
+  const values = Array.from({ length: count }, () => Math.random() * (max - min) + min);
+  return values;
+};
+
+export const zFloatGeneratorFieldValue = z.union([
+  zFloatGeneratorStartEndStep,
+  zFloatGeneratorStartCountStep,
+  zFloatGeneratorRandom,
+]);
+const zFloatGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFloatGeneratorFieldValue,
+});
+const zFloatGeneratorFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFloatGeneratorFieldType,
+  originalType: zFieldType.optional(),
+  default: zFloatGeneratorFieldValue,
+});
+const zFloatGeneratorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zFloatGeneratorFieldType,
+});
+export type FloatGeneratorFieldValue = z.infer<typeof zFloatGeneratorFieldValue>;
+export type FloatGeneratorFieldInputInstance = z.infer<typeof zFloatGeneratorFieldInputInstance>;
+export type FloatGeneratorFieldInputTemplate = z.infer<typeof zFloatGeneratorFieldInputTemplate>;
+export const isFloatGeneratorFieldInputInstance = buildTypeGuard(zFloatGeneratorFieldInputInstance);
+export const isFloatGeneratorFieldInputTemplate = buildTypeGuard(zFloatGeneratorFieldInputTemplate);
+export const resolveFloatGeneratorField = ({ value }: FloatGeneratorFieldInputInstance) => {
+  if (value.values) {
+    return value.values;
+  }
+  if (value.type === 'float_generator_start_end_step') {
+    return getFloatGeneratorStartEndStepValues(value);
+  }
+  if (value.type === 'float_generator_start_count_step') {
+    return getFloatGeneratorStartCountStepValues(value);
+  }
+  if (value.type === 'float_generator_random') {
+    return getFloatGeneratorRandomValues(value);
+  }
+  assert(false, 'Invalid float generator type');
+};
+// #endregion
+
 // #region StatelessField
 /**
  * StatelessField is a catchall for stateless fields with no UI input components. They do not
@@ -1077,6 +1171,7 @@ export const zStatefulFieldValue = z.union([
   zControlLoRAModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
+  zFloatGeneratorFieldValue,
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1114,6 +1209,7 @@ const zStatefulFieldInputInstance = z.union([
   zCLIPEmbedModelFieldInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
+  zFloatGeneratorFieldInputInstance,
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
@@ -1155,6 +1251,7 @@ const zStatefulFieldInputTemplate = z.union([
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,
+  zFloatGeneratorFieldInputTemplate,
 ]);
 
 export const zFieldInputTemplate = z.union([zStatefulFieldInputTemplate, zStatelessFieldInputTemplate]);
@@ -1189,6 +1286,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zSpandrelImageToImageModelFieldOutputTemplate,
   zColorFieldOutputTemplate,
   zSchedulerFieldOutputTemplate,
+  zFloatGeneratorFieldOutputTemplate,
 ]);
 
 export const zFieldOutputTemplate = z.union([zStatefulFieldOutputTemplate, zStatelessFieldOutputTemplate]);

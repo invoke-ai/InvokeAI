@@ -13,6 +13,7 @@ import type {
   FieldType,
   FloatFieldCollectionInputTemplate,
   FloatFieldInputTemplate,
+  FloatGeneratorFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
   FluxVAEModelFieldInputTemplate,
   ImageFieldCollectionInputTemplate,
@@ -637,6 +638,26 @@ const buildSchedulerFieldInputTemplate: FieldInputTemplateBuilder<SchedulerField
   return template;
 };
 
+const buildFloatGeneratorFieldInputTemplate: FieldInputTemplateBuilder<FloatGeneratorFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FloatGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? {
+      type: 'float_generator_start_end_step',
+      start: 0,
+      end: 1,
+      step: 0.1,
+      values: undefined,
+    },
+  };
+
+  return template;
+};
+
 export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
   BoardField: buildBoardFieldInputTemplate,
   BooleanField: buildBooleanFieldInputTemplate,
@@ -665,6 +686,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
   ControlLoRAModelField: buildControlLoRAModelFieldInputTemplate,
+  FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (
