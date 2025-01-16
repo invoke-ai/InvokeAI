@@ -20,6 +20,7 @@ import type {
   ImageFieldInputTemplate,
   IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
+  IntegerGeneratorFieldInputTemplate,
   IPAdapterModelFieldInputTemplate,
   LoRAModelFieldInputTemplate,
   MainModelFieldInputTemplate,
@@ -639,18 +640,38 @@ const buildSchedulerFieldInputTemplate: FieldInputTemplateBuilder<SchedulerField
 };
 
 const buildFloatGeneratorFieldInputTemplate: FieldInputTemplateBuilder<FloatGeneratorFieldInputTemplate> = ({
-  schemaObject,
+  // schemaObject,
   baseField,
   fieldType,
 }) => {
   const template: FloatGeneratorFieldInputTemplate = {
     ...baseField,
     type: fieldType,
-    default: schemaObject.default ?? {
+    default: {
       type: 'float_generator_start_end_step',
       start: 0,
       end: 1,
       step: 0.1,
+      values: undefined,
+    },
+  };
+
+  return template;
+};
+
+const buildIntegerGeneratorFieldInputTemplate: FieldInputTemplateBuilder<IntegerGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: IntegerGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: {
+      type: 'integer_generator_start_end_step',
+      start: 0,
+      end: 10,
+      step: 1,
       values: undefined,
     },
   };
@@ -687,6 +708,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
   ControlLoRAModelField: buildControlLoRAModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
+  IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (

@@ -22,6 +22,7 @@ import type {
   ImageFieldValue,
   IntegerFieldCollectionValue,
   IntegerFieldValue,
+  IntegerGeneratorFieldValue,
   IPAdapterModelFieldValue,
   LoRAModelFieldValue,
   MainModelFieldValue,
@@ -54,6 +55,7 @@ import {
   zImageFieldValue,
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
+  zIntegerGeneratorFieldValue,
   zIPAdapterModelFieldValue,
   zLoRAModelFieldValue,
   zMainModelFieldValue,
@@ -399,6 +401,9 @@ export const nodesSlice = createSlice({
     fieldFloatGeneratorValueChanged: (state, action: FieldValueAction<FloatGeneratorFieldValue>) => {
       fieldValueReducer(state, action, zFloatGeneratorFieldValue);
     },
+    fieldIntegerGeneratorValueChanged: (state, action: FieldValueAction<IntegerGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zIntegerGeneratorFieldValue);
+    },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -464,6 +469,7 @@ export const {
   fieldControlLoRAModelValueChanged,
   fieldFluxVAEModelValueChanged,
   fieldFloatGeneratorValueChanged,
+  fieldIntegerGeneratorValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

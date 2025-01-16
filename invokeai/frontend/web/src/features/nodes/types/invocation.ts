@@ -107,6 +107,7 @@ export const isBatchNode = (node: InvocationNode) => {
 export const isGeneratorNode = (node: InvocationNode) => {
   switch (node.data.type) {
     case 'float_generator':
+    case 'integer_generator':
       return true;
     default:
       return false;

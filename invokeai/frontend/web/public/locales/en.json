@@ -857,9 +857,9 @@
         "defaultVAE": "Default VAE"
     },
     "nodes": {
-        "floatGeneratorStartEndStep": "Start, End, Step",
-        "floatGeneratorStartCountStep": "Start, Count Step",
-        "floatGeneratorRandom": "Random",
+        "startEndStep": "Start, End, Step",
+        "startCountStep": "Start, Count Step",
+        "random": "Random",
         "noBatchGroup": "no group",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",

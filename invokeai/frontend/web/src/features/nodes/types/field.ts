@@ -216,6 +216,10 @@ const zFloatGeneratorFieldType = zFieldTypeBase.extend({
   name: z.literal('FloatGeneratorField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zIntegerGeneratorFieldType = zFieldTypeBase.extend({
+  name: z.literal('IntegerGeneratorField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
@@ -245,6 +249,7 @@ const zStatefulFieldType = z.union([
   zColorFieldType,
   zSchedulerFieldType,
   zFloatGeneratorFieldType,
+  zIntegerGeneratorFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -1093,6 +1098,93 @@ export const resolveFloatGeneratorField = ({ value }: FloatGeneratorFieldInputIn
 };
 // #endregion
 
+// #region IntegerGeneratorField
+const zIntegerGeneratorStartEndStep = z.object({
+  type: z.literal('integer_generator_start_end_step').default('integer_generator_start_end_step'),
+  start: z.number().int().default(0),
+  end: z.number().int().default(10),
+  step: z.number().int().default(1),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorStartEndStep = z.infer<typeof zIntegerGeneratorStartEndStep>;
+export const getIntegerGeneratorStartEndStepDefaults = () => zIntegerGeneratorStartEndStep.parse({});
+export const getIntegerGeneratorStartEndStepValues = ({ start, end, step }: IntegerGeneratorStartEndStep) => {
+  if (step === 0) {
+    return [];
+  }
+  const values = Array.from({ length: Math.floor((end - start) / step) + 1 }, (_, i) => start + i * step);
+  return values;
+};
+
+const zIntegerGeneratorStartCountStep = z.object({
+  type: z.literal('integer_generator_start_count_step').default('integer_generator_start_count_step'),
+  start: z.number().int().default(0),
+  step: z.number().int().default(1),
+  count: z.number().int().default(10),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorStartCountStep = z.infer<typeof zIntegerGeneratorStartCountStep>;
+export const getIntegerGeneratorStartCountStepDefaults = () => zIntegerGeneratorStartCountStep.parse({});
+export const getIntegerGeneratorStartCountStepValues = ({ start, count, step }: IntegerGeneratorStartCountStep) => {
+  if (step === 0) {
+    return [];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + i * step);
+  return values;
+};
+
+const zIntegerGeneratorRandom = z.object({
+  type: z.literal('integer_generator_random').default('integer_generator_random'),
+  min: z.number().int().default(0),
+  max: z.number().int().default(10),
+  count: z.number().int().default(10),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorRandom = z.infer<typeof zIntegerGeneratorRandom>;
+export const getIntegerGeneratorRandomDefaults = () => zIntegerGeneratorRandom.parse({});
+export const getIntegerGeneratorRandomValues = ({ min, max, count }: IntegerGeneratorRandom) => {
+  const values = Array.from({ length: count }, () => Math.floor(Math.random() * (max - min + 1) + min));
+  return values;
+};
+
+export const zIntegerGeneratorFieldValue = z.union([
+  zIntegerGeneratorStartEndStep,
+  zIntegerGeneratorStartCountStep,
+  zIntegerGeneratorRandom,
+]);
+const zIntegerGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zIntegerGeneratorFieldValue,
+});
+const zIntegerGeneratorFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zIntegerGeneratorFieldType,
+  originalType: zFieldType.optional(),
+  default: zIntegerGeneratorFieldValue,
+});
+const zIntegerGeneratorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zIntegerGeneratorFieldType,
+});
+export type IntegerGeneratorFieldValue = z.infer<typeof zIntegerGeneratorFieldValue>;
+export type IntegerGeneratorFieldInputInstance = z.infer<typeof zIntegerGeneratorFieldInputInstance>;
+export type IntegerGeneratorFieldInputTemplate = z.infer<typeof zIntegerGeneratorFieldInputTemplate>;
+export const isIntegerGeneratorFieldInputInstance = buildTypeGuard(zIntegerGeneratorFieldInputInstance);
+export const isIntegerGeneratorFieldInputTemplate = buildTypeGuard(zIntegerGeneratorFieldInputTemplate);
+export const resolveIntegerGeneratorField = ({ value }: IntegerGeneratorFieldInputInstance) => {
+  if (value.values) {
+    return value.values;
+  }
+  if (value.type === 'integer_generator_start_end_step') {
+    return getIntegerGeneratorStartEndStepValues(value);
+  }
+  if (value.type === 'integer_generator_start_count_step') {
+    return getIntegerGeneratorStartCountStepValues(value);
+  }
+  if (value.type === 'integer_generator_random') {
+    return getIntegerGeneratorRandomValues(value);
+  }
+  assert(false, 'Invalid integer generator type');
+};
+// #endregion
+
 // #region StatelessField
 /**
  * StatelessField is a catchall for stateless fields with no UI input components. They do not
@@ -1172,6 +1264,7 @@ export const zStatefulFieldValue = z.union([
   zColorFieldValue,
   zSchedulerFieldValue,
   zFloatGeneratorFieldValue,
+  zIntegerGeneratorFieldValue,
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1210,6 +1303,7 @@ const zStatefulFieldInputInstance = z.union([
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
   zFloatGeneratorFieldInputInstance,
+  zIntegerGeneratorFieldInputInstance,
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
@@ -1252,6 +1346,7 @@ const zStatefulFieldInputTemplate = z.union([
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,
   zFloatGeneratorFieldInputTemplate,
+  zIntegerGeneratorFieldInputTemplate,
 ]);
 
 export const zFieldInputTemplate = z.union([zStatefulFieldInputTemplate, zStatelessFieldInputTemplate]);
@@ -1287,6 +1382,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zColorFieldOutputTemplate,
   zSchedulerFieldOutputTemplate,
   zFloatGeneratorFieldOutputTemplate,
+  zIntegerGeneratorFieldOutputTemplate,
 ]);
 
 export const zFieldOutputTemplate = z.union([zStatefulFieldOutputTemplate, zStatelessFieldOutputTemplate]);

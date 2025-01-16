@@ -130,6 +130,8 @@ export const parseSchema = (
 
         if (type === 'float_batch' && propertyName === 'floats') {
           fieldType.batch = true;
+        } else if (type === 'integer_batch' && propertyName === 'integers') {
+          fieldType.batch = true;
         }
 
         const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
@@ -194,6 +196,8 @@ export const parseSchema = (
         }
 
         if (type === 'float_generator' && propertyName === 'floats') {
+          fieldType.batch = true;
+        } else if (type === 'integer_generator' && propertyName === 'integers') {
           fieldType.batch = true;
         }
 
