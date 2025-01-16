@@ -1,16 +1,26 @@
 from typing import Literal
 
+from pydantic import BaseModel
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
+    BaseInvocationOutput,
     Classification,
     invocation,
+    invocation_output,
 )
 from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    OutputField,
 )
-from invokeai.app.invocations.primitives import FloatOutput, ImageOutput, IntegerOutput, StringOutput
+from invokeai.app.invocations.primitives import (
+    FloatOutput,
+    ImageOutput,
+    IntegerOutput,
+    StringOutput,
+)
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 BATCH_GROUP_IDS = Literal[
@@ -111,8 +121,55 @@ class FloatBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each float in the batch."""
 
     floats: list[float] = InputField(
-        default=[], min_length=1, description="The floats to batch over", input=Input.Direct
+        default=[],
+        min_length=1,
+        description="The floats to batch over",
     )
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
+        raise NotExecutableNodeError()
+
+
+@invocation_output("float_generator_output")
+class FloatGeneratorOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of floats"""
+
+    floats: list[float] = OutputField(description="The generated floats")
+
+
+default_float_generator = {
+    "type": "float_generator_start_end_step",
+    "start": 0.0,
+    "end": 1.0,
+    "step": 0.1,
+    "values": None,
+}
+
+
+class FloatGeneratorField(BaseModel):
+    pass
+
+
+@invocation(
+    "float_generator",
+    title="Float Generator",
+    tags=["primitives", "float", "number", "batch", "special"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class FloatGenerator(BaseInvocation):
+    """Generated a range of floats for use in a batched generation"""
+
+    generator: FloatGeneratorField = InputField(
+        default=default_float_generator,
+        description="The float generator.",
+        input=Input.Direct,
+        title="Generator Type",
+    )
+
+    def __init__(self):
+        raise NotExecutableNodeError()
+
+    def invoke(self, context: InvocationContext) -> FloatGeneratorOutput:
         raise NotExecutableNodeError()
