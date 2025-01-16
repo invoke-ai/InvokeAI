@@ -101,20 +101,23 @@ export const FloatGeneratorFieldInputComponent = memo(
         {field.value.type === 'float_generator_random' && (
           <FloatGeneratorRandomSettings state={field.value} onChange={onChange} />
         )}
-        <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
-          <Flex w="full" h="auto">
-            <OverlayScrollbarsComponent
-              className="nodrag nowheel"
-              defer
-              style={overlayScrollbarsStyles}
-              options={overlayscrollbarsOptions}
-            >
-              <Text className="nodrag nowheel" fontFamily="monospace" userSelect="text" cursor='text'>
-                {resolvedValuesAsString}
-              </Text>
-            </OverlayScrollbarsComponent>
+        {/* We don't show previews for random generators, bc they are non-deterministic */}
+        {field.value.type !== 'float_generator_random' && (
+          <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
+            <Flex w="full" h="auto">
+              <OverlayScrollbarsComponent
+                className="nodrag nowheel"
+                defer
+                style={overlayScrollbarsStyles}
+                options={overlayscrollbarsOptions}
+              >
+                <Text className="nodrag nowheel" fontFamily="monospace" userSelect="text" cursor="text">
+                  {resolvedValuesAsString}
+                </Text>
+              </OverlayScrollbarsComponent>
+            </Flex>
           </Flex>
-        </Flex>
+        )}
       </Flex>
     );
   }
