@@ -10,7 +10,11 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
-from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule, parameterize_mps_and_cuda
+from tests.backend.model_manager.load.model_cache.cached_model.utils import (
+    DummyModule,
+    parameterize_keep_ram_copy,
+    parameterize_mps_and_cuda,
+)
 
 
 @pytest.fixture
@@ -18,9 +22,6 @@ def model():
     model = DummyModule()
     apply_custom_layers_to_model(model)
     return model
-
-
-parameterize_keep_ram_copy = pytest.mark.parametrize("keep_ram_copy", [True, False])
 
 
 @parameterize_mps_and_cuda
