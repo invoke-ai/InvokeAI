@@ -78,6 +78,7 @@ class ModelCache:
         self,
         execution_device_working_mem_gb: float,
         enable_partial_loading: bool,
+        keep_ram_copy_of_weights: bool,
         max_ram_cache_size_gb: float | None = None,
         max_vram_cache_size_gb: float | None = None,
         execution_device: torch.device | str = "cuda",
@@ -105,6 +106,7 @@ class ModelCache:
         :param logger: InvokeAILogger to use (otherwise creates one)
         """
         self._enable_partial_loading = enable_partial_loading
+        self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
         self._storage_device: torch.device = torch.device(storage_device)
@@ -154,9 +156,13 @@ class ModelCache:
 
         # Wrap model.
         if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
-            wrapped_model = CachedModelWithPartialLoad(model, self._execution_device)
+            wrapped_model = CachedModelWithPartialLoad(
+                model, self._execution_device, keep_ram_copy=self._keep_ram_copy_of_weights
+            )
         else:
-            wrapped_model = CachedModelOnlyFullLoad(model, self._execution_device, size)
+            wrapped_model = CachedModelOnlyFullLoad(
+                model, self._execution_device, size, keep_ram_copy=self._keep_ram_copy_of_weights
+            )
 
         cache_record = CacheRecord(key=key, cached_model=wrapped_model)
         self._cached_models[key] = cache_record

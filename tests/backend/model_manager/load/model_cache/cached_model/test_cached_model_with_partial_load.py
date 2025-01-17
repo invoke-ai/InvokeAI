@@ -10,7 +10,11 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
-from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule, parameterize_mps_and_cuda
+from tests.backend.model_manager.load.model_cache.cached_model.utils import (
+    DummyModule,
+    parameterize_keep_ram_copy,
+    parameterize_mps_and_cuda,
+)
 
 
 @pytest.fixture
@@ -21,8 +25,11 @@ def model():
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_total_bytes(device: str, model: DummyModule):
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+@parameterize_keep_ram_copy
+def test_cached_model_total_bytes(device: str, model: DummyModule, keep_ram_copy: bool):
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
     linear1_numel = 10 * 32 + 32
     linear2_numel = 32 * 64 + 64
     buffer1_numel = 64
@@ -31,9 +38,12 @@ def test_cached_model_total_bytes(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_cur_vram_bytes(device: str, model: DummyModule):
+@parameterize_keep_ram_copy
+def test_cached_model_cur_vram_bytes(device: str, model: DummyModule, keep_ram_copy: bool):
     # Model starts in CPU memory.
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
     assert cached_model.cur_vram_bytes() == 0
 
     # Full load the model into VRAM.
@@ -45,9 +55,12 @@ def test_cached_model_cur_vram_bytes(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_partial_load(device: str, model: DummyModule):
+@parameterize_keep_ram_copy
+def test_cached_model_partial_load(device: str, model: DummyModule, keep_ram_copy: bool):
     # Model starts in CPU memory.
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == 0
 
@@ -71,9 +84,12 @@ def test_cached_model_partial_load(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_partial_unload(device: str, model: DummyModule):
+@parameterize_keep_ram_copy
+def test_cached_model_partial_unload(device: str, model: DummyModule, keep_ram_copy: bool):
     # Model starts in CPU memory.
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == 0
 
@@ -99,9 +115,14 @@ def test_cached_model_partial_unload(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_partial_unload_keep_required_weights_in_vram(device: str, model: DummyModule):
+@parameterize_keep_ram_copy
+def test_cached_model_partial_unload_keep_required_weights_in_vram(
+    device: str, model: DummyModule, keep_ram_copy: bool
+):
     # Model starts in CPU memory.
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == 0
 
@@ -130,8 +151,11 @@ def test_cached_model_partial_unload_keep_required_weights_in_vram(device: str, 
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_and_unload(device: str, model: DummyModule):
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+@parameterize_keep_ram_copy
+def test_cached_model_full_load_and_unload(device: str, model: DummyModule, keep_ram_copy: bool):
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
 
     # Model starts in CPU memory.
     model_total_bytes = cached_model.total_bytes()
@@ -162,8 +186,11 @@ def test_cached_model_full_load_and_unload(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_from_partial(device: str, model: DummyModule):
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+@parameterize_keep_ram_copy
+def test_cached_model_full_load_from_partial(device: str, model: DummyModule, keep_ram_copy: bool):
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
 
     # Model starts in CPU memory.
     model_total_bytes = cached_model.total_bytes()
@@ -190,8 +217,11 @@ def test_cached_model_full_load_from_partial(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_unload_from_partial(device: str, model: DummyModule):
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+@parameterize_keep_ram_copy
+def test_cached_model_full_unload_from_partial(device: str, model: DummyModule, keep_ram_copy: bool):
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
 
     # Model starts in CPU memory.
     model_total_bytes = cached_model.total_bytes()
@@ -219,7 +249,7 @@ def test_cached_model_full_unload_from_partial(device: str, model: DummyModule):
 
 @parameterize_mps_and_cuda
 def test_cached_model_get_cpu_state_dict(device: str, model: DummyModule):
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device), keep_ram_copy=True)
 
     # Model starts in CPU memory.
     assert cached_model.cur_vram_bytes() == 0
@@ -242,8 +272,11 @@ def test_cached_model_get_cpu_state_dict(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_and_inference(device: str, model: DummyModule):
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+@parameterize_keep_ram_copy
+def test_cached_model_full_load_and_inference(device: str, model: DummyModule, keep_ram_copy: bool):
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
     # Model starts in CPU memory.
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == 0
@@ -269,9 +302,12 @@ def test_cached_model_full_load_and_inference(device: str, model: DummyModule):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_partial_load_and_inference(device: str, model: DummyModule):
+@parameterize_keep_ram_copy
+def test_cached_model_partial_load_and_inference(device: str, model: DummyModule, keep_ram_copy: bool):
     # Model starts in CPU memory.
-    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device(device))
+    cached_model = CachedModelWithPartialLoad(
+        model=model, compute_device=torch.device(device), keep_ram_copy=keep_ram_copy
+    )
     model_total_bytes = cached_model.total_bytes()
     assert cached_model.cur_vram_bytes() == 0
 
