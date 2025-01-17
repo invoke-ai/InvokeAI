@@ -145,3 +145,19 @@ It is strongly suggested to disable this feature:
     If the sysmem fallback feature sounds familiar, that's because Invoke's partial model loading strategy is conceptually very similar - use VRAM when there's room, else fall back to RAM.
 
     Unfortunately, the Nvidia implementation is not optimized for applications like Invoke and does more harm than good.
+
+## Troubleshooting
+
+### Windows page file
+
+Invoke has high virtual memory (a.k.a. 'committed memory') requirements. This can cause issues on Windows if the page file size limits are hit. (See this issue for the technical details on why this happens: https://github.com/invoke-ai/InvokeAI/issues/7563).
+
+If you run out of page file space, InvokeAI may crash. Often, these crashes will happen with one of the following errors:
+
+- InvokeAI exits with Windows error code `3221225477`
+- InvokeAI crashes without an error, but `eventvwr.msc` reveals an error with code `0xc0000005` (the hex equivalent of `3221225477`)
+
+If you are running out of page file space, try the following solutions:
+
+- Make sure that you have sufficient disk space for the page file to grow. Watch your disk usage as Invoke runs. If it climbs near 100% leading up to the crash, then this is very likely the source of the issue. Clear out some disk space to resolve the issue.
+- Make sure that your page file is set to "System managed size" (this is the default) rather than a custom size. Under the "System managed size" policy, the page file will grow dynamically as needed. 
