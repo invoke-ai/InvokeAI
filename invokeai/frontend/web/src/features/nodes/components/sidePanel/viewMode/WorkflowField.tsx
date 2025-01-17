@@ -1,14 +1,13 @@
-import { Flex, FormLabel, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
-import FieldTooltipContent from 'features/nodes/components/flow/nodes/Invocation/fields/FieldTooltipContent';
+import { Flex, FormLabel, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { FieldNotesIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldNotesIconButton';
 import InputFieldRenderer from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
 import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
-import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import { t } from 'i18next';
 import { memo } from 'react';
-import { PiArrowCounterClockwiseBold, PiInfoBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
 type Props = {
   nodeId: string;
@@ -21,17 +20,16 @@ const WorkflowFieldInternal = ({ nodeId, fieldName }: Props) => {
   const { isValueChanged, onReset } = useFieldOriginalValue(nodeId, fieldName);
 
   return (
-    <Flex layerStyle="second" position="relative" borderRadius="base" w="full" p={4} gap="2" flexDir="column">
-      <Flex alignItems="center">
+    <Flex position="relative" w="full" gap="2" flexDir="column">
+      <Flex alignItems="center" gap={1}>
         <FormLabel fontSize="sm">{label || fieldTemplateTitle}</FormLabel>
-
         <Spacer />
         {isValueChanged && (
           <IconButton
             aria-label={t('nodes.resetToDefaultValue')}
             tooltip={t('nodes.resetToDefaultValue')}
             variant="ghost"
-            size="sm"
+            size="xs"
             onClick={onReset}
             icon={<PiArrowCounterClockwiseBold />}
           />
