@@ -25,7 +25,9 @@ const StringFieldInputComponent = (props: FieldComponentProps<StringFieldInputIn
   );
 
   if (fieldTemplate.ui_component === 'textarea') {
-    return <Textarea className="nodrag" onChange={handleValueChanged} value={field.value} rows={5} resize="none" readOnly />;
+    return (
+      <Textarea className="nodrag" onChange={handleValueChanged} value={field.value} rows={5} resize="none" readOnly />
+    );
   }
 
   return <Input className="nodrag" onChange={handleValueChanged} value={field.value} />;
