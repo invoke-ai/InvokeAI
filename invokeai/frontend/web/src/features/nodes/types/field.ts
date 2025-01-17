@@ -1,5 +1,6 @@
 import { buildTypeGuard } from 'features/parameters/types/parameterSchemas';
-import { trim } from 'lodash-es';
+import { isNil, trim } from 'lodash-es';
+import MersenneTwister from 'mtwist';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
@@ -1057,13 +1058,22 @@ const zFloatGeneratorUniformRandomDistribution = z.object({
   min: z.number().default(0),
   max: z.number().default(1),
   count: z.number().int().default(10),
+  seed: z.number().int().nullish(),
   values: z.array(z.number()).nullish(),
 });
 export type FloatGeneratorUniformRandomDistribution = z.infer<typeof zFloatGeneratorUniformRandomDistribution>;
 const getFloatGeneratorUniformRandomDistributionDefaults = () => zFloatGeneratorUniformRandomDistribution.parse({});
+const getRng = (seed?: number | null) => {
+  if (isNil(seed)) {
+    return () => Math.random();
+  }
+  const m = new MersenneTwister(seed);
+  return () => m.random();
+};
 const getFloatGeneratorUniformRandomDistributionValues = (generator: FloatGeneratorUniformRandomDistribution) => {
-  const { min, max, count } = generator;
-  const values = Array.from({ length: count }, () => Math.random() * (max - min) + min);
+  const { min, max, count, seed } = generator;
+  const rng = getRng(seed);
+  const values = Array.from({ length: count }, (_) => rng() * (max - min) + min);
   return values;
 };
 
@@ -1191,13 +1201,15 @@ const zIntegerGeneratorUniformRandomDistribution = z.object({
   min: z.number().int().default(0),
   max: z.number().int().default(10),
   count: z.number().int().default(10),
+  seed: z.number().int().nullish(),
   values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorUniformRandomDistribution = z.infer<typeof zIntegerGeneratorUniformRandomDistribution>;
 const getIntegerGeneratorUniformRandomDistributionDefaults = () => zIntegerGeneratorUniformRandomDistribution.parse({});
 const getIntegerGeneratorUniformRandomDistributionValues = (generator: IntegerGeneratorUniformRandomDistribution) => {
-  const { min, max, count } = generator;
-  const values = Array.from({ length: count }, () => Math.floor(Math.random() * (max - min + 1)) + min);
+  const { min, max, count, seed } = generator;
+  const rng = getRng(seed);
+  const values = Array.from({ length: count }, () => Math.floor(rng() * (max - min + 1)) + min);
   return values;
 };
 
