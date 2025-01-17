@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Circle, Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
+import { FieldNotesIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldNotesIconButton';
 import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
 import { useLinearViewFieldDnd } from 'features/nodes/components/sidePanel/workflow/useLinearViewFieldDnd';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
@@ -63,6 +64,7 @@ const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
             <EditableFieldTitle nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} kind="inputs" />
             <Spacer />
             {isMouseOverNode && <Circle me={2} size={2} borderRadius="full" bg="invokeBlue.500" />}
+            <FieldNotesIconButton nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
             {isValueChanged && (
               <IconButton
                 aria-label={t('nodes.resetToDefaultValue')}
