@@ -34,7 +34,14 @@ export const IntegerGeneratorParseStringSettings = memo(
         </FormControl>
         <FormControl orientation="vertical">
           <FormLabel>{t('common.input')}</FormLabel>
-          <Textarea value={state.input} onChange={onChangeInput} rows={7} />
+          <Textarea
+            className="nowheel nodrag nopan"
+            value={state.input}
+            onChange={onChangeInput}
+            p={2}
+            resize="none"
+            rows={5}
+          />
         </FormControl>
       </Flex>
     );
