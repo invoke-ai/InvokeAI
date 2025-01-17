@@ -64,14 +64,18 @@ export const IntegerGeneratorFieldInputComponent = memo(
     );
 
     const [debouncedField] = useDebounce(field, 300);
-    const resolvedValues = useMemo(() => resolveIntegerGeneratorField(debouncedField), [debouncedField]);
     const resolvedValuesAsString = useMemo(() => {
+      if (debouncedField.value.type === IntegerGeneratorUniformRandomDistributionType) {
+        const { count } = debouncedField.value;
+        return `<${t('nodes.generatorNRandomValues', { count })}>`;
+      }
+      const resolvedValues = resolveIntegerGeneratorField(debouncedField);
       if (resolvedValues.length === 0) {
-        return '<empty>';
+        return `<${t('nodes.generatorNoValues')}>`;
       } else {
         return resolvedValues.map((val) => round(val, 2)).join(', ');
       }
-    }, [resolvedValues]);
+    }, [debouncedField, t]);
 
     return (
       <Flex flexDir="column" gap={2}>
@@ -93,23 +97,20 @@ export const IntegerGeneratorFieldInputComponent = memo(
         {field.value.type === IntegerGeneratorParseStringType && (
           <IntegerGeneratorParseStringSettings state={field.value} onChange={onChange} />
         )}
-        {/* We don't show previews for random generators, bc they are non-deterministic */}
-        {field.value.type !== IntegerGeneratorUniformRandomDistributionType && (
-          <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
-            <Flex w="full" h="auto">
-              <OverlayScrollbarsComponent
-                className="nodrag nowheel"
-                defer
-                style={overlayScrollbarsStyles}
-                options={overlayscrollbarsOptions}
-              >
-                <Text className="nodrag nowheel" fontFamily="monospace" userSelect="text" cursor="text">
-                  {resolvedValuesAsString}
-                </Text>
-              </OverlayScrollbarsComponent>
-            </Flex>
+        <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
+          <Flex w="full" h="auto">
+            <OverlayScrollbarsComponent
+              className="nodrag nowheel"
+              defer
+              style={overlayScrollbarsStyles}
+              options={overlayscrollbarsOptions}
+            >
+              <Text className="nodrag nowheel" fontFamily="monospace" userSelect="text" cursor="text">
+                {resolvedValuesAsString}
+              </Text>
+            </OverlayScrollbarsComponent>
           </Flex>
-        )}
+        </Flex>
       </Flex>
     );
   }
