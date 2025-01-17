@@ -1,4 +1,5 @@
 import { Flex, FormControl } from '@invoke-ai/ui-library';
+import { FieldNotesIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldNotesIconButton';
 import FieldResetToDefaultValueButton from 'features/nodes/components/flow/nodes/Invocation/fields/FieldResetToDefaultValueButton';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
@@ -71,6 +72,7 @@ const InputField = ({ nodeId, fieldName }: Props) => {
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
           <Flex gap={1}>
             <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" isInvalid={isInvalid} withTooltip />
+            {isHovered && <FieldNotesIconButton nodeId={nodeId} fieldName={fieldName} />}
             {isHovered && <FieldResetToDefaultValueButton nodeId={nodeId} fieldName={fieldName} />}
             {isHovered && <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} />}
           </Flex>
