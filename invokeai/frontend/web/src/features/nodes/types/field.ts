@@ -38,6 +38,7 @@ const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
 const zFieldInputInstanceBase = z.object({
   name: z.string().trim().min(1),
   label: z.string().nullish(),
+  notes: z.string().nullish(),
 });
 const zFieldTemplateBase = z.object({
   name: z.string().min(1),
