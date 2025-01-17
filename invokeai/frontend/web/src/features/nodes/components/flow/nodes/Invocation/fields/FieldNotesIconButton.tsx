@@ -1,10 +1,12 @@
 import {
+  Box,
   FormControl,
   FormLabel,
   IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Text,
   Textarea,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -18,9 +20,10 @@ import { PiNoteBold } from 'react-icons/pi';
 type Props = {
   nodeId: string;
   fieldName: string;
+  readOnly?: boolean;
 };
 
-export const FieldNotesIconButton = memo(({ nodeId, fieldName }: Props) => {
+export const FieldNotesIconButton = memo(({ nodeId, fieldName, readOnly }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const notes = useFieldNotes(nodeId, fieldName);
@@ -30,6 +33,10 @@ export const FieldNotesIconButton = memo(({ nodeId, fieldName }: Props) => {
     },
     [dispatch, fieldName, nodeId]
   );
+
+  if (readOnly && !notes?.trim()) {
+    return null;
+  }
 
   return (
     <Popover>
@@ -46,15 +53,22 @@ export const FieldNotesIconButton = memo(({ nodeId, fieldName }: Props) => {
       <PopoverContent p={2} w={256}>
         <FormControl orientation="vertical">
           <FormLabel>{t('nodes.notes')}</FormLabel>
-          <Textarea
-            className="nodrag nopan nowheel"
-            fontSize="sm"
-            value={notes ?? ''}
-            onChange={onChange}
-            p={2}
-            resize="none"
-            rows={5}
-          />
+          {readOnly && (
+            <Box borderWidth={1} borderRadius="base" p={2} w="full" h="full">
+              <Text fontSize="sm">{notes}</Text>
+            </Box>
+          )}
+          {!readOnly && (
+            <Textarea
+              className="nodrag nopan nowheel"
+              fontSize="sm"
+              value={notes ?? ''}
+              onChange={onChange}
+              p={2}
+              resize="none"
+              rows={5}
+            />
+          )}
         </FormControl>
       </PopoverContent>
     </Popover>

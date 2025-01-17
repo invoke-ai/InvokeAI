@@ -36,15 +36,7 @@ const WorkflowFieldInternal = ({ nodeId, fieldName }: Props) => {
             icon={<PiArrowCounterClockwiseBold />}
           />
         )}
-        <Tooltip
-          label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" />}
-          openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-          placement="top"
-        >
-          <Flex h="24px" alignItems="center">
-            <Icon fontSize="md" color="base.300" as={PiInfoBold} />
-          </Flex>
-        </Tooltip>
+        <FieldNotesIconButton nodeId={nodeId} fieldName={fieldName} readOnly />
       </Flex>
       <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
     </Flex>
