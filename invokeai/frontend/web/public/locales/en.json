@@ -185,7 +185,8 @@
         "min": "Min",
         "max": "Max",
         "values": "Values",
-        "resetToDefaults": "Reset to Defaults"
+        "resetToDefaults": "Reset to Defaults",
+        "seed": "Seed"
     },
     "hrf": {
         "hrf": "High Resolution Fix",

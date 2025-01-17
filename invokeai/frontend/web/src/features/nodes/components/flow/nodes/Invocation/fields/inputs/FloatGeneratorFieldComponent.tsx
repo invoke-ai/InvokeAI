@@ -16,7 +16,7 @@ import {
   getFloatGeneratorDefaults,
   resolveFloatGeneratorField,
 } from 'features/nodes/types/field';
-import { round } from 'lodash-es';
+import { isNil, round } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -63,7 +63,10 @@ export const FloatGeneratorFieldInputComponent = memo(
 
     const [debouncedField] = useDebounce(field, 300);
     const resolvedValuesAsString = useMemo(() => {
-      if (debouncedField.value.type === FloatGeneratorUniformRandomDistributionType) {
+      if (
+        debouncedField.value.type === FloatGeneratorUniformRandomDistributionType &&
+        isNil(debouncedField.value.seed)
+      ) {
         const { count } = debouncedField.value;
         return `<${t('nodes.generatorNRandomValues', { count })}>`;
       }
