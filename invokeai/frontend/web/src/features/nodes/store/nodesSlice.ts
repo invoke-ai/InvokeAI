@@ -95,23 +95,30 @@ type FieldValueAction<T extends FieldValue> = PayloadAction<{
   value: T;
 }>;
 
+const getField = (nodeId: string, fieldName: string, state: NodesState) => {
+  const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+  const node = state.nodes?.[nodeIndex];
+  if (!isInvocationNode(node)) {
+    return;
+  }
+  return node.data?.inputs[fieldName];
+};
+
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
   action: FieldValueAction<T>,
   schema: z.ZodTypeAny
 ) => {
   const { nodeId, fieldName, value } = action.payload;
-  const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-  const node = state.nodes?.[nodeIndex];
-  if (!isInvocationNode(node)) {
+  const field = getField(nodeId, fieldName, state);
+  if (!field) {
     return;
   }
-  const input = node.data?.inputs[fieldName];
   const result = schema.safeParse(value);
-  if (!input || nodeIndex < 0 || !result.success) {
+  if (!result.success) {
     return;
   }
-  input.value = result.data;
+  field.value = result.data;
 };
 
 export const nodesSlice = createSlice({
@@ -409,6 +416,14 @@ export const nodesSlice = createSlice({
     fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StringGeneratorFieldValue>) => {
       fieldValueReducer(state, action, zStringGeneratorFieldValue);
     },
+    fieldNotesChanged: (state, action: PayloadAction<{ nodeId: string; fieldName: string; val?: string }>) => {
+      const { nodeId, fieldName, val } = action.payload;
+      const field = getField(nodeId, fieldName, state);
+      if (!field) {
+        return;
+      }
+      field.notes = val;
+    },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -476,6 +491,7 @@ export const {
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
+  fieldNotesChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
