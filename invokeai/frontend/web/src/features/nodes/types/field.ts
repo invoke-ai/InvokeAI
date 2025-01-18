@@ -1352,8 +1352,22 @@ const getStringGeneratorParseStringValues = (generator: StringGeneratorParseStri
   const values = splitValues.filter((s) => s.length > 0);
   return values;
 };
+export const StringGeneratorDynamicPromptsType = 'string_generator_dynamic_prompts';
+const zStringGeneratorDynamicPrompts = z.object({
+  type: z.literal(StringGeneratorDynamicPromptsType).default(StringGeneratorDynamicPromptsType),
+  input: z.string().default('a super {cute|ferocious} {dog|cat}'),
+  maxPrompts: z.number().int().gte(1).default(20),
+  combinatorial: z.boolean().default(true),
+  values: z.array(z.string()).nullish(),
+});
+export type StringGeneratorDynamicPrompts = z.infer<typeof zStringGeneratorDynamicPrompts>;
+export const getStringGeneratorDynamicPromptsDefaults = () => zStringGeneratorDynamicPrompts.parse({});
+const getStringGeneratorDynamicPromptsValues = (generator: StringGeneratorDynamicPrompts) => {
+  const { values } = generator;
+  return values ?? [];
+};
 
-export const zStringGeneratorFieldValue = zStringGeneratorParseString;
+export const zStringGeneratorFieldValue = z.union([zStringGeneratorParseString, zStringGeneratorDynamicPrompts]);
 const zStringGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zStringGeneratorFieldValue,
 });
@@ -1377,11 +1391,17 @@ export const resolveStringGeneratorField = ({ value }: StringGeneratorFieldInput
   if (value.type === StringGeneratorParseStringType) {
     return getStringGeneratorParseStringValues(value);
   }
+  if (value.type === StringGeneratorDynamicPromptsType) {
+    return getStringGeneratorDynamicPromptsValues(value);
+  }
   assert(false, 'Invalid string generator type');
 };
 export const getStringGeneratorDefaults = (type: StringGeneratorFieldValue['type']) => {
   if (type === StringGeneratorParseStringType) {
     return getStringGeneratorParseStringDefaults();
+  }
+  if (type === StringGeneratorDynamicPromptsType) {
+    return getStringGeneratorDynamicPromptsDefaults();
   }
   assert(false, 'Invalid string generator type');
 };
