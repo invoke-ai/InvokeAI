@@ -1,7 +1,8 @@
 import { Flex, Select, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { StringGeneratorDynamicPromptsSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorDynamicPromptsSettings';
+import { StringGeneratorDynamicPromptsCombinatorialSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorDynamicPromptsCombinatorialSettings';
+import { StringGeneratorDynamicPromptsRandomSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorDynamicPromptsRandomSettings';
 import { StringGeneratorParseStringSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorParseStringSettings';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { fieldStringGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
@@ -9,9 +10,11 @@ import type { StringGeneratorFieldInputInstance, StringGeneratorFieldInputTempla
 import {
   getStringGeneratorDefaults,
   resolveStringGeneratorField,
-  StringGeneratorDynamicPromptsType,
+  StringGeneratorDynamicPromptsCombinatorialType,
+  StringGeneratorDynamicPromptsRandomType,
   StringGeneratorParseStringType,
 } from 'features/nodes/types/field';
+import { isNil } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -55,6 +58,11 @@ export const StringGeneratorFieldInputComponent = memo(
 
     const [debouncedField] = useDebounce(field, 300);
     const resolvedValuesAsString = useMemo(() => {
+      if (debouncedField.value.type === StringGeneratorDynamicPromptsRandomType && isNil(debouncedField.value.seed)) {
+        const { count } = debouncedField.value;
+        return `<${t('nodes.generatorNRandomValues', { count })}>`;
+      }
+
       const resolvedValues = resolveStringGeneratorField(debouncedField);
       if (resolvedValues.length === 0) {
         return `<${t('nodes.generatorNoValues')}>`;
@@ -67,13 +75,19 @@ export const StringGeneratorFieldInputComponent = memo(
       <Flex flexDir="column" gap={2}>
         <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
           <option value={StringGeneratorParseStringType}>{t('nodes.parseString')}</option>
-          <option value={StringGeneratorDynamicPromptsType}>{t('nodes.dynamicPrompts')}</option>
+          <option value={StringGeneratorDynamicPromptsRandomType}>{t('nodes.dynamicPromptsRandom')}</option>
+          <option value={StringGeneratorDynamicPromptsCombinatorialType}>
+            {t('nodes.dynamicPromptsCombinatorial')}
+          </option>
         </Select>
         {field.value.type === StringGeneratorParseStringType && (
           <StringGeneratorParseStringSettings state={field.value} onChange={onChange} />
         )}
-        {field.value.type === StringGeneratorDynamicPromptsType && (
-          <StringGeneratorDynamicPromptsSettings state={field.value} onChange={onChange} />
+        {field.value.type === StringGeneratorDynamicPromptsRandomType && (
+          <StringGeneratorDynamicPromptsRandomSettings state={field.value} onChange={onChange} />
+        )}
+        {field.value.type === StringGeneratorDynamicPromptsCombinatorialType && (
+          <StringGeneratorDynamicPromptsCombinatorialSettings state={field.value} onChange={onChange} />
         )}
         <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
           <Flex w="full" h="auto">

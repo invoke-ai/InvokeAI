@@ -186,7 +186,8 @@
         "max": "Max",
         "values": "Values",
         "resetToDefaults": "Reset to Defaults",
-        "seed": "Seed"
+        "seed": "Seed",
+        "combinatorial": "Combinatorial"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -868,6 +869,9 @@
         "generatorNRandomValues_one": "{{count}} random value",
         "generatorNRandomValues_other": "{{count}} random values",
         "generatorNoValues": "empty",
+        "generatorLoading": "loading",
+        "dynamicPromptsRandom": "Dynamic Prompts (Random)",
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Combinatorial)",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
         "addLinearView": "Add to Linear View",
@@ -1133,7 +1137,8 @@
             "perPromptLabel": "Seed per Image",
             "perPromptDesc": "Use a different seed for each image"
         },
-        "loading": "Generating Dynamic Prompts..."
+        "loading": "Generating Dynamic Prompts...",
+        "promptsToGenerate": "Prompts to Generate"
     },
     "sdxl": {
         "cfgScale": "CFG Scale",
