@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Grid, GridItem, IconButton, Input } from '@invoke-ai/ui-library';
+import { Button, Divider, Flex, FormLabel, Grid, GridItem, IconButton, Input } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
@@ -12,7 +12,7 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold, PiXBold } from 'react-icons/pi';
+import { PiXBold } from 'react-icons/pi';
 
 import type { FieldComponentProps } from './types';
 
@@ -29,6 +29,7 @@ const sx = {
 export const StringFieldCollectionInputComponent = memo(
   (props: FieldComponentProps<StringFieldCollectionInputInstance, StringFieldCollectionInputTemplate>) => {
     const { nodeId, field } = props;
+    const { t } = useTranslation();
     const store = useAppStore();
 
     const isInvalid = useFieldIsInvalid(nodeId, field.name);
@@ -61,52 +62,42 @@ export const StringFieldCollectionInputComponent = memo(
         className="nodrag"
         position="relative"
         w="full"
-        h="full"
+        h="auto"
         maxH={64}
         alignItems="stretch"
         justifyContent="center"
+        p={1}
+        sx={sx}
+        data-error={isInvalid}
+        borderRadius="base"
+        flexDir="column"
+        gap={1}
       >
-        {(!field.value || field.value.length === 0) && (
-          <Box w="full" sx={sx} data-error={isInvalid} borderRadius="base">
-            <IconButton
-              w="full"
-              onClick={onAddString}
-              aria-label="Add Item"
-              icon={<PiPlusBold />}
-              variant="ghost"
-              size="sm"
-            />
-          </Box>
-        )}
+        <Button onClick={onAddString} variant="ghost">
+          {t('nodes.addItem')}
+        </Button>
         {field.value && field.value.length > 0 && (
-          <Box w="full" h="auto" p={1} sx={sx} data-error={isInvalid} borderRadius="base">
+          <>
+            <Divider />
             <OverlayScrollbarsComponent
               className="nowheel"
               defer
               style={overlayScrollbarsStyles}
               options={overlayscrollbarsOptions}
             >
-              <Grid w="full" h="full" templateColumns="repeat(1, 1fr)" gap={1}>
-                <IconButton
-                  onClick={onAddString}
-                  aria-label="Add Item"
-                  icon={<PiPlusBold />}
-                  variant="ghost"
-                  size="sm"
-                />
+              <Grid gap={1} gridTemplateColumns="auto 1fr auto" alignItems="center">
                 {field.value.map((value, index) => (
-                  <GridItem key={index} position="relative" className="nodrag">
-                    <StringListItemContent
-                      value={value}
-                      index={index}
-                      onRemoveString={onRemoveString}
-                      onChangeString={onChangeString}
-                    />
-                  </GridItem>
+                  <ListItemContent
+                    key={index}
+                    value={value}
+                    index={index}
+                    onRemoveString={onRemoveString}
+                    onChangeString={onChangeString}
+                  />
                 ))}
               </Grid>
             </OverlayScrollbarsComponent>
-          </Box>
+          </>
         )}
       </Flex>
     );
@@ -150,3 +141,49 @@ const StringListItemContent = memo(({ value, index, onRemoveString, onChangeStri
   );
 });
 StringListItemContent.displayName = 'StringListItemContent';
+
+type ListItemContentProps = {
+  value: string;
+  index: number;
+  onRemoveString: (index: number) => void;
+  onChangeString: (index: number, value: string) => void;
+};
+
+const ListItemContent = memo(({ value, index, onRemoveString, onChangeString }: ListItemContentProps) => {
+  const { t } = useTranslation();
+
+  const onClickRemove = useCallback(() => {
+    onRemoveString(index);
+  }, [index, onRemoveString]);
+  const onChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      onChangeString(index, e.target.value);
+    },
+    [index, onChangeString]
+  );
+
+  return (
+    <>
+      <GridItem>
+        <FormLabel ps={1} m={0}>
+          {index + 1}.
+        </FormLabel>
+      </GridItem>
+      <GridItem>
+        <Input size="sm" resize="none" value={value} onChange={onChange} />
+      </GridItem>
+      <GridItem>
+        <IconButton
+          tabIndex={-1}
+          size="sm"
+          variant="link"
+          alignSelf="stretch"
+          onClick={onClickRemove}
+          icon={<PiXBold />}
+          aria-label={t('common.delete')}
+        />
+      </GridItem>
+    </>
+  );
+});
+ListItemContent.displayName = 'ListItemContent';
