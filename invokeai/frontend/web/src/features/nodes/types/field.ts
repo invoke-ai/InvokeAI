@@ -1093,12 +1093,26 @@ export type FloatGeneratorParseString = z.infer<typeof zFloatGeneratorParseStrin
 const getFloatGeneratorParseStringDefaults = () => zFloatGeneratorParseString.parse({});
 const getFloatGeneratorParseStringValues = (generator: FloatGeneratorParseString) => {
   const { input, splitOn } = generator;
-  const values = input
-    .split(splitOn)
+
+  let splitValues: string[] = [];
+  if (splitOn === '') {
+    // special case for empty splitOn
+    splitValues = [input];
+  } else {
+    // try to parse splitOn as a JSON string, this allows for special characters like \n
+    try {
+      splitValues = input.split(JSON.parse(`"${splitOn}"`));
+    } catch {
+      // if JSON parsing fails, just split on the string
+      splitValues = input.split(splitOn);
+    }
+  }
+  const values = splitValues
     .map(trim)
     .filter((s) => s.length > 0)
     .map((s) => parseFloat(s))
     .filter((n) => !isNaN(n));
+
   return values;
 };
 
@@ -1229,12 +1243,27 @@ export type IntegerGeneratorParseString = z.infer<typeof zIntegerGeneratorParseS
 const getIntegerGeneratorParseStringDefaults = () => zIntegerGeneratorParseString.parse({});
 const getIntegerGeneratorParseStringValues = (generator: IntegerGeneratorParseString) => {
   const { input, splitOn } = generator;
-  const values = input
-    .split(splitOn)
+
+  let splitValues: string[] = [];
+  if (splitOn === '') {
+    // special case for empty splitOn
+    splitValues = [input];
+  } else {
+    // try to parse splitOn as a JSON string, this allows for special characters like \n
+    try {
+      splitValues = input.split(JSON.parse(`"${splitOn}"`));
+    } catch {
+      // if JSON parsing fails, just split on the string
+      splitValues = input.split(splitOn);
+    }
+  }
+
+  const values = splitValues
     .map(trim)
     .filter((s) => s.length > 0)
     .map((s) => parseInt(s, 10))
     .filter((n) => !isNaN(n));
+
   return values;
 };
 
