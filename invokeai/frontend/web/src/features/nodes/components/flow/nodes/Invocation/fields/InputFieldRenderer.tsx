@@ -4,6 +4,7 @@ import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/f
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
 import { NumberFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/NumberFieldCollectionInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
+import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
 import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import {
@@ -67,6 +68,8 @@ import {
   isStringFieldCollectionInputTemplate,
   isStringFieldInputInstance,
   isStringFieldInputTemplate,
+  isStringGeneratorFieldInputInstance,
+  isStringGeneratorFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
   isT2IAdapterModelFieldInputTemplate,
   isT5EncoderModelFieldInputInstance,
@@ -249,6 +252,10 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isIntegerGeneratorFieldInputInstance(fieldInstance) && isIntegerGeneratorFieldInputTemplate(fieldTemplate)) {
     return <IntegerGeneratorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isStringGeneratorFieldInputInstance(fieldInstance) && isStringGeneratorFieldInputTemplate(fieldTemplate)) {
+    return <StringGeneratorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (fieldTemplate) {
