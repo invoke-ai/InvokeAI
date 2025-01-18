@@ -41,6 +41,7 @@ export const IntegerGeneratorParseStringSettings = memo(
             p={2}
             resize="none"
             rows={5}
+            fontSize="sm"
           />
         </FormControl>
       </Flex>
