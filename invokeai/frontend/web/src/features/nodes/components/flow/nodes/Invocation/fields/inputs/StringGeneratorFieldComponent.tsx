@@ -1,6 +1,7 @@
 import { Flex, Select, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
+import { StringGeneratorDynamicPromptsSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorDynamicPromptsSettings';
 import { StringGeneratorParseStringSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorParseStringSettings';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { fieldStringGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
@@ -8,6 +9,7 @@ import type { StringGeneratorFieldInputInstance, StringGeneratorFieldInputTempla
 import {
   getStringGeneratorDefaults,
   resolveStringGeneratorField,
+  StringGeneratorDynamicPromptsType,
   StringGeneratorParseStringType,
 } from 'features/nodes/types/field';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -65,9 +67,13 @@ export const StringGeneratorFieldInputComponent = memo(
       <Flex flexDir="column" gap={2}>
         <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
           <option value={StringGeneratorParseStringType}>{t('nodes.parseString')}</option>
+          <option value={StringGeneratorDynamicPromptsType}>{t('nodes.dynamicPrompts')}</option>
         </Select>
         {field.value.type === StringGeneratorParseStringType && (
           <StringGeneratorParseStringSettings state={field.value} onChange={onChange} />
+        )}
+        {field.value.type === StringGeneratorDynamicPromptsType && (
+          <StringGeneratorDynamicPromptsSettings state={field.value} onChange={onChange} />
         )}
         <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
           <Flex w="full" h="auto">
