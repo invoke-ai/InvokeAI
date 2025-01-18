@@ -1,4 +1,5 @@
 import type {
+  BlurFilterConfig,
   CannyEdgeDetectionFilterConfig,
   ColorMapFilterConfig,
   ContentShuffleFilterConfig,
@@ -12,6 +13,7 @@ import type {
   LineartEdgeDetectionFilterConfig,
   MediaPipeFaceDetectionFilterConfig,
   MLSDDetectionFilterConfig,
+  NoiseFilterConfig,
   NormalMapFilterConfig,
   PiDiNetEdgeDetectionFilterConfig,
 } from 'features/controlLayers/store/filters';
@@ -54,6 +56,7 @@ describe('Control Adapter Types', () => {
   });
   test('Processor Configs', () => {
     // Types derived from OpenAPI
+    type _BlurFilterConfig = Required<Pick<Invocation<'img_blur'>, 'type' | 'radius' | 'blur_type'>>;
     type _CannyEdgeDetectionFilterConfig = Required<
       Pick<Invocation<'canny_edge_detection'>, 'type' | 'low_threshold' | 'high_threshold'>
     >;
@@ -71,6 +74,9 @@ describe('Control Adapter Types', () => {
     type _MLSDDetectionFilterConfig = Required<
       Pick<Invocation<'mlsd_detection'>, 'type' | 'score_threshold' | 'distance_threshold'>
     >;
+    type _NoiseFilterConfig = Required<
+      Pick<Invocation<'img_noise'>, 'type' | 'noise_type' | 'amount' | 'noise_color' | 'size'>
+    >;
     type _NormalMapFilterConfig = Required<Pick<Invocation<'normal_map'>, 'type'>>;
     type _DWOpenposeDetectionFilterConfig = Required<
       Pick<Invocation<'dw_openpose_detection'>, 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>
@@ -81,6 +87,7 @@ describe('Control Adapter Types', () => {
 
     // The processor configs are manually modeled zod schemas. This test ensures that the inferred types are correct.
     // The types prefixed with `_` are types generated from OpenAPI, while the types without the prefix are manually modeled.
+    assert<Equals<_BlurFilterConfig, BlurFilterConfig>>();
     assert<Equals<_CannyEdgeDetectionFilterConfig, CannyEdgeDetectionFilterConfig>>();
     assert<Equals<_ColorMapFilterConfig, ColorMapFilterConfig>>();
     assert<Equals<_ContentShuffleFilterConfig, ContentShuffleFilterConfig>>();
@@ -90,6 +97,7 @@ describe('Control Adapter Types', () => {
     assert<Equals<_LineartEdgeDetectionFilterConfig, LineartEdgeDetectionFilterConfig>>();
     assert<Equals<_MediaPipeFaceDetectionFilterConfig, MediaPipeFaceDetectionFilterConfig>>();
     assert<Equals<_MLSDDetectionFilterConfig, MLSDDetectionFilterConfig>>();
+    assert<Equals<_NoiseFilterConfig, NoiseFilterConfig>>();
     assert<Equals<_NormalMapFilterConfig, NormalMapFilterConfig>>();
     assert<Equals<_DWOpenposeDetectionFilterConfig, DWOpenposeDetectionFilterConfig>>();
     assert<Equals<_PiDiNetEdgeDetectionFilterConfig, PiDiNetEdgeDetectionFilterConfig>>();

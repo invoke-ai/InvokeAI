@@ -297,10 +297,9 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     const imageState = imageDTOToImageObject(filterResult.value);
     this.$imageState.set(imageState);
 
-    // Destroy any existing masked image and create a new one
-    if (this.imageModule) {
-      this.imageModule.destroy();
-    }
+    // Stash the existing image module - we will destroy it after the new image is rendered to prevent a flash
+    // of an empty layer
+    const oldImageModule = this.imageModule;
 
     this.imageModule = new CanvasObjectImage(imageState, this);
 
@@ -308,6 +307,16 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     await this.imageModule.update(imageState, true);
 
     this.konva.group.add(this.imageModule.konva.group);
+
+    // The filtered image have some transparency, so we need to hide the objects of the parent entity to prevent the
+    // two images from blending. We will show the objects again in the teardown method, which is always called after
+    // the filter finishes (applied or canceled).
+    this.parent.renderer.hideObjects();
+
+    if (oldImageModule) {
+      // Destroy the old image module now that the new one is rendered
+      oldImageModule.destroy();
+    }
 
     // The porcessing is complete, set can set the last processed hash and isProcessing to false
     this.$lastProcessedHash.set(hash);
@@ -424,6 +433,8 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
   teardown = () => {
     this.unsubscribe();
+    // Re-enable the objects of the parent entity
+    this.parent.renderer.showObjects();
     this.konva.group.remove();
     // The reset must be done _after_ unsubscribing from listeners, in case the listeners would otherwise react to
     // the reset. For example, if auto-processing is enabled and we reset the state, it may trigger processing.

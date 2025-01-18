@@ -11,7 +11,7 @@ describe(getCollectItemType.name, () => {
     const n2 = buildNode(collect);
     const e1 = buildEdge(n1.id, 'value', n2.id, 'item');
     const result = getCollectItemType(templates, [n1, n2], [e1], n2.id);
-    expect(result).toEqual<FieldType>({ name: 'IntegerField', cardinality: 'SINGLE' });
+    expect(result).toEqual<FieldType>({ name: 'IntegerField', cardinality: 'SINGLE', batch: false });
   });
   it('should return null if the collect node does not have any connections', () => {
     const n1 = buildNode(collect);

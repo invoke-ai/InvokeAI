@@ -40,6 +40,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.model_manager import BaseModelType, ModelVariantType
+from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -85,6 +86,7 @@ def get_scheduler(
     scheduler_info: ModelIdentifierField,
     scheduler_name: str,
     seed: int,
+    unet_config: AnyModelConfig,
 ) -> Scheduler:
     """Load a scheduler and apply some scheduler-specific overrides."""
     # TODO(ryand): Silently falling back to ddim seems like a bad idea. Look into why this was added and remove if
@@ -102,6 +104,9 @@ def get_scheduler(
         **scheduler_extra_config,  # FIXME
         "_backup": scheduler_config,
     }
+
+    if hasattr(unet_config, "prediction_type"):
+        scheduler_config["prediction_type"] = unet_config.prediction_type
 
     # make dpmpp_sde reproducable(seed can be passed only in initializer)
     if scheduler_class is DPMSolverSDEScheduler:
@@ -829,6 +834,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
         _, _, latent_height, latent_width = latents.shape
 
+        # get the unet's config so that we can pass the base to sd_step_callback()
+        unet_config = context.models.get_config(self.unet.unet.key)
+
         conditioning_data = self.get_conditioning_data(
             context=context,
             positive_conditioning_field=self.positive_conditioning,
@@ -848,6 +856,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             scheduler_info=self.unet.scheduler,
             scheduler_name=self.scheduler,
             seed=seed,
+            unet_config=unet_config,
         )
 
         timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
@@ -858,9 +867,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             denoising_start=self.denoising_start,
             denoising_end=self.denoising_end,
         )
-
-        # get the unet's config so that we can pass the base to sd_step_callback()
-        unet_config = context.models.get_config(self.unet.unet.key)
 
         ### preview
         def step_callback(state: PipelineIntermediateState) -> None:
@@ -1030,6 +1036,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 scheduler_info=self.unet.scheduler,
                 scheduler_name=self.scheduler,
                 seed=seed,
+                unet_config=unet_config,
             )
 
             pipeline = self.create_pipeline(unet, scheduler)

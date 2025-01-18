@@ -9,12 +9,17 @@ class CachedModelOnlyFullLoad:
     MPS memory, etc.
     """
 
-    def __init__(self, model: torch.nn.Module | Any, compute_device: torch.device, total_bytes: int):
+    def __init__(
+        self, model: torch.nn.Module | Any, compute_device: torch.device, total_bytes: int, keep_ram_copy: bool = False
+    ):
         """Initialize a CachedModelOnlyFullLoad.
         Args:
             model (torch.nn.Module | Any): The model to wrap. Should be on the CPU.
             compute_device (torch.device): The compute device to move the model to.
             total_bytes (int): The total size (in bytes) of all the weights in the model.
+            keep_ram_copy (bool): Whether to keep a read-only copy of the model's state dict in RAM. Keeping a RAM copy
+                increases RAM usage, but speeds up model offload from VRAM and LoRA patching (assuming there is
+                sufficient RAM).
         """
         # model is often a torch.nn.Module, but could be any model type. Throughout this class, we handle both cases.
         self._model = model
@@ -23,7 +28,7 @@ class CachedModelOnlyFullLoad:
 
         # A CPU read-only copy of the model's state dict.
         self._cpu_state_dict: dict[str, torch.Tensor] | None = None
-        if isinstance(model, torch.nn.Module):
+        if isinstance(model, torch.nn.Module) and keep_ram_copy:
             self._cpu_state_dict = model.state_dict()
 
         self._total_bytes = total_bytes

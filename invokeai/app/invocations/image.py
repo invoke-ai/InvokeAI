@@ -23,6 +23,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
@@ -161,12 +162,12 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     crop: bool = InputField(default=False, description="Crop to base image dimensions")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        base_image = context.images.get_pil(self.base_image.image_name)
-        image = context.images.get_pil(self.image.image_name)
+        base_image = context.images.get_pil(self.base_image.image_name, mode="RGBA")
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
         mask = None
         if self.mask is not None:
-            mask = context.images.get_pil(self.mask.image_name)
-            mask = ImageOps.invert(mask.convert("L"))
+            mask = context.images.get_pil(self.mask.image_name, mode="L")
+            mask = ImageOps.invert(mask)
         # TODO: probably shouldn't invert mask here... should user be required to do it?
 
         min_x = min(0, self.x)
@@ -176,7 +177,11 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
         new_image.paste(base_image, (abs(min_x), abs(min_y)))
-        new_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+
+        # Create a temporary image to paste the image with transparency
+        temp_image = Image.new("RGBA", new_image.size)
+        temp_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+        new_image = Image.alpha_composite(new_image, temp_image)
 
         if self.crop:
             base_w, base_h = base_image.size
@@ -301,14 +306,44 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
     blur_type: Literal["gaussian", "box"] = InputField(default="gaussian", description="The type of blur")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
 
+        # Split the image into RGBA channels
+        r, g, b, a = image.split()
+
+        # Premultiply RGB channels by alpha
+        premultiplied_image = ImageChops.multiply(image, a.convert("RGBA"))
+        premultiplied_image.putalpha(a)
+
+        # Apply the blur
         blur = (
             ImageFilter.GaussianBlur(self.radius) if self.blur_type == "gaussian" else ImageFilter.BoxBlur(self.radius)
         )
-        blur_image = image.filter(blur)
+        blurred_image = premultiplied_image.filter(blur)
 
-        image_dto = context.images.save(image=blur_image)
+        # Split the blurred image into RGBA channels
+        r, g, b, a_orig = blurred_image.split()
+
+        # Convert to float using NumPy. float 32/64 division are much faster than float 16
+        r = numpy.array(r, dtype=numpy.float32)
+        g = numpy.array(g, dtype=numpy.float32)
+        b = numpy.array(b, dtype=numpy.float32)
+        a = numpy.array(a_orig, dtype=numpy.float32) / 255.0  # Normalize alpha to [0, 1]
+
+        # Unpremultiply RGB channels by alpha
+        r /= a + 1e-6  # Add a small epsilon to avoid division by zero
+        g /= a + 1e-6
+        b /= a + 1e-6
+
+        # Convert back to PIL images
+        r = Image.fromarray(numpy.uint8(numpy.clip(r, 0, 255)))
+        g = Image.fromarray(numpy.uint8(numpy.clip(g, 0, 255)))
+        b = Image.fromarray(numpy.uint8(numpy.clip(b, 0, 255)))
+
+        # Merge back into a single image
+        result_image = Image.merge("RGBA", (r, g, b, a_orig))
+
+        image_dto = context.images.save(image=result_image)
 
         return ImageOutput.build(image_dto)
 
@@ -1053,5 +1088,69 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             generated_image = context.images.get_pil(self.generated_image.image_name)
             generated_image.putalpha(mask)
             image_dto = context.images.save(image=generated_image)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "img_noise",
+    title="Add Image Noise",
+    tags=["image", "noise"],
+    category="image",
+    version="1.0.1",
+)
+class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Add noise to an image"""
+
+    image: ImageField = InputField(description="The image to add noise to")
+    seed: int = InputField(
+        default=0,
+        ge=0,
+        le=SEED_MAX,
+        description=FieldDescriptions.seed,
+    )
+    noise_type: Literal["gaussian", "salt_and_pepper"] = InputField(
+        default="gaussian",
+        description="The type of noise to add",
+    )
+    amount: float = InputField(default=0.1, ge=0, le=1, description="The amount of noise to add")
+    noise_color: bool = InputField(default=True, description="Whether to add colored noise")
+    size: int = InputField(default=1, ge=1, description="The size of the noise points")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+
+        # Save out the alpha channel
+        alpha = image.getchannel("A")
+
+        # Set the seed for numpy random
+        rs = numpy.random.RandomState(numpy.random.MT19937(numpy.random.SeedSequence(self.seed)))
+
+        if self.noise_type == "gaussian":
+            if self.noise_color:
+                noise = rs.normal(0, 1, (image.height // self.size, image.width // self.size, 3)) * 255
+            else:
+                noise = rs.normal(0, 1, (image.height // self.size, image.width // self.size)) * 255
+                noise = numpy.stack([noise] * 3, axis=-1)
+        elif self.noise_type == "salt_and_pepper":
+            if self.noise_color:
+                noise = rs.choice(
+                    [0, 255], (image.height // self.size, image.width // self.size, 3), p=[1 - self.amount, self.amount]
+                )
+            else:
+                noise = rs.choice(
+                    [0, 255], (image.height // self.size, image.width // self.size), p=[1 - self.amount, self.amount]
+                )
+                noise = numpy.stack([noise] * 3, axis=-1)
+
+        noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB").resize(
+            (image.width, image.height), Image.Resampling.NEAREST
+        )
+        noisy_image = Image.blend(image.convert("RGB"), noise, self.amount).convert("RGBA")
+
+        # Paste back the alpha channel
+        noisy_image.putalpha(alpha)
+
+        image_dto = context.images.save(image=noisy_image)
 
         return ImageOutput.build(image_dto)

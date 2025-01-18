@@ -1,4 +1,3 @@
-import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
@@ -31,18 +30,14 @@ import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } fro
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
-import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store/selectors';
-import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
+import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
-import { uniqBy } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
-
-const log = logger('system');
 
 export const setGlobalReferenceImage = (arg: {
   imageDTO: ImageDTO;
@@ -75,54 +70,6 @@ export const setNodeImageFieldImage = (arg: {
 }) => {
   const { imageDTO, fieldIdentifier, dispatch } = arg;
   dispatch(fieldImageValueChanged({ ...fieldIdentifier, value: imageDTO }));
-};
-
-export const addImagesToNodeImageFieldCollectionAction = (arg: {
-  imageDTOs: ImageDTO[];
-  fieldIdentifier: FieldIdentifier;
-  dispatch: AppDispatch;
-  getState: () => RootState;
-}) => {
-  const { imageDTOs, fieldIdentifier, dispatch, getState } = arg;
-  const fieldInputInstance = selectFieldInputInstance(
-    selectNodesSlice(getState()),
-    fieldIdentifier.nodeId,
-    fieldIdentifier.fieldName
-  );
-
-  if (!isImageFieldCollectionInputInstance(fieldInputInstance)) {
-    log.warn({ fieldIdentifier }, 'Attempted to add images to a non-image field collection');
-    return;
-  }
-
-  const images = fieldInputInstance.value ? [...fieldInputInstance.value] : [];
-  images.push(...imageDTOs.map(({ image_name }) => ({ image_name })));
-  const uniqueImages = uniqBy(images, 'image_name');
-  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifier, value: uniqueImages }));
-};
-
-export const removeImageFromNodeImageFieldCollectionAction = (arg: {
-  imageName: string;
-  fieldIdentifier: FieldIdentifier;
-  dispatch: AppDispatch;
-  getState: () => RootState;
-}) => {
-  const { imageName, fieldIdentifier, dispatch, getState } = arg;
-  const fieldInputInstance = selectFieldInputInstance(
-    selectNodesSlice(getState()),
-    fieldIdentifier.nodeId,
-    fieldIdentifier.fieldName
-  );
-
-  if (!isImageFieldCollectionInputInstance(fieldInputInstance)) {
-    log.warn({ fieldIdentifier }, 'Attempted to remove image from a non-image field collection');
-    return;
-  }
-
-  const images = fieldInputInstance.value ? [...fieldInputInstance.value] : [];
-  const imagesWithoutTheImageToRemove = images.filter((image) => image.image_name !== imageName);
-  const uniqueImages = uniqBy(imagesWithoutTheImageToRemove, 'image_name');
-  dispatch(fieldImageCollectionValueChanged({ ...fieldIdentifier, value: uniqueImages }));
 };
 
 export const setComparisonImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {

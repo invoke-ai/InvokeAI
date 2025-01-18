@@ -1,6 +1,6 @@
 import { Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectInvocationNode, selectNodesSlice } from 'features/nodes/store/selectors';
@@ -18,7 +18,7 @@ export const InvocationInputFieldCheck = memo(({ nodeId, fieldName, children }: 
   const templates = useStore($templates);
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodesSlice) => {
+      createMemoizedSelector(selectNodesSlice, (nodesSlice) => {
         const node = selectInvocationNode(nodesSlice, nodeId);
         const instance = node.data.inputs[fieldName];
         const template = templates[node.data.type];

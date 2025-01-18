@@ -1,4 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { AppConfig } from 'app/types/invokeai';
 import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
@@ -18,14 +19,34 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
-import { isImageFieldCollectionInputInstance, isImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import {
+  isFloatFieldCollectionInputInstance,
+  isFloatFieldCollectionInputTemplate,
+  isFloatGeneratorFieldInputInstance,
+  isImageFieldCollectionInputInstance,
+  isImageFieldCollectionInputTemplate,
+  isIntegerFieldCollectionInputInstance,
+  isIntegerFieldCollectionInputTemplate,
+  isIntegerGeneratorFieldInputInstance,
+  isStringFieldCollectionInputInstance,
+  isStringFieldCollectionInputTemplate,
+  resolveFloatGeneratorField,
+  resolveIntegerGeneratorField,
+} from 'features/nodes/types/field';
+import {
+  validateImageFieldCollectionValue,
+  validateNumberFieldCollectionValue,
+  validateStringFieldCollectionValue,
+} from 'features/nodes/types/fieldValidators';
+import type { InvocationNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import i18n from 'i18next';
-import { forEach, upperFirst } from 'lodash-es';
+import { forEach, groupBy, upperFirst } from 'lodash-es';
 import { getConnectedEdges } from 'reactflow';
+import { assert } from 'tsafe';
 
 /**
  * This file contains selectors and utilities for determining the app is ready to enqueue generations. The handling
@@ -47,6 +68,55 @@ export type Reason = { prefix?: string; content: string };
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
+export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNode[], edges: InvocationNodeEdge[]) => {
+  if (batchNode.data.type === 'image_batch') {
+    assert(isImageFieldCollectionInputInstance(batchNode.data.inputs.images));
+    const ownValue = batchNode.data.inputs.images.value ?? [];
+    // no generators for images yet
+    return ownValue;
+  } else if (batchNode.data.type === 'string_batch') {
+    assert(isStringFieldCollectionInputInstance(batchNode.data.inputs.strings));
+    const ownValue = batchNode.data.inputs.strings.value ?? [];
+    // no generators for strings yet
+    return ownValue;
+  } else if (batchNode.data.type === 'float_batch') {
+    assert(isFloatFieldCollectionInputInstance(batchNode.data.inputs.floats));
+    const ownValue = batchNode.data.inputs.floats.value;
+    const edgeToFloats = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'floats');
+
+    if (!edgeToFloats) {
+      return ownValue ?? [];
+    }
+
+    const generatorNode = nodes.find((node) => node.id === edgeToFloats.source);
+    assert(generatorNode, 'Missing edge from float generator to float batch');
+
+    const generatorField = generatorNode.data.inputs['generator'];
+    assert(isFloatGeneratorFieldInputInstance(generatorField), 'Invalid float generator');
+
+    const generatorValue = resolveFloatGeneratorField(generatorField);
+    return generatorValue;
+  } else if (batchNode.data.type === 'integer_batch') {
+    assert(isIntegerFieldCollectionInputInstance(batchNode.data.inputs.integers));
+    const ownValue = batchNode.data.inputs.integers.value;
+    const incomers = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'integers');
+
+    if (!incomers) {
+      return ownValue ?? [];
+    }
+
+    const generatorNode = nodes.find((node) => node.id === incomers.source);
+    assert(generatorNode, 'Missing edge from integer generator to integer batch');
+
+    const generatorField = generatorNode.data.inputs['generator'];
+    assert(isIntegerGeneratorFieldInputInstance(generatorField), 'Invalid integer generator field');
+
+    const generatorValue = resolveIntegerGeneratorField(generatorField);
+    return generatorValue;
+  }
+  assert(false, 'Invalid batch node type');
+};
+
 const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
   isConnected: boolean;
   nodes: NodesState;
@@ -61,11 +131,54 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
   }
 
   if (workflowSettings.shouldValidateGraph) {
-    if (!nodes.nodes.length) {
+    const invocationNodes = nodes.nodes.filter(isInvocationNode);
+    const batchNodes = invocationNodes.filter(isBatchNode);
+    const executableNodes = invocationNodes.filter(isExecutableNode);
+
+    if (!executableNodes.length) {
       reasons.push({ content: i18n.t('parameters.invoke.noNodesInGraph') });
     }
 
-    nodes.nodes.forEach((node) => {
+    for (const node of batchNodes) {
+      if (nodes.edges.find((e) => e.source === node.id) === undefined) {
+        reasons.push({ content: i18n.t('parameters.invoke.batchNodeNotConnected', { label: node.data.label }) });
+      }
+    }
+
+    if (batchNodes.length > 1) {
+      const batchSizes: number[] = [];
+      const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['batch_group_id']?.value);
+      for (const [batchGroupId, batchNodes] of Object.entries(groupedBatchNodes)) {
+        // But grouped batch nodes must have the same collection size
+        const groupBatchSizes: number[] = [];
+
+        for (const node of batchNodes) {
+          const size = resolveBatchValue(node, invocationNodes, nodes.edges).length;
+          if (batchGroupId === 'None') {
+            // Ungrouped batch nodes may have differing collection sizes
+            batchSizes.push(size);
+          } else {
+            groupBatchSizes.push(size);
+          }
+        }
+
+        if (groupBatchSizes.some((count) => count !== groupBatchSizes[0])) {
+          reasons.push({
+            content: i18n.t('parameters.invoke.batchNodeCollectionSizeMismatch', { batchGroupId }),
+          });
+        }
+
+        if (groupBatchSizes[0] !== undefined) {
+          batchSizes.push(groupBatchSizes[0]);
+        }
+      }
+
+      if (batchSizes.some((size) => size === 0)) {
+        reasons.push({ content: i18n.t('parameters.invoke.batchNodeEmptyCollection') });
+      }
+    }
+
+    executableNodes.forEach((node) => {
       if (!isInvocationNode(node)) {
         return;
       }
@@ -91,45 +204,38 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
           return;
         }
 
-        const baseTKeyOptions = {
-          nodeLabel: node.data.label || nodeTemplate.title,
-          fieldLabel: field.label || fieldTemplate.title,
-        };
+        const prefix = `${node.data.label || nodeTemplate.title} -> ${field.label || fieldTemplate.title}`;
 
         if (fieldTemplate.required && field.value === undefined && !hasConnection) {
-          reasons.push({ content: i18n.t('parameters.invoke.missingInputForField', baseTKeyOptions) });
-          return;
+          reasons.push({ prefix, content: i18n.t('parameters.invoke.missingInputForField') });
         } else if (
           field.value &&
           isImageFieldCollectionInputInstance(field) &&
           isImageFieldCollectionInputTemplate(fieldTemplate)
         ) {
-          // Image collections may have min or max items to validate
-          // TODO(psyche): generalize this to other collection types
-          if (fieldTemplate.minItems !== undefined && fieldTemplate.minItems > 0 && field.value.length === 0) {
-            reasons.push({ content: i18n.t('parameters.invoke.collectionEmpty', baseTKeyOptions) });
-            return;
-          }
-          if (fieldTemplate.minItems !== undefined && field.value.length < fieldTemplate.minItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooFewItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                minItems: fieldTemplate.minItems,
-              }),
-            });
-            return;
-          }
-          if (fieldTemplate.maxItems !== undefined && field.value.length > fieldTemplate.maxItems) {
-            reasons.push({
-              content: i18n.t('parameters.invoke.collectionTooManyItems', {
-                ...baseTKeyOptions,
-                size: field.value.length,
-                maxItems: fieldTemplate.maxItems,
-              }),
-            });
-            return;
-          }
+          const errors = validateImageFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
+        } else if (
+          field.value &&
+          isStringFieldCollectionInputInstance(field) &&
+          isStringFieldCollectionInputTemplate(fieldTemplate)
+        ) {
+          const errors = validateStringFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
+        } else if (
+          field.value &&
+          isIntegerFieldCollectionInputInstance(field) &&
+          isIntegerFieldCollectionInputTemplate(fieldTemplate)
+        ) {
+          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
+        } else if (
+          field.value &&
+          isFloatFieldCollectionInputInstance(field) &&
+          isFloatFieldCollectionInputTemplate(fieldTemplate)
+        ) {
+          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
+          reasons.push(...errors.map((error) => ({ prefix, content: error })));
         }
       });
     });
@@ -491,17 +597,80 @@ export const selectPromptsCount = createSelector(
   (params, dynamicPrompts) => (getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1)
 );
 
-export const selectWorkflowsBatchSize = createSelector(selectNodesSlice, ({ nodes }) =>
-  // The batch size is the product of all batch nodes' collection sizes
-  nodes.filter(isInvocationNode).reduce((batchSize, node) => {
-    if (!isImageFieldCollectionInputInstance(node.data.inputs.images)) {
-      return batchSize;
-    }
-    // If the batch size is not set, default to 1
-    batchSize = batchSize || 1;
-    // Multiply the batch size by the number of images in the batch
-    batchSize = batchSize * (node.data.inputs.images.value?.length ?? 0);
+const buildSelectGroupBatchSizes = (batchGroupId: string) =>
+  createMemoizedSelector(selectNodesSlice, ({ nodes, edges }) => {
+    const invocationNodes = nodes.filter(isInvocationNode);
+    return invocationNodes
+      .filter(isBatchNode)
+      .filter((node) => node.data.inputs['batch_group_id']?.value === batchGroupId)
+      .map((batchNodes) => resolveBatchValue(batchNodes, invocationNodes, edges).length);
+  });
 
-    return batchSize;
-  }, 0)
+const selectUngroupedBatchSizes = buildSelectGroupBatchSizes('None');
+const selectGroup1BatchSizes = buildSelectGroupBatchSizes('Group 1');
+const selectGroup2BatchSizes = buildSelectGroupBatchSizes('Group 2');
+const selectGroup3BatchSizes = buildSelectGroupBatchSizes('Group 3');
+const selectGroup4BatchSizes = buildSelectGroupBatchSizes('Group 4');
+const selectGroup5BatchSizes = buildSelectGroupBatchSizes('Group 5');
+
+export const selectWorkflowsBatchSize = createSelector(
+  selectUngroupedBatchSizes,
+  selectGroup1BatchSizes,
+  selectGroup2BatchSizes,
+  selectGroup3BatchSizes,
+  selectGroup4BatchSizes,
+  selectGroup5BatchSizes,
+  (
+    ungroupedBatchSizes,
+    group1BatchSizes,
+    group2BatchSizes,
+    group3BatchSizes,
+    group4BatchSizes,
+    group5BatchSizes
+  ): number | 'EMPTY_BATCHES' | 'NO_BATCHES' => {
+    // All batch nodes _must_ have a populated collection
+
+    const allBatchSizes = [
+      ...ungroupedBatchSizes,
+      ...group1BatchSizes,
+      ...group2BatchSizes,
+      ...group3BatchSizes,
+      ...group4BatchSizes,
+      ...group5BatchSizes,
+    ];
+
+    // There are no batch nodes
+    if (allBatchSizes.length === 0) {
+      return 'NO_BATCHES';
+    }
+
+    // All batch nodes must have a populated collection
+    if (allBatchSizes.some((size) => size === 0)) {
+      return 'EMPTY_BATCHES';
+    }
+
+    for (const group of [group1BatchSizes, group2BatchSizes, group3BatchSizes, group4BatchSizes, group5BatchSizes]) {
+      // Ignore groups with no batch nodes
+      if (group.length === 0) {
+        continue;
+      }
+      // Grouped batch nodes must have the same collection size
+      if (group.some((size) => size !== group[0])) {
+        return 'EMPTY_BATCHES';
+      }
+    }
+
+    // Total batch size = product of all ungrouped batches and each grouped batch
+    const totalBatchSize = [
+      ...ungroupedBatchSizes,
+      // In case of no batch nodes in a group, fall back to 1 for the product calculation
+      group1BatchSizes[0] ?? 1,
+      group2BatchSizes[0] ?? 1,
+      group3BatchSizes[0] ?? 1,
+      group4BatchSizes[0] ?? 1,
+      group5BatchSizes[0] ?? 1,
+    ].reduce((acc, size) => acc * size, 1);
+
+    return totalBatchSize;
+  }
 );

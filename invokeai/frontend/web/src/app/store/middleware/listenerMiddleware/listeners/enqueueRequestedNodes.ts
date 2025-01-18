@@ -1,15 +1,13 @@
-import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
-import { isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
+import { resolveBatchValue } from 'features/queue/store/readiness';
+import { groupBy } from 'lodash-es';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, BatchConfig } from 'services/api/types';
-
-const log = logger('workflows');
 
 export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -33,28 +31,54 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
       const data: Batch['data'] = [];
 
-      // Skip edges from batch nodes - these should not be in the graph, they exist only in the UI
-      const imageBatchNodes = nodes.nodes.filter(isInvocationNode).filter((node) => node.data.type === 'image_batch');
-      for (const node of imageBatchNodes) {
-        const images = node.data.inputs['images'];
-        if (!isImageFieldCollectionInputInstance(images)) {
-          log.warn({ nodeId: node.id }, 'Image batch images field is not an image collection');
-          break;
-        }
-        const edgesFromImageBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === 'image');
-        const batchDataCollectionItem: NonNullable<Batch['data']>[number] = [];
-        for (const edge of edgesFromImageBatch) {
-          if (!edge.targetHandle) {
-            break;
+      const invocationNodes = nodes.nodes.filter(isInvocationNode);
+      const batchNodes = invocationNodes.filter(isBatchNode);
+
+      // Handle zipping batch nodes. First group the batch nodes by their batch_group_id
+      const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['batch_group_id']?.value);
+
+      // Then, we will create a batch data collection item for each group
+      for (const [batchGroupId, batchNodes] of Object.entries(groupedBatchNodes)) {
+        const zippedBatchDataCollectionItems: NonNullable<Batch['data']>[number] = [];
+
+        for (const node of batchNodes) {
+          const value = resolveBatchValue(node, invocationNodes, nodes.edges);
+          const sourceHandle = node.data.type === 'image_batch' ? 'image' : 'value';
+          const edgesFromBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === sourceHandle);
+          if (batchGroupId !== 'None') {
+            // If this batch node has a batch_group_id, we will zip the data collection items
+            for (const edge of edgesFromBatch) {
+              if (!edge.targetHandle) {
+                break;
+              }
+              zippedBatchDataCollectionItems.push({
+                node_path: edge.target,
+                field_name: edge.targetHandle,
+                items: value,
+              });
+            }
+          } else {
+            // Otherwise add the data collection items to root of the batch so they are not zipped
+            const productBatchDataCollectionItems: NonNullable<Batch['data']>[number] = [];
+            for (const edge of edgesFromBatch) {
+              if (!edge.targetHandle) {
+                break;
+              }
+              productBatchDataCollectionItems.push({
+                node_path: edge.target,
+                field_name: edge.targetHandle,
+                items: value,
+              });
+            }
+            if (productBatchDataCollectionItems.length > 0) {
+              data.push(productBatchDataCollectionItems);
+            }
           }
-          batchDataCollectionItem.push({
-            node_path: edge.target,
-            field_name: edge.targetHandle,
-            items: images.value,
-          });
         }
-        if (batchDataCollectionItem.length > 0) {
-          data.push(batchDataCollectionItem);
+
+        // Finally, if this batch data collection item has any items, add it to the data array
+        if (batchGroupId !== 'None' && zippedBatchDataCollectionItems.length > 0) {
+          data.push(zippedBatchDataCollectionItems);
         }
       }
 

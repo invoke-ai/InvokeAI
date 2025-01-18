@@ -177,7 +177,16 @@
         "none": "None",
         "new": "New",
         "generating": "Generating",
-        "warnings": "Warnings"
+        "warnings": "Warnings",
+        "start": "Start",
+        "count": "Count",
+        "step": "Step",
+        "end": "End",
+        "min": "Min",
+        "max": "Max",
+        "values": "Values",
+        "resetToDefaults": "Reset to Defaults",
+        "seed": "Seed"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -850,6 +859,15 @@
         "defaultVAE": "Default VAE"
     },
     "nodes": {
+        "arithmeticSequence": "Arithmetic Sequence",
+        "linearDistribution": "Linear Distribution",
+        "uniformRandomDistribution": "Uniform Random Distribution",
+        "parseString": "Parse String",
+        "splitOn": "Split On",
+        "noBatchGroup": "no group",
+        "generatorNRandomValues_one": "{{count}} random value",
+        "generatorNRandomValues_other": "{{count}} random values",
+        "generatorNoValues": "empty",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
         "addLinearView": "Add to Linear View",
@@ -989,7 +1007,11 @@
         "imageAccessError": "Unable to find image {{image_name}}, resetting to default",
         "boardAccessError": "Unable to find board {{board_id}}, resetting to default",
         "modelAccessError": "Unable to find model {{key}}, resetting to default",
-        "saveToGallery": "Save To Gallery"
+        "saveToGallery": "Save To Gallery",
+        "addItem": "Add Item",
+        "generateValues": "Generate Values",
+        "floatRangeGenerator": "Float Range Generator",
+        "integerRangeGenerator": "Integer Range Generator"
     },
     "parameters": {
         "aspect": "Aspect",
@@ -1024,11 +1046,22 @@
             "addingImagesTo": "Adding images to",
             "invoke": "Invoke",
             "missingFieldTemplate": "Missing field template",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: missing input",
+            "missingInputForField": "missing input",
             "missingNodeTemplate": "Missing node template",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} empty collection",
-            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: too few items, minimum {{minItems}}",
-            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: too many items, maximum {{maxItems}}",
+            "emptyBatches": "empty batches",
+            "batchNodeNotConnected": "Batch node not connected: {{label}}",
+            "batchNodeEmptyCollection": "Some batch nodes have empty collections",
+            "invalidBatchConfigurationCannotCalculate": "Invalid batch configuration; cannot calculate",
+            "collectionTooFewItems": "too few items, minimum {{minItems}}",
+            "collectionTooManyItems": "too many items, maximum {{maxItems}}",
+            "collectionStringTooLong": "too long, max {{maxLength}}",
+            "collectionStringTooShort": "too short, min {{minLength}}",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (inc max)",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (inc min)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (exc max)",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (exc min)",
+            "collectionNumberNotMultipleOf": "{{value}} not multiple of {{multipleOf}}",
+            "batchNodeCollectionSizeMismatch": "Collection size mismatch on Batch {{batchGroupId}}",
             "noModelSelected": "No model selected",
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
@@ -1932,6 +1965,24 @@
                 "description": "Generates an edge map from the selected layer using the PiDiNet edge detection model.",
                 "scribble": "Scribble",
                 "quantize_edges": "Quantize Edges"
+            },
+            "img_blur": {
+                "label": "Blur Image",
+                "description": "Blurs the selected layer.",
+                "blur_type": "Blur Type",
+                "blur_radius": "Radius",
+                "gaussian_type": "Gaussian",
+                "box_type": "Box"
+            },
+            "img_noise": {
+                "label": "Noise Image",
+                "description": "Adds noise to the selected layer.",
+                "noise_type": "Noise Type",
+                "noise_amount": "Amount",
+                "gaussian_type": "Gaussian",
+                "salt_and_pepper_type": "Salt and Pepper",
+                "noise_color": "Colored Noise",
+                "size": "Noise Size"
             }
         },
         "transform": {

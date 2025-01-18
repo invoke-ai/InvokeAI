@@ -78,6 +78,7 @@ class ModelCache:
         self,
         execution_device_working_mem_gb: float,
         enable_partial_loading: bool,
+        keep_ram_copy_of_weights: bool,
         max_ram_cache_size_gb: float | None = None,
         max_vram_cache_size_gb: float | None = None,
         execution_device: torch.device | str = "cuda",
@@ -105,6 +106,7 @@ class ModelCache:
         :param logger: InvokeAILogger to use (otherwise creates one)
         """
         self._enable_partial_loading = enable_partial_loading
+        self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
         self._storage_device: torch.device = torch.device(storage_device)
@@ -120,6 +122,8 @@ class ModelCache:
 
         self._cached_models: Dict[str, CacheRecord] = {}
         self._cache_stack: List[str] = []
+
+        self._ram_cache_size_bytes = self._calc_ram_available_to_model_cache()
 
     @property
     def stats(self) -> Optional[CacheStats]:
@@ -154,9 +158,13 @@ class ModelCache:
 
         # Wrap model.
         if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
-            wrapped_model = CachedModelWithPartialLoad(model, self._execution_device)
+            wrapped_model = CachedModelWithPartialLoad(
+                model, self._execution_device, keep_ram_copy=self._keep_ram_copy_of_weights
+            )
         else:
-            wrapped_model = CachedModelOnlyFullLoad(model, self._execution_device, size)
+            wrapped_model = CachedModelOnlyFullLoad(
+                model, self._execution_device, size, keep_ram_copy=self._keep_ram_copy_of_weights
+            )
 
         cache_record = CacheRecord(key=key, cached_model=wrapped_model)
         self._cached_models[key] = cache_record
@@ -382,40 +390,88 @@ class ModelCache:
         # Alternative definition of VRAM in use:
         # return sum(ce.cached_model.cur_vram_bytes() for ce in self._cached_models.values())
 
-    def _get_ram_available(self) -> int:
-        """Get the amount of RAM available for the cache to use, while keeping memory pressure under control."""
+    def _calc_ram_available_to_model_cache(self) -> int:
+        """Calculate the amount of RAM available for the cache to use."""
         # If self._max_ram_cache_size_gb is set, then it overrides the default logic.
         if self._max_ram_cache_size_gb is not None:
-            ram_total_available_to_cache = int(self._max_ram_cache_size_gb * GB)
-            return ram_total_available_to_cache - self._get_ram_in_use()
+            self._logger.info(f"Using user-defined RAM cache size: {self._max_ram_cache_size_gb} GB.")
+            return int(self._max_ram_cache_size_gb * GB)
 
-        virtual_memory = psutil.virtual_memory()
-        ram_total = virtual_memory.total
-        ram_available = virtual_memory.available
-        ram_used = ram_total - ram_available
+        # Heuristics for dynamically calculating the RAM cache size, **in order of increasing priority**:
+        # 1. As an initial default, use 50% of the total RAM for InvokeAI.
+        #   - Assume a 2GB baseline for InvokeAI's non-model RAM usage, and use the rest of the RAM for the model cache.
+        # 2. On a system with a lot of RAM (e.g. 64GB+), users probably don't want InvokeAI to eat up too much RAM.
+        #    There are diminishing returns to storing more and more models. So, we apply an upper bound.
+        #    - On systems without a CUDA device, the upper bound is 32GB.
+        #    - On systems with a CUDA device, the upper bound is 2x the amount of VRAM.
+        # 3. On systems with a CUDA device, the minimum should be the VRAM size (less the working memory).
+        #    - Setting lower than this would mean that we sometimes kick models out of the cache when there is room for
+        #      all models in VRAM.
+        #    - Consider an extreme case of a system with 8GB RAM / 24GB VRAM. I haven't tested this, but I think
+        #      you'd still want the RAM cache size to be ~24GB (less the working memory). (Though you'd probably want to
+        #      set `keep_ram_copy_of_weights: false` in this case.)
+        # 4. Absolute minimum of 4GB.
 
-        # The total size of all the models in the cache will often be larger than the amount of RAM reported by psutil
-        # (due to lazy-loading and OS RAM caching behaviour). We could just rely on the psutil values, but it feels
-        # like a bad idea to over-fill the model cache. So, for now, we'll try to keep the total size of models in the
-        # cache under the total amount of system RAM.
-        cache_ram_used = self._get_ram_in_use()
-        ram_used = max(cache_ram_used, ram_used)
+        # NOTE(ryand): We explored dynamically adjusting the RAM cache size based on memory pressure (using psutil), but
+        # decided against it for now, for the following reasons:
+        # - It was surprisingly difficult to get memory metrics with consistent definitions across OSes. (If you go
+        # down this path again, don't underestimate the amount of complexity here and be sure to test rigorously on all
+        # OSes.)
+        # - Making the RAM cache size dynamic opens the door for performance regressions that are hard to diagnose and
+        #   hard for users to understand. It is better for users to see that their RAM is maxed out, and then override
+        #   the default value if desired.
 
-        # Aim to keep 10% of RAM free.
-        ram_available_based_on_memory_usage = int(ram_total * 0.9) - ram_used
+        # Lookup the total VRAM size for the CUDA execution device.
+        total_cuda_vram_bytes: int | None = None
+        if self._execution_device.type == "cuda":
+            _, total_cuda_vram_bytes = torch.cuda.mem_get_info(self._execution_device)
 
-        # If we are running out of RAM, then there's an increased likelihood that we will run into this issue:
-        # https://github.com/invoke-ai/InvokeAI/issues/7513
-        # To keep things running smoothly, there's a minimum RAM cache size that we always allow (even if this means
-        # using swap).
-        min_ram_cache_size_bytes = 4 * GB
-        ram_available_based_on_min_cache_size = min_ram_cache_size_bytes - cache_ram_used
+        # Apply heuristic 1.
+        # ------------------
+        heuristics_applied = [1]
+        total_system_ram_bytes = psutil.virtual_memory().total
+        # Assumed baseline RAM used by InvokeAI for non-model stuff.
+        baseline_ram_used_by_invokeai = 2 * GB
+        ram_available_to_model_cache = int(total_system_ram_bytes * 0.5 - baseline_ram_used_by_invokeai)
 
-        return max(ram_available_based_on_memory_usage, ram_available_based_on_min_cache_size)
+        # Apply heuristic 2.
+        # ------------------
+        max_ram_cache_size_bytes = 32 * GB
+        if total_cuda_vram_bytes is not None:
+            max_ram_cache_size_bytes = 2 * total_cuda_vram_bytes
+        if ram_available_to_model_cache > max_ram_cache_size_bytes:
+            heuristics_applied.append(2)
+            ram_available_to_model_cache = max_ram_cache_size_bytes
+
+        # Apply heuristic 3.
+        # ------------------
+        if total_cuda_vram_bytes is not None:
+            if self._max_vram_cache_size_gb is not None:
+                min_ram_cache_size_bytes = int(self._max_vram_cache_size_gb * GB)
+            else:
+                min_ram_cache_size_bytes = total_cuda_vram_bytes - int(self._execution_device_working_mem_gb * GB)
+            if ram_available_to_model_cache < min_ram_cache_size_bytes:
+                heuristics_applied.append(3)
+                ram_available_to_model_cache = min_ram_cache_size_bytes
+
+        # Apply heuristic 4.
+        # ------------------
+        if ram_available_to_model_cache < 4 * GB:
+            heuristics_applied.append(4)
+            ram_available_to_model_cache = 4 * GB
+
+        self._logger.info(
+            f"Calculated model RAM cache size: {ram_available_to_model_cache / MB:.2f} MB. Heuristics applied: {heuristics_applied}."
+        )
+        return ram_available_to_model_cache
 
     def _get_ram_in_use(self) -> int:
         """Get the amount of RAM currently in use."""
         return sum(ce.cached_model.total_bytes() for ce in self._cached_models.values())
+
+    def _get_ram_available(self) -> int:
+        """Get the amount of RAM available for the cache to use."""
+        return self._ram_cache_size_bytes - self._get_ram_in_use()
 
     def _capture_memory_snapshot(self) -> Optional[MemorySnapshot]:
         if self._log_memory_usage:

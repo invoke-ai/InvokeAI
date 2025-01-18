@@ -2,7 +2,7 @@ from contextlib import ExitStack
 from typing import Iterator, Literal, Optional, Tuple
 
 import torch
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer, T5TokenizerFast
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -76,7 +76,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
             context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
         ):
             assert isinstance(t5_text_encoder, T5EncoderModel)
-            assert isinstance(t5_tokenizer, T5Tokenizer)
+            assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
 
             t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
 

@@ -3,7 +3,11 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
     CachedModelOnlyFullLoad,
 )
-from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule, parameterize_mps_and_cuda
+from tests.backend.model_manager.load.model_cache.cached_model.utils import (
+    DummyModule,
+    parameterize_keep_ram_copy,
+    parameterize_mps_and_cuda,
+)
 
 
 class NonTorchModel:
@@ -17,16 +21,22 @@ class NonTorchModel:
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_total_bytes(device: str):
+@parameterize_keep_ram_copy
+def test_cached_model_total_bytes(device: str, keep_ram_copy: bool):
     model = DummyModule()
-    cached_model = CachedModelOnlyFullLoad(model=model, compute_device=torch.device(device), total_bytes=100)
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device(device), total_bytes=100, keep_ram_copy=keep_ram_copy
+    )
     assert cached_model.total_bytes() == 100
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_is_in_vram(device: str):
+@parameterize_keep_ram_copy
+def test_cached_model_is_in_vram(device: str, keep_ram_copy: bool):
     model = DummyModule()
-    cached_model = CachedModelOnlyFullLoad(model=model, compute_device=torch.device(device), total_bytes=100)
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device(device), total_bytes=100, keep_ram_copy=keep_ram_copy
+    )
     assert not cached_model.is_in_vram()
     assert cached_model.cur_vram_bytes() == 0
 
@@ -40,9 +50,12 @@ def test_cached_model_is_in_vram(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_and_unload(device: str):
+@parameterize_keep_ram_copy
+def test_cached_model_full_load_and_unload(device: str, keep_ram_copy: bool):
     model = DummyModule()
-    cached_model = CachedModelOnlyFullLoad(model=model, compute_device=torch.device(device), total_bytes=100)
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device(device), total_bytes=100, keep_ram_copy=keep_ram_copy
+    )
     assert cached_model.full_load_to_vram() == 100
     assert cached_model.is_in_vram()
     assert all(p.device.type == device for p in cached_model.model.parameters())
@@ -55,7 +68,9 @@ def test_cached_model_full_load_and_unload(device: str):
 @parameterize_mps_and_cuda
 def test_cached_model_get_cpu_state_dict(device: str):
     model = DummyModule()
-    cached_model = CachedModelOnlyFullLoad(model=model, compute_device=torch.device(device), total_bytes=100)
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device(device), total_bytes=100, keep_ram_copy=True
+    )
     assert not cached_model.is_in_vram()
 
     # The CPU state dict can be accessed and has the expected properties.
@@ -76,9 +91,12 @@ def test_cached_model_get_cpu_state_dict(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_cached_model_full_load_and_inference(device: str):
+@parameterize_keep_ram_copy
+def test_cached_model_full_load_and_inference(device: str, keep_ram_copy: bool):
     model = DummyModule()
-    cached_model = CachedModelOnlyFullLoad(model=model, compute_device=torch.device(device), total_bytes=100)
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device(device), total_bytes=100, keep_ram_copy=keep_ram_copy
+    )
     assert not cached_model.is_in_vram()
 
     # Run inference on the CPU.
@@ -99,9 +117,12 @@ def test_cached_model_full_load_and_inference(device: str):
 
 
 @parameterize_mps_and_cuda
-def test_non_torch_model(device: str):
+@parameterize_keep_ram_copy
+def test_non_torch_model(device: str, keep_ram_copy: bool):
     model = NonTorchModel()
-    cached_model = CachedModelOnlyFullLoad(model=model, compute_device=torch.device(device), total_bytes=100)
+    cached_model = CachedModelOnlyFullLoad(
+        model=model, compute_device=torch.device(device), total_bytes=100, keep_ram_copy=keep_ram_copy
+    )
     assert not cached_model.is_in_vram()
 
     # The model does not have a CPU state dict.

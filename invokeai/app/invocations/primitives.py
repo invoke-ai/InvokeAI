@@ -7,7 +7,6 @@ import torch
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Classification,
     invocation,
     invocation_output,
 )
@@ -539,23 +538,3 @@ class BoundingBoxInvocation(BaseInvocation):
 
 
 # endregion
-
-
-@invocation(
-    "image_batch",
-    title="Image Batch",
-    tags=["primitives", "image", "batch", "internal"],
-    category="primitives",
-    version="1.0.0",
-    classification=Classification.Special,
-)
-class ImageBatchInvocation(BaseInvocation):
-    """Create a batched generation, where the workflow is executed once for each image in the batch."""
-
-    images: list[ImageField] = InputField(min_length=1, description="The images to batch over", input=Input.Direct)
-
-    def __init__(self):
-        raise NotImplementedError("This class should never be executed or instantiated directly.")
-
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        raise NotImplementedError("This class should never be executed or instantiated directly.")

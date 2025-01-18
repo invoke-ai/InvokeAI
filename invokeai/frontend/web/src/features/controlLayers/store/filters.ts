@@ -95,6 +95,28 @@ const zSpandrelFilterConfig = z.object({
 });
 export type SpandrelFilterConfig = z.infer<typeof zSpandrelFilterConfig>;
 
+const zBlurTypes = z.enum(['gaussian', 'box']);
+export type BlurTypes = z.infer<typeof zBlurTypes>;
+export const isBlurTypes = (v: unknown): v is BlurTypes => zBlurTypes.safeParse(v).success;
+const zBlurFilterConfig = z.object({
+  type: z.literal('img_blur'),
+  blur_type: zBlurTypes,
+  radius: z.number().gte(0),
+});
+export type BlurFilterConfig = z.infer<typeof zBlurFilterConfig>;
+
+const zNoiseTypes = z.enum(['gaussian', 'salt_and_pepper']);
+export type NoiseTypes = z.infer<typeof zNoiseTypes>;
+export const isNoiseTypes = (v: unknown): v is NoiseTypes => zNoiseTypes.safeParse(v).success;
+const zNoiseFilterConfig = z.object({
+  type: z.literal('img_noise'),
+  noise_type: zNoiseTypes,
+  amount: z.number().gte(0).lte(1),
+  noise_color: z.boolean(),
+  size: z.number().int().gte(1),
+});
+export type NoiseFilterConfig = z.infer<typeof zNoiseFilterConfig>;
+
 const zFilterConfig = z.discriminatedUnion('type', [
   zCannyEdgeDetectionFilterConfig,
   zColorMapFilterConfig,
@@ -109,6 +131,8 @@ const zFilterConfig = z.discriminatedUnion('type', [
   zPiDiNetEdgeDetectionFilterConfig,
   zDWOpenposeDetectionFilterConfig,
   zSpandrelFilterConfig,
+  zBlurFilterConfig,
+  zNoiseFilterConfig,
 ]);
 export type FilterConfig = z.infer<typeof zFilterConfig>;
 
@@ -126,6 +150,8 @@ const zFilterType = z.enum([
   'pidi_edge_detection',
   'dw_openpose_detection',
   'spandrel_filter',
+  'img_blur',
+  'img_noise',
 ]);
 export type FilterType = z.infer<typeof zFilterType>;
 export const isFilterType = (v: unknown): v is FilterType => zFilterType.safeParse(v).success;
@@ -427,6 +453,62 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
         return false;
       }
       return true;
+    },
+  },
+  img_blur: {
+    type: 'img_blur',
+    buildDefaults: () => ({
+      type: 'img_blur',
+      blur_type: 'gaussian',
+      radius: 8,
+    }),
+    buildGraph: ({ image_name }, { blur_type, radius }) => {
+      const graph = new Graph(getPrefixedId('img_blur'));
+      const node = graph.addNode({
+        id: getPrefixedId('img_blur'),
+        type: 'img_blur',
+        image: { image_name },
+        blur_type: blur_type,
+        radius: radius,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
+  },
+  img_noise: {
+    type: 'img_noise',
+    buildDefaults: () => ({
+      type: 'img_noise',
+      noise_type: 'gaussian',
+      amount: 0.3,
+      noise_color: true,
+      size: 1,
+    }),
+    buildGraph: ({ image_name }, { noise_type, amount, noise_color, size }) => {
+      const graph = new Graph(getPrefixedId('img_noise'));
+      const node = graph.addNode({
+        id: getPrefixedId('img_noise'),
+        type: 'img_noise',
+        image: { image_name },
+        noise_type: noise_type,
+        amount: amount,
+        noise_color: noise_color,
+        size: size,
+      });
+      const rand = graph.addNode({
+        id: getPrefixedId('rand_int'),
+        use_cache: false,
+        type: 'rand_int',
+        low: 0,
+        high: 2147483647,
+      });
+      graph.addEdge(rand, 'value', node, 'seed');
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
     },
   },
 } as const;

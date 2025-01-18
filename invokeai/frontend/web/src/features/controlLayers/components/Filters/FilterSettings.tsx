@@ -1,4 +1,5 @@
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { FilterBlur } from 'features/controlLayers/components/Filters/FilterBlur';
 import { FilterCannyEdgeDetection } from 'features/controlLayers/components/Filters/FilterCannyEdgeDetection';
 import { FilterColorMap } from 'features/controlLayers/components/Filters/FilterColorMap';
 import { FilterContentShuffle } from 'features/controlLayers/components/Filters/FilterContentShuffle';
@@ -8,6 +9,7 @@ import { FilterHEDEdgeDetection } from 'features/controlLayers/components/Filter
 import { FilterLineartEdgeDetection } from 'features/controlLayers/components/Filters/FilterLineartEdgeDetection';
 import { FilterMediaPipeFaceDetection } from 'features/controlLayers/components/Filters/FilterMediaPipeFaceDetection';
 import { FilterMLSDDetection } from 'features/controlLayers/components/Filters/FilterMLSDDetection';
+import { FilterNoise } from 'features/controlLayers/components/Filters/FilterNoise';
 import { FilterPiDiNetEdgeDetection } from 'features/controlLayers/components/Filters/FilterPiDiNetEdgeDetection';
 import { FilterSpandrel } from 'features/controlLayers/components/Filters/FilterSpandrel';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
@@ -18,6 +20,10 @@ type Props = { filterConfig: FilterConfig; onChange: (filterConfig: FilterConfig
 
 export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
   const { t } = useTranslation();
+
+  if (filterConfig.type === 'img_blur') {
+    return <FilterBlur config={filterConfig} onChange={onChange} />;
+  }
 
   if (filterConfig.type === 'canny_edge_detection') {
     return <FilterCannyEdgeDetection config={filterConfig} onChange={onChange} />;
@@ -57,6 +63,10 @@ export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
 
   if (filterConfig.type === 'pidi_edge_detection') {
     return <FilterPiDiNetEdgeDetection config={filterConfig} onChange={onChange} />;
+  }
+
+  if (filterConfig.type === 'img_noise') {
+    return <FilterNoise config={filterConfig} onChange={onChange} />;
   }
 
   if (filterConfig.type === 'spandrel_filter') {

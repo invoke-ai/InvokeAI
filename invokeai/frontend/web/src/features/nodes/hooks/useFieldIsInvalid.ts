@@ -3,7 +3,21 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useConnectionState } from 'features/nodes/hooks/useConnectionState';
 import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
 import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store/selectors';
-import { isImageFieldCollectionInputInstance, isImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
+import {
+  isFloatFieldCollectionInputInstance,
+  isFloatFieldCollectionInputTemplate,
+  isImageFieldCollectionInputInstance,
+  isImageFieldCollectionInputTemplate,
+  isIntegerFieldCollectionInputInstance,
+  isIntegerFieldCollectionInputTemplate,
+  isStringFieldCollectionInputInstance,
+  isStringFieldCollectionInputTemplate,
+} from 'features/nodes/types/field';
+import {
+  validateImageFieldCollectionValue,
+  validateNumberFieldCollectionValue,
+  validateStringFieldCollectionValue,
+} from 'features/nodes/types/fieldValidators';
 import { useMemo } from 'react';
 
 export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
@@ -35,13 +49,27 @@ export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
       }
 
       // Else special handling for individual field types
+
       if (isImageFieldCollectionInputInstance(field) && isImageFieldCollectionInputTemplate(template)) {
-        // Image collections may have min or max item counts
-        if (template.minItems !== undefined && field.value.length < template.minItems) {
+        if (validateImageFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
+      }
 
-        if (template.maxItems !== undefined && field.value.length > template.maxItems) {
+      if (isStringFieldCollectionInputInstance(field) && isStringFieldCollectionInputTemplate(template)) {
+        if (validateStringFieldCollectionValue(field.value, template).length > 0) {
+          return true;
+        }
+      }
+
+      if (isIntegerFieldCollectionInputInstance(field) && isIntegerFieldCollectionInputTemplate(template)) {
+        if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
+          return true;
+        }
+      }
+
+      if (isFloatFieldCollectionInputInstance(field) && isFloatFieldCollectionInputTemplate(template)) {
+        if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
       }

@@ -19,6 +19,11 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
     return true;
   }
 
+  // Batch and non-batch fields are incompatible.
+  if (sourceType.batch !== targetType.batch) {
+    return false;
+  }
+
   /**
    * Connection types must be the same for a connection, with exceptions:
    * - CollectionItem can connect to any non-COLLECTION (e.g. SINGLE or SINGLE_OR_COLLECTION)

@@ -1,3 +1,7 @@
+import { buildTypeGuard } from 'features/parameters/types/parameterSchemas';
+import { isNil, trim } from 'lodash-es';
+import MersenneTwister from 'mtwist';
+import { assert } from 'tsafe';
 import { z } from 'zod';
 
 import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
@@ -29,7 +33,7 @@ import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedule
 /** */
 
 // #region Base schemas & misc
-const zFieldInput = z.enum(['connection', 'direct', 'any']);
+const zFieldInput = z.enum(['connection', 'direct', 'any', 'batch']);
 const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
 const zFieldInputInstanceBase = z.object({
   name: z.string().trim().min(1),
@@ -61,6 +65,7 @@ const zCardinality = z.enum([SINGLE, COLLECTION, SINGLE_OR_COLLECTION]);
 
 const zFieldTypeBase = z.object({
   cardinality: zCardinality,
+  batch: z.boolean(),
 });
 
 export const zFieldIdentifier = z.object({
@@ -78,14 +83,35 @@ const zIntegerFieldType = zFieldTypeBase.extend({
   name: z.literal('IntegerField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zIntegerCollectionFieldType = zFieldTypeBase.extend({
+  name: z.literal('IntegerField'),
+  cardinality: z.literal(COLLECTION),
+  originalType: zStatelessFieldType.optional(),
+});
+export const isIntegerCollectionFieldType = buildTypeGuard(zIntegerCollectionFieldType);
+
 const zFloatFieldType = zFieldTypeBase.extend({
   name: z.literal('FloatField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zFloatCollectionFieldType = zFieldTypeBase.extend({
+  name: z.literal('FloatField'),
+  cardinality: z.literal(COLLECTION),
+  originalType: zStatelessFieldType.optional(),
+});
+export const isFloatCollectionFieldType = buildTypeGuard(zFloatCollectionFieldType);
+
 const zStringFieldType = zFieldTypeBase.extend({
   name: z.literal('StringField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zStringCollectionFieldType = zFieldTypeBase.extend({
+  name: z.literal('StringField'),
+  cardinality: z.literal(COLLECTION),
+  originalType: zStatelessFieldType.optional(),
+});
+export const isStringCollectionFieldType = buildTypeGuard(zStringCollectionFieldType);
+
 const zBooleanFieldType = zFieldTypeBase.extend({
   name: z.literal('BooleanField'),
   originalType: zStatelessFieldType.optional(),
@@ -98,14 +124,12 @@ const zImageFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   originalType: zStatelessFieldType.optional(),
 });
-const zImageCollectionFieldType = z.object({
+const zImageCollectionFieldType = zFieldTypeBase.extend({
   name: z.literal('ImageField'),
   cardinality: z.literal(COLLECTION),
   originalType: zStatelessFieldType.optional(),
 });
-export const isImageCollectionFieldType = (
-  fieldType: FieldType
-): fieldType is z.infer<typeof zImageCollectionFieldType> => zImageCollectionFieldType.safeParse(fieldType).success;
+export const isImageCollectionFieldType = buildTypeGuard(zImageCollectionFieldType);
 const zBoardFieldType = zFieldTypeBase.extend({
   name: z.literal('BoardField'),
   originalType: zStatelessFieldType.optional(),
@@ -190,6 +214,14 @@ const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zFloatGeneratorFieldType = zFieldTypeBase.extend({
+  name: z.literal('FloatGeneratorField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zIntegerGeneratorFieldType = zFieldTypeBase.extend({
+  name: z.literal('IntegerGeneratorField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
@@ -218,6 +250,8 @@ const zStatefulFieldType = z.union([
   zFluxVAEModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
+  zFloatGeneratorFieldType,
+  zIntegerGeneratorFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -254,10 +288,46 @@ const zIntegerFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type IntegerFieldValue = z.infer<typeof zIntegerFieldValue>;
 export type IntegerFieldInputInstance = z.infer<typeof zIntegerFieldInputInstance>;
 export type IntegerFieldInputTemplate = z.infer<typeof zIntegerFieldInputTemplate>;
-export const isIntegerFieldInputInstance = (val: unknown): val is IntegerFieldInputInstance =>
-  zIntegerFieldInputInstance.safeParse(val).success;
-export const isIntegerFieldInputTemplate = (val: unknown): val is IntegerFieldInputTemplate =>
-  zIntegerFieldInputTemplate.safeParse(val).success;
+export const isIntegerFieldInputInstance = buildTypeGuard(zIntegerFieldInputInstance);
+export const isIntegerFieldInputTemplate = buildTypeGuard(zIntegerFieldInputTemplate);
+// #endregion
+
+// #region IntegerField Collection
+export const zIntegerFieldCollectionValue = z.array(zIntegerFieldValue).optional();
+const zIntegerFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
+  value: zIntegerFieldCollectionValue,
+});
+const zIntegerFieldCollectionInputTemplate = zFieldInputTemplateBase
+  .extend({
+    type: zIntegerCollectionFieldType,
+    originalType: zFieldType.optional(),
+    default: zIntegerFieldCollectionValue,
+    maxItems: z.number().int().gte(0).optional(),
+    minItems: z.number().int().gte(0).optional(),
+    multipleOf: z.number().int().optional(),
+    maximum: z.number().int().optional(),
+    exclusiveMaximum: z.number().int().optional(),
+    minimum: z.number().int().optional(),
+    exclusiveMinimum: z.number().int().optional(),
+  })
+  .refine(
+    (val) => {
+      if (val.maxItems !== undefined && val.minItems !== undefined) {
+        return val.maxItems >= val.minItems;
+      }
+      return true;
+    },
+    { message: 'maxItems must be greater than or equal to minItems' }
+  );
+
+const zIntegerFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zIntegerCollectionFieldType,
+});
+export type IntegerFieldCollectionValue = z.infer<typeof zIntegerFieldCollectionValue>;
+export type IntegerFieldCollectionInputInstance = z.infer<typeof zIntegerFieldCollectionInputInstance>;
+export type IntegerFieldCollectionInputTemplate = z.infer<typeof zIntegerFieldCollectionInputTemplate>;
+export const isIntegerFieldCollectionInputInstance = buildTypeGuard(zIntegerFieldCollectionInputInstance);
+export const isIntegerFieldCollectionInputTemplate = buildTypeGuard(zIntegerFieldCollectionInputTemplate);
 // #endregion
 
 // #region FloatField
@@ -282,10 +352,46 @@ const zFloatFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type FloatFieldValue = z.infer<typeof zFloatFieldValue>;
 export type FloatFieldInputInstance = z.infer<typeof zFloatFieldInputInstance>;
 export type FloatFieldInputTemplate = z.infer<typeof zFloatFieldInputTemplate>;
-export const isFloatFieldInputInstance = (val: unknown): val is FloatFieldInputInstance =>
-  zFloatFieldInputInstance.safeParse(val).success;
-export const isFloatFieldInputTemplate = (val: unknown): val is FloatFieldInputTemplate =>
-  zFloatFieldInputTemplate.safeParse(val).success;
+export const isFloatFieldInputInstance = buildTypeGuard(zFloatFieldInputInstance);
+export const isFloatFieldInputTemplate = buildTypeGuard(zFloatFieldInputTemplate);
+// #endregion
+
+// #region FloatField Collection
+export const zFloatFieldCollectionValue = z.array(zFloatFieldValue).optional();
+const zFloatFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
+  value: zFloatFieldCollectionValue,
+});
+const zFloatFieldCollectionInputTemplate = zFieldInputTemplateBase
+  .extend({
+    type: zFloatCollectionFieldType,
+    originalType: zFieldType.optional(),
+    default: zFloatFieldCollectionValue,
+    maxItems: z.number().int().gte(0).optional(),
+    minItems: z.number().int().gte(0).optional(),
+    multipleOf: z.number().int().optional(),
+    maximum: z.number().optional(),
+    exclusiveMaximum: z.number().optional(),
+    minimum: z.number().optional(),
+    exclusiveMinimum: z.number().optional(),
+  })
+  .refine(
+    (val) => {
+      if (val.maxItems !== undefined && val.minItems !== undefined) {
+        return val.maxItems >= val.minItems;
+      }
+      return true;
+    },
+    { message: 'maxItems must be greater than or equal to minItems' }
+  );
+
+const zFloatFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zFloatCollectionFieldType,
+});
+export type FloatFieldCollectionValue = z.infer<typeof zFloatFieldCollectionValue>;
+export type FloatFieldCollectionInputInstance = z.infer<typeof zFloatFieldCollectionInputInstance>;
+export type FloatFieldCollectionInputTemplate = z.infer<typeof zFloatFieldCollectionInputTemplate>;
+export const isFloatFieldCollectionInputInstance = buildTypeGuard(zFloatFieldCollectionInputInstance);
+export const isFloatFieldCollectionInputTemplate = buildTypeGuard(zFloatFieldCollectionInputTemplate);
 // #endregion
 
 // #region StringField
@@ -315,13 +421,55 @@ const zStringFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zStringFieldType,
 });
 
+// #region StringField Collection
+export const zStringFieldCollectionValue = z.array(zStringFieldValue).optional();
+const zStringFieldCollectionInputInstance = zFieldInputInstanceBase.extend({
+  value: zStringFieldCollectionValue,
+});
+const zStringFieldCollectionInputTemplate = zFieldInputTemplateBase
+  .extend({
+    type: zStringCollectionFieldType,
+    originalType: zFieldType.optional(),
+    default: zStringFieldCollectionValue,
+    maxLength: z.number().int().gte(0).optional(),
+    minLength: z.number().int().gte(0).optional(),
+    maxItems: z.number().int().gte(0).optional(),
+    minItems: z.number().int().gte(0).optional(),
+  })
+  .refine(
+    (val) => {
+      if (val.maxLength !== undefined && val.minLength !== undefined) {
+        return val.maxLength >= val.minLength;
+      }
+      return true;
+    },
+    { message: 'maxLength must be greater than or equal to minLength' }
+  )
+  .refine(
+    (val) => {
+      if (val.maxItems !== undefined && val.minItems !== undefined) {
+        return val.maxItems >= val.minItems;
+      }
+      return true;
+    },
+    { message: 'maxItems must be greater than or equal to minItems' }
+  );
+
+const zStringFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zStringCollectionFieldType,
+});
+export type StringFieldCollectionValue = z.infer<typeof zStringFieldCollectionValue>;
+export type StringFieldCollectionInputInstance = z.infer<typeof zStringFieldCollectionInputInstance>;
+export type StringFieldCollectionInputTemplate = z.infer<typeof zStringFieldCollectionInputTemplate>;
+export const isStringFieldCollectionInputInstance = buildTypeGuard(zStringFieldCollectionInputInstance);
+export const isStringFieldCollectionInputTemplate = buildTypeGuard(zStringFieldCollectionInputTemplate);
+// #endregion
+
 export type StringFieldValue = z.infer<typeof zStringFieldValue>;
 export type StringFieldInputInstance = z.infer<typeof zStringFieldInputInstance>;
 export type StringFieldInputTemplate = z.infer<typeof zStringFieldInputTemplate>;
-export const isStringFieldInputInstance = (val: unknown): val is StringFieldInputInstance =>
-  zStringFieldInputInstance.safeParse(val).success;
-export const isStringFieldInputTemplate = (val: unknown): val is StringFieldInputTemplate =>
-  zStringFieldInputTemplate.safeParse(val).success;
+export const isStringFieldInputInstance = buildTypeGuard(zStringFieldInputInstance);
+export const isStringFieldInputTemplate = buildTypeGuard(zStringFieldInputTemplate);
 // #endregion
 
 // #region BooleanField
@@ -341,10 +489,8 @@ const zBooleanFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type BooleanFieldValue = z.infer<typeof zBooleanFieldValue>;
 export type BooleanFieldInputInstance = z.infer<typeof zBooleanFieldInputInstance>;
 export type BooleanFieldInputTemplate = z.infer<typeof zBooleanFieldInputTemplate>;
-export const isBooleanFieldInputInstance = (val: unknown): val is BooleanFieldInputInstance =>
-  zBooleanFieldInputInstance.safeParse(val).success;
-export const isBooleanFieldInputTemplate = (val: unknown): val is BooleanFieldInputTemplate =>
-  zBooleanFieldInputTemplate.safeParse(val).success;
+export const isBooleanFieldInputInstance = buildTypeGuard(zBooleanFieldInputInstance);
+export const isBooleanFieldInputTemplate = buildTypeGuard(zBooleanFieldInputTemplate);
 // #endregion
 
 // #region EnumField
@@ -366,10 +512,8 @@ const zEnumFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type EnumFieldValue = z.infer<typeof zEnumFieldValue>;
 export type EnumFieldInputInstance = z.infer<typeof zEnumFieldInputInstance>;
 export type EnumFieldInputTemplate = z.infer<typeof zEnumFieldInputTemplate>;
-export const isEnumFieldInputInstance = (val: unknown): val is EnumFieldInputInstance =>
-  zEnumFieldInputInstance.safeParse(val).success;
-export const isEnumFieldInputTemplate = (val: unknown): val is EnumFieldInputTemplate =>
-  zEnumFieldInputTemplate.safeParse(val).success;
+export const isEnumFieldInputInstance = buildTypeGuard(zEnumFieldInputInstance);
+export const isEnumFieldInputTemplate = buildTypeGuard(zEnumFieldInputTemplate);
 // #endregion
 
 // #region ImageField
@@ -388,10 +532,8 @@ const zImageFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type ImageFieldValue = z.infer<typeof zImageFieldValue>;
 export type ImageFieldInputInstance = z.infer<typeof zImageFieldInputInstance>;
 export type ImageFieldInputTemplate = z.infer<typeof zImageFieldInputTemplate>;
-export const isImageFieldInputInstance = (val: unknown): val is ImageFieldInputInstance =>
-  zImageFieldInputInstance.safeParse(val).success;
-export const isImageFieldInputTemplate = (val: unknown): val is ImageFieldInputTemplate =>
-  zImageFieldInputTemplate.safeParse(val).success;
+export const isImageFieldInputInstance = buildTypeGuard(zImageFieldInputInstance);
+export const isImageFieldInputTemplate = buildTypeGuard(zImageFieldInputTemplate);
 // #endregion
 
 // #region ImageField Collection
@@ -414,7 +556,7 @@ const zImageFieldCollectionInputTemplate = zFieldInputTemplateBase
       }
       return true;
     },
-    { message: 'maxLength must be greater than or equal to minLength' }
+    { message: 'maxItems must be greater than or equal to minItems' }
   );
 
 const zImageFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
@@ -423,10 +565,8 @@ const zImageFieldCollectionOutputTemplate = zFieldOutputTemplateBase.extend({
 export type ImageFieldCollectionValue = z.infer<typeof zImageFieldCollectionValue>;
 export type ImageFieldCollectionInputInstance = z.infer<typeof zImageFieldCollectionInputInstance>;
 export type ImageFieldCollectionInputTemplate = z.infer<typeof zImageFieldCollectionInputTemplate>;
-export const isImageFieldCollectionInputInstance = (val: unknown): val is ImageFieldCollectionInputInstance =>
-  zImageFieldCollectionInputInstance.safeParse(val).success;
-export const isImageFieldCollectionInputTemplate = (val: unknown): val is ImageFieldCollectionInputTemplate =>
-  zImageFieldCollectionInputTemplate.safeParse(val).success;
+export const isImageFieldCollectionInputInstance = buildTypeGuard(zImageFieldCollectionInputInstance);
+export const isImageFieldCollectionInputTemplate = buildTypeGuard(zImageFieldCollectionInputTemplate);
 // #endregion
 
 // #region BoardField
@@ -446,10 +586,8 @@ const zBoardFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type BoardFieldValue = z.infer<typeof zBoardFieldValue>;
 export type BoardFieldInputInstance = z.infer<typeof zBoardFieldInputInstance>;
 export type BoardFieldInputTemplate = z.infer<typeof zBoardFieldInputTemplate>;
-export const isBoardFieldInputInstance = (val: unknown): val is BoardFieldInputInstance =>
-  zBoardFieldInputInstance.safeParse(val).success;
-export const isBoardFieldInputTemplate = (val: unknown): val is BoardFieldInputTemplate =>
-  zBoardFieldInputTemplate.safeParse(val).success;
+export const isBoardFieldInputInstance = buildTypeGuard(zBoardFieldInputInstance);
+export const isBoardFieldInputTemplate = buildTypeGuard(zBoardFieldInputTemplate);
 // #endregion
 
 // #region ColorField
@@ -469,10 +607,8 @@ const zColorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type ColorFieldValue = z.infer<typeof zColorFieldValue>;
 export type ColorFieldInputInstance = z.infer<typeof zColorFieldInputInstance>;
 export type ColorFieldInputTemplate = z.infer<typeof zColorFieldInputTemplate>;
-export const isColorFieldInputInstance = (val: unknown): val is ColorFieldInputInstance =>
-  zColorFieldInputInstance.safeParse(val).success;
-export const isColorFieldInputTemplate = (val: unknown): val is ColorFieldInputTemplate =>
-  zColorFieldInputTemplate.safeParse(val).success;
+export const isColorFieldInputInstance = buildTypeGuard(zColorFieldInputInstance);
+export const isColorFieldInputTemplate = buildTypeGuard(zColorFieldInputTemplate);
 // #endregion
 
 // #region MainModelField
@@ -492,10 +628,8 @@ const zMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type MainModelFieldValue = z.infer<typeof zMainModelFieldValue>;
 export type MainModelFieldInputInstance = z.infer<typeof zMainModelFieldInputInstance>;
 export type MainModelFieldInputTemplate = z.infer<typeof zMainModelFieldInputTemplate>;
-export const isMainModelFieldInputInstance = (val: unknown): val is MainModelFieldInputInstance =>
-  zMainModelFieldInputInstance.safeParse(val).success;
-export const isMainModelFieldInputTemplate = (val: unknown): val is MainModelFieldInputTemplate =>
-  zMainModelFieldInputTemplate.safeParse(val).success;
+export const isMainModelFieldInputInstance = buildTypeGuard(zMainModelFieldInputInstance);
+export const isMainModelFieldInputTemplate = buildTypeGuard(zMainModelFieldInputTemplate);
 // #endregion
 
 // #region ModelIdentifierField
@@ -514,10 +648,8 @@ const zModelIdentifierFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type ModelIdentifierFieldValue = z.infer<typeof zModelIdentifierFieldValue>;
 export type ModelIdentifierFieldInputInstance = z.infer<typeof zModelIdentifierFieldInputInstance>;
 export type ModelIdentifierFieldInputTemplate = z.infer<typeof zModelIdentifierFieldInputTemplate>;
-export const isModelIdentifierFieldInputInstance = (val: unknown): val is ModelIdentifierFieldInputInstance =>
-  zModelIdentifierFieldInputInstance.safeParse(val).success;
-export const isModelIdentifierFieldInputTemplate = (val: unknown): val is ModelIdentifierFieldInputTemplate =>
-  zModelIdentifierFieldInputTemplate.safeParse(val).success;
+export const isModelIdentifierFieldInputInstance = buildTypeGuard(zModelIdentifierFieldInputInstance);
+export const isModelIdentifierFieldInputTemplate = buildTypeGuard(zModelIdentifierFieldInputTemplate);
 // #endregion
 
 // #region SDXLMainModelField
@@ -536,10 +668,8 @@ const zSDXLMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 });
 export type SDXLMainModelFieldInputInstance = z.infer<typeof zSDXLMainModelFieldInputInstance>;
 export type SDXLMainModelFieldInputTemplate = z.infer<typeof zSDXLMainModelFieldInputTemplate>;
-export const isSDXLMainModelFieldInputInstance = (val: unknown): val is SDXLMainModelFieldInputInstance =>
-  zSDXLMainModelFieldInputInstance.safeParse(val).success;
-export const isSDXLMainModelFieldInputTemplate = (val: unknown): val is SDXLMainModelFieldInputTemplate =>
-  zSDXLMainModelFieldInputTemplate.safeParse(val).success;
+export const isSDXLMainModelFieldInputInstance = buildTypeGuard(zSDXLMainModelFieldInputInstance);
+export const isSDXLMainModelFieldInputTemplate = buildTypeGuard(zSDXLMainModelFieldInputTemplate);
 // #endregion
 
 // #region SD3MainModelField
@@ -558,10 +688,8 @@ const zSD3MainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 });
 export type SD3MainModelFieldInputInstance = z.infer<typeof zSD3MainModelFieldInputInstance>;
 export type SD3MainModelFieldInputTemplate = z.infer<typeof zSD3MainModelFieldInputTemplate>;
-export const isSD3MainModelFieldInputInstance = (val: unknown): val is SD3MainModelFieldInputInstance =>
-  zSD3MainModelFieldInputInstance.safeParse(val).success;
-export const isSD3MainModelFieldInputTemplate = (val: unknown): val is SD3MainModelFieldInputTemplate =>
-  zSD3MainModelFieldInputTemplate.safeParse(val).success;
+export const isSD3MainModelFieldInputInstance = buildTypeGuard(zSD3MainModelFieldInputInstance);
+export const isSD3MainModelFieldInputTemplate = buildTypeGuard(zSD3MainModelFieldInputTemplate);
 
 // #endregion
 
@@ -581,10 +709,8 @@ const zFluxMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 });
 export type FluxMainModelFieldInputInstance = z.infer<typeof zFluxMainModelFieldInputInstance>;
 export type FluxMainModelFieldInputTemplate = z.infer<typeof zFluxMainModelFieldInputTemplate>;
-export const isFluxMainModelFieldInputInstance = (val: unknown): val is FluxMainModelFieldInputInstance =>
-  zFluxMainModelFieldInputInstance.safeParse(val).success;
-export const isFluxMainModelFieldInputTemplate = (val: unknown): val is FluxMainModelFieldInputTemplate =>
-  zFluxMainModelFieldInputTemplate.safeParse(val).success;
+export const isFluxMainModelFieldInputInstance = buildTypeGuard(zFluxMainModelFieldInputInstance);
+export const isFluxMainModelFieldInputTemplate = buildTypeGuard(zFluxMainModelFieldInputTemplate);
 
 // #endregion
 
@@ -606,10 +732,8 @@ const zSDXLRefinerModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type SDXLRefinerModelFieldValue = z.infer<typeof zSDXLRefinerModelFieldValue>;
 export type SDXLRefinerModelFieldInputInstance = z.infer<typeof zSDXLRefinerModelFieldInputInstance>;
 export type SDXLRefinerModelFieldInputTemplate = z.infer<typeof zSDXLRefinerModelFieldInputTemplate>;
-export const isSDXLRefinerModelFieldInputInstance = (val: unknown): val is SDXLRefinerModelFieldInputInstance =>
-  zSDXLRefinerModelFieldInputInstance.safeParse(val).success;
-export const isSDXLRefinerModelFieldInputTemplate = (val: unknown): val is SDXLRefinerModelFieldInputTemplate =>
-  zSDXLRefinerModelFieldInputTemplate.safeParse(val).success;
+export const isSDXLRefinerModelFieldInputInstance = buildTypeGuard(zSDXLRefinerModelFieldInputInstance);
+export const isSDXLRefinerModelFieldInputTemplate = buildTypeGuard(zSDXLRefinerModelFieldInputTemplate);
 // #endregion
 
 // #region VAEModelField
@@ -629,10 +753,8 @@ const zVAEModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type VAEModelFieldValue = z.infer<typeof zVAEModelFieldValue>;
 export type VAEModelFieldInputInstance = z.infer<typeof zVAEModelFieldInputInstance>;
 export type VAEModelFieldInputTemplate = z.infer<typeof zVAEModelFieldInputTemplate>;
-export const isVAEModelFieldInputInstance = (val: unknown): val is VAEModelFieldInputInstance =>
-  zVAEModelFieldInputInstance.safeParse(val).success;
-export const isVAEModelFieldInputTemplate = (val: unknown): val is VAEModelFieldInputTemplate =>
-  zVAEModelFieldInputTemplate.safeParse(val).success;
+export const isVAEModelFieldInputInstance = buildTypeGuard(zVAEModelFieldInputInstance);
+export const isVAEModelFieldInputTemplate = buildTypeGuard(zVAEModelFieldInputTemplate);
 // #endregion
 
 // #region LoRAModelField
@@ -652,10 +774,8 @@ const zLoRAModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type LoRAModelFieldValue = z.infer<typeof zLoRAModelFieldValue>;
 export type LoRAModelFieldInputInstance = z.infer<typeof zLoRAModelFieldInputInstance>;
 export type LoRAModelFieldInputTemplate = z.infer<typeof zLoRAModelFieldInputTemplate>;
-export const isLoRAModelFieldInputInstance = (val: unknown): val is LoRAModelFieldInputInstance =>
-  zLoRAModelFieldInputInstance.safeParse(val).success;
-export const isLoRAModelFieldInputTemplate = (val: unknown): val is LoRAModelFieldInputTemplate =>
-  zLoRAModelFieldInputTemplate.safeParse(val).success;
+export const isLoRAModelFieldInputInstance = buildTypeGuard(zLoRAModelFieldInputInstance);
+export const isLoRAModelFieldInputTemplate = buildTypeGuard(zLoRAModelFieldInputTemplate);
 // #endregion
 
 // #region ControlNetModelField
@@ -675,10 +795,8 @@ const zControlNetModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type ControlNetModelFieldValue = z.infer<typeof zControlNetModelFieldValue>;
 export type ControlNetModelFieldInputInstance = z.infer<typeof zControlNetModelFieldInputInstance>;
 export type ControlNetModelFieldInputTemplate = z.infer<typeof zControlNetModelFieldInputTemplate>;
-export const isControlNetModelFieldInputInstance = (val: unknown): val is ControlNetModelFieldInputInstance =>
-  zControlNetModelFieldInputInstance.safeParse(val).success;
-export const isControlNetModelFieldInputTemplate = (val: unknown): val is ControlNetModelFieldInputTemplate =>
-  zControlNetModelFieldInputTemplate.safeParse(val).success;
+export const isControlNetModelFieldInputInstance = buildTypeGuard(zControlNetModelFieldInputInstance);
+export const isControlNetModelFieldInputTemplate = buildTypeGuard(zControlNetModelFieldInputTemplate);
 // #endregion
 
 // #region IPAdapterModelField
@@ -698,10 +816,8 @@ const zIPAdapterModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type IPAdapterModelFieldValue = z.infer<typeof zIPAdapterModelFieldValue>;
 export type IPAdapterModelFieldInputInstance = z.infer<typeof zIPAdapterModelFieldInputInstance>;
 export type IPAdapterModelFieldInputTemplate = z.infer<typeof zIPAdapterModelFieldInputTemplate>;
-export const isIPAdapterModelFieldInputInstance = (val: unknown): val is IPAdapterModelFieldInputInstance =>
-  zIPAdapterModelFieldInputInstance.safeParse(val).success;
-export const isIPAdapterModelFieldInputTemplate = (val: unknown): val is IPAdapterModelFieldInputTemplate =>
-  zIPAdapterModelFieldInputTemplate.safeParse(val).success;
+export const isIPAdapterModelFieldInputInstance = buildTypeGuard(zIPAdapterModelFieldInputInstance);
+export const isIPAdapterModelFieldInputTemplate = buildTypeGuard(zIPAdapterModelFieldInputTemplate);
 // #endregion
 
 // #region T2IAdapterField
@@ -721,10 +837,8 @@ const zT2IAdapterModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type T2IAdapterModelFieldValue = z.infer<typeof zT2IAdapterModelFieldValue>;
 export type T2IAdapterModelFieldInputInstance = z.infer<typeof zT2IAdapterModelFieldInputInstance>;
 export type T2IAdapterModelFieldInputTemplate = z.infer<typeof zT2IAdapterModelFieldInputTemplate>;
-export const isT2IAdapterModelFieldInputInstance = (val: unknown): val is T2IAdapterModelFieldInputInstance =>
-  zT2IAdapterModelFieldInputInstance.safeParse(val).success;
-export const isT2IAdapterModelFieldInputTemplate = (val: unknown): val is T2IAdapterModelFieldInputTemplate =>
-  zT2IAdapterModelFieldInputTemplate.safeParse(val).success;
+export const isT2IAdapterModelFieldInputInstance = buildTypeGuard(zT2IAdapterModelFieldInputInstance);
+export const isT2IAdapterModelFieldInputTemplate = buildTypeGuard(zT2IAdapterModelFieldInputTemplate);
 // #endregion
 
 // #region SpandrelModelToModelField
@@ -744,14 +858,12 @@ const zSpandrelImageToImageModelFieldOutputTemplate = zFieldOutputTemplateBase.e
 export type SpandrelImageToImageModelFieldValue = z.infer<typeof zSpandrelImageToImageModelFieldValue>;
 export type SpandrelImageToImageModelFieldInputInstance = z.infer<typeof zSpandrelImageToImageModelFieldInputInstance>;
 export type SpandrelImageToImageModelFieldInputTemplate = z.infer<typeof zSpandrelImageToImageModelFieldInputTemplate>;
-export const isSpandrelImageToImageModelFieldInputInstance = (
-  val: unknown
-): val is SpandrelImageToImageModelFieldInputInstance =>
-  zSpandrelImageToImageModelFieldInputInstance.safeParse(val).success;
-export const isSpandrelImageToImageModelFieldInputTemplate = (
-  val: unknown
-): val is SpandrelImageToImageModelFieldInputTemplate =>
-  zSpandrelImageToImageModelFieldInputTemplate.safeParse(val).success;
+export const isSpandrelImageToImageModelFieldInputInstance = buildTypeGuard(
+  zSpandrelImageToImageModelFieldInputInstance
+);
+export const isSpandrelImageToImageModelFieldInputTemplate = buildTypeGuard(
+  zSpandrelImageToImageModelFieldInputTemplate
+);
 // #endregion
 
 // #region T5EncoderModelField
@@ -770,10 +882,8 @@ export type T5EncoderModelFieldValue = z.infer<typeof zT5EncoderModelFieldValue>
 
 export type T5EncoderModelFieldInputInstance = z.infer<typeof zT5EncoderModelFieldInputInstance>;
 export type T5EncoderModelFieldInputTemplate = z.infer<typeof zT5EncoderModelFieldInputTemplate>;
-export const isT5EncoderModelFieldInputInstance = (val: unknown): val is T5EncoderModelFieldInputInstance =>
-  zT5EncoderModelFieldInputInstance.safeParse(val).success;
-export const isT5EncoderModelFieldInputTemplate = (val: unknown): val is T5EncoderModelFieldInputTemplate =>
-  zT5EncoderModelFieldInputTemplate.safeParse(val).success;
+export const isT5EncoderModelFieldInputInstance = buildTypeGuard(zT5EncoderModelFieldInputInstance);
+export const isT5EncoderModelFieldInputTemplate = buildTypeGuard(zT5EncoderModelFieldInputTemplate);
 
 // #endregion
 
@@ -793,10 +903,8 @@ export type FluxVAEModelFieldValue = z.infer<typeof zFluxVAEModelFieldValue>;
 
 export type FluxVAEModelFieldInputInstance = z.infer<typeof zFluxVAEModelFieldInputInstance>;
 export type FluxVAEModelFieldInputTemplate = z.infer<typeof zFluxVAEModelFieldInputTemplate>;
-export const isFluxVAEModelFieldInputInstance = (val: unknown): val is FluxVAEModelFieldInputInstance =>
-  zFluxVAEModelFieldInputInstance.safeParse(val).success;
-export const isFluxVAEModelFieldInputTemplate = (val: unknown): val is FluxVAEModelFieldInputTemplate =>
-  zFluxVAEModelFieldInputTemplate.safeParse(val).success;
+export const isFluxVAEModelFieldInputInstance = buildTypeGuard(zFluxVAEModelFieldInputInstance);
+export const isFluxVAEModelFieldInputTemplate = buildTypeGuard(zFluxVAEModelFieldInputTemplate);
 
 // #endregion
 
@@ -816,10 +924,8 @@ export type CLIPEmbedModelFieldValue = z.infer<typeof zCLIPEmbedModelFieldValue>
 
 export type CLIPEmbedModelFieldInputInstance = z.infer<typeof zCLIPEmbedModelFieldInputInstance>;
 export type CLIPEmbedModelFieldInputTemplate = z.infer<typeof zCLIPEmbedModelFieldInputTemplate>;
-export const isCLIPEmbedModelFieldInputInstance = (val: unknown): val is CLIPEmbedModelFieldInputInstance =>
-  zCLIPEmbedModelFieldInputInstance.safeParse(val).success;
-export const isCLIPEmbedModelFieldInputTemplate = (val: unknown): val is CLIPEmbedModelFieldInputTemplate =>
-  zCLIPEmbedModelFieldInputTemplate.safeParse(val).success;
+export const isCLIPEmbedModelFieldInputInstance = buildTypeGuard(zCLIPEmbedModelFieldInputInstance);
+export const isCLIPEmbedModelFieldInputTemplate = buildTypeGuard(zCLIPEmbedModelFieldInputTemplate);
 
 // #endregion
 
@@ -839,10 +945,8 @@ export type CLIPLEmbedModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldValu
 
 export type CLIPLEmbedModelFieldInputInstance = z.infer<typeof zCLIPLEmbedModelFieldInputInstance>;
 export type CLIPLEmbedModelFieldInputTemplate = z.infer<typeof zCLIPLEmbedModelFieldInputTemplate>;
-export const isCLIPLEmbedModelFieldInputInstance = (val: unknown): val is CLIPLEmbedModelFieldInputInstance =>
-  zCLIPLEmbedModelFieldInputInstance.safeParse(val).success;
-export const isCLIPLEmbedModelFieldInputTemplate = (val: unknown): val is CLIPLEmbedModelFieldInputTemplate =>
-  zCLIPLEmbedModelFieldInputTemplate.safeParse(val).success;
+export const isCLIPLEmbedModelFieldInputInstance = buildTypeGuard(zCLIPLEmbedModelFieldInputInstance);
+export const isCLIPLEmbedModelFieldInputTemplate = buildTypeGuard(zCLIPLEmbedModelFieldInputTemplate);
 
 // #endregion
 
@@ -862,10 +966,8 @@ export type CLIPGEmbedModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldValu
 
 export type CLIPGEmbedModelFieldInputInstance = z.infer<typeof zCLIPGEmbedModelFieldInputInstance>;
 export type CLIPGEmbedModelFieldInputTemplate = z.infer<typeof zCLIPGEmbedModelFieldInputTemplate>;
-export const isCLIPGEmbedModelFieldInputInstance = (val: unknown): val is CLIPGEmbedModelFieldInputInstance =>
-  zCLIPGEmbedModelFieldInputInstance.safeParse(val).success;
-export const isCLIPGEmbedModelFieldInputTemplate = (val: unknown): val is CLIPGEmbedModelFieldInputTemplate =>
-  zCLIPGEmbedModelFieldInputTemplate.safeParse(val).success;
+export const isCLIPGEmbedModelFieldInputInstance = buildTypeGuard(zCLIPGEmbedModelFieldInputInstance);
+export const isCLIPGEmbedModelFieldInputTemplate = buildTypeGuard(zCLIPGEmbedModelFieldInputTemplate);
 
 // #endregion
 
@@ -885,10 +987,8 @@ export type ControlLoRAModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldVal
 
 export type ControlLoRAModelFieldInputInstance = z.infer<typeof zControlLoRAModelFieldInputInstance>;
 export type ControlLoRAModelFieldInputTemplate = z.infer<typeof zControlLoRAModelFieldInputTemplate>;
-export const isControlLoRAModelFieldInputInstance = (val: unknown): val is ControlLoRAModelFieldInputInstance =>
-  zControlLoRAModelFieldInputInstance.safeParse(val).success;
-export const isControlLoRAModelFieldInputTemplate = (val: unknown): val is ControlLoRAModelFieldInputTemplate =>
-  zControlLoRAModelFieldInputTemplate.safeParse(val).success;
+export const isControlLoRAModelFieldInputInstance = buildTypeGuard(zControlLoRAModelFieldInputInstance);
+export const isControlLoRAModelFieldInputTemplate = buildTypeGuard(zControlLoRAModelFieldInputTemplate);
 
 // #endregion
 
@@ -909,10 +1009,285 @@ const zSchedulerFieldOutputTemplate = zFieldOutputTemplateBase.extend({
 export type SchedulerFieldValue = z.infer<typeof zSchedulerFieldValue>;
 export type SchedulerFieldInputInstance = z.infer<typeof zSchedulerFieldInputInstance>;
 export type SchedulerFieldInputTemplate = z.infer<typeof zSchedulerFieldInputTemplate>;
-export const isSchedulerFieldInputInstance = (val: unknown): val is SchedulerFieldInputInstance =>
-  zSchedulerFieldInputInstance.safeParse(val).success;
-export const isSchedulerFieldInputTemplate = (val: unknown): val is SchedulerFieldInputTemplate =>
-  zSchedulerFieldInputTemplate.safeParse(val).success;
+export const isSchedulerFieldInputInstance = buildTypeGuard(zSchedulerFieldInputInstance);
+export const isSchedulerFieldInputTemplate = buildTypeGuard(zSchedulerFieldInputTemplate);
+// #endregion
+
+// #region FloatGeneratorField
+export const FloatGeneratorArithmeticSequenceType = 'float_generator_arithmetic_sequence';
+const zFloatGeneratorArithmeticSequence = z.object({
+  type: z.literal(FloatGeneratorArithmeticSequenceType).default(FloatGeneratorArithmeticSequenceType),
+  start: z.number().default(0),
+  step: z.number().default(0.1),
+  count: z.number().int().default(10),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorArithmeticSequence = z.infer<typeof zFloatGeneratorArithmeticSequence>;
+export const getFloatGeneratorArithmeticSequenceDefaults = () => zFloatGeneratorArithmeticSequence.parse({});
+const getFloatGeneratorArithmeticSequenceValues = (generator: FloatGeneratorArithmeticSequence) => {
+  const { start, step, count } = generator;
+  if (step === 0) {
+    return [start];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + i * step);
+  return values;
+};
+
+export const FloatGeneratorLinearDistributionType = 'float_generator_linear_distribution';
+const zFloatGeneratorLinearDistribution = z.object({
+  type: z.literal(FloatGeneratorLinearDistributionType).default(FloatGeneratorLinearDistributionType),
+  start: z.number().default(0),
+  end: z.number().default(1),
+  count: z.number().int().default(10),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorLinearDistribution = z.infer<typeof zFloatGeneratorLinearDistribution>;
+const getFloatGeneratorLinearDistributionDefaults = () => zFloatGeneratorLinearDistribution.parse({});
+const getFloatGeneratorLinearDistributionValues = (generator: FloatGeneratorLinearDistribution) => {
+  const { start, end, count } = generator;
+  if (count === 1) {
+    return [start];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + (end - start) * (i / (count - 1)));
+  return values;
+};
+
+export const FloatGeneratorUniformRandomDistributionType = 'float_generator_random_distribution_uniform';
+const zFloatGeneratorUniformRandomDistribution = z.object({
+  type: z.literal(FloatGeneratorUniformRandomDistributionType).default(FloatGeneratorUniformRandomDistributionType),
+  min: z.number().default(0),
+  max: z.number().default(1),
+  count: z.number().int().default(10),
+  seed: z.number().int().nullish(),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorUniformRandomDistribution = z.infer<typeof zFloatGeneratorUniformRandomDistribution>;
+const getFloatGeneratorUniformRandomDistributionDefaults = () => zFloatGeneratorUniformRandomDistribution.parse({});
+const getRng = (seed?: number | null) => {
+  if (isNil(seed)) {
+    return () => Math.random();
+  }
+  const m = new MersenneTwister(seed);
+  return () => m.random();
+};
+const getFloatGeneratorUniformRandomDistributionValues = (generator: FloatGeneratorUniformRandomDistribution) => {
+  const { min, max, count, seed } = generator;
+  const rng = getRng(seed);
+  const values = Array.from({ length: count }, (_) => rng() * (max - min) + min);
+  return values;
+};
+
+export const FloatGeneratorParseStringType = 'float_generator_parse_string';
+const zFloatGeneratorParseString = z.object({
+  type: z.literal(FloatGeneratorParseStringType).default(FloatGeneratorParseStringType),
+  input: z.string().default('0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1'),
+  splitOn: z.string().default(','),
+  values: z.array(z.number()).nullish(),
+});
+export type FloatGeneratorParseString = z.infer<typeof zFloatGeneratorParseString>;
+const getFloatGeneratorParseStringDefaults = () => zFloatGeneratorParseString.parse({});
+const getFloatGeneratorParseStringValues = (generator: FloatGeneratorParseString) => {
+  const { input, splitOn } = generator;
+  const values = input
+    .split(splitOn)
+    .map(trim)
+    .filter((s) => s.length > 0)
+    .map((s) => parseFloat(s))
+    .filter((n) => !isNaN(n));
+  return values;
+};
+
+export const zFloatGeneratorFieldValue = z.union([
+  zFloatGeneratorArithmeticSequence,
+  zFloatGeneratorLinearDistribution,
+  zFloatGeneratorUniformRandomDistribution,
+  zFloatGeneratorParseString,
+]);
+const zFloatGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFloatGeneratorFieldValue,
+});
+const zFloatGeneratorFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFloatGeneratorFieldType,
+  originalType: zFieldType.optional(),
+  default: zFloatGeneratorFieldValue,
+});
+const zFloatGeneratorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zFloatGeneratorFieldType,
+});
+export type FloatGeneratorFieldValue = z.infer<typeof zFloatGeneratorFieldValue>;
+export type FloatGeneratorFieldInputInstance = z.infer<typeof zFloatGeneratorFieldInputInstance>;
+export type FloatGeneratorFieldInputTemplate = z.infer<typeof zFloatGeneratorFieldInputTemplate>;
+export const isFloatGeneratorFieldInputInstance = buildTypeGuard(zFloatGeneratorFieldInputInstance);
+export const isFloatGeneratorFieldInputTemplate = buildTypeGuard(zFloatGeneratorFieldInputTemplate);
+export const resolveFloatGeneratorField = ({ value }: FloatGeneratorFieldInputInstance) => {
+  if (value.values) {
+    return value.values;
+  }
+  if (value.type === FloatGeneratorArithmeticSequenceType) {
+    return getFloatGeneratorArithmeticSequenceValues(value);
+  }
+  if (value.type === FloatGeneratorLinearDistributionType) {
+    return getFloatGeneratorLinearDistributionValues(value);
+  }
+  if (value.type === FloatGeneratorUniformRandomDistributionType) {
+    return getFloatGeneratorUniformRandomDistributionValues(value);
+  }
+  if (value.type === FloatGeneratorParseStringType) {
+    return getFloatGeneratorParseStringValues(value);
+  }
+  assert(false, 'Invalid float generator type');
+};
+
+export const getFloatGeneratorDefaults = (type: FloatGeneratorFieldValue['type']) => {
+  if (type === FloatGeneratorArithmeticSequenceType) {
+    return getFloatGeneratorArithmeticSequenceDefaults();
+  }
+  if (type === FloatGeneratorLinearDistributionType) {
+    return getFloatGeneratorLinearDistributionDefaults();
+  }
+  if (type === FloatGeneratorUniformRandomDistributionType) {
+    return getFloatGeneratorUniformRandomDistributionDefaults();
+  }
+  if (type === FloatGeneratorParseStringType) {
+    return getFloatGeneratorParseStringDefaults();
+  }
+  assert(false, 'Invalid float generator type');
+};
+
+// #endregion
+
+// #region IntegerGeneratorField
+export const IntegerGeneratorArithmeticSequenceType = 'integer_generator_arithmetic_sequence';
+const zIntegerGeneratorArithmeticSequence = z.object({
+  type: z.literal(IntegerGeneratorArithmeticSequenceType).default(IntegerGeneratorArithmeticSequenceType),
+  start: z.number().int().default(0),
+  step: z.number().int().default(1),
+  count: z.number().int().default(10),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorArithmeticSequence = z.infer<typeof zIntegerGeneratorArithmeticSequence>;
+export const getIntegerGeneratorArithmeticSequenceDefaults = () => zIntegerGeneratorArithmeticSequence.parse({});
+const getIntegerGeneratorArithmeticSequenceValues = (generator: IntegerGeneratorArithmeticSequence) => {
+  const { start, step, count } = generator;
+  if (step === 0) {
+    return [start];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + i * step);
+  return values;
+};
+
+export const IntegerGeneratorLinearDistributionType = 'integer_generator_linear_distribution';
+const zIntegerGeneratorLinearDistribution = z.object({
+  type: z.literal(IntegerGeneratorLinearDistributionType).default(IntegerGeneratorLinearDistributionType),
+  start: z.number().int().default(0),
+  end: z.number().int().default(10),
+  count: z.number().int().default(10),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorLinearDistribution = z.infer<typeof zIntegerGeneratorLinearDistribution>;
+const getIntegerGeneratorLinearDistributionDefaults = () => zIntegerGeneratorLinearDistribution.parse({});
+const getIntegerGeneratorLinearDistributionValues = (generator: IntegerGeneratorLinearDistribution) => {
+  const { start, end, count } = generator;
+  if (count === 1) {
+    return [start];
+  }
+  const values = Array.from({ length: count }, (_, i) => start + Math.round((end - start) * (i / (count - 1))));
+  return values;
+};
+
+export const IntegerGeneratorUniformRandomDistributionType = 'integer_generator_random_distribution_uniform';
+const zIntegerGeneratorUniformRandomDistribution = z.object({
+  type: z.literal(IntegerGeneratorUniformRandomDistributionType).default(IntegerGeneratorUniformRandomDistributionType),
+  min: z.number().int().default(0),
+  max: z.number().int().default(10),
+  count: z.number().int().default(10),
+  seed: z.number().int().nullish(),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorUniformRandomDistribution = z.infer<typeof zIntegerGeneratorUniformRandomDistribution>;
+const getIntegerGeneratorUniformRandomDistributionDefaults = () => zIntegerGeneratorUniformRandomDistribution.parse({});
+const getIntegerGeneratorUniformRandomDistributionValues = (generator: IntegerGeneratorUniformRandomDistribution) => {
+  const { min, max, count, seed } = generator;
+  const rng = getRng(seed);
+  const values = Array.from({ length: count }, () => Math.floor(rng() * (max - min + 1)) + min);
+  return values;
+};
+
+export const IntegerGeneratorParseStringType = 'integer_generator_parse_string';
+const zIntegerGeneratorParseString = z.object({
+  type: z.literal(IntegerGeneratorParseStringType).default(IntegerGeneratorParseStringType),
+  input: z.string().default('1,2,3,4,5,6,7,8,9,10'),
+  splitOn: z.string().default(','),
+  values: z.array(z.number().int()).nullish(),
+});
+export type IntegerGeneratorParseString = z.infer<typeof zIntegerGeneratorParseString>;
+const getIntegerGeneratorParseStringDefaults = () => zIntegerGeneratorParseString.parse({});
+const getIntegerGeneratorParseStringValues = (generator: IntegerGeneratorParseString) => {
+  const { input, splitOn } = generator;
+  const values = input
+    .split(splitOn)
+    .map(trim)
+    .filter((s) => s.length > 0)
+    .map((s) => parseInt(s, 10))
+    .filter((n) => !isNaN(n));
+  return values;
+};
+
+export const zIntegerGeneratorFieldValue = z.union([
+  zIntegerGeneratorArithmeticSequence,
+  zIntegerGeneratorLinearDistribution,
+  zIntegerGeneratorUniformRandomDistribution,
+  zIntegerGeneratorParseString,
+]);
+const zIntegerGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zIntegerGeneratorFieldValue,
+});
+const zIntegerGeneratorFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zIntegerGeneratorFieldType,
+  originalType: zFieldType.optional(),
+  default: zIntegerGeneratorFieldValue,
+});
+const zIntegerGeneratorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zIntegerGeneratorFieldType,
+});
+export type IntegerGeneratorFieldValue = z.infer<typeof zIntegerGeneratorFieldValue>;
+export type IntegerGeneratorFieldInputInstance = z.infer<typeof zIntegerGeneratorFieldInputInstance>;
+export type IntegerGeneratorFieldInputTemplate = z.infer<typeof zIntegerGeneratorFieldInputTemplate>;
+export const isIntegerGeneratorFieldInputInstance = buildTypeGuard(zIntegerGeneratorFieldInputInstance);
+export const isIntegerGeneratorFieldInputTemplate = buildTypeGuard(zIntegerGeneratorFieldInputTemplate);
+export const resolveIntegerGeneratorField = ({ value }: IntegerGeneratorFieldInputInstance) => {
+  if (value.values) {
+    return value.values;
+  }
+  if (value.type === IntegerGeneratorArithmeticSequenceType) {
+    return getIntegerGeneratorArithmeticSequenceValues(value);
+  }
+  if (value.type === IntegerGeneratorLinearDistributionType) {
+    return getIntegerGeneratorLinearDistributionValues(value);
+  }
+  if (value.type === IntegerGeneratorUniformRandomDistributionType) {
+    return getIntegerGeneratorUniformRandomDistributionValues(value);
+  }
+  if (value.type === IntegerGeneratorParseStringType) {
+    return getIntegerGeneratorParseStringValues(value);
+  }
+  assert(false, 'Invalid integer generator type');
+};
+export const getIntegerGeneratorDefaults = (type: IntegerGeneratorFieldValue['type']) => {
+  if (type === IntegerGeneratorArithmeticSequenceType) {
+    return getIntegerGeneratorArithmeticSequenceDefaults();
+  }
+  if (type === IntegerGeneratorLinearDistributionType) {
+    return getIntegerGeneratorLinearDistributionDefaults();
+  }
+  if (type === IntegerGeneratorUniformRandomDistributionType) {
+    return getIntegerGeneratorUniformRandomDistributionDefaults();
+  }
+  if (type === IntegerGeneratorParseStringType) {
+    return getIntegerGeneratorParseStringDefaults();
+  }
+  assert(false, 'Invalid integer generator type');
+};
 // #endregion
 
 // #region StatelessField
@@ -963,8 +1338,11 @@ export type StatelessFieldInputTemplate = z.infer<typeof zStatelessFieldInputTem
 // #region StatefulFieldValue & FieldValue
 export const zStatefulFieldValue = z.union([
   zIntegerFieldValue,
+  zIntegerFieldCollectionValue,
   zFloatFieldValue,
+  zFloatFieldCollectionValue,
   zStringFieldValue,
+  zStringFieldCollectionValue,
   zBooleanFieldValue,
   zEnumFieldValue,
   zImageFieldValue,
@@ -990,6 +1368,8 @@ export const zStatefulFieldValue = z.union([
   zControlLoRAModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
+  zFloatGeneratorFieldValue,
+  zIntegerGeneratorFieldValue,
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1000,8 +1380,11 @@ export type FieldValue = z.infer<typeof zFieldValue>;
 // #region StatefulFieldInputInstance & FieldInputInstance
 const zStatefulFieldInputInstance = z.union([
   zIntegerFieldInputInstance,
+  zIntegerFieldCollectionInputInstance,
   zFloatFieldInputInstance,
+  zFloatFieldCollectionInputInstance,
   zStringFieldInputInstance,
+  zStringFieldCollectionInputInstance,
   zBooleanFieldInputInstance,
   zEnumFieldInputInstance,
   zImageFieldInputInstance,
@@ -1024,19 +1407,23 @@ const zStatefulFieldInputInstance = z.union([
   zCLIPEmbedModelFieldInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
+  zFloatGeneratorFieldInputInstance,
+  zIntegerGeneratorFieldInputInstance,
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
 export type FieldInputInstance = z.infer<typeof zFieldInputInstance>;
-export const isFieldInputInstance = (val: unknown): val is FieldInputInstance =>
-  zFieldInputInstance.safeParse(val).success;
+export const isFieldInputInstance = buildTypeGuard(zFieldInputInstance);
 // #endregion
 
 // #region StatefulFieldInputTemplate & FieldInputTemplate
 const zStatefulFieldInputTemplate = z.union([
   zIntegerFieldInputTemplate,
+  zIntegerFieldCollectionInputTemplate,
   zFloatFieldInputTemplate,
+  zFloatFieldCollectionInputTemplate,
   zStringFieldInputTemplate,
+  zStringFieldCollectionInputTemplate,
   zBooleanFieldInputTemplate,
   zEnumFieldInputTemplate,
   zImageFieldInputTemplate,
@@ -1063,19 +1450,23 @@ const zStatefulFieldInputTemplate = z.union([
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,
+  zFloatGeneratorFieldInputTemplate,
+  zIntegerGeneratorFieldInputTemplate,
 ]);
 
 export const zFieldInputTemplate = z.union([zStatefulFieldInputTemplate, zStatelessFieldInputTemplate]);
 export type FieldInputTemplate = z.infer<typeof zFieldInputTemplate>;
-export const isFieldInputTemplate = (val: unknown): val is FieldInputTemplate =>
-  zFieldInputTemplate.safeParse(val).success;
+export const isFieldInputTemplate = buildTypeGuard(zFieldInputTemplate);
 // #endregion
 
 // #region StatefulFieldOutputTemplate & FieldOutputTemplate
 const zStatefulFieldOutputTemplate = z.union([
   zIntegerFieldOutputTemplate,
+  zIntegerFieldCollectionOutputTemplate,
   zFloatFieldOutputTemplate,
+  zFloatFieldCollectionOutputTemplate,
   zStringFieldOutputTemplate,
+  zStringFieldCollectionOutputTemplate,
   zBooleanFieldOutputTemplate,
   zEnumFieldOutputTemplate,
   zImageFieldOutputTemplate,
@@ -1095,6 +1486,8 @@ const zStatefulFieldOutputTemplate = z.union([
   zSpandrelImageToImageModelFieldOutputTemplate,
   zColorFieldOutputTemplate,
   zSchedulerFieldOutputTemplate,
+  zFloatGeneratorFieldOutputTemplate,
+  zIntegerGeneratorFieldOutputTemplate,
 ]);
 
 export const zFieldOutputTemplate = z.union([zStatefulFieldOutputTemplate, zStatelessFieldOutputTemplate]);

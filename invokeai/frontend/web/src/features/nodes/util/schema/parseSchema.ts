@@ -107,6 +107,7 @@ export const parseSchema = (
           ? {
               name: property.ui_type,
               cardinality: isCollectionFieldType(property.ui_type) ? 'COLLECTION' : 'SINGLE',
+              batch: false,
             }
           : null;
 
@@ -125,6 +126,12 @@ export const parseSchema = (
 
         if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
           fieldType.originalType = deepClone(originalFieldType);
+        }
+
+        if (type === 'float_batch' && propertyName === 'floats') {
+          fieldType.batch = true;
+        } else if (type === 'integer_batch' && propertyName === 'integers') {
+          fieldType.batch = true;
         }
 
         const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
@@ -172,6 +179,7 @@ export const parseSchema = (
           ? {
               name: property.ui_type,
               cardinality: isCollectionFieldType(property.ui_type) ? 'COLLECTION' : 'SINGLE',
+              batch: false,
             }
           : null;
 
@@ -185,6 +193,12 @@ export const parseSchema = (
 
         if (isStatefulFieldType(fieldType) && originalFieldType && !isEqual(originalFieldType, fieldType)) {
           fieldType.originalType = deepClone(originalFieldType);
+        }
+
+        if (type === 'float_generator' && propertyName === 'floats') {
+          fieldType.batch = true;
+        } else if (type === 'integer_generator' && propertyName === 'integers') {
+          fieldType.batch = true;
         }
 
         const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);

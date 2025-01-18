@@ -206,8 +206,16 @@ const QueueCountPredictionWorkflowsTab = memo(() => {
   const iterationsCount = useAppSelector(selectIterations);
 
   const text = useMemo(() => {
-    const generationCount = Math.min(batchSize * iterationsCount, 10000);
     const iterations = t('queue.iterations', { count: iterationsCount });
+    if (batchSize === 'NO_BATCHES') {
+      const generationCount = Math.min(10000, iterationsCount);
+      const generations = t('queue.generations', { count: generationCount });
+      return `${iterationsCount} ${iterations} -> ${generationCount} ${generations}`.toLowerCase();
+    }
+    if (batchSize === 'EMPTY_BATCHES') {
+      return t('parameters.invoke.invalidBatchConfigurationCannotCalculate');
+    }
+    const generationCount = Math.min(batchSize * iterationsCount, 10000);
     const generations = t('queue.generations', { count: generationCount });
     return `${batchSize} ${t('queue.batchSize')} \u00d7 ${iterationsCount} ${iterations} -> ${generationCount} ${generations}`.toLowerCase();
   }, [batchSize, iterationsCount, t]);

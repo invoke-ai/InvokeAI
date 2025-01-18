@@ -740,3 +740,12 @@ export const getColorAtCoordinate = (stage: Konva.Stage, coord: Coordinate): Rgb
 
   return { r, g, b };
 };
+
+export const roundRect = (rect: Rect): Rect => {
+  return {
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  };
+};

@@ -10,6 +10,10 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.t5_model_identifier import (
+    preprocess_t5_encoder_model_identifier,
+    preprocess_t5_tokenizer_model_identifier,
+)
 from invokeai.backend.flux.util import max_seq_lengths
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
@@ -74,8 +78,8 @@ class FluxModelLoaderInvocation(BaseInvocation):
         tokenizer = self.clip_embed_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
         clip_encoder = self.clip_embed_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
 
-        tokenizer2 = self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
-        t5_encoder = self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+        tokenizer2 = preprocess_t5_tokenizer_model_identifier(self.t5_encoder_model)
+        t5_encoder = preprocess_t5_encoder_model_identifier(self.t5_encoder_model)
 
         transformer_config = context.models.get_config(transformer)
         assert isinstance(transformer_config, CheckpointConfigBase)

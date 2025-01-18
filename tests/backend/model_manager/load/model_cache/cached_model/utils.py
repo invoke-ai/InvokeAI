@@ -29,3 +29,5 @@ parameterize_mps_and_cuda = pytest.mark.parametrize(
         pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available.")),
     ],
 )
+
+parameterize_keep_ram_copy = pytest.mark.parametrize("keep_ram_copy", [True, False])

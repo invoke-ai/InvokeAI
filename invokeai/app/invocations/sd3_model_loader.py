@@ -10,6 +10,10 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.t5_model_identifier import (
+    preprocess_t5_encoder_model_identifier,
+    preprocess_t5_tokenizer_model_identifier,
+)
 from invokeai.backend.model_manager.config import SubModelType
 
 
@@ -88,16 +92,8 @@ class Sd3ModelLoaderInvocation(BaseInvocation):
             if self.clip_g_model
             else self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
         )
-        tokenizer_t5 = (
-            self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
-            if self.t5_encoder_model
-            else self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
-        )
-        t5_encoder = (
-            self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
-            if self.t5_encoder_model
-            else self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
-        )
+        tokenizer_t5 = preprocess_t5_tokenizer_model_identifier(self.t5_encoder_model or self.model)
+        t5_encoder = preprocess_t5_encoder_model_identifier(self.t5_encoder_model or self.model)
 
         return Sd3ModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),

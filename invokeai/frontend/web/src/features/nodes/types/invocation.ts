@@ -91,3 +91,29 @@ const zInvocationNodeEdgeExtra = z.object({
 type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
 export type InvocationNodeEdge = Edge<InvocationNodeEdgeExtra>;
 // #endregion
+
+export const isBatchNode = (node: InvocationNode) => {
+  switch (node.data.type) {
+    case 'image_batch':
+    case 'string_batch':
+    case 'integer_batch':
+    case 'float_batch':
+      return true;
+    default:
+      return false;
+  }
+};
+
+const isGeneratorNode = (node: InvocationNode) => {
+  switch (node.data.type) {
+    case 'float_generator':
+    case 'integer_generator':
+      return true;
+    default:
+      return false;
+  }
+};
+
+export const isExecutableNode = (node: InvocationNode) => {
+  return !isBatchNode(node) && !isGeneratorNode(node);
+};

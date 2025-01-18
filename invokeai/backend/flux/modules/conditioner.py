@@ -1,13 +1,19 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
 from torch import Tensor, nn
-from transformers import PreTrainedModel, PreTrainedTokenizer
+from transformers import PreTrainedModel, PreTrainedTokenizer, PreTrainedTokenizerFast
 
 from invokeai.backend.util.devices import TorchDevice
 
 
 class HFEncoder(nn.Module):
-    def __init__(self, encoder: PreTrainedModel, tokenizer: PreTrainedTokenizer, is_clip: bool, max_length: int):
+    def __init__(
+        self,
+        encoder: PreTrainedModel,
+        tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast,
+        is_clip: bool,
+        max_length: int,
+    ):
         super().__init__()
         self.max_length = max_length
         self.is_clip = is_clip

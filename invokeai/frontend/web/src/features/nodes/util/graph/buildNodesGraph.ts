@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { NodesState } from 'features/nodes/store/types';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { omit, reduce } from 'lodash-es';
 import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,7 +14,7 @@ export const buildNodesGraph = (nodesState: NodesState): Graph => {
   const { nodes, edges } = nodesState;
 
   // Exclude all batch nodes - we will handle these in the batch setup in a diff function
-  const filteredNodes = nodes.filter(isInvocationNode).filter((node) => node.data.type !== 'image_batch');
+  const filteredNodes = nodes.filter(isInvocationNode).filter(isExecutableNode);
 
   // Reduce the node editor nodes into invocation graph nodes
   const parsedNodes = filteredNodes.reduce<NonNullable<Graph['nodes']>>((nodesAccumulator, node) => {

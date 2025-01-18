@@ -11,12 +11,16 @@ import type {
   EnumFieldInputTemplate,
   FieldInputTemplate,
   FieldType,
+  FloatFieldCollectionInputTemplate,
   FloatFieldInputTemplate,
+  FloatGeneratorFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
   FluxVAEModelFieldInputTemplate,
   ImageFieldCollectionInputTemplate,
   ImageFieldInputTemplate,
+  IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
+  IntegerGeneratorFieldInputTemplate,
   IPAdapterModelFieldInputTemplate,
   LoRAModelFieldInputTemplate,
   MainModelFieldInputTemplate,
@@ -28,12 +32,21 @@ import type {
   SpandrelImageToImageModelFieldInputTemplate,
   StatefulFieldType,
   StatelessFieldInputTemplate,
+  StringFieldCollectionInputTemplate,
   StringFieldInputTemplate,
   T2IAdapterModelFieldInputTemplate,
   T5EncoderModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
-import { isImageCollectionFieldType, isStatefulFieldType } from 'features/nodes/types/field';
+import {
+  getFloatGeneratorArithmeticSequenceDefaults,
+  getIntegerGeneratorArithmeticSequenceDefaults,
+  isFloatCollectionFieldType,
+  isImageCollectionFieldType,
+  isIntegerCollectionFieldType,
+  isStatefulFieldType,
+  isStringCollectionFieldType,
+} from 'features/nodes/types/field';
 import type { InvocationFieldSchema } from 'features/nodes/types/openapi';
 import { isSchemaObject } from 'features/nodes/types/openapi';
 import { t } from 'i18next';
@@ -53,6 +66,48 @@ const buildIntegerFieldInputTemplate: FieldInputTemplateBuilder<IntegerFieldInpu
     type: fieldType,
     default: schemaObject.default ?? 0,
   };
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
+const buildIntegerFieldCollectionInputTemplate: FieldInputTemplateBuilder<IntegerFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: IntegerFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
 
   if (schemaObject.multipleOf !== undefined) {
     template.multipleOf = schemaObject.multipleOf;
@@ -111,6 +166,48 @@ const buildFloatFieldInputTemplate: FieldInputTemplateBuilder<FloatFieldInputTem
   return template;
 };
 
+const buildFloatFieldCollectionInputTemplate: FieldInputTemplateBuilder<FloatFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FloatFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
+  }
+
+  if (schemaObject.multipleOf !== undefined) {
+    template.multipleOf = schemaObject.multipleOf;
+  }
+
+  if (schemaObject.maximum !== undefined) {
+    template.maximum = schemaObject.maximum;
+  }
+
+  if (schemaObject.exclusiveMaximum !== undefined && isNumber(schemaObject.exclusiveMaximum)) {
+    template.exclusiveMaximum = schemaObject.exclusiveMaximum;
+  }
+
+  if (schemaObject.minimum !== undefined) {
+    template.minimum = schemaObject.minimum;
+  }
+
+  if (schemaObject.exclusiveMinimum !== undefined && isNumber(schemaObject.exclusiveMinimum)) {
+    template.exclusiveMinimum = schemaObject.exclusiveMinimum;
+  }
+
+  return template;
+};
+
 const buildStringFieldInputTemplate: FieldInputTemplateBuilder<StringFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -128,6 +225,36 @@ const buildStringFieldInputTemplate: FieldInputTemplateBuilder<StringFieldInputT
 
   if (schemaObject.maxLength !== undefined) {
     template.maxLength = schemaObject.maxLength;
+  }
+
+  return template;
+};
+
+const buildStringFieldCollectionInputTemplate: FieldInputTemplateBuilder<StringFieldCollectionInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: StringFieldCollectionInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? (schemaObject.orig_required ? [] : undefined),
+  };
+
+  if (schemaObject.minLength !== undefined) {
+    template.minLength = schemaObject.minLength;
+  }
+
+  if (schemaObject.maxLength !== undefined) {
+    template.maxLength = schemaObject.maxLength;
+  }
+
+  if (schemaObject.minItems !== undefined) {
+    template.minItems = schemaObject.minItems;
+  }
+
+  if (schemaObject.maxItems !== undefined) {
+    template.maxItems = schemaObject.maxItems;
   }
 
   return template;
@@ -514,6 +641,34 @@ const buildSchedulerFieldInputTemplate: FieldInputTemplateBuilder<SchedulerField
   return template;
 };
 
+const buildFloatGeneratorFieldInputTemplate: FieldInputTemplateBuilder<FloatGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FloatGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getFloatGeneratorArithmeticSequenceDefaults(),
+  };
+
+  return template;
+};
+
+const buildIntegerGeneratorFieldInputTemplate: FieldInputTemplateBuilder<IntegerGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: IntegerGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getIntegerGeneratorArithmeticSequenceDefaults(),
+  };
+
+  return template;
+};
+
 export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
   BoardField: buildBoardFieldInputTemplate,
   BooleanField: buildBooleanFieldInputTemplate,
@@ -542,6 +697,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
   ControlLoRAModelField: buildControlLoRAModelFieldInputTemplate,
+  FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
+  IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (
@@ -569,8 +726,25 @@ export const buildFieldInputTemplate = (
 
   if (isStatefulFieldType(fieldType)) {
     if (isImageCollectionFieldType(fieldType)) {
-      fieldType;
       return buildImageFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isStringCollectionFieldType(fieldType)) {
+      return buildStringFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isIntegerCollectionFieldType(fieldType)) {
+      return buildIntegerFieldCollectionInputTemplate({
+        schemaObject: fieldSchema,
+        baseField,
+        fieldType,
+      });
+    } else if (isFloatCollectionFieldType(fieldType)) {
+      return buildFloatFieldCollectionInputTemplate({
         schemaObject: fieldSchema,
         baseField,
         fieldType,

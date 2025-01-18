@@ -5,7 +5,7 @@ import NodeOpacitySlider from './NodeOpacitySlider';
 import ViewportControls from './ViewportControls';
 
 const BottomLeftPanel = () => (
-  <Flex gap={2} position="absolute" bottom={0} insetInlineStart={0}>
+  <Flex gap={2} position="absolute" bottom={2} insetInlineStart={2}>
     <ViewportControls />
     <NodeOpacitySlider />
   </Flex>

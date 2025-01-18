@@ -12,7 +12,7 @@ import { memo } from 'react';
 const TopCenterPanel = () => {
   const name = useAppSelector(selectWorkflowName);
   return (
-    <Flex gap={2} top={0} left={0} right={0} position="absolute" alignItems="flex-start" pointerEvents="none">
+    <Flex gap={2} top={2} left={2} right={2} position="absolute" alignItems="flex-start" pointerEvents="none">
       <Flex gap="2">
         <AddNodeButton />
         <UpdateNodesButton />
