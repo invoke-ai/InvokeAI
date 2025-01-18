@@ -40,6 +40,7 @@ export const FloatGeneratorParseStringSettings = memo(({ state, onChange }: Floa
           p={2}
           resize="none"
           rows={5}
+          fontSize='sm'
         />
       </FormControl>
     </Flex>
