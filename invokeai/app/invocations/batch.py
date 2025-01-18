@@ -90,6 +90,41 @@ class StringBatchInvocation(BaseBatchInvocation):
         raise NotExecutableNodeError()
 
 
+@invocation_output("string_generator_output")
+class StringGeneratorOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of strings"""
+
+    strings: list[str] = OutputField(description="The generated strings")
+
+
+class StringGeneratorField(BaseModel):
+    pass
+
+
+@invocation(
+    "string_generator",
+    title="String Generator",
+    tags=["primitives", "string", "number", "batch", "special"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class StringGenerator(BaseInvocation):
+    """Generated a range of strings for use in a batched generation"""
+
+    generator: StringGeneratorField = InputField(
+        description="The string generator.",
+        input=Input.Direct,
+        title="Generator Type",
+    )
+
+    def __init__(self):
+        raise NotExecutableNodeError()
+
+    def invoke(self, context: InvocationContext) -> StringGeneratorOutput:
+        raise NotExecutableNodeError()
+
+
 @invocation(
     "integer_batch",
     title="Integer Batch",
