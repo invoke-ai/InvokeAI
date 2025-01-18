@@ -1,4 +1,5 @@
 import { Checkbox, CompositeNumberInput, Flex, FormControl, FormLabel, Textarea } from '@invoke-ai/ui-library';
+import { LoadTextFromFileIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/LoadTextFromFileIconButton';
 import type { StringGeneratorDynamicPromptsRandom } from 'features/nodes/types/field';
 import { isNil, random } from 'lodash-es';
 import type { ChangeEvent } from 'react';
@@ -36,6 +37,13 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
         onChange({ ...state, seed, values: loadingValues });
       },
       [onChange, state, loadingValues]
+    );
+
+    const onLoadFile = useCallback(
+      (value: string) => {
+        onChange({ ...state, input: value });
+      },
+      [onChange, state]
     );
 
     const arg = useMemo(() => {
@@ -79,7 +87,7 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
             <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={1000} />
           </FormControl>
         </Flex>
-        <FormControl orientation="vertical">
+        <FormControl orientation="vertical" position="relative">
           <FormLabel>{t('common.input')}</FormLabel>
           <Textarea
             className="nowheel nodrag nopan"
@@ -90,6 +98,7 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
             rows={5}
             fontSize="sm"
           />
+          <LoadTextFromFileIconButton position="absolute" top={10} right={2} onLoadFile={onLoadFile} />
         </FormControl>
       </Flex>
     );

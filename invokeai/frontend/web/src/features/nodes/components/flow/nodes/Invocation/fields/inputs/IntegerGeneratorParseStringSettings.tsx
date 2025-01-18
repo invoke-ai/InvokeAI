@@ -1,4 +1,5 @@
 import { Flex, FormControl, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
+import { LoadTextFromFileIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/LoadTextFromFileIconButton';
 import type { IntegerGeneratorParseString } from 'features/nodes/types/field';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -26,13 +27,20 @@ export const IntegerGeneratorParseStringSettings = memo(
       [onChange, state]
     );
 
+    const onLoadFile = useCallback(
+      (value: string) => {
+        onChange({ ...state, input: value });
+      },
+      [onChange, state]
+    );
+
     return (
       <Flex gap={2} flexDir="column">
         <FormControl orientation="vertical">
           <FormLabel>{t('nodes.splitOn')}</FormLabel>
           <Input value={state.splitOn} onChange={onChangeSplitOn} />
         </FormControl>
-        <FormControl orientation="vertical">
+        <FormControl orientation="vertical" position="relative">
           <FormLabel>{t('common.input')}</FormLabel>
           <Textarea
             className="nowheel nodrag nopan"
@@ -43,6 +51,7 @@ export const IntegerGeneratorParseStringSettings = memo(
             rows={5}
             fontSize="sm"
           />
+          <LoadTextFromFileIconButton position="absolute" top={10} right={2} onLoadFile={onLoadFile} />
         </FormControl>
       </Flex>
     );

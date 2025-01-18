@@ -1,4 +1,5 @@
 import { CompositeNumberInput, Flex, FormControl, FormLabel, Textarea } from '@invoke-ai/ui-library';
+import { LoadTextFromFileIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/LoadTextFromFileIconButton';
 import type { StringGeneratorDynamicPromptsCombinatorial } from 'features/nodes/types/field';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo } from 'react';
@@ -46,13 +47,20 @@ export const StringGeneratorDynamicPromptsCombinatorialSettings = memo(
       }
     }, [data, isLoading, loadingValues, onChange, state]);
 
+    const onLoadFile = useCallback(
+      (value: string) => {
+        onChange({ ...state, input: value });
+      },
+      [onChange, state]
+    );
+
     return (
       <Flex gap={2} flexDir="column">
         <FormControl orientation="vertical">
           <FormLabel>{t('dynamicPrompts.maxPrompts')}</FormLabel>
-          <CompositeNumberInput value={state.maxPrompts} onChange={onChangeMaxPrompts} min={1} max={1000} w="full"/>
+          <CompositeNumberInput value={state.maxPrompts} onChange={onChangeMaxPrompts} min={1} max={1000} w="full" />
         </FormControl>
-        <FormControl orientation="vertical">
+        <FormControl orientation="vertical" position="relative">
           <FormLabel>{t('common.input')}</FormLabel>
           <Textarea
             className="nowheel nodrag nopan"
@@ -63,6 +71,7 @@ export const StringGeneratorDynamicPromptsCombinatorialSettings = memo(
             rows={5}
             fontSize="sm"
           />
+          <LoadTextFromFileIconButton position="absolute" top={10} right={2} onLoadFile={onLoadFile} />
         </FormControl>
       </Flex>
     );
