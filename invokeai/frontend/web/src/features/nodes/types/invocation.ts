@@ -108,6 +108,7 @@ const isGeneratorNode = (node: InvocationNode) => {
   switch (node.data.type) {
     case 'float_generator':
     case 'integer_generator':
+    case 'string_generator':
       return true;
     default:
       return false;

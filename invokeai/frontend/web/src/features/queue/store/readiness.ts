@@ -30,8 +30,10 @@ import {
   isIntegerGeneratorFieldInputInstance,
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
+  isStringGeneratorFieldInputInstance,
   resolveFloatGeneratorField,
   resolveIntegerGeneratorField,
+  resolveStringGeneratorField,
 } from 'features/nodes/types/field';
 import {
   validateImageFieldCollectionValue,
@@ -76,9 +78,21 @@ export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNo
     return ownValue;
   } else if (batchNode.data.type === 'string_batch') {
     assert(isStringFieldCollectionInputInstance(batchNode.data.inputs.strings));
-    const ownValue = batchNode.data.inputs.strings.value ?? [];
-    // no generators for strings yet
-    return ownValue;
+    const ownValue = batchNode.data.inputs.strings.value;
+    const edgeToStrings = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'strings');
+
+    if (!edgeToStrings) {
+      return ownValue ?? [];
+    }
+
+    const generatorNode = nodes.find((node) => node.id === edgeToStrings.source);
+    assert(generatorNode, 'Missing edge from string generator to string batch');
+
+    const generatorField = generatorNode.data.inputs['generator'];
+    assert(isStringGeneratorFieldInputInstance(generatorField), 'Invalid string generator');
+
+    const generatorValue = resolveStringGeneratorField(generatorField);
+    return generatorValue;
   } else if (batchNode.data.type === 'float_batch') {
     assert(isFloatFieldCollectionInputInstance(batchNode.data.inputs.floats));
     const ownValue = batchNode.data.inputs.floats.value;

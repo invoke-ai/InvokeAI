@@ -222,6 +222,10 @@ const zIntegerGeneratorFieldType = zFieldTypeBase.extend({
   name: z.literal('IntegerGeneratorField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zStringGeneratorFieldType = zFieldTypeBase.extend({
+  name: z.literal('StringGeneratorField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
@@ -252,6 +256,7 @@ const zStatefulFieldType = z.union([
   zSchedulerFieldType,
   zFloatGeneratorFieldType,
   zIntegerGeneratorFieldType,
+  zStringGeneratorFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -1290,6 +1295,69 @@ export const getIntegerGeneratorDefaults = (type: IntegerGeneratorFieldValue['ty
 };
 // #endregion
 
+// #region StringGeneratorField
+export const StringGeneratorParseStringType = 'string_generator_parse_string';
+const zStringGeneratorParseString = z.object({
+  type: z.literal(StringGeneratorParseStringType).default(StringGeneratorParseStringType),
+  input: z.string().default('foo,bar,baz,qux'),
+  splitOn: z.string().default(','),
+  values: z.array(z.string()).nullish(),
+});
+export type StringGeneratorParseString = z.infer<typeof zStringGeneratorParseString>;
+export const getStringGeneratorParseStringDefaults = () => zStringGeneratorParseString.parse({});
+const getStringGeneratorParseStringValues = (generator: StringGeneratorParseString) => {
+  const { input, splitOn } = generator;
+  let splitValues: string[] = [];
+  if (splitOn === '') {
+    // special case for empty splitOn
+    splitValues = [input];
+  } else {
+    // try to parse splitOn as a JSON string, this allows for special characters like \n
+    try {
+      splitValues = input.split(JSON.parse(`"${splitOn}"`));
+    } catch {
+      // if JSON parsing fails, just split on the string
+      splitValues = input.split(splitOn);
+    }
+  }
+  const values = splitValues.filter((s) => s.length > 0);
+  return values;
+};
+
+export const zStringGeneratorFieldValue = zStringGeneratorParseString;
+const zStringGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zStringGeneratorFieldValue,
+});
+const zStringGeneratorFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zStringGeneratorFieldType,
+  originalType: zFieldType.optional(),
+  default: zStringGeneratorFieldValue,
+});
+const zStringGeneratorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zStringGeneratorFieldType,
+});
+export type StringGeneratorFieldValue = z.infer<typeof zStringGeneratorFieldValue>;
+export type StringGeneratorFieldInputInstance = z.infer<typeof zStringGeneratorFieldInputInstance>;
+export type StringGeneratorFieldInputTemplate = z.infer<typeof zStringGeneratorFieldInputTemplate>;
+export const isStringGeneratorFieldInputInstance = buildTypeGuard(zStringGeneratorFieldInputInstance);
+export const isStringGeneratorFieldInputTemplate = buildTypeGuard(zStringGeneratorFieldInputTemplate);
+export const resolveStringGeneratorField = ({ value }: StringGeneratorFieldInputInstance) => {
+  if (value.values) {
+    return value.values;
+  }
+  if (value.type === StringGeneratorParseStringType) {
+    return getStringGeneratorParseStringValues(value);
+  }
+  assert(false, 'Invalid string generator type');
+};
+export const getStringGeneratorDefaults = (type: StringGeneratorFieldValue['type']) => {
+  if (type === StringGeneratorParseStringType) {
+    return getStringGeneratorParseStringDefaults();
+  }
+  assert(false, 'Invalid string generator type');
+};
+// #endregion
+
 // #region StatelessField
 /**
  * StatelessField is a catchall for stateless fields with no UI input components. They do not
@@ -1370,6 +1438,7 @@ export const zStatefulFieldValue = z.union([
   zSchedulerFieldValue,
   zFloatGeneratorFieldValue,
   zIntegerGeneratorFieldValue,
+  zStringGeneratorFieldValue,
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1409,6 +1478,7 @@ const zStatefulFieldInputInstance = z.union([
   zSchedulerFieldInputInstance,
   zFloatGeneratorFieldInputInstance,
   zIntegerGeneratorFieldInputInstance,
+  zStringGeneratorFieldInputInstance,
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
@@ -1452,6 +1522,7 @@ const zStatefulFieldInputTemplate = z.union([
   zStatelessFieldInputTemplate,
   zFloatGeneratorFieldInputTemplate,
   zIntegerGeneratorFieldInputTemplate,
+  zStringGeneratorFieldInputTemplate,
 ]);
 
 export const zFieldInputTemplate = z.union([zStatefulFieldInputTemplate, zStatelessFieldInputTemplate]);
@@ -1488,6 +1559,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zSchedulerFieldOutputTemplate,
   zFloatGeneratorFieldOutputTemplate,
   zIntegerGeneratorFieldOutputTemplate,
+  zStringGeneratorFieldOutputTemplate,
 ]);
 
 export const zFieldOutputTemplate = z.union([zStatefulFieldOutputTemplate, zStatelessFieldOutputTemplate]);

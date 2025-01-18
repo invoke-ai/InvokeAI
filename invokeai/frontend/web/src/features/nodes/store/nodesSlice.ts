@@ -33,6 +33,7 @@ import type {
   StatefulFieldValue,
   StringFieldCollectionValue,
   StringFieldValue,
+  StringGeneratorFieldValue,
   T2IAdapterModelFieldValue,
   T5EncoderModelFieldValue,
   VAEModelFieldValue,
@@ -66,6 +67,7 @@ import {
   zStatefulFieldValue,
   zStringFieldCollectionValue,
   zStringFieldValue,
+  zStringGeneratorFieldValue,
   zT2IAdapterModelFieldValue,
   zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
@@ -404,6 +406,9 @@ export const nodesSlice = createSlice({
     fieldIntegerGeneratorValueChanged: (state, action: FieldValueAction<IntegerGeneratorFieldValue>) => {
       fieldValueReducer(state, action, zIntegerGeneratorFieldValue);
     },
+    fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StringGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zStringGeneratorFieldValue);
+    },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -470,6 +475,7 @@ export const {
   fieldFluxVAEModelValueChanged,
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
+  fieldStringGeneratorValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

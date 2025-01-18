@@ -199,6 +199,8 @@ export const parseSchema = (
           fieldType.batch = true;
         } else if (type === 'integer_generator' && propertyName === 'integers') {
           fieldType.batch = true;
+        } else if (type === 'string_generator' && propertyName === 'strings') {
+          fieldType.batch = true;
         }
 
         const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);
