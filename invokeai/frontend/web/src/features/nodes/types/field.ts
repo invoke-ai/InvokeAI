@@ -1363,7 +1363,7 @@ const zStringGeneratorDynamicPromptsCombinatorial = z.object({
   values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorDynamicPromptsCombinatorial = z.infer<typeof zStringGeneratorDynamicPromptsCombinatorial>;
-export const getStringGeneratorDynamicPromptsCombinatorialDefaults = () =>
+const getStringGeneratorDynamicPromptsCombinatorialDefaults = () =>
   zStringGeneratorDynamicPromptsCombinatorial.parse({});
 const getStringGeneratorDynamicPromptsCombinatorialValues = (generator: StringGeneratorDynamicPromptsCombinatorial) => {
   const { values } = generator;
@@ -1379,7 +1379,7 @@ const zStringGeneratorDynamicPromptsRandom = z.object({
   values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorDynamicPromptsRandom = z.infer<typeof zStringGeneratorDynamicPromptsRandom>;
-export const getStringGeneratorDynamicPromptsRandomDefaults = () => zStringGeneratorDynamicPromptsRandom.parse({});
+const getStringGeneratorDynamicPromptsRandomDefaults = () => zStringGeneratorDynamicPromptsRandom.parse({});
 const getStringGeneratorDynamicPromptsRandomValues = (generator: StringGeneratorDynamicPromptsRandom) => {
   const { values } = generator;
   return values ?? [];
