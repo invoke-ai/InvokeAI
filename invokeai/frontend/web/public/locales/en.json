@@ -870,6 +870,7 @@
         "generatorNRandomValues_other": "{{count}} random values",
         "generatorNoValues": "empty",
         "generatorLoading": "loading",
+        "generatorLoadFromFile": "Load from File",
         "dynamicPromptsRandom": "Dynamic Prompts (Random)",
         "dynamicPromptsCombinatorial": "Dynamic Prompts (Combinatorial)",
         "addNode": "Add Node",

@@ -62,8 +62,8 @@ export const GeneratorTextareaWithFileUpload = memo(({ value, onChange }: Props)
         {t('common.input')}
         <Spacer />
         <IconButton
-          tooltip="Load from file"
-          aria-label="Load from file"
+          tooltip={t('nodes.generatorLoadFromFile')}
+          aria-label={t('nodes.generatorLoadFromFile')}
           icon={<PiUploadFill />}
           variant="link"
           {...getRootProps()}
