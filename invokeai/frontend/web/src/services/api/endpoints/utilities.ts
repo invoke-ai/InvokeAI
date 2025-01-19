@@ -29,4 +29,4 @@ export const utilitiesApi = api.injectEndpoints({
   }),
 });
 
-export const { useDynamicPromptsQuery, useLazyDynamicPromptsQuery } = utilitiesApi;
+export const { useDynamicPromptsQuery } = utilitiesApi;

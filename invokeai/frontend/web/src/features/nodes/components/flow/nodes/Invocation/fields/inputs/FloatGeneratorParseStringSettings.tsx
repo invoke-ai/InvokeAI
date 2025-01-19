@@ -48,7 +48,7 @@ export const FloatGeneratorParseStringSettings = memo(({ state, onChange }: Floa
           p={2}
           resize="none"
           rows={5}
-          fontSize='sm'
+          fontSize="sm"
         />
         <LoadTextFromFileIconButton position="absolute" top={10} right={2} onLoadFile={onLoadFile} />
       </FormControl>
