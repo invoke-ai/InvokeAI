@@ -1,8 +1,7 @@
-import { Checkbox, CompositeNumberInput, Flex, FormControl, FormLabel, Textarea } from '@invoke-ai/ui-library';
-import { LoadTextFromFileIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/LoadTextFromFileIconButton';
+import { Checkbox, CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { GeneratorTextareaWithFileUpload } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/GeneratorTextareaWithFileUpload';
 import type { StringGeneratorDynamicPromptsRandom } from 'features/nodes/types/field';
 import { isNil, random } from 'lodash-es';
-import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDynamicPromptsQuery } from 'services/api/endpoints/utilities';
@@ -18,8 +17,8 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
     const loadingValues = useMemo(() => [`<${t('nodes.generatorLoading')}>`], [t]);
 
     const onChangeInput = useCallback(
-      (e: ChangeEvent<HTMLTextAreaElement>) => {
-        onChange({ ...state, input: e.target.value, values: loadingValues });
+      (input: string) => {
+        onChange({ ...state, input, values: loadingValues });
       },
       [onChange, state, loadingValues]
     );
@@ -37,13 +36,6 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
         onChange({ ...state, seed, values: loadingValues });
       },
       [onChange, state, loadingValues]
-    );
-
-    const onLoadFile = useCallback(
-      (value: string) => {
-        onChange({ ...state, input: value });
-      },
-      [onChange, state]
     );
 
     const arg = useMemo(() => {
@@ -87,19 +79,7 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
             <CompositeNumberInput value={state.count} onChange={onChangeCount} min={1} max={1000} />
           </FormControl>
         </Flex>
-        <FormControl orientation="vertical" position="relative">
-          <FormLabel>{t('common.input')}</FormLabel>
-          <Textarea
-            className="nowheel nodrag nopan"
-            value={state.input}
-            onChange={onChangeInput}
-            p={2}
-            resize="none"
-            rows={5}
-            fontSize="sm"
-          />
-          <LoadTextFromFileIconButton position="absolute" top={10} right={2} onLoadFile={onLoadFile} />
-        </FormControl>
+        <GeneratorTextareaWithFileUpload value={state.input} onChange={onChangeInput} />
       </Flex>
     );
   }
