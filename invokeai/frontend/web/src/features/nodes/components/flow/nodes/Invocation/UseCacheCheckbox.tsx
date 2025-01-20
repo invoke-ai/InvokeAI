@@ -23,7 +23,7 @@ const UseCacheCheckbox = ({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
   return (
     <FormControl>
-      <FormLabel>{t('invocationCache.useCache')}</FormLabel>
+      <FormLabel m={0}>{t('invocationCache.useCache')}</FormLabel>
       <Checkbox className="nopan" onChange={handleChange} isChecked={useCache} />
     </FormControl>
   );

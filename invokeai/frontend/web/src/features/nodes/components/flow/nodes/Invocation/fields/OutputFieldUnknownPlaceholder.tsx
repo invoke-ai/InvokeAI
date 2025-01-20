@@ -1,6 +1,6 @@
 import { FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { OutputFieldWrapper } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldWrapper';
-import { useFieldOutputName } from 'features/nodes/hooks/useFieldOutputName';
+import { useOutputFieldName } from 'features/nodes/hooks/useOutputFieldName';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,10 +11,10 @@ type Props = {
 
 export const OutputFieldUnknownPlaceholder = memo(({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
-  const name = useFieldOutputName(nodeId, fieldName);
+  const name = useOutputFieldName(nodeId, fieldName);
 
   return (
-    <OutputFieldWrapper shouldDim={false}>
+    <OutputFieldWrapper>
       <FormControl isInvalid={true} alignItems="stretch" justifyContent="space-between" gap={2} h="full" w="full">
         <FormLabel display="flex" alignItems="center" h="full" color="error.300" mb={0} px={1} gap={2}>
           {t('nodes.unknownOutput', { name })}

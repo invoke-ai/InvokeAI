@@ -11,19 +11,8 @@ const sx = {
   transitionProperty: 'opacity',
   transitionDuration: '0.1s',
   justifyContent: 'flex-end',
-  '&[data-should-dim="true"]': {
-    opacity: 0.5,
-  },
 } satisfies SystemStyleObject;
 
-type OutputFieldWrapperProps = PropsWithChildren<{
-  shouldDim: boolean;
-}>;
-
-export const OutputFieldWrapper = memo(({ shouldDim, children }: OutputFieldWrapperProps) => (
-  <Flex sx={sx} data-should-dim={shouldDim}>
-    {children}
-  </Flex>
-));
+export const OutputFieldWrapper = memo(({ children }: PropsWithChildren) => <Flex sx={sx}>{children}</Flex>);
 
 OutputFieldWrapper.displayName = 'OutputFieldWrapper';

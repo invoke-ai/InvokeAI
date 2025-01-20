@@ -3,9 +3,9 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useConnection } from 'features/nodes/hooks/useConnection';
-import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
-import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
+import { useNodeCopyPaste } from 'features/nodes/hooks/useNodeCopyPaste';
+import { useSyncExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $addNodeCmdk,
@@ -208,7 +208,7 @@ export const Flow = memo(() => {
 
   // #endregion
 
-  const { copySelection, pasteSelection, pasteSelectionWithEdges } = useCopyPaste();
+  const { copySelection, pasteSelection, pasteSelectionWithEdges } = useNodeCopyPaste();
 
   useRegisteredHotkeys({
     id: 'copySelection',
