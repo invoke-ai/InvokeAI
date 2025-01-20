@@ -75,10 +75,10 @@ export const StringGeneratorFieldInputComponent = memo(
       <Flex flexDir="column" gap={2}>
         <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
           <option value={StringGeneratorParseStringType}>{t('nodes.parseString')}</option>
-          <option value={StringGeneratorDynamicPromptsRandomType}>{t('nodes.dynamicPromptsRandom')}</option>
+          {/* <option value={StringGeneratorDynamicPromptsRandomType}>{t('nodes.dynamicPromptsRandom')}</option>
           <option value={StringGeneratorDynamicPromptsCombinatorialType}>
             {t('nodes.dynamicPromptsCombinatorial')}
-          </option>
+          </option> */}
         </Select>
         {field.value.type === StringGeneratorParseStringType && (
           <StringGeneratorParseStringSettings state={field.value} onChange={onChange} />
