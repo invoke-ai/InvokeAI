@@ -5,7 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
+import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectLastSelectedNode, selectNodesSlice } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -35,7 +35,7 @@ const InspectorOutputsTab = () => {
     [templates]
   );
   const data = useAppSelector(selector);
-  const nes = useExecutionState(data?.nodeId);
+  const nes = useNodeExecutionState(data?.nodeId);
   const { t } = useTranslation();
 
   if (!data || !nes) {
