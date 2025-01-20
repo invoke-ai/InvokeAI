@@ -1,5 +1,6 @@
 import { Checkbox, CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { GeneratorTextareaWithFileUpload } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/GeneratorTextareaWithFileUpload';
+import { useViewContext } from 'features/nodes/contexts/ViewContext';
 import type { StringGeneratorDynamicPromptsRandom } from 'features/nodes/types/field';
 import { isNil, random } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
@@ -14,6 +15,7 @@ type StringGeneratorDynamicPromptsRandomSettingsProps = {
 export const StringGeneratorDynamicPromptsRandomSettings = memo(
   ({ state, onChange }: StringGeneratorDynamicPromptsRandomSettingsProps) => {
     const { t } = useTranslation();
+    const view = useViewContext();
     const loadingValues = useMemo(() => [`<${t('nodes.generatorLoading')}>`], [t]);
 
     const onChangeInput = useCallback(
@@ -39,22 +41,25 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
     );
 
     const arg = useMemo(() => {
-      const { input, count, seed } = state;
-      return { prompt: input, max_prompts: count, combinatorial: false, seed: seed ?? random() };
-    }, [state]);
+      return { prompt: state.input, max_prompts: state.count, combinatorial: false, seed: state.seed ?? random() };
+    }, [state.count, state.input, state.seed]);
+
     const [debouncedArg] = useDebounce(arg, 300);
 
     const { data, isLoading } = useDynamicPromptsQuery(debouncedArg);
 
     useEffect(() => {
       if (isLoading) {
-        onChange({ ...state, values: loadingValues });
-      } else if (data) {
-        onChange({ ...state, values: data.prompts });
-      } else {
-        onChange({ ...state, values: [] });
+        return;
       }
-    }, [data, isLoading, loadingValues, onChange, state]);
+
+      if (!data) {
+        onChange({ ...state, values: [] });
+        return;
+      }
+
+      onChange({ ...state, values: data.prompts });
+    }, [data, isLoading, onChange, state, view]);
 
     return (
       <Flex gap={2} flexDir="column">
