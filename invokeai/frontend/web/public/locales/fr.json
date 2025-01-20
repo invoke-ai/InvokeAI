@@ -352,7 +352,6 @@
             "noT5EncoderModelSelected": "Aucun modèle T5 Encoder sélectionné pour la génération FLUX",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la largeur de la bounding box mise à l'échelle est {{width}}",
             "canvasIsCompositing": "La toile est en train de composer",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} collection vide",
             "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}} : trop peu d'éléments, minimum {{minItems}}",
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}} : trop d'éléments, maximum {{maxItems}}",
             "canvasIsSelectingObject": "La toile est occupée (sélection d'objet)"
@@ -2171,8 +2170,6 @@
         "toGetStarted": "Pour commencer, saisissez un prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement dans la <StrongComponent>Galerie</StrongComponent> ou de les modifier sur la <StrongComponent>Toile</StrongComponent>.",
         "gettingStartedSeries": "Vous souhaitez plus de conseils ? Consultez notre <LinkComponent>Série de démarrage</LinkComponent> pour des astuces sur l'exploitation du plein potentiel de l'Invoke Studio.",
         "noModelsInstalled": "Il semble qu'aucun modèle ne soit installé",
-        "downloadStarterModels": "Télécharger les modèles de démarrage",
-        "importModels": "Importer des Modèles",
         "toGetStartedLocal": "Pour commencer, assurez-vous de télécharger ou d'importer des modèles nécessaires pour exécuter Invoke. Ensuite, saisissez le prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement sur <StrongComponent>Galerie</StrongComponent> ou les modifier sur la <StrongComponent>Toile</StrongComponent>."
     },
     "upsell": {

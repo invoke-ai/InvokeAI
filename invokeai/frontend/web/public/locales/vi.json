@@ -220,7 +220,15 @@
         "tab": "Tab",
         "loadingModel": "Đang Tải Model",
         "generating": "Đang Tạo Sinh",
-        "warnings": "Cảnh Báo"
+        "warnings": "Cảnh Báo",
+        "count": "Đếm",
+        "step": "Bước",
+        "values": "Giá Trị",
+        "start": "Bắt Đầu",
+        "end": "Kết Thúc",
+        "min": "Tối Thiểu",
+        "max": "Tối Đa",
+        "resetToDefaults": "Đặt Lại Về Mặc Định"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -965,7 +973,19 @@
         "outputFieldTypeParseError": "Không thể phân tích loại dữ liệu đầu ra của {{node}}.{{field}} ({{message}})",
         "modelAccessError": "Không thể tìm thấy model {{key}}, chuyển về mặc định",
         "internalDesc": "Trình kích hoạt này được dùng bên trong bởi Invoke. Nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng và có thể bị xoá bất cứ lúc nào.",
-        "specialDesc": "Trình kích hoạt này có một số xử lý đặc biệt trong ứng dụng. Ví dụ, Node Hàng Loạt được dùng để xếp vào nhiều đồ thị từ một workflow."
+        "specialDesc": "Trình kích hoạt này có một số xử lý đặc biệt trong ứng dụng. Ví dụ, Node Hàng Loạt được dùng để xếp vào nhiều đồ thị từ một workflow.",
+        "addItem": "Thêm Mục",
+        "generateValues": "Cho Ra Giá Trị",
+        "floatRangeGenerator": "Phạm Vị Tạo Ra Số Thực",
+        "integerRangeGenerator": "Phạm Vị Tạo Ra Số Nguyên",
+        "linearDistribution": "Phân Bố Tuyến Tính",
+        "uniformRandomDistribution": "Phân Bố Ngẫu Nhiên Đồng Nhất",
+        "parseString": "Phân Tích Chuỗi",
+        "noBatchGroup": "không có nhóm",
+        "generatorNoValues": "trống",
+        "splitOn": "Tách Ở",
+        "arithmeticSequence": "Cấp Số Cộng",
+        "generatorNRandomValues_other": "{{count}} giá trị ngẫu nhiên"
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -1433,13 +1453,24 @@
             "missingNodeTemplate": "Thiếu mẫu trình bày node",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều dài hộp giới hạn là {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều rộng hộp giới hạn là {{width}}",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: thiếu đầu vào",
+            "missingInputForField": "thiếu đầu vào",
             "missingFieldTemplate": "Thiếu vùng mẫu trình bày",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} tài nguyên trống",
-            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: quá ít mục, tối thiểu {{minItems}}",
-            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: quá nhiều mục, tối đa {{maxItems}}",
+            "collectionTooFewItems": "quá ít mục, tối thiểu là {{minItems}}",
+            "collectionTooManyItems": "quá nhiều mục, tối đa là {{maxItems}}",
             "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)",
-            "fluxModelMultipleControlLoRAs": "Chỉ có thể dùng 1 LoRA Điều Khiển Được"
+            "fluxModelMultipleControlLoRAs": "Chỉ có thể dùng 1 LoRA Điều Khiển Được",
+            "collectionStringTooLong": "quá dài, tối đa là {{maxLength}}",
+            "collectionStringTooShort": "quá ngắn, tối thiểu là {{minLength}}",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (giá trị tối đa)",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (giá trị tối thiểu)",
+            "collectionNumberNotMultipleOf": "{{value}} không phải bội của {{multipleOf}}",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (giá trị chọn lọc tối thiểu)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (giá trị chọn lọc tối đa)",
+            "batchNodeCollectionSizeMismatch": "Kích cỡ tài nguyên không phù hợp với Lô {{batchGroupId}}",
+            "emptyBatches": "lô trống",
+            "batchNodeNotConnected": "Node Hàng Loạt chưa được kết nối: {{label}}",
+            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng",
+            "invalidBatchConfigurationCannotCalculate": "Thiết lập lô không hợp lệ; không thể tính toán"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -1458,8 +1489,8 @@
         "recallMetadata": "Gợi Lại Metadata",
         "clipSkip": "CLIP Skip",
         "general": "Cài Đặt Chung",
-        "boxBlur": "Box Blur",
-        "gaussianBlur": "Gaussian Blur",
+        "boxBlur": "Làm Mờ Dạng Box",
+        "gaussianBlur": "Làm Mờ Dạng Gaussian",
         "staged": "Staged (Tăng khử nhiễu có hệ thống)",
         "scaledHeight": "Tỉ Lệ Dài",
         "cancel": {
@@ -1859,7 +1890,25 @@
             },
             "advanced": "Nâng Cao",
             "processingLayerWith": "Đang xử lý layer với bộ lọc {{type}}.",
-            "forMoreControl": "Để kiểm soát tốt hơn, bấm vào mục Nâng Cao bên dưới."
+            "forMoreControl": "Để kiểm soát tốt hơn, bấm vào mục Nâng Cao bên dưới.",
+            "img_blur": {
+                "description": "Làm mờ layer được chọn.",
+                "blur_type": "Dạng Làm Mờ",
+                "blur_radius": "Radius",
+                "gaussian_type": "Gaussian",
+                "label": "Làm Mờ Ảnh",
+                "box_type": "Box"
+            },
+            "img_noise": {
+                "salt_and_pepper_type": "Salt and Pepper",
+                "noise_amount": "Lượng Nhiễu",
+                "label": "Độ Nhiễu Ảnh",
+                "description": "Tăng độ nhiễu vào layer được chọn.",
+                "noise_type": "Dạng Nhiễu",
+                "gaussian_type": "Gaussian",
+                "noise_color": "Màu Nhiễu",
+                "size": "Cỡ Nhiễu"
+            }
         },
         "transform": {
             "fitModeCover": "Che Phủ",
@@ -2067,7 +2116,8 @@
         "problemCopyingImage": "Không Thể Sao Chép Ảnh",
         "problemDownloadingImage": "Không Thể Tải Xuống Ảnh",
         "problemCopyingLayer": "Không Thể Sao Chép Layer",
-        "problemSavingLayer": "Không Thể Lưu Layer"
+        "problemSavingLayer": "Không Thể Lưu Layer",
+        "outOfMemoryErrorDescLocal": "Làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi để hạn chế OOM (Tràn bộ nhớ)."
     },
     "ui": {
         "tabs": {
@@ -2153,9 +2203,8 @@
         "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Cần thêm hướng dẫn? Xem thử <LinkComponent>Bắt Đầu Làm Quen</LinkComponent> để biết thêm mẹo khai thác toàn bộ tiềm năng của Invoke Studio.",
         "toGetStarted": "Để bắt đầu, hãy nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
-        "downloadStarterModels": "Tải Xuống Model Khởi Đầu",
-        "importModels": "Nhập Vào Model",
-        "noModelsInstalled": "Hình như bạn không có model nào được tải cả"
+        "noModelsInstalled": "Dường như bạn chưa tải model nào cả! Bạn có thể <DownloadStarterModelsButton>tải xuống các model khởi đầu</DownloadStarterModelsButton> hoặc <ImportModelsButton>nhập vào thêm model</ImportModelsButton>.",
+        "lowVRAMMode": "Cho hiệu suất tốt nhất, hãy làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Có Gì Mới Ở Invoke",
@@ -2163,7 +2212,10 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "<StrongComponent>Hướng Dẫn Khu Vực FLUX (beta)</StrongComponent>: Bản beta của Hướng Dẫn Khu Vực FLUX của chúng ta đã có mắt tại bảng điều khiển lệnh khu vực."
+            "Chế độ VRAM thấp",
+            "Trình quản lý bộ nhớ động",
+            "Tải model nhanh hơn",
+            "Ít lỗi bộ nhớ hơn"
         ]
     },
     "upsell": {

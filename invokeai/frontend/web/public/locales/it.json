@@ -97,7 +97,14 @@
         "ok": "Ok",
         "generating": "Generazione",
         "loadingModel": "Caricamento del modello",
-        "warnings": "Avvisi"
+        "warnings": "Avvisi",
+        "step": "Passo",
+        "values": "Valori",
+        "start": "Inizio",
+        "end": "Fine",
+        "resetToDefaults": "Ripristina le impostazioni predefinite",
+        "seed": "Seme",
+        "combinatorial": "Combinatorio"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -668,7 +675,7 @@
             "addingImagesTo": "Aggiungi immagini a",
             "systemDisconnected": "Sistema disconnesso",
             "missingNodeTemplate": "Modello di nodo mancante",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: ingresso mancante",
+            "missingInputForField": "ingresso mancante",
             "missingFieldTemplate": "Modello di campo mancante",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), altezza riquadro è {{height}}",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza riquadro è {{width}}",
@@ -681,11 +688,22 @@
             "canvasIsRasterizing": "La tela è occupata (sta rasterizzando)",
             "canvasIsCompositing": "La tela è occupata (in composizione)",
             "canvasIsFiltering": "La tela è occupata (sta filtrando)",
-            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi elementi, massimo {{maxItems}}",
+            "collectionTooManyItems": "troppi elementi, massimo {{maxItems}}",
             "canvasIsSelectingObject": "La tela è occupata (selezione dell'oggetto)",
-            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi pochi elementi, minimo {{minItems}}",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} raccolta vuota",
-            "fluxModelMultipleControlLoRAs": "È possibile utilizzare solo 1 Controllo LoRA alla volta"
+            "collectionTooFewItems": "troppi pochi elementi, minimo {{minItems}}",
+            "fluxModelMultipleControlLoRAs": "È possibile utilizzare solo 1 Controllo LoRA alla volta",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (incr max)",
+            "collectionStringTooLong": "troppo lungo, massimo {{maxLength}}",
+            "batchNodeNotConnected": "Nodo Lotto non connesso: {{label}}",
+            "batchNodeEmptyCollection": "Alcuni nodi lotto hanno raccolte vuote",
+            "emptyBatches": "lotti vuoti",
+            "batchNodeCollectionSizeMismatch": "Le dimensioni della raccolta nel Lotto {{batchGroupId}} non corrispondono",
+            "invalidBatchConfigurationCannotCalculate": "Configurazione lotto non valida; impossibile calcolare",
+            "collectionStringTooShort": "troppo corto, minimo {{minLength}}",
+            "collectionNumberNotMultipleOf": "{{value}} non è multiplo di {{multipleOf}}",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (incr min)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (excl max)",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (excl min)"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -813,7 +831,8 @@
         "imagesWillBeAddedTo": "Le immagini caricate verranno aggiunte alle risorse della bacheca {{boardName}}.",
         "uploadFailedInvalidUploadDesc_withCount_one": "Devi caricare al massimo 1 immagine PNG o JPEG.",
         "uploadFailedInvalidUploadDesc_withCount_many": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
-        "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG o JPEG."
+        "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
+        "outOfMemoryErrorDescLocal": "Segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent> per ridurre gli OOM."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -972,7 +991,25 @@
         "noWorkflows": "Nessun flusso di lavoro",
         "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>.",
         "specialDesc": "Questa invocazione comporta una gestione speciale nell'applicazione. Ad esempio, i nodi Lotto vengono utilizzati per mettere in coda più grafici da un singolo flusso di lavoro.",
-        "internalDesc": "Questa invocazione è utilizzata internamente da Invoke. Potrebbe subire modifiche significative durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento."
+        "internalDesc": "Questa invocazione è utilizzata internamente da Invoke. Potrebbe subire modifiche significative durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento.",
+        "addItem": "Aggiungi elemento",
+        "generateValues": "Genera valori",
+        "generatorNoValues": "vuoto",
+        "linearDistribution": "Distribuzione lineare",
+        "parseString": "Analizza stringa",
+        "splitOn": "Diviso su",
+        "noBatchGroup": "nessun gruppo",
+        "generatorLoading": "caricamento",
+        "generatorLoadFromFile": "Carica da file",
+        "dynamicPromptsRandom": "Prompt dinamici (casuali)",
+        "dynamicPromptsCombinatorial": "Prompt dinamici (combinatori)",
+        "floatRangeGenerator": "Generatore di intervalli di numeri in virgola mobile",
+        "integerRangeGenerator": "Generatore di intervalli di numeri interi",
+        "uniformRandomDistribution": "Distribuzione casuale uniforme",
+        "generatorNRandomValues_one": "{{count}} valore casuale",
+        "generatorNRandomValues_many": "{{count}} valori casuali",
+        "generatorNRandomValues_other": "{{count}} valori casuali",
+        "arithmeticSequence": "Sequenza aritmetica"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1138,7 +1175,8 @@
         "dynamicPrompts": "Prompt dinamici",
         "promptsPreview": "Anteprima dei prompt",
         "showDynamicPrompts": "Mostra prompt dinamici",
-        "loading": "Generazione prompt dinamici..."
+        "loading": "Generazione prompt dinamici...",
+        "promptsToGenerate": "Prompt da generare"
     },
     "popovers": {
         "paramScheduler": {
@@ -1907,7 +1945,24 @@
             },
             "forMoreControl": "Per un maggiore controllo, fare clic su Avanzate qui sotto.",
             "advanced": "Avanzate",
-            "processingLayerWith": "Elaborazione del livello con il filtro {{type}}."
+            "processingLayerWith": "Elaborazione del livello con il filtro {{type}}.",
+            "img_blur": {
+                "label": "Sfoca immagine",
+                "description": "Sfoca il livello selezionato.",
+                "blur_type": "Tipo di sfocatura",
+                "blur_radius": "Raggio",
+                "gaussian_type": "Gaussiana"
+            },
+            "img_noise": {
+                "size": "Dimensione del rumore",
+                "salt_and_pepper_type": "Sale e pepe",
+                "gaussian_type": "Gaussiano",
+                "noise_color": "Rumore colorato",
+                "description": "Aggiunge rumore al livello selezionato.",
+                "noise_type": "Tipo di rumore",
+                "label": "Aggiungi rumore",
+                "noise_amount": "Quantità"
+            }
         },
         "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",
         "regionalGuidance_withCount_hidden": "Guida regionale ({{count}} nascosti)",
@@ -2166,10 +2221,9 @@
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
         "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
-        "importModels": "Importa modelli",
-        "downloadStarterModels": "Scarica i modelli per iniziare",
-        "noModelsInstalled": "Sembra che tu non abbia installato alcun modello",
-        "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
+        "noModelsInstalled": "Sembra che non hai installato alcun modello! Puoi <DownloadStarterModelsButton>scaricare un pacchetto di modelli di avvio</DownloadStarterModelsButton> o <ImportModelsButton>importare modelli</ImportModelsButton>.",
+        "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
+        "lowVRAMMode": "Per prestazioni ottimali, segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent>."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Novità in Invoke",
@@ -2177,7 +2231,10 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>Livelli di controllo Flux</StrongComponent>: nuovi modelli di controllo per il rilevamento dei bordi e la mappatura della profondità sono ora supportati per i modelli di Flux dev."
+            "Modalità Bassa-VRAM",
+            "Gestione dinamica della memoria",
+            "Tempi di caricamento del modello più rapidi",
+            "Meno errori di memoria"
         ]
     },
     "system": {

@@ -901,9 +901,7 @@
         }
     },
     "newUserExperience": {
-        "downloadStarterModels": "Descargar modelos de inicio",
         "toGetStarted": "Para empezar, introduzca un mensaje en el cuadro y haga clic en <StrongComponent>Invocar</StrongComponent> para generar su primera imagen. Seleccione una plantilla para mejorar los resultados. Puede elegir guardar sus imágenes directamente en <StrongComponent>Galería</StrongComponent> o editarlas en <StrongComponent>Lienzo</StrongComponent>.",
-        "importModels": "Importar modelos",
         "noModelsInstalled": "Parece que no tienes ningún modelo instalado",
         "gettingStartedSeries": "¿Desea más orientación? Consulte nuestra <LinkComponent>Serie de introducción</LinkComponent> para obtener consejos sobre cómo aprovechar todo el potencial de Invoke Studio.",
         "toGetStartedLocal": "Para empezar, asegúrate de descargar o importar los modelos necesarios para ejecutar Invoke. A continuación, introduzca un mensaje en el cuadro y haga clic en <StrongComponent>Invocar</StrongComponent> para generar su primera imagen. Seleccione una plantilla para mejorar los resultados. Puede elegir guardar sus imágenes directamente en <StrongComponent>Galería</StrongComponent> o editarlas en el <StrongComponent>Lienzo</StrongComponent>."
