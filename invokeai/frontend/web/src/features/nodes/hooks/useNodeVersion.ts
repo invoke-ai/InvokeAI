@@ -3,17 +3,16 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { selectInvocationNode, selectNodesSlice } from 'features/nodes/store/selectors';
 import { useMemo } from 'react';
 
-export const useInvocationNodeNotes = (nodeId: string): string => {
+export const useNodeVersion = (nodeId: string) => {
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) => {
-        const node = selectInvocationNode(nodes, nodeId);
-        return node.data.notes;
+      createSelector(selectNodesSlice, (nodesSlice) => {
+        const node = selectInvocationNode(nodesSlice, nodeId);
+        return node.data.version;
       }),
     [nodeId]
   );
 
-  const notes = useAppSelector(selector);
-
-  return notes;
+  const version = useAppSelector(selector);
+  return version;
 };

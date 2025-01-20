@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
 import { useMemo } from 'react';
 
-export const useIsIntermediate = (nodeId: string): boolean => {
+export const useNodeIsIntermediate = (nodeId: string): boolean => {
   const selector = useMemo(
     () =>
       createSelector(selectNodesSlice, (nodes) => {
