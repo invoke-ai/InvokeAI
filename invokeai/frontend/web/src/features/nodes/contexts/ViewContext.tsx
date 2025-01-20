@@ -2,12 +2,14 @@ import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext } from 'react';
 import { assert } from 'tsafe';
 
-type ViewType = 'linear-user' | 'linear-editor' | 'nodes-editor';
+type View = 'view-mode-linear' | 'edit-mode-linear' | 'edit-mode-nodes';
 
-const ViewContext = createContext<ViewType | null>(null);
+const ViewContext = createContext<View | null>(null);
 
-export const ViewContextProvider = memo((props: PropsWithChildren<{ viewType: ViewType }>) => {
-  return <ViewContext.Provider value={props.viewType}>{props.children}</ViewContext.Provider>;
+type Props = PropsWithChildren<{ view: View }>;
+
+export const ViewContextProvider = memo((props: Props) => {
+  return <ViewContext.Provider value={props.view}>{props.children}</ViewContext.Provider>;
 });
 
 ViewContextProvider.displayName = 'ViewContextProvider';
