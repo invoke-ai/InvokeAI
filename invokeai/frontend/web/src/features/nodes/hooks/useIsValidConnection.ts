@@ -1,4 +1,3 @@
-// TODO: enable this at some point
 import { useStore } from '@nanostores/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { $edgePendingUpdate, $templates } from 'features/nodes/store/nodesSlice';
@@ -7,11 +6,6 @@ import { validateConnection } from 'features/nodes/store/util/validateConnection
 import { selectShouldShouldValidateGraph } from 'features/nodes/store/workflowSettingsSlice';
 import { useCallback } from 'react';
 import type { Connection } from 'reactflow';
-
-/**
- * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
- * TODO: Figure out how to do this without duplicating all the logic
- */
 
 export const useIsValidConnection = () => {
   const store = useAppStore();
