@@ -98,7 +98,7 @@ class FLUXLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a FLUX transformer."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=[], description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
     )
 
     transformer: Optional[TransformerField] = InputField(
@@ -126,7 +126,9 @@ class FLUXLoRACollectionLoader(BaseInvocation):
             output.clip = self.clip.model_copy(deep=True)
 
         for lora in loras:
-            assert lora is LoRAField
+            if lora is None:
+                continue
+            assert type(lora) is LoRAField
             if lora.lora.key in added_loras:
                 continue
 
