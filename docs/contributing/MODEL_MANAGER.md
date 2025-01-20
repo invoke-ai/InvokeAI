@@ -265,7 +265,7 @@ If the key is unrecognized, this call raises an
 
 #### exists(key) -> AnyModelConfig
 
-Returns True if a model with the given key exists in the databsae.
+Returns True if a model with the given key exists in the database.
 
 #### search_by_path(path) -> AnyModelConfig
 
@@ -718,7 +718,7 @@ When downloading remote models is implemented, additional
 configuration information, such as list of trigger terms, will be
 retrieved from the HuggingFace and Civitai model repositories.
 
-The probed values can be overriden by providing a dictionary in the
+The probed values can be overridden by providing a dictionary in the
 optional `config` argument passed to `import_model()`. You may provide
 overriding values for any of the model's configuration
 attributes. Here is an example of setting the
@@ -841,7 +841,7 @@ variable.
 
 #### installer.start(invoker)
 
-The `start` method is called by the API intialization routines when
+The `start` method is called by the API initialization routines when
 the API starts up. Its effect is to call `sync_to_config()` to
 synchronize the model record store database with what's currently on
 disk.

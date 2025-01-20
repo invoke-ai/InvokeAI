@@ -46,7 +46,7 @@ def fetch_commits_between_tags(
     commit_info: list[CommitInfo] = []
     headers = {"Authorization": f"token {token}"} if token else None
 
-    # Get the total number of pages w/ an intial request - a bit hacky but it works...
+    # Get the total number of pages w/ an initial request - a bit hacky but it works...
     response = requests.get(
         f"https://api.github.com/repos/{org_name}/{repo_name}/compare/{from_ref}...{to_ref}?page=1&per_page=100",
         headers=headers,
