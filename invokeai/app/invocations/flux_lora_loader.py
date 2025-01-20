@@ -91,14 +91,14 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     title="FLUX LoRA Collection Loader",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a FLUX transformer."""
 
-    loras: LoRAField | list[LoRAField] = InputField(
-        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    loras: Optional[LoRAField | list[LoRAField]] = InputField(
+        default=[], description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
     )
 
     transformer: Optional[TransformerField] = InputField(
@@ -119,7 +119,14 @@ class FLUXLoRACollectionLoader(BaseInvocation):
         loras = self.loras if isinstance(self.loras, list) else [self.loras]
         added_loras: list[str] = []
 
+        if self.transformer is not None:
+            output.transformer = self.transformer.model_copy(deep=True)
+
+        if self.clip is not None:
+            output.clip = self.clip.model_copy(deep=True)
+
         for lora in loras:
+            assert lora is LoRAField
             if lora.lora.key in added_loras:
                 continue
 
@@ -130,14 +137,10 @@ class FLUXLoRACollectionLoader(BaseInvocation):
 
             added_loras.append(lora.lora.key)
 
-            if self.transformer is not None:
-                if output.transformer is None:
-                    output.transformer = self.transformer.model_copy(deep=True)
+            if self.transformer is not None and output.transformer is not None:
                 output.transformer.loras.append(lora)
 
-            if self.clip is not None:
-                if output.clip is None:
-                    output.clip = self.clip.model_copy(deep=True)
+            if self.clip is not None and output.clip is not None:
                 output.clip.loras.append(lora)
 
         return output
