@@ -5,7 +5,7 @@ import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightP
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
-import WorkflowsLeftPanel from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
 import QueueControls from 'features/queue/components/QueueControls';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
@@ -183,7 +183,7 @@ const LeftPanelContent = memo(() => {
     return <ParametersPanelUpscale />;
   }
   if (tab === 'workflows') {
-    return <WorkflowsLeftPanel />;
+    return <WorkflowsTabLeftPanel />;
   }
 
   return null;
