@@ -5,6 +5,7 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { InputFieldViewMode } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldViewMode';
+import { ViewContextProvider } from 'features/nodes/contexts/ViewContext';
 import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
 import { memo } from 'react';
@@ -16,13 +17,15 @@ const selectExposedFields = createMemoizedSelector(selectWorkflowSlice, (workflo
 
 export const ViewModeLeftPanelContent = memo(() => {
   return (
-    <Box position="relative" w="full" h="full">
-      <ScrollableContent>
-        <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} w="full" h="full">
-          <ViewModeLeftPanelContentInner />
-        </Flex>
-      </ScrollableContent>
-    </Box>
+    <ViewContextProvider view="view-mode-linear">
+      <Box position="relative" w="full" h="full">
+        <ScrollableContent>
+          <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} w="full" h="full">
+            <ViewModeLeftPanelContentInner />
+          </Flex>
+        </ScrollableContent>
+      </Box>
+    </ViewContextProvider>
   );
 });
 ViewModeLeftPanelContent.displayName = 'ViewModeLeftPanelContent';
