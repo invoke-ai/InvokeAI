@@ -83,7 +83,9 @@ class StringBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each string in the batch."""
 
     strings: list[str] = InputField(
-        default=[], min_length=1, description="The strings to batch over", input=Input.Direct
+        default=[],
+        min_length=1,
+        description="The strings to batch over",
     )
 
     def invoke(self, context: InvocationContext) -> StringOutput:
