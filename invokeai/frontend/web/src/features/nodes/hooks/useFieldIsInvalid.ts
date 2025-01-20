@@ -22,7 +22,7 @@ import { useMemo } from 'react';
 
 export const useFieldIsInvalid = (nodeId: string, fieldName: string) => {
   const template = useFieldInputTemplate(nodeId, fieldName);
-  const connectionState = useConnectionState({ nodeId, fieldName, kind: 'inputs' });
+  const connectionState = useConnectionState(nodeId, fieldName, 'inputs');
 
   const selectIsInvalid = useMemo(() => {
     return createSelector(selectNodesSlice, (nodes) => {

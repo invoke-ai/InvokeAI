@@ -10,23 +10,20 @@ const sx = {
   alignItems: 'center',
   transitionProperty: 'opacity',
   transitionDuration: '0.1s',
-  w: 'full',
-  h: 'full',
+  justifyContent: 'flex-end',
   '&[data-should-dim="true"]': {
     opacity: 0.5,
   },
 } satisfies SystemStyleObject;
 
-type InputFieldWrapperProps = PropsWithChildren<{
+type OutputFieldWrapperProps = PropsWithChildren<{
   shouldDim: boolean;
 }>;
 
-export const InputFieldWrapper = memo(({ shouldDim, children }: InputFieldWrapperProps) => {
-  return (
-    <Flex sx={sx} data-should-dim={shouldDim}>
-      {children}
-    </Flex>
-  );
-});
+export const OutputFieldWrapper = memo(({ shouldDim, children }: OutputFieldWrapperProps) => (
+  <Flex sx={sx} data-should-dim={shouldDim}>
+    {children}
+  </Flex>
+));
 
-InputFieldWrapper.displayName = 'InputFieldWrapper';
+OutputFieldWrapper.displayName = 'OutputFieldWrapper';

@@ -1,13 +1,14 @@
 import { Flex, Grid, GridItem } from '@invoke-ai/ui-library';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
-import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
+import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
+import { OutputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldGate';
+import { OutputFieldNodesEditorView } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldNodesEditorView';
 import { useFieldNames } from 'features/nodes/hooks/useFieldNames';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 import { memo } from 'react';
 
-import InputField from './fields/InputField';
-import OutputField from './fields/OutputField';
+import { InputFieldViewNodes } from './fields/InputFieldViewNodes';
 import InvocationNodeFooter from './InvocationNodeFooter';
 import InvocationNodeHeader from './InvocationNodeHeader';
 
@@ -42,34 +43,28 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
               <Grid gridTemplateColumns="1fr auto" gridAutoRows="1fr">
                 {fieldNames.connectionFields.map((fieldName, i) => (
                   <GridItem gridColumnStart={1} gridRowStart={i + 1} key={`${nodeId}.${fieldName}.input-field`}>
-                    <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
-                      <InputField nodeId={nodeId} fieldName={fieldName} />
-                    </InvocationInputFieldCheck>
+                    <InputFieldGate nodeId={nodeId} fieldName={fieldName}>
+                      <InputFieldViewNodes nodeId={nodeId} fieldName={fieldName} />
+                    </InputFieldGate>
                   </GridItem>
                 ))}
                 {outputFieldNames.map((fieldName, i) => (
                   <GridItem gridColumnStart={2} gridRowStart={i + 1} key={`${nodeId}.${fieldName}.output-field`}>
-                    <OutputField nodeId={nodeId} fieldName={fieldName} />
+                    <OutputFieldGate nodeId={nodeId} fieldName={fieldName}>
+                      <OutputFieldNodesEditorView nodeId={nodeId} fieldName={fieldName} />
+                    </OutputFieldGate>
                   </GridItem>
                 ))}
               </Grid>
               {fieldNames.anyOrDirectFields.map((fieldName) => (
-                <InvocationInputFieldCheck
-                  key={`${nodeId}.${fieldName}.input-field`}
-                  nodeId={nodeId}
-                  fieldName={fieldName}
-                >
-                  <InputField nodeId={nodeId} fieldName={fieldName} />
-                </InvocationInputFieldCheck>
+                <InputFieldGate key={`${nodeId}.${fieldName}.input-field`} nodeId={nodeId} fieldName={fieldName}>
+                  <InputFieldViewNodes nodeId={nodeId} fieldName={fieldName} />
+                </InputFieldGate>
               ))}
               {fieldNames.missingFields.map((fieldName) => (
-                <InvocationInputFieldCheck
-                  key={`${nodeId}.${fieldName}.input-field`}
-                  nodeId={nodeId}
-                  fieldName={fieldName}
-                >
-                  <InputField nodeId={nodeId} fieldName={fieldName} />
-                </InvocationInputFieldCheck>
+                <InputFieldGate key={`${nodeId}.${fieldName}.input-field`} nodeId={nodeId} fieldName={fieldName}>
+                  <InputFieldViewNodes nodeId={nodeId} fieldName={fieldName} />
+                </InputFieldGate>
               ))}
             </Flex>
           </Flex>

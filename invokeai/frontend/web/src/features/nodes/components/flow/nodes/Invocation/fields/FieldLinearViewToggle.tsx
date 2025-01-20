@@ -1,13 +1,12 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useFieldIsExposed } from 'features/nodes/hooks/useFieldIsExposed';
 import { useFieldValue } from 'features/nodes/hooks/useFieldValue';
 import {
-  selectWorkflowSlice,
   workflowExposedFieldAdded,
   workflowExposedFieldRemoved,
 } from 'features/nodes/store/workflowSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMinusBold, PiPlusBold } from 'react-icons/pi';
 
@@ -20,15 +19,7 @@ const FieldLinearViewToggle = ({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const value = useFieldValue(nodeId, fieldName);
-  const selectIsExposed = useMemo(
-    () =>
-      createSelector(selectWorkflowSlice, (workflow) => {
-        return Boolean(workflow.exposedFields.find((f) => f.nodeId === nodeId && f.fieldName === fieldName));
-      }),
-    [fieldName, nodeId]
-  );
-
-  const isExposed = useAppSelector(selectIsExposed);
+  const isExposed = useFieldIsExposed(nodeId, fieldName);
 
   const handleExposeField = useCallback(() => {
     dispatch(workflowExposedFieldAdded({ nodeId, fieldName, value }));

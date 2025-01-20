@@ -5,7 +5,7 @@ import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import { memo } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 
-export const WorkflowsTabContent = memo(() => {
+export const WorkflowsMainPanel = memo(() => {
   const mode = useAppSelector(selectWorkflowMode);
 
   if (mode === 'edit') {
@@ -19,4 +19,4 @@ export const WorkflowsTabContent = memo(() => {
   return <ImageViewer />;
 });
 
-WorkflowsTabContent.displayName = 'WorkflowsTabContent';
+WorkflowsMainPanel.displayName = 'WorkflowsMainPanel';

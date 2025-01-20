@@ -1,4 +1,5 @@
 import { Flex, FormControl } from '@invoke-ai/ui-library';
+import { FieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldHandle';
 import { FieldLinearViewConfigIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldLinearViewConfigIconButton';
 import { FieldNotesIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldNotesIconButton';
 import FieldResetToDefaultValueButton from 'features/nodes/components/flow/nodes/Invocation/fields/FieldResetToDefaultValueButton';
@@ -8,7 +9,6 @@ import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
 import { memo, useCallback, useState } from 'react';
 
 import EditableFieldTitle from './EditableFieldTitle';
-import FieldHandle from './FieldHandle';
 import FieldLinearViewToggle from './FieldLinearViewToggle';
 import InputFieldRenderer from './InputFieldRenderer';
 import { InputFieldWrapper } from './InputFieldWrapper';
@@ -18,13 +18,13 @@ interface Props {
   fieldName: string;
 }
 
-const InputField = ({ nodeId, fieldName }: Props) => {
+export const InputFieldViewNodes = memo(({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
   const [isHovered, setIsHovered] = useState(false);
   const isInvalid = useFieldIsInvalid(nodeId, fieldName);
 
   const { isConnected, isConnectionInProgress, isConnectionStartField, validationResult, shouldDim } =
-    useConnectionState({ nodeId, fieldName, kind: 'inputs' });
+    useConnectionState(nodeId, fieldName, 'inputs');
 
   const onMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -49,8 +49,8 @@ const InputField = ({ nodeId, fieldName }: Props) => {
         </FormControl>
 
         <FieldHandle
-          fieldTemplate={fieldTemplate}
           handleType="target"
+          fieldTemplate={fieldTemplate}
           isConnectionInProgress={isConnectionInProgress}
           isConnectionStartField={isConnectionStartField}
           validationResult={validationResult}
@@ -73,10 +73,14 @@ const InputField = ({ nodeId, fieldName }: Props) => {
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
           <Flex gap={1}>
             <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" isInvalid={isInvalid} withTooltip />
-            {isHovered && <FieldLinearViewConfigIconButton nodeId={nodeId} fieldName={fieldName} />}
-            {isHovered && <FieldNotesIconButton nodeId={nodeId} fieldName={fieldName} />}
-            {isHovered && <FieldResetToDefaultValueButton nodeId={nodeId} fieldName={fieldName} />}
-            {isHovered && <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} />}
+            {isHovered && (
+              <>
+                <FieldLinearViewConfigIconButton nodeId={nodeId} fieldName={fieldName} />
+                <FieldNotesIconButton nodeId={nodeId} fieldName={fieldName} />
+                <FieldResetToDefaultValueButton nodeId={nodeId} fieldName={fieldName} />
+                <FieldLinearViewToggle nodeId={nodeId} fieldName={fieldName} />
+              </>
+            )}
           </Flex>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
         </Flex>
@@ -84,8 +88,8 @@ const InputField = ({ nodeId, fieldName }: Props) => {
 
       {fieldTemplate.input !== 'direct' && (
         <FieldHandle
-          fieldTemplate={fieldTemplate}
           handleType="target"
+          fieldTemplate={fieldTemplate}
           isConnectionInProgress={isConnectionInProgress}
           isConnectionStartField={isConnectionStartField}
           validationResult={validationResult}
@@ -93,6 +97,6 @@ const InputField = ({ nodeId, fieldName }: Props) => {
       )}
     </InputFieldWrapper>
   );
-};
+});
 
-export default memo(InputField);
+InputFieldViewNodes.displayName = 'InputFieldViewNodes';
