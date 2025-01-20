@@ -2177,7 +2177,10 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>Livelli di controllo Flux</StrongComponent>: nuovi modelli di controllo per il rilevamento dei bordi e la mappatura della profondità sono ora supportati per i modelli di Flux dev."
+            "Modalità Bassa-VRAM",
+            "Gestione dinamica della memoria",
+            "Tempi di caricamento del modello più rapidi",
+            "Meno errori di memoria"
         ]
     },
     "system": {
