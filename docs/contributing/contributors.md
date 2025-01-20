@@ -16,7 +16,7 @@ We thank [all contributors](https://github.com/invoke-ai/InvokeAI/graphs/contrib
 - @psychedelicious (Spencer Mabrito) - Web Team Leader
 - @joshistoast (Josh Corbett) - Web Development
 - @cheerio (Mary Rogers) - Lead Engineer & Web App Development
-- @ebr (Eugene Brodsky) - Cloud/DevOps/Sofware engineer; your friendly neighbourhood cluster-autoscaler
+- @ebr (Eugene Brodsky) - Cloud/DevOps/Software engineer; your friendly neighbourhood cluster-autoscaler
 - @sunija - Standalone version
 - @brandon (Brandon Rising) - Platform, Infrastructure, Backend Systems
 - @ryanjdick (Ryan Dick) - Machine Learning & Training
