@@ -6,9 +6,9 @@ import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { isEqual } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 
-export const useFieldOriginalValue = (nodeId: string, fieldName: string) => {
+export const useFieldInitialLinearViewValue = (nodeId: string, fieldName: string) => {
   const dispatch = useAppDispatch();
-  const selectOriginalExposedFieldValues = useMemo(
+  const selectInitialLinearViewValue = useMemo(
     () =>
       createSelector(
         selectWorkflowSlice,
@@ -17,12 +17,12 @@ export const useFieldOriginalValue = (nodeId: string, fieldName: string) => {
       ),
     [nodeId, fieldName]
   );
-  const originalValue = useAppSelector(selectOriginalExposedFieldValues);
+  const initialLinearViewValue = useAppSelector(selectInitialLinearViewValue);
   const value = useFieldValue(nodeId, fieldName);
-  const isValueChanged = useMemo(() => !isEqual(value, originalValue), [value, originalValue]);
-  const onReset = useCallback(() => {
-    dispatch(fieldValueReset({ nodeId, fieldName, value: originalValue }));
-  }, [dispatch, fieldName, nodeId, originalValue]);
+  const isValueChanged = useMemo(() => !isEqual(value, initialLinearViewValue), [value, initialLinearViewValue]);
+  const resetToInitialLinearViewValue = useCallback(() => {
+    dispatch(fieldValueReset({ nodeId, fieldName, value: initialLinearViewValue }));
+  }, [dispatch, fieldName, nodeId, initialLinearViewValue]);
 
-  return { originalValue, isValueChanged, onReset };
+  return { initialLinearViewValue, isValueChanged, resetToInitialLinearViewValue };
 };

@@ -1,7 +1,7 @@
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge';
-import { Box, Flex } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -10,7 +10,8 @@ import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { deepClone } from 'common/util/deepClone';
 import { singleWorkflowFieldDndSource } from 'features/dnd/dnd';
 import { triggerPostMoveFlash } from 'features/dnd/util';
-import LinearViewFieldInternal from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
+import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
+import { InputFieldViewLinear } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldViewLinear';
 import { selectWorkflowSlice, workflowExposedFieldsReordered } from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isEqual } from 'lodash-es';
@@ -23,13 +24,11 @@ const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => workf
 
 const WorkflowLinearTab = () => {
   return (
-    <Box position="relative" w="full" h="full">
-      <ScrollableContent>
-        <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} py={2} gap={2} h="full" w="full">
-          <FieldListContent />
-        </Flex>
-      </ScrollableContent>
-    </Box>
+    <ScrollableContent>
+      <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} py={2} gap={2} h="full" w="full">
+        <FieldListContent />
+      </Flex>
+    </ScrollableContent>
   );
 };
 
@@ -142,11 +141,10 @@ const FieldListInnerContent = memo(({ fields }: { fields: FieldIdentifier[] }) =
 
   return (
     <>
-      {fields.map((fieldIdentifier) => (
-        <LinearViewFieldInternal
-          key={`${fieldIdentifier.nodeId}.${fieldIdentifier.fieldName}`}
-          fieldIdentifier={fieldIdentifier}
-        />
+      {fields.map(({ nodeId, fieldName }) => (
+        <InputFieldGate key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName}>
+          <InputFieldViewLinear nodeId={nodeId} fieldName={fieldName} />
+        </InputFieldGate>
       ))}
     </>
   );

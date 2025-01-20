@@ -14,6 +14,7 @@ import type {
   ControlLoRAModelFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
+  FieldInputInstance,
   FieldValue,
   FloatFieldValue,
   FloatGeneratorFieldValue,
@@ -424,6 +425,21 @@ export const nodesSlice = createSlice({
       }
       field.notes = val;
     },
+    fieldLinearViewConfigChanged: (
+      state,
+      action: PayloadAction<{
+        nodeId: string;
+        fieldName: string;
+        linearViewConfig?: FieldInputInstance['linearViewConfig'];
+      }>
+    ) => {
+      const { nodeId, fieldName, linearViewConfig } = action.payload;
+      const field = getField(nodeId, fieldName, state);
+      if (!field) {
+        return;
+      }
+      field.linearViewConfig = linearViewConfig;
+    },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -492,6 +508,7 @@ export const {
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
   fieldNotesChanged,
+  fieldLinearViewConfigChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

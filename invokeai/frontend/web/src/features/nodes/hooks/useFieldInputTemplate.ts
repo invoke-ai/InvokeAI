@@ -7,7 +7,7 @@ export const useFieldInputTemplate = (nodeId: string, fieldName: string): FieldI
   const template = useNodeTemplate(nodeId);
   const fieldTemplate = useMemo(() => {
     const _fieldTemplate = template.inputs[fieldName];
-    assert(_fieldTemplate, `Field template for field ${fieldName} not found`);
+    assert(_fieldTemplate, `Template for input field ${fieldName} not found.`);
     return _fieldTemplate;
   }, [fieldName, template.inputs]);
   return fieldTemplate;

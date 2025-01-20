@@ -7,7 +7,7 @@ import InspectorDetailsTab from './InspectorDetailsTab';
 import InspectorOutputsTab from './InspectorOutputsTab';
 import InspectorTemplateTab from './InspectorTemplateTab';
 
-const InspectorPanel = () => {
+const WorkflowNodeInspectorPanel = () => {
   const { t } = useTranslation();
   return (
     <Flex layerStyle="first" flexDir="column" w="full" h="full" borderRadius="base" p={2} gap={2}>
@@ -38,4 +38,4 @@ const InspectorPanel = () => {
   );
 };
 
-export default memo(InspectorPanel);
+export default memo(WorkflowNodeInspectorPanel);
