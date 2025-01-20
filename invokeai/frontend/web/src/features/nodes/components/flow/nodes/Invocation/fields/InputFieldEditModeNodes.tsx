@@ -1,7 +1,6 @@
 import { Flex, FormControl } from '@invoke-ai/ui-library';
 import { FieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldHandle';
-import { InputFieldLinearViewConfigIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldLinearViewConfigIconButton';
-import { InputFieldNotesIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButton';
+import { InputFieldNotesIconButtonEditable } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonEditable';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
 import { useInputFieldConnectionState } from 'features/nodes/hooks/useInputFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
@@ -76,8 +75,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
             <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
             {isHovered && (
               <>
-                <InputFieldLinearViewConfigIconButton nodeId={nodeId} fieldName={fieldName} />
-                <InputFieldNotesIconButton nodeId={nodeId} fieldName={fieldName} />
+                <InputFieldNotesIconButtonEditable nodeId={nodeId} fieldName={fieldName} />
                 <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
                 <InputFieldAddRemoveLinearViewIconButton nodeId={nodeId} fieldName={fieldName} />
               </>

@@ -2,14 +2,15 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Circle, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
-import { InputFieldNotesIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButton';
-import InputFieldResetToInitialValueIconButton from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToInitialValueIconButton';
+import { InputFieldLinearViewConfigIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldLinearViewConfigIconButton';
+import { InputFieldNotesIconButtonEditable } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonEditable';
+import { InputFieldResetToInitialValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToInitialValueIconButton';
 import { useLinearViewFieldDnd } from 'features/nodes/components/sidePanel/workflow/useLinearViewFieldDnd';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleBold } from 'react-icons/pi';
+import { PiMinusBold } from 'react-icons/pi';
 
 import { InputFieldRenderer } from './InputFieldRenderer';
 import { InputFieldTitle } from './InputFieldTitle';
@@ -55,20 +56,21 @@ export const InputFieldEditModeLinear = memo(({ nodeId, fieldName }: Props) => {
         onMouseLeave={handleMouseOut}
         sx={sx}
       >
-        <Flex flexDir="column" w="full">
+        <Flex flexDir="column" w="full" gap={1}>
           <Flex alignItems="center" gap={2}>
             <InputFieldTitle nodeId={nodeId} fieldName={fieldName} />
             <Spacer />
             {isMouseOverNode && <Circle me={2} size={2} borderRadius="full" bg="invokeBlue.500" />}
-            <InputFieldNotesIconButton nodeId={nodeId} fieldName={fieldName} />
+            <InputFieldLinearViewConfigIconButton nodeId={nodeId} fieldName={fieldName} />
+            <InputFieldNotesIconButtonEditable nodeId={nodeId} fieldName={fieldName} />
             <InputFieldResetToInitialValueIconButton nodeId={nodeId} fieldName={fieldName} />
             <IconButton
               aria-label={t('nodes.removeLinearView')}
               tooltip={t('nodes.removeLinearView')}
               variant="ghost"
-              size="sm"
+              size="xs"
               onClick={handleRemoveField}
-              icon={<PiTrashSimpleBold />}
+              icon={<PiMinusBold />}
             />
           </Flex>
           <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
