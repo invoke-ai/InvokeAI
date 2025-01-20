@@ -1455,7 +1455,6 @@
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều rộng hộp giới hạn là {{width}}",
             "missingInputForField": "thiếu đầu vào",
             "missingFieldTemplate": "Thiếu vùng mẫu trình bày",
-            "collectionEmpty": "tài nguyên trống",
             "collectionTooFewItems": "quá ít mục, tối thiểu là {{minItems}}",
             "collectionTooManyItems": "quá nhiều mục, tối đa là {{maxItems}}",
             "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)",

@@ -352,7 +352,6 @@
             "noT5EncoderModelSelected": "Aucun modèle T5 Encoder sélectionné pour la génération FLUX",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la largeur de la bounding box mise à l'échelle est {{width}}",
             "canvasIsCompositing": "La toile est en train de composer",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} collection vide",
             "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}} : trop peu d'éléments, minimum {{minItems}}",
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}} : trop d'éléments, maximum {{maxItems}}",
             "canvasIsSelectingObject": "La toile est occupée (sélection d'objet)"
