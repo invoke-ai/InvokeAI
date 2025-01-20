@@ -33,7 +33,7 @@ import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedule
 /** */
 
 // #region Base schemas & misc
-const zFieldInput = z.enum(['connection', 'direct', 'any', 'batch']);
+const zFieldInput = z.enum(['connection', 'direct', 'any']);
 const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
 const zFieldInputInstanceLinearViewConfigBase = z.object({
   notesDisplay: z.enum(['none', 'helper-text', 'icon-with-popover']).nullish(),
