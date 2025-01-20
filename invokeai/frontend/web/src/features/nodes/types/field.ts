@@ -35,10 +35,14 @@ import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedule
 // #region Base schemas & misc
 const zFieldInput = z.enum(['connection', 'direct', 'any', 'batch']);
 const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
+const zFieldInputInstanceLinearViewConfigBase = z.object({
+  notesDisplay: z.enum(['none', 'helper-text', 'icon-with-popover']).nullish(),
+});
 const zFieldInputInstanceBase = z.object({
   name: z.string().trim().min(1),
   label: z.string().nullish(),
   notes: z.string().nullish(),
+  linearViewConfig: zFieldInputInstanceLinearViewConfigBase.nullish(),
 });
 const zFieldTemplateBase = z.object({
   name: z.string().min(1),

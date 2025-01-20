@@ -2,7 +2,7 @@ import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext } from 'react';
 import { assert } from 'tsafe';
 
-type ViewType = 'user-linear' | 'editor-linear' | 'editor-nodes';
+type ViewType = 'linear-user' | 'linear-editor' | 'nodes-editor';
 
 const ViewContext = createContext<ViewType | null>(null);
 

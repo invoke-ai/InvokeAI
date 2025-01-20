@@ -12,9 +12,9 @@ import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
-import InspectorPanel from './inspector/InspectorPanel';
-import { WorkflowViewMode } from './viewMode/WorkflowViewMode';
-import WorkflowPanel from './workflow/WorkflowPanel';
+import WorkflowNodeInspectorPanel from './inspector/WorkflowNodeInspectorPanel';
+import { FieldsSimpleView } from './viewMode/WorkflowSimpleView';
+import WorkflowFieldsLinearViewPanel from './workflow/WorkflowPanel';
 import { WorkflowListMenu } from './WorkflowListMenu/WorkflowListMenu';
 import { WorkflowListMenuTrigger } from './WorkflowListMenu/WorkflowListMenuTrigger';
 
@@ -25,7 +25,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const NodeEditorPanelGroup = () => {
+const WorkflowsLeftPanel = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const workflowListMenu = useWorkflowListMenu();
@@ -50,9 +50,9 @@ const NodeEditorPanelGroup = () => {
             </OverlayScrollbarsComponent>
           )}
 
-          <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-            {mode === 'view' && <WorkflowViewMode />}
-            {mode === 'edit' && (
+          {mode === 'view' && <FieldsSimpleView />}
+          {mode === 'edit' && (
+            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
               <PanelGroup
                 ref={panelGroupRef}
                 id="workflow-panel-group"
@@ -61,19 +61,19 @@ const NodeEditorPanelGroup = () => {
                 style={panelGroupStyles}
               >
                 <Panel id="workflow" collapsible minSize={25}>
-                  <WorkflowPanel />
+                  <WorkflowFieldsLinearViewPanel />
                 </Panel>
                 <ResizeHandle onDoubleClick={handleDoubleClickHandle} />
                 <Panel id="inspector" collapsible minSize={25}>
-                  <InspectorPanel />
+                  <WorkflowNodeInspectorPanel />
                 </Panel>
               </PanelGroup>
-            )}
-          </OverlayScrollbarsComponent>
+            </OverlayScrollbarsComponent>
+          )}
         </Box>
       </Flex>
     </Flex>
   );
 };
 
-export default memo(NodeEditorPanelGroup);
+export default memo(WorkflowsLeftPanel);

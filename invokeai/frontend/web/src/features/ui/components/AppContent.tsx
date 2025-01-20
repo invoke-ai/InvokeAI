@@ -5,7 +5,7 @@ import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightP
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
-import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import WorkflowsLeftPanel from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import QueueControls from 'features/queue/components/QueueControls';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
@@ -13,7 +13,7 @@ import FloatingParametersPanelButtons from 'features/ui/components/FloatingParam
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
-import { WorkflowsTabContent } from 'features/ui/components/tabs/WorkflowsTabContent';
+import { WorkflowsMainPanel } from 'features/ui/components/tabs/WorkflowsTabContent';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
@@ -165,7 +165,6 @@ const RightPanelContent = memo(() => {
   if (tab === 'canvas') {
     return <CanvasRightPanel />;
   }
-
   if (tab === 'upscaling' || tab === 'workflows') {
     return <GalleryPanelContent />;
   }
@@ -183,9 +182,8 @@ const LeftPanelContent = memo(() => {
   if (tab === 'upscaling') {
     return <ParametersPanelUpscale />;
   }
-
   if (tab === 'workflows') {
-    return <NodeEditorPanelGroup />;
+    return <WorkflowsLeftPanel />;
   }
 
   return null;
@@ -194,6 +192,7 @@ LeftPanelContent.displayName = 'LeftPanelContent';
 
 const MainPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
+
   if (tab === 'canvas') {
     return <CanvasMainPanelContent />;
   }
@@ -201,7 +200,7 @@ const MainPanelContent = memo(() => {
     return <ImageViewer />;
   }
   if (tab === 'workflows') {
-    return <WorkflowsTabContent />;
+    return <WorkflowsMainPanel />;
   }
   if (tab === 'models') {
     return <ModelManagerTab />;

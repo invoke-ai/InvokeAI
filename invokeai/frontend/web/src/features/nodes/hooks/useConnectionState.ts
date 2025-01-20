@@ -6,29 +6,22 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeConnectionErrorSelector';
 import { useMemo } from 'react';
 
-type UseConnectionStateProps = {
-  nodeId: string;
-  fieldName: string;
-  kind: 'inputs' | 'outputs';
-};
-
-export const useConnectionState = ({ nodeId, fieldName, kind }: UseConnectionStateProps) => {
+export const useConnectionState = (nodeId: string, fieldName: string, kind: 'inputs' | 'outputs') => {
   const pendingConnection = useStore($pendingConnection);
   const templates = useStore($templates);
   const edgePendingUpdate = useStore($edgePendingUpdate);
 
   const selectIsConnected = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) =>
-        Boolean(
-          nodes.edges.filter((edge) => {
-            return (
-              (kind === 'inputs' ? edge.target : edge.source) === nodeId &&
-              (kind === 'inputs' ? edge.targetHandle : edge.sourceHandle) === fieldName
-            );
-          }).length
-        )
-      ),
+      createSelector(selectNodesSlice, (nodes) => {
+        const firstConnectedEdge = nodes.edges.find((edge) => {
+          return (
+            (kind === 'inputs' ? edge.target : edge.source) === nodeId &&
+            (kind === 'inputs' ? edge.targetHandle : edge.sourceHandle) === fieldName
+          );
+        });
+        return firstConnectedEdge !== undefined;
+      }),
     [fieldName, kind, nodeId]
   );
 

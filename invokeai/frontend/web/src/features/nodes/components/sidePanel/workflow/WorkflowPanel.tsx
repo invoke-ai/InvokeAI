@@ -6,7 +6,7 @@ import WorkflowGeneralTab from './WorkflowGeneralTab';
 import WorkflowJSONTab from './WorkflowJSONTab';
 import WorkflowLinearTab from './WorkflowLinearTab';
 
-const WorkflowPanel = () => {
+const WorkflowFieldsLinearViewPanel = () => {
   const { t } = useTranslation();
   return (
     <Flex layerStyle="first" flexDir="column" w="full" h="full" borderRadius="base" p={2} gap={2}>
@@ -33,4 +33,4 @@ const WorkflowPanel = () => {
   );
 };
 
-export default memo(WorkflowPanel);
+export default memo(WorkflowFieldsLinearViewPanel);
