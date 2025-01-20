@@ -9,7 +9,7 @@ type Props = {
   fieldName: string;
 };
 
-const InputFieldResetToInitialValueIconButton = ({ nodeId, fieldName }: Props) => {
+export const InputFieldResetToInitialValueIconButton = memo(({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
   const { isValueChanged, resetToInitialLinearViewValue } = useInputFieldInitialLinearViewValue(nodeId, fieldName);
 
@@ -25,6 +25,6 @@ const InputFieldResetToInitialValueIconButton = ({ nodeId, fieldName }: Props) =
       isDisabled={!isValueChanged}
     />
   );
-};
+});
 
-export default memo(InputFieldResetToInitialValueIconButton);
+InputFieldResetToInitialValueIconButton.displayName = 'InputFieldResetToInitialValueIconButton';
