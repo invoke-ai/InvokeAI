@@ -14,20 +14,20 @@ import { EmptyState } from './EmptyState';
 
 const selectExposedFields = createMemoizedSelector(selectWorkflowSlice, (workflow) => workflow.exposedFields);
 
-export const FieldsSimpleView = memo(() => {
+export const SimpleViewLeftPanelContent = memo(() => {
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
         <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} w="full" h="full">
-          <FieldSimpleViewContent />
+          <SimpleViewLeftPanelContentInner />
         </Flex>
       </ScrollableContent>
     </Box>
   );
 });
-FieldsSimpleView.displayName = 'FieldsSimpleView';
+SimpleViewLeftPanelContent.displayName = 'SimpleViewLeftPanelContent';
 
-const FieldSimpleViewContent = memo(() => {
+const SimpleViewLeftPanelContentInner = memo(() => {
   const { isLoading } = useGetOpenAPISchemaQuery();
   const exposedFields = useAppSelector(selectExposedFields);
 
@@ -49,4 +49,4 @@ const FieldSimpleViewContent = memo(() => {
     </>
   );
 });
-FieldSimpleViewContent.displayName = 'FieldSimpleViewContent';
+SimpleViewLeftPanelContentInner.displayName = ' SimpleViewLeftPanelContentInner';
