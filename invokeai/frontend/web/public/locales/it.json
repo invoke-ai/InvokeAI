@@ -684,7 +684,6 @@
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi elementi, massimo {{maxItems}}",
             "canvasIsSelectingObject": "La tela è occupata (selezione dell'oggetto)",
             "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi pochi elementi, minimo {{minItems}}",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} raccolta vuota",
             "fluxModelMultipleControlLoRAs": "È possibile utilizzare solo 1 Controllo LoRA alla volta"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
