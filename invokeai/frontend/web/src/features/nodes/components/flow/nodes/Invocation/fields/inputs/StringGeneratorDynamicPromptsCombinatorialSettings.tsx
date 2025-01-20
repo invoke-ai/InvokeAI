@@ -29,8 +29,7 @@ export const StringGeneratorDynamicPromptsCombinatorialSettings = memo(
     );
 
     const arg = useMemo(() => {
-      const { input, maxPrompts } = state;
-      return { prompt: input, max_prompts: maxPrompts, combinatorial: true };
+      return { prompt: state.input, max_prompts: state.maxPrompts, combinatorial: true };
     }, [state]);
     const [debouncedArg] = useDebounce(arg, 300);
 
@@ -38,13 +37,16 @@ export const StringGeneratorDynamicPromptsCombinatorialSettings = memo(
 
     useEffect(() => {
       if (isLoading) {
-        onChange({ ...state, values: loadingValues });
-      } else if (data) {
-        onChange({ ...state, values: data.prompts });
-      } else {
-        onChange({ ...state, values: [] });
+        return;
       }
-    }, [data, isLoading, loadingValues, onChange, state]);
+
+      if (!data) {
+        onChange({ ...state, values: [] });
+        return;
+      }
+
+      onChange({ ...state, values: data.prompts });
+    }, [data, isLoading, onChange, state]);
 
     return (
       <Flex gap={2} flexDir="column">
