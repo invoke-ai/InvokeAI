@@ -2163,7 +2163,10 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "<StrongComponent>Hướng Dẫn Khu Vực FLUX (beta)</StrongComponent>: Bản beta của Hướng Dẫn Khu Vực FLUX của chúng ta đã có mắt tại bảng điều khiển lệnh khu vực."
+            "Chế độ VRAM thấp",
+            "Trình quản lý bộ nhớ động",
+            "Tải model nhanh hơn",
+            "Ít lỗi bộ nhớ hơn"
         ]
     },
     "upsell": {
