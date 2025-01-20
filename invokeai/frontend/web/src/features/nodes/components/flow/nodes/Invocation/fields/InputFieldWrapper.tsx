@@ -12,21 +12,10 @@ const sx = {
   transitionDuration: '0.1s',
   w: 'full',
   h: 'full',
-  '&[data-should-dim="true"]': {
-    opacity: 0.5,
-  },
 } satisfies SystemStyleObject;
 
-type InputFieldWrapperProps = PropsWithChildren<{
-  shouldDim: boolean;
-}>;
-
-export const InputFieldWrapper = memo(({ shouldDim, children }: InputFieldWrapperProps) => {
-  return (
-    <Flex sx={sx} data-should-dim={shouldDim}>
-      {children}
-    </Flex>
-  );
+export const InputFieldWrapper = memo(({ children }: PropsWithChildren) => {
+  return <Flex sx={sx}>{children}</Flex>;
 });
 
 InputFieldWrapper.displayName = 'InputFieldWrapper';

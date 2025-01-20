@@ -1,19 +1,24 @@
-import { useNode } from 'features/nodes/hooks/useNode';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectNode, selectNodesSlice } from 'features/nodes/store/selectors';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
 export const useBatchGroupId = (nodeId: string) => {
-  const node = useNode(nodeId);
+  const selector = useMemo(() => {
+    return createSelector(selectNodesSlice, (nodes) => {
+      const node = selectNode(nodes, nodeId);
+      if (!isInvocationNode(node)) {
+        return;
+      }
+      if (!isBatchNode(node)) {
+        return;
+      }
+      return node.data.inputs['batch_group_id']?.value as string;
+    });
+  }, [nodeId]);
 
-  const batchGroupId = useMemo(() => {
-    if (!isInvocationNode(node)) {
-      return;
-    }
-    if (!isBatchNode(node)) {
-      return;
-    }
-    return node.data.inputs['batch_group_id']?.value as string;
-  }, [node]);
+  const batchGroupId = useAppSelector(selector);
 
   return batchGroupId;
 };

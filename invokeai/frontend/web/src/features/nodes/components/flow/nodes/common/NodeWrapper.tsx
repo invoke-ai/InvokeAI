@@ -2,7 +2,7 @@ import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
-import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
+import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodes } from 'features/nodes/store/selectors';
@@ -24,7 +24,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const store = useAppStore();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
 
-  const executionState = useExecutionState(nodeId);
+  const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
 
   const [nodeInProgress, shadowsXl, shadowsBase] = useToken('shadows', [

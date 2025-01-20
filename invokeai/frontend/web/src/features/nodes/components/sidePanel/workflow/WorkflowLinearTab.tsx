@@ -10,8 +10,8 @@ import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { deepClone } from 'common/util/deepClone';
 import { singleWorkflowFieldDndSource } from 'features/dnd/dnd';
 import { triggerPostMoveFlash } from 'features/dnd/util';
+import { InputFieldEditModeLinear } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldEditModeLinear';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
-import { InputFieldViewLinear } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldViewLinear';
 import { selectWorkflowSlice, workflowExposedFieldsReordered } from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isEqual } from 'lodash-es';
@@ -143,7 +143,7 @@ const FieldListInnerContent = memo(({ fields }: { fields: FieldIdentifier[] }) =
     <>
       {fields.map(({ nodeId, fieldName }) => (
         <InputFieldGate key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName}>
-          <InputFieldViewLinear nodeId={nodeId} fieldName={fieldName} />
+          <InputFieldEditModeLinear nodeId={nodeId} fieldName={fieldName} />
         </InputFieldGate>
       ))}
     </>

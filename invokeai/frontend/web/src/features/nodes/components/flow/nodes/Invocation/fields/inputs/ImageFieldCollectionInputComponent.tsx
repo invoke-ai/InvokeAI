@@ -10,7 +10,7 @@ import { addImagesToNodeImageFieldCollectionDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
+import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageField } from 'features/nodes/types/common';
 import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
@@ -39,7 +39,7 @@ export const ImageFieldCollectionInputComponent = memo(
     const { nodeId, field } = props;
     const store = useAppStore();
 
-    const isInvalid = useFieldIsInvalid(nodeId, field.name);
+    const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
 
     const dndTargetData = useMemo<AddImagesToNodeImageFieldCollection>(
       () =>

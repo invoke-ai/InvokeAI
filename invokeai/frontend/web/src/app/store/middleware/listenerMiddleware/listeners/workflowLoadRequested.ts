@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
+import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState';
 import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';

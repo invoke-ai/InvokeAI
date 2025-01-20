@@ -5,8 +5,8 @@ import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/n
 import { NumberFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/NumberFieldCollectionInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
-import { useFieldInputInstance } from 'features/nodes/hooks/useFieldInputInstance';
-import { useFieldInputTemplate } from 'features/nodes/hooks/useFieldInputTemplate';
+import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
+import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import {
   isBoardFieldInputInstance,
   isBoardFieldInputTemplate,
@@ -110,9 +110,9 @@ type InputFieldProps = {
   fieldName: string;
 };
 
-const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
-  const fieldInstance = useFieldInputInstance(nodeId, fieldName);
-  const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
+export const InputFieldRenderer = memo(({ nodeId, fieldName }: InputFieldProps) => {
+  const fieldInstance = useInputFieldInstance(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
 
   if (isStringFieldCollectionInputInstance(fieldInstance) && isStringFieldCollectionInputTemplate(fieldTemplate)) {
     return <StringFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
@@ -258,10 +258,7 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
     return <StringGeneratorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (fieldTemplate) {
-    // Fallback for when there is no component for the type
-    return null;
-  }
-};
+  return null;
+});
 
-export default memo(InputFieldRenderer);
+InputFieldRenderer.displayName = 'InputFieldRenderer';

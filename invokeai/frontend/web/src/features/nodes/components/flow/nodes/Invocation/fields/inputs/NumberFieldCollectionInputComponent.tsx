@@ -12,7 +12,7 @@ import {
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
+import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { fieldNumberCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   FloatFieldCollectionInputInstance,
@@ -48,7 +48,7 @@ export const NumberFieldCollectionInputComponent = memo(
     const store = useAppStore();
     const { t } = useTranslation();
 
-    const isInvalid = useFieldIsInvalid(nodeId, field.name);
+    const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
     const isIntegerField = useMemo(() => fieldTemplate.type.name === 'IntegerField', [fieldTemplate.type]);
 
     const onRemoveNumber = useCallback(

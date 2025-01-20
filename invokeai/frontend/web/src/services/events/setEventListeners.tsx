@@ -6,7 +6,7 @@ import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
+import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { ErrorToastTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';

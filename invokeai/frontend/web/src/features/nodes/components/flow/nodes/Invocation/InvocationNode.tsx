@@ -3,12 +3,12 @@ import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { OutputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldGate';
 import { OutputFieldNodesEditorView } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldNodesEditorView';
-import { useFieldNames } from 'features/nodes/hooks/useFieldNames';
+import { useInputFieldNamesByStatus } from 'features/nodes/hooks/useInputFieldNamesByStatus';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 import { memo } from 'react';
 
-import { InputFieldViewNodes } from './fields/InputFieldViewNodes';
+import { InputFieldEditModeNodes } from './fields/InputFieldEditModeNodes';
 import InvocationNodeFooter from './InvocationNodeFooter';
 import InvocationNodeHeader from './InvocationNodeHeader';
 
@@ -21,7 +21,7 @@ type Props = {
 };
 
 const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
-  const fieldNames = useFieldNames(nodeId);
+  const fieldNames = useInputFieldNamesByStatus(nodeId);
   const withFooter = useWithFooter(nodeId);
   const outputFieldNames = useOutputFieldNames(nodeId);
 
@@ -44,7 +44,7 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
                 {fieldNames.connectionFields.map((fieldName, i) => (
                   <GridItem gridColumnStart={1} gridRowStart={i + 1} key={`${nodeId}.${fieldName}.input-field`}>
                     <InputFieldGate nodeId={nodeId} fieldName={fieldName}>
-                      <InputFieldViewNodes nodeId={nodeId} fieldName={fieldName} />
+                      <InputFieldEditModeNodes nodeId={nodeId} fieldName={fieldName} />
                     </InputFieldGate>
                   </GridItem>
                 ))}
@@ -58,12 +58,12 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
               </Grid>
               {fieldNames.anyOrDirectFields.map((fieldName) => (
                 <InputFieldGate key={`${nodeId}.${fieldName}.input-field`} nodeId={nodeId} fieldName={fieldName}>
-                  <InputFieldViewNodes nodeId={nodeId} fieldName={fieldName} />
+                  <InputFieldEditModeNodes nodeId={nodeId} fieldName={fieldName} />
                 </InputFieldGate>
               ))}
               {fieldNames.missingFields.map((fieldName) => (
                 <InputFieldGate key={`${nodeId}.${fieldName}.input-field`} nodeId={nodeId} fieldName={fieldName}>
-                  <InputFieldViewNodes nodeId={nodeId} fieldName={fieldName} />
+                  <InputFieldEditModeNodes nodeId={nodeId} fieldName={fieldName} />
                 </InputFieldGate>
               ))}
             </Flex>
