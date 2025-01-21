@@ -13,13 +13,8 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
-import { fieldNumberCollectionValueChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  FloatFieldCollectionInputInstance,
-  FloatFieldCollectionInputTemplate,
-  IntegerFieldCollectionInputInstance,
-  IntegerFieldCollectionInputTemplate,
-} from 'features/nodes/types/field';
+import { fieldFloatCollectionValueChanged } from 'features/nodes/store/nodesSlice';
+import type { FloatFieldCollectionInputInstance, FloatFieldCollectionInputTemplate } from 'features/nodes/types/field';
 import { isNil } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
@@ -38,41 +33,42 @@ const sx = {
   },
 } satisfies SystemStyleObject;
 
-export const NumberFieldCollectionInputComponent = memo(
-  (
-    props:
-      | FieldComponentProps<IntegerFieldCollectionInputInstance, IntegerFieldCollectionInputTemplate>
-      | FieldComponentProps<FloatFieldCollectionInputInstance, FloatFieldCollectionInputTemplate>
-  ) => {
+export const FloatFieldCollectionInputComponent = memo(
+  (props: FieldComponentProps<FloatFieldCollectionInputInstance, FloatFieldCollectionInputTemplate>) => {
     const { nodeId, field, fieldTemplate } = props;
     const store = useAppStore();
     const { t } = useTranslation();
 
     const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
-    const isIntegerField = useMemo(() => fieldTemplate.type.name === 'IntegerField', [fieldTemplate.type]);
 
+    const onChangeValue = useCallback(
+      (value: FloatFieldCollectionInputInstance['value']) => {
+        store.dispatch(fieldFloatCollectionValueChanged({ nodeId, fieldName: field.name, value }));
+      },
+      [field.name, nodeId, store]
+    );
     const onRemoveNumber = useCallback(
       (index: number) => {
         const newValue = field.value ? [...field.value] : [];
         newValue.splice(index, 1);
-        store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
+        onChangeValue(newValue);
       },
-      [field.name, field.value, nodeId, store]
+      [field.value, onChangeValue]
     );
 
     const onChangeNumber = useCallback(
       (index: number, value: number) => {
         const newValue = field.value ? [...field.value] : [];
         newValue[index] = value;
-        store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
+        onChangeValue(newValue);
       },
-      [field.name, field.value, nodeId, store]
+      [field.value, onChangeValue]
     );
 
     const onAddNumber = useCallback(() => {
       const newValue = field.value ? [...field.value, 0] : [0];
-      store.dispatch(fieldNumberCollectionValueChanged({ nodeId, fieldName: field.name, value: newValue }));
-    }, [field.name, field.value, nodeId, store]);
+      onChangeValue(newValue);
+    }, [field.value, onChangeValue]);
 
     const min = useMemo(() => {
       let min = -NUMPY_RAND_MAX;
@@ -98,17 +94,17 @@ export const NumberFieldCollectionInputComponent = memo(
 
     const step = useMemo(() => {
       if (isNil(fieldTemplate.multipleOf)) {
-        return isIntegerField ? 1 : 0.1;
+        return 0.1;
       }
       return fieldTemplate.multipleOf;
-    }, [fieldTemplate.multipleOf, isIntegerField]);
+    }, [fieldTemplate.multipleOf]);
 
     const fineStep = useMemo(() => {
       if (isNil(fieldTemplate.multipleOf)) {
-        return isIntegerField ? 1 : 0.01;
+        return 0.01;
       }
       return fieldTemplate.multipleOf;
-    }, [fieldTemplate.multipleOf, isIntegerField]);
+    }, [fieldTemplate.multipleOf]);
 
     return (
       <Flex
@@ -140,7 +136,7 @@ export const NumberFieldCollectionInputComponent = memo(
             >
               <Grid gap={1} gridTemplateColumns="auto 1fr auto" alignItems="center">
                 {field.value.map((value, index) => (
-                  <NumberListItemContent
+                  <FloatListItemContent
                     key={index}
                     value={value}
                     index={index}
@@ -148,7 +144,6 @@ export const NumberFieldCollectionInputComponent = memo(
                     max={max}
                     step={step}
                     fineStep={fineStep}
-                    isIntegerField={isIntegerField}
                     onRemoveNumber={onRemoveNumber}
                     onChangeNumber={onChangeNumber}
                   />
@@ -162,12 +157,11 @@ export const NumberFieldCollectionInputComponent = memo(
   }
 );
 
-NumberFieldCollectionInputComponent.displayName = 'NumberFieldCollectionInputComponent';
+FloatFieldCollectionInputComponent.displayName = 'FloatFieldCollectionInputComponent';
 
-type NumberListItemContentProps = {
+type FloatListItemContentProps = {
   value: number;
   index: number;
-  isIntegerField: boolean;
   min: number;
   max: number;
   step: number;
@@ -176,28 +170,18 @@ type NumberListItemContentProps = {
   onChangeNumber: (index: number, value: number) => void;
 };
 
-const NumberListItemContent = memo(
-  ({
-    value,
-    index,
-    isIntegerField,
-    min,
-    max,
-    step,
-    fineStep,
-    onRemoveNumber,
-    onChangeNumber,
-  }: NumberListItemContentProps) => {
+const FloatListItemContent = memo(
+  ({ value, index, min, max, step, fineStep, onRemoveNumber, onChangeNumber }: FloatListItemContentProps) => {
     const { t } = useTranslation();
 
     const onClickRemove = useCallback(() => {
       onRemoveNumber(index);
     }, [index, onRemoveNumber]);
     const onChange = useCallback(
-      (v: number) => {
-        onChangeNumber(index, isIntegerField ? Math.floor(Number(v)) : Number(v));
+      (value: number) => {
+        onChangeNumber(index, value);
       },
-      [index, isIntegerField, onChangeNumber]
+      [index, onChangeNumber]
     );
 
     return (
@@ -234,4 +218,4 @@ const NumberListItemContent = memo(
     );
   }
 );
-NumberListItemContent.displayName = 'NumberListItemContent';
+FloatListItemContent.displayName = 'FloatListItemContent';
