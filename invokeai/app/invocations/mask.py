@@ -227,7 +227,7 @@ WHITE = ColorField(r=255, g=255, b=255, a=255)
     version="1.0.0",
     classification=Classification.Beta,
 )
-class GetMaskBoundingBoxInvocation(BaseInvocation, WithMetadata):
+class GetMaskBoundingBoxInvocation(BaseInvocation):
     """Gets the bounding box of the given mask image."""
 
     mask: ImageField = InputField(description="The mask to crop.")
