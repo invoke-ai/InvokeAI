@@ -1147,6 +1147,7 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     category="image",
     version="1.0.0",
     tags=["image", "crop"],
+    classification=Classification.Beta,
 )
 class CropImageToBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Crop an image to the given bounding box. If the bounding box is omitted, the image is cropped to the non-transparent pixels."""
@@ -1173,6 +1174,7 @@ class CropImageToBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
     category="image",
     version="1.0.0",
     tags=["image", "crop"],
+    classification=Classification.Beta,
 )
 class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Paste the source image into the target image at the given bounding box.

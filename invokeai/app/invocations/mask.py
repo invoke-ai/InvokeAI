@@ -225,6 +225,7 @@ WHITE = ColorField(r=255, g=255, b=255, a=255)
     tags=["mask"],
     category="mask",
     version="1.0.0",
+    classification=Classification.Beta,
 )
 class GetMaskBoundingBoxInvocation(BaseInvocation, WithMetadata):
     """Gets the bounding box of the given mask image."""
