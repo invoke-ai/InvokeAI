@@ -1,4 +1,4 @@
-import { FormControl, FormLabel, Spacer } from '@invoke-ai/ui-library';
+import { Box, FormControl, FormLabel, Spacer } from '@invoke-ai/ui-library';
 import { InputFieldNotesHelperText } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesHelperText';
 import { InputFieldNotesIconButtonReadonly } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonReadonly';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
@@ -28,7 +28,9 @@ export const InputFieldViewMode = memo(({ nodeId, fieldName }: Props) => {
         )}
         <InputFieldResetToInitialValueIconButton nodeId={nodeId} fieldName={fieldName} />
       </FormLabel>
-      <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+      <Box w="full" h="full">
+        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+      </Box>
       {linearViewConfig?.notesDisplay === 'helper-text' && (
         <InputFieldNotesHelperText nodeId={nodeId} fieldName={fieldName} />
       )}

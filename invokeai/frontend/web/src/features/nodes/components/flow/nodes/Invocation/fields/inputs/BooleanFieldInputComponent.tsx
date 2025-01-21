@@ -27,7 +27,7 @@ const BooleanFieldInputComponent = (
     [dispatch, field.name, nodeId]
   );
 
-  return <Switch className="nodrag" onChange={handleValueChanged} isChecked={field.value}></Switch>;
+  return <Switch className="nodrag" onChange={handleValueChanged} isChecked={field.value} />;
 };
 
 export default memo(BooleanFieldInputComponent);
