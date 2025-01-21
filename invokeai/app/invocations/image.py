@@ -1166,3 +1166,30 @@ class CropImageToBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_dto = context.images.save(image=cropped_image)
         return ImageOutput.build(image_dto)
 
+
+@invocation(
+    "paste_image_into_bounding_box",
+    title="Paste Image into Bounding Box",
+    category="image",
+    version="1.0.0",
+    tags=["image", "crop"],
+)
+class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Paste the source image into the target image at the given bounding box.
+
+    The source image must be the same size as the bounding box, and the bounding box must fit within the target image."""
+
+    source_image: ImageField = InputField(description="The image to paste")
+    target_image: ImageField = InputField(description="The image to paste into")
+    bounding_box: BoundingBoxField = InputField(description="The bounding box to paste the image into")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        source_image = context.images.get_pil(self.source_image.image_name, mode="RGBA")
+        target_image = context.images.get_pil(self.target_image.image_name, mode="RGBA")
+
+        bounding_box = self.bounding_box.tuple()
+
+        target_image.paste(source_image, bounding_box, source_image)
+
+        image_dto = context.images.save(image=target_image)
+        return ImageOutput.build(image_dto)
