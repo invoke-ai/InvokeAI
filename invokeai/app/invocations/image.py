@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
+    BoundingBoxField,
     ColorField,
     FieldDescriptions,
     ImageField,
@@ -997,10 +998,10 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 @invocation(
     "mask_from_id",
-    title="Mask from ID",
+    title="Mask from Segmented Image",
     tags=["image", "mask", "id"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
 )
 class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generate a mask for a particular color in an ID Map"""
@@ -1010,40 +1011,24 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     threshold: int = InputField(default=100, description="Threshold for color detection")
     invert: bool = InputField(default=False, description="Whether or not to invert the mask")
 
-    def rgba_to_hex(self, rgba_color: tuple[int, int, int, int]):
-        r, g, b, a = rgba_color
-        hex_code = "#{:02X}{:02X}{:02X}{:02X}".format(r, g, b, int(a * 255))
-        return hex_code
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
 
-    def id_to_mask(self, id_mask: Image.Image, color: tuple[int, int, int, int], threshold: int = 100):
-        if id_mask.mode != "RGB":
-            id_mask = id_mask.convert("RGB")
-
-        # Can directly just use the tuple but I'll leave this rgba_to_hex here
-        # incase anyone prefers using hex codes directly instead of the color picker
-        hex_color_str = self.rgba_to_hex(color)
-        rgb_color = numpy.array([int(hex_color_str[i : i + 2], 16) for i in (1, 3, 5)])
+        np_color = numpy.array(self.color.tuple())
 
         # Maybe there's a faster way to calculate this distance but I can't think of any right now.
-        color_distance = numpy.linalg.norm(id_mask - rgb_color, axis=-1)
+        color_distance = numpy.linalg.norm(image - np_color, axis=-1)
 
         # Create a mask based on the threshold and the distance calculated above
-        binary_mask = (color_distance < threshold).astype(numpy.uint8) * 255
+        binary_mask = (color_distance < self.threshold).astype(numpy.uint8) * 255
 
         # Convert the mask back to PIL
         binary_mask_pil = Image.fromarray(binary_mask)
 
-        return binary_mask_pil
-
-    def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
-
-        mask = self.id_to_mask(image, self.color.tuple(), self.threshold)
-
         if self.invert:
-            mask = ImageOps.invert(mask)
+            binary_mask_pil = ImageOps.invert(binary_mask_pil)
 
-        image_dto = context.images.save(image=mask, image_category=ImageCategory.MASK)
+        image_dto = context.images.save(image=binary_mask_pil, image_category=ImageCategory.MASK)
 
         return ImageOutput.build(image_dto)
 
@@ -1153,4 +1138,60 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         image_dto = context.images.save(image=noisy_image)
 
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "crop_image_to_bounding_box",
+    title="Crop Image to Bounding Box",
+    category="image",
+    version="1.0.0",
+    tags=["image", "crop"],
+    classification=Classification.Beta,
+)
+class CropImageToBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Crop an image to the given bounding box. If the bounding box is omitted, the image is cropped to the non-transparent pixels."""
+
+    image: ImageField = InputField(description="The image to crop")
+    bounding_box: BoundingBoxField | None = InputField(
+        default=None, description="The bounding box to crop the image to"
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+
+        bounding_box = self.bounding_box.tuple() if self.bounding_box is not None else image.getbbox()
+
+        cropped_image = image.crop(bounding_box)
+
+        image_dto = context.images.save(image=cropped_image)
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "paste_image_into_bounding_box",
+    title="Paste Image into Bounding Box",
+    category="image",
+    version="1.0.0",
+    tags=["image", "crop"],
+    classification=Classification.Beta,
+)
+class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Paste the source image into the target image at the given bounding box.
+
+    The source image must be the same size as the bounding box, and the bounding box must fit within the target image."""
+
+    source_image: ImageField = InputField(description="The image to paste")
+    target_image: ImageField = InputField(description="The image to paste into")
+    bounding_box: BoundingBoxField = InputField(description="The bounding box to paste the image into")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        source_image = context.images.get_pil(self.source_image.image_name, mode="RGBA")
+        target_image = context.images.get_pil(self.target_image.image_name, mode="RGBA")
+
+        bounding_box = self.bounding_box.tuple()
+
+        target_image.paste(source_image, bounding_box, source_image)
+
+        image_dto = context.images.save(image=target_image)
         return ImageOutput.build(image_dto)
