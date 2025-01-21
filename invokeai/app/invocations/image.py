@@ -997,7 +997,7 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 @invocation(
     "mask_from_id",
-    title="Mask from ID",
+    title="Mask from Segmented Image",
     tags=["image", "mask", "id"],
     category="image",
     version="1.0.1",
