@@ -1,8 +1,10 @@
+import { FloatFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldCollectionInputComponent';
+import { FloatFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldInputComponent';
 import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
+import { IntegerFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerFieldCollectionInputComponent';
 import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorFieldComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
-import { NumberFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/NumberFieldCollectionInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
@@ -91,10 +93,10 @@ import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import FluxMainModelFieldInputComponent from './inputs/FluxMainModelFieldInputComponent';
 import FluxVAEModelFieldInputComponent from './inputs/FluxVAEModelFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
+import { IntegerFieldInputComponent } from './inputs/IntegerFieldInputComponent';
 import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
-import NumberFieldInputComponent from './inputs/NumberFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComponent';
@@ -126,20 +128,20 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName }: InputFieldProps) 
     return <BooleanFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
-  if (isIntegerFieldInputInstance(fieldInstance) && isIntegerFieldInputTemplate(fieldTemplate)) {
-    return <NumberFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
-  }
-
   if (isFloatFieldInputInstance(fieldInstance) && isFloatFieldInputTemplate(fieldTemplate)) {
-    return <NumberFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
-  }
-
-  if (isIntegerFieldCollectionInputInstance(fieldInstance) && isIntegerFieldCollectionInputTemplate(fieldTemplate)) {
-    return <NumberFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return <FloatFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isFloatFieldCollectionInputInstance(fieldInstance) && isFloatFieldCollectionInputTemplate(fieldTemplate)) {
-    return <NumberFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return <FloatFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isIntegerFieldInputInstance(fieldInstance) && isIntegerFieldInputTemplate(fieldTemplate)) {
+    return <IntegerFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isIntegerFieldCollectionInputInstance(fieldInstance) && isIntegerFieldCollectionInputTemplate(fieldTemplate)) {
+    return <IntegerFieldCollectionInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isEnumFieldInputInstance(fieldInstance) && isEnumFieldInputTemplate(fieldTemplate)) {
