@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
+    BoundingBoxField,
     ColorField,
     FieldDescriptions,
     ImageField,
@@ -1138,3 +1139,30 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_dto = context.images.save(image=noisy_image)
 
         return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "crop_image_to_bounding_box",
+    title="Crop Image to Bounding Box",
+    category="image",
+    version="1.0.0",
+    tags=["image", "crop"],
+)
+class CropImageToBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Crop an image to the given bounding box. If the bounding box is omitted, the image is cropped to the non-transparent pixels."""
+
+    image: ImageField = InputField(description="The image to crop")
+    bounding_box: BoundingBoxField | None = InputField(
+        default=None, description="The bounding box to crop the image to"
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+
+        bounding_box = self.bounding_box.tuple() if self.bounding_box is not None else image.getbbox()
+
+        cropped_image = image.crop(bounding_box)
+
+        image_dto = context.images.save(image=cropped_image)
+        return ImageOutput.build(image_dto)
+
