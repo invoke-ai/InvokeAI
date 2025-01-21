@@ -26,6 +26,14 @@ FLUX_KOHYA_TRANSFORMER_KEY_REGEX = (
 #   lora_te1_text_model_encoder_layers_0_mlp_fc1.lora_up.weight
 FLUX_KOHYA_CLIP_KEY_REGEX = r"lora_te1_text_model_encoder_layers_(\d+)_(mlp|self_attn)_(\w+)\.?.*"
 
+# A regex pattern that matches all of the T5 keys in the Kohya FLUX LoRA format.
+# Example keys:
+#   lora_te2_encoder_block_0_layer_0_SelfAttention_k.alpha
+#   lora_te2_encoder_block_0_layer_0_SelfAttention_k.dora_scale
+#   lora_te2_encoder_block_0_layer_0_SelfAttention_k.lora_down.weight
+#   lora_te2_encoder_block_0_layer_0_SelfAttention_k.lora_up.weight
+FLUX_KOHYA_T5_KEY_REGEX = r"lora_te2_encoder_block_(\d+)_layer_(\d+)_(DenseReluDense|SelfAttention)_(\w+)\.?.*"
+
 
 def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> bool:
     """Checks if the provided state dict is likely in the Kohya FLUX LoRA format.
@@ -34,7 +42,9 @@ def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> boo
     perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
     """
     return all(
-        re.match(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, k) or re.match(FLUX_KOHYA_CLIP_KEY_REGEX, k)
+        re.match(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, k)
+        or re.match(FLUX_KOHYA_CLIP_KEY_REGEX, k)
+        or re.match(FLUX_KOHYA_T5_KEY_REGEX, k)
         for k in state_dict.keys()
     )
 
