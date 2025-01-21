@@ -300,6 +300,13 @@ class BoundingBoxField(BaseModel):
             raise ValueError(f"y_min ({self.y_min}) is greater than y_max ({self.y_max}).")
         return self
 
+    def tuple(self) -> Tuple[int, int, int, int]:
+        """
+        Returns the bounding box as a tuple suitable for use with PIL's `Image.crop()` method.
+        This method returns a tuple of the form (left, upper, right, lower) == (x_min, y_min, x_max, y_max).
+        """
+        return (self.x_min, self.y_min, self.x_max, self.y_max)
+
 
 class MetadataField(RootModel[dict[str, Any]]):
     """
