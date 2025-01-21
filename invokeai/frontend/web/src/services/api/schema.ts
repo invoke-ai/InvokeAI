@@ -6230,7 +6230,7 @@ export type components = {
             /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
-             * @default null
+             * @default []
              */
             loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
@@ -12235,7 +12235,7 @@ export type components = {
             /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
-             * @default null
+             * @default []
              */
             loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
@@ -16083,7 +16083,7 @@ export type components = {
             /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
-             * @default null
+             * @default []
              */
             loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
