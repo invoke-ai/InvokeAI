@@ -333,11 +333,17 @@ export const nodesSlice = createSlice({
     fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
       fieldValueReducer(state, action, zStringFieldCollectionValue);
     },
-    fieldNumberValueChanged: (state, action: FieldValueAction<IntegerFieldValue | FloatFieldValue>) => {
-      fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
+    fieldIntegerValueChanged: (state, action: FieldValueAction<IntegerFieldValue>) => {
+      fieldValueReducer(state, action, zIntegerFieldValue);
     },
-    fieldNumberCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
-      fieldValueReducer(state, action, zIntegerFieldCollectionValue.or(zFloatFieldCollectionValue));
+    fieldFloatValueChanged: (state, action: FieldValueAction<FloatFieldValue>) => {
+      fieldValueReducer(state, action, zFloatFieldValue);
+    },
+    fieldFloatCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zFloatFieldCollectionValue);
+    },
+    fieldIntegerCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zIntegerFieldCollectionValue);
     },
     fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
       fieldValueReducer(state, action, zBooleanFieldValue);
@@ -491,8 +497,10 @@ export const {
   fieldLoRAModelValueChanged,
   fieldModelIdentifierValueChanged,
   fieldMainModelValueChanged,
-  fieldNumberValueChanged,
-  fieldNumberCollectionValueChanged,
+  fieldIntegerValueChanged,
+  fieldFloatValueChanged,
+  fieldFloatCollectionValueChanged,
+  fieldIntegerCollectionValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
@@ -609,8 +617,10 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldLabelChanged,
   fieldLoRAModelValueChanged,
   fieldMainModelValueChanged,
-  fieldNumberValueChanged,
-  fieldNumberCollectionValueChanged,
+  fieldIntegerValueChanged,
+  fieldIntegerCollectionValueChanged,
+  fieldFloatValueChanged,
+  fieldFloatCollectionValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
