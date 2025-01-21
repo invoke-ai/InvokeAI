@@ -25,10 +25,18 @@ const StringFieldInputComponent = (props: FieldComponentProps<StringFieldInputIn
   );
 
   if (fieldTemplate.ui_component === 'textarea') {
-    return <Textarea className="nodrag" onChange={handleValueChanged} value={field.value} rows={5} resize="none" />;
+    return (
+      <Textarea
+        className="nodrag nowheel nopan"
+        onChange={handleValueChanged}
+        value={field.value}
+        h="full"
+        resize="none"
+      />
+    );
   }
 
-  return <Input className="nodrag" onChange={handleValueChanged} value={field.value} />;
+  return <Input className="nodrag nowheel nopan" onChange={handleValueChanged} value={field.value} />;
 };
 
 export default memo(StringFieldInputComponent);
