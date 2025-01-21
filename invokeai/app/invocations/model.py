@@ -205,7 +205,7 @@ class LoRALoaderInvocation(BaseInvocation):
         lora_key = self.lora.key
 
         if not context.models.exists(lora_key):
-            raise Exception(f"Unkown lora: {lora_key}!")
+            raise Exception(f"Unknown lora: {lora_key}!")
 
         if self.unet is not None and any(lora.lora.key == lora_key for lora in self.unet.loras):
             raise Exception(f'LoRA "{lora_key}" already applied to unet')
@@ -261,7 +261,7 @@ class LoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to the provided UNet and CLIP models."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=[], description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
     )
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -287,8 +287,6 @@ class LoRACollectionLoader(BaseInvocation):
             output.clip = self.clip.model_copy(deep=True)
 
         for lora in loras:
-            if lora is None:
-                continue
             assert type(lora) is LoRAField
             if lora.lora.key in added_loras:
                 continue
@@ -409,7 +407,7 @@ class SDXLLoRACollectionLoader(BaseInvocation):
     """Applies a collection of SDXL LoRAs to the provided UNet and CLIP models."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
-        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+        default=[], description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
     )
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -445,8 +443,6 @@ class SDXLLoRACollectionLoader(BaseInvocation):
             output.clip2 = self.clip2.model_copy(deep=True)
 
         for lora in loras:
-            if lora is None:
-                continue
             assert type(lora) is LoRAField
             if lora.lora.key in added_loras:
                 continue
