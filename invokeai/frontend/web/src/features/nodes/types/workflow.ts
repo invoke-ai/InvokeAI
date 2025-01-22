@@ -1,6 +1,4 @@
-import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { useMemo, useSyncExternalStore } from 'react';
 import { z } from 'zod';
 
 import { zFieldIdentifier } from './field';
@@ -75,34 +73,21 @@ export const zWorkflowV3 = z.object({
     category: zWorkflowCategory.default('user'),
     version: z.literal('3.0.0'),
   }),
-  form: z.object({
-    elements: z.record(z.lazy(() => zFormElement)),
-    structure: z.lazy(() => zContainerElement),
-  }),
+  form: z
+    .object({
+      elements: z.record(z.lazy(() => zFormElement)),
+      rootElementId: z.lazy(() => zElementId),
+    })
+    .optional(),
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion
 
 // #region Workflow Builder
-
-export const elements = new SyncableMap<string, FormElement>();
+export const elements: Record<string, FormElement> = {};
 
 export const addElement = (element: FormElement) => {
-  elements.set(element.id, element);
-};
-
-export const removeElement = (id: ElementId) => {
-  return elements.delete(id);
-};
-
-export const getElement = (id: ElementId) => {
-  return elements.get(id);
-};
-
-export const useElement = <T extends FormElement>(id: string) => {
-  const map = useSyncExternalStore(elements.subscribe, elements.getSnapshot);
-  const element = useMemo(() => map.get(id), [id, map]);
-  return element as T | undefined;
+  elements[element.id] = element;
 };
 
 const zElementId = z.string().trim().min(1);
@@ -121,6 +106,7 @@ const zNodeFieldElement = zElementBase.extend({
   }),
 });
 export type NodeFieldElement = z.infer<typeof zNodeFieldElement>;
+export const isNodeFieldElement = (el: FormElement): el is NodeFieldElement => el.type === NODE_FIELD_TYPE;
 const nodeField = (
   nodeId: NodeFieldElement['data']['fieldIdentifier']['nodeId'],
   fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName']
@@ -146,6 +132,7 @@ const zHeadingElement = zElementBase.extend({
   }),
 });
 export type HeadingElement = z.infer<typeof zHeadingElement>;
+export const isHeadingElement = (el: FormElement): el is HeadingElement => el.type === HEADING_TYPE;
 const heading = (
   content: HeadingElement['data']['content'],
   level: HeadingElement['data']['level']
@@ -172,6 +159,7 @@ const zTextElement = zElementBase.extend({
   }),
 });
 export type TextElement = z.infer<typeof zTextElement>;
+export const isTextElement = (el: FormElement): el is TextElement => el.type === TEXT_TYPE;
 const text = (content: TextElement['data']['content'], fontSize: TextElement['data']['fontSize']): TextElement => {
   const element: TextElement = {
     id: getPrefixedId(TEXT_TYPE),
@@ -191,6 +179,7 @@ const zDividerElement = zElementBase.extend({
   type: z.literal(DIVIDER_TYPE),
 });
 export type DividerElement = z.infer<typeof zDividerElement>;
+export const isDividerElement = (el: FormElement): el is DividerElement => el.type === DIVIDER_TYPE;
 const divider = (): DividerElement => {
   const element: DividerElement = {
     id: getPrefixedId(DIVIDER_TYPE),
@@ -218,6 +207,7 @@ const zContainerElement: z.ZodType<ContainerElement> = zElementBase.extend({
     children: z.array(zElementId),
   }),
 });
+export const isContainerElement = (el: FormElement): el is ContainerElement => el.type === CONTAINER_TYPE;
 const container = (
   direction: ContainerElement['data']['direction'],
   children: ContainerElement['data']['children']
@@ -238,7 +228,7 @@ const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElem
 
 export type FormElement = z.infer<typeof zFormElement>;
 
-export const rootId: string = container('column', [
+export const rootElementId: string = container('column', [
   heading('My Cool Workflow', 1).id,
   text('This is a description of what my workflow does. It does things.', 'md').id,
   divider().id,
