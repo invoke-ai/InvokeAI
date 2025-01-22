@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
+from invokeai.backend.patches.layers.partial_layer import PartialLayer, Range
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -41,7 +41,7 @@ def lora_model_from_flux_diffusers_state_dict(
 
 def lora_layers_from_flux_diffusers_grouped_state_dict(
     grouped_state_dict: Dict[str, Dict[str, torch.Tensor]], alpha: float | None
-) -> dict[str, BaseLayerPatch]:
+) -> list[tuple[str, BaseLayerPatch]]:
     """Converts a grouped state dict with Diffusers FLUX LoRA keys to LoRA layers with BFL keys (i.e. the module key
     format used by Invoke).
 
@@ -59,7 +59,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     mlp_ratio = 4.0
     mlp_hidden_dim = int(hidden_size * mlp_ratio)
 
-    layers: dict[str, BaseLayerPatch] = {}
+    layers: list[tuple[str, BaseLayerPatch]] = []
 
     def get_lora_layer_values(src_layer_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         if "lora_A.weight" in src_layer_dict:
@@ -80,7 +80,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
         if src_key in grouped_state_dict:
             src_layer_dict = grouped_state_dict.pop(src_key)
             values = get_lora_layer_values(src_layer_dict)
-            layers[dst_key] = any_lora_layer_from_state_dict(values)
+            layers.append((dst_key, any_lora_layer_from_state_dict(values)))
 
     def add_qkv_lora_layer_if_present(
         src_keys: list[str],
@@ -96,14 +96,13 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
         if not any(keys_present):
             return
 
-        sub_layers: list[BaseLayerPatch] = []
+        dim_0_offset = 0
         for src_key, src_weight_shape in zip(src_keys, src_weight_shapes, strict=True):
             src_layer_dict = grouped_state_dict.pop(src_key, None)
             if src_layer_dict is not None:
                 values = get_lora_layer_values(src_layer_dict)
                 assert values["lora_down.weight"].shape[1] == src_weight_shape[1]
                 assert values["lora_up.weight"].shape[0] == src_weight_shape[0]
-                sub_layers.append(any_lora_layer_from_state_dict(values))
             else:
                 if not allow_missing_keys:
                     raise ValueError(f"Missing LoRA layer: '{src_key}'.")
@@ -111,8 +110,19 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
                     "lora_up.weight": torch.zeros((src_weight_shape[0], 1)),
                     "lora_down.weight": torch.zeros((1, src_weight_shape[1])),
                 }
-                sub_layers.append(any_lora_layer_from_state_dict(values))
-        layers[dst_qkv_key] = ConcatenatedLoRALayer(lora_layers=sub_layers)
+            layers.append(
+                (
+                    dst_qkv_key,
+                    PartialLayer(
+                        any_lora_layer_from_state_dict(values),
+                        (
+                            Range(dim_0_offset, dim_0_offset + src_weight_shape[0]),
+                            Range(0, src_weight_shape[1]),
+                        ),
+                    ),
+                )
+            )
+            dim_0_offset += src_weight_shape[0]
 
     # time_text_embed.timestep_embedder -> time_in.
     add_lora_layer_if_present("time_text_embed.timestep_embedder.linear_1", "time_in.in_layer")
@@ -226,7 +236,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     # Assert that all keys were processed.
     assert len(grouped_state_dict) == 0
 
-    layers_with_prefix = {f"{FLUX_LORA_TRANSFORMER_PREFIX}{k}": v for k, v in layers.items()}
+    layers_with_prefix = [(f"{FLUX_LORA_TRANSFORMER_PREFIX}{k}", v) for k, v in layers]
 
     return layers_with_prefix
 

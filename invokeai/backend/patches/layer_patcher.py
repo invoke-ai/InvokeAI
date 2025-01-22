@@ -81,11 +81,11 @@ class LayerPatcher:
         # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
         # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
         # without searching, but some legacy code still uses flattened keys.
-        layer_keys_are_flattened = "." not in next(iter(patch.layers.keys()))
+        layer_keys_are_flattened = "." not in next(iter(patch.layers))[0]
 
         prefix_len = len(prefix)
 
-        for layer_key, layer in patch.layers.items():
+        for layer_key, layer in patch.layers:
             if not layer_key.startswith(prefix):
                 continue
 
