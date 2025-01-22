@@ -1,6 +1,10 @@
-import { ContainerDirectionContext } from 'features/nodes/components/sidePanel/builder/ContainerContext';
-import { DividerElementComponent } from 'features/nodes/components/sidePanel/builder/DividerElementComponent';
-import { ElementWrapper } from 'features/nodes/components/sidePanel/builder/ElementWrapper';
+import { Flex, type SystemStyleObject } from '@invoke-ai/ui-library';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { ContainerContext } from 'features/nodes/components/sidePanel/builder/ContainerContext';
+import {
+  DIVIDER_CLASS_NAME,
+  DividerElementComponent,
+} from 'features/nodes/components/sidePanel/builder/DividerElementComponent';
 import { HeadingElementComponent } from 'features/nodes/components/sidePanel/builder/HeadingElementComponent';
 import { NodeFieldElementComponent } from 'features/nodes/components/sidePanel/builder/NodeFieldElementComponent';
 import { TextElementComponent } from 'features/nodes/components/sidePanel/builder/TextElementComponent';
@@ -9,16 +13,30 @@ import { memo } from 'react';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-const getGridTemplateColumns = (count: number) => {
-  return Array.from({ length: count }, () => '1fr').join(' ');
-};
-const fill = (count: number, val: string, last?: string) => {
-  return Array.from({ length: count }, (_, i) => {
-    if (last && i === count - 1) {
-      return last;
-    }
-    return val;
-  }).join(' ');
+const CONTAINER_CLASS_NAME = getPrefixedId('container');
+
+const sx: SystemStyleObject = {
+  gap: 4,
+  '&[data-container-direction="column"]': {
+    flexDir: 'column',
+    flex: '1 1 0',
+    // Select all non-divider children (dividers have a fixed width that they define on their own)
+    [`> *:not(.${DIVIDER_CLASS_NAME})`]: {
+      // By default, all children should take up the same amount of space
+      flex: '0 1 0',
+      // The last child should take up the remaining space
+      '&:last-child': {
+        flex: '1 1 auto',
+      },
+    },
+  },
+  '&[data-container-direction="row"]': {
+    // Select all non-divider children (dividers have a fixed width that they define on their own)
+    [`> *:not(.${DIVIDER_CLASS_NAME})`]: {
+      // By default, all children should take up the same amount of space
+      flex: '1 1 0',
+    },
+  },
 };
 
 export const ContainerElementComponent = memo(({ id }: { id: string }) => {
@@ -31,13 +49,13 @@ export const ContainerElementComponent = memo(({ id }: { id: string }) => {
   const { children, direction } = element.data;
 
   return (
-    <ContainerDirectionContext.Provider value={direction}>
-      <ElementWrapper id={id} gap={4} flexDir={direction}>
+    <ContainerContext.Provider value={element.data}>
+      <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-direction={direction}>
         {children.map((childId) => (
           <FormElementComponent key={childId} id={childId} />
         ))}
-      </ElementWrapper>
-    </ContainerDirectionContext.Provider>
+      </Flex>
+    </ContainerContext.Provider>
   );
 });
 ContainerElementComponent.displayName = 'ContainerElementComponent';

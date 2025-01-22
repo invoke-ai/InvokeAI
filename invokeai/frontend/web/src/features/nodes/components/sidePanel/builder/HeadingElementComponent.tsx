@@ -1,5 +1,4 @@
-import { Heading } from '@invoke-ai/ui-library';
-import { ElementWrapper } from 'features/nodes/components/sidePanel/builder/ElementWrapper';
+import { Flex, Heading } from '@invoke-ai/ui-library';
 import { useElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
@@ -21,9 +20,9 @@ export const HeadingElementComponent = memo(({ id }: { id: string }) => {
   const { content, level } = data;
 
   return (
-    <ElementWrapper id={id}>
+    <Flex id={id}>
       <Heading size={LEVEL_TO_SIZE[level]}>{content}</Heading>
-    </ElementWrapper>
+    </Flex>
   );
 });
 
