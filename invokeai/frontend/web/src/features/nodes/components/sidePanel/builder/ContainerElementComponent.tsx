@@ -58,6 +58,7 @@ export const ContainerElementComponent = memo(({ id }: { id: string }) => {
 });
 ContainerElementComponent.displayName = 'ContainerElementComponent';
 
+// TODO(psyche): Can we move this into a separate file and avoid circular dependencies between it and ContainerElementComponent?
 export const FormElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
 
