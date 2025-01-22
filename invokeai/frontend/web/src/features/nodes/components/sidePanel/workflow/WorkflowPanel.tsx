@@ -1,5 +1,5 @@
 import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
-import { WorkflowBuilder } from 'features/nodes/components/sidePanel/workflow/WorkflowBuilder';
+import { WorkflowBuilder } from 'features/nodes/components/sidePanel/builder/WorkflowBuilder';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
