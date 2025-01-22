@@ -1,7 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { InputFieldViewMode } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldViewMode';
-import { useElement } from 'features/nodes/types/workflow';
+import { NODE_FIELD_CLASS_NAME, useElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 export const NodeFieldElementComponent = memo(({ id }: { id: string }) => {
@@ -14,7 +14,7 @@ export const NodeFieldElementComponent = memo(({ id }: { id: string }) => {
   const { fieldIdentifier } = data;
 
   return (
-    <Flex id={id}>
+    <Flex id={id} className={NODE_FIELD_CLASS_NAME}>
       <InputFieldGate nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
         <InputFieldViewMode nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
       </InputFieldGate>

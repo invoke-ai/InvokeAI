@@ -1,12 +1,9 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { DIVIDER_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
-export const DIVIDER_CLASS_NAME = getPrefixedId('divider');
-
 const sx: SystemStyleObject = {
-  flex: '0 0 1px',
   bg: 'base.700',
   flexShrink: 0,
 };

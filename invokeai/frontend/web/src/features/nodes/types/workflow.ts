@@ -113,6 +113,7 @@ const zElementBase = z.object({
 });
 
 const NODE_FIELD_TYPE = 'node-field';
+export const NODE_FIELD_CLASS_NAME = getPrefixedId(NODE_FIELD_TYPE, '-');
 const zNodeFieldElement = zElementBase.extend({
   type: z.literal(NODE_FIELD_TYPE),
   data: z.object({
@@ -136,6 +137,7 @@ const nodeField = (
 };
 
 const HEADING_TYPE = 'heading';
+export const HEADING_CLASS_NAME = getPrefixedId(HEADING_TYPE, '-');
 const zHeadingElement = zElementBase.extend({
   type: z.literal(HEADING_TYPE),
   data: z.object({
@@ -161,6 +163,7 @@ const heading = (
 };
 
 const TEXT_TYPE = 'text';
+export const TEXT_CLASS_NAME = getPrefixedId(TEXT_TYPE, '-');
 const zTextElement = zElementBase.extend({
   type: z.literal(TEXT_TYPE),
   data: z.object({
@@ -183,6 +186,7 @@ const text = (content: TextElement['data']['content'], fontSize: TextElement['da
 };
 
 const DIVIDER_TYPE = 'divider';
+export const DIVIDER_CLASS_NAME = getPrefixedId(DIVIDER_TYPE, '-');
 const zDividerElement = zElementBase.extend({
   type: z.literal(DIVIDER_TYPE),
 });
@@ -206,6 +210,7 @@ export type ContainerElement = {
 };
 
 const CONTAINER_TYPE = 'container';
+export const CONTAINER_CLASS_NAME = getPrefixedId(CONTAINER_TYPE, '-');
 const zContainerElement: z.ZodType<ContainerElement> = zElementBase.extend({
   type: z.literal(CONTAINER_TYPE),
   data: z.object({
@@ -239,6 +244,7 @@ export const rootId: string = container('column', [
   divider().id,
   heading('First Section', 2).id,
   text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm').id,
+  divider().id,
   container('row', [
     nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
     divider().id,
