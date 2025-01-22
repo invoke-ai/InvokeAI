@@ -1,5 +1,6 @@
 import { Flex, Heading } from '@invoke-ai/ui-library';
-import { HEADING_CLASS_NAME, useElement } from 'features/nodes/types/workflow';
+import { useElement } from 'features/nodes/store/workflowSlice';
+import { HEADING_CLASS_NAME, isHeadingElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 const LEVEL_TO_SIZE = {
@@ -11,13 +12,13 @@ const LEVEL_TO_SIZE = {
 } as const;
 
 export const HeadingElementComponent = memo(({ id }: { id: string }) => {
-  const element = useElement(id);
+  const el = useElement(id);
 
-  if (!element || element.type !== 'heading') {
+  if (!el || !isHeadingElement(el)) {
     return null;
   }
 
-  const { content, level } = element.data;
+  const { content, level } = el.data;
 
   return (
     <Flex id={id} className={HEADING_CLASS_NAME}>
