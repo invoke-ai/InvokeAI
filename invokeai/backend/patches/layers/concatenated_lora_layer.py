@@ -2,7 +2,6 @@ from typing import Optional, Sequence
 
 import torch
 
-from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
 
 
@@ -14,7 +13,7 @@ class ConcatenatedLoRALayer(LoRALayerBase):
     stored as separate tensors. This class enables diffusers LoRA layers to be used in BFL FLUX models.
     """
 
-    def __init__(self, lora_layers: Sequence[LoRALayer], concat_axis: int = 0):
+    def __init__(self, lora_layers: Sequence[LoRALayerBase], concat_axis: int = 0):
         super().__init__(alpha=None, bias=None)
 
         self.lora_layers = lora_layers

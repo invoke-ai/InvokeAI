@@ -7,6 +7,7 @@ from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
     FLUX_LORA_CLIP_PREFIX,
+    FLUX_LORA_T5_PREFIX,
     FLUX_LORA_TRANSFORMER_PREFIX,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -32,7 +33,7 @@ FLUX_KOHYA_CLIP_KEY_REGEX = r"lora_te1_text_model_encoder_layers_(\d+)_(mlp|self
 #   lora_te2_encoder_block_0_layer_0_SelfAttention_k.dora_scale
 #   lora_te2_encoder_block_0_layer_0_SelfAttention_k.lora_down.weight
 #   lora_te2_encoder_block_0_layer_0_SelfAttention_k.lora_up.weight
-FLUX_KOHYA_T5_KEY_REGEX = r"lora_te2_encoder_block_(\d+)_layer_(\d+)_(DenseReluDense|SelfAttention)_(\w+)\.?.*"
+FLUX_KOHYA_T5_KEY_REGEX = r"lora_te2_encoder_block_(\d+)_layer_(\d+)_(DenseReluDense|SelfAttention)_(\w+)_?(\w+)?\.?.*"
 
 
 def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> bool:
@@ -58,27 +59,34 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
             grouped_state_dict[layer_name] = {}
         grouped_state_dict[layer_name][param_name] = value
 
-    # Split the grouped state dict into transformer and CLIP state dicts.
+    # Split the grouped state dict into transformer, CLIP, and T5 state dicts.
     transformer_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
     clip_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
+    t5_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
     for layer_name, layer_state_dict in grouped_state_dict.items():
         if layer_name.startswith("lora_unet"):
             transformer_grouped_sd[layer_name] = layer_state_dict
         elif layer_name.startswith("lora_te1"):
             clip_grouped_sd[layer_name] = layer_state_dict
+        elif layer_name.startswith("lora_te2"):
+            t5_grouped_sd[layer_name] = layer_state_dict
         else:
             raise ValueError(f"Layer '{layer_name}' does not match the expected pattern for FLUX LoRA weights.")
 
     # Convert the state dicts to the InvokeAI format.
     transformer_grouped_sd = _convert_flux_transformer_kohya_state_dict_to_invoke_format(transformer_grouped_sd)
     clip_grouped_sd = _convert_flux_clip_kohya_state_dict_to_invoke_format(clip_grouped_sd)
+    t5_grouped_sd = _convert_flux_t5_kohya_state_dict_to_invoke_format(t5_grouped_sd)
 
     # Create LoRA layers.
     layers: dict[str, BaseLayerPatch] = {}
-    for layer_key, layer_state_dict in transformer_grouped_sd.items():
-        layers[FLUX_LORA_TRANSFORMER_PREFIX + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
-    for layer_key, layer_state_dict in clip_grouped_sd.items():
-        layers[FLUX_LORA_CLIP_PREFIX + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
+    for model_prefix, grouped_sd in [
+        (FLUX_LORA_TRANSFORMER_PREFIX, transformer_grouped_sd),
+        (FLUX_LORA_CLIP_PREFIX, clip_grouped_sd),
+        (FLUX_LORA_T5_PREFIX, t5_grouped_sd),
+    ]:
+        for layer_key, layer_state_dict in grouped_sd.items():
+            layers[model_prefix + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
 
     # Create and return the LoRAModelRaw.
     return ModelPatchRaw(layers=layers)
@@ -128,6 +136,34 @@ def _convert_flux_transformer_kohya_state_dict_to_invoke_format(state_dict: Dict
         match = re.match(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, k)
         if match:
             new_key = re.sub(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, replace_func, k)
+            converted_dict[new_key] = v
+        else:
+            raise ValueError(f"Key '{k}' does not match the expected pattern for FLUX LoRA weights.")
+
+    return converted_dict
+
+
+def _convert_flux_t5_kohya_state_dict_to_invoke_format(state_dict: Dict[str, T]) -> Dict[str, T]:
+    """Converts a T5 LoRA state dict from the Kohya FLUX LoRA format to LoRA weight format used internally by
+    InvokeAI.
+
+    Example key conversions:
+
+    "lora_te2_encoder_block_0_layer_0_SelfAttention_k" -> "encoder.block.0.layer.0.SelfAttention.k"
+    "lora_te2_encoder_block_0_layer_1_DenseReluDense_wi_0" -> "encoder.block.0.layer.1.DenseReluDense.wi.0"
+    """
+
+    def replace_func(match: re.Match[str]) -> str:
+        s = f"{match.group(1)}.{match.group(2)}.{match.group(3)}.{match.group(4)}"
+        if match.group(5):
+            s += f".{match.group(5)}"
+        return "encoder.block." + s
+
+    converted_dict: dict[str, T] = {}
+    for k, v in state_dict.items():
+        match = re.match(FLUX_KOHYA_T5_KEY_REGEX, k)
+        if match:
+            new_key = re.sub(FLUX_KOHYA_T5_KEY_REGEX, replace_func, k)
             converted_dict[new_key] = v
         else:
             raise ValueError(f"Key '{k}' does not match the expected pattern for FLUX LoRA weights.")
