@@ -1,5 +1,4 @@
-import { Text } from '@invoke-ai/ui-library';
-import { ElementWrapper } from 'features/nodes/components/sidePanel/builder/ElementWrapper';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { useElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
@@ -13,9 +12,9 @@ export const TextElementComponent = memo(({ id }: { id: string }) => {
   const { content, fontSize } = data;
 
   return (
-    <ElementWrapper id={id}>
+    <Flex id={id}>
       <Text fontSize={fontSize}>{content}</Text>
-    </ElementWrapper>
+    </Flex>
   );
 });
 

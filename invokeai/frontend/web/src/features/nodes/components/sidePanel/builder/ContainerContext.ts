@@ -1,8 +1,9 @@
+import type { ContainerElement } from 'features/nodes/types/workflow';
 import { createContext, useContext } from 'react';
 
-export const ContainerDirectionContext = createContext<'row' | 'column' | null>(null);
+export const ContainerContext = createContext<ContainerElement['data'] | null>(null);
 
-export const useContainerDirectionContext = () => {
-  const containerDirection = useContext(ContainerDirectionContext);
+export const useContainerContext = () => {
+  const containerDirection = useContext(ContainerContext);
   return containerDirection;
 };
