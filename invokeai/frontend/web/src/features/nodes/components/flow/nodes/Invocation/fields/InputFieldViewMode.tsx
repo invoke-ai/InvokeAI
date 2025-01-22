@@ -16,7 +16,7 @@ export const InputFieldViewMode = memo(({ nodeId, fieldName }: Props) => {
 
   return (
     <FormControl w="full" gap={2} flexDir="column">
-      <FormLabel fontSize="sm" display="flex" w="full" m={0} gap={2} px={1}>
+      <FormLabel fontSize="sm" display="flex" w="full" m={0} gap={2} ps={1}>
         {label || fieldTemplateTitle}
         <Spacer />
         <InputFieldResetToInitialValueIconButton nodeId={nodeId} fieldName={fieldName} />
