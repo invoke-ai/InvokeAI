@@ -1,5 +1,5 @@
+import { FloatFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInput';
 import { FloatFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldCollectionInputComponent';
-import { FloatFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldInputComponent';
 import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
 import { IntegerFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerFieldCollectionInputComponent';
@@ -7,6 +7,9 @@ import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/f
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
+import { IntegerFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInput';
+import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
+import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import {
@@ -93,7 +96,6 @@ import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import FluxMainModelFieldInputComponent from './inputs/FluxMainModelFieldInputComponent';
 import FluxVAEModelFieldInputComponent from './inputs/FluxVAEModelFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
-import { IntegerFieldInputComponent } from './inputs/IntegerFieldInputComponent';
 import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
@@ -102,11 +104,9 @@ import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent'
 import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComponent';
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
-import StringFieldInputComponent from './inputs/StringFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
-
 type InputFieldProps = {
   nodeId: string;
   fieldName: string;
@@ -121,7 +121,11 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName }: InputFieldProps) 
   }
 
   if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
-    return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    if (fieldTemplate.ui_component === 'textarea') {
+      return <StringFieldTextarea nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    } else {
+      return <StringFieldInput nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    }
   }
 
   if (isBooleanFieldInputInstance(fieldInstance) && isBooleanFieldInputTemplate(fieldTemplate)) {
@@ -129,7 +133,7 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName }: InputFieldProps) 
   }
 
   if (isFloatFieldInputInstance(fieldInstance) && isFloatFieldInputTemplate(fieldTemplate)) {
-    return <FloatFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return <FloatFieldInput nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isFloatFieldCollectionInputInstance(fieldInstance) && isFloatFieldCollectionInputTemplate(fieldTemplate)) {
@@ -137,7 +141,7 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName }: InputFieldProps) 
   }
 
   if (isIntegerFieldInputInstance(fieldInstance) && isIntegerFieldInputTemplate(fieldTemplate)) {
-    return <IntegerFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+    return <IntegerFieldInput nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isIntegerFieldCollectionInputInstance(fieldInstance) && isIntegerFieldCollectionInputTemplate(fieldTemplate)) {
