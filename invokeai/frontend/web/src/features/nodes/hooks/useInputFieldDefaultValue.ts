@@ -1,6 +1,6 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useInputFieldValue } from 'features/nodes/hooks/useInputFieldValue';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldValue } from 'features/nodes/hooks/useInputFieldValue';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { isEqual } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
