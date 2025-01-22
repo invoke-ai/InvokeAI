@@ -1,5 +1,6 @@
 import { Heading } from '@invoke-ai/ui-library';
-import type { HeadingElement } from 'features/nodes/types/workflow';
+import { ElementWrapper } from 'features/nodes/components/sidePanel/builder/ElementWrapper';
+import { useElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 const LEVEL_TO_SIZE = {
@@ -10,14 +11,19 @@ const LEVEL_TO_SIZE = {
   5: 'xs',
 } as const;
 
-export const HeadingElementComponent = memo(({ element }: { element: HeadingElement }) => {
-  const { id, data } = element;
+export const HeadingElementComponent = memo(({ id }: { id: string }) => {
+  const element = useElement(id);
+
+  if (!element || element.type !== 'heading') {
+    return null;
+  }
+  const { data } = element;
   const { content, level } = data;
 
   return (
-    <Heading id={id} size={LEVEL_TO_SIZE[level]}>
-      {content}
-    </Heading>
+    <ElementWrapper id={id}>
+      <Heading size={LEVEL_TO_SIZE[level]}>{content}</Heading>
+    </ElementWrapper>
   );
 });
 
