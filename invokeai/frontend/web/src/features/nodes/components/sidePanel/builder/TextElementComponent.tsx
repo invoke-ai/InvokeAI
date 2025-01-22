@@ -1,5 +1,5 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
-import { useElement } from 'features/nodes/types/workflow';
+import { TEXT_CLASS_NAME, useElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 export const TextElementComponent = memo(({ id }: { id: string }) => {
@@ -12,7 +12,7 @@ export const TextElementComponent = memo(({ id }: { id: string }) => {
   const { content, fontSize } = data;
 
   return (
-    <Flex id={id}>
+    <Flex id={id} className={TEXT_CLASS_NAME}>
       <Text fontSize={fontSize}>{content}</Text>
     </Flex>
   );

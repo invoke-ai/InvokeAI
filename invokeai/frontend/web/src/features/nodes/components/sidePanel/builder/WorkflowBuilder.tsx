@@ -7,8 +7,8 @@ import { memo } from 'react';
 export const WorkflowBuilder = memo(() => {
   return (
     <ScrollableContent>
-      <Flex w="full" h="full" justifyContent="center">
-        <Flex w="full" h="full" maxW={512}>
+      <Flex w="full" justifyContent="center">
+        <Flex w="full" maxW={512}>
           <FormElementComponent id={rootId} />
         </Flex>
       </Flex>
