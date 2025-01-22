@@ -147,40 +147,18 @@ const divider = (): DividerElement => ({
   type: 'divider',
 });
 
-export type ColumnElement = {
-  id: string;
-  type: 'column';
-  data: {
-    elements: ColumnChildElement[];
-  };
-};
-
-const zColumnElement = zElementBase.extend({
-  type: z.literal('column'),
-  data: z.object({
-    elements: z.lazy(() => z.array(zColumnChildElement)),
-  }),
-});
-const column = (elements: ColumnElement['data']['elements']): ColumnElement => ({
-  id: nanoid(),
-  type: 'column',
-  data: {
-    elements,
-  },
-});
-
 export type ContainerElement = {
   id: string;
   type: 'container';
   data: {
-    columns: ColumnElement[];
+    columns: FormElement[][];
   };
 };
 
 const zContainerElement: z.ZodType<ContainerElement> = zElementBase.extend({
   type: z.literal('container'),
   data: z.object({
-    columns: z.lazy(() => z.array(zColumnElement)),
+    columns: z.lazy(() => z.array(z.array(zFormElement))),
   }),
 });
 const container = (columns: ContainerElement['data']['columns']): ContainerElement => ({
@@ -191,70 +169,60 @@ const container = (columns: ContainerElement['data']['columns']): ContainerEleme
   },
 });
 
-// export type CollapsibleElement = {
-//   id: string;
-//   type: 'collapsible';
-//   columns: BuilderElement[];
-//   title: string;
-//   collapsed: boolean;
-// };
+const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElement, zTextElement, zDividerElement]);
 
-// const zCollapsibleElement: z.ZodType<CollapsibleElement> = z.object({
-//   type: z.literal('collapsible'),
-//   columns: z.lazy(() => z.array(zElement)),
-//   title: z.string(),
-//   collapsed: z.boolean(),
-// });
-
-const zColumnChildElement = z.union([
-  zContainerElement,
-  // zCollapsibleElement
-  zNodeFieldElement,
-  zHeadingElement,
-  zTextElement,
-  zDividerElement,
-]);
-
-export type ColumnChildElement = z.infer<typeof zColumnChildElement>;
+export type FormElement = z.infer<typeof zFormElement>;
 
 export const data: ContainerElement = container([
-  column([
+  [
     heading('My Cool Workflow', 1),
     text('This is a description of what my workflow does. It does things.', 'md'),
     divider(),
     heading('First Section', 2),
     text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm'),
     container([
-      column([nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image')]),
-      column([nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image')]),
-      column([nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image')]),
+      [nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image')],
+      [nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image')],
+      [nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image')],
     ]),
     nodeField('9c058600-8d73-4702-912b-0ccf37403bfd', 'value'),
     nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value'),
     nodeField('4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', 'value'),
     nodeField('39cb5272-a9d7-4da9-9c35-32e02b46bb34', 'color'),
     container([
-      column([
+      [
         nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
         nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
-      ]),
-      column([
+      ],
+      [
         nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
         nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
         nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
         nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
-      ]),
+      ],
+      [
+        container([
+          [
+            nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
+            nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
+          ],
+          [
+            nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
+            nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value'),
+          ],
+        ]),
+      ],
     ]),
     nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model'),
     divider(),
     text('These are some text that are definitely super helpful.', 'sm'),
     divider(),
     container([
-      column([
+      [
         nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image'),
         nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image'),
-      ]),
-      column([nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value')]),
+      ],
+      [nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value')],
     ]),
-  ]),
+  ],
 ]);
