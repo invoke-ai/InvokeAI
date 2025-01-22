@@ -1,6 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { ContainerElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
+import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
 import { data } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
@@ -9,7 +9,7 @@ export const WorkflowBuilder = memo(() => {
     <ScrollableContent>
       <Flex w="full" h="full" justifyContent="center">
         <Flex w="full" h="full" maxW={512}>
-          <ContainerElementComponent element={data} />
+          <FormElementComponent element={data} />
         </Flex>
       </Flex>
     </ScrollableContent>
