@@ -1,7 +1,13 @@
 import pytest
 
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
+    FLUX_LORA_CLIP_PREFIX,
+    FLUX_LORA_T5_PREFIX,
+    FLUX_LORA_TRANSFORMER_PREFIX,
+)
 from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_utils import (
     is_state_dict_likely_in_flux_onetrainer_format,
+    lora_model_from_flux_onetrainer_state_dict,
 )
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
     state_dict_keys as flux_onetrainer_state_dict_keys,
@@ -42,3 +48,30 @@ def test_is_state_dict_likely_in_flux_onetrainer_format_false(sd_keys: dict[str,
     """
     state_dict = keys_to_mock_state_dict(sd_keys)
     assert not is_state_dict_likely_in_flux_onetrainer_format(state_dict)
+
+
+def test_lora_model_from_flux_onetrainer_state_dict():
+    state_dict = keys_to_mock_state_dict(flux_onetrainer_state_dict_keys)
+
+    lora_model = lora_model_from_flux_onetrainer_state_dict(state_dict)
+
+    # Check that the model has the correct number of LoRA layers.
+    expected_lora_layers: set[str] = set()
+    for k in flux_onetrainer_state_dict_keys:
+        k = k.replace(".lora_up.weight", "")
+        k = k.replace(".lora_down.weight", "")
+        k = k.replace(".alpha", "")
+        k = k.replace(".dora_scale", "")
+        expected_lora_layers.add(k)
+    # Drop the K/V/proj_mlp weights because these are all concatenated into a single layer in the BFL format (we keep
+    # the Q weights so that we count these layers once).
+    concatenated_weights = ["to_k", "to_v", "proj_mlp", "add_k_proj", "add_v_proj"]
+    expected_lora_layers = {k for k in expected_lora_layers if not any(w in k for w in concatenated_weights)}
+
+    assert len(lora_model.layers) == len(expected_lora_layers)
+
+    # Check that all of the layers have the expected prefix.
+    assert all(
+        k.startswith((FLUX_LORA_TRANSFORMER_PREFIX, FLUX_LORA_CLIP_PREFIX, FLUX_LORA_T5_PREFIX))
+        for k in lora_model.layers.keys()
+    )
