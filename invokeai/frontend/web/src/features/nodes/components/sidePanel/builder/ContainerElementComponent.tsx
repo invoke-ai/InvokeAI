@@ -1,28 +1,12 @@
-import { Grid } from '@invoke-ai/ui-library';
-import { ColumnElementComponent } from 'features/nodes/components/sidePanel/builder/ColumnElementComponent';
-import type { ContainerElement } from 'features/nodes/types/workflow';
-import type { PropsWithChildren } from 'react';
-import { createContext, memo, useContext, useMemo } from 'react';
+import { Flex, Grid, GridItem } from '@invoke-ai/ui-library';
+import { DividerElementComponent } from 'features/nodes/components/sidePanel/builder/DividerElementComponent';
+import { HeadingElementComponent } from 'features/nodes/components/sidePanel/builder/HeadingElementComponent';
+import { NodeFieldElementComponent } from 'features/nodes/components/sidePanel/builder/NodeFieldElementComponent';
+import { TextElementComponent } from 'features/nodes/components/sidePanel/builder/TextElementComponent';
+import type { ContainerElement, FormElement } from 'features/nodes/types/workflow';
+import { Fragment, memo } from 'react';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
-
-const _ContainerContext = createContext<{ containerId: string; columnIds: string[]; depth: number } | null>(null);
-const ContainerContextProvider = ({
-  containerId,
-  columnIds,
-  children,
-}: PropsWithChildren<{ containerId: string; columnIds: string[] }>) => {
-  const parentCtx = useContext(_ContainerContext);
-  const ctx = useMemo(
-    () => ({ containerId, columnIds, depth: parentCtx ? parentCtx.depth + 1 : 0 }),
-    [columnIds, containerId, parentCtx]
-  );
-  return <_ContainerContext.Provider value={ctx}>{children}</_ContainerContext.Provider>;
-};
-export const useContainerContext = () => {
-  const context = useContext(_ContainerContext);
-  assert(context !== null);
-  return context;
-};
 
 const getGridTemplateColumns = (count: number) => {
   return Array.from({ length: count }, () => '1fr').join(' auto ');
@@ -31,16 +15,43 @@ const getGridTemplateColumns = (count: number) => {
 export const ContainerElementComponent = memo(({ element }: { element: ContainerElement }) => {
   const { id, data } = element;
   const { columns } = data;
-  const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
 
   return (
-    <ContainerContextProvider containerId={id} columnIds={columnIds}>
-      <Grid id={id} gap={4} gridTemplateColumns={getGridTemplateColumns(columns.length)} gridAutoFlow="column">
-        {columns.map((element, i) => {
-          return <ColumnElementComponent key={`column:${id}_${i + 1}`} element={element} />;
-        })}
-      </Grid>
-    </ContainerContextProvider>
+    <Grid id={id} gap={4} gridTemplateColumns={getGridTemplateColumns(columns.length)} gridAutoFlow="column">
+      {columns.map((elements, columnIndex) => {
+        const key = `${element.id}_${columnIndex}`;
+        const withDivider = columnIndex < columns.length - 1;
+        return (
+          <Fragment key={key}>
+            <GridItem as={Grid} id={key} gap={4} gridAutoRows="min-content" gridAutoFlow="row">
+              {elements.map((element) => (
+                <FormElementComponent key={element.id} element={element} />
+              ))}
+            </GridItem>
+            {withDivider && <Flex w="1px" bg="base.800" flexShrink={0} />}
+          </Fragment>
+        );
+      })}
+    </Grid>
   );
 });
 ContainerElementComponent.displayName = 'ContainerElementComponent';
+
+export const FormElementComponent = memo(({ element }: { element: FormElement }) => {
+  const { type, id } = element;
+  switch (type) {
+    case 'container':
+      return <ContainerElementComponent key={id} element={element} />;
+    case 'node-field':
+      return <NodeFieldElementComponent key={id} element={element} />;
+    case 'divider':
+      return <DividerElementComponent key={id} element={element} />;
+    case 'heading':
+      return <HeadingElementComponent key={id} element={element} />;
+    case 'text':
+      return <TextElementComponent key={id} element={element} />;
+    default:
+      assert<Equals<typeof type, never>>(false, `Unhandled type ${type}`);
+  }
+});
+FormElementComponent.displayName = 'FormElementComponent';
