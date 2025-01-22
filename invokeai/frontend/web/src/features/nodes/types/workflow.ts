@@ -78,182 +78,181 @@ export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion
 
 // #region Workflow Builder
-const zElementId = z.string().trim().min(1);
+const buildElementBuilder =
+  <T extends BuilderElement['type']>(type: T) =>
+  (data: Extract<BuilderElement, { type: T }>['data']): Extract<BuilderElement, { type: T }> =>
+    ({
+      id: nanoid(),
+      type,
+      data,
+    }) as Extract<BuilderElement, { type: T }>;
+const zFieldElementNumberConfig = z.object({
+  display: z.enum(['slider', 'input', 'input-with-slider-inline', 'input-with-slider-popover']),
+});
+const zFieldElementStringConfig = z.object({
+  display: z.enum(['input', 'textarea']),
+});
 
-const zFieldElement = z.object({
-  id: zElementId,
+const zElementBase = z.object({
+  id: z.string().trim().min(1),
+});
+
+const zFieldElement = zElementBase.extend({
   type: z.literal('field'),
-  fieldIdentifier: zFieldIdentifier,
+  data: z.object({
+    fieldIdentifier: zFieldIdentifier,
+    fieldConfig: z.union([zFieldElementNumberConfig, zFieldElementStringConfig]).optional(),
+  }),
 });
 export type FieldElement = z.infer<typeof zFieldElement>;
+const buildFieldElement = buildElementBuilder('field');
 
-const zHeadingElement = z.object({
-  id: zElementId,
+const zHeadingElement = zElementBase.extend({
   type: z.literal('heading'),
-  content: z.string(),
-  level: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  data: z.object({
+    content: z.string(),
+    level: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  }),
 });
 export type HeadingElement = z.infer<typeof zHeadingElement>;
+const buildHeadingElement = buildElementBuilder('heading');
 
-const zNotesElement = z.object({
-  id: zElementId,
-  type: z.literal('notes'),
-  content: z.string(),
-  fontSize: z.enum(['sm', 'md', 'lg']),
+const zTextElement = zElementBase.extend({
+  type: z.literal('text'),
+  data: z.object({
+    content: z.string(),
+    fontSize: z.enum(['sm', 'md', 'lg']),
+  }),
 });
-export type NotesElement = z.infer<typeof zNotesElement>;
+export type TextElement = z.infer<typeof zTextElement>;
+const buildTextElement = buildElementBuilder('text');
 
-const zDividerElement = z.object({
-  id: zElementId,
+const zDividerElement = zElementBase.extend({
   type: z.literal('divider'),
+  data: z.void(),
 });
 export type DividerElement = z.infer<typeof zDividerElement>;
+const buildDividerElement = buildElementBuilder('divider');
 
-export type ContainerElement = {
+export type StackElement = {
   id: string;
-  type: 'container';
-  children: BuilderElement[];
-  orientation: 'horizontal' | 'vertical';
+  type: 'stack';
+  data: {
+    children: BuilderElement[];
+    direction: 'horizontal' | 'vertical';
+  };
 };
 
-export type BuilderElement = FieldElement | HeadingElement | NotesElement | DividerElement | ContainerElement;
-
-const zContainerElement: z.ZodType<ContainerElement> = z.object({
-  id: zElementId,
-  type: z.literal('container'),
-  children: z.lazy(() => z.array(zElement)),
-  orientation: z.enum(['horizontal', 'vertical']),
+const zStackElement: z.ZodType<StackElement> = zElementBase.extend({
+  type: z.literal('stack'),
+  data: z.object({
+    children: z.lazy(() => z.array(zElement)),
+    direction: z.enum(['horizontal', 'vertical']),
+  }),
 });
+const buildStackElement = buildElementBuilder('stack');
 
-const zElement = z.union([zFieldElement, zNotesElement, zDividerElement, zContainerElement]);
+// export type CollapsibleElement = {
+//   id: string;
+//   type: 'collapsible';
+//   children: BuilderElement[];
+//   title: string;
+//   collapsed: boolean;
+// };
 
-type ElementType = BuilderElement['type'];
+// const zCollapsibleElement: z.ZodType<CollapsibleElement> = z.object({
+//   type: z.literal('collapsible'),
+//   children: z.lazy(() => z.array(zElement)),
+//   title: z.string(),
+//   collapsed: z.boolean(),
+// });
 
-export const data: ContainerElement = {
-  id: nanoid(),
-  type: 'container',
-  orientation: 'vertical',
+const zElement = z.union([
+  zStackElement,
+  // zCollapsibleElement
+  zFieldElement,
+  zHeadingElement,
+  zTextElement,
+  zDividerElement,
+]);
+
+export type BuilderElement =
+  | StackElement
+  // | CollapsibleElement
+  | FieldElement
+  | HeadingElement
+  | TextElement
+  | DividerElement;
+
+export const data: StackElement = buildStackElement({
+  direction: 'vertical',
   children: [
-    { id: nanoid(), type: 'heading', content: 'My Cool Workflow', level: 1 },
-    {
-      id: nanoid(),
-      type: 'notes',
-      content: 'This is a description of what my workflow does. It does things.',
-      fontSize: 'md',
-    },
-    { id: nanoid(), type: 'heading', content: 'First Section', level: 2 },
-    {
-      id: nanoid(),
-      type: 'notes',
+    buildHeadingElement({ content: 'My Cool Workflow', level: 1 }),
+    buildTextElement({ content: 'This is a description of what my workflow does. It does things.', fontSize: 'md' }),
+    buildDividerElement(),
+    buildHeadingElement({ content: 'First Section', level: 2 }),
+    buildTextElement({
       content: 'The first section includes fields relevant to the first section. This note describes that fact.',
       fontSize: 'sm',
-    },
-    {
-      id: nanoid(),
-      type: 'container',
-      orientation: 'horizontal',
+    }),
+    buildStackElement({
+      direction: 'horizontal',
       children: [
-        {
-          id: nanoid(),
-          type: 'field',
+        buildFieldElement({
           fieldIdentifier: { nodeId: '7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', fieldName: 'image' },
-        },
-        {
-          id: nanoid(),
-          type: 'field',
+        }),
+        buildFieldElement({
           fieldIdentifier: { nodeId: '7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', fieldName: 'image' },
-        },
-        {
-          id: nanoid(),
-          type: 'field',
+        }),
+        buildFieldElement({
           fieldIdentifier: { nodeId: '7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', fieldName: 'image' },
-        },
+        }),
       ],
-    },
-    {
-      id: nanoid(),
-      type: 'field',
-      fieldIdentifier: { nodeId: '9c058600-8d73-4702-912b-0ccf37403bfd', fieldName: 'value' },
-    },
-    {
-      id: nanoid(),
-      type: 'field',
-      fieldIdentifier: { nodeId: '7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', fieldName: 'value' },
-    },
-    {
-      id: nanoid(),
-      type: 'field',
-      fieldIdentifier: { nodeId: '4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', fieldName: 'value' },
-    },
-    {
-      id: nanoid(),
-      type: 'field',
-      fieldIdentifier: { nodeId: '39cb5272-a9d7-4da9-9c35-32e02b46bb34', fieldName: 'color' },
-    },
-    {
-      id: nanoid(),
-      type: 'container',
-      orientation: 'horizontal',
+    }),
+    buildFieldElement({ fieldIdentifier: { nodeId: '9c058600-8d73-4702-912b-0ccf37403bfd', fieldName: 'value' } }),
+    buildFieldElement({ fieldIdentifier: { nodeId: '7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', fieldName: 'value' } }),
+    buildFieldElement({ fieldIdentifier: { nodeId: '4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', fieldName: 'value' } }),
+    buildFieldElement({ fieldIdentifier: { nodeId: '39cb5272-a9d7-4da9-9c35-32e02b46bb34', fieldName: 'color' } }),
+    buildStackElement({
+      direction: 'horizontal',
       children: [
-        {
-          id: nanoid(),
-          type: 'field',
+        buildFieldElement({
           fieldIdentifier: { nodeId: '4f609a81-0e25-47d1-ba0d-f24fedd5273f', fieldName: 'value' },
-        },
-        {
-          id: nanoid(),
-          type: 'field',
+        }),
+        buildFieldElement({
           fieldIdentifier: { nodeId: '4f609a81-0e25-47d1-ba0d-f24fedd5273f', fieldName: 'value' },
-        },
-        {
-          id: nanoid(),
-          type: 'field',
+        }),
+        buildFieldElement({
           fieldIdentifier: { nodeId: '4f609a81-0e25-47d1-ba0d-f24fedd5273f', fieldName: 'value' },
-        },
-        {
-          id: nanoid(),
-          type: 'field',
+        }),
+        buildFieldElement({
           fieldIdentifier: { nodeId: '4f609a81-0e25-47d1-ba0d-f24fedd5273f', fieldName: 'value' },
-        },
+        }),
       ],
-    },
-    {
-      id: nanoid(),
-      type: 'field',
-      fieldIdentifier: { nodeId: '14744f68-9000-4694-b4d6-cbe83ee231ee', fieldName: 'model' },
-    },
-    { id: nanoid(), type: 'divider' },
-    { id: nanoid(), type: 'notes', content: 'These are some notes that are definitely super helpful.', fontSize: 'sm' },
-    { id: nanoid(), type: 'divider' },
-    {
-      id: nanoid(),
-      type: 'container',
-      orientation: 'horizontal',
+    }),
+    buildFieldElement({ fieldIdentifier: { nodeId: '14744f68-9000-4694-b4d6-cbe83ee231ee', fieldName: 'model' } }),
+    buildDividerElement(),
+    buildTextElement({ content: 'These are some text that are definitely super helpful.', fontSize: 'sm' }),
+    buildDividerElement(),
+    buildStackElement({
+      direction: 'horizontal',
       children: [
-        {
-          id: nanoid(),
-          type: 'container',
-          orientation: 'vertical',
+        buildStackElement({
+          direction: 'vertical',
           children: [
-            {
-              id: nanoid(),
-              type: 'field',
+            buildFieldElement({
               fieldIdentifier: { nodeId: '7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', fieldName: 'image' },
-            },
-            {
-              id: nanoid(),
-              type: 'field',
+            }),
+            buildFieldElement({
               fieldIdentifier: { nodeId: '7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', fieldName: 'image' },
-            },
+            }),
           ],
-        },
-        { id: nanoid(), type: 'divider' },
-        {
-          id: nanoid(),
-          type: 'field',
+        }),
+        buildDividerElement(),
+        buildFieldElement({
           fieldIdentifier: { nodeId: '7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', fieldName: 'value' },
-        },
+        }),
       ],
-    },
+    }),
   ],
-};
+});
