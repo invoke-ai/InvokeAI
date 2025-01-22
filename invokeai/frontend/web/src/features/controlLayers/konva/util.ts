@@ -484,9 +484,10 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 export const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 10);
 
 export function getPrefixedId(
-  prefix: CanvasEntityIdentifier['type'] | CanvasObjectState['type'] | (string & Record<never, never>)
+  prefix: CanvasEntityIdentifier['type'] | CanvasObjectState['type'] | (string & Record<never, never>),
+  separator = ':'
 ): string {
-  return `${prefix}:${nanoid()}`;
+  return `${prefix}${separator}${nanoid()}`;
 }
 
 export const getEmptyRect = (): Rect => {
