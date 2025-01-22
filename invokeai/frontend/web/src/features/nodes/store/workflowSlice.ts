@@ -28,6 +28,17 @@ const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   exposedFields: [],
   meta: { version: '3.0.0', category: 'user' },
   id: undefined,
+  form: {
+    elements: {},
+    structure: {
+      id: 'root',
+      type: 'container',
+      data: {
+        direction: 'column',
+        children: [],
+      },
+    },
+  },
 };
 
 const initialWorkflowState: WorkflowState = {
