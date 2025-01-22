@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
@@ -11,8 +12,9 @@ import type {
 } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import type { WorkflowCategory, WorkflowV3 } from 'features/nodes/types/workflow';
+import type { ContainerElement, FormElement, WorkflowCategory, WorkflowV3 } from 'features/nodes/types/workflow';
 import { isEqual, omit, uniqBy } from 'lodash-es';
+import { useMemo } from 'react';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
 import { selectNodesSlice } from './selectors';
@@ -28,17 +30,7 @@ const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   exposedFields: [],
   meta: { version: '3.0.0', category: 'user' },
   id: undefined,
-  form: {
-    elements: {},
-    structure: {
-      id: 'root',
-      type: 'container',
-      data: {
-        direction: 'column',
-        children: [],
-      },
-    },
-  },
+  form: undefined,
 };
 
 const initialWorkflowState: WorkflowState = {
@@ -133,6 +125,43 @@ export const workflowSlice = createSlice({
     },
     workflowSaved: (state) => {
       state.isTouched = false;
+    },
+    formLoaded: (state, action: PayloadAction<{ elements: Record<string, FormElement>; rootElementId: string }>) => {
+      state.form = action.payload;
+    },
+    formCreated: (state, action: PayloadAction<{ container: ContainerElement }>) => {
+      const { container } = action.payload;
+      state.form = {
+        elements: {
+          [container.id]: container,
+        },
+        rootElementId: container.id,
+      };
+    },
+    formElementAdded: (state, action: PayloadAction<{ element: FormElement; containerId: string; index: number }>) => {
+      if (!state.form) {
+        // Cannot add an element if the form has not been created
+        return;
+      }
+      const { element, containerId, index } = action.payload;
+      const containerElement = state.form.elements[containerId];
+      if (containerElement?.type !== 'container') {
+        return;
+      }
+      state.form.elements[element.id] = element;
+      containerElement.data.children.splice(index, 0, element.id);
+    },
+    formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
+      if (!state.form) {
+        // Cannot remove an element if the form has not been created
+        return;
+      }
+      const form = state.form;
+      const { id } = action.payload;
+      buildRemoveElementById(form.elements)(id, form.rootElementId);
+    },
+    formReset: (state) => {
+      state.form = undefined;
     },
   },
   extraReducers: (builder) => {
@@ -247,6 +276,11 @@ export const {
   workflowOrderByChanged,
   workflowOrderDirectionChanged,
   categorySectionsChanged,
+  formLoaded,
+  formCreated,
+  formElementAdded,
+  formElementRemoved,
+  formReset,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -283,3 +317,37 @@ export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflo
   const savedWorkflow = !!workflow.id;
   return noNodes && !isTouched && !savedWorkflow;
 });
+
+export const selectRootElementId = createWorkflowSelector((workflow) => workflow.form?.rootElementId);
+const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
+export const useElement = (id: string): FormElement | undefined => {
+  const selector = useMemo(() => buildSelectElement(id), [id]);
+  const element = useAppSelector(selector);
+  return element;
+};
+
+const buildRemoveElementById = (elements: NonNullable<WorkflowV3['form']>['elements']) => {
+  const removeElementById = (id: string, containerId: string): boolean => {
+    const container = elements[containerId] as ContainerElement;
+
+    if (container.type !== 'container') {
+      return false;
+    }
+
+    const index = container.data.children.indexOf(id);
+    if (index !== -1) {
+      container.data.children.splice(index, 1);
+      delete elements[id];
+      return true;
+    }
+
+    for (const childId of container.data.children) {
+      if (removeElementById(id, childId)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+  return removeElementById;
+};
