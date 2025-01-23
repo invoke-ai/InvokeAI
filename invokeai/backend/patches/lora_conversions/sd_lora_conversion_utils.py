@@ -10,9 +10,9 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 def lora_model_from_sd_state_dict(state_dict: Dict[str, torch.Tensor]) -> ModelPatchRaw:
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = _group_state(state_dict)
 
-    layers: dict[str, BaseLayerPatch] = {}
+    layers: list[tuple[str, BaseLayerPatch]] = []
     for layer_key, values in grouped_state_dict.items():
-        layers[layer_key] = any_lora_layer_from_state_dict(values)
+        layers.append((layer_key, any_lora_layer_from_state_dict(values)))
 
     return ModelPatchRaw(layers=layers)
 

@@ -55,12 +55,8 @@ def test_lora_model_from_flux_diffusers_state_dict(sd_keys: dict[str, list[int]]
         k = k.replace("lora_A.weight", "")
         k = k.replace("lora_B.weight", "")
         expected_lora_layers.add(k)
-    # Drop the K/V/proj_mlp weights because these are all concatenated into a single layer in the BFL format (we keep
-    # the Q weights so that we count these layers once).
-    concatenated_weights = ["to_k", "to_v", "proj_mlp", "add_k_proj", "add_v_proj"]
-    expected_lora_layers = {k for k in expected_lora_layers if not any(w in k for w in concatenated_weights)}
     assert len(model.layers) == len(expected_lora_layers)
-    assert all(k.startswith(FLUX_LORA_TRANSFORMER_PREFIX) for k in model.layers.keys())
+    assert all(k.startswith(FLUX_LORA_TRANSFORMER_PREFIX) for k, _ in model.layers)
 
 
 def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():

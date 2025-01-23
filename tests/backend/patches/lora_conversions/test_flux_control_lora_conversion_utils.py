@@ -51,10 +51,8 @@ def test_lora_model_from_flux_control_state_dict(sd_keys: dict[str, list[int]]):
         k = k.replace("lora_B.bias", "")
         k = k.replace(".scale", "")
         expected_lora_layers.add(k)
-    # Drop the K/V/proj_mlp weights because these are all concatenated into a single layer in the BFL format (we keep
-    # the Q weights so that we count these layers once).
     assert len(model.layers) == len(expected_lora_layers)
-    assert all(k.startswith(FLUX_LORA_TRANSFORMER_PREFIX) for k in model.layers.keys())
+    assert all(k.startswith(FLUX_LORA_TRANSFORMER_PREFIX) for k, _ in model.layers)
 
 
 def test_lora_model_from_flux_control_state_dict_extra_keys_error():

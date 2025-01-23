@@ -58,14 +58,21 @@ def test_apply_smart_model_patches(
     lora_weight = 0.5
     lora_models: list[tuple[ModelPatchRaw, float]] = []
     for _ in range(num_loras):
-        lora_layers = {
-            "linear_layer_1": LoRALayer.from_state_dict_values(
-                values={
-                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
-                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
-                },
+        lora_layers = [
+            (
+                "linear_layer_1",
+                LoRALayer.from_state_dict_values(
+                    values={
+                        "lora_down.weight": torch.ones(
+                            (lora_rank, linear_in_features), device="cpu", dtype=torch.float16
+                        ),
+                        "lora_up.weight": torch.ones(
+                            (linear_out_features, lora_rank), device="cpu", dtype=torch.float16
+                        ),
+                    },
+                ),
             )
-        }
+        ]
         lora = ModelPatchRaw(lora_layers)
         lora_models.append((lora, lora_weight))
 
@@ -104,8 +111,8 @@ def test_apply_smart_model_patches(
 
             # After patching, all LoRA layer weights should have been moved back to the cpu.
             for lora, _ in lora_models:
-                assert lora.layers["linear_layer_1"].up.device.type == "cpu"
-                assert lora.layers["linear_layer_1"].down.device.type == "cpu"
+                assert lora.layers[0][1].up.device.type == "cpu"
+                assert lora.layers[0][1].down.device.type == "cpu"
 
         output_during_patch = model(input)
 
@@ -150,20 +157,34 @@ def test_apply_smart_lora_patches_to_partially_loaded_model(num_loras: int):
     lora_weight = 0.5
     lora_models: list[tuple[ModelPatchRaw, float]] = []
     for _ in range(num_loras):
-        lora_layers = {
-            "linear_layer_1": LoRALayer.from_state_dict_values(
-                values={
-                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
-                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
-                },
+        lora_layers = [
+            (
+                "linear_layer_1",
+                LoRALayer.from_state_dict_values(
+                    values={
+                        "lora_down.weight": torch.ones(
+                            (lora_rank, linear_in_features), device="cpu", dtype=torch.float16
+                        ),
+                        "lora_up.weight": torch.ones(
+                            (linear_out_features, lora_rank), device="cpu", dtype=torch.float16
+                        ),
+                    },
+                ),
             ),
-            "linear_layer_2": LoRALayer.from_state_dict_values(
-                values={
-                    "lora_down.weight": torch.ones((lora_rank, linear_out_features), device="cpu", dtype=torch.float16),
-                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
-                },
+            (
+                "linear_layer_2",
+                LoRALayer.from_state_dict_values(
+                    values={
+                        "lora_down.weight": torch.ones(
+                            (lora_rank, linear_out_features), device="cpu", dtype=torch.float16
+                        ),
+                        "lora_up.weight": torch.ones(
+                            (linear_out_features, lora_rank), device="cpu", dtype=torch.float16
+                        ),
+                    },
+                ),
             ),
-        }
+        ]
         lora = ModelPatchRaw(lora_layers)
         lora_models.append((lora, lora_weight))
 
@@ -204,14 +225,21 @@ def test_all_patching_methods_produce_same_output(num_loras: int):
     lora_weight = 0.5
     lora_models: list[tuple[ModelPatchRaw, float]] = []
     for _ in range(num_loras):
-        lora_layers = {
-            "linear_layer_1": LoRALayer.from_state_dict_values(
-                values={
-                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
-                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
-                },
+        lora_layers = [
+            (
+                "linear_layer_1",
+                LoRALayer.from_state_dict_values(
+                    values={
+                        "lora_down.weight": torch.ones(
+                            (lora_rank, linear_in_features), device="cpu", dtype=torch.float16
+                        ),
+                        "lora_up.weight": torch.ones(
+                            (linear_out_features, lora_rank), device="cpu", dtype=torch.float16
+                        ),
+                    },
+                ),
             )
-        }
+        ]
         lora = ModelPatchRaw(lora_layers)
         lora_models.append((lora, lora_weight))
 
@@ -249,14 +277,17 @@ def test_apply_smart_model_patches_change_device():
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=torch.float16)
     apply_custom_layers_to_model(model)
 
-    lora_layers = {
-        "linear_layer_1": LoRALayer.from_state_dict_values(
-            values={
-                "lora_down.weight": torch.ones((lora_dim, linear_in_features), device="cpu", dtype=torch.float16),
-                "lora_up.weight": torch.ones((linear_out_features, lora_dim), device="cpu", dtype=torch.float16),
-            },
+    lora_layers = [
+        (
+            "linear_layer_1",
+            LoRALayer.from_state_dict_values(
+                values={
+                    "lora_down.weight": torch.ones((lora_dim, linear_in_features), device="cpu", dtype=torch.float16),
+                    "lora_up.weight": torch.ones((linear_out_features, lora_dim), device="cpu", dtype=torch.float16),
+                },
+            ),
         )
-    }
+    ]
     lora = ModelPatchRaw(lora_layers)
 
     orig_linear_weight = model.linear_layer_1.weight.data.detach().clone()
@@ -265,8 +296,8 @@ def test_apply_smart_model_patches_change_device():
         model=model, patches=[(lora, 0.5)], prefix="", dtype=torch.float16, force_direct_patching=True
     ):
         # After patching, all LoRA layer weights should have been moved back to the cpu.
-        assert lora_layers["linear_layer_1"].up.device.type == "cpu"
-        assert lora_layers["linear_layer_1"].down.device.type == "cpu"
+        assert lora_layers[0][1].up.device.type == "cpu"
+        assert lora_layers[0][1].down.device.type == "cpu"
 
         # After patching, the patched model should still be on the CPU.
         assert model.linear_layer_1.weight.data.device.type == "cpu"
@@ -292,14 +323,17 @@ def test_apply_smart_model_patches_force_sidecar_and_direct_patching():
     model = DummyModuleWithOneLayer(linear_in_features, linear_out_features, device="cpu", dtype=torch.float16)
     apply_custom_layers_to_model(model)
 
-    lora_layers = {
-        "linear_layer_1": LoRALayer.from_state_dict_values(
-            values={
-                "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
-                "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
-            },
+    lora_layers = [
+        (
+            "linear_layer_1",
+            LoRALayer.from_state_dict_values(
+                values={
+                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
+                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
+                },
+            ),
         )
-    }
+    ]
     lora = ModelPatchRaw(lora_layers)
     with pytest.raises(ValueError, match="Cannot force both direct and sidecar patching."):
         with LayerPatcher.apply_smart_model_patches(

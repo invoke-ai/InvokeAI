@@ -84,18 +84,18 @@ def lora_model_from_flux_onetrainer_state_dict(state_dict: Dict[str, torch.Tenso
     t5_grouped_sd = _convert_flux_t5_kohya_state_dict_to_invoke_format(t5_grouped_sd)
 
     # Create LoRA layers.
-    layers: dict[str, BaseLayerPatch] = {}
+    layers: list[tuple[str, BaseLayerPatch]] = []
     for model_prefix, grouped_sd in [
         # (FLUX_LORA_TRANSFORMER_PREFIX, transformer_grouped_sd),
         (FLUX_LORA_CLIP_PREFIX, clip_grouped_sd),
         (FLUX_LORA_T5_PREFIX, t5_grouped_sd),
     ]:
         for layer_key, layer_state_dict in grouped_sd.items():
-            layers[model_prefix + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
+            layers.append((model_prefix + layer_key, any_lora_layer_from_state_dict(layer_state_dict)))
 
     # Handle the transformer.
     transformer_layers = _convert_flux_transformer_onetrainer_state_dict_to_invoke_format(transformer_grouped_sd)
-    layers.update(transformer_layers)
+    layers.extend(transformer_layers)
 
     # Create and return the LoRAModelRaw.
     return ModelPatchRaw(layers=layers)
@@ -137,7 +137,7 @@ flux_transformer_kohya_parsing_tree: ParsingTree = {
 
 def _convert_flux_transformer_onetrainer_state_dict_to_invoke_format(
     state_dict: Dict[str, Dict[str, torch.Tensor]],
-) -> dict[str, BaseLayerPatch]:
+) -> list[tuple[str, BaseLayerPatch]]:
     """Converts a FLUX transformer LoRA state dict from the OneTrainer FLUX LoRA format to the LoRA weight format used
     internally by InvokeAI.
     """

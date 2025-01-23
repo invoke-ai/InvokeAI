@@ -63,15 +63,11 @@ def test_lora_model_from_flux_onetrainer_state_dict():
         k = k.replace(".alpha", "")
         k = k.replace(".dora_scale", "")
         expected_lora_layers.add(k)
-    # Drop the K/V/proj_mlp weights because these are all concatenated into a single layer in the BFL format (we keep
-    # the Q weights so that we count these layers once).
-    concatenated_weights = ["to_k", "to_v", "proj_mlp", "add_k_proj", "add_v_proj"]
-    expected_lora_layers = {k for k in expected_lora_layers if not any(w in k for w in concatenated_weights)}
 
     assert len(lora_model.layers) == len(expected_lora_layers)
 
     # Check that all of the layers have the expected prefix.
     assert all(
         k.startswith((FLUX_LORA_TRANSFORMER_PREFIX, FLUX_LORA_CLIP_PREFIX, FLUX_LORA_T5_PREFIX))
-        for k in lora_model.layers.keys()
+        for k, _ in lora_model.layers
     )

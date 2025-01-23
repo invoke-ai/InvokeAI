@@ -110,6 +110,6 @@ def test_lora_model_from_flux_kohya_state_dict(sd_keys: dict[str, list[int]]):
         expected_layer_keys.add(k)
 
     # Assert that the lora_model has the expected layers.
-    lora_model_keys = set(lora_model.layers.keys())
+    lora_model_keys = {k for k, _ in lora_model.layers}
     lora_model_keys = {k.replace(".", "_") for k in lora_model_keys}
     assert lora_model_keys == expected_layer_keys

@@ -1,5 +1,5 @@
 # Copyright (c) 2024 The InvokeAI Development team
-from typing import Iterable, Optional
+from typing import Optional, Sequence
 
 import torch
 
@@ -8,12 +8,8 @@ from invokeai.backend.raw_model import RawModel
 
 
 class ModelPatchRaw(RawModel):
-    def __init__(self, layers: Iterable[tuple[str, BaseLayerPatch]]):
-        # HACK(ryand): Update all places a dict is passed in.
-        if isinstance(layers, dict):
-            self.layers = [(k, v) for k, v in layers.items()]
-        else:
-            self.layers = layers
+    def __init__(self, layers: Sequence[tuple[str, BaseLayerPatch]]):
+        self.layers = layers
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         for _, layer in self.layers:

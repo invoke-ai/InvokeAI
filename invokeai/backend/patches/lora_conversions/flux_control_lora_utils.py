@@ -56,28 +56,38 @@ def lora_model_from_flux_control_state_dict(state_dict: Dict[str, torch.Tensor])
         grouped_state_dict[layer_name][param_name] = value
 
     # Create LoRA layers.
-    layers: dict[str, BaseLayerPatch] = {}
+    layers: list[tuple[str, BaseLayerPatch]] = []
     for layer_key, layer_state_dict in grouped_state_dict.items():
         prefixed_key = f"{FLUX_LORA_TRANSFORMER_PREFIX}{layer_key}"
         if layer_key == "img_in":
             # img_in is a special case because it changes the shape of the original weight.
-            layers[prefixed_key] = FluxControlLoRALayer(
-                layer_state_dict["lora_B.weight"],
-                None,
-                layer_state_dict["lora_A.weight"],
-                None,
-                layer_state_dict["lora_B.bias"],
+            layers.append(
+                (
+                    prefixed_key,
+                    FluxControlLoRALayer(
+                        layer_state_dict["lora_B.weight"],
+                        None,
+                        layer_state_dict["lora_A.weight"],
+                        None,
+                        layer_state_dict["lora_B.bias"],
+                    ),
+                )
             )
         elif all(k in layer_state_dict for k in ["lora_A.weight", "lora_B.bias", "lora_B.weight"]):
-            layers[prefixed_key] = LoRALayer(
-                layer_state_dict["lora_B.weight"],
-                None,
-                layer_state_dict["lora_A.weight"],
-                None,
-                layer_state_dict["lora_B.bias"],
+            layers.append(
+                (
+                    prefixed_key,
+                    LoRALayer(
+                        layer_state_dict["lora_B.weight"],
+                        None,
+                        layer_state_dict["lora_A.weight"],
+                        None,
+                        layer_state_dict["lora_B.bias"],
+                    ),
+                )
             )
         elif "scale" in layer_state_dict:
-            layers[prefixed_key] = SetParameterLayer("scale", layer_state_dict["scale"])
+            layers.append((prefixed_key, SetParameterLayer("scale", layer_state_dict["scale"])))
         else:
             raise ValueError(f"{layer_key} not expected")
 
