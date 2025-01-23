@@ -8,7 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
-from invokeai.app.invocations.model import CLIPField, LoRAField, ModelIdentifierField, TransformerField
+from invokeai.app.invocations.model import CLIPField, LoRAField, ModelIdentifierField, T5EncoderField, TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import BaseModelType
 
@@ -21,6 +21,9 @@ class FluxLoRALoaderOutput(BaseInvocationOutput):
         default=None, description=FieldDescriptions.transformer, title="FLUX Transformer"
     )
     clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
+    t5_encoder: Optional[T5EncoderField] = OutputField(
+        default=None, description=FieldDescriptions.t5_encoder, title="T5 Encoder"
+    )
 
 
 @invocation(
@@ -28,7 +31,7 @@ class FluxLoRALoaderOutput(BaseInvocationOutput):
     title="FLUX LoRA",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class FluxLoRALoaderInvocation(BaseInvocation):
@@ -50,6 +53,12 @@ class FluxLoRALoaderInvocation(BaseInvocation):
         description=FieldDescriptions.clip,
         input=Input.Connection,
     )
+    t5_encoder: T5EncoderField | None = InputField(
+        default=None,
+        title="T5 Encoder",
+        description=FieldDescriptions.t5_encoder,
+        input=Input.Connection,
+    )
 
     def invoke(self, context: InvocationContext) -> FluxLoRALoaderOutput:
         lora_key = self.lora.key
@@ -62,6 +71,8 @@ class FluxLoRALoaderInvocation(BaseInvocation):
             raise ValueError(f'LoRA "{lora_key}" already applied to transformer.')
         if self.clip and any(lora.lora.key == lora_key for lora in self.clip.loras):
             raise ValueError(f'LoRA "{lora_key}" already applied to CLIP encoder.')
+        if self.t5_encoder and any(lora.lora.key == lora_key for lora in self.t5_encoder.loras):
+            raise ValueError(f'LoRA "{lora_key}" already applied to T5 encoder.')
 
         output = FluxLoRALoaderOutput()
 
@@ -82,6 +93,14 @@ class FluxLoRALoaderInvocation(BaseInvocation):
                     weight=self.weight,
                 )
             )
+        if self.t5_encoder is not None:
+            output.t5_encoder = self.t5_encoder.model_copy(deep=True)
+            output.t5_encoder.loras.append(
+                LoRAField(
+                    lora=self.lora,
+                    weight=self.weight,
+                )
+            )
 
         return output
 
@@ -91,7 +110,7 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     title="FLUX LoRA Collection Loader",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
@@ -111,6 +130,12 @@ class FLUXLoRACollectionLoader(BaseInvocation):
         default=None,
         title="CLIP",
         description=FieldDescriptions.clip,
+        input=Input.Connection,
+    )
+    t5_encoder: T5EncoderField | None = InputField(
+        default=None,
+        title="T5 Encoder",
+        description=FieldDescriptions.t5_encoder,
         input=Input.Connection,
     )
 
@@ -139,5 +164,10 @@ class FLUXLoRACollectionLoader(BaseInvocation):
                 if output.clip is None:
                     output.clip = self.clip.model_copy(deep=True)
                 output.clip.loras.append(lora)
+
+            if self.t5_encoder is not None:
+                if output.t5_encoder is None:
+                    output.t5_encoder = self.t5_encoder.model_copy(deep=True)
+                output.t5_encoder.loras.append(lora)
 
         return output
