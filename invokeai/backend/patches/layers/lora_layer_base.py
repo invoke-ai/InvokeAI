@@ -4,6 +4,7 @@ import torch
 
 import invokeai.backend.util.logging as logger
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.param_shape_utils import get_param_shape
 from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
@@ -67,8 +68,8 @@ class LoRALayerBase(BaseLayerPatch):
         # Reshape all params to match the original module's shape.
         for param_name, param_weight in params.items():
             orig_param = orig_parameters[param_name]
-            if param_weight.shape != orig_param.shape:
-                params[param_name] = param_weight.reshape(orig_param.shape)
+            if param_weight.shape != get_param_shape(orig_param):
+                params[param_name] = param_weight.reshape(get_param_shape(orig_param))
 
         return params
 
