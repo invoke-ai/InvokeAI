@@ -187,7 +187,8 @@ class ModelInstallService(ModelInstallServiceBase):
         )  # type: ignore
 
         if preferred_name := config.name:
-            preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
+            if model_path.suffix:
+                preferred_name = f"{preferred_name}.{model_path.suffix}"
 
         dest_path = (
             self.app_config.models_path / info.base.value / info.type.value / (preferred_name or model_path.name)
