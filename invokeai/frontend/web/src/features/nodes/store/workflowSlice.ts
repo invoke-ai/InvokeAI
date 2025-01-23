@@ -152,7 +152,19 @@ export const workflowSlice = createSlice({
       }
       const { elements } = state.form;
       const { element, containerId, index } = action.payload;
-      addElement(elements, element, containerId, index);
+
+      const container = elements[containerId];
+      if (!container || !isContainerElement(container)) {
+        return;
+      }
+
+      elements[element.id] = element;
+
+      if (index === undefined) {
+        container.data.children.push(element.id);
+      } else {
+        container.data.children.splice(index, 0, element.id);
+      }
     },
     formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
       if (!state.form) {
@@ -161,16 +173,23 @@ export const workflowSlice = createSlice({
       }
       const { elements, rootElementId } = state.form;
       const { id } = action.payload;
-      removeElement(elements, id, rootElementId);
+      recursivelyRemoveElement(elements, id, rootElementId);
     },
-    formElementMoved: (state, action: PayloadAction<{ id: string; containerId: string; index: number }>) => {
+    formElementContainerDataChanged: (
+      state,
+      action: PayloadAction<{ id: string; changes: Partial<ContainerElement['data']> }>
+    ) => {
       if (!state.form) {
-        // Cannot move an element if the form has not been created
+        // Cannot change a container if the form has not been created
         return;
       }
       const { elements } = state.form;
-      const { id, containerId, index } = action.payload;
-      moveElement(elements, id, containerId, index);
+      const { id, changes } = action.payload;
+      const container = elements[id];
+      if (!container || !isContainerElement(container)) {
+        return;
+      }
+      container.data = { ...container.data, ...changes };
     },
     formReset: (state) => {
       state.form = undefined;
@@ -295,6 +314,7 @@ export const {
   formCreated,
   formElementAdded,
   formElementRemoved,
+  formElementContainerDataChanged,
   formReset,
   formModeToggled,
 } = workflowSlice.actions;
@@ -343,25 +363,7 @@ export const useElement = (id: string): FormElement | undefined => {
   return element;
 };
 
-const addElement = (
-  elements: NonNullable<WorkflowV3['form']>['elements'],
-  element: FormElement,
-  containerId: string,
-  index?: number
-) => {
-  const container = elements[containerId];
-  if (!container || !isContainerElement(container)) {
-    return;
-  }
-  elements[element.id] = element;
-  if (index === undefined) {
-    container.data.children.push(element.id);
-  } else {
-    container.data.children.splice(index, 0, element.id);
-  }
-};
-
-const removeElement = (
+const recursivelyRemoveElement = (
   elements: NonNullable<WorkflowV3['form']>['elements'],
   id: string,
   containerId: string
@@ -380,29 +382,10 @@ const removeElement = (
   }
 
   for (const childId of container.data.children) {
-    if (removeElement(elements, id, childId)) {
+    if (recursivelyRemoveElement(elements, id, childId)) {
       return true;
     }
   }
 
   return false;
-};
-
-const moveElement = (
-  elements: NonNullable<WorkflowV3['form']>['elements'],
-  id: string,
-  containerId: string,
-  index: number
-) => {
-  const element = elements[id];
-  if (!element) {
-    return;
-  }
-  const container = elements[containerId];
-  if (!container || !isContainerElement(container)) {
-    return;
-  }
-
-  removeElement(elements, id, containerId);
-  addElement(elements, element, containerId, index);
 };
