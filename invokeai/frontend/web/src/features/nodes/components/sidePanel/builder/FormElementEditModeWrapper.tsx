@@ -71,6 +71,7 @@ export const FormElementEditModeWrapper = memo(
         w="full"
         h="full"
         bg={getBgColor(dndListState)}
+        opacity={dndListState.type === 'is-dragging' ? 0.3 : 1}
         {...rest}
       >
         <Flex
