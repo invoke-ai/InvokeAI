@@ -118,6 +118,10 @@ const nodeField = (
       fieldIdentifier: { nodeId, fieldName },
     },
   };
+  return element;
+};
+const _nodeField = (...args: Parameters<typeof nodeField>): NodeFieldElement => {
+  const element = nodeField(...args);
   addElement(element);
   return element;
 };
@@ -145,6 +149,10 @@ const heading = (
       level,
     },
   };
+  return element;
+};
+const _heading = (...args: Parameters<typeof heading>): HeadingElement => {
+  const element = heading(...args);
   addElement(element);
   return element;
 };
@@ -172,6 +180,11 @@ const text = (content: TextElement['data']['content'], fontSize: TextElement['da
   addElement(element);
   return element;
 };
+const _text = (...args: Parameters<typeof text>): TextElement => {
+  const element = text(...args);
+  addElement(element);
+  return element;
+};
 
 const DIVIDER_TYPE = 'divider';
 export const DIVIDER_CLASS_NAME = getPrefixedId(DIVIDER_TYPE, '-');
@@ -185,6 +198,11 @@ const divider = (): DividerElement => {
     id: getPrefixedId(DIVIDER_TYPE),
     type: DIVIDER_TYPE,
   };
+  addElement(element);
+  return element;
+};
+const _divider = (...args: Parameters<typeof divider>): DividerElement => {
+  const element = divider(...args);
   addElement(element);
   return element;
 };
@@ -208,7 +226,7 @@ const zContainerElement: z.ZodType<ContainerElement> = zElementBase.extend({
   }),
 });
 export const isContainerElement = (el: FormElement): el is ContainerElement => el.type === CONTAINER_TYPE;
-const container = (
+export const container = (
   direction: ContainerElement['data']['direction'],
   children: ContainerElement['data']['children']
 ): ContainerElement => {
@@ -220,6 +238,10 @@ const container = (
       children,
     },
   };
+  return element;
+};
+export const _container = (...args: Parameters<typeof container>): ContainerElement => {
+  const element = container(...args);
   addElement(element);
   return element;
 };
@@ -228,55 +250,53 @@ const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElem
 
 export type FormElement = z.infer<typeof zFormElement>;
 
-export const rootElementId: string = container('column', [
-  heading('My Cool Workflow', 1).id,
-  text('This is a description of what my workflow does. It does things.', 'md').id,
-  divider().id,
-  heading('First Section', 2).id,
-  text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm').id,
-  divider().id,
-  container('row', [
-    nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-    divider().id,
-    nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-    divider().id,
-    nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+export const rootElementId: string = _container('column', [
+  _heading('My Cool Workflow', 1).id,
+  _text('This is a description of what my workflow does. It does things.', 'md').id,
+  _divider().id,
+  _heading('First Section', 2).id,
+  _text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm').id,
+  _divider().id,
+  _container('row', [
+    _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+    _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+    _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
   ]).id,
-  nodeField('9c058600-8d73-4702-912b-0ccf37403bfd', 'value').id,
-  nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id,
-  nodeField('4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', 'value').id,
-  nodeField('39cb5272-a9d7-4da9-9c35-32e02b46bb34', 'color').id,
-  container('row', [
-    container('column', [
-      nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+  _nodeField('9c058600-8d73-4702-912b-0ccf37403bfd', 'value').id,
+  _nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id,
+  _nodeField('4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', 'value').id,
+  _nodeField('39cb5272-a9d7-4da9-9c35-32e02b46bb34', 'color').id,
+  _container('row', [
+    _container('column', [
+      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
     ]).id,
-    container('column', [
-      nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+    _container('column', [
+      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
     ]).id,
-    container('column', [
-      container('row', [
-        nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-        nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+    _container('column', [
+      _container('row', [
+        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
       ]).id,
-      container('row', [
-        nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-        nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+      _container('row', [
+        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
       ]).id,
     ]).id,
   ]).id,
-  nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
-  divider().id,
-  text('These are some text that are definitely super helpful.', 'sm').id,
-  divider().id,
-  container('row', [
-    container('column', [
-      nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-      nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+  _nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
+  _divider().id,
+  _text('These are some text that are definitely super helpful.', 'sm').id,
+  _divider().id,
+  _container('row', [
+    _container('column', [
+      _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+      _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
     ]).id,
-    container('column', [nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id]).id,
+    _container('column', [_nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id]).id,
   ]).id,
 ]).id;
