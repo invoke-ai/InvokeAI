@@ -6,6 +6,7 @@ import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/
 import { HeadingElementComponent } from 'features/nodes/components/sidePanel/builder/HeadingElementComponent';
 import { NodeFieldElementComponent } from 'features/nodes/components/sidePanel/builder/NodeFieldElementComponent';
 import { TextElementComponent } from 'features/nodes/components/sidePanel/builder/TextElementComponent';
+import { useMonitorForFormElementDnd } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { formElementAdded, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
@@ -71,9 +72,9 @@ ContainerElementComponentViewMode.displayName = 'ContainerElementComponentViewMo
 
 export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }) => {
   const depth = useContext(DepthContext);
-
   const { id, data } = el;
   const { children, direction } = data;
+  useMonitorForFormElementDnd(id, children);
 
   return (
     <FormElementEditModeWrapper element={el}>
