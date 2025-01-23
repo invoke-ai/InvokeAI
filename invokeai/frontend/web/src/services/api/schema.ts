@@ -6181,7 +6181,7 @@ export type components = {
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
              */
-            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
              * Transformer
              * @description Transformer
@@ -7716,11 +7716,6 @@ export type components = {
          * @description Gets the bounding box of the given mask image.
          */
         GetMaskBoundingBoxInvocation: {
-            /**
-             * @description Optional metadata to be saved with the image
-             * @default null
-             */
-            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -12173,7 +12168,7 @@ export type components = {
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
              */
-            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
              * UNet
              * @description UNet (scheduler, LoRAs)
@@ -16021,7 +16016,7 @@ export type components = {
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
              */
-            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
              * UNet
              * @description UNet (scheduler, LoRAs)
