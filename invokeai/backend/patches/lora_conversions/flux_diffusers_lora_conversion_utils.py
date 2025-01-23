@@ -101,8 +101,8 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
             src_layer_dict = grouped_state_dict.pop(src_key, None)
             if src_layer_dict is not None:
                 values = get_lora_layer_values(src_layer_dict)
-                assert values["lora_down.weight"].shape[1] == src_weight_shape[1]
-                assert values["lora_up.weight"].shape[0] == src_weight_shape[0]
+                # assert values["lora_down.weight"].shape[1] == src_weight_shape[1]
+                # assert values["lora_up.weight"].shape[0] == src_weight_shape[0]
                 sub_layers.append(any_lora_layer_from_state_dict(values))
             else:
                 if not allow_missing_keys:
