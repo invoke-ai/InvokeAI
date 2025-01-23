@@ -91,7 +91,7 @@ export const addElement = (element: FormElement) => {
 };
 
 const zElementId = z.string().trim().min(1);
-type ElementId = z.infer<typeof zElementId>;
+export type ElementId = z.infer<typeof zElementId>;
 
 const zElementBase = z.object({
   id: zElementId,
@@ -112,7 +112,7 @@ const nodeField = (
   fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName']
 ): NodeFieldElement => {
   const element: NodeFieldElement = {
-    id: getPrefixedId(NODE_FIELD_TYPE),
+    id: getPrefixedId(NODE_FIELD_TYPE, '-'),
     type: NODE_FIELD_TYPE,
     data: {
       fieldIdentifier: { nodeId, fieldName },
@@ -142,7 +142,7 @@ const heading = (
   level: HeadingElement['data']['level']
 ): HeadingElement => {
   const element: HeadingElement = {
-    id: getPrefixedId(HEADING_TYPE),
+    id: getPrefixedId(HEADING_TYPE, '-'),
     type: HEADING_TYPE,
     data: {
       content,
@@ -170,7 +170,7 @@ export type TextElement = z.infer<typeof zTextElement>;
 export const isTextElement = (el: FormElement): el is TextElement => el.type === TEXT_TYPE;
 const text = (content: TextElement['data']['content'], fontSize: TextElement['data']['fontSize']): TextElement => {
   const element: TextElement = {
-    id: getPrefixedId(TEXT_TYPE),
+    id: getPrefixedId(TEXT_TYPE, '-'),
     type: TEXT_TYPE,
     data: {
       content,
@@ -195,7 +195,7 @@ export type DividerElement = z.infer<typeof zDividerElement>;
 export const isDividerElement = (el: FormElement): el is DividerElement => el.type === DIVIDER_TYPE;
 const divider = (): DividerElement => {
   const element: DividerElement = {
-    id: getPrefixedId(DIVIDER_TYPE),
+    id: getPrefixedId(DIVIDER_TYPE, '-'),
     type: DIVIDER_TYPE,
   };
   addElement(element);
@@ -231,7 +231,7 @@ export const container = (
   children: ContainerElement['data']['children']
 ): ContainerElement => {
   const element: ContainerElement = {
-    id: getPrefixedId(CONTAINER_TYPE),
+    id: getPrefixedId(CONTAINER_TYPE, '-'),
     type: CONTAINER_TYPE,
     data: {
       direction,
@@ -257,46 +257,48 @@ export const rootElementId: string = _container('column', [
   _heading('First Section', 2).id,
   _text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm').id,
   _divider().id,
-  _container('row', [
-    _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-    _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-    _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-  ]).id,
-  _nodeField('9c058600-8d73-4702-912b-0ccf37403bfd', 'value').id,
-  _nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id,
-  _nodeField('4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', 'value').id,
-  _nodeField('39cb5272-a9d7-4da9-9c35-32e02b46bb34', 'color').id,
-  _container('row', [
-    _container('column', [
-      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-    ]).id,
-    _container('column', [
-      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-    ]).id,
-    _container('column', [
-      _container('row', [
-        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      ]).id,
-      _container('row', [
-        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-        _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-      ]).id,
-    ]).id,
-  ]).id,
+  _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+  _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
   _nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
-  _divider().id,
-  _text('These are some text that are definitely super helpful.', 'sm').id,
-  _divider().id,
-  _container('row', [
-    _container('column', [
-      _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-      _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-    ]).id,
-    _container('column', [_nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id]).id,
-  ]).id,
 ]).id;
+
+// export const rootElementId: string = _container('column', [
+//   _heading('My Cool Workflow', 1).id,
+//   _text('This is a description of what my workflow does. It does things.', 'md').id,
+//   _divider().id,
+//   _heading('First Section', 2).id,
+//   _text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm').id,
+//   _divider().id,
+//   _container('row', [
+//     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//   ]).id,
+//   _nodeField('9c058600-8d73-4702-912b-0ccf37403bfd', 'value').id,
+//   _nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id,
+//   _nodeField('4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', 'value').id,
+//   _nodeField('39cb5272-a9d7-4da9-9c35-32e02b46bb34', 'color').id,
+//   _container('row', [
+//     _container('column', [
+//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//     ]).id,
+//     _container('column', [
+//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//       _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//     ]).id,
+//   ]).id,
+//   _nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
+//   _divider().id,
+//   _text('These are some text that are definitely super helpful.', 'sm').id,
+//   _divider().id,
+//   _container('row', [
+//     _container('column', [
+//       _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//       _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//     ]).id,
+//     _container('column', [_nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id]).id,
+//   ]).id,
+// ]).id;
