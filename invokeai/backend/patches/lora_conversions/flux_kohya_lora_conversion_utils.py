@@ -154,10 +154,10 @@ def _convert_flux_t5_kohya_state_dict_to_invoke_format(state_dict: Dict[str, T])
     """
 
     def replace_func(match: re.Match[str]) -> str:
-        s = f"{match.group(1)}.{match.group(2)}.{match.group(3)}.{match.group(4)}"
+        s = f"encoder.block.{match.group(1)}.layer.{match.group(2)}.{match.group(3)}.{match.group(4)}"
         if match.group(5):
             s += f".{match.group(5)}"
-        return "encoder.block." + s
+        return s
 
     converted_dict: dict[str, T] = {}
     for k, v in state_dict.items():
