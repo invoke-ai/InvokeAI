@@ -1,5 +1,6 @@
-import type { As, ChakraProps, FlexProps } from '@invoke-ai/ui-library';
+import type { ChakraProps, FlexProps } from '@invoke-ai/ui-library';
 import { Flex, Icon, Skeleton, Spinner, Text } from '@invoke-ai/ui-library';
+import type { ElementType } from 'react';
 import { memo, useMemo } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
@@ -28,7 +29,7 @@ IAILoadingImageFallback.displayName = 'IAILoadingImageFallback';
 
 type IAINoImageFallbackProps = FlexProps & {
   label?: string;
-  icon?: As | null;
+  icon?: ElementType | null;
   boxSize?: ChakraProps['boxSize'];
 };
 
