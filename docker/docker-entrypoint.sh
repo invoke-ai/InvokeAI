@@ -19,7 +19,25 @@ USER=ubuntu
 # if the user does not exist, create it. It is expected to be present on ubuntu >=24.x
 _=$(id ${USER} 2>&1) || useradd -u ${USER_ID} ${USER}
 # ensure the UID is correct
-usermod -u ${USER_ID} ${USER} 1>/dev/null
+usermod -u ${USER_ID} ${USER} || true 1>/dev/null
+mkdir -p /home/${USER}
+chown ${USER} /home/${USER}
+
+# Add ${USER} in render group when required
+if [ -c /dev/kfd ]
+then
+	RENDER_GID=$(stat -c %g /dev/kfd)
+	_=$(getent group ${RENDER_GID} 2>&1) || groupadd -g ${RENDER_GID} render
+	usermod -a -G $RENDER_GID $USER
+fi
+
+# Add ${USER} in video group when required
+if [ -c /dev/dri/card0 ]
+then
+	VIDEO_GID=$(stat -c %g /dev/dri/card0)
+	_=$(getent group ${VIDEO_GID} 2>&1) || groupadd ${VIDEO_GID} video
+	usermod -a -G $VIDEO_GID $USER
+fi
 
 ### Set the $PUBLIC_KEY env var to enable SSH access.
 # We do not install openssh-server in the image by default to avoid bloat.
