@@ -158,7 +158,7 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
           const queryArgs = selectListImagesQueryArgs(state);
           const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
           if (data) {
-            // When we delete multiple images, we clear the selection. Then, the the next time we load images, we will
+            // When we delete multiple images, we clear the selection. Then, the next time we load images, we will
             // select the first one. This is handled below in the listener for `imagesApi.endpoints.listImages.matchFulfilled`.
             dispatch(imageSelected(null));
           }

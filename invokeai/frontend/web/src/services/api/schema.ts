@@ -7158,7 +7158,7 @@ export type components = {
             cfg_scale?: number | number[];
             /**
              * CFG Scale Start Step
-             * @description Index of the first step to apply cfg_scale. Negative indices count backwards from the the last step (e.g. a value of -1 refers to the final step).
+             * @description Index of the first step to apply cfg_scale. Negative indices count backwards from the last step (e.g. a value of -1 refers to the final step).
              * @default 0
              */
             cfg_scale_start_step?: number;
