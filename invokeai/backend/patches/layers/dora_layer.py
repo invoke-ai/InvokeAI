@@ -72,7 +72,7 @@ class DoRALayer(LoRALayerBase):
         # TODO(ryand): Simplify this logic.
         direction_norm = (
             out_weight.transpose(0, 1)
-            .reshape(out_weight.shape[0], -1)
+            .reshape(out_weight.shape[1], -1)
             .norm(dim=1, keepdim=True)
             .reshape(out_weight.shape[1], *[1] * (out_weight.dim() - 1))
             .transpose(0, 1)
