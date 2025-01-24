@@ -1,17 +1,19 @@
 import { Flex, type FlexProps, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
-import type { DndListTargetState } from 'features/dnd/types';
-import { DepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
+import { useContainerContext, useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
+import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
+import type { DndListTargetState } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { useDraggableFormElement } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import { type FormElement, isContainerElement } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
-import { memo, useCallback, useContext, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
 export const EDIT_MODE_WRAPPER_CLASS_NAME = getPrefixedId('edit-mode-wrapper', '-');
+
+export const getEditModeWrapperId = (id: string) => `${id}-edit-mode-wrapper`;
 
 const getHeaderBgColor = (depth: number) => {
   if (depth <= 1) {
@@ -40,6 +42,9 @@ const getBgColor = (dndListState: DndListTargetState) => {
     case 'is-dragging':
       return 'red';
     case 'is-dragging-over':
+      if (dndListState.closestCenterOrEdge === 'center') {
+        return 'magenta';
+      }
       return 'blue';
     case 'preview':
       return 'green';
@@ -50,22 +55,27 @@ export const FormElementEditModeWrapper = memo(
   ({ element, children, ...rest }: { element: FormElement } & FlexProps) => {
     const draggableRef = useRef<HTMLDivElement>(null);
     const dragHandleRef = useRef<HTMLDivElement>(null);
-    const [dndListState] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
-    const depth = useContext(DepthContext);
+    const container = useContainerContext();
+    const [dndListState] = useDraggableFormElement(element.id, container?.id ?? null, draggableRef, dragHandleRef);
+    const depth = useDepthContext();
     const dispatch = useAppDispatch();
     const removeElement = useCallback(() => {
       dispatch(formElementRemoved({ id: element.id }));
     }, [dispatch, element.id]);
 
+    if (dndListState.type !== 'idle') {
+      // console.log(element.id, 'dndListState', dndListState);
+    }
+
     return (
       <Flex
+        id={getEditModeWrapperId(element.id)}
         ref={draggableRef}
         position="relative"
         className={EDIT_MODE_WRAPPER_CLASS_NAME}
         flexDir="column"
-        borderWidth={1}
+        boxShadow="0 0 0 1px var(--invoke-colors-base-750)"
         borderRadius="base"
-        borderColor="base.750"
         alignItems="center"
         justifyContent="flex-start"
         w="full"
@@ -81,13 +91,14 @@ export const FormElementEditModeWrapper = memo(
           h={8}
           bg={getHeaderBgColor(depth)}
           borderTopRadius="inherit"
-          borderBottomWidth={1}
+          // borderBottomWidth={1}
           borderColor="inherit"
           alignItems="center"
           cursor="grab"
         >
           <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
-            {getHeaderLabel(element)}
+            {element.id}
+            {/* {getHeaderLabel(element)} */}
           </Text>
           <Spacer />
           <IconButton

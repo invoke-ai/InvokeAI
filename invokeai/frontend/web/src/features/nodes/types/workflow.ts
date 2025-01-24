@@ -95,6 +95,7 @@ export type ElementId = z.infer<typeof zElementId>;
 
 const zElementBase = z.object({
   id: zElementId,
+  parentId: zElementId.optional(),
 });
 
 const NODE_FIELD_TYPE = 'node-field';
@@ -109,11 +110,13 @@ export type NodeFieldElement = z.infer<typeof zNodeFieldElement>;
 export const isNodeFieldElement = (el: FormElement): el is NodeFieldElement => el.type === NODE_FIELD_TYPE;
 const nodeField = (
   nodeId: NodeFieldElement['data']['fieldIdentifier']['nodeId'],
-  fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName']
+  fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName'],
+  parentId?: NodeFieldElement['parentId']
 ): NodeFieldElement => {
   const element: NodeFieldElement = {
     id: getPrefixedId(NODE_FIELD_TYPE, '-'),
     type: NODE_FIELD_TYPE,
+    parentId,
     data: {
       fieldIdentifier: { nodeId, fieldName },
     },
@@ -139,10 +142,12 @@ export type HeadingElement = z.infer<typeof zHeadingElement>;
 export const isHeadingElement = (el: FormElement): el is HeadingElement => el.type === HEADING_TYPE;
 const heading = (
   content: HeadingElement['data']['content'],
-  level: HeadingElement['data']['level']
+  level: HeadingElement['data']['level'],
+  parentId?: NodeFieldElement['parentId']
 ): HeadingElement => {
   const element: HeadingElement = {
     id: getPrefixedId(HEADING_TYPE, '-'),
+    parentId,
     type: HEADING_TYPE,
     data: {
       content,
@@ -168,9 +173,14 @@ const zTextElement = zElementBase.extend({
 });
 export type TextElement = z.infer<typeof zTextElement>;
 export const isTextElement = (el: FormElement): el is TextElement => el.type === TEXT_TYPE;
-const text = (content: TextElement['data']['content'], fontSize: TextElement['data']['fontSize']): TextElement => {
+const text = (
+  content: TextElement['data']['content'],
+  fontSize: TextElement['data']['fontSize'],
+  parentId?: NodeFieldElement['parentId']
+): TextElement => {
   const element: TextElement = {
     id: getPrefixedId(TEXT_TYPE, '-'),
+    parentId,
     type: TEXT_TYPE,
     data: {
       content,
@@ -193,9 +203,10 @@ const zDividerElement = zElementBase.extend({
 });
 export type DividerElement = z.infer<typeof zDividerElement>;
 export const isDividerElement = (el: FormElement): el is DividerElement => el.type === DIVIDER_TYPE;
-const divider = (): DividerElement => {
+const divider = (parentId?: NodeFieldElement['parentId']): DividerElement => {
   const element: DividerElement = {
     id: getPrefixedId(DIVIDER_TYPE, '-'),
+    parentId,
     type: DIVIDER_TYPE,
   };
   addElement(element);
@@ -207,31 +218,25 @@ const _divider = (...args: Parameters<typeof divider>): DividerElement => {
   return element;
 };
 
-export type ContainerElement = {
-  id: string;
-  type: typeof CONTAINER_TYPE;
-  data: {
-    direction: 'row' | 'column';
-    children: ElementId[];
-  };
-};
-
 const CONTAINER_TYPE = 'container';
 export const CONTAINER_CLASS_NAME = getPrefixedId(CONTAINER_TYPE, '-');
-const zContainerElement: z.ZodType<ContainerElement> = zElementBase.extend({
+const zContainerElement = zElementBase.extend({
   type: z.literal(CONTAINER_TYPE),
   data: z.object({
     direction: z.enum(['row', 'column']),
     children: z.array(zElementId),
   }),
 });
+export type ContainerElement = z.infer<typeof zContainerElement>;
 export const isContainerElement = (el: FormElement): el is ContainerElement => el.type === CONTAINER_TYPE;
 export const container = (
   direction: ContainerElement['data']['direction'],
-  children: ContainerElement['data']['children']
+  children: ContainerElement['data']['children'],
+  parentId?: NodeFieldElement['parentId']
 ): ContainerElement => {
   const element: ContainerElement = {
     id: getPrefixedId(CONTAINER_TYPE, '-'),
+    parentId,
     type: CONTAINER_TYPE,
     data: {
       direction,
@@ -250,18 +255,35 @@ const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElem
 
 export type FormElement = z.infer<typeof zFormElement>;
 
-export const rootElementId: string = _container('column', [
-  _heading('My Cool Workflow', 1).id,
-  _text('This is a description of what my workflow does. It does things.', 'md').id,
-  _divider().id,
-  _heading('First Section', 2).id,
-  _text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm').id,
-  _divider().id,
-  _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-  _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-  _nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
-]).id;
+// export const rootElementId: string = _container('column', [
+//   _heading('My Cool Workflow', 1).id,
+//   _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//   _nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
+//   _container('row', [_container('column', []).id, _container('column', []).id, _container('column', []).id]).id,
+// ]).id;
 
+const rootContainer = container('column', []);
+addElement(rootContainer);
+const children = [
+  heading('My Cool Workflow', 1, rootContainer.id),
+  text('This is a description of what my workflow does. It does things.', 'md', rootContainer.id),
+  divider(rootContainer.id),
+  heading('First Section', 2, rootContainer.id),
+  text(
+    'The first section includes fields relevant to the first section. This note describes that fact.',
+    'sm',
+    rootContainer.id
+  ),
+  divider(rootContainer.id),
+  text('These are some text that are definitely super helpful.', 'sm', rootContainer.id),
+  divider(rootContainer.id),
+];
+children.forEach((child) => {
+  addElement(child);
+  rootContainer.data.children.push(child.id);
+});
+
+export const rootElementId = rootContainer.id;
 // export const rootElementId: string = _container('column', [
 //   _heading('My Cool Workflow', 1).id,
 //   _text('This is a description of what my workflow does. It does things.', 'md').id,
@@ -269,36 +291,36 @@ export const rootElementId: string = _container('column', [
 //   _heading('First Section', 2).id,
 //   _text('The first section includes fields relevant to the first section. This note describes that fact.', 'sm').id,
 //   _divider().id,
-//   _container('row', [
-//     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-//     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-//     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-//   ]).id,
-//   _nodeField('9c058600-8d73-4702-912b-0ccf37403bfd', 'value').id,
-//   _nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id,
-//   _nodeField('4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', 'value').id,
-//   _nodeField('39cb5272-a9d7-4da9-9c35-32e02b46bb34', 'color').id,
-//   _container('row', [
-//     _container('column', [
-//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-//     ]).id,
-//     _container('column', [
-//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-//       _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-//       _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
-//     ]).id,
-//   ]).id,
-//   _nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
+//   // _container('row', [
+//   //   _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//   //   _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//   //   _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//   // ]).id,
+//   // _nodeField('9c058600-8d73-4702-912b-0ccf37403bfd', 'value').id,
+//   // _nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id,
+//   // _nodeField('4e16cbf6-457c-46fb-9ab7-9cb262fa1e03', 'value').id,
+//   // _nodeField('39cb5272-a9d7-4da9-9c35-32e02b46bb34', 'color').id,
+//   // _container('row', [
+//   //   _container('column', [
+//   //     _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//   //     _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//   //   ]).id,
+//   //   _container('column', [
+//   //     _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//   //     _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//   //     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//   //     _nodeField('4f609a81-0e25-47d1-ba0d-f24fedd5273f', 'value').id,
+//   //   ]).id,
+//   // ]).id,
+//   // _nodeField('14744f68-9000-4694-b4d6-cbe83ee231ee', 'model').id,
 //   _divider().id,
 //   _text('These are some text that are definitely super helpful.', 'sm').id,
 //   _divider().id,
-//   _container('row', [
-//     _container('column', [
-//       _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-//       _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
-//     ]).id,
-//     _container('column', [_nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id]).id,
-//   ]).id,
+//   // _container('row', [
+//   //   _container('column', [
+//   //     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//   //     _nodeField('7aed1a5f-7fd7-4184-abe8-ddea0ea5e706', 'image').id,
+//   //   ]).id,
+//   //   _container('column', [_nodeField('7a8bbab2-6919-4cfc-bd7c-bcfda3c79ecf', 'value').id]).id,
+//   // ]).id,
 // ]).id;

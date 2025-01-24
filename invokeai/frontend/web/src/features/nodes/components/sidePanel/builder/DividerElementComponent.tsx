@@ -1,12 +1,12 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
+import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
 import { selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { DividerElement } from 'features/nodes/types/workflow';
 import { DIVIDER_CLASS_NAME, isDividerElement } from 'features/nodes/types/workflow';
-import { memo, useContext } from 'react';
+import { memo } from 'react';
 
 const sx: SystemStyleObject = {
   bg: 'base.700',
@@ -40,7 +40,7 @@ export const DividerElementComponent = memo(({ id }: { id: string }) => {
 DividerElementComponent.displayName = 'DividerElementComponent';
 
 export const DividerElementComponentViewMode = memo(({ el }: { el: DividerElement }) => {
-  const container = useContext(ContainerContext);
+  const container = useContainerContext();
   const { id } = el;
 
   return (
@@ -56,7 +56,7 @@ export const DividerElementComponentViewMode = memo(({ el }: { el: DividerElemen
 DividerElementComponentViewMode.displayName = 'DividerElementComponentViewMode';
 
 export const DividerElementComponentEditMode = memo(({ el }: { el: DividerElement }) => {
-  const container = useContext(ContainerContext);
+  const container = useContainerContext();
   const { id } = el;
 
   return (

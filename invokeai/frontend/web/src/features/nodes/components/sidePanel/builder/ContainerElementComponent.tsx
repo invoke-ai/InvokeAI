@@ -1,12 +1,15 @@
 import { Flex, IconButton, type SystemStyleObject } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ContainerContext, DepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
+import {
+  ContainerContextProvider,
+  DepthContextProvider,
+  useDepthContext,
+} from 'features/nodes/components/sidePanel/builder/contexts';
 import { DividerElementComponent } from 'features/nodes/components/sidePanel/builder/DividerElementComponent';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
 import { HeadingElementComponent } from 'features/nodes/components/sidePanel/builder/HeadingElementComponent';
 import { NodeFieldElementComponent } from 'features/nodes/components/sidePanel/builder/NodeFieldElementComponent';
 import { TextElementComponent } from 'features/nodes/components/sidePanel/builder/TextElementComponent';
-import { useMonitorForFormElementDnd } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { formElementAdded, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
@@ -18,7 +21,7 @@ import {
   isNodeFieldElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
-import { memo, useCallback, useContext } from 'react';
+import { memo, useCallback } from 'react';
 import { PiPlusBold } from 'react-icons/pi';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -52,34 +55,33 @@ export const ContainerElementComponent = memo(({ id }: { id: string }) => {
 ContainerElementComponent.displayName = 'ContainerElementComponent';
 
 export const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
-  const depth = useContext(DepthContext);
+  const depth = useDepthContext();
   const { id, data } = el;
   const { children, direction } = data;
 
   return (
-    <DepthContext.Provider value={depth + 1}>
-      <ContainerContext.Provider value={data}>
+    <DepthContextProvider depth={depth + 1}>
+      <ContainerContextProvider id={id} direction={direction}>
         <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-direction={direction}>
           {children.map((childId) => (
             <FormElementComponent key={childId} id={childId} />
           ))}
         </Flex>
-      </ContainerContext.Provider>{' '}
-    </DepthContext.Provider>
+      </ContainerContextProvider>
+    </DepthContextProvider>
   );
 });
 ContainerElementComponentViewMode.displayName = 'ContainerElementComponentViewMode';
 
 export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }) => {
-  const depth = useContext(DepthContext);
+  const depth = useDepthContext();
   const { id, data } = el;
   const { children, direction } = data;
-  useMonitorForFormElementDnd(id, children);
 
   return (
     <FormElementEditModeWrapper element={el}>
-      <DepthContext.Provider value={depth + 1}>
-        <ContainerContext.Provider value={data}>
+      <DepthContextProvider depth={depth + 1}>
+        <ContainerContextProvider id={id} direction={direction}>
           <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-direction={direction}>
             {children.map((childId) => (
               <FormElementComponent key={childId} id={childId} />
@@ -87,8 +89,8 @@ export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerEl
             {direction === 'row' && children.length < 3 && depth < 2 && <AddColumnButton containerId={id} />}
             {direction === 'column' && depth < 1 && <AddRowButton containerId={id} />}
           </Flex>
-        </ContainerContext.Provider>
-      </DepthContext.Provider>
+        </ContainerContextProvider>
+      </DepthContextProvider>
     </FormElementEditModeWrapper>
   );
 });

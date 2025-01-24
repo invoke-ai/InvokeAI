@@ -2,15 +2,14 @@
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
-import type { DndListTargetState } from 'features/dnd/types';
+import type { DndListTargetState } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 
 /**
  * Design decisions for the drop indicator's main line
  */
 const line = {
   thickness: 2,
-  backgroundColor: 'red',
-  // backgroundColor: 'base.500',
+  backgroundColor: 'base.500',
 };
 
 type DropIndicatorProps = {
@@ -95,7 +94,6 @@ function DndDropIndicatorInternal({ edge, gap = '0px' }: DropIndicatorProps) {
    * the drop indicator should be positioned half way between draggable items.
    */
   const lineOffset = `calc(-0.5 * (${gap} + ${line.thickness}px))`;
-
   const orientation = edgeToOrientationMap[edge];
 
   return (
@@ -110,13 +108,13 @@ export const DndListDropIndicator = ({ dndState, gap }: { dndState: DndListTarge
     return null;
   }
 
-  if (!dndState.closestEdge) {
+  if (!dndState.closestCenterOrEdge || dndState.closestCenterOrEdge === 'center') {
     return null;
   }
 
   return (
     <DndDropIndicatorInternal
-      edge={dndState.closestEdge}
+      edge={dndState.closestCenterOrEdge}
       // This is the gap between items in the list, used to calculate the position of the drop indicator
       gap={gap || 'var(--invoke-space-2)'}
     />
