@@ -6195,6 +6195,12 @@ export type components = {
              */
             clip?: components["schemas"]["CLIPField"] | null;
             /**
+             * T5 Encoder
+             * @description T5 tokenizer and text encoder
+             * @default null
+             */
+            t5_encoder?: components["schemas"]["T5EncoderField"] | null;
+            /**
              * type
              * @default flux_lora_collection_loader
              * @constant
@@ -7337,6 +7343,12 @@ export type components = {
              */
             clip?: components["schemas"]["CLIPField"] | null;
             /**
+             * T5 Encoder
+             * @description T5 tokenizer and text encoder
+             * @default null
+             */
+            t5_encoder?: components["schemas"]["T5EncoderField"] | null;
+            /**
              * type
              * @default flux_lora_loader
              * @constant
@@ -7361,6 +7373,12 @@ export type components = {
              * @default null
              */
             clip: components["schemas"]["CLIPField"] | null;
+            /**
+             * T5 Encoder
+             * @description T5 tokenizer and text encoder
+             * @default null
+             */
+            t5_encoder: components["schemas"]["T5EncoderField"] | null;
             /**
              * type
              * @default flux_lora_loader_output
@@ -7716,11 +7734,6 @@ export type components = {
          * @description Gets the bounding box of the given mask image.
          */
         GetMaskBoundingBoxInvocation: {
-            /**
-             * @description Optional metadata to be saved with the image
-             * @default null
-             */
-            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -18350,6 +18363,11 @@ export type components = {
             tokenizer: components["schemas"]["ModelIdentifierField"];
             /** @description Info to load text_encoder submodel */
             text_encoder: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Loras
+             * @description LoRAs to apply on model loading
+             */
+            loras: components["schemas"]["LoRAField"][];
         };
         /** TBLR */
         TBLR: {

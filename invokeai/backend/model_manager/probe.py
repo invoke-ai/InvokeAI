@@ -46,6 +46,9 @@ from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_ut
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
     is_state_dict_likely_in_flux_kohya_format,
 )
+from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_onetrainer_format,
+)
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
@@ -283,7 +286,7 @@ class ModelProbe(object):
                 return ModelType.Main
             elif key.startswith(("encoder.conv_in", "decoder.conv_in")):
                 return ModelType.VAE
-            elif key.startswith(("lora_te_", "lora_unet_")):
+            elif key.startswith(("lora_te_", "lora_unet_", "lora_te1_", "lora_te2_", "lora_transformer_")):
                 return ModelType.LoRA
             # "lora_A.weight" and "lora_B.weight" are associated with models in PEFT format. We don't support all PEFT
             # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
@@ -632,6 +635,7 @@ class LoRACheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         if (
             is_state_dict_likely_in_flux_kohya_format(self.checkpoint)
+            or is_state_dict_likely_in_flux_onetrainer_format(self.checkpoint)
             or is_state_dict_likely_in_flux_diffusers_format(self.checkpoint)
             or is_state_dict_likely_flux_control(self.checkpoint)
         ):

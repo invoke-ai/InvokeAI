@@ -35,11 +35,13 @@ export const addFLUXLoRAs = (
   // Use model loader as transformer input
   g.addEdge(modelLoader, 'transformer', loraCollectionLoader, 'transformer');
   g.addEdge(modelLoader, 'clip', loraCollectionLoader, 'clip');
+  g.addEdge(modelLoader, 't5_encoder', loraCollectionLoader, 't5_encoder');
   // Reroute model connections through the LoRA collection loader
   g.deleteEdgesTo(denoise, ['transformer']);
-  g.deleteEdgesTo(fluxTextEncoder, ['clip']);
+  g.deleteEdgesTo(fluxTextEncoder, ['clip', 't5_encoder']);
   g.addEdge(loraCollectionLoader, 'transformer', denoise, 'transformer');
   g.addEdge(loraCollectionLoader, 'clip', fluxTextEncoder, 'clip');
+  g.addEdge(loraCollectionLoader, 't5_encoder', fluxTextEncoder, 't5_encoder');
 
   for (const lora of enabledLoRAs) {
     const { weight } = lora;

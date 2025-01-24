@@ -7,7 +7,6 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
     CustomModuleMixin,
 )
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 
@@ -19,25 +18,6 @@ def linear_lora_forward(input: torch.Tensor, lora_layer: LoRALayer, lora_weight:
         x = torch.nn.functional.linear(x, lora_layer.mid)
     x = torch.nn.functional.linear(x, lora_layer.up, bias=lora_layer.bias)
     x *= lora_weight * lora_layer.scale()
-    return x
-
-
-def concatenated_lora_forward(
-    input: torch.Tensor, concatenated_lora_layer: ConcatenatedLoRALayer, lora_weight: float
-) -> torch.Tensor:
-    """An optimized implementation of the residual calculation for a sidecar ConcatenatedLoRALayer."""
-    x_chunks: list[torch.Tensor] = []
-    for lora_layer in concatenated_lora_layer.lora_layers:
-        x_chunk = torch.nn.functional.linear(input, lora_layer.down)
-        if lora_layer.mid is not None:
-            x_chunk = torch.nn.functional.linear(x_chunk, lora_layer.mid)
-        x_chunk = torch.nn.functional.linear(x_chunk, lora_layer.up, bias=lora_layer.bias)
-        x_chunk *= lora_weight * lora_layer.scale()
-        x_chunks.append(x_chunk)
-
-    # TODO(ryand): Generalize to support concat_axis != 0.
-    assert concatenated_lora_layer.concat_axis == 0
-    x = torch.cat(x_chunks, dim=-1)
     return x
 
 
@@ -66,8 +46,6 @@ def autocast_linear_forward_sidecar_patches(
             output += linear_lora_forward(orig_input, patch, patch_weight)
         elif isinstance(patch, LoRALayer):
             output += linear_lora_forward(input, patch, patch_weight)
-        elif isinstance(patch, ConcatenatedLoRALayer):
-            output += concatenated_lora_forward(input, patch, patch_weight)
         else:
             unprocessed_patches_and_weights.append((patch, patch_weight))
 

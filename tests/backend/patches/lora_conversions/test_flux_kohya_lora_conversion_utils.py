@@ -13,6 +13,9 @@ from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
     FLUX_LORA_CLIP_PREFIX,
     FLUX_LORA_TRANSFORMER_PREFIX,
 )
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
+    state_dict_keys as flux_onetrainer_state_dict_keys,
+)
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_format import (
     state_dict_keys as flux_diffusers_state_dict_keys,
 )
@@ -34,11 +37,12 @@ def test_is_state_dict_likely_in_flux_kohya_format_true(sd_keys: dict[str, list[
     assert is_state_dict_likely_in_flux_kohya_format(state_dict)
 
 
-def test_is_state_dict_likely_in_flux_kohya_format_false():
+@pytest.mark.parametrize("sd_keys", [flux_diffusers_state_dict_keys, flux_onetrainer_state_dict_keys])
+def test_is_state_dict_likely_in_flux_kohya_format_false(sd_keys: dict[str, list[int]]):
     """Test that is_state_dict_likely_in_flux_kohya_format() returns False for a state dict that is in the Diffusers
     FLUX LoRA format.
     """
-    state_dict = keys_to_mock_state_dict(flux_diffusers_state_dict_keys)
+    state_dict = keys_to_mock_state_dict(sd_keys)
     assert not is_state_dict_likely_in_flux_kohya_format(state_dict)
 
 
