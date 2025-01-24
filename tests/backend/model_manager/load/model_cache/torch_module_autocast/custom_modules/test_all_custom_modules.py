@@ -13,7 +13,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
+from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer, Range
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
@@ -330,12 +330,16 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
 
         # Create a ConcatenatedLoRA layer.
         sub_layers: list[LoRALayer] = []
+        sub_layer_ranges: list[Range] = []
+        dim_0_offset = 0
         for out_features in sub_layer_out_features:
             down = torch.randn(rank, in_features)
             up = torch.randn(out_features, rank)
             bias = torch.randn(out_features)
             sub_layers.append(LoRALayer(up=up, mid=None, down=down, alpha=1.0, bias=bias))
-        concatenated_lora_layer = ConcatenatedLoRALayer(sub_layers, concat_axis=0)
+            sub_layer_ranges.append(Range(dim_0_offset, dim_0_offset + out_features))
+            dim_0_offset += out_features
+        concatenated_lora_layer = ConcatenatedLoRALayer(sub_layers, sub_layer_ranges)
 
         input = torch.randn(1, in_features)
         return ([(concatenated_lora_layer, 0.7)], input)

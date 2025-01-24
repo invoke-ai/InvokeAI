@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
+from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer, Range
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -96,7 +96,9 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
         if not any(keys_present):
             return
 
+        dim_0_offset = 0
         sub_layers: list[BaseLayerPatch] = []
+        sub_layer_ranges: list[Range] = []
         for src_key, src_weight_shape in zip(src_keys, src_weight_shapes, strict=True):
             src_layer_dict = grouped_state_dict.pop(src_key, None)
             if src_layer_dict is not None:
@@ -104,15 +106,14 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
                 # assert values["lora_down.weight"].shape[1] == src_weight_shape[1]
                 # assert values["lora_up.weight"].shape[0] == src_weight_shape[0]
                 sub_layers.append(any_lora_layer_from_state_dict(values))
+                sub_layer_ranges.append(Range(dim_0_offset, dim_0_offset + src_weight_shape[0]))
             else:
                 if not allow_missing_keys:
                     raise ValueError(f"Missing LoRA layer: '{src_key}'.")
-                values = {
-                    "lora_up.weight": torch.zeros((src_weight_shape[0], 1)),
-                    "lora_down.weight": torch.zeros((1, src_weight_shape[1])),
-                }
-                sub_layers.append(any_lora_layer_from_state_dict(values))
-        layers[dst_qkv_key] = ConcatenatedLoRALayer(lora_layers=sub_layers)
+
+            dim_0_offset += src_weight_shape[0]
+
+        layers[dst_qkv_key] = ConcatenatedLoRALayer(sub_layers, sub_layer_ranges)
 
     # time_text_embed.timestep_embedder -> time_in.
     add_lora_layer_if_present("time_text_embed.timestep_embedder.linear_1", "time_in.in_layer")
