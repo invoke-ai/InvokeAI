@@ -13,8 +13,8 @@ class Range:
     end: int
 
 
-class ConcatenatedLoRALayer(BaseLayerPatch):
-    """A patch layer that is composed of multiple sub-layers concatenated together.
+class MergedLayerPatch(BaseLayerPatch):
+    """A patch layer that is composed of multiple sub-layers merged together.
 
     This class was created to handle a special case with FLUX LoRA models. In the BFL FLUX model format, the attention
     Q, K, V matrices are concatenated along the first dimension. In the diffusers LoRA format, the Q, K, V matrices are

@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer, Range
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -113,7 +113,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
 
             dim_0_offset += src_weight_shape[0]
 
-        layers[dst_qkv_key] = ConcatenatedLoRALayer(sub_layers, sub_layer_ranges)
+        layers[dst_qkv_key] = MergedLayerPatch(sub_layers, sub_layer_ranges)
 
     # time_text_embed.timestep_embedder -> time_in.
     add_lora_layer_if_present("time_text_embed.timestep_embedder.linear_1", "time_in.in_layer")

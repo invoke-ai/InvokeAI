@@ -98,7 +98,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
                 raise ValueError(f"Unsupported model format: {t5_encoder_config.format}")
 
             # Apply LoRA models to the T5 encoder.
-            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            # Note: We apply the LoRA after the encoder has been moved to its target device for faster patching.
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=t5_text_encoder,
