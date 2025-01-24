@@ -1,9 +1,9 @@
-import { Flex, type FlexProps, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
+import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
-import type { DndListTargetState } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { useDraggableFormElement } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import { type FormElement, isContainerElement } from 'features/nodes/types/workflow';
@@ -15,16 +15,6 @@ export const EDIT_MODE_WRAPPER_CLASS_NAME = getPrefixedId('edit-mode-wrapper', '
 
 export const getEditModeWrapperId = (id: string) => `${id}-edit-mode-wrapper`;
 
-const getHeaderBgColor = (depth: number) => {
-  if (depth <= 1) {
-    return 'base.800';
-  }
-  if (depth === 2) {
-    return 'base.750';
-  }
-  return 'base.700';
-};
-
 const getHeaderLabel = (el: FormElement) => {
   if (isContainerElement(el)) {
     if (el.data.direction === 'column') {
@@ -35,21 +25,43 @@ const getHeaderLabel = (el: FormElement) => {
   return startCase(el.type);
 };
 
-const getBgColor = (dndListState: DndListTargetState) => {
-  if (dndListState.type !== 'is-dragging-over') {
-    return undefined;
-  }
-  if (dndListState.closestCenterOrEdge === 'center') {
-    return 'base.700';
-  }
-  return undefined;
+const wrapperSx: SystemStyleObject = {
+  position: 'relative',
+  flexDir: 'column',
+  boxShadow: '0 0 0 1px var(--invoke-colors-base-750)',
+  borderRadius: 'base',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  w: 'full',
+  h: 'full',
+  '&[data-is-dragging="true"]': {
+    opacity: 0.3,
+  },
+  '&[data-is-dragging-over-center="true"]': {
+    opacity: 1,
+    bg: 'base.700',
+  },
+};
+
+const headerSx: SystemStyleObject = {
+  w: 'full',
+  ps: 2,
+  h: 8,
+  borderTopRadius: 'inherit',
+  borderColor: 'inherit',
+  alignItems: 'center',
+  cursor: 'grab',
+  bg: 'base.700',
+  '&[data-depth="0"]': { bg: 'base.800' },
+  '&[data-depth="1"]': { bg: 'base.800' },
+  '&[data-depth="2"]': { bg: 'base.750' },
 };
 
 export const FormElementEditModeWrapper = memo(
   ({ element, children, ...rest }: { element: FormElement } & FlexProps) => {
     const draggableRef = useRef<HTMLDivElement>(null);
     const dragHandleRef = useRef<HTMLDivElement>(null);
-    const [dndListState] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
+    const [dndListState, isDragging] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
     const depth = useDepthContext();
     const dispatch = useAppDispatch();
     const removeElement = useCallback(() => {
@@ -60,30 +72,15 @@ export const FormElementEditModeWrapper = memo(
       <Flex
         id={getEditModeWrapperId(element.id)}
         ref={draggableRef}
-        position="relative"
+        sx={wrapperSx}
         className={EDIT_MODE_WRAPPER_CLASS_NAME}
-        flexDir="column"
-        boxShadow="0 0 0 1px var(--invoke-colors-base-750)"
-        borderRadius="base"
-        alignItems="center"
-        justifyContent="flex-start"
-        w="full"
-        h="full"
-        bg={getBgColor(dndListState)}
-        opacity={dndListState.type === 'is-dragging' ? 0.3 : 1}
+        data-is-dragging={isDragging}
+        data-is-dragging-over-center={
+          dndListState.type === 'is-dragging-over' && dndListState.closestCenterOrEdge === 'center'
+        }
         {...rest}
       >
-        <Flex
-          ref={dragHandleRef}
-          w="full"
-          ps={2}
-          h={8}
-          bg={getHeaderBgColor(depth)}
-          borderTopRadius="inherit"
-          borderColor="inherit"
-          alignItems="center"
-          cursor="grab"
-        >
+        <Flex ref={dragHandleRef} sx={headerSx} data-depth={depth}>
           <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
             {getHeaderLabel(element)} ({element.id})
           </Text>
