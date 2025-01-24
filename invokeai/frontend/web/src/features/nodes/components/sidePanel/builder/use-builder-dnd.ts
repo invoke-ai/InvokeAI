@@ -83,6 +83,11 @@ export const useMonitorForFormElementDnd = () => {
         const sourceData = source.data as DndData;
         const targetData = target.data as DndData;
 
+        //
+        if (sourceData.element.id === targetData.element.id) {
+          return;
+        }
+
         const closestCenterOrEdge = extractClosestCenterOrEdge(targetData);
 
         if (closestCenterOrEdge === 'center') {
@@ -210,7 +215,7 @@ export const useDraggableFormElement = (
           });
         },
         getIsSticky: () => true,
-        onDrag: ({ self, location }) => {
+        onDrag: ({ self, location, source }) => {
           const innermostDropTargetElement = location.current.dropTargets.at(0)?.element;
 
           // If the innermost target is not this draggable element, bail. We only want to react when dragging over _this_ element.
@@ -220,6 +225,12 @@ export const useDraggableFormElement = (
           }
 
           const closestCenterOrEdge = extractClosestCenterOrEdge(self.data);
+
+          // Don't allow reparanting to the same container
+          if (closestCenterOrEdge === 'center' && source.element === draggableElement) {
+            setListDndState(idle);
+            return;
+          }
 
           // Only need to update react state if nothing has changed.
           // Prevents re-rendering.
