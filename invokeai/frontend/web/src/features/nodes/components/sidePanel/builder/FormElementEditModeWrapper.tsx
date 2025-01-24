@@ -1,7 +1,7 @@
 import { Flex, type FlexProps, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { useContainerContext, useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
+import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import type { DndListTargetState } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { useDraggableFormElement } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
@@ -55,8 +55,7 @@ export const FormElementEditModeWrapper = memo(
   ({ element, children, ...rest }: { element: FormElement } & FlexProps) => {
     const draggableRef = useRef<HTMLDivElement>(null);
     const dragHandleRef = useRef<HTMLDivElement>(null);
-    const container = useContainerContext();
-    const [dndListState] = useDraggableFormElement(element.id, container?.id ?? null, draggableRef, dragHandleRef);
+    const [dndListState] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
     const depth = useDepthContext();
     const dispatch = useAppDispatch();
     const removeElement = useCallback(() => {
