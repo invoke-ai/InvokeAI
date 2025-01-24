@@ -94,7 +94,7 @@ class DoRALayer(LoRALayerBase):
             # If any of the original parameters are on the 'meta' device, we assume this is because the base model is in
             # a quantization format that doesn't allow easy dequantization.
             raise RuntimeError(
-                "The base model quantization format (likely bitsandbytes) is not supported for DoRA patches."
+                "The base model quantization format (likely bitsandbytes) is not compatible with DoRA patches."
             )
 
         scale = self.scale()

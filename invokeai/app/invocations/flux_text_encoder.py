@@ -83,21 +83,32 @@ class FluxTextEncoderInvocation(BaseInvocation):
             assert isinstance(t5_text_encoder, T5EncoderModel)
             assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
 
-            # Apply LoRA models to the T5 encoder.
-            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
-            if t5_encoder_config.format == ModelFormat.T5Encoder:
-                # The model is non-quantized, so we can apply the LoRA weights directly into the model.
-                exit_stack.enter_context(
-                    LayerPatcher.apply_smart_model_patches(
-                        model=t5_text_encoder,
-                        patches=self._t5_lora_iterator(context),
-                        prefix=FLUX_LORA_T5_PREFIX,
-                        dtype=t5_text_encoder.dtype,
-                        cached_weights=cached_weights,
-                    )
-                )
+            # Determine if the model is quantized.
+            # If the model is quantized, then we need to apply the LoRA weights as sidecar layers. This results in
+            # slower inference than direct patching, but is agnostic to the quantization format.
+            if t5_encoder_config.format in [ModelFormat.T5Encoder, ModelFormat.Diffusers]:
+                model_is_quantized = False
+            elif t5_encoder_config.format in [
+                ModelFormat.BnbQuantizedLlmInt8b,
+                ModelFormat.BnbQuantizednf4b,
+                ModelFormat.GGUFQuantized,
+            ]:
+                model_is_quantized = True
             else:
                 raise ValueError(f"Unsupported model format: {t5_encoder_config.format}")
+
+            # Apply LoRA models to the T5 encoder.
+            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=t5_text_encoder,
+                    patches=self._t5_lora_iterator(context),
+                    prefix=FLUX_LORA_T5_PREFIX,
+                    dtype=t5_text_encoder.dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=model_is_quantized,
+                )
+            )
 
             t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
 
