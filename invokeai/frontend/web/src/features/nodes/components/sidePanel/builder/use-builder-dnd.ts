@@ -15,7 +15,7 @@ import {
 } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
 import { formElementMoved } from 'features/nodes/store/workflowSlice';
-import type { ContainerElement, ElementId, FormElement } from 'features/nodes/types/workflow';
+import type { ElementId, FormElement } from 'features/nodes/types/workflow';
 import { isContainerElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
@@ -42,9 +42,12 @@ export type DndListTargetState =
     };
 export const idle: DndListTargetState = { type: 'idle' };
 
+// using a symbol so we can guarantee a key with a unique value
+const uniqueBuilderDndKey = Symbol('builderDnd');
+
 type DndData = {
+  [uniqueBuilderDndKey]: true;
   element: FormElement;
-  container: ContainerElement | null;
 };
 
 const getElement = <T extends FormElement>(id: ElementId, guard?: (el: FormElement) => el is T): T => {
@@ -70,11 +73,8 @@ export const useMonitorForFormElementDnd = () => {
 
   useEffect(() => {
     return monitorForElements({
-      // canMonitor({ source }) {
-      //   return (source.data as FormElement).id === containerId;
-      // },
-      canMonitor: () => true,
-      onDrop({ location, source }) {
+      canMonitor: ({ source }) => uniqueBuilderDndKey in source.data,
+      onDrop: ({ location, source }) => {
         const target = location.current.dropTargets[0];
         if (!target) {
           return;
@@ -83,83 +83,55 @@ export const useMonitorForFormElementDnd = () => {
         const sourceData = source.data as DndData;
         const targetData = target.data as DndData;
 
-        const sourceElementId = sourceData.element.id;
-        const targetElementId = targetData.element.id;
-
         const closestCenterOrEdge = extractClosestCenterOrEdge(targetData);
 
         if (closestCenterOrEdge === 'center') {
-          const targetContainer = getElement(targetElementId);
-          if (!isContainerElement(targetContainer)) {
-            // Shouldn't happen - when dropped on the center of drop target, the target should always be a container type.
-            return;
-          }
+          // Move the element to the target container - should we double-check that the target is a container?
           flushSync(() => {
-            dispatch(formElementMoved({ id: sourceElementId, containerId: targetContainer.id }));
+            dispatch(formElementMoved({ id: sourceData.element.id, containerId: targetData.element.id }));
           });
         } else if (closestCenterOrEdge) {
-          if (targetData.container) {
-            const targetContainer = getElement(targetData.container.id);
-            if (!isContainerElement(targetContainer)) {
-              // Shouldn't happen - drop targets should always have a container.
+          // Move the element to the target's parent container at the correct index
+          const { parentId } = targetData.element;
+          assert(parentId !== undefined, 'Target element should have a parent');
+
+          const isReparenting = parentId !== sourceData.element.parentId;
+
+          const parentContainer = getElement(parentId, isContainerElement);
+          const targetIndex = parentContainer.data.children.findIndex(
+            (elementId) => elementId === targetData.element.id
+          );
+
+          let index: number | undefined = undefined;
+
+          if (!isReparenting) {
+            const sourceIndex = parentContainer.data.children.findIndex(
+              (elementId) => elementId === sourceData.element.id
+            );
+            if (sourceIndex === targetIndex || sourceIndex === adjustIndexForDrop(targetIndex, closestCenterOrEdge)) {
               return;
             }
-            const indexOfSource = targetContainer.data.children.findIndex((elementId) => elementId === sourceElementId);
-            const indexOfTarget = targetContainer.data.children.findIndex((elementId) => elementId === targetElementId);
-
-            if (indexOfSource === indexOfTarget) {
-              // Don't move if the source and target are the same index, meaning same position in the list.
-              return;
-            }
-
-            const adjustedIndex = adjustIndexForDrop(indexOfTarget, closestCenterOrEdge);
-
-            if (indexOfSource === adjustedIndex) {
-              // Don't move if the source is already in the correct position.
-              return;
-            }
-
-            flushSync(() => {
-              dispatch(
-                formElementMoved({
-                  id: sourceElementId,
-                  containerId: targetContainer.id,
-                  index: indexOfTarget,
-                })
-              );
-            });
+            index = targetIndex;
+          } else {
+            index = adjustIndexForDrop(targetIndex, closestCenterOrEdge);
           }
+
+          flushSync(() => {
+            dispatch(
+              formElementMoved({
+                id: sourceData.element.id,
+                containerId: parentId,
+                index,
+              })
+            );
+          });
         } else {
           // No container, cannot do anything
           return;
         }
-        // const childrenClone = [...targetData.container.data.children];
-
-        // const indexOfSource = childrenClone.findIndex((elementId) => elementId === sourceElementId);
-        // const indexOfTarget = childrenClone.findIndex((elementId) => elementId === targetElementId);
-
-        // if (indexOfTarget < 0 || indexOfSource < 0) {
-        //   return;
-        // }
-
-        // // Don't move if the source and target are the same index, meaning same position in the list
-        // if (indexOfSource === indexOfTarget) {
-        //   return;
-        // }
-
-        // Using `flushSync` so we can query the DOM straight after this line
-        // flushSync(() => {
-        //   dispatch(
-        //     formElementMoved({
-        //       id: sourceElementId,
-        //       containerId: targetData.container.id,
-        //       index: indexOfTarget,
-        //     })
-        //   );
-        // });
 
         // Flash the element that was moved
-        const element = document.querySelector(`#${getEditModeWrapperId(sourceElementId)}`);
+        const element = document.querySelector(`#${getEditModeWrapperId(sourceData.element.id)}`);
         if (element instanceof HTMLElement) {
           triggerPostMoveFlash(element, colorTokenToCssVar('base.700'));
         }
@@ -170,7 +142,6 @@ export const useMonitorForFormElementDnd = () => {
 
 export const useDraggableFormElement = (
   elementId: ElementId,
-  containerId: ElementId | null,
   draggableRef: RefObject<HTMLElement>,
   dragHandleRef: RefObject<HTMLElement>
 ) => {
@@ -183,38 +154,39 @@ export const useDraggableFormElement = (
     if (!draggableElement || !dragHandleElement) {
       return;
     }
+    const _element = getElement(elementId);
+    if (!_element.parentId) {
+      // Root element, cannot drag
+      return;
+    }
     return combine(
       firefoxDndFix(draggableElement),
       draggable({
-        canDrag: () => Boolean(containerId),
         element: draggableElement,
         dragHandle: dragHandleElement,
-        getInitialData() {
-          const data: DndData = {
-            element: getElement(elementId),
-            container: containerId ? getElement(containerId, isContainerElement) : null,
-          };
-          return data;
-        },
-        onDragStart() {
+        getInitialData: () => ({
+          [uniqueBuilderDndKey]: true,
+          element: getElement(elementId),
+        }),
+        onDragStart: () => {
           setListDndState({ type: 'is-dragging' });
           setIsDragging(true);
         },
-        onDrop() {
+        onDrop: () => {
           setListDndState(idle);
           setIsDragging(false);
         },
       }),
       dropTargetForElements({
         element: draggableElement,
-        // canDrop() {},
-        getData({ input }) {
+        canDrop: ({ source }) => uniqueBuilderDndKey in source.data,
+        getData: ({ input }) => {
           const element = getElement(elementId);
-          const container = containerId ? getElement(containerId, isContainerElement) : null;
+          const container = element.parentId ? getElement(element.parentId, isContainerElement) : null;
 
           const data: DndData = {
+            [uniqueBuilderDndKey]: true,
             element,
-            container,
           };
 
           const allowedCenterOrEdge: CenterOrEdge[] = [];
@@ -237,10 +209,8 @@ export const useDraggableFormElement = (
             allowedCenterOrEdge,
           });
         },
-        getIsSticky() {
-          return true;
-        },
-        onDrag({ self, location }) {
+        getIsSticky: () => true,
+        onDrag: ({ self, location }) => {
           const innermostDropTargetElement = location.current.dropTargets.at(0)?.element;
 
           // If the innermost target is not this draggable element, bail. We only want to react when dragging over _this_ element.
@@ -260,15 +230,15 @@ export const useDraggableFormElement = (
             return { type: 'is-dragging-over', closestCenterOrEdge };
           });
         },
-        onDragLeave() {
+        onDragLeave: () => {
           setListDndState(idle);
         },
-        onDrop() {
+        onDrop: () => {
           setListDndState(idle);
         },
       })
     );
-  }, [containerId, dragHandleRef, draggableRef, elementId]);
+  }, [dragHandleRef, draggableRef, elementId]);
 
   return [dndListState, isDragging] as const;
 };

@@ -5,6 +5,8 @@ import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/dist/types/t
 
 export type CenterOrEdge = 'center' | Edge;
 
+const CENTER_BIAS_FACTOR = 0.8;
+
 // re-exporting type to make it easy to use
 
 const getDistanceToCenterOrEdge: {
@@ -17,7 +19,7 @@ const getDistanceToCenterOrEdge: {
   center: (rect, client) => {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    return Math.sqrt((client.x - centerX) ** 2 + (client.y - centerY) ** 2);
+    return Math.sqrt((client.x - centerX) ** 2 + (client.y - centerY) ** 2) * CENTER_BIAS_FACTOR;
   },
 };
 

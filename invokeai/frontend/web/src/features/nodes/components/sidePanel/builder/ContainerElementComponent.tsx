@@ -86,8 +86,8 @@ export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerEl
             {children.map((childId) => (
               <FormElementComponent key={childId} id={childId} />
             ))}
-            {direction === 'row' && children.length < 3 && depth < 2 && <AddColumnButton containerId={id} />}
-            {direction === 'column' && depth < 1 && <AddRowButton containerId={id} />}
+            {direction === 'row' && children.length < 3 && depth < 2 && <AddColumnButton el={el} />}
+            {direction === 'column' && depth < 1 && <AddRowButton el={el} />}
           </Flex>
         </ContainerContextProvider>
       </DepthContextProvider>
@@ -96,23 +96,23 @@ export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerEl
 });
 ContainerElementComponentEditMode.displayName = 'ContainerElementComponentEditMode';
 
-const AddColumnButton = ({ containerId }: { containerId: string }) => {
+const AddColumnButton = ({ el }: { el: ContainerElement }) => {
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    const element = container('column', []);
-    dispatch(formElementAdded({ element, containerId }));
-  }, [containerId, dispatch]);
+    const element = container('column', [], el.id);
+    dispatch(formElementAdded({ element, containerId: el.id }));
+  }, [dispatch, el.id]);
   return (
     <IconButton onClick={onClick} aria-label="add column" icon={<PiPlusBold />} h="unset" variant="ghost" size="sm" />
   );
 };
 
-const AddRowButton = ({ containerId }: { containerId: string }) => {
+const AddRowButton = ({ el }: { el: ContainerElement }) => {
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    const element = container('row', []);
-    dispatch(formElementAdded({ element, containerId }));
-  }, [containerId, dispatch]);
+    const element = container('row', [], el.id);
+    dispatch(formElementAdded({ element, containerId: el.id }));
+  }, [dispatch, el.id]);
   return (
     <IconButton onClick={onClick} aria-label="add row" icon={<PiPlusBold />} w="unset" variant="ghost" size="sm" />
   );

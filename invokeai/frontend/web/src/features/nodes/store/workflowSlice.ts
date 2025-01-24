@@ -422,11 +422,36 @@ const moveElement = (args: {
   if (!element) {
     return;
   }
-  const container = elements[containerId];
-  if (!container || !isContainerElement(container)) {
+  const newContainer = elements[containerId];
+  if (!newContainer || !isContainerElement(newContainer)) {
     return;
   }
 
-  recursivelyRemoveElement({ formState, id });
-  addElement({ formState, element, containerId, index });
+  if (newContainer.data.children.includes(id)) {
+    // Moving within the same container - remove the element from its current position and insert it at the new position
+    const currentIndex = newContainer.data.children.indexOf(id);
+    if (currentIndex === -1) {
+      return;
+    }
+    newContainer.data.children.splice(currentIndex, 1);
+    if (index === undefined) {
+      newContainer.data.children.push(id);
+    } else {
+      newContainer.data.children.splice(index, 0, id);
+    }
+  } else if (element.parentId !== undefined) {
+    const oldContainer = elements[element.parentId];
+    if (!oldContainer || !isContainerElement(oldContainer)) {
+      return;
+    }
+    oldContainer.data.children = oldContainer.data.children.filter((childId) => childId !== id);
+    if (index === undefined) {
+      newContainer.data.children.push(id);
+    } else {
+      newContainer.data.children.splice(index, 0, id);
+    }
+    element.parentId = containerId;
+  } else {
+    // Should never happen
+  }
 };
