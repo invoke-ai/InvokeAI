@@ -52,7 +52,9 @@ class CustomModuleMixin:
             if type(param) is torch.nn.Parameter and type(param.data) is torch.Tensor:
                 pass
             elif type(param) is GGMLTensor:
-                pass
+                # Move to device and dequantize here. Doing it in the patch layer can result in redundant casts /
+                # dequantizations.
+                orig_params[param_name] = param.to(device=device).get_dequantized_tensor()
             else:
                 orig_params[param_name] = torch.empty(get_param_shape(param), device="meta")
 
