@@ -36,19 +36,13 @@ const getHeaderLabel = (el: FormElement) => {
 };
 
 const getBgColor = (dndListState: DndListTargetState) => {
-  switch (dndListState.type) {
-    case 'idle':
-      return undefined;
-    case 'is-dragging':
-      return 'red';
-    case 'is-dragging-over':
-      if (dndListState.closestCenterOrEdge === 'center') {
-        return 'magenta';
-      }
-      return 'blue';
-    case 'preview':
-      return 'green';
+  if (dndListState.type !== 'is-dragging-over') {
+    return undefined;
   }
+  if (dndListState.closestCenterOrEdge === 'center') {
+    return 'base.700';
+  }
+  return undefined;
 };
 
 export const FormElementEditModeWrapper = memo(
@@ -61,10 +55,6 @@ export const FormElementEditModeWrapper = memo(
     const removeElement = useCallback(() => {
       dispatch(formElementRemoved({ id: element.id }));
     }, [dispatch, element.id]);
-
-    if (dndListState.type !== 'idle') {
-      // console.log(element.id, 'dndListState', dndListState);
-    }
 
     return (
       <Flex
@@ -90,14 +80,12 @@ export const FormElementEditModeWrapper = memo(
           h={8}
           bg={getHeaderBgColor(depth)}
           borderTopRadius="inherit"
-          // borderBottomWidth={1}
           borderColor="inherit"
           alignItems="center"
           cursor="grab"
         >
           <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
-            {element.id}
-            {/* {getHeaderLabel(element)} */}
+            {getHeaderLabel(element)} ({element.id})
           </Text>
           <Spacer />
           <IconButton
