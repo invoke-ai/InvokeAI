@@ -5,21 +5,67 @@ import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/dist/types/t
 
 export type CenterOrEdge = 'center' | Edge;
 
-const CENTER_BIAS_FACTOR = 0.8;
-
 // re-exporting type to make it easy to use
 
+// When the DOM element is small, the closest-edge algorithm can result in a very small hitbox for the center
+// region, making it difficult for the user to hit the center. To mitigate this, when the center is allowed,
+// we use an absolute edge hitbox size of 10px or 1/4 of the element's size, whichever is smaller.
+
 const getDistanceToCenterOrEdge: {
-  [TKey in CenterOrEdge]: (rect: DOMRect, client: Position) => number;
+  [TKey in CenterOrEdge]: (
+    rect: Pick<DOMRect, 'top' | 'right' | 'bottom' | 'left' | 'width' | 'height'>,
+    client: Position,
+    isCenterAllowed: boolean
+  ) => number;
 } = {
-  top: (rect, client) => Math.abs(client.y - rect.top),
-  right: (rect, client) => Math.abs(rect.right - client.x),
-  bottom: (rect, client) => Math.abs(rect.bottom - client.y),
-  left: (rect, client) => Math.abs(client.x - rect.left),
-  center: (rect, client) => {
+  top: (rect, client, isCenterAllowed) => {
+    const distanceFromTop = Math.abs(client.y - rect.top);
+    if (!isCenterAllowed) {
+      return distanceFromTop;
+    }
+    const hitboxHeight = Math.min(rect.height / 4, 10);
+    if (distanceFromTop <= hitboxHeight) {
+      return 0;
+    }
+    return Infinity;
+  },
+  right: (rect, client, isCenterAllowed) => {
+    const distanceFromRight = Math.abs(rect.right - client.x);
+    if (!isCenterAllowed) {
+      return distanceFromRight;
+    }
+    const hitboxWidth = Math.min(rect.width / 4, 10);
+    if (distanceFromRight <= hitboxWidth) {
+      return 0;
+    }
+    return Infinity;
+  },
+  bottom: (rect, client, isCenterAllowed) => {
+    const distanceFromBottom = Math.abs(rect.bottom - client.y);
+    if (!isCenterAllowed) {
+      return distanceFromBottom;
+    }
+    const hitboxHeight = Math.min(rect.height / 4, 10);
+    if (distanceFromBottom <= hitboxHeight) {
+      return 0;
+    }
+    return Infinity;
+  },
+  left: (rect, client, isCenterAllowed) => {
+    const distanceFromLeft = Math.abs(client.x - rect.left);
+    if (!isCenterAllowed) {
+      return distanceFromLeft;
+    }
+    const hitboxWidth = Math.min(rect.width / 4, 10);
+    if (distanceFromLeft <= hitboxWidth) {
+      return 0;
+    }
+    return Infinity;
+  },
+  center: (rect, client, _) => {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    return Math.sqrt((client.x - centerX) ** 2 + (client.y - centerY) ** 2) * CENTER_BIAS_FACTOR;
+    return Math.sqrt((client.x - centerX) ** 2 + (client.y - centerY) ** 2);
   },
 };
 
@@ -49,11 +95,11 @@ export function attachClosestCenterOrEdge(
   // frame in order to improve performance.
   // However, on measurement I saw no improvement. So no longer caching
   const rect: DOMRect = element.getBoundingClientRect();
+
+  const isCenterAllowed = allowedCenterOrEdge.includes('center');
+
   const entries = allowedCenterOrEdge.map((edge) => {
-    return {
-      edge,
-      value: getDistanceToCenterOrEdge[edge](rect, client),
-    };
+    return { edge, value: getDistanceToCenterOrEdge[edge](rect, client, isCenterAllowed) };
   });
 
   // edge can be `null` when `allowedCenterOrEdge` is []
