@@ -40,11 +40,11 @@ export const TextElementComponentEditMode = memo(({ el }: { el: TextElement }) =
   const { content, fontSize } = data;
 
   return (
-    <Flex id={id} className={TEXT_CLASS_NAME}>
-      <FormElementEditModeWrapper element={el}>
+    <FormElementEditModeWrapper element={el}>
+      <Flex id={id} className={TEXT_CLASS_NAME}>
         <Text fontSize={fontSize}>{content}</Text>
-      </FormElementEditModeWrapper>
-    </Flex>
+      </Flex>
+    </FormElementEditModeWrapper>
   );
 });
 TextElementComponentEditMode.displayName = 'TextElementComponentEditMode';

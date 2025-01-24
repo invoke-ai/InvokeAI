@@ -150,30 +150,24 @@ export const workflowSlice = createSlice({
         // Cannot add an element if the form has not been created
         return;
       }
-      const { elements } = state.form;
       const { element, containerId, index } = action.payload;
-
-      const container = elements[containerId];
-      if (!container || !isContainerElement(container)) {
-        return;
-      }
-
-      elements[element.id] = element;
-
-      if (index === undefined) {
-        container.data.children.push(element.id);
-      } else {
-        container.data.children.splice(index, 0, element.id);
-      }
+      addElement({ formState: state.form, element, containerId, index });
     },
     formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
       if (!state.form) {
         // Cannot remove an element if the form has not been created
         return;
       }
-      const { elements, rootElementId } = state.form;
       const { id } = action.payload;
-      recursivelyRemoveElement(elements, id, rootElementId);
+      recursivelyRemoveElement({ id, formState: state.form });
+    },
+    formElementMoved: (state, action: PayloadAction<{ id: string; containerId: string; index?: number }>) => {
+      if (!state.form) {
+        // Cannot remove an element if the form has not been created
+        return;
+      }
+      const { id, containerId, index } = action.payload;
+      moveElement({ formState: state.form, id, containerId, index });
     },
     formElementContainerDataChanged: (
       state,
@@ -314,6 +308,7 @@ export const {
   formCreated,
   formElementAdded,
   formElementRemoved,
+  formElementMoved,
   formElementContainerDataChanged,
   formReset,
   formModeToggled,
@@ -363,12 +358,14 @@ export const useElement = (id: string): FormElement | undefined => {
   return element;
 };
 
-const recursivelyRemoveElement = (
-  elements: NonNullable<WorkflowV3['form']>['elements'],
-  id: string,
-  containerId: string
-): boolean => {
-  const container = elements[containerId];
+const recursivelyRemoveElement = (args: {
+  id: string;
+  containerId?: string;
+  formState: NonNullable<WorkflowV3['form']>;
+}): boolean => {
+  const { id, containerId, formState } = args;
+  const { elements, rootElementId } = formState;
+  const container = elements[containerId || rootElementId];
 
   if (!container || !isContainerElement(container)) {
     return false;
@@ -382,10 +379,54 @@ const recursivelyRemoveElement = (
   }
 
   for (const childId of container.data.children) {
-    if (recursivelyRemoveElement(elements, id, childId)) {
+    if (recursivelyRemoveElement({ id, containerId: childId, formState })) {
       return true;
     }
   }
 
   return false;
+};
+
+const addElement = (args: {
+  formState: NonNullable<WorkflowV3['form']>;
+  element: FormElement;
+  containerId: string;
+  index?: number;
+}) => {
+  const { formState, element, containerId, index } = args;
+  const { elements } = formState;
+  const container = elements[containerId];
+  if (!container || !isContainerElement(container)) {
+    return;
+  }
+
+  elements[element.id] = element;
+
+  if (index === undefined) {
+    container.data.children.push(element.id);
+  } else {
+    container.data.children.splice(index, 0, element.id);
+  }
+};
+
+const moveElement = (args: {
+  formState: NonNullable<WorkflowV3['form']>;
+  id: string;
+  containerId: string;
+  index?: number;
+}) => {
+  const { formState, id, containerId, index } = args;
+  const { elements } = formState;
+
+  const element = elements[id];
+  if (!element) {
+    return;
+  }
+  const container = elements[containerId];
+  if (!container || !isContainerElement(container)) {
+    return;
+  }
+
+  recursivelyRemoveElement({ formState, id });
+  addElement({ formState, element, containerId, index });
 };
