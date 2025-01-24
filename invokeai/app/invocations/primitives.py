@@ -416,6 +416,7 @@ class ColorInvocation(BaseInvocation):
 class MaskOutput(BaseInvocationOutput):
     """A torch mask tensor."""
 
+    # shape: [1, H, W], dtype: bool
     mask: TensorField = OutputField(description="The mask.")
     width: int = OutputField(description="The width of the mask in pixels.")
     height: int = OutputField(description="The height of the mask in pixels.")
