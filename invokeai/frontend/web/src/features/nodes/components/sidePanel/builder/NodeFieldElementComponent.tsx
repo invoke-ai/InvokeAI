@@ -47,7 +47,7 @@ export const NodeFieldElementComponentEditMode = memo(({ el }: { el: NodeFieldEl
 
   return (
     <FormElementEditModeWrapper element={el}>
-      <Flex id={id} className={NODE_FIELD_CLASS_NAME} w='full'>
+      <Flex id={id} className={NODE_FIELD_CLASS_NAME} w="full">
         <InputFieldGate nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
           <InputFieldViewMode nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
         </InputFieldGate>

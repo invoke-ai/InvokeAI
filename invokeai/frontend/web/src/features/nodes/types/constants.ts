@@ -1,4 +1,4 @@
-import type { Node } from 'reactflow';
+import type { AnyNode } from 'features/nodes/types/invocation';
 
 /**
  * How long to wait before showing a tooltip when hovering a field handle.
@@ -19,7 +19,7 @@ export const DRAG_HANDLE_CLASSNAME = 'node-drag-handle';
 /**
  * reactflow-specifc properties shared between all node types.
  */
-export const SHARED_NODE_PROPERTIES: Partial<Node> = {
+export const SHARED_NODE_PROPERTIES: Partial<AnyNode> = {
   dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
 };
 

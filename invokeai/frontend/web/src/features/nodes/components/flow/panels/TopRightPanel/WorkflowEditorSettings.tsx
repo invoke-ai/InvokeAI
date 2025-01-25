@@ -15,6 +15,7 @@ import {
   ModalOverlay,
   Switch,
 } from '@invoke-ai/ui-library';
+import { SelectionMode } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
@@ -35,7 +36,6 @@ import {
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SelectionMode } from 'reactflow';
 
 const formLabelProps: FormLabelProps = { flexGrow: 1 };
 export const [useWorkflowEditorSettingsModal] = buildUseBoolean(false);

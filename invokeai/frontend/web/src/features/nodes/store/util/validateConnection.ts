@@ -1,10 +1,10 @@
+import type { Connection as NullableConnection } from '@xyflow/react';
 import type { Templates } from 'features/nodes/store/types';
 import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
 import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
-import type { AnyNode } from 'features/nodes/types/invocation';
-import type { Connection as NullableConnection, Edge } from 'reactflow';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import type { SetNonNullable } from 'type-fest';
 
 type Connection = SetNonNullable<NullableConnection>;
@@ -22,15 +22,15 @@ export type ValidationResult =
 type ValidateConnectionFunc = (
   connection: Connection,
   nodes: AnyNode[],
-  edges: Edge[],
+  edges: AnyEdge[],
   templates: Templates,
-  ignoreEdge: Edge | null,
+  ignoreEdge: AnyEdge | null,
   strict?: boolean
 ) => ValidationResult;
 
 const getEqualityPredicate =
   (c: Connection) =>
-  (e: Edge): boolean => {
+  (e: AnyEdge): boolean => {
     return (
       e.target === c.target &&
       e.targetHandle === c.targetHandle &&
@@ -41,7 +41,7 @@ const getEqualityPredicate =
 
 const getTargetEqualityPredicate =
   (c: Connection) =>
-  (e: Edge): boolean => {
+  (e: AnyEdge): boolean => {
     return e.target === c.target && e.targetHandle === c.targetHandle;
   };
 

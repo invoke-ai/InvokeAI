@@ -1,12 +1,13 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import type { EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { getEdgeStyles } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectShouldShowEdgeLabels } from 'features/nodes/store/workflowSettingsSlice';
+import type { DefaultInvocationNodeEdge } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
-import type { EdgeProps } from 'reactflow';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
 
 import { makeEdgeSelector } from './util/makeEdgeSelector';
 
@@ -23,7 +24,7 @@ const InvocationDefaultEdge = ({
   target,
   sourceHandleId,
   targetHandleId,
-}: EdgeProps) => {
+}: EdgeProps<DefaultInvocationNodeEdge>) => {
   const templates = useStore($templates);
   const selector = useMemo(
     () => makeEdgeSelector(templates, source, sourceHandleId, target, targetHandleId),
