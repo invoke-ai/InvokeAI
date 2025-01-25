@@ -13,6 +13,7 @@ import type {
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import {
+  buildContainer,
   type ContainerElement,
   type FormElement,
   isContainerElement,
@@ -25,18 +26,26 @@ import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types'
 
 import { selectNodesSlice } from './selectors';
 
-const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
-  name: '',
-  author: '',
-  description: '',
-  version: '',
-  contact: '',
-  tags: '',
-  notes: '',
-  exposedFields: [],
-  meta: { version: '3.0.0', category: 'user' },
-  id: undefined,
-  form: undefined,
+const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
+  const rootElement = buildContainer('column', []);
+  return {
+    name: '',
+    author: '',
+    description: '',
+    version: '',
+    contact: '',
+    tags: '',
+    notes: '',
+    exposedFields: [],
+    meta: { version: '3.0.0', category: 'user' },
+    id: undefined,
+    form: {
+      elements: {
+        [rootElement.id]: rootElement,
+      },
+      rootElementId: rootElement.id,
+    },
+  };
 };
 
 const initialWorkflowState: WorkflowState = {
@@ -49,7 +58,7 @@ const initialWorkflowState: WorkflowState = {
   orderDirection: 'DESC',
   categorySections: {},
   formMode: 'view',
-  ...blankWorkflow,
+  ...getBlankWorkflow(),
 };
 
 export const workflowSlice = createSlice({
