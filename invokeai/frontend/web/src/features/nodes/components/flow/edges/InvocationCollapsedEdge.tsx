@@ -1,13 +1,14 @@
 import { Badge, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import type { EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { getEdgeStyles } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { makeEdgeSelector } from 'features/nodes/components/flow/edges/util/makeEdgeSelector';
 import { $templates } from 'features/nodes/store/nodesSlice';
+import type { CollapsedInvocationNodeEdge } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
-import type { EdgeProps } from 'reactflow';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
 
 const InvocationCollapsedEdge = ({
   sourceX,
@@ -23,7 +24,7 @@ const InvocationCollapsedEdge = ({
   sourceHandleId,
   target,
   targetHandleId,
-}: EdgeProps<{ count: number }>) => {
+}: EdgeProps<CollapsedInvocationNodeEdge>) => {
   const templates = useStore($templates);
   const selector = useMemo(
     () => makeEdgeSelector(templates, source, sourceHandleId, target, targetHandleId),

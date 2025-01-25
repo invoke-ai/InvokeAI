@@ -1,4 +1,4 @@
-import 'reactflow/dist/style.css';
+import '@xyflow/react/dist/base.css';
 
 import { Flex } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';

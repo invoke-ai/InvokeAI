@@ -1,4 +1,4 @@
-import 'reactflow/dist/style.css';
+import '@xyflow/react/dist/base.css';
 
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';

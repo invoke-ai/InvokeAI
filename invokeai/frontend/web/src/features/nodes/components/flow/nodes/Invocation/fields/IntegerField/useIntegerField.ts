@@ -23,7 +23,7 @@ export const useIntegerField = (props: FieldComponentProps<IntegerFieldInputInst
       min = fieldTemplate.minimum;
     }
     if (!isNil(fieldTemplate.exclusiveMinimum)) {
-      min = fieldTemplate.exclusiveMinimum + 1
+      min = fieldTemplate.exclusiveMinimum + 1;
     }
     return min;
   }, [fieldTemplate.exclusiveMinimum, fieldTemplate.minimum]);
@@ -34,7 +34,7 @@ export const useIntegerField = (props: FieldComponentProps<IntegerFieldInputInst
       max = fieldTemplate.maximum;
     }
     if (!isNil(fieldTemplate.exclusiveMaximum)) {
-      max = fieldTemplate.exclusiveMaximum - 1
+      max = fieldTemplate.exclusiveMaximum - 1;
     }
     return max;
   }, [fieldTemplate.exclusiveMaximum, fieldTemplate.maximum]);

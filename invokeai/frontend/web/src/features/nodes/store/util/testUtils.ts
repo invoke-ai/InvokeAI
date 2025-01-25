@@ -1,10 +1,9 @@
 import type { Templates } from 'features/nodes/store/types';
-import type { InvocationTemplate } from 'features/nodes/types/invocation';
+import type { AnyEdge, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import type { OpenAPIV3_1 } from 'openapi-types';
-import type { Edge } from 'reactflow';
 
-export const buildEdge = (source: string, sourceHandle: string, target: string, targetHandle: string): Edge => ({
+export const buildEdge = (source: string, sourceHandle: string, target: string, targetHandle: string): AnyEdge => ({
   source,
   sourceHandle,
   target,

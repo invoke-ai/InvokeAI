@@ -1,8 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
+import { SelectionMode } from '@xyflow/react';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { Selector } from 'react-redux';
-import { SelectionMode } from 'reactflow';
 
 export type WorkflowSettingsState = {
   _version: 1;

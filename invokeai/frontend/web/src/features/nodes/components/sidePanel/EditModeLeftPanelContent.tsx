@@ -1,4 +1,4 @@
-import 'reactflow/dist/style.css';
+import '@xyflow/react/dist/base.css';
 
 import { Box } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
