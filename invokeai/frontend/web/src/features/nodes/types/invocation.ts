@@ -1,4 +1,4 @@
-import type { Edge, Node } from 'reactflow';
+import type { Edge, Node } from '@xyflow/react';
 import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
@@ -49,17 +49,15 @@ const zCurrentImageNodeData = z.object({
   label: z.string(),
   isOpen: z.boolean(),
 });
-const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData]);
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
 type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
-type AnyNodeData = z.infer<typeof zAnyNodeData>;
 
 export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
 export type NotesNode = Node<NotesNodeData, 'notes'>;
 export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
-export type AnyNode = Node<AnyNodeData>;
+export type AnyNode = InvocationNode | NotesNode | CurrentImageNode;
 
 export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
@@ -85,11 +83,13 @@ export type NodeExecutionState = z.infer<typeof zNodeExecutionState>;
 // #endregion
 
 // #region Edges
-const zInvocationNodeEdgeExtra = z.object({
-  type: z.union([z.literal('default'), z.literal('collapsed')]),
+const zInvocationNodeEdgeCollapsedData = z.object({
+  count: z.number().int().min(1),
 });
-type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
-export type InvocationNodeEdge = Edge<InvocationNodeEdgeExtra>;
+type InvocationNodeEdgeCollapsedData = z.infer<typeof zInvocationNodeEdgeCollapsedData>;
+export type DefaultInvocationNodeEdge = Edge<Record<string, never>, 'default'>;
+export type CollapsedInvocationNodeEdge = Edge<InvocationNodeEdgeCollapsedData, 'collapsed'>;
+export type AnyEdge = DefaultInvocationNodeEdge | CollapsedInvocationNodeEdge;
 // #endregion
 
 export const isBatchNode = (node: InvocationNode) => {

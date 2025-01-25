@@ -1,5 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Tooltip } from '@invoke-ai/ui-library';
+import type { HandleType } from '@xyflow/react';
+import { Handle, Position } from '@xyflow/react';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import type { ValidationResult } from 'features/nodes/store/util/validateConnection';
@@ -8,8 +10,6 @@ import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/typ
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { HandleType } from 'reactflow';
-import { Handle, Position } from 'reactflow';
 
 type Props = {
   handleType: HandleType;
@@ -60,12 +60,12 @@ const handleStyleBase = {
 
 const targetHandleStyle = {
   ...handleStyleBase,
-  insetInlineStart: '-1rem',
+  insetInlineStart: '-0.5rem',
 } satisfies CSSProperties;
 
 const sourceHandleStyle = {
   ...handleStyleBase,
-  insetInlineEnd: '-1rem',
+  insetInlineEnd: '-0.5rem',
 } satisfies CSSProperties;
 
 export const FieldHandle = memo((props: Props) => {

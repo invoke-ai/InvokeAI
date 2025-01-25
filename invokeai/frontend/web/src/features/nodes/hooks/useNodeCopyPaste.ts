@@ -1,3 +1,4 @@
+import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
@@ -13,9 +14,9 @@ import {
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { t } from 'i18next';
 import { isEqual, isNil, uniqWith } from 'lodash-es';
-import type { EdgeChange, NodeChange } from 'reactflow';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -80,8 +81,8 @@ const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
     edge.id = uuidv4();
   });
 
-  const nodeChanges: NodeChange[] = [];
-  const edgeChanges: EdgeChange[] = [];
+  const nodeChanges: NodeChange<AnyNode>[] = [];
+  const edgeChanges: EdgeChange<AnyEdge>[] = [];
   // Deselect existing nodes
   nodes.forEach(({ id, selected }) => {
     if (selected) {

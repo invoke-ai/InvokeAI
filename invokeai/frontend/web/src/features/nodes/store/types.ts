@@ -1,3 +1,4 @@
+import type { HandleType } from '@xyflow/react';
 import type {
   FieldIdentifier,
   FieldInputTemplate,
@@ -5,13 +6,12 @@ import type {
   StatefulFieldValue,
 } from 'features/nodes/types/field';
 import type {
+  AnyEdge,
   AnyNode,
-  InvocationNodeEdge,
   InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import type { HandleType } from 'reactflow';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
 export type Templates = Record<string, InvocationTemplate>;
@@ -27,7 +27,7 @@ export type PendingConnection = {
 export type NodesState = {
   _version: 1;
   nodes: AnyNode[];
-  edges: InvocationNodeEdge[];
+  edges: AnyEdge[];
 };
 
 export type WorkflowMode = 'edit' | 'view';

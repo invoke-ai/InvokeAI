@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react';
+import { useReactFlow } from '@xyflow/react';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
@@ -6,7 +7,6 @@ import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImag
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
 import { useCallback } from 'react';
-import { useReactFlow } from 'reactflow';
 
 export const useBuildNode = () => {
   const templates = useStore($templates);

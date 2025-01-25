@@ -1,5 +1,7 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
+import type { EdgeChange, NodeChange, Viewport, XYPosition } from '@xyflow/react';
+import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from '@xyflow/react';
 import type { PersistConfig } from 'app/store/store';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { workflowLoaded } from 'features/nodes/store/actions';
@@ -72,12 +74,10 @@ import {
   zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
-import type { Edge, EdgeChange, NodeChange, Viewport, XYPosition } from 'reactflow';
-import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
 import type { z } from 'zod';
 
@@ -125,10 +125,10 @@ export const nodesSlice = createSlice({
   name: 'nodes',
   initialState: initialNodesState,
   reducers: {
-    nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
-      state.nodes = applyNodeChanges(action.payload, state.nodes);
+    nodesChanged: (state, action: PayloadAction<NodeChange<AnyNode>[]>) => {
+      state.nodes = applyNodeChanges<AnyNode>(action.payload, state.nodes);
       // Remove edges that are no longer valid, due to a removed or otherwise changed node
-      const edgeChanges: EdgeChange[] = [];
+      const edgeChanges: EdgeChange<AnyEdge>[] = [];
       state.edges.forEach((e) => {
         const sourceExists = state.nodes.some((n) => n.id === e.source);
         const targetExists = state.nodes.some((n) => n.id === e.target);
@@ -136,10 +136,10 @@ export const nodesSlice = createSlice({
           edgeChanges.push({ type: 'remove', id: e.id });
         }
       });
-      state.edges = applyEdgeChanges(edgeChanges, state.edges);
+      state.edges = applyEdgeChanges<AnyEdge>(edgeChanges, state.edges);
     },
-    edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
-      const changes: EdgeChange[] = [];
+    edgesChanged: (state, action: PayloadAction<EdgeChange<AnyEdge>[]>) => {
+      const changes: EdgeChange<AnyEdge>[] = [];
       // We may need to massage the edge changes or otherwise handle them
       action.payload.forEach((change) => {
         if (change.type === 'remove' || change.type === 'select') {
@@ -251,7 +251,7 @@ export const nodesSlice = createSlice({
           (node) => isInvocationNode(node) && node.data.isOpen === false
         );
 
-        const collapsedEdgesToCreate: Edge<{ count: number }>[] = [];
+        const collapsedEdgesToCreate: AnyEdge[] = [];
 
         // hide all edges
         connectedEdges.forEach((edge) => {
@@ -271,7 +271,7 @@ export const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
-                updatable: false,
+                reconnectable: false,
                 selected: edge.selected,
               });
             }
@@ -292,14 +292,14 @@ export const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
-                updatable: false,
+                reconnectable: false,
                 selected: edge.selected,
               });
             }
           }
         });
         if (collapsedEdgesToCreate.length) {
-          state.edges = applyEdgeChanges(
+          state.edges = applyEdgeChanges<AnyEdge>(
             collapsedEdgesToCreate.map((edge) => ({ type: 'add', item: edge })),
             state.edges
           );
@@ -449,13 +449,28 @@ export const nodesSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes, edges } = action.payload;
-      state.nodes = applyNodeChanges(
-        nodes.map((node) => ({
-          type: 'add',
-          item: { ...node, ...SHARED_NODE_PROPERTIES },
-        })),
-        []
-      );
+
+      const changes: NodeChange<AnyNode>[] = [];
+      for (const node of nodes) {
+        if (node.type === 'notes') {
+          changes.push({
+            type: 'add',
+            item: {
+              ...SHARED_NODE_PROPERTIES,
+              ...node,
+            },
+          });
+        } else if (node.type === 'invocation') {
+          changes.push({
+            type: 'add',
+            item: {
+              ...SHARED_NODE_PROPERTIES,
+              ...node,
+            },
+          });
+        }
+      }
+      state.nodes = applyNodeChanges<AnyNode>(changes, []);
       state.edges = applyEdgeChanges(
         edges.map((edge) => ({ type: 'add', item: edge })),
         []
@@ -516,10 +531,10 @@ export const $cursorPos = atom<XYPosition | null>(null);
 export const $templates = atom<Templates>({});
 export const $hasTemplates = computed($templates, (templates) => Object.keys(templates).length > 0);
 export const $copiedNodes = atom<AnyNode[]>([]);
-export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
-export const $edgesToCopiedNodes = atom<InvocationNodeEdge[]>([]);
+export const $copiedEdges = atom<AnyEdge[]>([]);
+export const $edgesToCopiedNodes = atom<AnyEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
-export const $edgePendingUpdate = atom<Edge | null>(null);
+export const $edgePendingUpdate = atom<AnyEdge | null>(null);
 export const $didUpdateEdge = atom(false);
 export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);
 
