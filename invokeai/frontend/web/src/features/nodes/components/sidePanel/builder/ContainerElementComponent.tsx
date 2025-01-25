@@ -13,7 +13,7 @@ import { TextElementComponent } from 'features/nodes/components/sidePanel/builde
 import { formElementAdded, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
-  container,
+  buildContainer,
   CONTAINER_CLASS_NAME,
   isContainerElement,
   isDividerElement,
@@ -99,7 +99,7 @@ ContainerElementComponentEditMode.displayName = 'ContainerElementComponentEditMo
 const AddColumnButton = ({ el }: { el: ContainerElement }) => {
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    const element = container('column', [], el.id);
+    const element = buildContainer('column', [], el.id);
     dispatch(formElementAdded({ element, containerId: el.id }));
   }, [dispatch, el.id]);
   return (
@@ -110,7 +110,7 @@ const AddColumnButton = ({ el }: { el: ContainerElement }) => {
 const AddRowButton = ({ el }: { el: ContainerElement }) => {
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    const element = container('row', [], el.id);
+    const element = buildContainer('row', [], el.id);
     dispatch(formElementAdded({ element, containerId: el.id }));
   }, [dispatch, el.id]);
   return (

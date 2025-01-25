@@ -2,7 +2,7 @@
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
-import type { DndListTargetState } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
+import type { CenterOrEdge } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 
 /**
  * Design decisions for the drop indicator's main line
@@ -103,18 +103,23 @@ function DndDropIndicatorInternal({ edge, gap = '0px' }: DropIndicatorProps) {
   );
 }
 
-export const DndListDropIndicator = ({ dndState, gap }: { dndState: DndListTargetState; gap?: string }) => {
-  if (dndState.type !== 'is-dragging-over') {
+export const DndListDropIndicator = ({
+  activeDropRegion,
+  gap,
+}: {
+  activeDropRegion: CenterOrEdge | null;
+  gap?: string;
+}) => {
+  if (!activeDropRegion) {
     return null;
   }
-
-  if (!dndState.closestCenterOrEdge || dndState.closestCenterOrEdge === 'center') {
+  if (activeDropRegion === 'center') {
     return null;
   }
 
   return (
     <DndDropIndicatorInternal
-      edge={dndState.closestCenterOrEdge}
+      edge={activeDropRegion}
       // This is the gap between items in the list, used to calculate the position of the drop indicator
       gap={gap || 'var(--invoke-space-2)'}
     />

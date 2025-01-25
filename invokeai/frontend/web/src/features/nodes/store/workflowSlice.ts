@@ -400,6 +400,7 @@ const addElement = (args: {
     return;
   }
 
+  element.parentId = containerId;
   elements[element.id] = element;
 
   if (index === undefined) {
