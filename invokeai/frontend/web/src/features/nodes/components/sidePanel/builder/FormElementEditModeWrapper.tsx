@@ -83,15 +83,17 @@ export const FormElementEditModeWrapper = memo(
             {getHeaderLabel(element)} ({element.id})
           </Text>
           <Spacer />
-          <IconButton
-            aria-label="delete"
-            onClick={removeElement}
-            icon={<PiXBold />}
-            variant="link"
-            size="sm"
-            alignSelf="stretch"
-            colorScheme="error"
-          />
+          {element.parentId && (
+            <IconButton
+              aria-label="delete"
+              onClick={removeElement}
+              icon={<PiXBold />}
+              variant="link"
+              size="sm"
+              alignSelf="stretch"
+              colorScheme="error"
+            />
+          )}
         </Flex>
         <Flex w="full" p={4} alignItems="center" gap={4}>
           {children}
