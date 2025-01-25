@@ -72,11 +72,11 @@ const selectionOverlaySx: SystemStyleObject = {
   visibility: 'hidden',
   opacity: 0.5,
   '&[data-is-selected="true"], &[data-is-hovered="true"]': { visibility: 'visible' },
-  '&[data-is-selected="true"]': { shadow: '0 0 0 3px var(--invoke-colors-blue-500)' },
-  '&[data-is-hovered="true"]': { shadow: '0 0 0 2px var(--invoke-colors-blue-500)' },
+  '&[data-is-selected="true"]': { shadow: '0 0 0 3px var(--invoke-colors-blue-300)' },
+  '&[data-is-hovered="true"]': { shadow: '0 0 0 2px var(--invoke-colors-blue-300)' },
   '&[data-is-selected="true"][data-is-hovered="true"]': {
     opacity: 1,
-    shadow: '0 0 0 3px var(--invoke-colors-blue-500)',
+    shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
   },
 };
 
