@@ -24,11 +24,11 @@ const baseEdgeSx: SystemStyleObject = {
   '&[data-selected="true"]': {
     opacity: '1 !important',
   },
-  '&[data-selected="true"], &[data-are-connected-nodes-selected="true"]': {
-    strokeDasharray: '5 !important',
-  },
   '&[data-should-animate-edges="true"]': {
     animation: 'dashdraw 0.5s linear infinite !important',
+    '&[data-selected="true"], &[data-are-connected-nodes-selected="true"]': {
+      strokeDasharray: '5 !important',
+    },
   },
 };
 
