@@ -9,34 +9,23 @@ import {
   buildAddFormElementDndData,
   useMonitorForFormElementDnd,
 } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
-import { formLoaded, formModeToggled, selectWorkflowFormMode } from 'features/nodes/store/workflowSlice';
+import { formModeToggled, selectRootElementId, selectWorkflowFormMode } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
-import {
-  buildContainer,
-  buildDivider,
-  buildHeading,
-  buildText,
-  elements,
-  rootElementId,
-} from 'features/nodes/types/workflow';
+import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { assert } from 'tsafe';
 
 export const WorkflowBuilder = memo(() => {
-  const dispatch = useAppDispatch();
   const mode = useAppSelector(selectWorkflowFormMode);
+  const rootElementId = useAppSelector(selectRootElementId);
   useMonitorForFormElementDnd();
 
-  useEffect(() => {
-    // dispatch(formReset());
-    dispatch(formLoaded({ elements, rootElementId }));
-  }, [dispatch]);
   return (
     <ScrollableContent>
       <Flex w="full" justifyContent="center">
         <Flex flexDir="column" w={mode === 'view' ? '512px' : 'min-content'} minW="512px" gap={2}>
-          <ButtonGroup isAttached={false}>
+          <ButtonGroup isAttached={false} justifyContent="center">
             <ToggleModeButton />
             <AddFormElementDndButton type="container" />
             <AddFormElementDndButton type="divider" />
