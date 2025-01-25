@@ -37,7 +37,7 @@ const wrapperSx: SystemStyleObject = {
   '&[data-is-dragging="true"]': {
     opacity: 0.3,
   },
-  '&[data-is-dragging-over-center="true"]': {
+  '&[data-active-drop-region="center"]': {
     opacity: 1,
     bg: 'base.700',
   },
@@ -61,7 +61,7 @@ export const FormElementEditModeWrapper = memo(
   ({ element, children, ...rest }: { element: FormElement } & FlexProps) => {
     const draggableRef = useRef<HTMLDivElement>(null);
     const dragHandleRef = useRef<HTMLDivElement>(null);
-    const [dndListState, isDragging] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
+    const [activeDropRegion, isDragging] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
     const depth = useDepthContext();
     const dispatch = useAppDispatch();
     const removeElement = useCallback(() => {
@@ -75,9 +75,7 @@ export const FormElementEditModeWrapper = memo(
         sx={wrapperSx}
         className={EDIT_MODE_WRAPPER_CLASS_NAME}
         data-is-dragging={isDragging}
-        data-is-dragging-over-center={
-          dndListState.type === 'is-dragging-over' && dndListState.closestCenterOrEdge === 'center'
-        }
+        data-active-drop-region={activeDropRegion}
         {...rest}
       >
         <Flex ref={dragHandleRef} sx={headerSx} data-depth={depth}>
@@ -98,7 +96,7 @@ export const FormElementEditModeWrapper = memo(
         <Flex w="full" p={4} alignItems="center" gap={4}>
           {children}
         </Flex>
-        <DndListDropIndicator dndState={dndListState} gap="var(--invoke-space-4)" />
+        <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
       </Flex>
     );
   }

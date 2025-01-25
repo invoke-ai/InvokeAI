@@ -108,7 +108,7 @@ const zNodeFieldElement = zElementBase.extend({
 });
 export type NodeFieldElement = z.infer<typeof zNodeFieldElement>;
 export const isNodeFieldElement = (el: FormElement): el is NodeFieldElement => el.type === NODE_FIELD_TYPE;
-const nodeField = (
+export const buildNodeField = (
   nodeId: NodeFieldElement['data']['fieldIdentifier']['nodeId'],
   fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName'],
   parentId?: NodeFieldElement['parentId']
@@ -123,8 +123,8 @@ const nodeField = (
   };
   return element;
 };
-const _nodeField = (...args: Parameters<typeof nodeField>): NodeFieldElement => {
-  const element = nodeField(...args);
+const _nodeField = (...args: Parameters<typeof buildNodeField>): NodeFieldElement => {
+  const element = buildNodeField(...args);
   addElement(element);
   return element;
 };
@@ -140,7 +140,7 @@ const zHeadingElement = zElementBase.extend({
 });
 export type HeadingElement = z.infer<typeof zHeadingElement>;
 export const isHeadingElement = (el: FormElement): el is HeadingElement => el.type === HEADING_TYPE;
-const heading = (
+export const buildHeading = (
   content: HeadingElement['data']['content'],
   level: HeadingElement['data']['level'],
   parentId?: NodeFieldElement['parentId']
@@ -156,8 +156,8 @@ const heading = (
   };
   return element;
 };
-const _heading = (...args: Parameters<typeof heading>): HeadingElement => {
-  const element = heading(...args);
+const _heading = (...args: Parameters<typeof buildHeading>): HeadingElement => {
+  const element = buildHeading(...args);
   addElement(element);
   return element;
 };
@@ -173,7 +173,7 @@ const zTextElement = zElementBase.extend({
 });
 export type TextElement = z.infer<typeof zTextElement>;
 export const isTextElement = (el: FormElement): el is TextElement => el.type === TEXT_TYPE;
-const text = (
+export const buildText = (
   content: TextElement['data']['content'],
   fontSize: TextElement['data']['fontSize'],
   parentId?: NodeFieldElement['parentId']
@@ -187,11 +187,10 @@ const text = (
       fontSize,
     },
   };
-  addElement(element);
   return element;
 };
-const _text = (...args: Parameters<typeof text>): TextElement => {
-  const element = text(...args);
+const _text = (...args: Parameters<typeof buildText>): TextElement => {
+  const element = buildText(...args);
   addElement(element);
   return element;
 };
@@ -203,17 +202,16 @@ const zDividerElement = zElementBase.extend({
 });
 export type DividerElement = z.infer<typeof zDividerElement>;
 export const isDividerElement = (el: FormElement): el is DividerElement => el.type === DIVIDER_TYPE;
-const divider = (parentId?: NodeFieldElement['parentId']): DividerElement => {
+export const buildDivider = (parentId?: NodeFieldElement['parentId']): DividerElement => {
   const element: DividerElement = {
     id: getPrefixedId(DIVIDER_TYPE, '-'),
     parentId,
     type: DIVIDER_TYPE,
   };
-  addElement(element);
   return element;
 };
-const _divider = (...args: Parameters<typeof divider>): DividerElement => {
-  const element = divider(...args);
+const _divider = (...args: Parameters<typeof buildDivider>): DividerElement => {
+  const element = buildDivider(...args);
   addElement(element);
   return element;
 };
@@ -229,7 +227,7 @@ const zContainerElement = zElementBase.extend({
 });
 export type ContainerElement = z.infer<typeof zContainerElement>;
 export const isContainerElement = (el: FormElement): el is ContainerElement => el.type === CONTAINER_TYPE;
-export const container = (
+export const buildContainer = (
   direction: ContainerElement['data']['direction'],
   children: ContainerElement['data']['children'],
   parentId?: NodeFieldElement['parentId']
@@ -245,8 +243,8 @@ export const container = (
   };
   return element;
 };
-export const _container = (...args: Parameters<typeof container>): ContainerElement => {
-  const element = container(...args);
+export const _container = (...args: Parameters<typeof buildContainer>): ContainerElement => {
+  const element = buildContainer(...args);
   addElement(element);
   return element;
 };
@@ -262,21 +260,25 @@ export type FormElement = z.infer<typeof zFormElement>;
 //   _container('row', [_container('column', []).id, _container('column', []).id, _container('column', []).id]).id,
 // ]).id;
 
-const rootContainer = container('column', []);
+const rootContainer = buildContainer('column', []);
 addElement(rootContainer);
+const rowContainer = buildContainer('row', [], rootContainer.id);
+const rowContainerChildren = [
+  _nodeField('58e748ec-7405-4816-a5ff-c168ee35161a', 'value', rowContainer.id),
+  _nodeField('1b383334-2efc-406d-a000-49c4c5ebccde', 'value', rowContainer.id),
+  _nodeField('7ebda150-63c7-4ccd-a1d2-444459107393', 'value', rowContainer.id),
+];
+rowContainerChildren.forEach((child) => {
+  addElement(child);
+  rowContainer.data.children.push(child.id);
+});
+
 const children = [
-  heading('My Cool Workflow', 1, rootContainer.id),
-  text('This is a description of what my workflow does. It does things.', 'md', rootContainer.id),
-  divider(rootContainer.id),
-  heading('First Section', 2, rootContainer.id),
-  text(
-    'The first section includes fields relevant to the first section. This note describes that fact.',
-    'sm',
-    rootContainer.id
-  ),
-  divider(rootContainer.id),
-  text('These are some text that are definitely super helpful.', 'sm', rootContainer.id),
-  divider(rootContainer.id),
+  buildHeading('My Cool Workflow', 1, rootContainer.id),
+  buildText('This is a description of what my workflow does. It does things.', 'md', rootContainer.id),
+  buildDivider(rootContainer.id),
+  buildText('These are some text that are definitely super helpful.', 'sm', rootContainer.id),
+  rowContainer,
 ];
 children.forEach((child) => {
   addElement(child);

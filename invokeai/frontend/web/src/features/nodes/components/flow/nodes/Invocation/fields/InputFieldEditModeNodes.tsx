@@ -1,12 +1,18 @@
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Flex, FormControl } from '@invoke-ai/ui-library';
+import { firefoxDndFix } from 'features/dnd/util';
 import { FieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldHandle';
 import { InputFieldNotesIconButtonEditable } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonEditable';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
+import { buildNodeFieldDndData } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { useInputFieldConnectionState } from 'features/nodes/hooks/useInputFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
-import { memo, useCallback, useState } from 'react';
+import type { FieldIdentifier } from 'features/nodes/types/field';
+import type { RefObject } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { InputFieldAddRemoveLinearViewIconButton } from './InputFieldAddRemoveLinearViewIconButton';
 import { InputFieldRenderer } from './InputFieldRenderer';
@@ -20,6 +26,8 @@ interface Props {
 
 export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
+  const draggableRef = useRef<HTMLDivElement>(null);
+  const dragHandleRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
   const isInvalid = useInputFieldIsInvalid(nodeId, fieldName);
   const isConnected = useInputFieldIsConnected(nodeId, fieldName);
@@ -35,6 +43,8 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
   const onMouseLeave = useCallback(() => {
     setIsHovered(false);
   }, []);
+
+  const isDragging = useNodeFieldDnd({ nodeId, fieldName }, draggableRef, dragHandleRef);
 
   if (fieldTemplate.input === 'connection' || isConnected) {
     return (
@@ -62,6 +72,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
   return (
     <InputFieldWrapper>
       <FormControl
+        ref={draggableRef}
         isInvalid={isInvalid}
         isDisabled={isConnected}
         // Without pointerEvents prop, disabled inputs don't trigger reactflow events. For example, when making a
@@ -69,9 +80,10 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
         pointerEvents={isConnected ? 'none' : 'auto'}
         orientation="vertical"
         px={2}
+        opacity={isDragging ? 0.3 : 1}
       >
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
-          <Flex gap={1}>
+          <Flex className="nodrag" ref={dragHandleRef} gap={1}>
             <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
             {isHovered && (
               <>
@@ -99,3 +111,35 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
 });
 
 InputFieldEditModeNodes.displayName = 'InputFieldEditModeNodes';
+
+const useNodeFieldDnd = (
+  fieldIdentifier: FieldIdentifier,
+  draggableRef: RefObject<HTMLElement>,
+  dragHandleRef: RefObject<HTMLElement>
+) => {
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const draggableElement = draggableRef.current;
+    const dragHandleElement = dragHandleRef.current;
+    if (!draggableElement || !dragHandleElement) {
+      return;
+    }
+    return combine(
+      firefoxDndFix(draggableElement),
+      draggable({
+        element: draggableElement,
+        dragHandle: dragHandleElement,
+        getInitialData: () => buildNodeFieldDndData(fieldIdentifier),
+        onDragStart: () => {
+          setIsDragging(true);
+        },
+        onDrop: () => {
+          setIsDragging(false);
+        },
+      })
+    );
+  }, [dragHandleRef, draggableRef, fieldIdentifier]);
+
+  return isDragging;
+};
