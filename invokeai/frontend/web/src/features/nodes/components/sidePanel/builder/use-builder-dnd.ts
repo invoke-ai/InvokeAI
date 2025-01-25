@@ -289,13 +289,12 @@ export const useDraggableFormElement = (
       return;
     }
     const _element = getElement(elementId);
-    if (!_element.parentId) {
-      // Root element, cannot drag
-      return;
-    }
+
     return combine(
       firefoxDndFix(draggableElement),
       draggable({
+        // The root element is not draggable
+        canDrag: () => Boolean(_element.parentId),
         element: draggableElement,
         dragHandle: dragHandleElement,
         getInitialData: () => buildMoveFormElementDndData(getElement(elementId)),
