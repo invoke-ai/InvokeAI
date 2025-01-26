@@ -13,7 +13,7 @@ import {
   attachClosestCenterOrEdge,
   extractClosestCenterOrEdge,
 } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
-import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
+import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { formElementAdded, formElementMoved } from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
