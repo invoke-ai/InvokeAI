@@ -69,7 +69,7 @@ export const FilterAdjustImage = memo(({ onChange, config }: Props) => {
         <Combobox value={value} options={options} onChange={handleChannelChange} isSearchable={false} />
       </FormControl>
       <FormControl>
-        <FormLabel m={0}>{t('controlLayers.filter.adjust_image.value')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.adjust_image.value_setting')}</FormLabel>
         <CompositeSlider
           value={config.value}
           defaultValue={DEFAULTS.value}
