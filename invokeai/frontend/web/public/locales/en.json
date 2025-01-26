@@ -1994,6 +1994,30 @@
                 "salt_and_pepper_type": "Salt and Pepper",
                 "noise_color": "Colored Noise",
                 "size": "Noise Size"
+            },
+            "adjust_image": {
+                "label": "Adjust Image",
+                "description": "Adjusts the selected channel of an image.",
+                "channel": "Channel",
+                "value_setting": "Value",
+                "scale_values": "Scale Values",
+                "red": "Red (RGBA)",
+                "green": "Green (RGBA)",
+                "blue": "Blue (RGBA)",
+                "alpha": "Alpha (RGBA)",
+                "cyan": "Cyan (CMYK)",
+                "magenta": "Magenta (CMYK)",
+                "yellow": "Yellow (CMYK)",
+                "black": "Black (CMYK)",
+                "hue": "Hue (HSV)",
+                "saturation": "Saturation (HSV)",
+                "value": "Value (HSV)",
+                "luminosity": "Luminosity (LAB)",
+                "a": "A (LAB)",
+                "b": "B (LAB)",
+                "y": "Y (YCbCr)",
+                "cb": "Cb (YCbCr)",
+                "cr": "Cr (YCbCr)"
             }
         },
         "transform": {
