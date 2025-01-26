@@ -84,12 +84,6 @@ export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion
 
 // #region Workflow Builder
-export const elements: Record<string, FormElement> = {};
-
-export const addElement = (element: FormElement) => {
-  elements[element.id] = element;
-};
-
 const zElementId = z.string().trim().min(1);
 export type ElementId = z.infer<typeof zElementId>;
 
@@ -123,11 +117,6 @@ export const buildNodeField = (
   };
   return element;
 };
-const _nodeField = (...args: Parameters<typeof buildNodeField>): NodeFieldElement => {
-  const element = buildNodeField(...args);
-  addElement(element);
-  return element;
-};
 
 const HEADING_TYPE = 'heading';
 export const HEADING_CLASS_NAME = getPrefixedId(HEADING_TYPE, '-');
@@ -154,11 +143,6 @@ export const buildHeading = (
       level,
     },
   };
-  return element;
-};
-const _heading = (...args: Parameters<typeof buildHeading>): HeadingElement => {
-  const element = buildHeading(...args);
-  addElement(element);
   return element;
 };
 
@@ -189,11 +173,6 @@ export const buildText = (
   };
   return element;
 };
-const _text = (...args: Parameters<typeof buildText>): TextElement => {
-  const element = buildText(...args);
-  addElement(element);
-  return element;
-};
 
 const DIVIDER_TYPE = 'divider';
 export const DIVIDER_CLASS_NAME = getPrefixedId(DIVIDER_TYPE, '-');
@@ -208,11 +187,6 @@ export const buildDivider = (parentId?: NodeFieldElement['parentId']): DividerEl
     parentId,
     type: DIVIDER_TYPE,
   };
-  return element;
-};
-const _divider = (...args: Parameters<typeof buildDivider>): DividerElement => {
-  const element = buildDivider(...args);
-  addElement(element);
   return element;
 };
 
@@ -241,11 +215,6 @@ export const buildContainer = (
       children,
     },
   };
-  return element;
-};
-export const _container = (...args: Parameters<typeof buildContainer>): ContainerElement => {
-  const element = buildContainer(...args);
-  addElement(element);
   return element;
 };
 
