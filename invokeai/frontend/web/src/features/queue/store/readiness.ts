@@ -41,7 +41,7 @@ import {
   validateNumberFieldCollectionValue,
   validateStringFieldCollectionValue,
 } from 'features/nodes/types/fieldValidators';
-import type { InvocationNode, AnyEdge } from 'features/nodes/types/invocation';
+import type { AnyEdge, InvocationNode } from 'features/nodes/types/invocation';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';

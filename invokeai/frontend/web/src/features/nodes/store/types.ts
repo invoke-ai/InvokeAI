@@ -5,12 +5,7 @@ import type {
   FieldOutputTemplate,
   StatefulFieldValue,
 } from 'features/nodes/types/field';
-import type {
-  AnyEdge,
-  AnyNode,
-  InvocationTemplate,
-  NodeExecutionState,
-} from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode, InvocationTemplate, NodeExecutionState } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
