@@ -68,7 +68,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   /**
    * The config for the filter.
    */
-  $filterConfig = atom<FilterConfig>(IMAGE_FILTERS.canny_edge_detection.buildDefaults());
+  $filterConfig = atom<FilterConfig>(IMAGE_FILTERS.adjust_image.buildDefaults());
 
   /**
    * The initial filter config, used to reset the filter config.
@@ -212,7 +212,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       return filter.buildDefaults();
     } else {
       // Otherwise, used the default filter
-      return IMAGE_FILTERS.canny_edge_detection.buildDefaults();
+      return IMAGE_FILTERS.adjust_image.buildDefaults();
     }
   };
 

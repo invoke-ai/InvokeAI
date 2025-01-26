@@ -6,6 +6,35 @@ import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConf
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
+const zAjustImageChannels = z.enum([
+  'Red (RGBA)',
+  'Green (RGBA)',
+  'Blue (RGBA)',
+  'Alpha (RGBA)',
+  'Cyan (CMYK)',
+  'Magenta (CMYK)',
+  'Yellow (CMYK)',
+  'Black (CMYK)',
+  'Hue (HSV)',
+  'Saturation (HSV)',
+  'Value (HSV)',
+  'Luminosity (LAB)',
+  'A (LAB)',
+  'B (LAB)',
+  'Y (YCbCr)',
+  'Cb (YCbCr)',
+  'Cr (YCbCr)',
+]);
+export type AjustImageChannels = z.infer<typeof zAjustImageChannels>;
+export const isAjustImageChannels = (v: unknown): v is AjustImageChannels => zAjustImageChannels.safeParse(v).success;
+const zAdjustImageFilterConfig = z.object({
+  type: z.literal('adjust_image'),
+  channel: zAjustImageChannels,
+  value: z.number(),
+  scale_values: z.boolean().optional(),
+});
+export type AdjustImageFilterConfig = z.infer<typeof zAdjustImageFilterConfig>;
+
 const zCannyEdgeDetectionFilterConfig = z.object({
   type: z.literal('canny_edge_detection'),
   low_threshold: z.number().int().gte(0).lte(255),
@@ -118,6 +147,7 @@ const zNoiseFilterConfig = z.object({
 export type NoiseFilterConfig = z.infer<typeof zNoiseFilterConfig>;
 
 const zFilterConfig = z.discriminatedUnion('type', [
+  zAdjustImageFilterConfig,
   zCannyEdgeDetectionFilterConfig,
   zColorMapFilterConfig,
   zContentShuffleFilterConfig,
@@ -137,6 +167,7 @@ const zFilterConfig = z.discriminatedUnion('type', [
 export type FilterConfig = z.infer<typeof zFilterConfig>;
 
 const zFilterType = z.enum([
+  'adjust_image',
   'canny_edge_detection',
   'color_map',
   'content_shuffle',
@@ -167,6 +198,42 @@ type ImageFilterData<T extends FilterConfig['type']> = {
 };
 
 export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key> } = {
+  adjust_image: {
+    type: 'adjust_image',
+    buildDefaults: () => ({
+      type: 'adjust_image',
+      channel: 'Luminosity (LAB)',
+      value: 1,
+      scale_values: false,
+    }),
+    buildGraph: ({ image_name }, { channel, value, scale_values }) => {
+      const graph = new Graph(getPrefixedId('adjust_image_filter'));
+      let node;
+      if (scale_values) {
+        node = graph.addNode({
+          id: getPrefixedId('img_channel_multiply'),
+          type: 'img_channel_multiply',
+          image: { image_name },
+          channel,
+          scale: value,
+          invert_channel: false,
+        });
+      } else {
+        value = Math.min(value, 2); // Limit value to a maximum of 2
+        node = graph.addNode({
+          id: getPrefixedId('img_channel_offset'),
+          type: 'img_channel_offset',
+          image: { image_name },
+          channel,
+          offset: Math.round(255 * (value - 1)), // value is in range [0, 2], offset is in range [-255, 255]
+        });
+      }
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
+  },
   canny_edge_detection: {
     type: 'canny_edge_detection',
     buildDefaults: () => ({
