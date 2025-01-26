@@ -1,19 +1,15 @@
 import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
+import { EDIT_MODE_WRAPPER_CLASS_NAME, getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { useDraggableFormElement } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import { type FormElement, isContainerElement } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
 import { memo, useCallback, useRef } from 'react';
 import { PiXBold } from 'react-icons/pi';
-
-export const EDIT_MODE_WRAPPER_CLASS_NAME = getPrefixedId('edit-mode-wrapper', '-');
-
-export const getEditModeWrapperId = (id: string) => `${id}-edit-mode-wrapper`;
 
 const getHeaderLabel = (el: FormElement) => {
   if (isContainerElement(el)) {
