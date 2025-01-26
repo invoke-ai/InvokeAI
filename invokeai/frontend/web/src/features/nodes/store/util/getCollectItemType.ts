@@ -1,6 +1,6 @@
 import type { Templates } from 'features/nodes/store/types';
 import type { FieldType } from 'features/nodes/types/field';
-import type { AnyNode, AnyEdge } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 
 /**
  * Given a collect node, return the type of the items it collects. The graph is traversed to find the first node and
