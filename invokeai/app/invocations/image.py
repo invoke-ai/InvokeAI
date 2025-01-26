@@ -863,6 +863,10 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
         converted_image = numpy.array(pil_image.convert(mode)).astype(int)
         image_channel = converted_image[:, :, channel_number]
 
+        if self.channel == "Hue (HSV)":
+            # loop around the values because hue is special
+            image_channel = (image_channel + self.offset) % 256
+
         # Adjust the value, clipping to 0..255
         image_channel = numpy.clip(image_channel + self.offset, 0, 255)
 
