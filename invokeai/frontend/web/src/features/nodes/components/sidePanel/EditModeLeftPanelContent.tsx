@@ -1,5 +1,3 @@
-import '@xyflow/react/dist/base.css';
-
 import { Box } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { ViewContextProvider } from 'features/nodes/contexts/ViewContext';
