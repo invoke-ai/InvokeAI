@@ -202,7 +202,7 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
     type: 'adjust_image',
     buildDefaults: () => ({
       type: 'adjust_image',
-      channel: 'Value (HSV)',
+      channel: 'Luminosity (LAB)',
       value: 1,
       scale_values: false,
     }),
