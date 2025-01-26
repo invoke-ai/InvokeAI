@@ -44,6 +44,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCircuitryBold, PiFlaskBold, PiHammerBold, PiLightningFill } from 'react-icons/pi';
 import type { S } from 'services/api/types';
+import { objectEntries } from 'tsafe';
 
 const useThrottle = <T,>(value: T, limit: number) => {
   const [throttledValue, setThrottledValue] = useState(value);
@@ -382,11 +383,11 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
         if (filter(template, searchTerm)) {
           const candidateFields = pendingConnection.handleType === 'source' ? template.inputs : template.outputs;
 
-          for (const field of Object.values(candidateFields)) {
+          for (const [_fieldName, fieldTemplate] of objectEntries(candidateFields)) {
             const sourceType =
-              pendingConnection.handleType === 'source' ? field.type : pendingConnection.fieldTemplate.type;
+              pendingConnection.handleType === 'source' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
             const targetType =
-              pendingConnection.handleType === 'target' ? field.type : pendingConnection.fieldTemplate.type;
+              pendingConnection.handleType === 'target' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
 
             if (validateConnectionTypes(sourceType, targetType)) {
               _items.push({
