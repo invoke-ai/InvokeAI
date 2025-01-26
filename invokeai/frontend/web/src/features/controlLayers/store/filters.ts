@@ -225,7 +225,7 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
           type: 'img_channel_offset',
           image: { image_name },
           channel,
-          offset: 255 * (value - 1), // value is in range [0, 2], offset is in range [-255, 255]
+          offset: Math.round(255 * (value - 1)), // value is in range [0, 2], offset is in range [-255, 255]
         });
       }
       return {
