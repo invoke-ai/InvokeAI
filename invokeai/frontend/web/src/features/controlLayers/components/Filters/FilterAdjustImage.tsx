@@ -76,7 +76,7 @@ export const FilterAdjustImage = memo(({ onChange, config }: Props) => {
           onChange={handleValueChange}
           min={0}
           max={2}
-          step={0.01}
+          step={0.0025}
           marks
         />
         <CompositeNumberInput
@@ -85,7 +85,7 @@ export const FilterAdjustImage = memo(({ onChange, config }: Props) => {
           onChange={handleValueChange}
           min={0}
           max={255}
-          step={0.01}
+          step={0.0025}
         />
       </FormControl>
       <FormControl w="max-content">
