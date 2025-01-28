@@ -13,10 +13,10 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 from tests.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.test_custom_invoke_linear_8_bit_lt import (
     build_linear_8bit_lt_layer,
@@ -328,17 +328,21 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
     elif layer_type == "concatenated_lora":
         sub_layer_out_features = [16, 16, 32]
 
-        # Create a ConcatenatedLoRA layer.
+        # Create a MergedLayerPatch.
         sub_layers: list[LoRALayer] = []
+        sub_layer_ranges: list[Range] = []
+        dim_0_offset = 0
         for out_features in sub_layer_out_features:
             down = torch.randn(rank, in_features)
             up = torch.randn(out_features, rank)
             bias = torch.randn(out_features)
             sub_layers.append(LoRALayer(up=up, mid=None, down=down, alpha=1.0, bias=bias))
-        concatenated_lora_layer = ConcatenatedLoRALayer(sub_layers, concat_axis=0)
+            sub_layer_ranges.append(Range(dim_0_offset, dim_0_offset + out_features))
+            dim_0_offset += out_features
+        merged_layer_patch = MergedLayerPatch(sub_layers, sub_layer_ranges)
 
         input = torch.randn(1, in_features)
-        return ([(concatenated_lora_layer, 0.7)], input)
+        return ([(merged_layer_patch, 0.7)], input)
     elif layer_type == "flux_control_lora":
         # Create a FluxControlLoRALayer.
         patched_in_features = 40
