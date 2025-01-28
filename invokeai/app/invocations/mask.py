@@ -86,7 +86,7 @@ class AlphaMaskToTensorInvocation(BaseInvocation):
     title="Invert Tensor Mask",
     tags=["conditioning"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class InvertTensorMaskInvocation(BaseInvocation):
@@ -96,6 +96,15 @@ class InvertTensorMaskInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
         mask = context.tensors.load(self.mask.tensor_name)
+
+        # Verify dtype and shape.
+        assert mask.dtype == torch.bool
+        assert mask.dim() in [2, 3]
+
+        # Unsqueeze the channel dimension if it is missing. The MaskOutput type expects a single channel.
+        if mask.dim() == 2:
+            mask = mask.unsqueeze(0)
+
         inverted = ~mask
 
         return MaskOutput(
