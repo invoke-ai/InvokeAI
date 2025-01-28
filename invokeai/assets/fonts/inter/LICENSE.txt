@@ -1,4 +1,4 @@
-Copyright (c) 2016-2020 The Inter Project Authors.
+Copyright (c) 2016-2025 The Inter Project Authors.
 "Inter" is trademark of Rasmus Andersson.
 https://github.com/rsms/inter
 
