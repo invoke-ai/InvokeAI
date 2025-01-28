@@ -320,6 +320,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/empty_model_cache": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Empty Model Cache
+         * @description Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped.
+         */
+        post: operations["empty_model_cache"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/hf_login": {
         parameters: {
             query?: never;
@@ -20323,6 +20343,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CacheStats"] | null;
+                };
+            };
+        };
+    };
+    empty_model_cache: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

@@ -858,6 +858,18 @@ async def get_stats() -> Optional[CacheStats]:
     return ApiDependencies.invoker.services.model_manager.load.ram_cache.stats
 
 
+@model_manager_router.post(
+    "/empty_model_cache",
+    operation_id="empty_model_cache",
+    status_code=200,
+)
+async def empty_model_cache() -> None:
+    """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
+    # Request 1000GB of room in order to force the cache to drop all models.
+    ApiDependencies.invoker.services.logger.info("Emptying model cache.")
+    ApiDependencies.invoker.services.model_manager.load.ram_cache.make_room(1000 * 2**30)
+
+
 class HFTokenStatus(str, Enum):
     VALID = "valid"
     INVALID = "invalid"

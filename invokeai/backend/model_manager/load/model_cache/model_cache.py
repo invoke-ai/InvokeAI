@@ -1,8 +1,10 @@
 import gc
 import logging
+import threading
 import time
+from functools import wraps
 from logging import Logger
-from typing import Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import psutil
 import torch
@@ -39,6 +41,17 @@ def get_model_cache_key(model_key: str, submodel_type: Optional[SubModelType] = 
         return f"{model_key}:{submodel_type.value}"
     else:
         return model_key
+
+
+def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
+    """A decorator that applies the class's self._lock to the method."""
+
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:  # Automatically acquire and release the lock
+            return method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class ModelCache:
@@ -125,16 +138,25 @@ class ModelCache:
 
         self._ram_cache_size_bytes = self._calc_ram_available_to_model_cache()
 
+        # A lock applied to all public method calls to make the ModelCache thread-safe.
+        # At the time of writing, the ModelCache should only be accessed from two threads:
+        # - The graph execution thread
+        # - Requests to empty the cache from a separate thread
+        self._lock = threading.RLock()
+
     @property
+    @synchronized
     def stats(self) -> Optional[CacheStats]:
         """Return collected CacheStats object."""
         return self._stats
 
     @stats.setter
+    @synchronized
     def stats(self, stats: CacheStats) -> None:
         """Set the CacheStats object for collecting cache statistics."""
         self._stats = stats
 
+    @synchronized
     def put(self, key: str, model: AnyModel) -> None:
         """Add a model to the cache."""
         if key in self._cached_models:
@@ -173,6 +195,7 @@ class ModelCache:
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size/MB:.2f}MB)"
         )
 
+    @synchronized
     def get(self, key: str, stats_name: Optional[str] = None) -> CacheRecord:
         """Retrieve a model from the cache.
 
@@ -208,6 +231,7 @@ class ModelCache:
         self._logger.debug(f"Cache hit: {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
         return cache_entry
 
+    @synchronized
     def lock(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int]) -> None:
         """Lock a model for use and move it into VRAM."""
         if cache_entry.key not in self._cached_models:
@@ -243,6 +267,7 @@ class ModelCache:
 
         self._log_cache_state()
 
+    @synchronized
     def unlock(self, cache_entry: CacheRecord) -> None:
         """Unlock a model."""
         if cache_entry.key not in self._cached_models:
@@ -576,6 +601,7 @@ class ModelCache:
 
         self._logger.debug(log)
 
+    @synchronized
     def make_room(self, bytes_needed: int) -> None:
         """Make enough room in the cache to accommodate a new model of indicated size.
 
