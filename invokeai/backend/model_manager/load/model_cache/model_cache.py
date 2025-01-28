@@ -400,23 +400,19 @@ class ModelCache:
         # Heuristics for dynamically calculating the RAM cache size, **in order of increasing priority**:
         # 1. As an initial default, use 50% of the total RAM for InvokeAI.
         #   - Assume a 2GB baseline for InvokeAI's non-model RAM usage, and use the rest of the RAM for the model cache.
-        # 2. On a system with a lot of RAM (e.g. 64GB+), users probably don't want InvokeAI to eat up too much RAM.
-        #    There are diminishing returns to storing more and more models. So, we apply an upper bound.
+        # 2. On a system with a lot of RAM, users probably don't want InvokeAI to eat up too much RAM.
+        #    There are diminishing returns to storing more and more models. So, we apply an upper bound. (Keep in mind
+        #    that most OSes have some amount of disk caching, which we still benefit from if there is excess memory,
+        #    even if we drop models from the cache.)
         #    - On systems without a CUDA device, the upper bound is 32GB.
-        #    - On systems with a CUDA device, the upper bound is 2x the amount of VRAM.
-        # 3. On systems with a CUDA device, the minimum should be the VRAM size (less the working memory).
-        #    - Setting lower than this would mean that we sometimes kick models out of the cache when there is room for
-        #      all models in VRAM.
-        #    - Consider an extreme case of a system with 8GB RAM / 24GB VRAM. I haven't tested this, but I think
-        #      you'd still want the RAM cache size to be ~24GB (less the working memory). (Though you'd probably want to
-        #      set `keep_ram_copy_of_weights: false` in this case.)
-        # 4. Absolute minimum of 4GB.
+        #    - On systems with a CUDA device, the upper bound is 1x the amount of VRAM (less the working memory).
+        # 3. Absolute minimum of 4GB.
 
         # NOTE(ryand): We explored dynamically adjusting the RAM cache size based on memory pressure (using psutil), but
         # decided against it for now, for the following reasons:
         # - It was surprisingly difficult to get memory metrics with consistent definitions across OSes. (If you go
-        # down this path again, don't underestimate the amount of complexity here and be sure to test rigorously on all
-        # OSes.)
+        #   down this path again, don't underestimate the amount of complexity here and be sure to test rigorously on all
+        #   OSes.)
         # - Making the RAM cache size dynamic opens the door for performance regressions that are hard to diagnose and
         #   hard for users to understand. It is better for users to see that their RAM is maxed out, and then override
         #   the default value if desired.
@@ -438,26 +434,18 @@ class ModelCache:
         # ------------------
         max_ram_cache_size_bytes = 32 * GB
         if total_cuda_vram_bytes is not None:
-            max_ram_cache_size_bytes = 2 * total_cuda_vram_bytes
+            if self._max_vram_cache_size_gb is not None:
+                max_ram_cache_size_bytes = int(self._max_vram_cache_size_gb * GB)
+            else:
+                max_ram_cache_size_bytes = total_cuda_vram_bytes - int(self._execution_device_working_mem_gb * GB)
         if ram_available_to_model_cache > max_ram_cache_size_bytes:
             heuristics_applied.append(2)
             ram_available_to_model_cache = max_ram_cache_size_bytes
 
         # Apply heuristic 3.
         # ------------------
-        if total_cuda_vram_bytes is not None:
-            if self._max_vram_cache_size_gb is not None:
-                min_ram_cache_size_bytes = int(self._max_vram_cache_size_gb * GB)
-            else:
-                min_ram_cache_size_bytes = total_cuda_vram_bytes - int(self._execution_device_working_mem_gb * GB)
-            if ram_available_to_model_cache < min_ram_cache_size_bytes:
-                heuristics_applied.append(3)
-                ram_available_to_model_cache = min_ram_cache_size_bytes
-
-        # Apply heuristic 4.
-        # ------------------
         if ram_available_to_model_cache < 4 * GB:
-            heuristics_applied.append(4)
+            heuristics_applied.append(3)
             ram_available_to_model_cache = 4 * GB
 
         self._logger.info(
