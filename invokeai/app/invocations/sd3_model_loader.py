@@ -99,6 +99,6 @@ class Sd3ModelLoaderInvocation(BaseInvocation):
             transformer=TransformerField(transformer=transformer, loras=[]),
             clip_l=CLIPField(tokenizer=tokenizer_l, text_encoder=clip_encoder_l, loras=[], skipped_layers=0),
             clip_g=CLIPField(tokenizer=tokenizer_g, text_encoder=clip_encoder_g, loras=[], skipped_layers=0),
-            t5_encoder=T5EncoderField(tokenizer=tokenizer_t5, text_encoder=t5_encoder),
+            t5_encoder=T5EncoderField(tokenizer=tokenizer_t5, text_encoder=t5_encoder, loras=[]),
             vae=VAEField(vae=vae),
         )
