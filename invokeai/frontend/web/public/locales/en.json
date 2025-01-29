@@ -294,6 +294,11 @@
         "disableFailed": "Problem Disabling Invocation Cache",
         "useCache": "Use Cache"
     },
+    "modelCache": {
+        "clear": "Clear Model Cache",
+        "clearSucceeded": "Model Cache Cleared",
+        "clearFailed": "Problem Clearing Model Cache"
+    },
     "gallery": {
         "gallery": "Gallery",
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
