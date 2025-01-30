@@ -12,19 +12,45 @@ import type {
 } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import type {
+  ContainerElement,
+  FormElement,
+  HeadingElement,
+  NodeFieldElement,
+  TextElement,
+  WorkflowCategory,
+  WorkflowV3,
+} from 'features/nodes/types/workflow';
 import {
   buildContainer,
-  type ContainerElement,
-  type FormElement,
   isContainerElement,
-  type WorkflowCategory,
-  type WorkflowV3,
+  isHeadingElement,
+  isNodeFieldElement,
+  isTextElement,
 } from 'features/nodes/types/workflow';
 import { isEqual, omit, uniqBy } from 'lodash-es';
 import { useMemo } from 'react';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
 import { selectNodesSlice } from './selectors';
+
+type FormElementDataChangedAction<T extends FormElement> = PayloadAction<{
+  id: string;
+  changes: Partial<T['data']>;
+}>;
+
+const formElementDataChangedReducer = <T extends FormElement>(
+  state: WorkflowState,
+  action: FormElementDataChangedAction<T>,
+  guard: (element: FormElement) => element is T
+) => {
+  const { id, changes } = action.payload;
+  const element = state.form?.elements[id];
+  if (!element || !guard(element)) {
+    return;
+  }
+  element.data = { ...element.data, ...changes } as T['data'];
+};
 
 const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
   const rootElement = buildContainer('column', []);
@@ -178,21 +204,17 @@ export const workflowSlice = createSlice({
       const { id, containerId, index } = action.payload;
       moveElement({ formState: state.form, id, containerId, index });
     },
-    formElementContainerDataChanged: (
-      state,
-      action: PayloadAction<{ id: string; changes: Partial<ContainerElement['data']> }>
-    ) => {
-      if (!state.form) {
-        // Cannot change a container if the form has not been created
-        return;
-      }
-      const { elements } = state.form;
-      const { id, changes } = action.payload;
-      const container = elements[id];
-      if (!container || !isContainerElement(container)) {
-        return;
-      }
-      container.data = { ...container.data, ...changes };
+    formElementHeadingDataChanged: (state, action: FormElementDataChangedAction<HeadingElement>) => {
+      formElementDataChangedReducer(state, action, isHeadingElement);
+    },
+    formElementTextDataChanged: (state, action: FormElementDataChangedAction<TextElement>) => {
+      formElementDataChangedReducer(state, action, isTextElement);
+    },
+    formElementNodeFieldDataChanged: (state, action: FormElementDataChangedAction<NodeFieldElement>) => {
+      formElementDataChangedReducer(state, action, isNodeFieldElement);
+    },
+    formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
+      formElementDataChangedReducer(state, action, isContainerElement);
     },
     formReset: (state) => {
       state.form = undefined;
@@ -318,6 +340,9 @@ export const {
   formElementAdded,
   formElementRemoved,
   formElementMoved,
+  formElementHeadingDataChanged,
+  formElementTextDataChanged,
+  formElementNodeFieldDataChanged,
   formElementContainerDataChanged,
   formReset,
   formModeToggled,

@@ -90,6 +90,7 @@ export type ElementId = z.infer<typeof zElementId>;
 const zElementBase = z.object({
   id: zElementId,
   parentId: zElementId.optional(),
+  data: z.undefined(),
 });
 
 const NODE_FIELD_TYPE = 'node-field';
