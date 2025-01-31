@@ -75,11 +75,11 @@ const useAddFormElementDnd = (type: Omit<FormElement['type'], 'node-field'>, dra
             return buildAddFormElementDndData(element);
           }
           if (type === 'heading') {
-            const element = buildHeading('default heading', 1);
+            const element = buildHeading('default heading');
             return buildAddFormElementDndData(element);
           }
           if (type === 'text') {
-            const element = buildText('default text', 'sm');
+            const element = buildText('default text');
             return buildAddFormElementDndData(element);
           }
           assert(false);

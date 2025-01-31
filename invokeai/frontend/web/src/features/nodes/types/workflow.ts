@@ -123,26 +123,19 @@ const HEADING_TYPE = 'heading';
 export const HEADING_CLASS_NAME = getPrefixedId(HEADING_TYPE, '-');
 const zHeadingElement = zElementBase.extend({
   type: z.literal(HEADING_TYPE),
-  data: z.object({
-    content: z.string(),
-    level: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
-  }),
+  data: z.object({ content: z.string() }),
 });
 export type HeadingElement = z.infer<typeof zHeadingElement>;
 export const isHeadingElement = (el: FormElement): el is HeadingElement => el.type === HEADING_TYPE;
 export const buildHeading = (
   content: HeadingElement['data']['content'],
-  level: HeadingElement['data']['level'],
   parentId?: NodeFieldElement['parentId']
 ): HeadingElement => {
   const element: HeadingElement = {
     id: getPrefixedId(HEADING_TYPE, '-'),
     parentId,
     type: HEADING_TYPE,
-    data: {
-      content,
-      level,
-    },
+    data: { content },
   };
   return element;
 };
@@ -151,26 +144,19 @@ const TEXT_TYPE = 'text';
 export const TEXT_CLASS_NAME = getPrefixedId(TEXT_TYPE, '-');
 const zTextElement = zElementBase.extend({
   type: z.literal(TEXT_TYPE),
-  data: z.object({
-    content: z.string(),
-    fontSize: z.enum(['sm', 'md', 'lg']),
-  }),
+  data: z.object({ content: z.string() }),
 });
 export type TextElement = z.infer<typeof zTextElement>;
 export const isTextElement = (el: FormElement): el is TextElement => el.type === TEXT_TYPE;
 export const buildText = (
   content: TextElement['data']['content'],
-  fontSize: TextElement['data']['fontSize'],
   parentId?: NodeFieldElement['parentId']
 ): TextElement => {
   const element: TextElement = {
     id: getPrefixedId(TEXT_TYPE, '-'),
     parentId,
     type: TEXT_TYPE,
-    data: {
-      content,
-      fontSize,
-    },
+    data: { content },
   };
   return element;
 };
