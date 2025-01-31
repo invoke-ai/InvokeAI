@@ -1,4 +1,4 @@
-import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
@@ -8,6 +8,7 @@ import { useDraggableFormElement } from 'features/nodes/components/sidePanel/bui
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import { type FormElement, isContainerElement } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
+import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
@@ -53,27 +54,24 @@ const headerSx: SystemStyleObject = {
   '&[data-depth="2"]': { bg: 'base.750' },
 };
 
-export const FormElementEditModeWrapper = memo(
-  ({ element, children, ...rest }: { element: FormElement } & FlexProps) => {
-    const draggableRef = useRef<HTMLDivElement>(null);
-    const dragHandleRef = useRef<HTMLDivElement>(null);
-    const [activeDropRegion, isDragging] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
-    const depth = useDepthContext();
-    const dispatch = useAppDispatch();
-    const removeElement = useCallback(() => {
-      dispatch(formElementRemoved({ id: element.id }));
-    }, [dispatch, element.id]);
+export const FormElementEditModeWrapper = memo(({ element, children }: PropsWithChildren<{ element: FormElement }>) => {
+  const draggableRef = useRef<HTMLDivElement>(null);
+  const dragHandleRef = useRef<HTMLDivElement>(null);
+  const [activeDropRegion, isDragging] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
+  const depth = useDepthContext();
+  const dispatch = useAppDispatch();
+  const removeElement = useCallback(() => {
+    dispatch(formElementRemoved({ id: element.id }));
+  }, [dispatch, element.id]);
 
-    return (
-      <Flex
-        id={getEditModeWrapperId(element.id)}
-        ref={draggableRef}
-        sx={wrapperSx}
-        className={EDIT_MODE_WRAPPER_CLASS_NAME}
-        data-is-dragging={isDragging}
-        data-active-drop-region={activeDropRegion}
-        {...rest}
-      >
+  return (
+    <Flex
+      id={getEditModeWrapperId(element.id)}
+      ref={draggableRef}
+      className={EDIT_MODE_WRAPPER_CLASS_NAME}
+      position="relative"
+    >
+      <Flex sx={wrapperSx} data-is-dragging={isDragging} data-active-drop-region={activeDropRegion}>
         <Flex ref={dragHandleRef} sx={headerSx} data-depth={depth}>
           <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
             {getHeaderLabel(element)} ({element.id})
@@ -94,10 +92,10 @@ export const FormElementEditModeWrapper = memo(
         <Flex w="full" p={4} alignItems="center" gap={4}>
           {children}
         </Flex>
-        <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
       </Flex>
-    );
-  }
-);
+      <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
+    </Flex>
+  );
+});
 
 FormElementEditModeWrapper.displayName = 'FormElementEditModeWrapper';
