@@ -110,7 +110,7 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     title="FLUX LoRA Collection Loader",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
@@ -150,6 +150,9 @@ class FLUXLoRACollectionLoader(BaseInvocation):
         if self.clip is not None:
             output.clip = self.clip.model_copy(deep=True)
 
+        if self.t5_encoder is not None:
+            output.t5_encoder = self.t5_encoder.model_copy(deep=True)
+
         for lora in loras:
             if lora is None:
                 continue
@@ -170,9 +173,7 @@ class FLUXLoRACollectionLoader(BaseInvocation):
             if self.clip is not None and output.clip is not None:
                 output.clip.loras.append(lora)
 
-            if self.t5_encoder is not None:
-                if output.t5_encoder is None:
-                    output.t5_encoder = self.t5_encoder.model_copy(deep=True)
+            if self.t5_encoder is not None and output.t5_encoder is None:
                 output.t5_encoder.loras.append(lora)
 
         return output
