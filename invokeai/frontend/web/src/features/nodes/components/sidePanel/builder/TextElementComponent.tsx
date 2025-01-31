@@ -27,11 +27,11 @@ TextElementComponent.displayName = 'TextElementComponent';
 
 export const TextElementComponentViewMode = memo(({ el }: { el: TextElement }) => {
   const { id, data } = el;
-  const { content, fontSize } = data;
+  const { content } = data;
 
   return (
     <Flex id={id} className={TEXT_CLASS_NAME}>
-      <Text fontSize={fontSize} overflowWrap="anywhere">
+      <Text fontSize="md" overflowWrap="anywhere">
         {content || 'Edit to add text'}
       </Text>
     </Flex>
@@ -55,7 +55,7 @@ TextElementComponentEditMode.displayName = 'TextElementComponentEditMode';
 export const EditableText = memo(({ el }: { el: TextElement }) => {
   const dispatch = useAppDispatch();
   const { id, data } = el;
-  const { content, fontSize } = data;
+  const { content } = data;
   const [localContent, setLocalContent] = useState(content);
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -91,7 +91,7 @@ export const EditableText = memo(({ el }: { el: TextElement }) => {
       onChange={onChange}
       onBlur={onBlur}
       onKeyDown={onKeyDown}
-      fontSize={fontSize}
+      fontSize="md"
       variant="outline"
       overflowWrap="anywhere"
       w="full"

@@ -8,14 +8,6 @@ import { HEADING_CLASS_NAME, isHeadingElement } from 'features/nodes/types/workf
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
 
-const LEVEL_TO_FONT_SIZE = {
-  1: '4xl',
-  2: '3xl',
-  3: '2xl',
-  4: 'xl',
-  5: 'lg',
-} as const;
-
 export const HeadingElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
   const mode = useAppSelector(selectWorkflowFormMode);
@@ -36,11 +28,11 @@ HeadingElementComponent.displayName = 'HeadingElementComponent';
 
 export const HeadingElementComponentViewMode = memo(({ el }: { el: HeadingElement }) => {
   const { id, data } = el;
-  const { content, level } = data;
+  const { content } = data;
 
   return (
     <Flex id={id} className={HEADING_CLASS_NAME}>
-      <Text fontWeight="bold" fontSize={LEVEL_TO_FONT_SIZE[level]}>
+      <Text fontWeight="bold" fontSize="4xl">
         {content || 'Edit to add heading'}
       </Text>
     </Flex>
@@ -66,7 +58,7 @@ HeadingElementComponentEditMode.displayName = 'HeadingElementComponentEditMode';
 export const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
   const dispatch = useAppDispatch();
   const { id, data } = el;
-  const { content, level } = data;
+  const { content } = data;
 
   const [localContent, setLocalContent] = useState(content);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -111,7 +103,7 @@ export const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
       resize="none"
       p={2}
       fontWeight="bold"
-      fontSize={LEVEL_TO_FONT_SIZE[level]}
+      fontSize="4xl"
     />
   );
 });
