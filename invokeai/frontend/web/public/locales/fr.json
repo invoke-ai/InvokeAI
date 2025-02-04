@@ -2227,6 +2227,10 @@
             "understandingImageToImageAndDenoising": {
                 "title": "Comprendre l'Image-à-Image et le Débruitage",
                 "description": "Aperçu des transformations d'image à image et du débruitage dans Invoke."
+            },
+            "howDoIOutpaint": {
+                "title": "Comment effectuer un outpainting ?",
+                "description": "Guide pour l'extension au-delà des bordures de l'image originale."
             }
         },
         "gettingStarted": "Commencer",
