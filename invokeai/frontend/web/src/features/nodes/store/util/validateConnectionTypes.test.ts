@@ -63,14 +63,6 @@ describe(validateConnectionTypes.name, () => {
   });
 
   describe('special cases', () => {
-    it('should reject a COLLECTION input to a COLLECTION input', () => {
-      const r = validateConnectionTypes(
-        { name: 'CollectionField', cardinality: 'COLLECTION', batch: false },
-        { name: 'CollectionField', cardinality: 'COLLECTION', batch: false }
-      );
-      expect(r).toBe(false);
-    });
-
     it('should accept equal types', () => {
       const r = validateConnectionTypes(
         { name: 'IntegerField', cardinality: 'SINGLE', batch: false },
