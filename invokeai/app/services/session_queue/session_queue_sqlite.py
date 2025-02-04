@@ -9,6 +9,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
     BatchStatus,
+    CancelAllExceptCurrentResult,
     CancelByBatchIDsResult,
     CancelByDestinationResult,
     CancelByQueueIDResult,
@@ -509,6 +510,39 @@ class SqliteSessionQueue(SessionQueueBase):
         finally:
             self.__lock.release()
         return CancelByQueueIDResult(canceled=count)
+
+    def cancel_all_except_current(self, queue_id: str) -> CancelAllExceptCurrentResult:
+        try:
+            where = """--sql
+                WHERE
+                  queue_id == ?
+                  AND status == 'pending'
+                """
+            self.__lock.acquire()
+            self.__cursor.execute(
+                f"""--sql
+                SELECT COUNT(*)
+                FROM session_queue
+                {where};
+                """,
+                (queue_id,),
+            )
+            count = self.__cursor.fetchone()[0]
+            self.__cursor.execute(
+                f"""--sql
+                UPDATE session_queue
+                SET status = 'canceled'
+                {where};
+                """,
+                (queue_id,),
+            )
+            self.__conn.commit()
+        except Exception:
+            self.__conn.rollback()
+            raise
+        finally:
+            self.__lock.release()
+        return CancelAllExceptCurrentResult(canceled=count)
 
     def get_queue_item(self, item_id: int) -> SessionQueueItem:
         try:

@@ -5,6 +5,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
     BatchStatus,
+    CancelAllExceptCurrentResult,
     CancelByBatchIDsResult,
     CancelByDestinationResult,
     CancelByQueueIDResult,
@@ -110,6 +111,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
         """Cancels all queue items with matching queue ID"""
+        pass
+
+    @abstractmethod
+    def cancel_all_except_current(self, queue_id: str) -> CancelAllExceptCurrentResult:
+        """Cancels all queue items except in-progress items"""
         pass
 
     @abstractmethod

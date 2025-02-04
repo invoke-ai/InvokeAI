@@ -843,7 +843,7 @@ CHANNEL_FORMATS = {
         "value",
     ],
     category="image",
-    version="1.2.2",
+    version="1.2.3",
 )
 class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add or subtract a value from a specific color channel of an image."""
@@ -853,24 +853,32 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
     offset: int = InputField(default=0, ge=-255, le=255, description="The amount to adjust the channel by")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        pil_image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name, "RGBA")
 
         # extract the channel and mode from the input and reference tuple
         mode = CHANNEL_FORMATS[self.channel][0]
         channel_number = CHANNEL_FORMATS[self.channel][1]
 
         # Convert PIL image to new format
-        converted_image = numpy.array(pil_image.convert(mode)).astype(int)
+        converted_image = numpy.array(image.convert(mode)).astype(int)
         image_channel = converted_image[:, :, channel_number]
 
-        # Adjust the value, clipping to 0..255
-        image_channel = numpy.clip(image_channel + self.offset, 0, 255)
+        if self.channel == "Hue (HSV)":
+            # loop around the values because hue is special
+            image_channel = (image_channel + self.offset) % 256
+        else:
+            # Adjust the value, clipping to 0..255
+            image_channel = numpy.clip(image_channel + self.offset, 0, 255)
 
         # Put the channel back into the image
         converted_image[:, :, channel_number] = image_channel
 
         # Convert back to RGBA format and output
         pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
+
+        # restore the alpha channel
+        if self.channel != "Alpha (RGBA)":
+            pil_image.putalpha(image.getchannel("A"))
 
         image_dto = context.images.save(image=pil_image)
 
@@ -899,7 +907,7 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
         "value",
     ],
     category="image",
-    version="1.2.2",
+    version="1.2.3",
 )
 class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Scale a specific color channel of an image."""
@@ -910,14 +918,14 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     invert_channel: bool = InputField(default=False, description="Invert the channel after scaling")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        pil_image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name)
 
         # extract the channel and mode from the input and reference tuple
         mode = CHANNEL_FORMATS[self.channel][0]
         channel_number = CHANNEL_FORMATS[self.channel][1]
 
         # Convert PIL image to new format
-        converted_image = numpy.array(pil_image.convert(mode)).astype(float)
+        converted_image = numpy.array(image.convert(mode)).astype(float)
         image_channel = converted_image[:, :, channel_number]
 
         # Adjust the value, clipping to 0..255
@@ -932,6 +940,10 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Convert back to RGBA format and output
         pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
+
+        # restore the alpha channel
+        if self.channel != "Alpha (RGBA)":
+            pil_image.putalpha(image.getchannel("A"))
 
         image_dto = context.images.save(image=pil_image)
 

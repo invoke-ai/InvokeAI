@@ -1,4 +1,5 @@
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { FilterAdjustImage } from 'features/controlLayers/components/Filters/FilterAdjustImage';
 import { FilterBlur } from 'features/controlLayers/components/Filters/FilterBlur';
 import { FilterCannyEdgeDetection } from 'features/controlLayers/components/Filters/FilterCannyEdgeDetection';
 import { FilterColorMap } from 'features/controlLayers/components/Filters/FilterColorMap';
@@ -21,8 +22,8 @@ type Props = { filterConfig: FilterConfig; onChange: (filterConfig: FilterConfig
 export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
   const { t } = useTranslation();
 
-  if (filterConfig.type === 'img_blur') {
-    return <FilterBlur config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'adjust_image') {
+    return <FilterAdjustImage config={filterConfig} onChange={onChange} />;
   }
 
   if (filterConfig.type === 'canny_edge_detection') {
@@ -63,6 +64,10 @@ export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
 
   if (filterConfig.type === 'pidi_edge_detection') {
     return <FilterPiDiNetEdgeDetection config={filterConfig} onChange={onChange} />;
+  }
+
+  if (filterConfig.type === 'img_blur') {
+    return <FilterBlur config={filterConfig} onChange={onChange} />;
   }
 
   if (filterConfig.type === 'img_noise') {
