@@ -6232,7 +6232,7 @@ export type components = {
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
              */
-            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
              * Transformer
              * @description Transformer
@@ -12237,7 +12237,7 @@ export type components = {
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
              */
-            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
              * UNet
              * @description UNet (scheduler, LoRAs)
@@ -16085,7 +16085,7 @@ export type components = {
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
              */
-            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][];
+            loras?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
             /**
              * UNet
              * @description UNet (scheduler, LoRAs)

@@ -206,7 +206,7 @@ class LoRALoaderInvocation(BaseInvocation):
         lora_key = self.lora.key
 
         if not context.models.exists(lora_key):
-            raise Exception(f"Unkown lora: {lora_key}!")
+            raise Exception(f"Unknown lora: {lora_key}!")
 
         if self.unet is not None and any(lora.lora.key == lora_key for lora in self.unet.loras):
             raise Exception(f'LoRA "{lora_key}" already applied to unet')
@@ -257,12 +257,12 @@ class LoRASelectorInvocation(BaseInvocation):
         return LoRASelectorOutput(lora=LoRAField(lora=self.lora, weight=self.weight))
 
 
-@invocation("lora_collection_loader", title="LoRA Collection Loader", tags=["model"], category="model", version="1.0.0")
+@invocation("lora_collection_loader", title="LoRA Collection Loader", tags=["model"], category="model", version="1.1.0")
 class LoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to the provided UNet and CLIP models."""
 
-    loras: LoRAField | list[LoRAField] = InputField(
-        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    loras: Optional[LoRAField | list[LoRAField]] = InputField(
+        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
     )
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -282,7 +282,14 @@ class LoRACollectionLoader(BaseInvocation):
         loras = self.loras if isinstance(self.loras, list) else [self.loras]
         added_loras: list[str] = []
 
+        if self.unet is not None:
+            output.unet = self.unet.model_copy(deep=True)
+        if self.clip is not None:
+            output.clip = self.clip.model_copy(deep=True)
+
         for lora in loras:
+            if lora is None:
+                continue
             if lora.lora.key in added_loras:
                 continue
 
@@ -293,14 +300,10 @@ class LoRACollectionLoader(BaseInvocation):
 
             added_loras.append(lora.lora.key)
 
-            if self.unet is not None:
-                if output.unet is None:
-                    output.unet = self.unet.model_copy(deep=True)
+            if self.unet is not None and output.unet is not None:
                 output.unet.loras.append(lora)
 
-            if self.clip is not None:
-                if output.clip is None:
-                    output.clip = self.clip.model_copy(deep=True)
+            if self.clip is not None and output.clip is not None:
                 output.clip.loras.append(lora)
 
         return output
@@ -400,13 +403,13 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
     title="SDXL LoRA Collection Loader",
     tags=["model"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
 )
 class SDXLLoRACollectionLoader(BaseInvocation):
     """Applies a collection of SDXL LoRAs to the provided UNet and CLIP models."""
 
-    loras: LoRAField | list[LoRAField] = InputField(
-        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    loras: Optional[LoRAField | list[LoRAField]] = InputField(
+        default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
     )
     unet: Optional[UNetField] = InputField(
         default=None,
@@ -432,7 +435,18 @@ class SDXLLoRACollectionLoader(BaseInvocation):
         loras = self.loras if isinstance(self.loras, list) else [self.loras]
         added_loras: list[str] = []
 
+        if self.unet is not None:
+            output.unet = self.unet.model_copy(deep=True)
+
+        if self.clip is not None:
+            output.clip = self.clip.model_copy(deep=True)
+
+        if self.clip2 is not None:
+            output.clip2 = self.clip2.model_copy(deep=True)
+
         for lora in loras:
+            if lora is None:
+                continue
             if lora.lora.key in added_loras:
                 continue
 
@@ -443,19 +457,13 @@ class SDXLLoRACollectionLoader(BaseInvocation):
 
             added_loras.append(lora.lora.key)
 
-            if self.unet is not None:
-                if output.unet is None:
-                    output.unet = self.unet.model_copy(deep=True)
+            if self.unet is not None and output.unet is not None:
                 output.unet.loras.append(lora)
 
-            if self.clip is not None:
-                if output.clip is None:
-                    output.clip = self.clip.model_copy(deep=True)
+            if self.clip is not None and output.clip is not None:
                 output.clip.loras.append(lora)
 
-            if self.clip2 is not None:
-                if output.clip2 is None:
-                    output.clip2 = self.clip2.model_copy(deep=True)
+            if self.clip2 is not None and output.clip2 is not None:
                 output.clip2.loras.append(lora)
 
         return output
@@ -473,7 +481,7 @@ class VAELoaderInvocation(BaseInvocation):
         key = self.vae_model.key
 
         if not context.models.exists(key):
-            raise Exception(f"Unkown vae: {key}!")
+            raise Exception(f"Unknown vae: {key}!")
 
         return VAEOutput(vae=VAEField(vae=self.vae_model))
 
