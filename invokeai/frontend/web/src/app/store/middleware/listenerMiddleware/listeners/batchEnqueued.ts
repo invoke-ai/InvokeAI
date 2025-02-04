@@ -3,7 +3,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { zPydanticValidationError } from 'features/system/store/zodSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { truncate, upperFirst } from 'lodash-es';
+import { truncate } from 'lodash-es';
 import { serializeError } from 'serialize-error';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { JsonObject } from 'type-fest';
@@ -52,15 +52,12 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
       const result = zPydanticValidationError.safeParse(response);
       if (result.success) {
         result.data.data.detail.map((e) => {
+          const description = truncate(e.msg.replace(/^(Value|Index|Key) error, /i, ''), { length: 256 });
           toast({
             id: 'QUEUE_BATCH_FAILED',
-            title: truncate(upperFirst(e.msg), { length: 128 }),
+            title: t('queue.batchFailedToQueue'),
             status: 'error',
-            description: truncate(
-              `Path:
-              ${e.loc.join('.')}`,
-              { length: 128 }
-            ),
+            description,
           });
         });
       } else if (response.status !== 403) {
