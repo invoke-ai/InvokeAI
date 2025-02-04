@@ -8,13 +8,6 @@ import { type FieldType, isCollection, isSingle, isSingleOrCollection } from 'fe
  * @returns True if the connection is valid, false otherwise.
  */
 export const validateConnectionTypes = (sourceType: FieldType, targetType: FieldType) => {
-  // TODO: There's a bug with Collect -> Iterate nodes:
-  // https://github.com/invoke-ai/InvokeAI/issues/3956
-  // Once this is resolved, we can remove this check.
-  if (sourceType.name === 'CollectionField' && targetType.name === 'CollectionField') {
-    return false;
-  }
-
   if (areTypesEqual(sourceType, targetType)) {
     return true;
   }
