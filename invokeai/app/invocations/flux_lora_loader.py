@@ -156,7 +156,6 @@ class FLUXLoRACollectionLoader(BaseInvocation):
         for lora in loras:
             if lora is None:
                 continue
-            assert type(lora) is LoRAField
             if lora.lora.key in added_loras:
                 continue
 
