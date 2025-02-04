@@ -173,7 +173,7 @@ class FLUXLoRACollectionLoader(BaseInvocation):
             if self.clip is not None and output.clip is not None:
                 output.clip.loras.append(lora)
 
-            if self.t5_encoder is not None and output.t5_encoder is None:
+            if self.t5_encoder is not None and output.t5_encoder is not None:
                 output.t5_encoder.loras.append(lora)
 
         return output
