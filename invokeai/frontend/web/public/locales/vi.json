@@ -228,7 +228,9 @@
         "end": "Kết Thúc",
         "min": "Tối Thiểu",
         "max": "Tối Đa",
-        "resetToDefaults": "Đặt Lại Về Mặc Định"
+        "resetToDefaults": "Đặt Lại Về Mặc Định",
+        "seed": "Hạt Giống",
+        "combinatorial": "Tổ Hợp"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -985,7 +987,11 @@
         "generatorNoValues": "trống",
         "splitOn": "Tách Ở",
         "arithmeticSequence": "Cấp Số Cộng",
-        "generatorNRandomValues_other": "{{count}} giá trị ngẫu nhiên"
+        "generatorNRandomValues_other": "{{count}} giá trị ngẫu nhiên",
+        "generatorLoading": "đang tải",
+        "generatorLoadFromFile": "Tải Từ Tệp",
+        "dynamicPromptsRandom": "Dynamic Prompts (Ngẫu Nhiên)",
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Tổ Hợp)"
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -1543,11 +1549,12 @@
             "perPromptLabel": "Một Hạt Giống Mỗi Ảnh",
             "perIterationLabel": "Hạt Giống Mỗi Lần Lặp Lại"
         },
-        "loading": "Tạo Sinh Dùng Dynamic Prompt...",
+        "loading": "Tạo Sinh Bằng Dynamic Prompt...",
         "showDynamicPrompts": "HIện Dynamic Prompt",
         "maxPrompts": "Số Lệnh Tối Đa",
         "promptsPreview": "Xem Trước Lệnh",
-        "dynamicPrompts": "Dynamic Prompt"
+        "dynamicPrompts": "Dynamic Prompt",
+        "promptsToGenerate": "Lệnh Để Tạo Sinh"
     },
     "settings": {
         "beta": "Beta",
@@ -2215,7 +2222,8 @@
             "Chế độ VRAM thấp",
             "Trình quản lý bộ nhớ động",
             "Tải model nhanh hơn",
-            "Ít lỗi bộ nhớ hơn"
+            "Ít lỗi bộ nhớ hơn",
+            "Mở rộng khả năng xử lý hàng loạt workflow"
         ]
     },
     "upsell": {
@@ -2285,5 +2293,10 @@
         },
         "controlCanvas": "Điều Khiển Canvas",
         "watch": "Xem"
+    },
+    "modelCache": {
+        "clearSucceeded": "Cache Model Đã Được Dọn",
+        "clearFailed": "Có Vấn Đề Khi Dọn Cache Model",
+        "clear": "Dọn Cache Model"
     }
 }
