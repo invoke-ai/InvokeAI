@@ -96,6 +96,10 @@ def is_list_or_contains_list(t):
     return False
 
 
+def is_any(t: Any) -> bool:
+    return t == Any or Any in get_args(t)
+
+
 def are_connection_types_compatible(from_type: Any, to_type: Any) -> bool:
     if not from_type:
         return False
@@ -105,13 +109,7 @@ def are_connection_types_compatible(from_type: Any, to_type: Any) -> bool:
     # TODO: this is pretty forgiving on generic types. Clean that up (need to handle optionals and such)
     if from_type and to_type:
         # Ports are compatible
-        if (
-            from_type == to_type
-            or from_type == Any
-            or to_type == Any
-            or Any in get_args(from_type)
-            or Any in get_args(to_type)
-        ):
+        if from_type == to_type or is_any(from_type) or is_any(to_type):
             return True
 
         if from_type in get_args(to_type):
@@ -691,12 +689,14 @@ class Graph(BaseModel):
         input_root_type = next(t[0] for t in type_degrees if t[1] == 0)  # type: ignore
 
         # Verify that all outputs are lists
-        if not all(is_list_or_contains_list(f) for f in output_fields):
+        if not all(is_list_or_contains_list(f) or is_any(f) for f in output_fields):
             return "Collector output must connect to a collection input"
 
         # Verify that all outputs match the input type (are a base class or the same class)
         if not all(
-            is_union_subtype(input_root_type, get_args(f)[0]) or issubclass(input_root_type, get_args(f)[0])
+            is_any(f)
+            or is_union_subtype(input_root_type, get_args(f)[0])
+            or issubclass(input_root_type, get_args(f)[0])
             for f in output_fields
         ):
             return "Collector outputs must connect to a collection input with a matching type"
