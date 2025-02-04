@@ -104,7 +104,8 @@
         "end": "Fine",
         "resetToDefaults": "Ripristina le impostazioni predefinite",
         "seed": "Seme",
-        "combinatorial": "Combinatorio"
+        "combinatorial": "Combinatorio",
+        "count": "Quantità"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -2234,7 +2235,8 @@
             "Modalità Bassa-VRAM",
             "Gestione dinamica della memoria",
             "Tempi di caricamento del modello più rapidi",
-            "Meno errori di memoria"
+            "Meno errori di memoria",
+            "Funzionalità lotto del flusso di lavoro ampliate"
         ]
     },
     "system": {
@@ -2324,5 +2326,10 @@
         "watch": "Guarda",
         "studioSessionsDesc1": "Dai un'occhiata a <StudioSessionsPlaylistLink /> per approfondimenti su Invoke.",
         "studioSessionsDesc2": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e fare domande. Le sessioni vengono caricate sulla playlist la settimana successiva."
+    },
+    "modelCache": {
+        "clear": "Cancella la cache del modello",
+        "clearSucceeded": "Cache del modello cancellata",
+        "clearFailed": "Problema durante la cancellazione della cache del modello"
     }
 }
