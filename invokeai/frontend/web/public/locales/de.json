@@ -99,7 +99,15 @@
         "clipboard": "Zwischenablage",
         "generating": "Generieren",
         "loadingModel": "Lade Modell",
-        "warnings": "Warnungen"
+        "warnings": "Warnungen",
+        "start": "Starten",
+        "count": "Anzahl",
+        "step": "Schritt",
+        "values": "Werte",
+        "min": "Min",
+        "max": "Max",
+        "resetToDefaults": "Auf Standard zurücksetzen",
+        "seed": "Seed"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -1282,7 +1290,16 @@
         "unknownFieldType": "$t(nodes.unknownField) Typ: {{type}}",
         "unknownField": "Unbekanntes Feld",
         "unableToUpdateNodes_one": "{{count}} Knoten kann nicht aktualisiert werden",
-        "unableToUpdateNodes_other": "{{count}} Knoten können nicht aktualisiert werden"
+        "unableToUpdateNodes_other": "{{count}} Knoten können nicht aktualisiert werden",
+        "uniformRandomDistribution": "Uniforme Zufallsverteilung",
+        "linearDistribution": "Lineare Verteilung",
+        "generatorNRandomValues_one": "{{count}} Zufallswert",
+        "generatorNRandomValues_other": "{{count}} Zufallswerte",
+        "arithmeticSequence": "Arithmetische Folge",
+        "noBatchGroup": "keine Gruppe",
+        "generatorNoValues": "leer",
+        "generatorLoading": "wird geladen",
+        "generatorLoadFromFile": "Aus Datei laden"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
