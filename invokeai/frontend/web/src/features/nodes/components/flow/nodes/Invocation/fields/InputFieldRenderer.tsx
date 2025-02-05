@@ -8,6 +8,8 @@ import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/n
 import { StringFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringFieldCollectionInputComponent';
 import { StringGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorFieldComponent';
 import { IntegerFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInput';
+import { IntegerFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldInputAndSlider';
+import { IntegerFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/IntegerFieldSlider';
 import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
 import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
@@ -82,6 +84,7 @@ import {
   isVAEModelFieldInputInstance,
   isVAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
+import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
@@ -107,12 +110,14 @@ import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImage
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
-type InputFieldProps = {
+
+type Props = {
   nodeId: string;
   fieldName: string;
+  config?: NodeFieldElement['data']['config'];
 };
 
-export const InputFieldRenderer = memo(({ nodeId, fieldName }: InputFieldProps) => {
+export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) => {
   const field = useInputFieldInstance(nodeId, fieldName);
   const template = useInputFieldTemplate(nodeId, fieldName);
 
@@ -145,7 +150,16 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName }: InputFieldProps) 
     if (!isIntegerFieldInputInstance(field)) {
       return null;
     }
-    return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    if (config?.configType !== 'integer-field-config') {
+      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    }
+    if (config.component === 'input') {
+      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else if (config.component === 'slider') {
+      return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else if (config.component === 'input-and-slider') {
+      return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+    }
   }
 
   if (isFloatFieldInputTemplate(template)) {

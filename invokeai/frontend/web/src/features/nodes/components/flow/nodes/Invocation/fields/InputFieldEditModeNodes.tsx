@@ -10,7 +10,7 @@ import { useInputFieldConnectionState } from 'features/nodes/hooks/useInputField
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
-import type { FieldIdentifier } from 'features/nodes/types/field';
+import type { FieldIdentifier, FieldInputTemplate } from 'features/nodes/types/field';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
@@ -44,7 +44,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
     setIsHovered(false);
   }, []);
 
-  const isDragging = useNodeFieldDnd({ nodeId, fieldName }, draggableRef, dragHandleRef);
+  const isDragging = useNodeFieldDnd({ nodeId, fieldName }, fieldTemplate, draggableRef, dragHandleRef);
 
   if (fieldTemplate.input === 'connection' || isConnected) {
     return (
@@ -113,6 +113,7 @@ InputFieldEditModeNodes.displayName = 'InputFieldEditModeNodes';
 
 const useNodeFieldDnd = (
   fieldIdentifier: FieldIdentifier,
+  fieldTemplate: FieldInputTemplate,
   draggableRef: RefObject<HTMLElement>,
   dragHandleRef: RefObject<HTMLElement>
 ) => {
@@ -129,7 +130,7 @@ const useNodeFieldDnd = (
       draggable({
         element: draggableElement,
         dragHandle: dragHandleElement,
-        getInitialData: () => buildNodeFieldDndData(fieldIdentifier),
+        getInitialData: () => buildNodeFieldDndData(fieldIdentifier, fieldTemplate.type),
         onDragStart: () => {
           setIsDragging(true);
         },
@@ -138,7 +139,7 @@ const useNodeFieldDnd = (
         },
       })
     );
-  }, [dragHandleRef, draggableRef, fieldIdentifier]);
+  }, [dragHandleRef, draggableRef, fieldIdentifier, fieldTemplate.type]);
 
   return isDragging;
 };

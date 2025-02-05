@@ -15,7 +15,7 @@ import {
 } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { formElementAdded, formElementMoved } from 'features/nodes/store/workflowSlice';
-import type { FieldIdentifier } from 'features/nodes/types/field';
+import type { FieldIdentifier, FieldType } from 'features/nodes/types/field';
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
 import { buildNodeField, isContainerElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
@@ -53,10 +53,12 @@ const uniqueNodeFieldKey = Symbol('node-field');
 type NodeFieldDndData = {
   [uniqueNodeFieldKey]: true;
   fieldIdentifier: FieldIdentifier;
+  fieldType: FieldType;
 };
-export const buildNodeFieldDndData = (fieldIdentifier: FieldIdentifier): NodeFieldDndData => ({
+export const buildNodeFieldDndData = (fieldIdentifier: FieldIdentifier, fieldType: FieldType): NodeFieldDndData => ({
   [uniqueNodeFieldKey]: true,
   fieldIdentifier,
+  fieldType,
 });
 
 const isNodeFieldDndData = (data: Record<string | symbol, unknown>): data is NodeFieldDndData => {
@@ -116,6 +118,10 @@ export const useMonitorForFormElementDnd = () => {
       } else if (closestCenterOrEdge) {
         // Move the element to the target's parent container at the correct index
         const { parentId } = targetData.element;
+        if (parentId === sourceData.element.id) {
+          // Cannot move an element into itself
+          return;
+        }
         assert(parentId !== undefined, 'Target element should have a parent');
 
         const isReparenting = parentId !== sourceData.element.parentId;
@@ -202,11 +208,12 @@ export const useMonitorForFormElementDnd = () => {
   const handleNodeFieldDrop = useCallback(
     (sourceData: NodeFieldDndData, targetData: MoveFormElementDndData) => {
       const closestCenterOrEdge = extractClosestCenterOrEdge(targetData);
-      const { nodeId, fieldName } = sourceData.fieldIdentifier;
+      const { fieldIdentifier, fieldType } = sourceData;
+      const { nodeId, fieldName } = fieldIdentifier;
 
       if (closestCenterOrEdge === 'center') {
         // Move the element to the target container - should we double-check that the target is a container?
-        const element = buildNodeField(nodeId, fieldName, targetData.element.id);
+        const element = buildNodeField(nodeId, fieldName, fieldType, targetData.element.id);
         flushSync(() => {
           dispatch(formElementAdded({ element, containerId: targetData.element.id }));
         });
@@ -215,7 +222,7 @@ export const useMonitorForFormElementDnd = () => {
         // Move the element to the target's parent container at the correct index
         const { parentId } = targetData.element;
         assert(parentId !== undefined, 'Target element should have a parent');
-        const element = buildNodeField(nodeId, fieldName, parentId);
+        const element = buildNodeField(nodeId, fieldName, fieldType, parentId);
 
         const parentContainer = getElement(parentId, isContainerElement);
         const targetIndex = parentContainer.data.children.findIndex((elementId) => elementId === targetData.element.id);
@@ -308,12 +315,16 @@ export const useDraggableFormElement = (
       dropTargetForElements({
         element: draggableElement,
         canDrop: ({ source }) =>
-          isMoveFormElementDndData(source.data) ||
-          isNodeFieldDndData(source.data) ||
-          isAddFormElementDndData(source.data),
+          (isMoveFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId) ||
+          isAddFormElementDndData(source.data) ||
+          isNodeFieldDndData(source.data),
         getData: ({ input }) => {
           const element = getElement(elementId);
-          const container = element.parentId ? getElement(element.parentId, isContainerElement) : null;
+          const container = element.parentId
+            ? getElement(element.parentId, isContainerElement)
+            : isContainerElement(element)
+              ? element
+              : null;
 
           const data = buildMoveFormElementDndData(element);
 
@@ -323,11 +334,11 @@ export const useDraggableFormElement = (
             allowedCenterOrEdge.push('center');
           }
 
-          if (container?.data.direction === 'row') {
+          if (element.parentId !== undefined && container?.data.layout === 'row') {
             allowedCenterOrEdge.push('left', 'right');
           }
 
-          if (container?.data.direction === 'column') {
+          if (element.parentId !== undefined && container?.data.layout === 'column') {
             allowedCenterOrEdge.push('top', 'bottom');
           }
 

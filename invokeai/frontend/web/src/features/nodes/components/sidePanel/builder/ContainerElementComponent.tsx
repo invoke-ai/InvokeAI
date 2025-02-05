@@ -27,10 +27,10 @@ import { assert } from 'tsafe';
 const sx: SystemStyleObject = {
   gap: 4,
   flex: '1 1 0',
-  '&[data-container-direction="column"]': {
+  '&[data-container-layout="column"]': {
     flexDir: 'column',
   },
-  '&[data-container-direction="row"]': {
+  '&[data-container-layout="row"]': {
     flexDir: 'row',
   },
 };
@@ -55,12 +55,12 @@ ContainerElementComponent.displayName = 'ContainerElementComponent';
 export const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
   const depth = useDepthContext();
   const { id, data } = el;
-  const { children, direction } = data;
+  const { children, layout } = data;
 
   return (
     <DepthContextProvider depth={depth + 1}>
-      <ContainerContextProvider id={id} direction={direction}>
-        <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-direction={direction}>
+      <ContainerContextProvider id={id} layout={layout}>
+        <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-layout={layout}>
           {children.map((childId) => (
             <FormElementComponent key={childId} id={childId} />
           ))}
@@ -74,13 +74,13 @@ ContainerElementComponentViewMode.displayName = 'ContainerElementComponentViewMo
 export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }) => {
   const depth = useDepthContext();
   const { id, data } = el;
-  const { children, direction } = data;
+  const { children, layout } = data;
 
   return (
     <FormElementEditModeWrapper element={el}>
       <DepthContextProvider depth={depth + 1}>
-        <ContainerContextProvider id={id} direction={direction}>
-          <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-direction={direction}>
+        <ContainerContextProvider id={id} layout={layout}>
+          <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-layout={layout}>
             {children.map((childId) => (
               <FormElementComponent key={childId} id={childId} />
             ))}

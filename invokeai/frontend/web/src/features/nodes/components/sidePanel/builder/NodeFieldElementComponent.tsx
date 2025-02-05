@@ -39,7 +39,7 @@ NodeFieldElementComponent.displayName = 'NodeFieldElementComponent';
 
 export const NodeFieldElementInputComponent = memo(({ el }: { el: NodeFieldElement }) => {
   const { data } = el;
-  const { fieldIdentifier, withLabel, withDescription } = data;
+  const { fieldIdentifier, showLabel, showDescription } = data;
   const label = useInputFieldLabel(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const description = useInputFieldDescription(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplate(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
@@ -51,12 +51,16 @@ export const NodeFieldElementInputComponent = memo(({ el }: { el: NodeFieldEleme
   );
 
   return (
-    <FormControl flexGrow={1} orientation="vertical">
-      {withLabel && _label && <FormLabel>{_label}</FormLabel>}
-      <Flex w="full">
-        <InputFieldRenderer nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
+    <FormControl flex="1 1 0" orientation="vertical">
+      {showLabel && _label && <FormLabel>{_label}</FormLabel>}
+      <Flex w="full" gap={4}>
+        <InputFieldRenderer
+          nodeId={fieldIdentifier.nodeId}
+          fieldName={fieldIdentifier.fieldName}
+          config={data.config}
+        />
       </Flex>
-      {withDescription && _description && <FormHelperText>{_description}</FormHelperText>}
+      {showDescription && _description && <FormHelperText>{_description}</FormHelperText>}
     </FormControl>
   );
 });
@@ -66,7 +70,7 @@ export const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldEl
   const { id } = el;
 
   return (
-    <Flex id={id} className={NODE_FIELD_CLASS_NAME} flexGrow={1}>
+    <Flex id={id} className={NODE_FIELD_CLASS_NAME} flex="1 1 0">
       <NodeFieldElementInputComponent el={el} />
     </Flex>
   );
@@ -79,7 +83,7 @@ export const NodeFieldElementComponentEditMode = memo(({ el }: { el: NodeFieldEl
 
   return (
     <FormElementEditModeWrapper element={el}>
-      <Flex id={id} className={NODE_FIELD_CLASS_NAME} flexGrow={1}>
+      <Flex id={id} className={NODE_FIELD_CLASS_NAME} flex="1 1 0">
         <NodeFieldElementInputComponent el={el} />
       </Flex>
     </FormElementEditModeWrapper>

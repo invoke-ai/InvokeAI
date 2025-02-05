@@ -4,17 +4,15 @@ import { createContext, memo, useContext, useMemo } from 'react';
 
 type ContainerContextValue = {
   id: ElementId;
-  direction: ContainerElement['data']['direction'];
+  layout: ContainerElement['data']['layout'];
 };
 
 const ContainerContext = createContext<ContainerContextValue | null>(null);
 
-export const ContainerContextProvider = memo(
-  ({ id, direction, children }: PropsWithChildren<ContainerContextValue>) => {
-    const ctxValue = useMemo(() => ({ id, direction }), [id, direction]);
-    return <ContainerContext.Provider value={ctxValue}>{children}</ContainerContext.Provider>;
-  }
-);
+export const ContainerContextProvider = memo(({ id, layout, children }: PropsWithChildren<ContainerContextValue>) => {
+  const ctxValue = useMemo(() => ({ id, layout }), [id, layout]);
+  return <ContainerContext.Provider value={ctxValue}>{children}</ContainerContext.Provider>;
+});
 ContainerContextProvider.displayName = 'ContainerContextProvider';
 
 export const useContainerContext = () => {
