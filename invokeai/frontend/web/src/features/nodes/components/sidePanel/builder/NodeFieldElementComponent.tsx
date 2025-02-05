@@ -1,12 +1,15 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormHelperText, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
-import { InputFieldViewMode } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldViewMode';
+import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
+import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
+import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
+import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { isNodeFieldElement, NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 export const NodeFieldElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
@@ -17,24 +20,54 @@ export const NodeFieldElementComponent = memo(({ id }: { id: string }) => {
   }
 
   if (mode === 'view') {
-    return <NodeFieldElementComponentViewMode el={el} />;
+    return (
+      <InputFieldGate nodeId={el.data.fieldIdentifier.nodeId} fieldName={el.data.fieldIdentifier.fieldName}>
+        <NodeFieldElementComponentViewMode el={el} />
+      </InputFieldGate>
+    );
   }
 
   // mode === 'edit'
-  return <NodeFieldElementComponentEditMode el={el} />;
+  return (
+    <InputFieldGate nodeId={el.data.fieldIdentifier.nodeId} fieldName={el.data.fieldIdentifier.fieldName}>
+      <NodeFieldElementComponentEditMode el={el} />{' '}
+    </InputFieldGate>
+  );
 });
 
 NodeFieldElementComponent.displayName = 'NodeFieldElementComponent';
 
-export const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldElement }) => {
-  const { id, data } = el;
-  const { fieldIdentifier } = data;
+export const NodeFieldElementInputComponent = memo(({ el }: { el: NodeFieldElement }) => {
+  const { data } = el;
+  const { fieldIdentifier, withLabel, withDescription } = data;
+  const label = useInputFieldLabel(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldDescription(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplate(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+
+  const _label = useMemo(() => label || fieldTemplate.title, [label, fieldTemplate.title]);
+  const _description = useMemo(
+    () => description || fieldTemplate.description,
+    [description, fieldTemplate.description]
+  );
 
   return (
-    <Flex id={id} className={NODE_FIELD_CLASS_NAME}>
-      <InputFieldGate nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
-        <InputFieldViewMode nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
-      </InputFieldGate>
+    <FormControl flexGrow={1} orientation="vertical">
+      {withLabel && _label && <FormLabel>{_label}</FormLabel>}
+      <Flex w="full">
+        <InputFieldRenderer nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
+      </Flex>
+      {withDescription && _description && <FormHelperText>{_description}</FormHelperText>}
+    </FormControl>
+  );
+});
+NodeFieldElementInputComponent.displayName = 'NodeFieldElementInputComponent';
+
+export const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldElement }) => {
+  const { id } = el;
+
+  return (
+    <Flex id={id} className={NODE_FIELD_CLASS_NAME} flexGrow={1}>
+      <NodeFieldElementInputComponent el={el} />
     </Flex>
   );
 });
@@ -42,15 +75,12 @@ export const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldEl
 NodeFieldElementComponentViewMode.displayName = 'NodeFieldElementComponentViewMode';
 
 export const NodeFieldElementComponentEditMode = memo(({ el }: { el: NodeFieldElement }) => {
-  const { id, data } = el;
-  const { fieldIdentifier } = data;
+  const { id } = el;
 
   return (
     <FormElementEditModeWrapper element={el}>
-      <Flex id={id} className={NODE_FIELD_CLASS_NAME} w="full">
-        <InputFieldGate nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
-          <InputFieldViewMode nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
-        </InputFieldGate>
+      <Flex id={id} className={NODE_FIELD_CLASS_NAME} flexGrow={1}>
+        <NodeFieldElementInputComponent el={el} />
       </Flex>
     </FormElementEditModeWrapper>
   );

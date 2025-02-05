@@ -1,5 +1,5 @@
-import { Flex, IconButton, type SystemStyleObject } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { Flex, type SystemStyleObject } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import {
   ContainerContextProvider,
   DepthContextProvider,
@@ -10,10 +10,9 @@ import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/
 import { HeadingElementComponent } from 'features/nodes/components/sidePanel/builder/HeadingElementComponent';
 import { NodeFieldElementComponent } from 'features/nodes/components/sidePanel/builder/NodeFieldElementComponent';
 import { TextElementComponent } from 'features/nodes/components/sidePanel/builder/TextElementComponent';
-import { formElementAdded, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
-  buildContainer,
   CONTAINER_CLASS_NAME,
   isContainerElement,
   isDividerElement,
@@ -21,8 +20,7 @@ import {
   isNodeFieldElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
-import { memo, useCallback } from 'react';
-import { PiPlusBold } from 'react-icons/pi';
+import { memo } from 'react';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -86,8 +84,6 @@ export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerEl
             {children.map((childId) => (
               <FormElementComponent key={childId} id={childId} />
             ))}
-            {direction === 'row' && children.length < 3 && depth < 2 && <AddColumnButton el={el} />}
-            {direction === 'column' && depth < 1 && <AddRowButton el={el} />}
           </Flex>
         </ContainerContextProvider>
       </DepthContextProvider>
@@ -95,28 +91,6 @@ export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerEl
   );
 });
 ContainerElementComponentEditMode.displayName = 'ContainerElementComponentEditMode';
-
-const AddColumnButton = ({ el }: { el: ContainerElement }) => {
-  const dispatch = useAppDispatch();
-  const onClick = useCallback(() => {
-    const element = buildContainer('column', [], el.id);
-    dispatch(formElementAdded({ element, containerId: el.id }));
-  }, [dispatch, el.id]);
-  return (
-    <IconButton onClick={onClick} aria-label="add column" icon={<PiPlusBold />} h="unset" variant="ghost" size="sm" />
-  );
-};
-
-const AddRowButton = ({ el }: { el: ContainerElement }) => {
-  const dispatch = useAppDispatch();
-  const onClick = useCallback(() => {
-    const element = buildContainer('row', [], el.id);
-    dispatch(formElementAdded({ element, containerId: el.id }));
-  }, [dispatch, el.id]);
-  return (
-    <IconButton onClick={onClick} aria-label="add row" icon={<PiPlusBold />} w="unset" variant="ghost" size="sm" />
-  );
-};
 
 // TODO(psyche): Can we move this into a separate file and avoid circular dependencies between it and ContainerElementComponent?
 export const FormElementComponent = memo(({ id }: { id: string }) => {
