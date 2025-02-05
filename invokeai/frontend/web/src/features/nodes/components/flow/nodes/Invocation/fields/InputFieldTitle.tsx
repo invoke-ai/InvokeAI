@@ -1,13 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Input, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useEditable } from 'common/hooks/useEditable';
 import { InputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldTooltipContent';
 import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
 import { useInputFieldTemplateTitle } from 'features/nodes/hooks/useInputFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import type { ChangeEvent, KeyboardEvent } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelSx: SystemStyleObject = {
@@ -41,55 +41,21 @@ export const InputFieldTitle = memo((props: Props) => {
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();
-  const [isEditing, setIsEditing] = useState(false);
-  const initialTitle = useMemo(
-    () => label || fieldTemplateTitle || t('nodes.unknownField'),
-    [fieldTemplateTitle, label, t]
-  );
-  const [localTitle, setLocalTitle] = useState(() => initialTitle);
-
-  const onBlur = useCallback(() => {
-    const trimmedTitle = localTitle.trim();
-    const finalTitle = trimmedTitle || fieldTemplateTitle || t('nodes.unknownField');
-    setLocalTitle(finalTitle);
-    dispatch(fieldLabelChanged({ nodeId, fieldName, label: finalTitle }));
-    setIsEditing(false);
-  }, [localTitle, fieldTemplateTitle, t, dispatch, nodeId, fieldName]);
-
-  const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setLocalTitle(e.target.value);
-  }, []);
-
-  const onKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        onBlur();
-      } else if (e.key === 'Escape') {
-        setLocalTitle(initialTitle);
-        onBlur();
-        setIsEditing(false);
-      }
+  const defaultTitle = useMemo(() => fieldTemplateTitle || t('nodes.unknownField'), [fieldTemplateTitle, t]);
+  const onChange = useCallback(
+    (label: string) => {
+      dispatch(fieldLabelChanged({ nodeId, fieldName, label }));
     },
-    [initialTitle, onBlur]
+    [dispatch, nodeId, fieldName]
   );
+  const editable = useEditable({
+    value: label || defaultTitle,
+    defaultValue: defaultTitle,
+    onChange,
+    inputRef,
+  });
 
-  const onEdit = useCallback(() => {
-    setIsEditing(true);
-  }, []);
-
-  useEffect(() => {
-    // Another component may change the title; sync local title with global state
-    setLocalTitle(initialTitle);
-  }, [label, fieldTemplateTitle, t, initialTitle]);
-
-  useEffect(() => {
-    if (isEditing) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [isEditing]);
-
-  if (!isEditing) {
+  if (!editable.isEditing) {
     return (
       <Tooltip
         label={<InputFieldTooltipContent nodeId={nodeId} fieldName={fieldName} />}
@@ -101,24 +67,15 @@ export const InputFieldTitle = memo((props: Props) => {
           noOfLines={1}
           data-is-invalid={isInvalid}
           data-is-disabled={isDisabled}
-          onDoubleClick={onEdit}
+          onDoubleClick={editable.startEditing}
         >
-          {localTitle}
+          {editable.value}
         </Text>
       </Tooltip>
     );
   }
 
-  return (
-    <Input
-      ref={inputRef}
-      value={localTitle}
-      onChange={handleChange}
-      onBlur={onBlur}
-      onKeyDown={onKeyDown}
-      variant="unstyled"
-    />
-  );
+  return <Input ref={inputRef} variant="unstyled" {...editable.inputProps} />;
 });
 
 InputFieldTitle.displayName = 'InputFieldTitle';
