@@ -123,15 +123,15 @@ export const CanvasPasteModal = memo(() => {
       <ModalContent>
         <ModalHeader>{t('controlLayers.pasteTo')}</ModalHeader>
         <ModalCloseButton />
-        <ModalBody>
-          <Flex flexDir="column" gap={4}>
-            <Button variant="ghost" size="lg" onClick={pasteToAssets} isDisabled={isLoading}>
+        <ModalBody display="flex" justifyContent="center">
+          <Flex flexDir="column" gap={4} w="min-content">
+            <Button size="lg" onClick={pasteToAssets} isDisabled={isLoading}>
               {t('controlLayers.pasteToAssetsDesc')}
             </Button>
-            <Button variant="ghost" size="lg" onClick={pasteToBbox} isDisabled={isLoading}>
+            <Button size="lg" onClick={pasteToBbox} isDisabled={isLoading}>
               {t('controlLayers.pasteToBboxDesc')}
             </Button>
-            <Button variant="ghost" size="lg" onClick={pasteToCanvas} isDisabled={isLoading}>
+            <Button size="lg" onClick={pasteToCanvas} isDisabled={isLoading}>
               {t('controlLayers.pasteToCanvasDesc')}
             </Button>
           </Flex>
