@@ -11,11 +11,11 @@ import { memo } from 'react';
 const sx: SystemStyleObject = {
   bg: 'base.700',
   flexShrink: 0,
-  '&[data-orientation="horizontal"]': {
+  '&[data-layout="column"]': {
     width: '100%',
     height: '1px',
   },
-  '&[data-orientation="vertical"]': {
+  '&[data-layout="row"]': {
     height: '100%',
     width: '1px',
   },
@@ -43,14 +43,7 @@ export const DividerElementComponentViewMode = memo(({ el }: { el: DividerElemen
   const container = useContainerContext();
   const { id } = el;
 
-  return (
-    <Flex
-      id={id}
-      className={DIVIDER_CLASS_NAME}
-      sx={sx}
-      data-orientation={container?.layout === 'column' ? 'horizontal' : 'vertical'}
-    />
-  );
+  return <Flex id={id} className={DIVIDER_CLASS_NAME} sx={sx} data-layout={container?.layout} />;
 });
 
 DividerElementComponentViewMode.displayName = 'DividerElementComponentViewMode';
@@ -61,12 +54,7 @@ export const DividerElementComponentEditMode = memo(({ el }: { el: DividerElemen
 
   return (
     <FormElementEditModeWrapper element={el}>
-      <Flex
-        id={id}
-        className={DIVIDER_CLASS_NAME}
-        sx={sx}
-        data-orientation={container?.layout === 'column' ? 'horizontal' : 'vertical'}
-      />
+      <Flex id={id} className={DIVIDER_CLASS_NAME} sx={sx} data-layout={container?.layout} />
     </FormElementEditModeWrapper>
   );
 });
