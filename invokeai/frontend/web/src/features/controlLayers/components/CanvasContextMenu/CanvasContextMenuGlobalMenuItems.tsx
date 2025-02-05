@@ -3,6 +3,7 @@ import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { CanvasContextMenuItemsCropCanvasToBbox } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItemsCropCanvasToBbox';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import {
+  useCopyCanvasToClipboard,
   useNewControlLayerFromBbox,
   useNewGlobalReferenceImageFromBbox,
   useNewRasterLayerFromBbox,
@@ -13,12 +14,13 @@ import {
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFloppyDiskBold } from 'react-icons/pi';
+import { PiCopyBold, PiFloppyDiskBold } from 'react-icons/pi';
 
 export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const { t } = useTranslation();
   const saveSubMenu = useSubMenu();
   const newSubMenu = useSubMenu();
+  const copySubMenu = useSubMenu();
   const isBusy = useCanvasIsBusy();
   const saveCanvasToGallery = useSaveCanvasToGallery();
   const saveBboxToGallery = useSaveBboxToGallery();
@@ -26,6 +28,8 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const newGlobalReferenceImageFromBbox = useNewGlobalReferenceImageFromBbox();
   const newRasterLayerFromBbox = useNewRasterLayerFromBbox();
   const newControlLayerFromBbox = useNewControlLayerFromBbox();
+  const copyCanvasToClipboard = useCopyCanvasToClipboard('canvas');
+  const copyBboxToClipboard = useCopyCanvasToClipboard('bbox');
 
   return (
     <>
@@ -63,6 +67,21 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
               </MenuItem>
               <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRasterLayerFromBbox}>
                 {t('controlLayers.canvasContextMenu.newRasterLayer')}
+              </MenuItem>
+            </MenuList>
+          </Menu>
+        </MenuItem>
+        <MenuItem {...copySubMenu.parentMenuItemProps} icon={<PiCopyBold />}>
+          <Menu {...copySubMenu.menuProps}>
+            <MenuButton {...copySubMenu.menuButtonProps}>
+              <SubMenuButtonContent label={t('controlLayers.canvasContextMenu.copyToClipboard')} />
+            </MenuButton>
+            <MenuList {...copySubMenu.menuListProps}>
+              <MenuItem icon={<PiCopyBold />} isDisabled={isBusy} onClick={copyCanvasToClipboard}>
+                {t('controlLayers.canvasContextMenu.copyCanvasToClipboard')}
+              </MenuItem>
+              <MenuItem icon={<PiCopyBold />} isDisabled={isBusy} onClick={copyBboxToClipboard}>
+                {t('controlLayers.canvasContextMenu.copyBboxToClipboard')}
               </MenuItem>
             </MenuList>
           </Menu>

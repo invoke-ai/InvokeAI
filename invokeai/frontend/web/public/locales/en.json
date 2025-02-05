@@ -1704,6 +1704,8 @@
         "cropLayerToBbox": "Crop Layer to Bbox",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
+        "regionCopiedToClipboard": "{{region}} Copied to Clipboard",
+        "copyRegionError": "Error copying {{region}}",
         "newGlobalReferenceImageOk": "Created Global Reference Image",
         "newGlobalReferenceImageError": "Problem Creating Global Reference Image",
         "newRegionalReferenceImageOk": "Created Regional Reference Image",
@@ -2095,7 +2097,10 @@
             "newRasterLayer": "New Raster Layer",
             "newInpaintMask": "New Inpaint Mask",
             "newRegionalGuidance": "New Regional Guidance",
-            "cropCanvasToBbox": "Crop Canvas to Bbox"
+            "cropCanvasToBbox": "Crop Canvas to Bbox",
+            "copyToClipboard": "Copy to Clipboard",
+            "copyCanvasToClipboard": "Copy Canvas to Clipboard",
+            "copyBboxToClipboard": "Copy Bbox to Clipboard"
         },
         "stagingArea": {
             "accept": "Accept",

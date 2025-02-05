@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
@@ -26,17 +27,21 @@ export const useCopyLayerToClipboard = () => {
       if (!adapter) {
         return;
       }
-      try {
+
+      const result = await withResultAsync(async () => {
         const canvas = adapter.getCanvas();
         const blob = await canvasToBlob(canvas);
         copyBlobToClipboard(blob);
+      });
+
+      if (result.isOk()) {
         log.trace('Layer copied to clipboard');
         toast({
           status: 'info',
           title: t('toast.layerCopiedToClipboard'),
         });
-      } catch (error) {
-        log.error({ error: serializeError(error) }, 'Problem copying layer to clipboard');
+      } else {
+        log.error({ error: serializeError(result.error) }, 'Problem copying layer to clipboard');
         toast({
           status: 'error',
           title: t('toast.problemCopyingLayer'),
