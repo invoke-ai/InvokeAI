@@ -2244,11 +2244,10 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Low-VRAM mode",
-            "Dynamic memory management",
-            "Faster model loading times",
-            "Fewer memory errors",
-            "Expanded workflow batch capabilities"
+            "Improved VRAM setting defaults",
+            "Canvas Adjust filter",
+            "On-demand model cache clearing",
+            "Cancel all but current queue item"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
