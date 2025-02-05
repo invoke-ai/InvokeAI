@@ -1,12 +1,13 @@
+import type { TextProps } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useEditable } from 'common/hooks/useEditable';
 import { AutosizeTextarea } from 'features/nodes/components/sidePanel/builder/AutosizeTextarea';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
 import { formElementTextDataChanged, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { TextElement } from 'features/nodes/types/workflow';
 import { isTextElement, TEXT_CLASS_NAME } from 'features/nodes/types/workflow';
-import type { ChangeEvent, KeyboardEvent } from 'react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef } from 'react';
 
 export const TextElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
@@ -31,13 +32,20 @@ export const TextElementComponentViewMode = memo(({ el }: { el: TextElement }) =
 
   return (
     <Flex id={id} className={TEXT_CLASS_NAME}>
-      <Text fontSize="md" overflowWrap="anywhere">
-        {content || 'Edit to add text'}
-      </Text>
+      <TextContentDisplay content={content} />
     </Flex>
   );
 });
 TextElementComponentViewMode.displayName = 'TextElementComponentViewMode';
+
+const TextContentDisplay = memo(({ content, ...rest }: { content: string } & TextProps) => {
+  return (
+    <Text fontSize="md" overflowWrap="anywhere" {...rest}>
+      {content || 'Edit to add text'}
+    </Text>
+  );
+});
+TextContentDisplay.displayName = 'TextContentDisplay';
 
 export const TextElementComponentEditMode = memo(({ el }: { el: TextElement }) => {
   const { id } = el;
@@ -56,41 +64,31 @@ export const EditableText = memo(({ el }: { el: TextElement }) => {
   const dispatch = useAppDispatch();
   const { id, data } = el;
   const { content } = data;
-  const [localContent, setLocalContent] = useState(content);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  const onChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
-    setLocalContent(e.target.value);
-  }, []);
-
-  const onBlur = useCallback(() => {
-    const trimmedContent = localContent.trim();
-    if (trimmedContent === content) {
-      return;
-    }
-    setLocalContent(trimmedContent);
-    dispatch(formElementTextDataChanged({ id, changes: { content: trimmedContent } }));
-  }, [localContent, content, id, dispatch]);
-
-  const onKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter') {
-        onBlur();
-      } else if (e.key === 'Escape') {
-        setLocalContent(content);
-      }
+  const onChange = useCallback(
+    (content: string) => {
+      dispatch(formElementTextDataChanged({ id, changes: { content } }));
     },
-    [content, onBlur]
+    [dispatch, id]
   );
+
+  const editable = useEditable({
+    value: content,
+    defaultValue: '',
+    onChange,
+    inputRef: ref,
+  });
+
+  if (!editable.isEditing) {
+    return <TextContentDisplay content={editable.value} onDoubleClick={editable.startEditing} />;
+  }
 
   return (
     <AutosizeTextarea
       ref={ref}
       placeholder="Text"
-      value={localContent}
-      onChange={onChange}
-      onBlur={onBlur}
-      onKeyDown={onKeyDown}
+      {...editable.inputProps}
       fontSize="md"
       variant="outline"
       overflowWrap="anywhere"

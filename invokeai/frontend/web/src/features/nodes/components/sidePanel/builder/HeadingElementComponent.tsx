@@ -1,12 +1,13 @@
+import type { HeadingProps } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useEditable } from 'common/hooks/useEditable';
 import { AutosizeTextarea } from 'features/nodes/components/sidePanel/builder/AutosizeTextarea';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
 import { formElementHeadingDataChanged, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { HeadingElement } from 'features/nodes/types/workflow';
 import { HEADING_CLASS_NAME, isHeadingElement } from 'features/nodes/types/workflow';
-import type { ChangeEvent, KeyboardEvent } from 'react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef } from 'react';
 
 export const HeadingElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
@@ -32,9 +33,7 @@ export const HeadingElementComponentViewMode = memo(({ el }: { el: HeadingElemen
 
   return (
     <Flex id={id} className={HEADING_CLASS_NAME}>
-      <Text fontWeight="bold" fontSize="4xl">
-        {content || 'Edit to add heading'}
-      </Text>
+      <HeadingContentDisplay content={content} />
     </Flex>
   );
 });
@@ -53,48 +52,46 @@ export const HeadingElementComponentEditMode = memo(({ el }: { el: HeadingElemen
   );
 });
 
+const HeadingContentDisplay = memo(({ content, ...rest }: { content: string } & HeadingProps) => {
+  return (
+    <Text fontWeight="bold" fontSize="4xl" {...rest}>
+      {content || 'Edit to add heading'}
+    </Text>
+  );
+});
+HeadingContentDisplay.displayName = 'HeadingContentDisplay';
+
 HeadingElementComponentEditMode.displayName = 'HeadingElementComponentEditMode';
 
 export const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
   const dispatch = useAppDispatch();
   const { id, data } = el;
   const { content } = data;
-
-  const [localContent, setLocalContent] = useState(content);
   const ref = useRef<HTMLTextAreaElement>(null);
 
-  const onChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
-    setLocalContent(e.target.value);
-  }, []);
-
-  const onBlur = useCallback(() => {
-    const trimmedContent = localContent.trim();
-    if (trimmedContent === content) {
-      return;
-    }
-    setLocalContent(trimmedContent);
-    dispatch(formElementHeadingDataChanged({ id, changes: { content: trimmedContent } }));
-  }, [localContent, content, id, dispatch]);
-
-  const onKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter') {
-        onBlur();
-      } else if (e.key === 'Escape') {
-        setLocalContent(content);
-      }
+  const onChange = useCallback(
+    (content: string) => {
+      dispatch(formElementHeadingDataChanged({ id, changes: { content } }));
     },
-    [content, onBlur]
+    [dispatch, id]
   );
+
+  const editable = useEditable({
+    value: content,
+    defaultValue: '',
+    onChange,
+    inputRef: ref,
+  });
+
+  if (!editable.isEditing) {
+    return <HeadingContentDisplay content={editable.value} onDoubleClick={editable.startEditing} />;
+  }
 
   return (
     <AutosizeTextarea
       ref={ref}
       placeholder="Heading"
-      value={localContent}
-      onChange={onChange}
-      onBlur={onBlur}
-      onKeyDown={onKeyDown}
+      {...editable.inputProps}
       variant="outline"
       overflowWrap="anywhere"
       w="full"
