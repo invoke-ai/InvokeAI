@@ -15,17 +15,17 @@ const createSelectName = (entityIdentifier: CanvasEntityIdentifier) =>
     return entity.name;
   });
 
-export const useEntityTitle = (entityIdentifier: CanvasEntityIdentifier) => {
-  const { t } = useTranslation();
+export const useEntityName = (entityIdentifier: CanvasEntityIdentifier) => {
   const selectName = useMemo(() => createSelectName(entityIdentifier), [entityIdentifier]);
   const name = useAppSelector(selectName);
+  return name;
+};
 
-  const title = useMemo(() => {
-    if (name) {
-      return name;
-    }
+export const useEntityTypeName = (type: CanvasEntityIdentifier['type']) => {
+  const { t } = useTranslation();
 
-    switch (entityIdentifier.type) {
+  const typeName = useMemo(() => {
+    switch (type) {
       case 'inpaint_mask':
         return t('controlLayers.inpaintMask');
       case 'control_layer':
@@ -39,7 +39,15 @@ export const useEntityTitle = (entityIdentifier: CanvasEntityIdentifier) => {
       default:
         assert(false, 'Unexpected entity type');
     }
-  }, [entityIdentifier.type, name, t]);
+  }, [type, t]);
+
+  return typeName;
+};
+
+export const useEntityTitle = (entityIdentifier: CanvasEntityIdentifier) => {
+  const name = useEntityName(entityIdentifier);
+  const typeName = useEntityTypeName(entityIdentifier.type);
+  const title = useMemo(() => name || typeName, [name, typeName]);
 
   return title;
 };
