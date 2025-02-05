@@ -2,8 +2,8 @@ import { Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-l
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { CanvasContextMenuItemsCropCanvasToBbox } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItemsCropCanvasToBbox';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
+import { useCopyCanvasToClipboard } from 'features/controlLayers/hooks/copyHooks';
 import {
-  useCopyCanvasToClipboard,
   useNewControlLayerFromBbox,
   useNewGlobalReferenceImageFromBbox,
   useNewRasterLayerFromBbox,
