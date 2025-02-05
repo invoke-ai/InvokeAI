@@ -8,7 +8,6 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/nanostores/store';
@@ -36,6 +35,24 @@ export const CanvasPasteModal = memo(() => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage, { isLoading }] = useUploadImageMutation({ fixedCacheKey: 'canvasPasteModal' });
 
+  const getPosition = useCallback(
+    (destination: 'canvas' | 'bbox') => {
+      const { x, y } = canvasManager.stateApi.getBbox().rect;
+      if (destination === 'bbox') {
+        return { x, y };
+      }
+      const rasterLayerAdapters = canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
+      if (rasterLayerAdapters.length === 0) {
+        return { x, y };
+      }
+      {
+        const { x, y } = canvasManager.compositor.getRectOfAdapters(rasterLayerAdapters);
+        return { x, y };
+      }
+    },
+    [canvasManager.compositor, canvasManager.stateApi]
+  );
+
   const handlePaste = useCallback(
     async (file: File, destination: 'assets' | 'canvas' | 'bbox') => {
       try {
@@ -48,17 +65,12 @@ export const CanvasPasteModal = memo(() => {
         }).unwrap();
 
         if (destination !== 'assets') {
-          const { x, y } =
-            destination === 'canvas'
-              ? canvasManager.compositor.getVisibleRectOfType('raster_layer')
-              : canvasManager.stateApi.getBbox().rect;
-
           createNewCanvasEntityFromImage({
             type: 'raster_layer',
             imageDTO,
             dispatch,
             getState,
-            overrides: { position: { x, y } },
+            overrides: { position: getPosition(destination) },
           });
         }
       } catch {
@@ -72,16 +84,16 @@ export const CanvasPasteModal = memo(() => {
           title: t('toast.pasteSuccess', {
             destination:
               destination === 'assets'
-                ? t('gallery.galleryAssets')
-                : destination === 'canvas'
-                  ? t('controlLayers.canvasComposition')
-                  : t('controlLayers.canvasBbox'),
+                ? t('controlLayers.pasteToAssets')
+                : destination === 'bbox'
+                  ? t('controlLayers.pasteToBbox')
+                  : t('controlLayers.pasteToCanvas'),
           }),
           status: 'success',
         });
       }
+    },
     [autoAddBoardId, dispatch, getPosition, getState, t, uploadImage]
-    [autoAddBoardId, canvasManager.compositor, canvasManager.stateApi, dispatch, getState, t, uploadImage]
   );
 
   const pasteToAssets = useCallback(() => {
@@ -109,44 +121,19 @@ export const CanvasPasteModal = memo(() => {
     <Modal isOpen={imageToPaste !== null} onClose={clearFileToPaste} useInert={false} isCentered size="2xl">
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>{t('gallery.pasteTo')}</ModalHeader>
+        <ModalHeader>{t('controlLayers.pasteTo')}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
-          <Flex flexDir="column" gap={8}>
-            <Flex w="full" gap={2} justifyContent="center" alignItems="center">
-              <Button onClick={pasteToAssets} isDisabled={isLoading}>
-                {t('gallery.pasteToAssets')}
-              </Button>
-              <Button onClick={pasteToBbox} isDisabled={isLoading}>
-                {t('controlLayers.canvasBbox')}
-              </Button>
-              <Button onClick={pasteToCanvas} isDisabled={isLoading}>
-                {t('controlLayers.canvasComposition')}
-              </Button>
-            </Flex>
-            <Flex flexDir="column" gap={2} color="base.300" fontSize="md">
-              <Text fontSize="inherit">
-                <Text as="span" fontSize="inherit" fontWeight="semibold">
-                  {t('gallery.pasteToAssets')}
-                </Text>
-                {': '}
-                {t('gallery.pasteToAssetsDesc')}
-              </Text>
-              <Text fontSize="inherit">
-                <Text as="span" fontSize="inherit" fontWeight="semibold">
-                  {t('controlLayers.canvasBbox')}
-                </Text>
-                {': '}
-                {t('controlLayers.canvasBboxDesc')}
-              </Text>
-              <Text fontSize="inherit">
-                <Text as="span" fontSize="inherit" fontWeight="semibold">
-                  {t('controlLayers.canvasComposition')}
-                </Text>
-                {': '}
-                {t('controlLayers.canvasCompositionDesc')}
-              </Text>
-            </Flex>
+          <Flex flexDir="column" gap={4}>
+            <Button variant="ghost" size="lg" onClick={pasteToAssets} isDisabled={isLoading}>
+              {t('controlLayers.pasteToAssetsDesc')}
+            </Button>
+            <Button variant="ghost" size="lg" onClick={pasteToBbox} isDisabled={isLoading}>
+              {t('controlLayers.pasteToBboxDesc')}
+            </Button>
+            <Button variant="ghost" size="lg" onClick={pasteToCanvas} isDisabled={isLoading}>
+              {t('controlLayers.pasteToCanvasDesc')}
+            </Button>
           </Flex>
         </ModalBody>
         <ModalFooter>
