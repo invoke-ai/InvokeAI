@@ -24,7 +24,7 @@ import { useUploadImageMutation } from 'services/api/endpoints/images';
 
 const $imageFile = atom<File | null>(null);
 export const setFileToPaste = (file: File) => $imageFile.set(file);
-export const clearFileToPaste = () => $imageFile.set(null);
+const clearFileToPaste = () => $imageFile.set(null);
 
 export const CanvasPasteModal = memo(() => {
   useAssertSingleton('CanvasPasteModal');
