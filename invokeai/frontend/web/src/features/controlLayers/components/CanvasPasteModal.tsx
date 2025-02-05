@@ -80,7 +80,7 @@ export const CanvasPasteModal = memo(() => {
           status: 'success',
         });
       }
-    },
+    [autoAddBoardId, dispatch, getPosition, getState, t, uploadImage]
     [autoAddBoardId, canvasManager.compositor, canvasManager.stateApi, dispatch, getState, t, uploadImage]
   );
 
