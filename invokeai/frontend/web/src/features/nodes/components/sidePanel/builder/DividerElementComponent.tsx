@@ -48,7 +48,7 @@ export const DividerElementComponentViewMode = memo(({ el }: { el: DividerElemen
       id={id}
       className={DIVIDER_CLASS_NAME}
       sx={sx}
-      data-orientation={container?.direction === 'column' ? 'horizontal' : 'vertical'}
+      data-orientation={container?.layout === 'column' ? 'horizontal' : 'vertical'}
     />
   );
 });
@@ -65,7 +65,7 @@ export const DividerElementComponentEditMode = memo(({ el }: { el: DividerElemen
         id={id}
         className={DIVIDER_CLASS_NAME}
         sx={sx}
-        data-orientation={container?.direction === 'column' ? 'horizontal' : 'vertical'}
+        data-orientation={container?.layout === 'column' ? 'horizontal' : 'vertical'}
       />
     </FormElementEditModeWrapper>
   );

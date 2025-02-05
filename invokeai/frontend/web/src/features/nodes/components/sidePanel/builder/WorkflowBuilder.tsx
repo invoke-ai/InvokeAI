@@ -12,6 +12,7 @@ import {
 import { formModeToggled, selectRootElementId, selectWorkflowFormMode } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
+import { startCase } from 'lodash-es';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { assert } from 'tsafe';
@@ -27,7 +28,8 @@ export const WorkflowBuilder = memo(() => {
         <Flex flexDir="column" w={mode === 'view' ? '512px' : 'min-content'} minW="512px" gap={2}>
           <ButtonGroup isAttached={false} justifyContent="center">
             <ToggleModeButton />
-            <AddFormElementDndButton type="container" />
+            <AddFormElementDndButton type="row" />
+            <AddFormElementDndButton type="column" />
             <AddFormElementDndButton type="divider" />
             <AddFormElementDndButton type="heading" />
             <AddFormElementDndButton type="text" />
@@ -53,7 +55,10 @@ const ToggleModeButton = memo(() => {
 });
 ToggleModeButton.displayName = 'ToggleModeButton';
 
-const useAddFormElementDnd = (type: Omit<FormElement['type'], 'node-field'>, draggableRef: RefObject<HTMLElement>) => {
+const useAddFormElementDnd = (
+  type: Exclude<FormElement['type'], 'node-field' | 'container'> | 'row' | 'column',
+  draggableRef: RefObject<HTMLElement>
+) => {
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -66,8 +71,12 @@ const useAddFormElementDnd = (type: Omit<FormElement['type'], 'node-field'>, dra
       draggable({
         element: draggableElement,
         getInitialData: () => {
-          if (type === 'container') {
+          if (type === 'row') {
             const element = buildContainer('row', []);
+            return buildAddFormElementDndData(element);
+          }
+          if (type === 'column') {
+            const element = buildContainer('column', []);
             return buildAddFormElementDndData(element);
           }
           if (type === 'divider') {
@@ -97,13 +106,13 @@ const useAddFormElementDnd = (type: Omit<FormElement['type'], 'node-field'>, dra
   return isDragging;
 };
 
-const AddFormElementDndButton = ({ type }: { type: Omit<FormElement['type'], 'node-field'> }) => {
+const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormElementDnd>[0] }) => {
   const draggableRef = useRef<HTMLButtonElement>(null);
   const isDragging = useAddFormElementDnd(type, draggableRef);
 
   return (
     <Button ref={draggableRef} variant="ghost" pointerEvents="auto" opacity={isDragging ? 0.3 : 1}>
-      {type}
+      {startCase(type)}
     </Button>
   );
 };

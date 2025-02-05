@@ -17,6 +17,7 @@ export const FloatFieldInput = memo((props: FieldComponentProps<FloatFieldInputI
       step={step}
       fineStep={fineStep}
       className="nodrag"
+      flex="1 1 0"
     />
   );
 });

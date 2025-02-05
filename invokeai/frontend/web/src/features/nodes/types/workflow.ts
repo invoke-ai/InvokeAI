@@ -1,6 +1,7 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { z } from 'zod';
 
+import type { FieldType } from './field';
 import { zFieldIdentifier } from './field';
 import { zInvocationNodeData, zNotesNodeData } from './invocation';
 
@@ -97,14 +98,18 @@ const NODE_FIELD_TYPE = 'node-field';
 export const NODE_FIELD_CLASS_NAME = getPrefixedId(NODE_FIELD_TYPE, '-');
 const FLOAT_FIELD_CONFIG_TYPE = 'float-field-config';
 const zFloatFieldConfig = z.object({
-  configType: z.literal(FLOAT_FIELD_CONFIG_TYPE),
-  component: z.enum(['input', 'slider', 'input-and-slider']),
+  configType: z.literal(FLOAT_FIELD_CONFIG_TYPE).default(FLOAT_FIELD_CONFIG_TYPE),
+  component: z.enum(['input', 'slider', 'input-and-slider']).default('input'),
 });
+export type NodeFieldFloatConfig = z.infer<typeof zFloatFieldConfig>;
+
 const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
 const zIntegerFieldConfig = z.object({
-  configType: z.literal(INTEGER_FIELD_CONFIG_TYPE),
-  component: z.enum(['input', 'slider', 'input-and-slider']),
+  configType: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
+  component: z.enum(['input', 'slider', 'input-and-slider']).default('input'),
 });
+export type NodeFieldIntegerConfig = z.infer<typeof zIntegerFieldConfig>;
+
 const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
 const zStringFieldConfig = z.object({
   configType: z.literal(STRING_FIELD_CONFIG_TYPE),
@@ -112,8 +117,8 @@ const zStringFieldConfig = z.object({
 });
 const zNodeFieldData = z.object({
   fieldIdentifier: zFieldIdentifier,
-  withLabel: z.boolean().default(true),
-  withDescription: z.boolean().default(true),
+  showLabel: z.boolean().default(true),
+  showDescription: z.boolean().default(true),
   config: z.union([zFloatFieldConfig, zIntegerFieldConfig, zStringFieldConfig]).optional(),
 });
 const zNodeFieldElement = zElementBase.extend({
@@ -125,13 +130,27 @@ export const isNodeFieldElement = (el: FormElement): el is NodeFieldElement => e
 export const buildNodeField = (
   nodeId: NodeFieldElement['data']['fieldIdentifier']['nodeId'],
   fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName'],
+  fieldType: FieldType,
   parentId?: NodeFieldElement['parentId']
 ): NodeFieldElement => {
+  let config: NodeFieldElement['data']['config'] = undefined;
+
+  if (fieldType.name === 'IntegerField') {
+    config = {
+      configType: 'integer-field-config',
+      component: 'input',
+    };
+  }
   const element: NodeFieldElement = {
     id: getPrefixedId(NODE_FIELD_TYPE, '-'),
     type: NODE_FIELD_TYPE,
     parentId,
-    data: zNodeFieldData.parse({ fieldIdentifier: { nodeId, fieldName } }),
+    data: {
+      fieldIdentifier: { nodeId, fieldName },
+      config,
+      showLabel: true,
+      showDescription: true,
+    },
   };
   return element;
 };
@@ -199,14 +218,14 @@ export const CONTAINER_CLASS_NAME = getPrefixedId(CONTAINER_TYPE, '-');
 const zContainerElement = zElementBase.extend({
   type: z.literal(CONTAINER_TYPE),
   data: z.object({
-    direction: z.enum(['row', 'column']),
+    layout: z.enum(['row', 'column']),
     children: z.array(zElementId),
   }),
 });
 export type ContainerElement = z.infer<typeof zContainerElement>;
 export const isContainerElement = (el: FormElement): el is ContainerElement => el.type === CONTAINER_TYPE;
 export const buildContainer = (
-  direction: ContainerElement['data']['direction'],
+  layout: ContainerElement['data']['layout'],
   children: ContainerElement['data']['children'],
   parentId?: NodeFieldElement['parentId']
 ): ContainerElement => {
@@ -215,7 +234,7 @@ export const buildContainer = (
     parentId,
     type: CONTAINER_TYPE,
     data: {
-      direction,
+      layout,
       children,
     },
   };

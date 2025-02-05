@@ -18,9 +18,9 @@ export const IntegerFieldSlider = memo(
         step={step}
         fineStep={fineStep}
         className="nodrag"
-        w="full"
         marks
         withThumbTooltip
+        flex="1 1 0"
       />
     );
   }

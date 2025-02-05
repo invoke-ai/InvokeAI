@@ -187,7 +187,10 @@
         "values": "Values",
         "resetToDefaults": "Reset to Defaults",
         "seed": "Seed",
-        "combinatorial": "Combinatorial"
+        "combinatorial": "Combinatorial",
+        "layout": "Layout",
+        "row": "Row",
+        "column": "Column"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -1694,7 +1697,18 @@
         "download": "Download",
         "copyShareLink": "Copy Share Link",
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
-        "delete": "Delete"
+        "delete": "Delete",
+        "builder": {
+            "layout": "Layout",
+            "row": "Row",
+            "column": "Column",
+            "label": "Label",
+            "description": "Description",
+            "component": "Component",
+            "input": "Input",
+            "slider": "Slider",
+            "both": "Both"
+        }
     },
     "controlLayers": {
         "regional": "Regional",

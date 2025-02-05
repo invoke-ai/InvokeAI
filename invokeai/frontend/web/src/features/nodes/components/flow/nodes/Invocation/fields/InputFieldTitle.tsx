@@ -7,7 +7,7 @@ import { useInputFieldTemplateTitle } from 'features/nodes/hooks/useInputFieldTe
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const labelSx: SystemStyleObject = {
@@ -42,15 +42,17 @@ export const InputFieldTitle = memo((props: Props) => {
 
   const dispatch = useAppDispatch();
   const [isEditing, setIsEditing] = useState(false);
-  const [localTitle, setLocalTitle] = useState(label || fieldTemplateTitle || t('nodes.unknownField'));
+  const initialTitle = useMemo(
+    () => label || fieldTemplateTitle || t('nodes.unknownField'),
+    [fieldTemplateTitle, label, t]
+  );
+  const [localTitle, setLocalTitle] = useState(() => initialTitle);
 
   const onBlur = useCallback(() => {
     const trimmedTitle = localTitle.trim();
     const finalTitle = trimmedTitle || fieldTemplateTitle || t('nodes.unknownField');
-    if (trimmedTitle !== localTitle) {
-      setLocalTitle(finalTitle);
-      dispatch(fieldLabelChanged({ nodeId, fieldName, label: finalTitle }));
-    }
+    setLocalTitle(finalTitle);
+    dispatch(fieldLabelChanged({ nodeId, fieldName, label: finalTitle }));
     setIsEditing(false);
   }, [localTitle, fieldTemplateTitle, t, dispatch, nodeId, fieldName]);
 
@@ -63,11 +65,12 @@ export const InputFieldTitle = memo((props: Props) => {
       if (e.key === 'Enter') {
         onBlur();
       } else if (e.key === 'Escape') {
-        setLocalTitle(label || fieldTemplateTitle || t('nodes.unknownField'));
+        setLocalTitle(initialTitle);
+        onBlur();
         setIsEditing(false);
       }
     },
-    [fieldTemplateTitle, label, onBlur, t]
+    [initialTitle, onBlur]
   );
 
   const onEdit = useCallback(() => {
@@ -76,8 +79,8 @@ export const InputFieldTitle = memo((props: Props) => {
 
   useEffect(() => {
     // Another component may change the title; sync local title with global state
-    setLocalTitle(label || fieldTemplateTitle || t('nodes.unknownField'));
-  }, [label, fieldTemplateTitle, t]);
+    setLocalTitle(initialTitle);
+  }, [label, fieldTemplateTitle, t, initialTitle]);
 
   useEffect(() => {
     if (isEditing) {
