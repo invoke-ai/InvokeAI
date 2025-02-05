@@ -1,28 +1,14 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
+import { Flex } from '@invoke-ai/ui-library';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
+import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { EDIT_MODE_WRAPPER_CLASS_NAME, getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { useDraggableFormElement } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
-import { formElementRemoved } from 'features/nodes/store/workflowSlice';
-import { type FormElement, isContainerElement } from 'features/nodes/types/workflow';
-import { startCase } from 'lodash-es';
+import type { FormElement } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
-import { memo, useCallback, useRef } from 'react';
-import { PiXBold } from 'react-icons/pi';
+import { memo, useRef } from 'react';
 
-const getHeaderLabel = (el: FormElement) => {
-  if (isContainerElement(el)) {
-    if (el.data.direction === 'column') {
-      return 'Column';
-    }
-    return 'Row';
-  }
-  return startCase(el.type);
-};
-
-const wrapperSx: SystemStyleObject = {
+const sx: SystemStyleObject = {
   position: 'relative',
   flexDir: 'column',
   boxShadow: '0 0 0 1px var(--invoke-colors-base-750)',
@@ -40,29 +26,10 @@ const wrapperSx: SystemStyleObject = {
   },
 };
 
-const headerSx: SystemStyleObject = {
-  w: 'full',
-  ps: 2,
-  h: 8,
-  borderTopRadius: 'inherit',
-  borderColor: 'inherit',
-  alignItems: 'center',
-  cursor: 'grab',
-  bg: 'base.700',
-  '&[data-depth="0"]': { bg: 'base.800' },
-  '&[data-depth="1"]': { bg: 'base.800' },
-  '&[data-depth="2"]': { bg: 'base.750' },
-};
-
 export const FormElementEditModeWrapper = memo(({ element, children }: PropsWithChildren<{ element: FormElement }>) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [activeDropRegion, isDragging] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
-  const depth = useDepthContext();
-  const dispatch = useAppDispatch();
-  const removeElement = useCallback(() => {
-    dispatch(formElementRemoved({ id: element.id }));
-  }, [dispatch, element.id]);
 
   return (
     <Flex
@@ -70,25 +37,10 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
       ref={draggableRef}
       className={EDIT_MODE_WRAPPER_CLASS_NAME}
       position="relative"
+      flex={1}
     >
-      <Flex sx={wrapperSx} data-is-dragging={isDragging} data-active-drop-region={activeDropRegion}>
-        <Flex ref={dragHandleRef} sx={headerSx} data-depth={depth}>
-          <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
-            {getHeaderLabel(element)} ({element.id})
-          </Text>
-          <Spacer />
-          {element.parentId && (
-            <IconButton
-              aria-label="delete"
-              onClick={removeElement}
-              icon={<PiXBold />}
-              variant="link"
-              size="sm"
-              alignSelf="stretch"
-              colorScheme="error"
-            />
-          )}
-        </Flex>
+      <Flex sx={sx} data-is-dragging={isDragging} data-active-drop-region={activeDropRegion}>
+        <FormElementEditModeHeader ref={dragHandleRef} element={element} />
         <Flex w="full" p={4} alignItems="center" gap={4}>
           {children}
         </Flex>

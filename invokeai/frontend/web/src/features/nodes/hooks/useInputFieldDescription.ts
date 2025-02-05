@@ -4,7 +4,7 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
-export const useInputFieldNotes = (nodeId: string, fieldName: string) => {
+export const useInputFieldDescription = (nodeId: string, fieldName: string) => {
   const selector = useMemo(
     () =>
       createSelector(selectNodesSlice, (nodes) => {
@@ -12,7 +12,7 @@ export const useInputFieldNotes = (nodeId: string, fieldName: string) => {
         if (!isInvocationNode(node)) {
           return;
         }
-        return node?.data.inputs[fieldName]?.notes;
+        return node?.data.inputs[fieldName]?.description;
       }),
     [fieldName, nodeId]
   );

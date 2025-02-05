@@ -114,6 +114,7 @@ const fieldValueReducer = <T extends FieldValue>(
   if (!field) {
     return;
   }
+  // TODO(psyche): Do we need to do this zod validation? We already have type safety from the action payload...
   const result = schema.safeParse(value);
   if (!result.success) {
     return;
@@ -422,13 +423,13 @@ export const nodesSlice = createSlice({
     fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StringGeneratorFieldValue>) => {
       fieldValueReducer(state, action, zStringGeneratorFieldValue);
     },
-    fieldNotesChanged: (state, action: PayloadAction<{ nodeId: string; fieldName: string; val?: string }>) => {
+    fieldDescriptionChanged: (state, action: PayloadAction<{ nodeId: string; fieldName: string; val?: string }>) => {
       const { nodeId, fieldName, val } = action.payload;
       const field = getField(nodeId, fieldName, state);
       if (!field) {
         return;
       }
-      field.notes = val;
+      field.description = val;
     },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
@@ -514,7 +515,7 @@ export const {
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
-  fieldNotesChanged,
+  fieldDescriptionChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

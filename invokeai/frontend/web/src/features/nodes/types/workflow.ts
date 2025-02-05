@@ -95,11 +95,30 @@ const zElementBase = z.object({
 
 const NODE_FIELD_TYPE = 'node-field';
 export const NODE_FIELD_CLASS_NAME = getPrefixedId(NODE_FIELD_TYPE, '-');
+const FLOAT_FIELD_CONFIG_TYPE = 'float-field-config';
+const zFloatFieldConfig = z.object({
+  configType: z.literal(FLOAT_FIELD_CONFIG_TYPE),
+  component: z.enum(['input', 'slider', 'input-and-slider']),
+});
+const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
+const zIntegerFieldConfig = z.object({
+  configType: z.literal(INTEGER_FIELD_CONFIG_TYPE),
+  component: z.enum(['input', 'slider', 'input-and-slider']),
+});
+const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
+const zStringFieldConfig = z.object({
+  configType: z.literal(STRING_FIELD_CONFIG_TYPE),
+  component: z.enum(['input', 'textarea']),
+});
+const zNodeFieldData = z.object({
+  fieldIdentifier: zFieldIdentifier,
+  withLabel: z.boolean().default(true),
+  withDescription: z.boolean().default(true),
+  config: z.union([zFloatFieldConfig, zIntegerFieldConfig, zStringFieldConfig]).optional(),
+});
 const zNodeFieldElement = zElementBase.extend({
   type: z.literal(NODE_FIELD_TYPE),
-  data: z.object({
-    fieldIdentifier: zFieldIdentifier,
-  }),
+  data: zNodeFieldData,
 });
 export type NodeFieldElement = z.infer<typeof zNodeFieldElement>;
 export const isNodeFieldElement = (el: FormElement): el is NodeFieldElement => el.type === NODE_FIELD_TYPE;
@@ -112,9 +131,7 @@ export const buildNodeField = (
     id: getPrefixedId(NODE_FIELD_TYPE, '-'),
     type: NODE_FIELD_TYPE,
     parentId,
-    data: {
-      fieldIdentifier: { nodeId, fieldName },
-    },
+    data: zNodeFieldData.parse({ fieldIdentifier: { nodeId, fieldName } }),
   };
   return element;
 };
