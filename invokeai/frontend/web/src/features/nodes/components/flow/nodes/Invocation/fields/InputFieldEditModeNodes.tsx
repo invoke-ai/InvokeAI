@@ -1,8 +1,8 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { Flex, FormControl } from '@invoke-ai/ui-library';
+import { Flex, FormControl, Spacer } from '@invoke-ai/ui-library';
 import { firefoxDndFix } from 'features/dnd/util';
-import { FieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldHandle';
+import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { InputFieldNotesIconButtonEditable } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonEditable';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
 import { buildNodeFieldDndData } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
@@ -58,8 +58,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
           />
         </FormControl>
 
-        <FieldHandle
-          handleType="target"
+        <InputFieldHandle
           fieldTemplate={fieldTemplate}
           isConnectionInProgress={isConnectionInProgress}
           isConnectionStartField={isConnectionStartField}
@@ -85,6 +84,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
           <Flex className="nodrag" ref={dragHandleRef} gap={1}>
             <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
+            <Spacer />
             {isHovered && (
               <>
                 <InputFieldNotesIconButtonEditable nodeId={nodeId} fieldName={fieldName} />
@@ -98,8 +98,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
       </FormControl>
 
       {fieldTemplate.input !== 'direct' && (
-        <FieldHandle
-          handleType="target"
+        <InputFieldHandle
           fieldTemplate={fieldTemplate}
           isConnectionInProgress={isConnectionInProgress}
           isConnectionStartField={isConnectionStartField}

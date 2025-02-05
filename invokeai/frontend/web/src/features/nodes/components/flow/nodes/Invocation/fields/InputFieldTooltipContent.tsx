@@ -11,7 +11,7 @@ interface Props {
   fieldName: string;
 }
 
-export const InputFieldTooltip = memo(({ nodeId, fieldName }: Props) => {
+export const InputFieldTooltipContent = memo(({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
 
   const fieldInstance = useInputFieldInstance(nodeId, fieldName);
@@ -46,4 +46,4 @@ export const InputFieldTooltip = memo(({ nodeId, fieldName }: Props) => {
   );
 });
 
-InputFieldTooltip.displayName = 'FieldTooltipContent';
+InputFieldTooltipContent.displayName = 'InputFieldTooltipContent';

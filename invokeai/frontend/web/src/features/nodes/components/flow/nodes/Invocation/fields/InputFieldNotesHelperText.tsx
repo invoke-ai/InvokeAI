@@ -1,6 +1,6 @@
 import type { FormHelperTextProps } from '@invoke-ai/ui-library';
 import { FormHelperText } from '@invoke-ai/ui-library';
-import { useInputFieldNotes } from 'features/nodes/hooks/useInputFieldNotes';
+import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
 import { memo } from 'react';
 
 type Props = FormHelperTextProps & {
@@ -9,7 +9,7 @@ type Props = FormHelperTextProps & {
 };
 
 export const InputFieldNotesHelperText = memo(({ nodeId, fieldName, ...rest }: Props) => {
-  const notes = useInputFieldNotes(nodeId, fieldName);
+  const notes = useInputFieldDescription(nodeId, fieldName);
 
   if (!notes?.trim()) {
     return null;
