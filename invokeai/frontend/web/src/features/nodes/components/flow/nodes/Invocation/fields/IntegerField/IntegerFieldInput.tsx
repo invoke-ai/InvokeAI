@@ -18,7 +18,7 @@ export const IntegerFieldInput = memo(
         step={step}
         fineStep={fineStep}
         className="nodrag"
-        flex={1}
+        flex="1 1 0"
       />
     );
   }

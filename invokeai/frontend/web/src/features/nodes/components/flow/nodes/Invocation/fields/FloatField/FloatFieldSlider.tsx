@@ -19,6 +19,7 @@ export const FloatFieldSlider = memo((props: FieldComponentProps<FloatFieldInput
       className="nodrag"
       marks
       withThumbTooltip
+      flex="1 1 0"
     />
   );
 });

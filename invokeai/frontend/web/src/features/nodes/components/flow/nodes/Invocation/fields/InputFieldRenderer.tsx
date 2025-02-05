@@ -1,4 +1,6 @@
 import { FloatFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInput';
+import { FloatFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInputAndSlider';
+import { FloatFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldSlider';
 import { FloatFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldCollectionInputComponent';
 import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
@@ -153,11 +155,11 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) =>
     if (config?.configType !== 'integer-field-config') {
       return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
-    if (config.component === 'input') {
+    if (config.component === 'number-input') {
       return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     } else if (config.component === 'slider') {
       return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (config.component === 'input-and-slider') {
+    } else if (config.component === 'number-input-and-slider') {
       return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
   }
@@ -166,7 +168,16 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) =>
     if (!isFloatFieldInputInstance(field)) {
       return null;
     }
-    return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    if (config?.configType !== 'float-field-config') {
+      return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    }
+    if (config.component === 'number-input') {
+      return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else if (config.component === 'slider') {
+      return <FloatFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else if (config.component === 'number-input-and-slider') {
+      return <FloatFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+    }
   }
 
   if (isIntegerFieldCollectionInputTemplate(template)) {

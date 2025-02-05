@@ -1,12 +1,12 @@
 import { CompositeNumberInput, CompositeSlider } from '@invoke-ai/ui-library';
+import { useFloatField } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/useFloatField';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
-import { useIntegerField } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/useIntegerField';
-import type { IntegerFieldInputInstance, IntegerFieldInputTemplate } from 'features/nodes/types/field';
+import type { FloatFieldInputInstance, FloatFieldInputTemplate } from 'features/nodes/types/field';
 import { memo } from 'react';
 
-export const IntegerFieldInputAndSlider = memo(
-  (props: FieldComponentProps<IntegerFieldInputInstance, IntegerFieldInputTemplate>) => {
-    const { defaultValue, onChange, value, min, max, step, fineStep } = useIntegerField(props);
+export const FloatFieldInputAndSlider = memo(
+  (props: FieldComponentProps<FloatFieldInputInstance, FloatFieldInputTemplate>) => {
+    const { defaultValue, onChange, value, min, max, step, fineStep } = useFloatField(props);
 
     return (
       <>
@@ -39,4 +39,4 @@ export const IntegerFieldInputAndSlider = memo(
   }
 );
 
-IntegerFieldInputAndSlider.displayName = 'IntegerFieldInputAndSlider';
+FloatFieldInputAndSlider.displayName = 'FloatFieldInputAndSlider ';

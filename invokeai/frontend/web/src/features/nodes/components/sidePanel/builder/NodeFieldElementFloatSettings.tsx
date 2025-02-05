@@ -1,18 +1,18 @@
 import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
-import { type NodeFieldIntegerConfig, zNumberComponent } from 'features/nodes/types/workflow';
+import { type NodeFieldFloatConfig, zNumberComponent } from 'features/nodes/types/workflow';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const NodeFieldElementIntegerConfig = memo(({ id, config }: { id: string; config: NodeFieldIntegerConfig }) => {
+export const NodeFieldElementFloatSettings = memo(({ id, config }: { id: string; config: NodeFieldFloatConfig }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const onChangeComponent = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
-      const newConfig: NodeFieldIntegerConfig = {
+      const newConfig: NodeFieldFloatConfig = {
         ...config,
         component: zNumberComponent.parse(e.target.value),
       };
@@ -32,4 +32,4 @@ export const NodeFieldElementIntegerConfig = memo(({ id, config }: { id: string;
     </FormControl>
   );
 });
-NodeFieldElementIntegerConfig.displayName = 'NodeFieldElementIntegerConfig';
+NodeFieldElementFloatSettings.displayName = 'NodeFieldElementFloatSettings';
