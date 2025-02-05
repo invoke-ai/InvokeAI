@@ -1,19 +1,17 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Tooltip } from '@invoke-ai/ui-library';
-import type { HandleType } from '@xyflow/react';
 import { Handle, Position } from '@xyflow/react';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import type { ValidationResult } from 'features/nodes/store/util/validateConnection';
 import { HANDLE_TOOLTIP_OPEN_DELAY, MODEL_TYPES } from 'features/nodes/types/constants';
-import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
+import type { FieldOutputTemplate } from 'features/nodes/types/field';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  handleType: HandleType;
-  fieldTemplate: FieldInputTemplate | FieldOutputTemplate;
+  fieldTemplate: FieldOutputTemplate;
   isConnectionInProgress: boolean;
   isConnectionStartField: boolean;
   validationResult: ValidationResult;
@@ -49,27 +47,18 @@ const sx = {
   },
 } satisfies SystemStyleObject;
 
-const handleStyleBase = {
+const handleStyles = {
   position: 'absolute',
   width: '1rem',
   height: '1rem',
   zIndex: 1,
   background: 'none',
   border: 'none',
-} satisfies CSSProperties;
-
-const targetHandleStyle = {
-  ...handleStyleBase,
-  insetInlineStart: '-0.5rem',
-} satisfies CSSProperties;
-
-const sourceHandleStyle = {
-  ...handleStyleBase,
   insetInlineEnd: '-0.5rem',
 } satisfies CSSProperties;
 
-export const FieldHandle = memo((props: Props) => {
-  const { fieldTemplate, isConnectionInProgress, isConnectionStartField, validationResult, handleType } = props;
+export const OutputFieldHandle = memo((props: Props) => {
+  const { fieldTemplate, isConnectionInProgress, isConnectionStartField, validationResult } = props;
   const { t } = useTranslation();
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const fieldColor = useMemo(() => getFieldColor(fieldTemplate.type), [fieldTemplate.type]);
@@ -83,17 +72,8 @@ export const FieldHandle = memo((props: Props) => {
   }, [fieldTypeName, isConnectionInProgress, t, validationResult.messageTKey]);
 
   return (
-    <Tooltip
-      label={tooltip}
-      placement={handleType === 'target' ? 'start' : 'end'}
-      openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
-    >
-      <Handle
-        type={handleType}
-        id={fieldTemplate.name}
-        position={handleType === 'target' ? Position.Left : Position.Right}
-        style={handleType === 'target' ? targetHandleStyle : sourceHandleStyle}
-      >
+    <Tooltip label={tooltip} placement="end" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
+      <Handle type="source" id={fieldTemplate.name} position={Position.Right} style={handleStyles}>
         <Box
           sx={sx}
           data-cardinality={fieldTemplate.type.cardinality}
@@ -110,4 +90,4 @@ export const FieldHandle = memo((props: Props) => {
   );
 });
 
-FieldHandle.displayName = 'FieldHandle';
+OutputFieldHandle.displayName = 'OutputFieldHandle';

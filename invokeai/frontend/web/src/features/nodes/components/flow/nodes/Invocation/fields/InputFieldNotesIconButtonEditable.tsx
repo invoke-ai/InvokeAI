@@ -8,8 +8,8 @@ import {
   Textarea,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useInputFieldNotes } from 'features/nodes/hooks/useInputFieldNotes';
-import { fieldNotesChanged } from 'features/nodes/store/nodesSlice';
+import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
+import { fieldDescriptionChanged } from 'features/nodes/store/nodesSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,10 +23,10 @@ type Props = {
 export const InputFieldNotesIconButtonEditable = memo(({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const notes = useInputFieldNotes(nodeId, fieldName);
+  const notes = useInputFieldDescription(nodeId, fieldName);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
-      dispatch(fieldNotesChanged({ nodeId, fieldName, val: e.target.value }));
+      dispatch(fieldDescriptionChanged({ nodeId, fieldName, val: e.target.value }));
     },
     [dispatch, fieldName, nodeId]
   );

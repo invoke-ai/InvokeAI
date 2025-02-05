@@ -3,12 +3,13 @@ import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTempl
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+
 interface Props {
   nodeId: string;
   fieldName: string;
 }
 
-export const OutputFieldTooltip = memo(({ nodeId, fieldName }: Props) => {
+export const OutputFieldTooltipContent = memo(({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useOutputFieldTemplate(nodeId, fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const { t } = useTranslation();
@@ -26,4 +27,4 @@ export const OutputFieldTooltip = memo(({ nodeId, fieldName }: Props) => {
   );
 });
 
-OutputFieldTooltip.displayName = 'OutputFieldTooltip';
+OutputFieldTooltipContent.displayName = 'OutputFieldTooltipContent';

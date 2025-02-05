@@ -1,4 +1,4 @@
-import { FieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/FieldHandle';
+import { OutputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldHandle';
 import { OutputFieldTitle } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldTitle';
 import { OutputFieldWrapper } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldWrapper';
 import { useOutputFieldConnectionState } from 'features/nodes/hooks/useOutputFieldConnectionState';
@@ -27,8 +27,7 @@ export const OutputFieldNodesEditorView = memo(({ nodeId, fieldName }: Props) =>
         fieldName={fieldName}
         isDisabled={(isConnectionInProgress && !validationResult.isValid && !isConnectionStartField) || isConnected}
       />
-      <FieldHandle
-        handleType="source"
+      <OutputFieldHandle
         fieldTemplate={fieldTemplate}
         isConnectionInProgress={isConnectionInProgress}
         isConnectionStartField={isConnectionStartField}

@@ -1,11 +1,10 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Text, Tooltip } from '@invoke-ai/ui-library';
+import { OutputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldTooltipContent';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
-
-import { OutputFieldTooltip } from './OutputFieldTooltip';
 
 const sx = {
   fontSize: 'sm',
@@ -28,10 +27,9 @@ export const OutputFieldTitle = memo(({ nodeId, fieldName, isDisabled }: Props) 
 
   return (
     <Tooltip
-      label={<OutputFieldTooltip nodeId={nodeId} fieldName={fieldName} />}
+      label={<OutputFieldTooltipContent nodeId={nodeId} fieldName={fieldName} />}
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
       placement="top"
-      shouldWrapChildren
     >
       <Text data-is-disabled={isDisabled} sx={sx}>
         {fieldTemplate.title}
