@@ -8,6 +8,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/nanostores/store';
@@ -73,7 +74,7 @@ export const CanvasPasteModal = memo(() => {
               destination === 'assets'
                 ? t('gallery.galleryAssets')
                 : destination === 'canvas'
-                  ? t('controlLayers.canvasOrigin')
+                  ? t('controlLayers.canvasComposition')
                   : t('controlLayers.canvasBbox'),
           }),
           status: 'success',
@@ -111,16 +112,41 @@ export const CanvasPasteModal = memo(() => {
         <ModalHeader>{t('gallery.pasteTo')}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
-          <Flex w="full" gap={2} justifyContent="center" alignItems="center">
-            <Button onClick={pasteToAssets} isDisabled={isLoading}>
-              {t('gallery.galleryAssets')}
-            </Button>
-            <Button onClick={pasteToBbox} isDisabled={isLoading}>
-              {t('controlLayers.canvasBbox')}
-            </Button>
-            <Button onClick={pasteToCanvas} isDisabled={isLoading}>
-              {t('controlLayers.canvasOrigin')}
-            </Button>
+          <Flex flexDir="column" gap={8}>
+            <Flex w="full" gap={2} justifyContent="center" alignItems="center">
+              <Button onClick={pasteToAssets} isDisabled={isLoading}>
+                {t('gallery.pasteToAssets')}
+              </Button>
+              <Button onClick={pasteToBbox} isDisabled={isLoading}>
+                {t('controlLayers.canvasBbox')}
+              </Button>
+              <Button onClick={pasteToCanvas} isDisabled={isLoading}>
+                {t('controlLayers.canvasComposition')}
+              </Button>
+            </Flex>
+            <Flex flexDir="column" gap={2} color="base.300" fontSize="md">
+              <Text fontSize="inherit">
+                <Text as="span" fontSize="inherit" fontWeight="semibold">
+                  {t('gallery.pasteToAssets')}
+                </Text>
+                {': '}
+                {t('gallery.pasteToAssetsDesc')}
+              </Text>
+              <Text fontSize="inherit">
+                <Text as="span" fontSize="inherit" fontWeight="semibold">
+                  {t('controlLayers.canvasBbox')}
+                </Text>
+                {': '}
+                {t('controlLayers.canvasBboxDesc')}
+              </Text>
+              <Text fontSize="inherit">
+                <Text as="span" fontSize="inherit" fontWeight="semibold">
+                  {t('controlLayers.canvasComposition')}
+                </Text>
+                {': '}
+                {t('controlLayers.canvasCompositionDesc')}
+              </Text>
+            </Flex>
           </Flex>
         </ModalBody>
         <ModalFooter>
