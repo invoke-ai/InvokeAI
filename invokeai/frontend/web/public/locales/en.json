@@ -1705,7 +1705,7 @@
             "label": "Label",
             "description": "Description",
             "component": "Component",
-            "input": "Input",
+            "numberInput": "Number Input",
             "slider": "Slider",
             "both": "Both"
         }

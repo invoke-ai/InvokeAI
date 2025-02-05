@@ -10,6 +10,7 @@ import {
   Switch,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { NodeFieldElementFloatSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementFloatSettings';
 import { NodeFieldElementIntegerConfig } from 'features/nodes/components/sidePanel/builder/NodeFieldElementIntegerSettings';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
@@ -33,7 +34,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
   }, [dispatch, id, showDescription]);
 
   return (
-    <Popover>
+    <Popover placement="top">
       <PopoverTrigger>
         <IconButton aria-label="settings" icon={<PiWrenchFill />} variant="link" size="sm" alignSelf="stretch" />
       </PopoverTrigger>
@@ -50,6 +51,9 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
           </FormControl>
           {data.config?.configType === 'integer-field-config' && (
             <NodeFieldElementIntegerConfig id={id} config={data.config} />
+          )}
+          {data.config?.configType === 'float-field-config' && (
+            <NodeFieldElementFloatSettings id={id} config={data.config} />
           )}
         </PopoverBody>
       </PopoverContent>

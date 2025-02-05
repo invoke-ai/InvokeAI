@@ -94,19 +94,21 @@ const zElementBase = z.object({
   data: z.undefined(),
 });
 
+export const zNumberComponent = z.enum(['number-input', 'slider', 'number-input-and-slider']);
+
 const NODE_FIELD_TYPE = 'node-field';
 export const NODE_FIELD_CLASS_NAME = getPrefixedId(NODE_FIELD_TYPE, '-');
 const FLOAT_FIELD_CONFIG_TYPE = 'float-field-config';
 const zFloatFieldConfig = z.object({
   configType: z.literal(FLOAT_FIELD_CONFIG_TYPE).default(FLOAT_FIELD_CONFIG_TYPE),
-  component: z.enum(['input', 'slider', 'input-and-slider']).default('input'),
+  component: zNumberComponent.default('number-input'),
 });
 export type NodeFieldFloatConfig = z.infer<typeof zFloatFieldConfig>;
 
 const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
 const zIntegerFieldConfig = z.object({
   configType: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
-  component: z.enum(['input', 'slider', 'input-and-slider']).default('input'),
+  component: zNumberComponent.default('number-input'),
 });
 export type NodeFieldIntegerConfig = z.infer<typeof zIntegerFieldConfig>;
 
@@ -135,12 +137,20 @@ export const buildNodeField = (
 ): NodeFieldElement => {
   let config: NodeFieldElement['data']['config'] = undefined;
 
-  if (fieldType.name === 'IntegerField') {
+  if (fieldType.name === 'IntegerField' && fieldType.cardinality === 'SINGLE') {
     config = {
       configType: 'integer-field-config',
-      component: 'input',
+      component: 'number-input',
     };
   }
+
+  if (fieldType.name === 'FloatField' && fieldType.cardinality === 'SINGLE') {
+    config = {
+      configType: 'float-field-config',
+      component: 'number-input',
+    };
+  }
+
   const element: NodeFieldElement = {
     id: getPrefixedId(NODE_FIELD_TYPE, '-'),
     type: NODE_FIELD_TYPE,
