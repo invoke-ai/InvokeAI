@@ -429,7 +429,7 @@ export const nodesSlice = createSlice({
       if (!field) {
         return;
       }
-      field.description = val;
+      field.description = val || '';
     },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
