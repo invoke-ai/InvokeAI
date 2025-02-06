@@ -68,6 +68,15 @@ Ensure that you checked **Add python.exe to PATH** when installing Python. This 
 
 This can be safely ignored. InvokeAI doesn't use Triton, but if you are on Linux and wish to dismiss the error, you can install Triton.
 
+## Unable to Copy on Firefox
+
+Firefox does not allow Invoke to directly access the clipboard by default. As a result, you may be unable to use certain copy functions. You can fix this by configuring Firefox to allow access to write to the clipboard:
+
+- Go to `about:config` and click the Accept button
+- Search for `dom.events.asyncClipboard.clipboardItem`
+- Set it to `true` by clicking the toggle button
+- Restart Firefox
+
 ## Updated to 3.4.0 and xformers can’t load C++/CUDA
 
 An issue occurred with your PyTorch update. Follow these steps to fix :
@@ -196,7 +205,7 @@ tips to reduce the problem:
     === "12GB VRAM GPU"
 
         This should be sufficient to generate larger images up to about 1280x1280.
-  
+
 ## Checkpoint Models Load Slowly or Use Too Much RAM
 
 The difference between diffusers models (a folder containing multiple
