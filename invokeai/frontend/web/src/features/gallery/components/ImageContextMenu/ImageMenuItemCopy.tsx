@@ -8,15 +8,11 @@ import { PiCopyBold } from 'react-icons/pi';
 export const ImageMenuItemCopy = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
-  const { isClipboardAPIAvailable, copyImageToClipboard } = useCopyImageToClipboard();
+  const copyImageToClipboard = useCopyImageToClipboard();
 
   const onClick = useCallback(() => {
     copyImageToClipboard(imageDTO.image_url);
   }, [copyImageToClipboard, imageDTO.image_url]);
-
-  if (!isClipboardAPIAvailable) {
-    return null;
-  }
 
   return (
     <IconMenuItem
