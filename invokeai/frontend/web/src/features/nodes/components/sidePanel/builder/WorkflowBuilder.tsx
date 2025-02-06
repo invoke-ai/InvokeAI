@@ -12,7 +12,7 @@ import {
   useRootContainerDropTarget,
 } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import {
-  formModeToggled,
+  formModeChanged,
   formReset,
   selectFormIsEmpty,
   selectFormLayout,
@@ -37,19 +37,30 @@ export const WorkflowBuilder = memo(() => {
     dispatch(formReset());
   }, [dispatch]);
 
+  const setToViewMode = useCallback(() => {
+    dispatch(formModeChanged({ mode: 'view' }));
+  }, [dispatch]);
+
+  const setToEditMode = useCallback(() => {
+    dispatch(formModeChanged({ mode: 'edit' }));
+  }, [dispatch]);
+
   return (
     <ScrollableContent>
       <Flex justifyContent="center" w="full" h="full" p={4}>
         <Flex flexDir="column" w={mode === 'view' ? '512px' : 'min-content'} h="full" minW="512px" gap={4}>
-          <ButtonGroup isAttached={false} justifyContent="center">
-            <ToggleModeButton />
-            <AddFormElementDndButton type="row" />
-            <AddFormElementDndButton type="column" />
-            <AddFormElementDndButton type="divider" />
-            <AddFormElementDndButton type="heading" />
-            <AddFormElementDndButton type="text" />
-            <Button onClick={resetForm}>{t('common.reset')}</Button>
-          </ButtonGroup>
+          {mode === 'edit' && (
+            <ButtonGroup isAttached={false} justifyContent="center">
+              <AddFormElementDndButton type="row" />
+              <AddFormElementDndButton type="column" />
+              <AddFormElementDndButton type="divider" />
+              <AddFormElementDndButton type="heading" />
+              <AddFormElementDndButton type="text" />
+              <Button onClick={setToViewMode}>{t('common.view')}</Button>
+              <Button onClick={resetForm}>{t('common.reset')}</Button>
+            </ButtonGroup>
+          )}
+          {mode === 'view' && !isEmpty && <Button onClick={setToEditMode}>{t('common.edit')}</Button>}
           {!isEmpty && <FormLayout />}
           {mode === 'view' && isEmpty && <EmptyStateViewMode />}
           {mode === 'edit' && isEmpty && <EmptyStateEditMode />}
@@ -76,8 +87,8 @@ FormLayout.displayName = 'FormLayout';
 const EmptyStateViewMode = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const toggleMode = useCallback(() => {
-    dispatch(formModeToggled());
+  const setToEditMode = useCallback(() => {
+    dispatch(formModeChanged({ mode: 'edit' }));
   }, [dispatch]);
 
   return (
@@ -85,7 +96,7 @@ const EmptyStateViewMode = memo(() => {
       <Text variant="subtext" fontSize="md">
         {t('workflows.builder.emptyRootPlaceholderViewMode')}
       </Text>
-      <Button onClick={toggleMode}>{t('common.edit')}</Button>
+      <Button onClick={setToEditMode}>{t('common.edit')}</Button>
     </Flex>
   );
 });
@@ -115,18 +126,6 @@ const EmptyStateEditMode = memo(() => {
   );
 });
 EmptyStateEditMode.displayName = 'EmptyStateEditMode';
-
-const ToggleModeButton = memo(() => {
-  const dispatch = useAppDispatch();
-  const mode = useAppSelector(selectWorkflowFormMode);
-
-  const onClick = useCallback(() => {
-    dispatch(formModeToggled());
-  }, [dispatch]);
-
-  return <Button onClick={onClick}>{mode === 'view' ? 'Edit' : 'View'}</Button>;
-});
-ToggleModeButton.displayName = 'ToggleModeButton';
 
 const useAddFormElementDnd = (
   type: Exclude<FormElement['type'], 'node-field' | 'container'> | 'row' | 'column',

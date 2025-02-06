@@ -227,8 +227,9 @@ export const workflowSlice = createSlice({
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
     },
-    formModeToggled: (state) => {
-      state.formMode = state.formMode === 'edit' ? 'view' : 'edit';
+    formModeChanged: (state, action: PayloadAction<{ mode: 'view' | 'edit' }>) => {
+      const { mode } = action.payload;
+      state.formMode = mode;
     },
   },
   extraReducers: (builder) => {
@@ -364,7 +365,7 @@ export const {
   formElementTextDataChanged,
   formElementNodeFieldDataChanged,
   formElementContainerDataChanged,
-  formModeToggled,
+  formModeChanged,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -498,81 +499,6 @@ const reparentElement = (args: {
 
   // We should never get here!
 };
-
-// const moveElement = (args: {
-//   formState: NonNullable<WorkflowV3['form']>;
-//   id: string;
-//   containerId?: string;
-//   index?: number;
-// }) => {
-//   const { formState, id, containerId, index } = args;
-//   const { elements } = formState;
-
-//   const element = elements[id];
-
-//   // Bail if the element doesn't exist
-//   if (!element) {
-//     return;
-//   }
-
-//   // The element is being moved within the root
-//   if (containerId === undefined && element.parentId === undefined) {
-//     formState.layout.splice(index ?? formState.layout.length, 0, id);
-//     return;
-//   }
-
-//   // The element is being moved within its current container
-//   if (containerId !== undefined && element.parentId !== undefined && containerId === element.parentId) {
-//     const parent = formState.elements[element.parentId];
-//     if (!parent || !isContainerElement(parent)) {
-//       return;
-//     }
-//     parent.data.children.splice(index ?? parent.data.children.length, 0, id);
-//     return;
-//   }
-
-//   // Element is being moved from a container to the root
-//   if (!containerId && element.parentId !== undefined) {
-//     const oldParent = formState.elements[element.parentId];
-//     if (!oldParent || !isContainerElement(oldParent)) {
-//       return;
-//     }
-//     oldParent.data.children = oldParent.data.children.filter((childId) => childId !== id);
-//     formState.layout.splice(index || formState.layout.length, 0, id);
-//     element.parentId = undefined;
-//     return;
-//   }
-
-//   // Element is being moved from the root to a container
-//   if (containerId && element.parentId === undefined) {
-//     const newParent = formState.elements[containerId];
-//     if (!newParent || !isContainerElement(newParent)) {
-//       return;
-//     }
-//     newParent.data.children.splice(index ?? newParent.data.children.length, 0, id);
-//     formState.layout = formState.layout.filter((elId) => elId !== id);
-//     element.parentId = containerId;
-//     return;
-//   }
-
-//   // Element is being moved from one container to another
-//   if (containerId !== undefined && element.parentId !== undefined && containerId !== element.parentId) {
-//     const oldParent = formState.elements[element.parentId];
-//     if (!oldParent || !isContainerElement(oldParent)) {
-//       return;
-//     }
-//     const newParent = formState.elements[containerId];
-//     if (!newParent || !isContainerElement(newParent)) {
-//       return;
-//     }
-//     oldParent.data.children = oldParent.data.children.filter((childId) => childId !== id);
-//     newParent.data.children.splice(index ?? newParent.data.children.length, 0, id);
-//     element.parentId = containerId;
-//     return;
-//   }
-
-//   // Should never get here - we've covered all cases
-// };
 
 const addElement = (args: {
   formState: NonNullable<WorkflowV3['form']>;
