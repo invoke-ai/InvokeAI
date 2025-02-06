@@ -75,7 +75,7 @@ export const InputFieldTitle = memo((props: Props) => {
     );
   }
 
-  return <Input ref={inputRef} variant="unstyled" {...editable.inputProps} />;
+  return <Input ref={inputRef} variant="outline" {...editable.inputProps} />;
 });
 
 InputFieldTitle.displayName = 'InputFieldTitle';

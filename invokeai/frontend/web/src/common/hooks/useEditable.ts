@@ -21,7 +21,8 @@ export const useEditable = ({ value, defaultValue, onChange: _onChange, onStartE
       _onChange(newValue);
     }
     setIsEditing(false);
-  }, [localValue, defaultValue, value, _onChange]);
+    inputRef.current?.setSelectionRange(0, 0);
+  }, [localValue, defaultValue, value, inputRef, _onChange]);
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setLocalValue(e.target.value);
