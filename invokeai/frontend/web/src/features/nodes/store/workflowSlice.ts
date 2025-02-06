@@ -21,12 +21,7 @@ import type {
   WorkflowCategory,
   WorkflowV3,
 } from 'features/nodes/types/workflow';
-import {
-  isContainerElement,
-  isHeadingElement,
-  isNodeFieldElement,
-  isTextElement,
-} from 'features/nodes/types/workflow';
+import { isContainerElement, isHeadingElement, isNodeFieldElement, isTextElement } from 'features/nodes/types/workflow';
 import { isEqual, omit, uniqBy } from 'lodash-es';
 import { useMemo } from 'react';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
@@ -268,7 +263,8 @@ export const workflowSlice = createSlice({
       // updated nodes. In this case, we should not remove the exposed fields. To handle this, we find the last remove
       // and add changes for each exposed field. If the remove change comes after the add change, we remove the exposed
       // field.
-      const exposedFieldsToRemove: FieldIdentifier[] = [];
+      const fieldsToRemove: FieldIdentifier[] = [];
+
       state.exposedFields.forEach((field) => {
         const removeIndex = action.payload.findLastIndex(
           (change) => change.type === 'remove' && change.id === field.nodeId
@@ -277,13 +273,22 @@ export const workflowSlice = createSlice({
           (change) => change.type === 'add' && change.item.id === field.nodeId
         );
         if (removeIndex > addIndex) {
-          exposedFieldsToRemove.push({ nodeId: field.nodeId, fieldName: field.fieldName });
+          fieldsToRemove.push({ nodeId: field.nodeId, fieldName: field.fieldName });
         }
       });
+      state.exposedFields = state.exposedFields.filter((field) => !fieldsToRemove.some((f) => isEqual(f, field)));
 
-      state.exposedFields = state.exposedFields.filter(
-        (field) => !exposedFieldsToRemove.some((f) => isEqual(f, field))
-      );
+      for (const el of Object.values(state.form?.elements || {})) {
+        if (!isNodeFieldElement(el)) {
+          continue;
+        }
+        const { nodeId } = el.data.fieldIdentifier;
+        const removeIndex = action.payload.findLastIndex((change) => change.type === 'remove' && change.id === nodeId);
+        const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
+        if (removeIndex > addIndex) {
+          delete state.form?.elements[el.id];
+        }
+      }
 
       // Not all changes to nodes should result in the workflow being marked touched
       const filteredChanges = action.payload.filter((change) => {
@@ -302,7 +307,7 @@ export const workflowSlice = createSlice({
         return false;
       });
 
-      if (filteredChanges.length > 0 || exposedFieldsToRemove.length > 0) {
+      if (filteredChanges.length > 0 || fieldsToRemove.length > 0) {
         state.isTouched = true;
       }
     });
