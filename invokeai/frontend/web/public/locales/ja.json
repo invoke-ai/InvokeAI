@@ -106,7 +106,6 @@
         "featuresWillReset": "この画像を削除すると、これらの機能は即座にリセットされます。",
         "unstarImage": "スターを外す",
         "loading": "ロード中",
-        "assets": "アセット",
         "currentlyInUse": "この画像は現在下記の機能を使用しています:",
         "drop": "ドロップ",
         "dropOrUpload": "$t(gallery.drop) またはアップロード",

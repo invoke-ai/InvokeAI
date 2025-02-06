@@ -195,7 +195,6 @@
     },
     "gallery": {
         "deleteImagePermanent": "Silinen görseller geri getirilemez.",
-        "assets": "Özkaynaklar",
         "autoAssignBoardOnClick": "Tıklanan Panoya Otomatik Atama",
         "loading": "Yükleniyor",
         "starImage": "Yıldız Koy",
