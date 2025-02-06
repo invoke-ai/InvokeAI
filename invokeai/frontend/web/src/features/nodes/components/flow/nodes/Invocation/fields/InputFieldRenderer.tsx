@@ -134,10 +134,17 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) =>
     if (!isStringFieldInputInstance(field)) {
       return null;
     }
-    if (template.ui_component === 'textarea') {
-      return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else {
+    if (config?.configType !== 'string-field-config') {
+      if (template.ui_component === 'textarea') {
+        return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
+      } else {
+        return <StringFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+      }
+    }
+    if (config.component === 'input') {
       return <StringFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else if (config.component === 'textarea') {
+      return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
   }
 
