@@ -151,23 +151,26 @@ export const useMonitorForFormElementDnd = () => {
         if (isFormElementDndData(targetData)) {
           const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
 
-          if (isAddingNewElement && targetData.element.parentId === undefined && closestEdgeOfTarget === 'center') {
+          const targetElement = getElement(targetData.element.id);
+          const sourceElement = getElement(sourceData.element.id);
+
+          if (isAddingNewElement && targetElement.parentId === undefined && closestEdgeOfTarget === 'center') {
             log.debug('Adding new element to empty container');
-            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            assert(isContainerElement(targetElement), 'Expected target to be a container');
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
-                containerId: targetData.element.id,
+                element: sourceElement,
+                containerId: targetElement.id,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
 
-          if (isAddingNewElement && targetData.element.parentId === undefined && closestEdgeOfTarget !== 'center') {
+          if (isAddingNewElement && targetElement.parentId === undefined && closestEdgeOfTarget !== 'center') {
             log.debug('Inserting new element into root');
             const layout = getLayout();
-            const indexOfTarget = layout.indexOf(targetData.element.id);
+            const indexOfTarget = layout.indexOf(targetElement.id);
             const index = getReorderDestinationIndex({
               startIndex: indexOfTarget + 1,
               indexOfTarget,
@@ -176,33 +179,33 @@ export const useMonitorForFormElementDnd = () => {
             });
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
+                element: sourceElement,
                 containerId: undefined,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
 
-          if (isAddingNewElement && targetData.element.parentId !== undefined && closestEdgeOfTarget === 'center') {
+          if (isAddingNewElement && targetElement.parentId !== undefined && closestEdgeOfTarget === 'center') {
             log.debug('Adding new element to empty container');
-            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            assert(isContainerElement(targetElement), 'Expected target to be a container');
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
-                containerId: targetData.element.id,
+                element: sourceElement,
+                containerId: targetElement.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
 
-          if (isAddingNewElement && targetData.element.parentId !== undefined && closestEdgeOfTarget !== 'center') {
+          if (isAddingNewElement && targetElement.parentId !== undefined && closestEdgeOfTarget !== 'center') {
             log.debug('Inserting new element into container');
-            const container = getElement(targetData.element.parentId, isContainerElement);
-            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const container = getElement(targetElement.parentId, isContainerElement);
+            const indexOfTarget = container.data.children.indexOf(targetElement.id);
             const index = getReorderDestinationIndex({
               startIndex: indexOfTarget + 1,
               indexOfTarget,
@@ -211,11 +214,11 @@ export const useMonitorForFormElementDnd = () => {
             });
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
+                element: sourceElement,
                 containerId: container.id,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -223,32 +226,32 @@ export const useMonitorForFormElementDnd = () => {
           // Moving an existing element within the root
           if (
             !isAddingNewElement &&
-            targetData.element.parentId === undefined &&
-            sourceData.element.parentId === undefined &&
+            targetElement.parentId === undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget === 'center'
           ) {
             log.debug('Reparenting element from root to empty container');
-            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            assert(isContainerElement(targetElement), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                containerId: targetElement.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
           if (
             !isAddingNewElement &&
-            targetData.element.parentId === undefined &&
-            sourceData.element.parentId === undefined &&
+            targetElement.parentId === undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.debug('Moving element within root');
             const layout = getLayout();
-            const startIndex = layout.indexOf(sourceData.element.id);
-            const indexOfTarget = layout.indexOf(targetData.element.id);
+            const startIndex = layout.indexOf(sourceElement.id);
+            const indexOfTarget = layout.indexOf(targetElement.id);
             const reorderedLayout = reorderWithEdge({
               list: layout,
               startIndex,
@@ -260,7 +263,7 @@ export const useMonitorForFormElementDnd = () => {
               formRootReordered({
                 layout: reorderedLayout,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -268,35 +271,35 @@ export const useMonitorForFormElementDnd = () => {
           // Moving an existing element within a container
           if (
             !isAddingNewElement &&
-            targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId === sourceData.element.parentId &&
+            targetElement.parentId !== undefined &&
+            sourceElement.parentId !== undefined &&
+            targetElement.parentId === sourceElement.parentId &&
             closestEdgeOfTarget === 'center'
           ) {
             log.debug('Reparenting element from a container to an empty container with same parent');
-            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            assert(isContainerElement(targetElement), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                containerId: targetElement.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
 
           if (
             !isAddingNewElement &&
-            targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId === sourceData.element.parentId &&
+            targetElement.parentId !== undefined &&
+            sourceElement.parentId !== undefined &&
+            targetElement.parentId === sourceElement.parentId &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.debug('Moving element within container');
-            const container = getElement(targetData.element.parentId, isContainerElement);
-            const startIndex = container.data.children.indexOf(sourceData.element.id);
-            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const container = getElement(targetElement.parentId, isContainerElement);
+            const startIndex = container.data.children.indexOf(sourceElement.id);
+            const indexOfTarget = container.data.children.indexOf(targetElement.id);
             const reorderedLayout = reorderWithEdge({
               list: container.data.children,
               startIndex,
@@ -309,7 +312,7 @@ export const useMonitorForFormElementDnd = () => {
                 containerId: container.id,
                 children: reorderedLayout,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -317,34 +320,34 @@ export const useMonitorForFormElementDnd = () => {
           // Moving an existing element within a container
           if (
             !isAddingNewElement &&
-            targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId !== sourceData.element.parentId &&
+            targetElement.parentId !== undefined &&
+            sourceElement.parentId !== undefined &&
+            targetElement.parentId !== sourceElement.parentId &&
             closestEdgeOfTarget === 'center'
           ) {
             log.debug('Reparenting element from one container to an empty container with different parent');
-            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            assert(isContainerElement(targetElement), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                containerId: targetElement.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
 
           if (
             !isAddingNewElement &&
-            targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId !== sourceData.element.parentId &&
+            targetElement.parentId !== undefined &&
+            sourceElement.parentId !== undefined &&
+            targetElement.parentId !== sourceElement.parentId &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.debug('Moving element from one container to another');
-            const container = getElement(targetData.element.parentId, isContainerElement);
-            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const container = getElement(targetElement.parentId, isContainerElement);
+            const indexOfTarget = container.data.children.indexOf(targetElement.id);
             const index = getReorderDestinationIndex({
               startIndex: container.data.children.length + 1,
               indexOfTarget,
@@ -353,11 +356,11 @@ export const useMonitorForFormElementDnd = () => {
             });
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
+                id: sourceElement.id,
                 containerId: container.id,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -365,31 +368,31 @@ export const useMonitorForFormElementDnd = () => {
           // Moving an existing element from a container to root
           if (
             !isAddingNewElement &&
-            targetData.element.parentId === undefined &&
-            sourceData.element.parentId !== undefined &&
+            targetElement.parentId === undefined &&
+            sourceElement.parentId !== undefined &&
             closestEdgeOfTarget === 'center'
           ) {
             log.debug('Reparenting element from container to empty container');
-            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            assert(isContainerElement(targetElement), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                containerId: targetElement.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
           if (
             !isAddingNewElement &&
-            targetData.element.parentId === undefined &&
-            sourceData.element.parentId !== undefined &&
+            targetElement.parentId === undefined &&
+            sourceElement.parentId !== undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.debug('Reparenting element from container to root');
             const layout = getLayout();
-            const indexOfTarget = layout.indexOf(targetData.element.id);
+            const indexOfTarget = layout.indexOf(targetElement.id);
             const index = getReorderDestinationIndex({
               startIndex: layout.length + 1,
               indexOfTarget,
@@ -398,11 +401,11 @@ export const useMonitorForFormElementDnd = () => {
             });
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
+                id: sourceElement.id,
                 containerId: undefined,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -410,32 +413,32 @@ export const useMonitorForFormElementDnd = () => {
           // Moving an existing element from root to a container
           if (
             !isAddingNewElement &&
-            targetData.element.parentId !== undefined &&
-            sourceData.element.parentId === undefined &&
+            targetElement.parentId !== undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget === 'center'
           ) {
             log.debug('Reparenting element from root to empty container');
-            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            assert(isContainerElement(targetElement), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                containerId: targetElement.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
 
           if (
             !isAddingNewElement &&
-            targetData.element.parentId !== undefined &&
-            sourceData.element.parentId === undefined &&
+            targetElement.parentId !== undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.debug('Reparenting element from root to container');
-            const container = getElement(targetData.element.parentId, isContainerElement);
-            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const container = getElement(targetElement.parentId, isContainerElement);
+            const indexOfTarget = container.data.children.indexOf(targetElement.id);
             const index = getReorderDestinationIndex({
               startIndex: indexOfTarget + 1,
               indexOfTarget,
@@ -444,15 +447,16 @@ export const useMonitorForFormElementDnd = () => {
             });
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.parentId,
+                id: sourceElement.id,
+                containerId: targetElement.parentId,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
         }
+        //#endregion
 
         log.warn(parseify({ targetData, sourceData }), 'Unhandled drop event!');
       },
