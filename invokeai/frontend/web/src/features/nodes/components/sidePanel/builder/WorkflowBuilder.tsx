@@ -1,6 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
@@ -24,7 +24,7 @@ export const WorkflowBuilder = memo(() => {
 
   return (
     <ScrollableContent>
-      <Flex w="full" justifyContent="center">
+      <Flex justifyContent="center">
         <Flex flexDir="column" w={mode === 'view' ? '512px' : 'min-content'} minW="512px" gap={2}>
           <ButtonGroup isAttached={false} justifyContent="center">
             <ToggleModeButton />
@@ -35,13 +35,42 @@ export const WorkflowBuilder = memo(() => {
             <AddFormElementDndButton type="text" />
           </ButtonGroup>
           {rootElementId && <FormElementComponent id={rootElementId} />}
+          {!rootElementId && <EmptyState />}
         </Flex>
       </Flex>
     </ScrollableContent>
   );
 });
-
 WorkflowBuilder.displayName = 'WorkflowBuilder';
+
+const EmptyState = memo(() => {
+  const mode = useAppSelector(selectWorkflowFormMode);
+  const dispatch = useAppDispatch();
+
+  const toggleMode = useCallback(() => {
+    dispatch(formModeToggled());
+  }, [dispatch]);
+
+  const addContainer = useCallback(() => {}, []);
+
+  if (mode === 'view') {
+    return (
+      <Flex flexDir="column" gap={4} w="full" h="full" justifyContent="center" alignItems="center">
+        <Text variant="subtext" fontSize="md">
+          Click Edit to build a form for this workflow.
+        </Text>
+        <Button onClick={toggleMode}>Edit</Button>
+      </Flex>
+    );
+  }
+
+  <Flex flexDir="column" gap={4} w="full" h="full" justifyContent="center" alignItems="center">
+    <Text variant="subtext" fontSize="md">
+      No form elements added. Click a button above to add a form element.
+    </Text>
+  </Flex>;
+});
+EmptyState.displayName = 'EmptyState';
 
 const ToggleModeButton = memo(() => {
   const dispatch = useAppDispatch();
@@ -57,7 +86,8 @@ ToggleModeButton.displayName = 'ToggleModeButton';
 
 const useAddFormElementDnd = (
   type: Exclude<FormElement['type'], 'node-field' | 'container'> | 'row' | 'column',
-  draggableRef: RefObject<HTMLElement>
+  draggableRef: RefObject<HTMLElement>,
+  isEnabled = true
 ) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -70,6 +100,7 @@ const useAddFormElementDnd = (
       firefoxDndFix(draggableElement),
       draggable({
         element: draggableElement,
+        canDrag: () => isEnabled,
         getInitialData: () => {
           if (type === 'row') {
             const element = buildContainer('row', []);
@@ -101,17 +132,29 @@ const useAddFormElementDnd = (
         },
       })
     );
-  }, [draggableRef, type]);
+  }, [draggableRef, isEnabled, type]);
 
   return isDragging;
 };
 
 const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormElementDnd>[0] }) => {
-  const draggableRef = useRef<HTMLButtonElement>(null);
+  const draggableRef = useRef<HTMLDivElement>(null);
+  const rootElementId = useAppSelector(selectRootElementId);
   const isDragging = useAddFormElementDnd(type, draggableRef);
 
   return (
-    <Button ref={draggableRef} variant="ghost" pointerEvents="auto" opacity={isDragging ? 0.3 : 1}>
+    <Button
+      ref={draggableRef}
+      variant="unstyled"
+      borderWidth={2}
+      borderStyle="dashed"
+      borderRadius="base"
+      px={4}
+      py={1}
+      cursor="grab"
+      _hover={{ bg: 'base.800' }}
+      isDisabled={isDragging || (type !== 'row' && type !== 'column' && !rootElementId)}
+    >
       {startCase(type)}
     </Button>
   );

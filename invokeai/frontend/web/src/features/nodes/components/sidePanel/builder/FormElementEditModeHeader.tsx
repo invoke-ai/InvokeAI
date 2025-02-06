@@ -52,17 +52,15 @@ export const FormElementEditModeHeader = memo(
         <Spacer />
         {isContainerElement(element) && <ContainerElementSettings element={element} />}
         {isNodeFieldElement(element) && <NodeFieldElementSettings element={element} />}
-        {element.parentId && (
-          <IconButton
-            aria-label="delete"
-            onClick={removeElement}
-            icon={<PiXBold />}
-            variant="link"
-            size="sm"
-            alignSelf="stretch"
-            colorScheme="error"
-          />
-        )}
+        <IconButton
+          aria-label="delete"
+          onClick={removeElement}
+          icon={<PiXBold />}
+          variant="link"
+          size="sm"
+          alignSelf="stretch"
+          colorScheme="error"
+        />
       </Flex>
     );
   })
