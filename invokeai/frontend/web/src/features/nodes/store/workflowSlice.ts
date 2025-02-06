@@ -302,7 +302,7 @@ export const workflowSlice = createSlice({
         const removeIndex = action.payload.findLastIndex((change) => change.type === 'remove' && change.id === nodeId);
         const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
         if (removeIndex > addIndex) {
-          delete state.form?.elements[el.id];
+          removeElement({ formState: state.form, id: el.id });
         }
       }
 
