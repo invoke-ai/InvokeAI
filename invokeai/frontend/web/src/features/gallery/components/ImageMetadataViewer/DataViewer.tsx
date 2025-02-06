@@ -1,5 +1,6 @@
 import { Box, Flex, IconButton, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { useClipboard } from 'common/hooks/useClipboard';
 import { Formatter } from 'fracturedjsonjs';
 import { isString } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -25,9 +26,10 @@ const DataViewer = (props: Props) => {
   const { label, data, fileName, withDownload = true, withCopy = true, extraCopyActions } = props;
   const dataString = useMemo(() => (isString(data) ? data : formatter.Serialize(data)) ?? '', [data]);
   const shift = useShiftModifier();
+  const clipboard = useClipboard();
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(dataString);
-  }, [dataString]);
+    clipboard.writeText(dataString);
+  }, [clipboard, dataString]);
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([dataString]);
@@ -94,9 +96,10 @@ type ExtraCopyActionProps = {
 };
 const ExtraCopyAction = ({ label, data, getData }: ExtraCopyActionProps) => {
   const { t } = useTranslation();
+  const clipboard = useClipboard();
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(JSON.stringify(getData(data), null, 2));
-  }, [data, getData]);
+    clipboard.writeText(JSON.stringify(getData(data), null, 2));
+  }, [clipboard, data, getData]);
 
   return (
     <Tooltip label={`${t('gallery.copy')} ${label} JSON`}>

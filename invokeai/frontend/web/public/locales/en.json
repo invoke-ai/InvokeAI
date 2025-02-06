@@ -1266,7 +1266,10 @@
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
         "workflowDeleted": "Workflow Deleted",
-        "problemDeletingWorkflow": "Problem Deleting Workflow"
+        "problemDeletingWorkflow": "Problem Deleting Workflow",
+        "unableToCopy": "Unable to Copy",
+        "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
+        "unableToCopyDesc_theseSteps": "these steps"
     },
     "popovers": {
         "clipSkip": {
