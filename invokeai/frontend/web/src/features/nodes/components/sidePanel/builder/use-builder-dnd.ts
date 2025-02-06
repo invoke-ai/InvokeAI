@@ -223,7 +223,6 @@ export const useMonitorForFormElementDnd = () => {
             return;
           }
 
-          // Moving an existing element within the root
           if (
             !isAddingNewElement &&
             targetElement.parentId === undefined &&
@@ -242,6 +241,7 @@ export const useMonitorForFormElementDnd = () => {
             );
             return;
           }
+
           if (
             !isAddingNewElement &&
             targetElement.parentId === undefined &&
@@ -268,7 +268,6 @@ export const useMonitorForFormElementDnd = () => {
             return;
           }
 
-          // Moving an existing element within a container
           if (
             !isAddingNewElement &&
             targetElement.parentId !== undefined &&
@@ -317,7 +316,6 @@ export const useMonitorForFormElementDnd = () => {
             return;
           }
 
-          // Moving an existing element within a container
           if (
             !isAddingNewElement &&
             targetElement.parentId !== undefined &&
@@ -365,7 +363,6 @@ export const useMonitorForFormElementDnd = () => {
             return;
           }
 
-          // Moving an existing element from a container to root
           if (
             !isAddingNewElement &&
             targetElement.parentId === undefined &&
@@ -410,7 +407,6 @@ export const useMonitorForFormElementDnd = () => {
             return;
           }
 
-          // Moving an existing element from root to a container
           if (
             !isAddingNewElement &&
             targetElement.parentId !== undefined &&
