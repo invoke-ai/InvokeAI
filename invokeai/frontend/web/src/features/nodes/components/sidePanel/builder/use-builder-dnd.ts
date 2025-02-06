@@ -28,8 +28,9 @@ import type { FieldIdentifier, FieldInputTemplate } from 'features/nodes/types/f
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, isContainerElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
+import type { Param0 } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('dnd');
@@ -87,6 +88,16 @@ const flashElement = (elementId: ElementId) => {
 export const useMonitorForFormElementDnd = () => {
   const dispatch = useAppDispatch();
 
+  const dispatchAndFlash = useCallback(
+    (action: Param0<typeof dispatch>, elementId: ElementId) => {
+      flushSync(() => {
+        dispatch(action);
+      });
+      flashElement(elementId);
+    },
+    [dispatch]
+  );
+
   useEffect(() => {
     return monitorForElements({
       canMonitor: ({ source }) => isFormElementDndData(source.data),
@@ -109,23 +120,34 @@ export const useMonitorForFormElementDnd = () => {
 
         const isAddingNewElement = !elementExists(sourceData.element.id);
 
-        // Appending a new element to the root container
         if (isAddingNewElement && isRootContainerDndData(targetData)) {
           log.debug('Adding new element to empty root');
-          flushSync(() => {
-            dispatch(
-              formElementAdded({
-                element: sourceData.element,
-                containerId: undefined,
-                index: undefined,
-              })
-            );
-          });
-          flashElement(sourceData.element.id);
+          dispatchAndFlash(
+            formElementAdded({
+              element: sourceData.element,
+              containerId: undefined,
+              index: undefined,
+            }),
+            sourceData.element.id
+          );
           return;
         }
 
-        // Inserting a new element - maybe to root, maybe to a container
+        // Reparenting an existing element to the root, appending it to the end
+        if (!isAddingNewElement && isRootContainerDndData(targetData) && sourceData.element.parentId !== undefined) {
+          log.debug('Reparenting element from container to empty root');
+
+          dispatchAndFlash(
+            formElementReparented({
+              id: sourceData.element.id,
+              containerId: undefined,
+              index: undefined,
+            }),
+            sourceData.element.id
+          );
+          return;
+        }
+
         if (isAddingNewElement && isFormElementDndData(targetData) && targetData.element.parentId === undefined) {
           const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
 
@@ -133,15 +155,13 @@ export const useMonitorForFormElementDnd = () => {
           if (closestEdgeOfTarget === 'center') {
             log.debug('Adding new element to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
-            flushSync(() => {
-              dispatch(
-                formElementAdded({
-                  element: sourceData.element,
-                  containerId: targetData.element.id,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementAdded({
+                element: sourceData.element,
+                containerId: targetData.element.id,
+              }),
+              sourceData.element.id
+            );
             return;
           } else {
             // Adding to the root
@@ -155,16 +175,14 @@ export const useMonitorForFormElementDnd = () => {
               closestEdgeOfTarget,
               axis: 'vertical',
             });
-            flushSync(() => {
-              dispatch(
-                formElementAdded({
-                  element: sourceData.element,
-                  containerId: undefined,
-                  index,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementAdded({
+                element: sourceData.element,
+                containerId: undefined,
+                index,
+              }),
+              sourceData.element.id
+            );
             return;
           }
         }
@@ -177,16 +195,14 @@ export const useMonitorForFormElementDnd = () => {
           if (closestEdgeOfTarget === 'center') {
             log.debug('Adding new element to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
-            flushSync(() => {
-              dispatch(
-                formElementAdded({
-                  element: sourceData.element,
-                  containerId: targetData.element.id,
-                  index: undefined,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementAdded({
+                element: sourceData.element,
+                containerId: targetData.element.id,
+                index: undefined,
+              }),
+              sourceData.element.id
+            );
             return;
           } else {
             log.debug('Inserting new element into container');
@@ -198,41 +214,16 @@ export const useMonitorForFormElementDnd = () => {
               closestEdgeOfTarget,
               axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
             });
-            flushSync(() => {
-              dispatch(
-                formElementAdded({
-                  element: sourceData.element,
-                  containerId: container.id,
-                  index,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementAdded({
+                element: sourceData.element,
+                containerId: container.id,
+                index,
+              }),
+              sourceData.element.id
+            );
             return;
           }
-        }
-
-        // Reparenting an existing element to the root, appending it to the end
-        if (!isAddingNewElement && isRootContainerDndData(targetData) && sourceData.element.parentId !== undefined) {
-          log.debug('Reparenting element from container to empty root');
-
-          flushSync(() => {
-            dispatch(
-              formElementReparented({
-                id: sourceData.element.id,
-                containerId: undefined,
-                index: undefined,
-              })
-            );
-          });
-          flashElement(sourceData.element.id);
-          return;
-        }
-
-        // This should never happen - the root is a dnd target _only_ when it is empty and we are adding a new element!
-        if (!isAddingNewElement && isRootContainerDndData(targetData)) {
-          log.error('Attempted to move an existing element to the root directly!');
-          return;
         }
 
         // Moving an existing element within the root
@@ -247,16 +238,14 @@ export const useMonitorForFormElementDnd = () => {
           if (closestEdgeOfTarget === 'center') {
             log.debug('Reparenting element from root to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: targetData.element.id,
-                  index: undefined,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: targetData.element.id,
+                index: undefined,
+              }),
+              sourceData.element.id
+            );
             return;
           } else {
             log.debug('Moving element within root');
@@ -270,14 +259,12 @@ export const useMonitorForFormElementDnd = () => {
               closestEdgeOfTarget,
               axis: 'vertical',
             });
-            flushSync(() => {
-              dispatch(
-                formRootReordered({
-                  layout: reorderedLayout,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formRootReordered({
+                layout: reorderedLayout,
+              }),
+              sourceData.element.id
+            );
             return;
           }
         }
@@ -296,16 +283,14 @@ export const useMonitorForFormElementDnd = () => {
             log.debug('Reparenting element from a container to an empty container with same parent');
             log.debug('Reparenting element from one container to an empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: targetData.element.id,
-                  index: undefined,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: targetData.element.id,
+                index: undefined,
+              }),
+              sourceData.element.id
+            );
             return;
           } else {
             log.debug('Moving element within container');
@@ -319,15 +304,13 @@ export const useMonitorForFormElementDnd = () => {
               closestEdgeOfTarget,
               axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
             });
-            flushSync(() => {
-              dispatch(
-                formContainerChildrenReordered({
-                  containerId: container.id,
-                  children: reorderedLayout,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formContainerChildrenReordered({
+                containerId: container.id,
+                children: reorderedLayout,
+              }),
+              sourceData.element.id
+            );
             return;
           }
         }
@@ -345,16 +328,14 @@ export const useMonitorForFormElementDnd = () => {
           if (closestEdgeOfTarget === 'center') {
             log.debug('Reparenting element from one container to an empty container with different parent');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: targetData.element.id,
-                  index: undefined,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: targetData.element.id,
+                index: undefined,
+              }),
+              sourceData.element.id
+            );
             return;
           } else {
             log.debug('Moving element from one container to another');
@@ -366,16 +347,14 @@ export const useMonitorForFormElementDnd = () => {
               closestEdgeOfTarget,
               axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
             });
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: container.id,
-                  index,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: container.id,
+                index,
+              }),
+              sourceData.element.id
+            );
             return;
           }
         }
@@ -392,16 +371,14 @@ export const useMonitorForFormElementDnd = () => {
           if (closestEdgeOfTarget === 'center') {
             log.debug('Reparenting element from container to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: targetData.element.id,
-                  index: undefined,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: targetData.element.id,
+                index: undefined,
+              }),
+              sourceData.element.id
+            );
             return;
           } else {
             log.debug('Reparenting element from container to root');
@@ -413,16 +390,14 @@ export const useMonitorForFormElementDnd = () => {
               closestEdgeOfTarget,
               axis: 'vertical',
             });
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: undefined,
-                  index,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: undefined,
+                index,
+              }),
+              sourceData.element.id
+            );
             return;
           }
         }
@@ -439,16 +414,14 @@ export const useMonitorForFormElementDnd = () => {
           if (closestEdgeOfTarget === 'center') {
             log.debug('Reparenting element from root to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: targetData.element.id,
-                  index: undefined,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: targetData.element.id,
+                index: undefined,
+              }),
+              sourceData.element.id
+            );
             return;
           } else {
             log.debug('Reparenting element from root to container');
@@ -460,16 +433,14 @@ export const useMonitorForFormElementDnd = () => {
               closestEdgeOfTarget,
               axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
             });
-            flushSync(() => {
-              dispatch(
-                formElementReparented({
-                  id: sourceData.element.id,
-                  containerId: targetData.element.parentId,
-                  index,
-                })
-              );
-            });
-            flashElement(sourceData.element.id);
+            dispatchAndFlash(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: targetData.element.parentId,
+                index,
+              }),
+              sourceData.element.id
+            );
             return;
           }
         }
@@ -477,7 +448,7 @@ export const useMonitorForFormElementDnd = () => {
         log.warn({ targetData, sourceData }, 'Unhandled drop event!');
       },
     });
-  }, [dispatch]);
+  }, [dispatchAndFlash]);
 };
 
 export const useRootContainerDropTarget = (ref: RefObject<HTMLElement>) => {
