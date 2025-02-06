@@ -43,7 +43,17 @@ export const DividerElementComponentViewMode = memo(({ el }: { el: DividerElemen
   const container = useContainerContext();
   const { id } = el;
 
-  return <Flex id={id} className={DIVIDER_CLASS_NAME} sx={sx} data-layout={container?.layout} />;
+  return (
+    <Flex
+      id={id}
+      className={DIVIDER_CLASS_NAME}
+      sx={sx}
+      data-layout={
+        // When there is no container, the layout is column by default
+        container?.layout || 'column'
+      }
+    />
+  );
 });
 
 DividerElementComponentViewMode.displayName = 'DividerElementComponentViewMode';
@@ -54,7 +64,15 @@ export const DividerElementComponentEditMode = memo(({ el }: { el: DividerElemen
 
   return (
     <FormElementEditModeWrapper element={el}>
-      <Flex id={id} className={DIVIDER_CLASS_NAME} sx={sx} data-layout={container?.layout} />
+      <Flex
+        id={id}
+        className={DIVIDER_CLASS_NAME}
+        sx={sx}
+        data-layout={
+          // When there is no container, the layout is column by default
+          container?.layout || 'column'
+        }
+      />
     </FormElementEditModeWrapper>
   );
 });
