@@ -551,6 +551,7 @@ export const useDraggableFormElement = (
       }),
       dropTargetForElements({
         element: draggableElement,
+        getIsSticky: () => getElement(elementId).parentId === undefined,
         canDrop: ({ source }) =>
           isFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId,
         getData: ({ input }) => {
