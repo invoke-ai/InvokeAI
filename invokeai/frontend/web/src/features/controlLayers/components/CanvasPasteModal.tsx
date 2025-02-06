@@ -20,6 +20,7 @@ import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiBoundingBoxBold, PiImageBold } from 'react-icons/pi';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 
 const $imageFile = atom<File | null>(null);
@@ -125,14 +126,14 @@ export const CanvasPasteModal = memo(() => {
         <ModalCloseButton />
         <ModalBody display="flex" justifyContent="center">
           <Flex flexDir="column" gap={4} w="min-content">
-            <Button size="lg" onClick={pasteToAssets} isDisabled={isLoading}>
-              {t('controlLayers.pasteToAssetsDesc')}
+            <Button size="lg" onClick={pasteToCanvas} isDisabled={isLoading} leftIcon={<PiImageBold />}>
+              {t('controlLayers.pasteToCanvasDesc')}
             </Button>
-            <Button size="lg" onClick={pasteToBbox} isDisabled={isLoading}>
+            <Button size="lg" onClick={pasteToBbox} isDisabled={isLoading} leftIcon={<PiBoundingBoxBold />}>
               {t('controlLayers.pasteToBboxDesc')}
             </Button>
-            <Button size="lg" onClick={pasteToCanvas} isDisabled={isLoading}>
-              {t('controlLayers.pasteToCanvasDesc')}
+            <Button size="lg" onClick={pasteToAssets} isDisabled={isLoading} variant="ghost">
+              {t('controlLayers.pasteToAssetsDesc')}
             </Button>
           </Flex>
         </ModalBody>
