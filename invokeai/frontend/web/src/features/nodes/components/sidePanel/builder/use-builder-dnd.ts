@@ -330,7 +330,7 @@ export const useDraggableFormElement = (
 
           const allowedCenterOrEdge: CenterOrEdge[] = [];
 
-          if (isContainerElement(element)) {
+          if (isContainerElement(element) && element.data.children.length === 0) {
             allowedCenterOrEdge.push('center');
           }
 
@@ -348,7 +348,6 @@ export const useDraggableFormElement = (
             allowedCenterOrEdge,
           });
         },
-        getIsSticky: () => true,
         onDrag: ({ self, location, source }) => {
           const innermostDropTargetElement = location.current.dropTargets.at(0)?.element;
 
