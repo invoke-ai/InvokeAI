@@ -5,27 +5,42 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
 import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
+import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import {
-  buildAddFormElementDndData,
+  buildFormElementDndData,
   useMonitorForFormElementDnd,
+  useRootContainerDropTarget,
 } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
-import { formModeToggled, selectRootElementId, selectWorkflowFormMode } from 'features/nodes/store/workflowSlice';
+import {
+  formModeToggled,
+  formReset,
+  selectFormIsEmpty,
+  selectFormLayout,
+  selectWorkflowFormMode,
+} from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
 export const WorkflowBuilder = memo(() => {
+  const { t } = useTranslation();
   const mode = useAppSelector(selectWorkflowFormMode);
-  const rootElementId = useAppSelector(selectRootElementId);
+  const dispatch = useAppDispatch();
+  const isEmpty = useAppSelector(selectFormIsEmpty);
   useMonitorForFormElementDnd();
+
+  const resetForm = useCallback(() => {
+    dispatch(formReset());
+  }, [dispatch]);
 
   return (
     <ScrollableContent>
-      <Flex justifyContent="center">
-        <Flex flexDir="column" w={mode === 'view' ? '512px' : 'min-content'} minW="512px" gap={2}>
+      <Flex justifyContent="center" w="full" h="full" p={4}>
+        <Flex flexDir="column" w={mode === 'view' ? '512px' : 'min-content'} h="full" minW="512px" gap={4}>
           <ButtonGroup isAttached={false} justifyContent="center">
             <ToggleModeButton />
             <AddFormElementDndButton type="row" />
@@ -33,9 +48,11 @@ export const WorkflowBuilder = memo(() => {
             <AddFormElementDndButton type="divider" />
             <AddFormElementDndButton type="heading" />
             <AddFormElementDndButton type="text" />
+            <Button onClick={resetForm}>{t('common.reset')}</Button>
           </ButtonGroup>
-          {rootElementId && <FormElementComponent id={rootElementId} />}
-          {!rootElementId && <EmptyState />}
+          {!isEmpty && <FormLayout />}
+          {mode === 'view' && isEmpty && <EmptyStateViewMode />}
+          {mode === 'edit' && isEmpty && <EmptyStateEditMode />}
         </Flex>
       </Flex>
     </ScrollableContent>
@@ -43,34 +60,61 @@ export const WorkflowBuilder = memo(() => {
 });
 WorkflowBuilder.displayName = 'WorkflowBuilder';
 
-const EmptyState = memo(() => {
-  const mode = useAppSelector(selectWorkflowFormMode);
-  const dispatch = useAppDispatch();
+const FormLayout = memo(() => {
+  const layout = useAppSelector(selectFormLayout);
 
+  return (
+    <Flex flexDir="column" gap={4} w="full" p={4} borderRadius="base">
+      {layout.map((id) => (
+        <FormElementComponent key={id} id={id} />
+      ))}
+    </Flex>
+  );
+});
+FormLayout.displayName = 'FormLayout';
+
+const EmptyStateViewMode = memo(() => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const toggleMode = useCallback(() => {
     dispatch(formModeToggled());
   }, [dispatch]);
 
-  const addContainer = useCallback(() => {}, []);
-
-  if (mode === 'view') {
-    return (
-      <Flex flexDir="column" gap={4} w="full" h="full" justifyContent="center" alignItems="center">
-        <Text variant="subtext" fontSize="md">
-          Click Edit to build a form for this workflow.
-        </Text>
-        <Button onClick={toggleMode}>Edit</Button>
-      </Flex>
-    );
-  }
-
-  <Flex flexDir="column" gap={4} w="full" h="full" justifyContent="center" alignItems="center">
-    <Text variant="subtext" fontSize="md">
-      No form elements added. Click a button above to add a form element.
-    </Text>
-  </Flex>;
+  return (
+    <Flex flexDir="column" gap={4} w="full" h="full" justifyContent="center" alignItems="center">
+      <Text variant="subtext" fontSize="md">
+        {t('workflows.builder.emptyRootPlaceholderViewMode')}
+      </Text>
+      <Button onClick={toggleMode}>{t('common.edit')}</Button>
+    </Flex>
+  );
 });
-EmptyState.displayName = 'EmptyState';
+EmptyStateViewMode.displayName = 'EmptyStateViewMode';
+
+const EmptyStateEditMode = memo(() => {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  const isDragging = useRootContainerDropTarget(ref);
+
+  return (
+    <Flex
+      id={getEditModeWrapperId('root')}
+      ref={ref}
+      w="full"
+      h="full"
+      bg={isDragging ? 'base.800' : undefined}
+      p={4}
+      borderRadius="base"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Text variant="subtext" fontSize="md">
+        {t('workflows.builder.emptyRootPlaceholderEditMode')}
+      </Text>
+    </Flex>
+  );
+});
+EmptyStateEditMode.displayName = 'EmptyStateEditMode';
 
 const ToggleModeButton = memo(() => {
   const dispatch = useAppDispatch();
@@ -104,23 +148,23 @@ const useAddFormElementDnd = (
         getInitialData: () => {
           if (type === 'row') {
             const element = buildContainer('row', []);
-            return buildAddFormElementDndData(element);
+            return buildFormElementDndData(element);
           }
           if (type === 'column') {
             const element = buildContainer('column', []);
-            return buildAddFormElementDndData(element);
+            return buildFormElementDndData(element);
           }
           if (type === 'divider') {
             const element = buildDivider();
-            return buildAddFormElementDndData(element);
+            return buildFormElementDndData(element);
           }
           if (type === 'heading') {
             const element = buildHeading('default heading');
-            return buildAddFormElementDndData(element);
+            return buildFormElementDndData(element);
           }
           if (type === 'text') {
             const element = buildText('default text');
-            return buildAddFormElementDndData(element);
+            return buildFormElementDndData(element);
           }
           assert(false);
         },
@@ -139,12 +183,13 @@ const useAddFormElementDnd = (
 
 const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormElementDnd>[0] }) => {
   const draggableRef = useRef<HTMLDivElement>(null);
-  const rootElementId = useAppSelector(selectRootElementId);
   const isDragging = useAddFormElementDnd(type, draggableRef);
 
   return (
     <Button
+      as="div"
       ref={draggableRef}
+      pointerEvents="all"
       variant="unstyled"
       borderWidth={2}
       borderStyle="dashed"
@@ -153,7 +198,7 @@ const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormE
       py={1}
       cursor="grab"
       _hover={{ bg: 'base.800' }}
-      isDisabled={isDragging || (type !== 'row' && type !== 'column' && !rootElementId)}
+      isDisabled={isDragging}
     >
       {startCase(type)}
     </Button>

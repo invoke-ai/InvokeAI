@@ -60,7 +60,7 @@ export const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldEl
           <InputFieldRenderer
             nodeId={fieldIdentifier.nodeId}
             fieldName={fieldIdentifier.fieldName}
-            config={data.config}
+            settings={data.settings}
           />
         </Flex>
         {showDescription && _description && <FormHelperText>{_description}</FormHelperText>}
@@ -84,7 +84,7 @@ export const NodeFieldElementComponentEditMode = memo(({ el }: { el: NodeFieldEl
             <InputFieldRenderer
               nodeId={fieldIdentifier.nodeId}
               fieldName={fieldIdentifier.fieldName}
-              config={data.config}
+              settings={data.settings}
             />
           </Flex>
           {showDescription && <NodeFieldEditableDescription el={el} />}

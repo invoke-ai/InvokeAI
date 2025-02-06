@@ -1,18 +1,13 @@
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
-import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Flex, FormControl, Spacer } from '@invoke-ai/ui-library';
-import { firefoxDndFix } from 'features/dnd/util';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { InputFieldNotesIconButtonEditable } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonEditable';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
-import { buildNodeFieldDndData } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
+import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import { useInputFieldConnectionState } from 'features/nodes/hooks/useInputFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
-import type { FieldIdentifier, FieldInputTemplate } from 'features/nodes/types/field';
-import type { RefObject } from 'react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 
 import { InputFieldAddRemoveLinearViewIconButton } from './InputFieldAddRemoveLinearViewIconButton';
 import { InputFieldRenderer } from './InputFieldRenderer';
@@ -110,36 +105,3 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
 });
 
 InputFieldEditModeNodes.displayName = 'InputFieldEditModeNodes';
-
-const useNodeFieldDnd = (
-  fieldIdentifier: FieldIdentifier,
-  fieldTemplate: FieldInputTemplate,
-  draggableRef: RefObject<HTMLElement>,
-  dragHandleRef: RefObject<HTMLElement>
-) => {
-  const [isDragging, setIsDragging] = useState(false);
-
-  useEffect(() => {
-    const draggableElement = draggableRef.current;
-    const dragHandleElement = dragHandleRef.current;
-    if (!draggableElement || !dragHandleElement) {
-      return;
-    }
-    return combine(
-      firefoxDndFix(draggableElement),
-      draggable({
-        element: draggableElement,
-        dragHandle: dragHandleElement,
-        getInitialData: () => buildNodeFieldDndData(fieldIdentifier, fieldTemplate.type),
-        onDragStart: () => {
-          setIsDragging(true);
-        },
-        onDrop: () => {
-          setIsDragging(false);
-        },
-      })
-    );
-  }, [dragHandleRef, draggableRef, fieldIdentifier, fieldTemplate.type]);
-
-  return isDragging;
-};

@@ -14,6 +14,10 @@ describe('validateWorkflow', () => {
     tags: '',
     notes: '',
     exposedFields: [],
+    form: {
+      elements: {},
+      layout: [],
+    },
     meta: { version: '3.0.0', category: 'user' },
     nodes: [
       {

@@ -116,10 +116,10 @@ import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
 type Props = {
   nodeId: string;
   fieldName: string;
-  config?: NodeFieldElement['data']['config'];
+  settings?: NodeFieldElement['data']['settings'];
 };
 
-export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) => {
+export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) => {
   const field = useInputFieldInstance(nodeId, fieldName);
   const template = useInputFieldTemplate(nodeId, fieldName);
 
@@ -134,16 +134,16 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) =>
     if (!isStringFieldInputInstance(field)) {
       return null;
     }
-    if (config?.configType !== 'string-field-config') {
+    if (settings?.type !== 'string-field-config') {
       if (template.ui_component === 'textarea') {
         return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
       } else {
         return <StringFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
       }
     }
-    if (config.component === 'input') {
+    if (settings.component === 'input') {
       return <StringFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (config.component === 'textarea') {
+    } else if (settings.component === 'textarea') {
       return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
   }
@@ -159,14 +159,14 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) =>
     if (!isIntegerFieldInputInstance(field)) {
       return null;
     }
-    if (config?.configType !== 'integer-field-config') {
+    if (settings?.type !== 'integer-field-config') {
       return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
-    if (config.component === 'number-input') {
+    if (settings.component === 'number-input') {
       return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (config.component === 'slider') {
+    } else if (settings.component === 'slider') {
       return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (config.component === 'number-input-and-slider') {
+    } else if (settings.component === 'number-input-and-slider') {
       return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
   }
@@ -175,14 +175,14 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, config }: Props) =>
     if (!isFloatFieldInputInstance(field)) {
       return null;
     }
-    if (config?.configType !== 'float-field-config') {
+    if (settings?.type !== 'float-field-config') {
       return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
-    if (config.component === 'number-input') {
+    if (settings.component === 'number-input') {
       return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (config.component === 'slider') {
+    } else if (settings.component === 'slider') {
       return <FloatFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (config.component === 'number-input-and-slider') {
+    } else if (settings.component === 'number-input-and-slider') {
       return <FloatFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
   }
