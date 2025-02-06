@@ -4,7 +4,7 @@ import { useContainerContext } from 'features/nodes/components/sidePanel/builder
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { EDIT_MODE_WRAPPER_CLASS_NAME, getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
-import { useDraggableFormElement } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
+import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import type { FormElement } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
 import { memo, useRef } from 'react';
@@ -44,7 +44,7 @@ const innerSx: SystemStyleObject = {
 export const FormElementEditModeWrapper = memo(({ element, children }: PropsWithChildren<{ element: FormElement }>) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
-  const [activeDropRegion, isDragging] = useDraggableFormElement(element.id, draggableRef, dragHandleRef);
+  const [activeDropRegion, isDragging] = useFormElementDnd(element.id, draggableRef, dragHandleRef);
   const containerCtx = useContainerContext();
 
   return (
