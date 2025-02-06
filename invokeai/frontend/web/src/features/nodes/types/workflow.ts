@@ -112,11 +112,14 @@ const zIntegerFieldConfig = z.object({
 });
 export type NodeFieldIntegerConfig = z.infer<typeof zIntegerFieldConfig>;
 
+export const zStringComponent = z.enum(['input', 'textarea']);
 const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
 const zStringFieldConfig = z.object({
-  configType: z.literal(STRING_FIELD_CONFIG_TYPE),
-  component: z.enum(['input', 'textarea']),
+  configType: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
+  component: zStringComponent.default('input'),
 });
+export type NodeFieldStringConfig = z.infer<typeof zStringFieldConfig>;
+
 const zNodeFieldData = z.object({
   fieldIdentifier: zFieldIdentifier,
   showLabel: z.boolean().default(true),
@@ -148,6 +151,13 @@ export const buildNodeField = (
     config = {
       configType: 'float-field-config',
       component: 'number-input',
+    };
+  }
+
+  if (fieldType.name === 'StringField' && fieldType.cardinality === 'SINGLE') {
+    config = {
+      configType: 'string-field-config',
+      component: 'input',
     };
   }
 

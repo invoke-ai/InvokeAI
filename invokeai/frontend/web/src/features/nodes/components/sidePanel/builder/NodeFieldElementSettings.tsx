@@ -12,6 +12,7 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import { NodeFieldElementFloatSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementFloatSettings';
 import { NodeFieldElementIntegerConfig } from 'features/nodes/components/sidePanel/builder/NodeFieldElementIntegerSettings';
+import { NodeFieldElementStringSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringSettings';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo, useCallback } from 'react';
@@ -54,6 +55,9 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
           )}
           {data.config?.configType === 'float-field-config' && (
             <NodeFieldElementFloatSettings id={id} config={data.config} />
+          )}
+          {data.config?.configType === 'string-field-config' && (
+            <NodeFieldElementStringSettings id={id} config={data.config} />
           )}
         </PopoverBody>
       </PopoverContent>
