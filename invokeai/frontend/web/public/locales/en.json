@@ -2245,9 +2245,11 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "Improved VRAM setting defaults",
-            "Canvas Adjust filter",
             "On-demand model cache clearing",
-            "Cancel all but current queue item"
+            "Expanded FLUX LoRA compatibility",
+            "Canvas Adjust Image filter",
+            "Cancel all but current queue item",
+            "Copy from and paste to Canvas"
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
