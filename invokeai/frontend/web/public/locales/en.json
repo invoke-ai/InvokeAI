@@ -305,6 +305,7 @@
     },
     "gallery": {
         "gallery": "Gallery",
+        "assets": "Assets",
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assetsTab": "Files you’ve uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
