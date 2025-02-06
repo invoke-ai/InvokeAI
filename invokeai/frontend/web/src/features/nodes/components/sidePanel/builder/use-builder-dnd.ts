@@ -35,15 +35,15 @@ import { assert } from 'tsafe';
 
 const log = logger('dnd');
 
-const uniqueRootContainerKey = Symbol('root-container');
-type RootContainerDndData = {
-  [uniqueRootContainerKey]: true;
+const uniqueRootKey = Symbol('root');
+type RootDndData = {
+  [uniqueRootKey]: true;
 };
-const buildRootContainerDndData = (): RootContainerDndData => ({
-  [uniqueRootContainerKey]: true,
+const buildRootDndData = (): RootDndData => ({
+  [uniqueRootKey]: true,
 });
-const isRootContainerDndData = (data: Record<string | symbol, unknown>): data is RootContainerDndData => {
-  return uniqueRootContainerKey in data;
+const isRootDndData = (data: Record<string | symbol, unknown>): data is RootDndData => {
+  return uniqueRootKey in data;
 };
 
 const uniqueFormElementDndKey = Symbol('form-element');
@@ -110,7 +110,7 @@ export const useMonitorForFormElementDnd = () => {
         const targetData = target.data;
         const sourceData = source.data;
 
-        if (!isFormElementDndData(targetData) && !isRootContainerDndData(targetData)) {
+        if (!isFormElementDndData(targetData) && !isRootDndData(targetData)) {
           return;
         }
 
@@ -120,7 +120,8 @@ export const useMonitorForFormElementDnd = () => {
 
         const isAddingNewElement = !elementExists(sourceData.element.id);
 
-        if (isAddingNewElement && isRootContainerDndData(targetData)) {
+        //#region Root container
+        if (isAddingNewElement && isRootDndData(targetData)) {
           log.debug('Adding new element to empty root');
           dispatchAndFlash(
             formElementAdded({
@@ -134,7 +135,7 @@ export const useMonitorForFormElementDnd = () => {
         }
 
         // Reparenting an existing element to the root, appending it to the end
-        if (!isAddingNewElement && isRootContainerDndData(targetData) && sourceData.element.parentId !== undefined) {
+        if (!isAddingNewElement && isRootDndData(targetData) && sourceData.element.parentId !== undefined) {
           log.debug('Reparenting element from container to empty root');
 
           dispatchAndFlash(
@@ -462,7 +463,7 @@ export const useRootContainerDropTarget = (ref: RefObject<HTMLElement>) => {
     return dropTargetForElements({
       element,
       canDrop: ({ source }) => isFormElementDndData(source.data) && isEmpty,
-      getData: () => buildRootContainerDndData(),
+      getData: () => buildRootDndData(),
       onDrag: ({ location, source }) => {
         const innermostDropTargetElement = location.current.dropTargets.at(0)?.element;
 
