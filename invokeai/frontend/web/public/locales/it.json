@@ -116,7 +116,6 @@
         "deleteImage_many": "Elimina {{count}} immagini",
         "deleteImage_other": "Elimina {{count}} immagini",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
-        "assets": "Risorse",
         "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
         "loading": "Caricamento in corso",
@@ -1132,7 +1131,11 @@
         "generation": "Generazione",
         "other": "Altro",
         "gallery": "Galleria",
-        "batchSize": "Dimensione del lotto"
+        "batchSize": "Dimensione del lotto",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Vuoi davvero annullare tutti gli elementi in coda in sospeso?",
+        "confirm": "Conferma",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "L'annullamento di tutti gli elementi della coda, eccetto quello corrente, interromperà gli elementi in sospeso ma consentirà il completamento di quello in corso.",
+        "cancelAllExceptCurrentTooltip": "Annulla tutto tranne l'elemento corrente"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1963,6 +1966,25 @@
                 "noise_type": "Tipo di rumore",
                 "label": "Aggiungi rumore",
                 "noise_amount": "Quantità"
+            },
+            "adjust_image": {
+                "description": "Regola il canale selezionato di un'immagine.",
+                "alpha": "Alfa (RGBA)",
+                "label": "Regola l'immagine",
+                "blue": "Blu (RGBA)",
+                "luminosity": "Luminosità (LAB)",
+                "channel": "Canale",
+                "value_setting": "Valore",
+                "scale_values": "Scala i valori",
+                "red": "Rosso (RGBA)",
+                "green": "Verde (RGBA)",
+                "cyan": "Ciano (CMYK)",
+                "magenta": "Magenta (CMYK)",
+                "yellow": "Giallo (CMYK)",
+                "black": "Nero (CMYK)",
+                "hue": "Tonalità (HSV)",
+                "saturation": "Saturazione (HSV)",
+                "value": "Valore (HSV)"
             }
         },
         "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",

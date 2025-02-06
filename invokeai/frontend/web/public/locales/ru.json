@@ -106,7 +106,6 @@
         "deleteImage_one": "Удалить изображение",
         "deleteImage_few": "Удалить {{count}} изображения",
         "deleteImage_many": "Удалить {{count}} изображений",
-        "assets": "Ресурсы",
         "autoAssignBoardOnClick": "Авто-назначение доски по клику",
         "deleteSelection": "Удалить выделенное",
         "featuresWillReset": "Если вы удалите это изображение, эти функции будут немедленно сброшены.",

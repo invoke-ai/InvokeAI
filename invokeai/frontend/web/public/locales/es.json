@@ -109,7 +109,6 @@
         "deleteImage_many": "Eliminar {{count}} Imágenes",
         "deleteImage_other": "Eliminar {{count}} Imágenes",
         "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
-        "assets": "Activos",
         "autoAssignBoardOnClick": "Asignar automática tableros al hacer clic",
         "gallery": "Galería",
         "noImageSelected": "Sin imágenes seleccionadas",
