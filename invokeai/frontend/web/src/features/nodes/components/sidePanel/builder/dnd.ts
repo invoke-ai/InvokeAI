@@ -523,7 +523,10 @@ export const useFormElementDnd = (
       draggable({
         element: draggableElement,
         dragHandle: dragHandleElement,
-        getInitialData: () => buildFormElementDndData(getElement(elementId)),
+        getInitialData: () => {
+          const element = getElement(elementId);
+          return buildFormElementDndData(element);
+        },
         onDragStart: () => {
           setIsDragging(true);
         },
@@ -546,6 +549,7 @@ export const useFormElementDnd = (
             allowedCenterOrEdge.push('center');
           }
 
+          // Parent is a container
           if (element.parentId !== undefined) {
             const parentContainer = getElement(element.parentId, isContainerElement);
             if (parentContainer.data.layout === 'row') {
@@ -556,8 +560,8 @@ export const useFormElementDnd = (
             }
           }
 
+          // Parent is the root
           if (element.parentId === undefined) {
-            // Root container
             allowedCenterOrEdge.push('top', 'bottom');
           }
 
@@ -578,14 +582,12 @@ export const useFormElementDnd = (
 
           const closestCenterOrEdge = extractClosestCenterOrEdge(self.data);
 
-          // Don't allow reparanting to the same container
+          // Don't allow reparenting to the same container
           if (closestCenterOrEdge === 'center' && source.element === draggableElement) {
             setActiveDropRegion(null);
             return;
           }
 
-          // Only need to update react state if nothing has changed.
-          // Prevents re-rendering.
           setActiveDropRegion(closestCenterOrEdge);
         },
         onDragLeave: () => {
