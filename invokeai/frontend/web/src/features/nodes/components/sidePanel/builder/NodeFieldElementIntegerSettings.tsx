@@ -16,7 +16,7 @@ export const NodeFieldElementIntegerConfig = memo(({ id, config }: { id: string;
         ...config,
         component: zNumberComponent.parse(e.target.value),
       };
-      dispatch(formElementNodeFieldDataChanged({ id, changes: { config: newConfig } }));
+      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
     },
     [config, dispatch, id]
   );

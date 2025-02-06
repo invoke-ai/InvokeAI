@@ -74,12 +74,10 @@ export const zWorkflowV3 = z.object({
     category: zWorkflowCategory.default('user'),
     version: z.literal('3.0.0'),
   }),
-  form: z
-    .object({
-      elements: z.record(z.lazy(() => zFormElement)),
-      rootElementId: z.lazy(() => zElementId),
-    })
-    .optional(),
+  form: z.object({
+    elements: z.record(z.lazy(() => zFormElement)),
+    layout: z.array(z.lazy(() => zElementId)),
+  }),
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion
@@ -98,16 +96,16 @@ export const zNumberComponent = z.enum(['number-input', 'slider', 'number-input-
 
 const NODE_FIELD_TYPE = 'node-field';
 export const NODE_FIELD_CLASS_NAME = getPrefixedId(NODE_FIELD_TYPE, '-');
-const FLOAT_FIELD_CONFIG_TYPE = 'float-field-config';
-const zFloatFieldConfig = z.object({
-  configType: z.literal(FLOAT_FIELD_CONFIG_TYPE).default(FLOAT_FIELD_CONFIG_TYPE),
+const FLOAT_FIELD_SETTINGS_TYPE = 'float-field-config';
+const zNodeFieldFloatSettings = z.object({
+  type: z.literal(FLOAT_FIELD_SETTINGS_TYPE).default(FLOAT_FIELD_SETTINGS_TYPE),
   component: zNumberComponent.default('number-input'),
 });
-export type NodeFieldFloatConfig = z.infer<typeof zFloatFieldConfig>;
+export type NodeFieldFloatSettings = z.infer<typeof zNodeFieldFloatSettings>;
 
 const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
 const zIntegerFieldConfig = z.object({
-  configType: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
+  type: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
   component: zNumberComponent.default('number-input'),
 });
 export type NodeFieldIntegerConfig = z.infer<typeof zIntegerFieldConfig>;
@@ -115,7 +113,7 @@ export type NodeFieldIntegerConfig = z.infer<typeof zIntegerFieldConfig>;
 export const zStringComponent = z.enum(['input', 'textarea']);
 const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
 const zStringFieldConfig = z.object({
-  configType: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
+  type: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
   component: zStringComponent.default('input'),
 });
 export type NodeFieldStringConfig = z.infer<typeof zStringFieldConfig>;
@@ -124,7 +122,7 @@ const zNodeFieldData = z.object({
   fieldIdentifier: zFieldIdentifier,
   showLabel: z.boolean().default(true),
   showDescription: z.boolean().default(true),
-  config: z.union([zFloatFieldConfig, zIntegerFieldConfig, zStringFieldConfig]).optional(),
+  settings: z.union([zNodeFieldFloatSettings, zIntegerFieldConfig, zStringFieldConfig]).optional(),
 });
 const zNodeFieldElement = zElementBase.extend({
   type: z.literal(NODE_FIELD_TYPE),
@@ -132,31 +130,31 @@ const zNodeFieldElement = zElementBase.extend({
 });
 export type NodeFieldElement = z.infer<typeof zNodeFieldElement>;
 export const isNodeFieldElement = (el: FormElement): el is NodeFieldElement => el.type === NODE_FIELD_TYPE;
-export const buildNodeField = (
+export const buildNodeFieldElement = (
   nodeId: NodeFieldElement['data']['fieldIdentifier']['nodeId'],
   fieldName: NodeFieldElement['data']['fieldIdentifier']['fieldName'],
   fieldType: FieldType,
   parentId?: NodeFieldElement['parentId']
 ): NodeFieldElement => {
-  let config: NodeFieldElement['data']['config'] = undefined;
+  let settings: NodeFieldElement['data']['settings'] = undefined;
 
   if (fieldType.name === 'IntegerField' && fieldType.cardinality === 'SINGLE') {
-    config = {
-      configType: 'integer-field-config',
+    settings = {
+      type: 'integer-field-config',
       component: 'number-input',
     };
   }
 
   if (fieldType.name === 'FloatField' && fieldType.cardinality === 'SINGLE') {
-    config = {
-      configType: 'float-field-config',
+    settings = {
+      type: 'float-field-config',
       component: 'number-input',
     };
   }
 
   if (fieldType.name === 'StringField' && fieldType.cardinality === 'SINGLE') {
-    config = {
-      configType: 'string-field-config',
+    settings = {
+      type: 'string-field-config',
       component: 'input',
     };
   }
@@ -167,7 +165,7 @@ export const buildNodeField = (
     parentId,
     data: {
       fieldIdentifier: { nodeId, fieldName },
-      config,
+      settings,
       showLabel: true,
       showDescription: true,
     },

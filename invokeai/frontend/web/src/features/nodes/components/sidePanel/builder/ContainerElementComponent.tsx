@@ -55,6 +55,7 @@ export const ContainerElementComponent = memo(({ id }: { id: string }) => {
 ContainerElementComponent.displayName = 'ContainerElementComponent';
 
 export const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
+  const { t } = useTranslation();
   const depth = useDepthContext();
   const { id, data } = el;
   const { children, layout } = data;
@@ -66,6 +67,11 @@ export const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerEl
           {children.map((childId) => (
             <FormElementComponent key={childId} id={childId} />
           ))}
+          {children.length === 0 && (
+            <Flex p={4} w="full" h="full" alignItems="center" justifyContent="center">
+              <Text variant="subtext">{t('workflows.builder.emptyContainerPlaceholderViewMode')}</Text>
+            </Flex>
+          )}
         </Flex>
       </ContainerContextProvider>
     </DepthContextProvider>
@@ -89,7 +95,7 @@ export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerEl
             ))}
             {children.length === 0 && (
               <Flex p={4} w="full" h="full" alignItems="center" justifyContent="center">
-                <Text variant="subtext">{t('workflows.builder.emptyContainerPlaceholder')}</Text>
+                <Text variant="subtext">{t('workflows.builder.emptyContainerPlaceholderEditMode')}</Text>
               </Flex>
             )}
           </Flex>

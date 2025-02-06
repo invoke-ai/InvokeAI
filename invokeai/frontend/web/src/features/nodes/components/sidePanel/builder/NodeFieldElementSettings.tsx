@@ -50,14 +50,14 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
             <FormLabel flex={1}>{t('workflows.builder.description')}</FormLabel>
             <Switch size="sm" isChecked={showDescription} onChange={toggleShowDescription} />
           </FormControl>
-          {data.config?.configType === 'integer-field-config' && (
-            <NodeFieldElementIntegerConfig id={id} config={data.config} />
+          {data.settings?.type === 'integer-field-config' && (
+            <NodeFieldElementIntegerConfig id={id} config={data.settings} />
           )}
-          {data.config?.configType === 'float-field-config' && (
-            <NodeFieldElementFloatSettings id={id} config={data.config} />
+          {data.settings?.type === 'float-field-config' && (
+            <NodeFieldElementFloatSettings id={id} config={data.settings} />
           )}
-          {data.config?.configType === 'string-field-config' && (
-            <NodeFieldElementStringSettings id={id} config={data.config} />
+          {data.settings?.type === 'string-field-config' && (
+            <NodeFieldElementStringSettings id={id} config={data.settings} />
           )}
         </PopoverBody>
       </PopoverContent>

@@ -16,7 +16,7 @@ export const NodeFieldElementStringSettings = memo(({ id, config }: { id: string
         ...config,
         component: zStringComponent.parse(e.target.value),
       };
-      dispatch(formElementNodeFieldDataChanged({ id, changes: { config: newConfig } }));
+      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
     },
     [config, dispatch, id]
   );

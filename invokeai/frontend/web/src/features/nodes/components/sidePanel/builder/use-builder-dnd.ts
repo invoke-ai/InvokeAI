@@ -4,8 +4,11 @@ import {
   dropTargetForElements,
   monitorForElements,
 } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { getReorderDestinationIndex } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/get-reorder-destination-index';
+import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge';
+import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { firefoxDndFix, triggerPostMoveFlash } from 'features/dnd/util';
 import type { CenterOrEdge } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
@@ -14,55 +17,49 @@ import {
   extractClosestCenterOrEdge,
 } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
-import { formElementAdded, formElementMoved } from 'features/nodes/store/workflowSlice';
-import type { FieldIdentifier, FieldType } from 'features/nodes/types/field';
+import {
+  formContainerChildrenReordered,
+  formElementAdded,
+  formElementReparented,
+  formRootReordered,
+  selectFormIsEmpty,
+} from 'features/nodes/store/workflowSlice';
+import type { FieldIdentifier, FieldInputTemplate } from 'features/nodes/types/field';
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
-import { buildNodeField, isContainerElement } from 'features/nodes/types/workflow';
+import { buildNodeFieldElement, isContainerElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { assert } from 'tsafe';
 
-const uniqueMoveFormElementKey = Symbol('move-form-element');
-type MoveFormElementDndData = {
-  [uniqueMoveFormElementKey]: true;
+const log = logger('dnd');
+
+const uniqueRootContainerKey = Symbol('root-container');
+type RootContainerDndData = {
+  [uniqueRootContainerKey]: true;
+};
+const buildRootContainerDndData = (): RootContainerDndData => ({
+  [uniqueRootContainerKey]: true,
+});
+const isRootContainerDndData = (data: Record<string | symbol, unknown>): data is RootContainerDndData => {
+  return uniqueRootContainerKey in data;
+};
+
+const uniqueFormElementDndKey = Symbol('form-element');
+type FormElementDndData = {
+  [uniqueFormElementDndKey]: true;
   element: FormElement;
 };
-const buildMoveFormElementDndData = (element: FormElement): MoveFormElementDndData => ({
-  [uniqueMoveFormElementKey]: true,
+export const buildFormElementDndData = (element: FormElement): FormElementDndData => ({
+  [uniqueFormElementDndKey]: true,
   element,
 });
-const isMoveFormElementDndData = (data: Record<string | symbol, unknown>): data is MoveFormElementDndData => {
-  return uniqueMoveFormElementKey in data;
+const isFormElementDndData = (data: Record<string | symbol, unknown>): data is FormElementDndData => {
+  return uniqueFormElementDndKey in data;
 };
 
-const uniqueAddFormElementKey = Symbol('add-form-element');
-type AddFormElementDndData = {
-  [uniqueAddFormElementKey]: true;
-  element: FormElement;
-};
-export const buildAddFormElementDndData = (element: FormElement): AddFormElementDndData => ({
-  [uniqueAddFormElementKey]: true,
-  element,
-});
-const isAddFormElementDndData = (data: Record<string | symbol, unknown>): data is AddFormElementDndData => {
-  return uniqueAddFormElementKey in data;
-};
-
-const uniqueNodeFieldKey = Symbol('node-field');
-type NodeFieldDndData = {
-  [uniqueNodeFieldKey]: true;
-  fieldIdentifier: FieldIdentifier;
-  fieldType: FieldType;
-};
-export const buildNodeFieldDndData = (fieldIdentifier: FieldIdentifier, fieldType: FieldType): NodeFieldDndData => ({
-  [uniqueNodeFieldKey]: true,
-  fieldIdentifier,
-  fieldType,
-});
-
-const isNodeFieldDndData = (data: Record<string | symbol, unknown>): data is NodeFieldDndData => {
-  return uniqueNodeFieldKey in data;
+const elementExists = (id: ElementId): boolean => {
+  return getStore().getState().workflow.form?.elements[id] !== undefined;
 };
 
 const getElement = <T extends FormElement>(id: ElementId, guard?: (el: FormElement) => el is T): T => {
@@ -76,18 +73,8 @@ const getElement = <T extends FormElement>(id: ElementId, guard?: (el: FormEleme
   }
 };
 
-const adjustIndexForFormElementMoveDrop = (index: number, edge: Exclude<CenterOrEdge, 'center'>) => {
-  if (edge === 'left' || edge === 'top') {
-    return index - 1;
-  }
-  return index + 1;
-};
-
-const adjustIndexForNodeFieldDrop = (index: number, edge: Exclude<CenterOrEdge, 'center'>) => {
-  if (edge === 'left' || edge === 'top') {
-    return index;
-  }
-  return index + 1;
+const getLayout = () => {
+  return getStore().getState().workflow.form.layout;
 };
 
 const flashElement = (elementId: ElementId) => {
@@ -100,185 +87,437 @@ const flashElement = (elementId: ElementId) => {
 export const useMonitorForFormElementDnd = () => {
   const dispatch = useAppDispatch();
 
-  const handleMoveFormElementDrop = useCallback(
-    (sourceData: MoveFormElementDndData, targetData: MoveFormElementDndData) => {
-      if (sourceData.element.id === targetData.element.id) {
-        return;
-      }
-
-      const closestCenterOrEdge = extractClosestCenterOrEdge(targetData);
-
-      if (closestCenterOrEdge === 'center') {
-        // Move the element to the target container - should we double-check that the target is a container?
-        flushSync(() => {
-          dispatch(formElementMoved({ id: sourceData.element.id, containerId: targetData.element.id }));
-        });
-        // Flash the element that was moved
-        flashElement(sourceData.element.id);
-      } else if (closestCenterOrEdge) {
-        // Move the element to the target's parent container at the correct index
-        const { parentId } = targetData.element;
-        if (parentId === sourceData.element.id) {
-          // Cannot move an element into itself
-          return;
-        }
-        assert(parentId !== undefined, 'Target element should have a parent');
-
-        const isReparenting = parentId !== sourceData.element.parentId;
-
-        const parentContainer = getElement(parentId, isContainerElement);
-        const targetIndex = parentContainer.data.children.findIndex((elementId) => elementId === targetData.element.id);
-
-        let index: number | undefined = undefined;
-
-        if (!isReparenting) {
-          const sourceIndex = parentContainer.data.children.findIndex(
-            (elementId) => elementId === sourceData.element.id
-          );
-          if (
-            sourceIndex === targetIndex ||
-            sourceIndex === adjustIndexForFormElementMoveDrop(targetIndex, closestCenterOrEdge)
-          ) {
-            return;
-          }
-          index = targetIndex;
-        } else {
-          index = adjustIndexForFormElementMoveDrop(targetIndex, closestCenterOrEdge);
-        }
-
-        flushSync(() => {
-          dispatch(
-            formElementMoved({
-              id: sourceData.element.id,
-              containerId: parentId,
-              index,
-            })
-          );
-        });
-        // Flash the element that was moved
-        flashElement(sourceData.element.id);
-      } else {
-        // No container, cannot do anything
-        return;
-      }
-    },
-    [dispatch]
-  );
-
-  const handleAddFormElementDrop = useCallback(
-    (sourceData: AddFormElementDndData, targetData: MoveFormElementDndData) => {
-      const closestCenterOrEdge = extractClosestCenterOrEdge(targetData);
-
-      if (closestCenterOrEdge === 'center') {
-        // Move the element to the target container - should we double-check that the target is a container?
-        const { element } = sourceData;
-        flushSync(() => {
-          dispatch(formElementAdded({ element, containerId: targetData.element.id }));
-        });
-        flashElement(element.id);
-      } else if (closestCenterOrEdge) {
-        // Move the element to the target's parent container at the correct index
-        const { parentId } = targetData.element;
-        assert(parentId !== undefined, 'Target element should have a parent');
-        const { element } = sourceData;
-
-        const parentContainer = getElement(parentId, isContainerElement);
-        const targetIndex = parentContainer.data.children.findIndex((elementId) => elementId === targetData.element.id);
-
-        const index = adjustIndexForNodeFieldDrop(targetIndex, closestCenterOrEdge);
-
-        flushSync(() => {
-          dispatch(
-            formElementAdded({
-              element,
-              containerId: parentId,
-              index,
-            })
-          );
-        });
-        flashElement(element.id);
-      } else {
-        // No container, cannot do anything
-        return;
-      }
-    },
-    [dispatch]
-  );
-
-  const handleNodeFieldDrop = useCallback(
-    (sourceData: NodeFieldDndData, targetData: MoveFormElementDndData) => {
-      const closestCenterOrEdge = extractClosestCenterOrEdge(targetData);
-      const { fieldIdentifier, fieldType } = sourceData;
-      const { nodeId, fieldName } = fieldIdentifier;
-
-      if (closestCenterOrEdge === 'center') {
-        // Move the element to the target container - should we double-check that the target is a container?
-        const element = buildNodeField(nodeId, fieldName, fieldType, targetData.element.id);
-        flushSync(() => {
-          dispatch(formElementAdded({ element, containerId: targetData.element.id }));
-        });
-        flashElement(element.id);
-      } else if (closestCenterOrEdge) {
-        // Move the element to the target's parent container at the correct index
-        const { parentId } = targetData.element;
-        assert(parentId !== undefined, 'Target element should have a parent');
-        const element = buildNodeField(nodeId, fieldName, fieldType, parentId);
-
-        const parentContainer = getElement(parentId, isContainerElement);
-        const targetIndex = parentContainer.data.children.findIndex((elementId) => elementId === targetData.element.id);
-
-        const index = adjustIndexForNodeFieldDrop(targetIndex, closestCenterOrEdge);
-
-        flushSync(() => {
-          dispatch(
-            formElementAdded({
-              element,
-              containerId: parentId,
-              index,
-            })
-          );
-        });
-        flashElement(element.id);
-      } else {
-        // No container, cannot do anything
-        return;
-      }
-    },
-    [dispatch]
-  );
-
   useEffect(() => {
     return monitorForElements({
-      canMonitor: ({ source }) =>
-        isMoveFormElementDndData(source.data) ||
-        isNodeFieldDndData(source.data) ||
-        isAddFormElementDndData(source.data),
+      canMonitor: ({ source }) => isFormElementDndData(source.data),
       onDrop: ({ location, source }) => {
         const target = location.current.dropTargets[0];
         if (!target) {
           return;
         }
 
-        const sourceData = source.data;
         const targetData = target.data;
+        const sourceData = source.data;
 
-        if (isMoveFormElementDndData(targetData) && isMoveFormElementDndData(sourceData)) {
-          handleMoveFormElementDrop(sourceData, targetData);
+        if (!isFormElementDndData(targetData) && !isRootContainerDndData(targetData)) {
           return;
         }
 
-        if (isMoveFormElementDndData(targetData) && isAddFormElementDndData(sourceData)) {
-          handleAddFormElementDrop(sourceData, targetData);
+        if (!isFormElementDndData(sourceData)) {
           return;
         }
 
-        if (isMoveFormElementDndData(targetData) && isNodeFieldDndData(sourceData)) {
-          handleNodeFieldDrop(sourceData, targetData);
+        const isAddingNewElement = !elementExists(sourceData.element.id);
+
+        // Appending a new element to the root container
+        if (isAddingNewElement && isRootContainerDndData(targetData)) {
+          log.debug('Adding new element to empty root');
+          flushSync(() => {
+            dispatch(
+              formElementAdded({
+                element: sourceData.element,
+                containerId: undefined,
+                index: undefined,
+              })
+            );
+          });
+          flashElement(sourceData.element.id);
           return;
         }
+
+        // Inserting a new element - maybe to root, maybe to a container
+        if (isAddingNewElement && isFormElementDndData(targetData) && targetData.element.parentId === undefined) {
+          const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
+
+          // Adding to an empty container
+          if (closestEdgeOfTarget === 'center') {
+            log.debug('Adding new element to empty container');
+            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            flushSync(() => {
+              dispatch(
+                formElementAdded({
+                  element: sourceData.element,
+                  containerId: targetData.element.id,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          } else {
+            // Adding to the root
+            log.debug('Inserting new element into root');
+            // closestEdgeOfTarget !== 'center'
+            const layout = getLayout();
+            const indexOfTarget = layout.indexOf(targetData.element.id);
+            const index = getReorderDestinationIndex({
+              startIndex: indexOfTarget + 1,
+              indexOfTarget,
+              closestEdgeOfTarget,
+              axis: 'vertical',
+            });
+            flushSync(() => {
+              dispatch(
+                formElementAdded({
+                  element: sourceData.element,
+                  containerId: undefined,
+                  index,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          }
+        }
+
+        // Inserting a new element into a container
+        if (isAddingNewElement && isFormElementDndData(targetData) && targetData.element.parentId !== undefined) {
+          const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
+
+          // Adding to an empty container
+          if (closestEdgeOfTarget === 'center') {
+            log.debug('Adding new element to empty container');
+            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            flushSync(() => {
+              dispatch(
+                formElementAdded({
+                  element: sourceData.element,
+                  containerId: targetData.element.id,
+                  index: undefined,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          } else {
+            log.debug('Inserting new element into container');
+            const container = getElement(targetData.element.parentId, isContainerElement);
+            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const index = getReorderDestinationIndex({
+              startIndex: indexOfTarget + 1,
+              indexOfTarget,
+              closestEdgeOfTarget,
+              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
+            });
+            flushSync(() => {
+              dispatch(
+                formElementAdded({
+                  element: sourceData.element,
+                  containerId: container.id,
+                  index,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          }
+        }
+
+        // Reparenting an existing element to the root, appending it to the end
+        if (!isAddingNewElement && isRootContainerDndData(targetData) && sourceData.element.parentId !== undefined) {
+          log.debug('Reparenting element from container to empty root');
+
+          flushSync(() => {
+            dispatch(
+              formElementReparented({
+                id: sourceData.element.id,
+                containerId: undefined,
+                index: undefined,
+              })
+            );
+          });
+          flashElement(sourceData.element.id);
+          return;
+        }
+
+        // This should never happen - the root is a dnd target _only_ when it is empty and we are adding a new element!
+        if (!isAddingNewElement && isRootContainerDndData(targetData)) {
+          log.error('Attempted to move an existing element to the root directly!');
+          return;
+        }
+
+        // Moving an existing element within the root
+        if (
+          !isAddingNewElement &&
+          isFormElementDndData(targetData) &&
+          targetData.element.parentId === undefined &&
+          sourceData.element.parentId === undefined
+        ) {
+          const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
+
+          if (closestEdgeOfTarget === 'center') {
+            log.debug('Reparenting element from root to empty container');
+            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: targetData.element.id,
+                  index: undefined,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          } else {
+            log.debug('Moving element within root');
+            const layout = getLayout();
+            const startIndex = layout.indexOf(sourceData.element.id);
+            const indexOfTarget = layout.indexOf(targetData.element.id);
+            const reorderedLayout = reorderWithEdge({
+              list: layout,
+              startIndex,
+              indexOfTarget,
+              closestEdgeOfTarget,
+              axis: 'vertical',
+            });
+            flushSync(() => {
+              dispatch(
+                formRootReordered({
+                  layout: reorderedLayout,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          }
+        }
+
+        // Moving an existing element within a container
+        if (
+          !isAddingNewElement &&
+          isFormElementDndData(targetData) &&
+          targetData.element.parentId !== undefined &&
+          sourceData.element.parentId !== undefined &&
+          targetData.element.parentId === sourceData.element.parentId
+        ) {
+          const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
+
+          if (closestEdgeOfTarget === 'center') {
+            log.debug('Reparenting element from a container to an empty container with same parent');
+            log.debug('Reparenting element from one container to an empty container');
+            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: targetData.element.id,
+                  index: undefined,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          } else {
+            log.debug('Moving element within container');
+            const container = getElement(targetData.element.parentId, isContainerElement);
+            const startIndex = container.data.children.indexOf(sourceData.element.id);
+            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const reorderedLayout = reorderWithEdge({
+              list: container.data.children,
+              startIndex,
+              indexOfTarget,
+              closestEdgeOfTarget,
+              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
+            });
+            flushSync(() => {
+              dispatch(
+                formContainerChildrenReordered({
+                  containerId: container.id,
+                  children: reorderedLayout,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          }
+        }
+
+        // Moving an existing element within a container
+        if (
+          !isAddingNewElement &&
+          isFormElementDndData(targetData) &&
+          targetData.element.parentId !== undefined &&
+          sourceData.element.parentId !== undefined &&
+          targetData.element.parentId !== sourceData.element.parentId
+        ) {
+          const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
+
+          if (closestEdgeOfTarget === 'center') {
+            log.debug('Reparenting element from one container to an empty container with different parent');
+            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: targetData.element.id,
+                  index: undefined,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          } else {
+            log.debug('Moving element from one container to another');
+            const container = getElement(targetData.element.parentId, isContainerElement);
+            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const index = getReorderDestinationIndex({
+              startIndex: container.data.children.length + 1,
+              indexOfTarget,
+              closestEdgeOfTarget,
+              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
+            });
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: container.id,
+                  index,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          }
+        }
+
+        // Moving an existing element from a container to root
+        if (
+          !isAddingNewElement &&
+          isFormElementDndData(targetData) &&
+          targetData.element.parentId === undefined &&
+          sourceData.element.parentId !== undefined
+        ) {
+          const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
+
+          if (closestEdgeOfTarget === 'center') {
+            log.debug('Reparenting element from container to empty container');
+            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: targetData.element.id,
+                  index: undefined,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          } else {
+            log.debug('Reparenting element from container to root');
+            const layout = getLayout();
+            const indexOfTarget = layout.indexOf(targetData.element.id);
+            const index = getReorderDestinationIndex({
+              startIndex: layout.length + 1,
+              indexOfTarget,
+              closestEdgeOfTarget,
+              axis: 'vertical',
+            });
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: undefined,
+                  index,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          }
+        }
+
+        // Moving an existing element from root to a container
+        if (
+          !isAddingNewElement &&
+          isFormElementDndData(targetData) &&
+          targetData.element.parentId !== undefined &&
+          sourceData.element.parentId === undefined
+        ) {
+          const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
+
+          if (closestEdgeOfTarget === 'center') {
+            log.debug('Reparenting element from root to empty container');
+            assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: targetData.element.id,
+                  index: undefined,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          } else {
+            log.debug('Reparenting element from root to container');
+            const container = getElement(targetData.element.parentId, isContainerElement);
+            const indexOfTarget = container.data.children.indexOf(targetData.element.id);
+            const index = getReorderDestinationIndex({
+              startIndex: indexOfTarget + 1,
+              indexOfTarget,
+              closestEdgeOfTarget,
+              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
+            });
+            flushSync(() => {
+              dispatch(
+                formElementReparented({
+                  id: sourceData.element.id,
+                  containerId: targetData.element.parentId,
+                  index,
+                })
+              );
+            });
+            flashElement(sourceData.element.id);
+            return;
+          }
+        }
+
+        log.warn({ targetData, sourceData }, 'Unhandled drop event!');
       },
     });
-  }, [handleAddFormElementDrop, handleMoveFormElementDrop, handleNodeFieldDrop]);
+  }, [dispatch]);
+};
+
+export const useRootContainerDropTarget = (ref: RefObject<HTMLElement>) => {
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const isEmpty = useAppSelector(selectFormIsEmpty);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) {
+      return;
+    }
+    return dropTargetForElements({
+      element,
+      canDrop: ({ source }) => isFormElementDndData(source.data) && isEmpty,
+      getData: () => buildRootContainerDndData(),
+      onDrag: ({ location, source }) => {
+        const innermostDropTargetElement = location.current.dropTargets.at(0)?.element;
+
+        // If the innermost target is not this draggable element, bail. We only want to react when dragging over _this_ element.
+        if (!innermostDropTargetElement || innermostDropTargetElement !== element) {
+          setIsDraggingOver(false);
+          return;
+        }
+
+        // Don't allow reparanting to the same container
+        if (source.element === element) {
+          setIsDraggingOver(false);
+          return;
+        }
+        setIsDraggingOver(true);
+      },
+      onDragLeave: () => {
+        setIsDraggingOver(false);
+      },
+      onDrop: () => {
+        setIsDraggingOver(false);
+      },
+    });
+  }, [isEmpty, ref]);
+
+  return isDraggingOver;
 };
 
 export const useDraggableFormElement = (
@@ -300,11 +539,9 @@ export const useDraggableFormElement = (
     return combine(
       firefoxDndFix(draggableElement),
       draggable({
-        // The root element is not draggable
-        canDrag: () => Boolean(_element.parentId),
         element: draggableElement,
         dragHandle: dragHandleElement,
-        getInitialData: () => buildMoveFormElementDndData(getElement(elementId)),
+        getInitialData: () => buildFormElementDndData(getElement(elementId)),
         onDragStart: () => {
           setIsDragging(true);
         },
@@ -315,18 +552,10 @@ export const useDraggableFormElement = (
       dropTargetForElements({
         element: draggableElement,
         canDrop: ({ source }) =>
-          (isMoveFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId) ||
-          isAddFormElementDndData(source.data) ||
-          isNodeFieldDndData(source.data),
+          isFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId,
         getData: ({ input }) => {
           const element = getElement(elementId);
-          const container = element.parentId
-            ? getElement(element.parentId, isContainerElement)
-            : isContainerElement(element)
-              ? element
-              : null;
-
-          const data = buildMoveFormElementDndData(element);
+          const targetData = buildFormElementDndData(element);
 
           const allowedCenterOrEdge: CenterOrEdge[] = [];
 
@@ -334,15 +563,22 @@ export const useDraggableFormElement = (
             allowedCenterOrEdge.push('center');
           }
 
-          if (element.parentId !== undefined && container?.data.layout === 'row') {
-            allowedCenterOrEdge.push('left', 'right');
+          if (element.parentId !== undefined) {
+            const parentContainer = getElement(element.parentId, isContainerElement);
+            if (parentContainer.data.layout === 'row') {
+              allowedCenterOrEdge.push('left', 'right');
+            } else {
+              // parentContainer.data.layout === 'row'
+              allowedCenterOrEdge.push('top', 'bottom');
+            }
           }
 
-          if (element.parentId !== undefined && container?.data.layout === 'column') {
+          if (element.parentId === undefined) {
+            // Root container
             allowedCenterOrEdge.push('top', 'bottom');
           }
 
-          return attachClosestCenterOrEdge(data, {
+          return attachClosestCenterOrEdge(targetData, {
             element: draggableElement,
             input,
             allowedCenterOrEdge,
@@ -380,4 +616,40 @@ export const useDraggableFormElement = (
   }, [dragHandleRef, draggableRef, elementId]);
 
   return [activeDropRegion, isDragging] as const;
+};
+
+export const useNodeFieldDnd = (
+  fieldIdentifier: FieldIdentifier,
+  fieldTemplate: FieldInputTemplate,
+  draggableRef: RefObject<HTMLElement>,
+  dragHandleRef: RefObject<HTMLElement>
+) => {
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const draggableElement = draggableRef.current;
+    const dragHandleElement = dragHandleRef.current;
+    if (!draggableElement || !dragHandleElement) {
+      return;
+    }
+    return combine(
+      firefoxDndFix(draggableElement),
+      draggable({
+        element: draggableElement,
+        dragHandle: dragHandleElement,
+        getInitialData: () => {
+          const element = buildNodeFieldElement(fieldIdentifier.nodeId, fieldIdentifier.fieldName, fieldTemplate.type);
+          return buildFormElementDndData(element);
+        },
+        onDragStart: () => {
+          setIsDragging(true);
+        },
+        onDrop: () => {
+          setIsDragging(false);
+        },
+      })
+    );
+  }, [dragHandleRef, draggableRef, fieldIdentifier, fieldTemplate.type]);
+
+  return isDragging;
 };
