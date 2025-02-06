@@ -8,8 +8,8 @@ import { FormElementComponent } from 'features/nodes/components/sidePanel/builde
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import {
   buildFormElementDndData,
-  useMonitorForFormElementDnd,
-  useRootContainerDropTarget,
+  useBuilderDndMonitor,
+  useRootDnd,
 } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
 import {
   formModeChanged,
@@ -31,7 +31,7 @@ export const WorkflowBuilder = memo(() => {
   const mode = useAppSelector(selectWorkflowFormMode);
   const dispatch = useAppDispatch();
   const isEmpty = useAppSelector(selectFormIsEmpty);
-  useMonitorForFormElementDnd();
+  useBuilderDndMonitor();
 
   const resetForm = useCallback(() => {
     dispatch(formReset());
@@ -105,7 +105,7 @@ EmptyStateViewMode.displayName = 'EmptyStateViewMode';
 const EmptyStateEditMode = memo(() => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
-  const isDragging = useRootContainerDropTarget(ref);
+  const isDragging = useRootDnd(ref);
 
   return (
     <Flex

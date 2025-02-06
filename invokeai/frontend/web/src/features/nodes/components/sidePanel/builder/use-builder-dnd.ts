@@ -9,6 +9,7 @@ import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/r
 import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { parseify } from 'common/util/serialize';
 import { firefoxDndFix, triggerPostMoveFlash } from 'features/dnd/util';
@@ -86,7 +87,8 @@ const flashElement = (elementId: ElementId) => {
   }
 };
 
-export const useMonitorForFormElementDnd = () => {
+export const useBuilderDndMonitor = () => {
+  useAssertSingleton('useBuilderDndMonitor');
   const dispatch = useAppDispatch();
 
   const dispatchAndFlash = useCallback(
@@ -460,7 +462,7 @@ export const useMonitorForFormElementDnd = () => {
   }, [dispatchAndFlash]);
 };
 
-export const useRootContainerDropTarget = (ref: RefObject<HTMLElement>) => {
+export const useRootDnd = (ref: RefObject<HTMLElement>) => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const isEmpty = useAppSelector(selectFormIsEmpty);
   useEffect(() => {
@@ -500,7 +502,7 @@ export const useRootContainerDropTarget = (ref: RefObject<HTMLElement>) => {
   return isDraggingOver;
 };
 
-export const useDraggableFormElement = (
+export const useFormElementDnd = (
   elementId: ElementId,
   draggableRef: RefObject<HTMLElement>,
   dragHandleRef: RefObject<HTMLElement>
