@@ -64,7 +64,7 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
         data-layout={containerCtx?.layout}
       >
         <FormElementEditModeHeader ref={dragHandleRef} element={element} />
-        <Flex w="full" h="full" p={4} alignItems="center" gap={4}>
+        <Flex w="full" h="full" p={4} gap={4}>
           {children}
         </Flex>
       </Flex>

@@ -22,7 +22,6 @@ import type {
   WorkflowV3,
 } from 'features/nodes/types/workflow';
 import {
-  buildContainer,
   isContainerElement,
   isHeadingElement,
   isNodeFieldElement,
@@ -53,7 +52,6 @@ const formElementDataChangedReducer = <T extends FormElement>(
 };
 
 const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
-  const rootElement = buildContainer('column', []);
   return {
     name: '',
     author: '',
@@ -65,12 +63,7 @@ const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
     exposedFields: [],
     meta: { version: '3.0.0', category: 'user' },
     id: undefined,
-    form: {
-      elements: {
-        [rootElement.id]: rootElement,
-      },
-      rootElementId: rootElement.id,
-    },
+    form: undefined,
   };
 };
 
@@ -194,7 +187,11 @@ export const workflowSlice = createSlice({
         return;
       }
       const { id } = action.payload;
-      recursivelyRemoveElement({ id, formState: state.form });
+      if (id === state.form.rootElementId) {
+        state.form = undefined;
+      } else {
+        recursivelyRemoveElement({ id, formState: state.form });
+      }
     },
     formElementMoved: (state, action: PayloadAction<{ id: string; containerId: string; index?: number }>) => {
       if (!state.form) {
