@@ -4,7 +4,7 @@ import { useContainerContext } from 'features/nodes/components/sidePanel/builder
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { EDIT_MODE_WRAPPER_CLASS_NAME, getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
-import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
+import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd';
 import type { FormElement } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
 import { memo, useRef } from 'react';

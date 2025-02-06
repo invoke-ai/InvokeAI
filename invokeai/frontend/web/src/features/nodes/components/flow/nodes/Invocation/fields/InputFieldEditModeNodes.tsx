@@ -2,7 +2,7 @@ import { Flex, FormControl, Spacer } from '@invoke-ai/ui-library';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { InputFieldNotesIconButtonEditable } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonEditable';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
-import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
+import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/dnd';
 import { useInputFieldConnectionState } from 'features/nodes/hooks/useInputFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
