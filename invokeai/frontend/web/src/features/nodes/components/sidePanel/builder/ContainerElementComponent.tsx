@@ -1,4 +1,5 @@
-import { Flex, type SystemStyleObject } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   ContainerContextProvider,
@@ -21,6 +22,7 @@ import {
   isTextElement,
 } from 'features/nodes/types/workflow';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -72,6 +74,7 @@ export const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerEl
 ContainerElementComponentViewMode.displayName = 'ContainerElementComponentViewMode';
 
 export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }) => {
+  const { t } = useTranslation();
   const depth = useDepthContext();
   const { id, data } = el;
   const { children, layout } = data;
@@ -84,6 +87,11 @@ export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerEl
             {children.map((childId) => (
               <FormElementComponent key={childId} id={childId} />
             ))}
+            {children.length === 0 && (
+              <Flex p={4} w="full" h="full" alignItems="center" justifyContent="center">
+                <Text variant="subtext">{t('workflows.builder.emptyContainerPlaceholder')}</Text>
+              </Flex>
+            )}
           </Flex>
         </ContainerContextProvider>
       </DepthContextProvider>
