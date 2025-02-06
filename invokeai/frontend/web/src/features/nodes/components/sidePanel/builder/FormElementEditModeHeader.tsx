@@ -24,6 +24,8 @@ const sx: SystemStyleObject = {
   w: 'full',
   ps: 2,
   h: 8,
+  minH: 8,
+  maxH: 8,
   borderTopRadius: 'inherit',
   borderColor: 'inherit',
   alignItems: 'center',

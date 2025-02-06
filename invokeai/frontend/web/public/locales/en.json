@@ -1707,7 +1707,8 @@
             "component": "Component",
             "numberInput": "Number Input",
             "slider": "Slider",
-            "both": "Both"
+            "both": "Both",
+            "emptyContainerPlaceholder": "Drag an element into this container."
         }
     },
     "controlLayers": {
