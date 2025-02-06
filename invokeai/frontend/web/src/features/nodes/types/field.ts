@@ -36,13 +36,13 @@ const zFieldInput = z.enum(['connection', 'direct', 'any']);
 const zFieldUIComponent = z.enum(['none', 'textarea', 'slider']);
 const zFieldInputInstanceBase = z.object({
   name: z.string().trim().min(1),
-  label: z.string().nullish(),
-  description: z.string().nullish(),
+  label: z.string().catch(''),
+  description: z.string().catch(''),
 });
 const zFieldTemplateBase = z.object({
   name: z.string().min(1),
   title: z.string().min(1),
-  description: z.string().nullish(),
+  description: z.string().catch(''),
   ui_hidden: z.boolean(),
   ui_type: z.string().nullish(),
   ui_order: z.number().int().nullish(),

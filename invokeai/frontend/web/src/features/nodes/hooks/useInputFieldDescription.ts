@@ -10,9 +10,9 @@ export const useInputFieldDescription = (nodeId: string, fieldName: string) => {
       createSelector(selectNodesSlice, (nodes) => {
         const node = nodes.nodes.find((node) => node.id === nodeId);
         if (!isInvocationNode(node)) {
-          return;
+          return '';
         }
-        return node?.data.inputs[fieldName]?.description;
+        return node?.data.inputs[fieldName]?.description ?? '';
       }),
     [fieldName, nodeId]
   );
