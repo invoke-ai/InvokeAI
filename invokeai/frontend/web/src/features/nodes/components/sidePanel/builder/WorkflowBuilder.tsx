@@ -10,7 +10,7 @@ import {
   buildFormElementDndData,
   useBuilderDndMonitor,
   useRootDnd,
-} from 'features/nodes/components/sidePanel/builder/use-builder-dnd';
+} from 'features/nodes/components/sidePanel/builder/dnd';
 import {
   formModeChanged,
   formReset,
