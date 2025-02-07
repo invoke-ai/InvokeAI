@@ -1,6 +1,9 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, forwardRef, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import {
+  NodeFieldElementResetToInitialValueIconButton,
+} from 'features/nodes/components/flow/nodes/Invocation/fields/NodeFieldElementResetToInitialValueIconButton';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
@@ -52,6 +55,7 @@ export const FormElementEditModeHeader = memo(
         <Spacer />
         {isContainerElement(element) && <ContainerElementSettings element={element} />}
         {isNodeFieldElement(element) && <NodeFieldElementSettings element={element} />}
+        {isNodeFieldElement(element) && <NodeFieldElementResetToInitialValueIconButton element={element} />}
         <IconButton
           aria-label="delete"
           onClick={removeElement}

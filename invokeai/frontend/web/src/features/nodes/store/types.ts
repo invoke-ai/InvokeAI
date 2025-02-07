@@ -40,4 +40,5 @@ export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   orderBy?: WorkflowRecordOrderBy;
   orderDirection: SQLiteDirection;
   categorySections: Record<string, boolean>;
+  formFieldInitialValues: Record<string, StatefulFieldValue>;
 };
