@@ -26,7 +26,7 @@ export const TextElementComponent = memo(({ id }: { id: string }) => {
 });
 TextElementComponent.displayName = 'TextElementComponent';
 
-export const TextElementComponentViewMode = memo(({ el }: { el: TextElement }) => {
+const TextElementComponentViewMode = memo(({ el }: { el: TextElement }) => {
   const { id, data } = el;
   const { content } = data;
 
@@ -47,7 +47,7 @@ const TextContentDisplay = memo(({ content, ...rest }: { content: string } & Tex
 });
 TextContentDisplay.displayName = 'TextContentDisplay';
 
-export const TextElementComponentEditMode = memo(({ el }: { el: TextElement }) => {
+const TextElementComponentEditMode = memo(({ el }: { el: TextElement }) => {
   const { id } = el;
 
   return (
@@ -60,7 +60,7 @@ export const TextElementComponentEditMode = memo(({ el }: { el: TextElement }) =
 });
 TextElementComponentEditMode.displayName = 'TextElementComponentEditMode';
 
-export const EditableText = memo(({ el }: { el: TextElement }) => {
+const EditableText = memo(({ el }: { el: TextElement }) => {
   const dispatch = useAppDispatch();
   const { id, data } = el;
   const { content } = data;

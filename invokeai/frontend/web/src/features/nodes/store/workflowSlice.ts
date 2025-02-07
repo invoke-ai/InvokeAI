@@ -159,9 +159,6 @@ export const workflowSlice = createSlice({
     workflowSaved: (state) => {
       state.isTouched = false;
     },
-    formLoaded: (state, action: PayloadAction<{ elements: Record<string, FormElement>; layout: string[] }>) => {
-      state.form = action.payload;
-    },
     formReset: (state) => {
       state.form = {
         elements: {},
@@ -354,7 +351,6 @@ export const {
   workflowOrderByChanged,
   workflowOrderDirectionChanged,
   categorySectionsChanged,
-  formLoaded,
   formReset,
   formElementAdded,
   formElementRemoved,
