@@ -942,6 +942,7 @@
         "sourceNodeFieldDoesNotExist": "Invalid edge: source/output field {{node}}.{{field}} does not exist",
         "targetNodeFieldDoesNotExist": "Invalid edge: target/input field {{node}}.{{field}} does not exist",
         "deletedInvalidEdge": "Deleted invalid edge {{source}} -> {{target}}",
+        "deletedMissingNodeFieldFormElement": "Deleted missing form field: node {{nodeId}} field {{fieldName}}",
         "noConnectionInProgress": "No connection in progress",
         "node": "Node",
         "nodeOutputs": "Node Outputs",
