@@ -6,7 +6,7 @@ import {
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { buildNodeFieldElement, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
+import { buildNodeFieldElement, isNodeFieldElement, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
 import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import type { JsonObject } from 'type-fest';
@@ -249,6 +249,23 @@ export const validateWorkflow = async (
       const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
       _workflow.form.elements[element.id] = element;
       _workflow.form.layout.push(element.id);
+    }
+  }
+
+  for (const element of Object.values(_workflow.form.elements)) {
+    if (!isNodeFieldElement(element)) {
+      continue;
+    }
+    const { nodeId, fieldName } = element.data.fieldIdentifier;
+    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === nodeId);
+    const field = node?.data.inputs[fieldName];
+    if (!field) {
+      // The form element field no longer exists on the node
+      delete _workflow.form.elements[element.id];
+      warnings.push({
+        message: t('nodes.deletedMissingNodeFieldFormElement', { nodeId, fieldName }),
+        data: { nodeId, fieldName },
+      });
     }
   }
 
