@@ -13,7 +13,7 @@ const WorkflowFieldsLinearViewPanel = () => {
     <Flex layerStyle="first" flexDir="column" w="full" h="full" borderRadius="base" p={2} gap={2}>
       <Tabs variant="line" display="flex" w="full" h="full" flexDir="column">
         <TabList>
-          <Tab>{t('common.builder')}</Tab>
+          <Tab>{t('workflows.builder.builder')}</Tab>
           <Tab>{t('common.linear')}</Tab>
           <Tab>{t('common.details')}</Tab>
           <Tab>JSON</Tab>
