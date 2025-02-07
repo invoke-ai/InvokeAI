@@ -74,10 +74,13 @@ export const zWorkflowV3 = z.object({
     category: zWorkflowCategory.default('user'),
     version: z.literal('3.0.0'),
   }),
-  form: z.object({
-    elements: z.record(z.lazy(() => zFormElement)),
-    layout: z.array(z.lazy(() => zElementId)),
-  }),
+  form: z
+    .object({
+      elements: z.record(z.lazy(() => zFormElement)),
+      layout: z.array(z.lazy(() => zElementId)),
+    })
+    // Catch must be a function else changes to the workflows parsed with this schema will mutate the catch value D:
+    .catch(() => ({ elements: {}, layout: [] })),
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion
