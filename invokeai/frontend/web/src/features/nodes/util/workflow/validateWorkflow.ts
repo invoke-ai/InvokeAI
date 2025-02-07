@@ -71,7 +71,7 @@ export const validateWorkflow = async (
   const { nodes, edges } = _workflow;
   const warnings: WorkflowWarning[] = [];
 
-  for (const [i, node] of nodes.entries()) {
+  for (const node of nodes) {
     if (!isWorkflowInvocationNode(node)) {
       // We don't need to validate Note nodes or CurrentImage nodes - only Invocation nodes
       continue;
@@ -94,7 +94,7 @@ export const validateWorkflow = async (
     if (getNeedsUpdate(node.data, template)) {
       try {
         const updatedNode = updateNode(node, template);
-        nodes[i] = updatedNode;
+        node.data = updatedNode.data;
       } catch (e) {
         const message = t('nodes.unableToUpdateNode', {
           node: node.id,
