@@ -20,10 +20,10 @@ type Props = {
   fieldName: string;
 };
 
-export const InputFieldNotesIconButtonEditable = memo(({ nodeId, fieldName }: Props) => {
+export const InputFieldDescriptionPopover = memo(({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const notes = useInputFieldDescription(nodeId, fieldName);
+  const description = useInputFieldDescription(nodeId, fieldName);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       dispatch(fieldDescriptionChanged({ nodeId, fieldName, val: e.target.value }));
@@ -36,8 +36,8 @@ export const InputFieldNotesIconButtonEditable = memo(({ nodeId, fieldName }: Pr
       <PopoverTrigger>
         <IconButton
           variant="ghost"
-          tooltip={t('nodes.notes')}
-          aria-label={t('nodes.notes')}
+          tooltip={t('nodes.description')}
+          aria-label={t('nodes.description')}
           icon={<PiNoteBold />}
           pointerEvents="auto"
           size="xs"
@@ -45,11 +45,11 @@ export const InputFieldNotesIconButtonEditable = memo(({ nodeId, fieldName }: Pr
       </PopoverTrigger>
       <PopoverContent p={2} w={256}>
         <FormControl orientation="vertical">
-          <FormLabel>{t('nodes.notes')}</FormLabel>
+          <FormLabel>{t('nodes.description')}</FormLabel>
           <Textarea
             className="nodrag nopan nowheel"
             fontSize="sm"
-            value={notes ?? ''}
+            value={description ?? ''}
             onChange={onChange}
             p={2}
             resize="none"
@@ -61,4 +61,4 @@ export const InputFieldNotesIconButtonEditable = memo(({ nodeId, fieldName }: Pr
   );
 });
 
-InputFieldNotesIconButtonEditable.displayName = 'InputFieldNotesIconButtonEditable';
+InputFieldDescriptionPopover.displayName = 'InputFieldDescriptionPopover';

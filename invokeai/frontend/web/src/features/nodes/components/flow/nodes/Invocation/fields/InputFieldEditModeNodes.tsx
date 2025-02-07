@@ -1,6 +1,6 @@
 import { Flex, FormControl, Spacer } from '@invoke-ai/ui-library';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
-import { InputFieldNotesIconButtonEditable } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldNotesIconButtonEditable';
+import { InputFieldDescriptionPopover } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldDescriptionPopover';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
 import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/dnd';
 import { useInputFieldConnectionState } from 'features/nodes/hooks/useInputFieldConnectionState';
@@ -82,7 +82,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
             <Spacer />
             {isHovered && (
               <>
-                <InputFieldNotesIconButtonEditable nodeId={nodeId} fieldName={fieldName} />
+                <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
                 <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
                 <InputFieldAddRemoveLinearViewIconButton nodeId={nodeId} fieldName={fieldName} />
               </>
