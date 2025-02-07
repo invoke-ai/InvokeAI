@@ -3,7 +3,7 @@ import { Box, Circle, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
 import { InputFieldDescriptionPopover } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldDescriptionPopover';
-import { InputFieldResetToInitialValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToInitialValueIconButton';
+import { InputFieldResetToInitialLinearViewValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToInitialLinearViewValueIconButton';
 import { useLinearViewFieldDnd } from 'features/nodes/components/sidePanel/workflow/useLinearViewFieldDnd';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
@@ -61,7 +61,7 @@ export const InputFieldEditModeLinear = memo(({ nodeId, fieldName }: Props) => {
             <Spacer />
             {isMouseOverNode && <Circle me={2} size={2} borderRadius="full" bg="invokeBlue.500" />}
             <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
-            <InputFieldResetToInitialValueIconButton nodeId={nodeId} fieldName={fieldName} />
+            <InputFieldResetToInitialLinearViewValueIconButton nodeId={nodeId} fieldName={fieldName} />
             <IconButton
               aria-label={t('nodes.removeLinearView')}
               tooltip={t('nodes.removeLinearView')}

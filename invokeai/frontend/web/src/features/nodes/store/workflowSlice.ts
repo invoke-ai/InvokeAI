@@ -10,10 +10,11 @@ import type {
   WorkflowMode,
   WorkflowsState as WorkflowState,
 } from 'features/nodes/store/types';
-import type { FieldIdentifier } from 'features/nodes/types/field';
+import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
   ContainerElement,
+  ElementId,
   FormElement,
   HeadingElement,
   NodeFieldElement,
@@ -70,6 +71,7 @@ const initialWorkflowState: WorkflowState = {
   isTouched: false,
   mode: 'view',
   originalExposedFieldValues: [],
+  formFieldInitialValues: {},
   searchTerm: '',
   orderBy: undefined, // initial value is decided in component
   orderDirection: 'DESC',
@@ -165,6 +167,17 @@ export const workflowSlice = createSlice({
         layout: [],
       };
     },
+    formElementNodeFieldInitialValueChanged: (
+      state,
+      action: PayloadAction<{ id: ElementId; value: StatefulFieldValue }>
+    ) => {
+      const { id, value } = action.payload;
+      const element = state.form?.elements[id];
+      if (!element || !isNodeFieldElement(element)) {
+        return;
+      }
+      state.formFieldInitialValues[id] = value;
+    },
     formElementAdded: (
       state,
       action: PayloadAction<{ element: FormElement; containerId?: string; index?: number }>
@@ -183,6 +196,7 @@ export const workflowSlice = createSlice({
       }
       const { id } = action.payload;
       removeElement({ id, formState: state.form });
+      delete state.formFieldInitialValues[id];
     },
     formRootReordered: (state, action: PayloadAction<{ layout: string[] }>) => {
       const { layout } = action.payload;
@@ -256,10 +270,34 @@ export const workflowSlice = createSlice({
         originalExposedFieldValues.push(originalExposedFieldValue);
       });
 
+      const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
+
+      for (const el of Object.values(workflowExtra.form.elements)) {
+        if (!isNodeFieldElement(el)) {
+          continue;
+        }
+        const { nodeId, fieldName } = el.data.fieldIdentifier;
+
+        const node = nodes.find((n) => n.id === nodeId);
+
+        if (!isInvocationNode(node)) {
+          return;
+        }
+
+        const field = node.data.inputs[fieldName];
+
+        if (!field) {
+          return;
+        }
+
+        formFieldInitialValues[el.id] = field.value;
+      }
+
       return {
         ...deepClone(initialWorkflowState),
         ...deepClone(workflowExtra),
         originalExposedFieldValues,
+        formFieldInitialValues,
         mode: state.mode,
       };
     });
@@ -360,6 +398,7 @@ export const {
   formElementHeadingDataChanged,
   formElementTextDataChanged,
   formElementNodeFieldDataChanged,
+  formElementNodeFieldInitialValueChanged,
   formElementContainerDataChanged,
   formModeChanged,
 } = workflowSlice.actions;
@@ -501,7 +540,7 @@ const addElement = (args: {
   element: FormElement;
   containerId?: string;
   index?: number;
-}) => {
+}): boolean => {
   const { formState, element, containerId, index } = args;
   const { elements } = formState;
 
@@ -510,15 +549,16 @@ const addElement = (args: {
     element.parentId = undefined;
     formState.elements[element.id] = element;
     formState.layout.splice(index ?? formState.layout.length, 0, element.id);
-    return;
+    return true;
   }
 
   const container = elements[containerId];
   if (!container || !isContainerElement(container)) {
-    return;
+    return false;
   }
 
   element.parentId = containerId;
   elements[element.id] = element;
   container.data.children.splice(index ?? container.data.children.length, 0, element.id);
+  return true;
 };
