@@ -1,4 +1,5 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { useClipboard } from 'common/hooks/useClipboard';
 import { ExternalLink } from 'features/gallery/components/ImageViewer/NoContentForViewer';
 import { useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -18,7 +19,7 @@ export const ErrorToastTitle = ({ errorType }: Props) => {
 
 export default function ErrorToastDescription({ errorType, isLocal, sessionId, errorMessage }: Props) {
   const { t } = useTranslation();
-
+  const clipboard = useClipboard();
   const description = useMemo(() => {
     if (errorType === 'OutOfMemoryError') {
       if (isLocal) {
@@ -38,7 +39,7 @@ export default function ErrorToastDescription({ errorType, isLocal, sessionId, e
     }
   }, [errorMessage, errorType, isLocal, t]);
 
-  const copySessionId = useCallback(() => navigator.clipboard.writeText(sessionId), [sessionId]);
+  const copySessionId = useCallback(() => clipboard.writeText(sessionId), [clipboard, sessionId]);
 
   return (
     <Flex flexDir="column">

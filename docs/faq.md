@@ -1,26 +1,18 @@
 # FAQ
 
-!!! info "How to Reinstall"
-
-    Many issues can be resolved by re-installing the application. You won't lose any data by re-installing. We suggest downloading the [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest) and using it to re-install the application. Consult the [installer guide](./installation/installer.md) for more information.
-
-    When you run the installer, you'll have an option to select the version to install. If you aren't ready to upgrade, you choose the current version to fix a broken install.
-
 If the troubleshooting steps on this page don't get you up and running, please either [create an issue] or hop on [discord] for help.
 
 ## How to Install
 
-You can download the latest installers [here](https://github.com/invoke-ai/InvokeAI/releases).
-
-Note that any releases marked as _pre-release_ are in a beta state. You may experience some issues, but we appreciate your help testing those! For stable/reliable installations, please install the [latest release].
+Follow the [Quick Start guide](./installation/quick_start.md) to install Invoke.
 
 ## Downloading models and using existing models
 
 The Model Manager tab in the UI provides a few ways to install models, including using your already-downloaded models. You'll see a popup directing you there on first startup. For more information, see the [model install docs].
 
-## Missing models after updating to v4
+## Missing models after updating from v3
 
-If you find some models are missing after updating to v4, it's likely they weren't correctly registered before the update and didn't get picked up in the migration.
+If you find some models are missing after updating from v3, it's likely they weren't correctly registered before the update and didn't get picked up in the migration.
 
 You can use the `Scan Folder` tab in the Model Manager UI to fix this. The models will either be in the old, now-unused `autoimport` folder, or your `models` folder.
 
@@ -37,114 +29,26 @@ Follow the same steps to scan and import the missing models.
 ## Slow generation
 
 - Check the [system requirements] to ensure that your system is capable of generating images.
-- Check the `ram` setting in `invokeai.yaml`. This setting tells Invoke how much of your system RAM can be used to cache models. Having this too high or too low can slow things down. That said, it's generally safest to not set this at all and instead let Invoke manage it.
-- Check the `vram` setting in `invokeai.yaml`. This setting tells Invoke how much of your GPU VRAM can be used to cache models. Counter-intuitively, if this setting is too high, Invoke will need to do a lot of shuffling of models as it juggles the VRAM cache and the currently-loaded model. The default value of 0.25 is generally works well for GPUs without 16GB or more VRAM. Even on a 24GB card, the default works well.
-- Check that your generations are happening on your GPU (if you have one). InvokeAI will log what is being used for generation upon startup. If your GPU isn't used, re-install to ensure the correct versions of torch get installed.
-- If you are on Windows, you may have exceeded your GPU's VRAM capacity and are using slower [shared GPU memory](#shared-gpu-memory-windows). There's a guide to opt out of this behaviour in the linked FAQ entry.
-
-## Shared GPU Memory (Windows)
-
-!!! tip "Nvidia GPUs with driver 536.40"
-
-    This only applies to current Nvidia cards with driver 536.40 or later, released in June 2023.
-
-When the GPU doesn't have enough VRAM for a task, Windows is able to allocate some of its CPU RAM to the GPU. This is much slower than VRAM, but it does allow the system to generate when it otherwise might no have enough VRAM.
-
-When shared GPU memory is used, generation slows down dramatically - but at least it doesn't crash.
-
-If you'd like to opt out of this behavior and instead get an error when you exceed your GPU's VRAM, follow [this guide from Nvidia](https://nvidia.custhelp.com/app/answers/detail/a_id/5490).
-
-Here's how to get the python path required in the linked guide:
-
-- Run `invoke.bat`.
-- Select option 2 for developer console.
-- At least one python path will be printed. Copy the path that includes your invoke installation directory (typically the first).
-
-## Installer cannot find python (Windows)
-
-Ensure that you checked **Add python.exe to PATH** when installing Python. This can be found at the bottom of the Python Installer window. If you already have Python installed, you can re-run the python installer, choose the Modify option and check the box.
+- Follow the [Low-VRAM mode guide](./features/low-vram.md) to optimize performance.
+- Check that your generations are happening on your GPU (if you have one). Invoke will log what is being used for generation upon startup. If your GPU isn't used, re-install to and ensure you select the appropriate GPU option.
+- If you are on Windows with an Nvidia GPU, you may have exceeded your GPU's VRAM capacity and are triggering Nvidia's "sysmem fallback". There's a guide to opt out of this behaviour in the [Low-VRAM mode guide](./features/low-vram.md).
 
 ## Triton error on startup
 
-This can be safely ignored. InvokeAI doesn't use Triton, but if you are on Linux and wish to dismiss the error, you can install Triton.
+This can be safely ignored. Invoke doesn't use Triton, but if you are on Linux and wish to dismiss the error, you can install Triton.
 
-## Updated to 3.4.0 and xformers can’t load C++/CUDA
+## Unable to Copy on Firefox
 
-An issue occurred with your PyTorch update. Follow these steps to fix :
+Firefox does not allow Invoke to directly access the clipboard by default. As a result, you may be unable to use certain copy functions. You can fix this by configuring Firefox to allow access to write to the clipboard:
 
-1. Launch your invoke.bat / invoke.sh and select the option to open the developer console
-2. Run:`pip install ".[xformers]" --upgrade --force-reinstall --extra-index-url https://download.pytorch.org/whl/cu121`
-   - If you run into an error with `typing_extensions`, re-open the developer console and run: `pip install -U typing-extensions`
-
-Note that v3.4.0 is an old, unsupported version. Please upgrade to the [latest release].
-
-## Install failed and says `pip` is out of date
-
-An out of date `pip` typically won't cause an installation to fail. The cause of the error can likely be found above the message that says `pip` is out of date.
-
-If you saw that warning but the install went well, don't worry about it (but you can update `pip` afterwards if you'd like).
+- Go to `about:config` and click the Accept button
+- Search for `dom.events.asyncClipboard.clipboardItem`
+- Set it to `true` by clicking the toggle button
+- Restart Firefox
 
 ## Replicate image found online
 
 Most example images with prompts that you'll find on the internet have been generated using different software, so you can't expect to get identical results. In order to reproduce an image, you need to replicate the exact settings and processing steps, including (but not limited to) the model, the positive and negative prompts, the seed, the sampler, the exact image size, any upscaling steps, etc.
-
-## OSErrors on Windows while installing dependencies
-
-During a zip file installation or an update, installation stops with an error like this:
-
-![broken-dependency-screenshot](./assets/troubleshooting/broken-dependency.png){:width="800px"}
-
-To resolve this, re-install the application as described above.
-
-## HuggingFace install failed due to invalid access token
-
-Some HuggingFace models require you to authenticate using an [access token].
-
-Invoke doesn't manage this token for you, but it's easy to set it up:
-
-- Follow the instructions in the link above to create an access token. Copy it.
-- Run the launcher script.
-- Select option 2 (developer console).
-- Paste the following command:
-
-  ```sh
-  python -c "import huggingface_hub; huggingface_hub.login()"
-  ```
-
-- Paste your access token when prompted and press Enter. You won't see anything when you paste it.
-- Type `n` if prompted about git credentials.
-
-If you get an error, try the command again - maybe the token didn't paste correctly.
-
-Once your token is set, start Invoke and try downloading the model again. The installer will automatically use the access token.
-
-If the install still fails, you may not have access to the model.
-
-## Stable Diffusion XL generation fails after trying to load UNet
-
-InvokeAI is working in other respects, but when trying to generate
-images with Stable Diffusion XL you get a "Server Error". The text log
-in the launch window contains this log line above several more lines of
-error messages:
-
-`INFO --> Loading model:D:\LONG\PATH\TO\MODEL, type sdxl:main:unet`
-
-This failure mode occurs when there is a network glitch during
-downloading the very large SDXL model.
-
-To address this, first go to the Model Manager and delete the
-Stable-Diffusion-XL-base-1.X model. Then, click the HuggingFace tab,
-paste the Repo ID stabilityai/stable-diffusion-xl-base-1.0 and install
-the model.
-
-## Package dependency conflicts during installation or update
-
-If you have previously installed InvokeAI or another Stable Diffusion
-package, the installer may occasionally pick up outdated libraries and
-either the installer or `invoke` will fail with complaints about
-library conflicts.
-
-To resolve this, re-install the application as described above.
 
 ## Invalid configuration file
 
@@ -154,64 +58,9 @@ This is caused by an invalid setting in the `invokeai.yaml` configuration file. 
 
 Check the [configuration docs] for more detail about the settings and how to specify them.
 
-## `ModuleNotFoundError: No module named 'controlnet_aux'`
+## Out of Memory Errors
 
-`controlnet_aux` is a dependency of Invoke and appears to have been packaged or distributed strangely. Sometimes, it doesn't install correctly. This is outside our control.
-
-If you encounter this error, the solution is to remove the package from the `pip` cache and re-run the Invoke installer so a fresh, working version of `controlnet_aux` can be downloaded and installed:
-
-- Run the Invoke launcher
-- Choose the developer console option
-- Run this command: `pip cache remove controlnet_aux`
-- Close the terminal window
-- Download and run the [installer][latest release], selecting your current install location
-
-## Out of Memory Issues
-
-The models are large, VRAM is expensive, and you may find yourself
-faced with Out of Memory errors when generating images. Here are some
-tips to reduce the problem:
-
-!!! info "Optimizing for GPU VRAM"
-
-    === "4GB VRAM GPU"
-
-        This should be adequate for 512x512 pixel images using Stable Diffusion 1.5
-        and derived models, provided that you do not use the NSFW checker. It won't be loaded unless you go into the UI settings and turn it on.
-
-        If you are on a CUDA-enabled GPU, we will automatically use xformers or torch-sdp to reduce VRAM requirements, though you can explicitly configure this. See the [configuration docs].
-
-    === "6GB VRAM GPU"
-
-        This is a border case. Using the SD 1.5 series you should be able to
-        generate images up to 640x640 with the NSFW checker enabled, and up to
-        1024x1024 with it disabled.
-
-        If you run into persistent memory issues there are a series of
-        environment variables that you can set before launching InvokeAI that
-        alter how the PyTorch machine learning library manages memory. See
-        <https://pytorch.org/docs/stable/notes/cuda.html#memory-management> for
-        a list of these tweaks.
-
-    === "12GB VRAM GPU"
-
-        This should be sufficient to generate larger images up to about 1280x1280.
-  
-## Checkpoint Models Load Slowly or Use Too Much RAM
-
-The difference between diffusers models (a folder containing multiple
-subfolders) and checkpoint models (a file ending with .safetensors or
-.ckpt) is that InvokeAI is able to load diffusers models into memory
-incrementally, while checkpoint models must be loaded all at
-once. With very large models, or systems with limited RAM, you may
-experience slowdowns and other memory-related issues when loading
-checkpoint models.
-
-To solve this, go to the Model Manager tab (the cube), select the
-checkpoint model that's giving you trouble, and press the "Convert"
-button in the upper right of your browser window. This will convert the
-checkpoint into a diffusers model, after which loading should be
-faster and less memory-intensive.
+The models are large, VRAM is expensive, and you may find yourself faced with Out of Memory errors when generating images. Follow our [Low-VRAM mode guide](./features/low-vram.md) to configure Invoke to prevent these.
 
 ## Memory Leak (Linux)
 
@@ -253,8 +102,6 @@ Note the differences between memory allocated as chunks in an arena vs. memory a
 
 [model install docs]: ./installation/models.md
 [system requirements]: ./installation/requirements.md
-[latest release]: https://github.com/invoke-ai/InvokeAI/releases/latest
 [create an issue]: https://github.com/invoke-ai/InvokeAI/issues
 [discord]: https://discord.gg/ZmtBAhwWhy
 [configuration docs]: ./configuration.md
-[access token]: https://huggingface.co/docs/hub/security-tokens#how-to-manage-user-access-tokens

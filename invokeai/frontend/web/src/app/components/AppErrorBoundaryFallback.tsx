@@ -1,6 +1,7 @@
 import { Button, Flex, Heading, Image, Link, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useClipboard } from 'common/hooks/useClipboard';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import newGithubIssueUrl from 'new-github-issue-url';
@@ -20,15 +21,17 @@ const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLoc
 const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   const { t } = useTranslation();
   const isLocal = useAppSelector(selectIsLocal);
+  const clipboard = useClipboard();
 
   const handleCopy = useCallback(() => {
     const text = JSON.stringify(serializeError(error), null, 2);
-    navigator.clipboard.writeText(`\`\`\`\n${text}\n\`\`\``);
-    toast({
-      id: 'ERROR_COPIED',
-      title: t('toast.errorCopied'),
+    clipboard.writeText(`\`\`\`\n${text}\n\`\`\``, () => {
+      toast({
+        id: 'ERROR_COPIED',
+        title: t('toast.errorCopied'),
+      });
     });
-  }, [error, t]);
+  }, [clipboard, error, t]);
 
   const url = useMemo(() => {
     if (isLocal) {

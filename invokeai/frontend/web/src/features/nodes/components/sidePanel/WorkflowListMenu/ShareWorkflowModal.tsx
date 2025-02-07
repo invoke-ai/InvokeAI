@@ -15,6 +15,7 @@ import {
 import { useStore } from '@nanostores/react';
 import { $projectUrl } from 'app/store/nanostores/projectId';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { useClipboard } from 'common/hooks/useClipboard';
 import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { useCallback, useMemo } from 'react';
@@ -38,7 +39,7 @@ export const ShareWorkflowModal = () => {
   const workflowToShare = useStore($workflowToShare);
   const projectUrl = useStore($projectUrl);
   const { t } = useTranslation();
-
+  const clipboard = useClipboard();
   const workflowLink = useMemo(() => {
     if (!workflowToShare || !projectUrl) {
       return null;
@@ -50,13 +51,14 @@ export const ShareWorkflowModal = () => {
     if (!workflowLink) {
       return;
     }
-    navigator.clipboard.writeText(workflowLink);
-    toast({
-      status: 'success',
-      title: t('toast.linkCopied'),
+    clipboard.writeText(workflowLink, () => {
+      toast({
+        status: 'success',
+        title: t('toast.linkCopied'),
+      });
     });
     $workflowToShare.set(null);
-  }, [workflowLink, t]);
+  }, [workflowLink, clipboard, t]);
 
   return (
     <Modal isOpen={workflowToShare !== null} onClose={clearWorkflowToShare} isCentered size="lg" useInert={false}>
