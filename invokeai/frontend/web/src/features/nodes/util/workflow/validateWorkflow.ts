@@ -6,7 +6,7 @@ import {
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { isWorkflowInvocationNode } from 'features/nodes/types/workflow';
+import { buildNodeFieldElement, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import { keyBy } from 'lodash-es';
@@ -226,5 +226,27 @@ export const validateWorkflow = async (
       });
     }
   });
+
+  if (_workflow.exposedFields.length > 0 && Object.values(_workflow.form.elements).length === 0) {
+    // Migrated exposed fields to form elements
+    for (const { nodeId, fieldName } of _workflow.exposedFields) {
+      const node = keyedNodes[nodeId];
+      if (!node) {
+        continue;
+      }
+      const nodeTemplate = templates[node.data.type];
+      if (!nodeTemplate) {
+        continue;
+      }
+      const fieldTemplate = nodeTemplate.inputs[fieldName];
+      if (!fieldTemplate) {
+        continue;
+      }
+      const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
+      _workflow.form.elements[element.id] = element;
+      _workflow.form.layout.push(element.id);
+    }
+  }
+
   return { workflow: _workflow, warnings };
 };
