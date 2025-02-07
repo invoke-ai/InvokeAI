@@ -1699,6 +1699,7 @@
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
         "delete": "Delete",
         "builder": {
+            "builder": "Builder",
             "layout": "Layout",
             "row": "Row",
             "column": "Column",

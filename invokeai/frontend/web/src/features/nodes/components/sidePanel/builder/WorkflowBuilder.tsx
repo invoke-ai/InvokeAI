@@ -5,12 +5,12 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
 import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
-import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import {
   buildFormElementDndData,
   useBuilderDndMonitor,
   useRootDnd,
 } from 'features/nodes/components/sidePanel/builder/dnd';
+import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import {
   formModeChanged,
   formReset,
@@ -48,7 +48,7 @@ export const WorkflowBuilder = memo(() => {
   return (
     <ScrollableContent>
       <Flex justifyContent="center" w="full" h="full" p={4}>
-        <Flex flexDir="column" w={mode === 'view' ? '512px' : 'min-content'} h="full" minW="512px" gap={4}>
+        <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
           {mode === 'edit' && (
             <ButtonGroup isAttached={false} justifyContent="center">
               <AddFormElementDndButton type="row" />
@@ -75,7 +75,7 @@ const FormLayout = memo(() => {
   const layout = useAppSelector(selectFormLayout);
 
   return (
-    <Flex flexDir="column" gap={4} w="full" p={4} borderRadius="base">
+    <Flex flexDir="column" gap={4} w="full" borderRadius="base">
       {layout.map((id) => (
         <FormElementComponent key={id} id={id} />
       ))}
