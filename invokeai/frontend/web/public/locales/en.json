@@ -956,6 +956,7 @@
         "nodeVersion": "Node Version",
         "noOutputRecorded": "No outputs recorded",
         "notes": "Notes",
+        "description": "Description",
         "notesDescription": "Add notes about your workflow",
         "problemSettingTitle": "Problem Setting Title",
         "resetToDefaultValue": "Reset to default value",

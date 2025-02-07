@@ -6,7 +6,7 @@ type UseEditableArg = {
   defaultValue: string;
   onChange: (value: string) => void;
   onStartEditing?: () => void;
-  inputRef: RefObject<HTMLInputElement | HTMLTextAreaElement>;
+  inputRef?: RefObject<HTMLInputElement | HTMLTextAreaElement>;
 };
 
 export const useEditable = ({ value, defaultValue, onChange: _onChange, onStartEditing, inputRef }: UseEditableArg) => {
@@ -21,7 +21,7 @@ export const useEditable = ({ value, defaultValue, onChange: _onChange, onStartE
       _onChange(newValue);
     }
     setIsEditing(false);
-    inputRef.current?.setSelectionRange(0, 0);
+    inputRef?.current?.setSelectionRange(0, 0);
   }, [localValue, defaultValue, value, inputRef, _onChange]);
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -53,8 +53,8 @@ export const useEditable = ({ value, defaultValue, onChange: _onChange, onStartE
 
   useEffect(() => {
     if (isEditing) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+      inputRef?.current?.focus();
+      inputRef?.current?.select();
     }
   }, [inputRef, isEditing]);
 
