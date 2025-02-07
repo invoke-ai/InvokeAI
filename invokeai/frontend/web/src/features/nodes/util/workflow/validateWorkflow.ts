@@ -7,9 +7,8 @@ import {
 } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
-import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
+import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
-import { keyBy } from 'lodash-es';
 import type { JsonObject } from 'type-fest';
 
 import { parseAndMigrateWorkflow } from './migrations';
@@ -72,11 +71,11 @@ export const validateWorkflow = async (
   const { nodes, edges } = _workflow;
   const warnings: WorkflowWarning[] = [];
 
-  // We don't need to validate Note nodes or CurrentImage nodes - only Invocation nodes
-  const invocationNodes = nodes.filter(isWorkflowInvocationNode);
-  const keyedNodes = keyBy(invocationNodes, 'id');
-
-  for (const node of Object.values(invocationNodes)) {
+  for (const [i, node] of nodes.entries()) {
+    if (!isWorkflowInvocationNode(node)) {
+      // We don't need to validate Note nodes or CurrentImage nodes - only Invocation nodes
+      continue;
+    }
     const template = templates[node.data.type];
     if (!template) {
       // This node's type template does not exist
@@ -91,17 +90,22 @@ export const validateWorkflow = async (
       continue;
     }
 
+    // This node needs to be updated, based on comparison of its version to the template version
     if (getNeedsUpdate(node.data, template)) {
-      // This node needs to be updated, based on comparison of its version to the template version
-      const message = t('nodes.mismatchedVersion', {
-        node: node.id,
-        type: node.data.type,
-      });
-      warnings.push({
-        message,
-        data: parseify({ node, nodeTemplate: template }),
-      });
-      continue;
+      try {
+        const updatedNode = updateNode(node, template);
+        nodes[i] = updatedNode;
+      } catch (e) {
+        const message = t('nodes.unableToUpdateNode', {
+          node: node.id,
+          type: node.data.type,
+        });
+        warnings.push({
+          message,
+          data: parseify({ node, nodeTemplate: template }),
+        });
+        continue;
+      }
     }
 
     for (const input of Object.values(node.data.inputs)) {
@@ -150,8 +154,8 @@ export const validateWorkflow = async (
   }
   edges.forEach((edge, i) => {
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
-    const sourceNode = keyedNodes[edge.source];
-    const targetNode = keyedNodes[edge.target];
+    const sourceNode = nodes.find(({ id }) => id === edge.source);
+    const targetNode = nodes.find(({ id }) => id === edge.target);
     const sourceTemplate = sourceNode ? templates[sourceNode.data.type] : undefined;
     const targetTemplate = targetNode ? templates[targetNode.data.type] : undefined;
     const issues: string[] = [];
@@ -230,7 +234,7 @@ export const validateWorkflow = async (
   if (_workflow.exposedFields.length > 0 && Object.values(_workflow.form.elements).length === 0) {
     // Migrated exposed fields to form elements
     for (const { nodeId, fieldName } of _workflow.exposedFields) {
-      const node = keyedNodes[nodeId];
+      const node = nodes.find(({ id }) => id === nodeId);
       if (!node) {
         continue;
       }

@@ -934,6 +934,7 @@
         "noWorkflows": "No Workflows",
         "noMatchingWorkflows": "No Matching Workflows",
         "noWorkflow": "No Workflow",
+        "unableToUpdateNode": "Node update failed: node {{node}} of type {{type}} (may require deleting and recreating)",
         "mismatchedVersion": "Invalid node: node {{node}} of type {{type}} has mismatched version (try updating?)",
         "missingTemplate": "Invalid node: node {{node}} of type {{type}} missing template (not installed?)",
         "sourceNodeDoesNotExist": "Invalid edge: source/output node {{node}} does not exist",
