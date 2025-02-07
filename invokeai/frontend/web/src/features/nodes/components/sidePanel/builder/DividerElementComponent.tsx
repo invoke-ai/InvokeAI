@@ -39,7 +39,7 @@ export const DividerElementComponent = memo(({ id }: { id: string }) => {
 
 DividerElementComponent.displayName = 'DividerElementComponent';
 
-export const DividerElementComponentViewMode = memo(({ el }: { el: DividerElement }) => {
+const DividerElementComponentViewMode = memo(({ el }: { el: DividerElement }) => {
   const container = useContainerContext();
   const { id } = el;
 
@@ -58,7 +58,7 @@ export const DividerElementComponentViewMode = memo(({ el }: { el: DividerElemen
 
 DividerElementComponentViewMode.displayName = 'DividerElementComponentViewMode';
 
-export const DividerElementComponentEditMode = memo(({ el }: { el: DividerElement }) => {
+const DividerElementComponentEditMode = memo(({ el }: { el: DividerElement }) => {
   const container = useContainerContext();
   const { id } = el;
 

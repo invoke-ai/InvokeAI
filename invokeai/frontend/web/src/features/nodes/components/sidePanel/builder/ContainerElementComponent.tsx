@@ -37,7 +37,7 @@ const sx: SystemStyleObject = {
   },
 };
 
-export const ContainerElementComponent = memo(({ id }: { id: string }) => {
+const ContainerElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
   const mode = useAppSelector(selectWorkflowFormMode);
 
@@ -54,7 +54,7 @@ export const ContainerElementComponent = memo(({ id }: { id: string }) => {
 });
 ContainerElementComponent.displayName = 'ContainerElementComponent';
 
-export const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
+const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
   const { t } = useTranslation();
   const depth = useDepthContext();
   const { id, data } = el;
@@ -79,7 +79,7 @@ export const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerEl
 });
 ContainerElementComponentViewMode.displayName = 'ContainerElementComponentViewMode';
 
-export const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }) => {
+const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }) => {
   const { t } = useTranslation();
   const depth = useDepthContext();
   const { id, data } = el;

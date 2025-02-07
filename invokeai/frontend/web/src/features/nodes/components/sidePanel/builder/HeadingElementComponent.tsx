@@ -27,7 +27,7 @@ export const HeadingElementComponent = memo(({ id }: { id: string }) => {
 
 HeadingElementComponent.displayName = 'HeadingElementComponent';
 
-export const HeadingElementComponentViewMode = memo(({ el }: { el: HeadingElement }) => {
+const HeadingElementComponentViewMode = memo(({ el }: { el: HeadingElement }) => {
   const { id, data } = el;
   const { content } = data;
 
@@ -40,7 +40,7 @@ export const HeadingElementComponentViewMode = memo(({ el }: { el: HeadingElemen
 
 HeadingElementComponentViewMode.displayName = 'HeadingElementComponentViewMode';
 
-export const HeadingElementComponentEditMode = memo(({ el }: { el: HeadingElement }) => {
+const HeadingElementComponentEditMode = memo(({ el }: { el: HeadingElement }) => {
   const { id } = el;
 
   return (
@@ -63,7 +63,7 @@ HeadingContentDisplay.displayName = 'HeadingContentDisplay';
 
 HeadingElementComponentEditMode.displayName = 'HeadingElementComponentEditMode';
 
-export const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
+const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
   const dispatch = useAppDispatch();
   const { id, data } = el;
   const { content } = data;

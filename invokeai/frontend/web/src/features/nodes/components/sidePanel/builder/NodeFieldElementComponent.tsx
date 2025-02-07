@@ -39,7 +39,7 @@ export const NodeFieldElementComponent = memo(({ id }: { id: string }) => {
 
 NodeFieldElementComponent.displayName = 'NodeFieldElementComponent';
 
-export const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldElement }) => {
+const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
   const { fieldIdentifier, showLabel, showDescription } = data;
   const label = useInputFieldLabel(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
@@ -71,7 +71,7 @@ export const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldEl
 
 NodeFieldElementComponentViewMode.displayName = 'NodeFieldElementComponentViewMode';
 
-export const NodeFieldElementComponentEditMode = memo(({ el }: { el: NodeFieldElement }) => {
+const NodeFieldElementComponentEditMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
   const { fieldIdentifier, showLabel, showDescription } = data;
 
