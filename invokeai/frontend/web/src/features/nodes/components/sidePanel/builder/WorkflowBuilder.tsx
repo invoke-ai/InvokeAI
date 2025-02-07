@@ -1,6 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { Button, ButtonGroup, Flex, Text } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
@@ -56,11 +56,17 @@ export const WorkflowBuilder = memo(() => {
               <AddFormElementDndButton type="divider" />
               <AddFormElementDndButton type="heading" />
               <AddFormElementDndButton type="text" />
-              <Button onClick={setToViewMode}>{t('common.view')}</Button>
               <Button onClick={resetForm}>{t('common.reset')}</Button>
+              <Spacer />
+              <Button onClick={setToViewMode}>{t('common.view')}</Button>
             </ButtonGroup>
           )}
-          {mode === 'view' && !isEmpty && <Button onClick={setToEditMode}>{t('common.edit')}</Button>}
+          {mode === 'view' && !isEmpty && (
+            <ButtonGroup>
+              <Spacer />
+              <Button onClick={setToEditMode}>{t('common.edit')}</Button>
+            </ButtonGroup>
+          )}
           {!isEmpty && <FormLayout />}
           {mode === 'view' && isEmpty && <EmptyStateViewMode />}
           {mode === 'edit' && isEmpty && <EmptyStateEditMode />}
