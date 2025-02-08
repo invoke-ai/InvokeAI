@@ -46,7 +46,7 @@ const MODEL_FIELD_TYPES = [
  * - Validates the workflow against the node templates, warning if the template is not known.
  * - Attempts to update nodes which have a mismatched version.
  * - Removes edges which are invalid.
- * @param workflow The raw workflow object (e.g. JSON.parse(stringifiedWorklow))
+ * @param workflow The raw workflow object (e.g. JSON.parse(stringifiedWorkflow))
  * @param templates The node templates to validate against.
  * @throws {WorkflowVersionError} If the workflow version is not recognized.
  * @throws {z.ZodError} If there is a validation error.
