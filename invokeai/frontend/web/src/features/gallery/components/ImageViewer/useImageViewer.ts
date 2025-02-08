@@ -21,7 +21,7 @@ import type { ImageDTO } from 'services/api/types';
  *
  * We can hack around this, thanks to the fact that the image viewer is always opened on the first app startup. By the
  * time the user closes it, the resizable panels library has already done its one extra resize and the DOM layout has
- * stablized. So we can track the first time the image viewer is closed and fit the layers to the stage at that time,
+ * stabilized. So we can track the first time the image viewer is closed and fit the layers to the stage at that time,
  * ensuring that the bbox is centered in the canvas stage on that first app startup.
  *
  * TODO(psyche): Figure out a better way to do handle this...
