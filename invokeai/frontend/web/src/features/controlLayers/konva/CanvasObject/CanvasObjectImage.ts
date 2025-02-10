@@ -1,5 +1,6 @@
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
@@ -94,7 +95,6 @@ export class CanvasObjectImage extends CanvasModuleBase {
   }
 
   updateImageSource = async (imageName: string) => {
-    try {
       this.log.trace({ imageName }, 'Updating image source');
 
       this.isLoading = true;
@@ -107,23 +107,29 @@ export class CanvasObjectImage extends CanvasModuleBase {
 
       const imageDTO = await getImageDTOSafe(imageName);
       if (imageDTO === null) {
-        this.onFailedToLoadImage();
+      // ImageDTO not found (or network error)
+      this.onFailedToLoadImage(t('controlLayers.unableToFindImage', 'Unable to find image'));
         return;
       }
 
-      this.imageElement = await loadImage(imageDTO.image_url);
-      await this.updateImageElement();
-    } catch {
-      this.onFailedToLoadImage();
+    const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url));
+    if (imageElementResult.isErr()) {
+      // Image loading failed (e.g. the URL to the "physical" image is invalid)
+      this.onFailedToLoadImage(t('controlLayers.unableToLoadImage', 'Unable to load image'));
+      return;
     }
+
+    this.imageElement = imageElementResult.value;
+
+    await this.updateImageElement();
   };
 
-  onFailedToLoadImage = () => {
-    this.log({ image: this.state.image }, 'Failed to load image');
+  onFailedToLoadImage = (message: string) => {
+    this.log({ image: this.state.image }, message);
     this.konva.image?.visible(false);
     this.isLoading = false;
     this.isError = true;
-    this.konva.placeholder.text.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+    this.konva.placeholder.text.text(message);
     this.konva.placeholder.group.visible(true);
   };
 
