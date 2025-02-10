@@ -11,10 +11,10 @@ export const ErrorToastTitle = ({ errorType }: Props) => {
   const { t } = useTranslation();
 
   if (errorType === 'OutOfMemoryError') {
-    return t('toast.outOfMemoryError');
+    return <Text>{t('toast.outOfMemoryError')}</Text>;
   }
 
-  return t('toast.serverError');
+  return <Text>{t('toast.serverError')}</Text>;
 };
 
 export default function ErrorToastDescription({ errorType, isLocal, sessionId, errorMessage }: Props) {
