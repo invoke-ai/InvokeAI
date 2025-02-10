@@ -95,22 +95,22 @@ export class CanvasObjectImage extends CanvasModuleBase {
   }
 
   updateImageSource = async (imageName: string) => {
-      this.log.trace({ imageName }, 'Updating image source');
+    this.log.trace({ imageName }, 'Updating image source');
 
-      this.isLoading = true;
-      this.konva.group.visible(true);
+    this.isLoading = true;
+    this.konva.group.visible(true);
 
-      if (!this.konva.image) {
-        this.konva.placeholder.group.visible(false);
-        this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
-      }
+    if (!this.konva.image) {
+      this.konva.placeholder.group.visible(false);
+      this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
+    }
 
-      const imageDTO = await getImageDTOSafe(imageName);
-      if (imageDTO === null) {
+    const imageDTO = await getImageDTOSafe(imageName);
+    if (imageDTO === null) {
       // ImageDTO not found (or network error)
       this.onFailedToLoadImage(t('controlLayers.unableToFindImage', 'Unable to find image'));
-        return;
-      }
+      return;
+    }
 
     const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url));
     if (imageElementResult.isErr()) {
@@ -146,6 +146,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
             image: this.imageElement,
             width,
             height,
+            visible: true,
           });
         } else {
           this.log.trace('Creating new Konva image');
