@@ -123,10 +123,10 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         hideProgressIfSameSession();
       } else if (this.image.isLoading) {
         // noop - just wait for the image to load
-      } else if (this.image.isError) {
-        hideProgressIfSameSession();
       } else if (this.image.state.image.image_name !== image.image_name) {
         await this.image.update({ ...this.image.state, image }, true);
+        hideProgressIfSameSession();
+      } else if (this.image.isError) {
         hideProgressIfSameSession();
       }
       this.image.konva.group.visible(shouldShowStagedImage);
