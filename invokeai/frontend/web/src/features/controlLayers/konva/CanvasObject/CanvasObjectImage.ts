@@ -8,7 +8,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
-import { loadImage } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, loadImage } from 'features/controlLayers/konva/util';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
@@ -208,6 +208,10 @@ export class CanvasObjectImage extends CanvasModuleBase {
       isLoading: this.isLoading,
       isError: this.isError,
       state: deepClone(this.state),
+      konva: {
+        group: getKonvaNodeDebugAttrs(this.konva.group),
+        image: this.konva.image ? getKonvaNodeDebugAttrs(this.konva.image) : null,
+      },
     };
   };
 }
