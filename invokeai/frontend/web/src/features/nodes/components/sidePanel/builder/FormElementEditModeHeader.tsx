@@ -53,7 +53,6 @@ export const FormElementEditModeHeader = memo(
           {getHeaderLabel(element)} ({element.id})
         </Text>
         <Spacer />
-        {isNodeFieldElement(element) && <NodeFieldElementResetToInitialValueIconButton element={element} />}
         {isContainerElement(element) && <ContainerElementSettings element={element} />}
         {isNodeFieldElement(element) && <NodeFieldElementSettings element={element} />}
         <IconButton
