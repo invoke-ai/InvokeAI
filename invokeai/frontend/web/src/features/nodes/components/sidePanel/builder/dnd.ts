@@ -87,6 +87,32 @@ const flashElement = (elementId: ElementId) => {
   }
 };
 
+const getAllowedDropRegions = (element: FormElement): CenterOrEdge[] => {
+  const dropRegions: CenterOrEdge[] = [];
+
+  if (isContainerElement(element) && element.data.children.length === 0) {
+    dropRegions.push('center');
+  }
+
+  // Parent is a container
+  if (element.parentId !== undefined) {
+    const parentContainer = getElement(element.parentId, isContainerElement);
+    if (parentContainer.data.layout === 'row') {
+      dropRegions.push('left', 'right');
+    } else {
+      // parentContainer.data.layout === 'row'
+      dropRegions.push('top', 'bottom');
+    }
+  }
+
+  // Parent is the root
+  if (element.parentId === undefined) {
+    dropRegions.push('top', 'bottom');
+  }
+
+  return dropRegions;
+};
+
 export const useBuilderDndMonitor = () => {
   useAssertSingleton('useBuilderDndMonitor');
   const dispatch = useAppDispatch();
@@ -538,29 +564,10 @@ export const useFormElementDnd = (
           isFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId,
         getData: ({ input }) => {
           const element = getElement(elementId);
+
           const targetData = buildFormElementDndData(element);
 
-          const allowedCenterOrEdge: CenterOrEdge[] = [];
-
-          if (isContainerElement(element) && element.data.children.length === 0) {
-            allowedCenterOrEdge.push('center');
-          }
-
-          // Parent is a container
-          if (element.parentId !== undefined) {
-            const parentContainer = getElement(element.parentId, isContainerElement);
-            if (parentContainer.data.layout === 'row') {
-              allowedCenterOrEdge.push('left', 'right');
-            } else {
-              // parentContainer.data.layout === 'row'
-              allowedCenterOrEdge.push('top', 'bottom');
-            }
-          }
-
-          // Parent is the root
-          if (element.parentId === undefined) {
-            allowedCenterOrEdge.push('top', 'bottom');
-          }
+          const allowedCenterOrEdge = getAllowedDropRegions(element);
 
           return attachClosestCenterOrEdge(targetData, {
             element: draggableElement,
