@@ -13,15 +13,28 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { NodeFieldElementFloatSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementFloatSettings';
 import { NodeFieldElementIntegerConfig } from 'features/nodes/components/sidePanel/builder/NodeFieldElementIntegerSettings';
 import { NodeFieldElementStringSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringSettings';
+import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
-import type { NodeFieldElement } from 'features/nodes/types/workflow';
-import { memo, useCallback } from 'react';
+import {
+  isFloatFieldInputTemplate,
+  isIntegerFieldInputTemplate,
+  isStringFieldInputTemplate,
+} from 'features/nodes/types/field';
+import {
+  getFloatFieldSettingsDefaults,
+  getIntegerFieldSettingsDefaults,
+  getStringFieldSettingsDefaults,
+  type NodeFieldElement,
+} from 'features/nodes/types/workflow';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWrenchFill } from 'react-icons/pi';
 
 export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldElement }) => {
   const { id, data } = element;
-  const { showLabel, showDescription } = data;
+  const { showLabel, showDescription, fieldIdentifier } = data;
+  const { nodeId, fieldName } = fieldIdentifier;
+  const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
 
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -33,6 +46,23 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
   const toggleShowDescription = useCallback(() => {
     dispatch(formElementNodeFieldDataChanged({ id, changes: { showDescription: !showDescription } }));
   }, [dispatch, id, showDescription]);
+
+  // If settings are not present, set defaults based on field type.
+  const settings = useMemo(() => {
+    if (data.settings) {
+      return data.settings;
+    }
+    if (isIntegerFieldInputTemplate(fieldTemplate)) {
+      return getIntegerFieldSettingsDefaults();
+    }
+    if (isFloatFieldInputTemplate(fieldTemplate)) {
+      return getFloatFieldSettingsDefaults();
+    }
+    if (isStringFieldInputTemplate(fieldTemplate)) {
+      return getStringFieldSettingsDefaults();
+    }
+    return null;
+  }, [data.settings, fieldTemplate]);
 
   return (
     <Popover placement="top">
@@ -50,15 +80,9 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
             <FormLabel flex={1}>{t('workflows.builder.description')}</FormLabel>
             <Switch size="sm" isChecked={showDescription} onChange={toggleShowDescription} />
           </FormControl>
-          {data.settings?.type === 'integer-field-config' && (
-            <NodeFieldElementIntegerConfig id={id} config={data.settings} />
-          )}
-          {data.settings?.type === 'float-field-config' && (
-            <NodeFieldElementFloatSettings id={id} config={data.settings} />
-          )}
-          {data.settings?.type === 'string-field-config' && (
-            <NodeFieldElementStringSettings id={id} config={data.settings} />
-          )}
+          {settings?.type === 'integer-field-config' && <NodeFieldElementIntegerConfig id={id} config={settings} />}
+          {settings?.type === 'float-field-config' && <NodeFieldElementFloatSettings id={id} config={settings} />}
+          {settings?.type === 'string-field-config' && <NodeFieldElementStringSettings id={id} config={settings} />}
         </PopoverBody>
       </PopoverContent>
     </Popover>

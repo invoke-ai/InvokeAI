@@ -104,6 +104,7 @@ const zNodeFieldFloatSettings = z.object({
   type: z.literal(FLOAT_FIELD_SETTINGS_TYPE).default(FLOAT_FIELD_SETTINGS_TYPE),
   component: zNumberComponent.default('number-input'),
 });
+export const getFloatFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
 export type NodeFieldFloatSettings = z.infer<typeof zNodeFieldFloatSettings>;
 
 const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
@@ -111,6 +112,7 @@ const zIntegerFieldConfig = z.object({
   type: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
   component: zNumberComponent.default('number-input'),
 });
+export const getIntegerFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
 export type NodeFieldIntegerConfig = z.infer<typeof zIntegerFieldConfig>;
 
 export const zStringComponent = z.enum(['input', 'textarea']);
@@ -119,6 +121,7 @@ const zStringFieldConfig = z.object({
   type: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
   component: zStringComponent.default('input'),
 });
+export const getStringFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
 export type NodeFieldStringConfig = z.infer<typeof zStringFieldConfig>;
 
 const zNodeFieldData = z.object({
@@ -142,24 +145,15 @@ export const buildNodeFieldElement = (
   let settings: NodeFieldElement['data']['settings'] = undefined;
 
   if (fieldType.name === 'IntegerField' && fieldType.cardinality === 'SINGLE') {
-    settings = {
-      type: 'integer-field-config',
-      component: 'number-input',
-    };
+    settings = getIntegerFieldSettingsDefaults();
   }
 
   if (fieldType.name === 'FloatField' && fieldType.cardinality === 'SINGLE') {
-    settings = {
-      type: 'float-field-config',
-      component: 'number-input',
-    };
+    settings = getFloatFieldSettingsDefaults();
   }
 
   if (fieldType.name === 'StringField' && fieldType.cardinality === 'SINGLE') {
-    settings = {
-      type: 'string-field-config',
-      component: 'input',
-    };
+    settings = getStringFieldSettingsDefaults();
   }
 
   const element: NodeFieldElement = {
