@@ -205,6 +205,10 @@ export const useBuilderDndMonitor = () => {
         //#region Form elements
         if (isFormElementDndData(targetData)) {
           const targetElement = targetData.element;
+          if (sourceElement.id === targetElement.id) {
+            // Dropping on self is a no-op
+            return;
+          }
           const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
 
           if (isAddingNewElement && targetElement.parentId === undefined && closestEdgeOfTarget === 'center') {
