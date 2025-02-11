@@ -11,7 +11,7 @@ import {
   useRootDnd,
 } from 'features/nodes/components/sidePanel/builder/dnd';
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
-import { formReset, selectFormIsEmpty, selectFormLayout, selectWorkflowMode } from 'features/nodes/store/workflowSlice';
+import { formReset, selectFormIsEmpty, selectFormLayout } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
@@ -22,7 +22,6 @@ import { assert } from 'tsafe';
 
 export const WorkflowBuilder = memo(() => {
   const { t } = useTranslation();
-  const mode = useAppSelector(selectWorkflowMode);
   const dispatch = useAppDispatch();
   const isEmpty = useAppSelector(selectFormIsEmpty);
   useBuilderDndMonitor();
@@ -35,18 +34,16 @@ export const WorkflowBuilder = memo(() => {
     <ScrollableContent>
       <Flex justifyContent="center" w="full" h="full">
         <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
-          {mode === 'edit' && (
-            <ButtonGroup isAttached={false} justifyContent="center">
-              <AddFormElementDndButton type="container" />
-              <AddFormElementDndButton type="divider" />
-              <AddFormElementDndButton type="heading" />
-              <AddFormElementDndButton type="text" />
-              <Spacer />
-              <Button onClick={resetForm}>{t('common.reset')}</Button>
-            </ButtonGroup>
-          )}
+          <ButtonGroup isAttached={false} justifyContent="center">
+            <AddFormElementDndButton type="container" />
+            <AddFormElementDndButton type="divider" />
+            <AddFormElementDndButton type="heading" />
+            <AddFormElementDndButton type="text" />
+            <Spacer />
+            <Button onClick={resetForm}>{t('common.reset')}</Button>
+          </ButtonGroup>
           {!isEmpty && <FormLayout />}
-          {mode === 'edit' && isEmpty && <EmptyStateEditMode />}
+          {isEmpty && <EmptyStateEditMode />}
         </Flex>
       </Flex>
     </ScrollableContent>
