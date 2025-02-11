@@ -1,4 +1,4 @@
-import type { HeadingProps } from '@invoke-ai/ui-library';
+import type { HeadingProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
@@ -8,6 +8,7 @@ import { formElementHeadingDataChanged, selectWorkflowFormMode, useElement } fro
 import type { HeadingElement } from 'features/nodes/types/workflow';
 import { HEADING_CLASS_NAME, isHeadingElement } from 'features/nodes/types/workflow';
 import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const HeadingElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
@@ -52,10 +53,19 @@ const HeadingElementComponentEditMode = memo(({ el }: { el: HeadingElement }) =>
   );
 });
 
+const headingSx: SystemStyleObject = {
+  fontWeight: 'bold',
+  fontSize: '4xl',
+  '&[data-is-empty="true"]': {
+    opacity: 0.3,
+  },
+};
+
 const HeadingContentDisplay = memo(({ content, ...rest }: { content: string } & HeadingProps) => {
+  const { t } = useTranslation();
   return (
-    <Text fontWeight="bold" fontSize="4xl" {...rest}>
-      {content || 'Edit to add heading'}
+    <Text sx={headingSx} data-is-empty={content === ''} {...rest}>
+      {content || t('workflows.builder.headingPlaceholder')}
     </Text>
   );
 });
@@ -64,6 +74,7 @@ HeadingContentDisplay.displayName = 'HeadingContentDisplay';
 HeadingElementComponentEditMode.displayName = 'HeadingElementComponentEditMode';
 
 const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { id, data } = el;
   const { content } = data;
@@ -90,7 +101,7 @@ const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
   return (
     <AutosizeTextarea
       ref={ref}
-      placeholder="Heading"
+      placeholder={t('workflows.builder.headingPlaceholder')}
       {...editable.inputProps}
       variant="outline"
       overflowWrap="anywhere"

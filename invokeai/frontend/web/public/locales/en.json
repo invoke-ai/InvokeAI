@@ -1715,7 +1715,9 @@
             "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
             "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",
             "emptyContainerPlaceholderViewMode": "Empty container!",
-            "emptyContainerPlaceholderEditMode": "Drag a form element or node field into this container."
+            "emptyContainerPlaceholderEditMode": "Drag a form element or node field into this container.",
+            "headingPlaceholder": "Empty Heading",
+            "textPlaceholder": "Empty Text"
         }
     },
     "controlLayers": {
