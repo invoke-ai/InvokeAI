@@ -1,6 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { Button, ButtonGroup, Flex, Spacer, Text } from '@invoke-ai/ui-library';
+import { Alert, AlertDescription, AlertIcon, Button, ButtonGroup, Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
@@ -18,6 +18,7 @@ import { startCase } from 'lodash-es';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { assert } from 'tsafe';
 
 export const WorkflowBuilder = memo(() => {
@@ -34,13 +35,19 @@ export const WorkflowBuilder = memo(() => {
     <ScrollableContent>
       <Flex justifyContent="center" w="full" h="full">
         <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
+          <Alert status="warning" variant="subtle" borderRadius="base">
+            <AlertIcon />
+            <AlertDescription fontSize="sm">{t('workflows.builder.workflowBuilderAlphaWarning')}</AlertDescription>
+          </Alert>
           <ButtonGroup isAttached={false} justifyContent="center">
             <AddFormElementDndButton type="container" />
             <AddFormElementDndButton type="divider" />
             <AddFormElementDndButton type="heading" />
             <AddFormElementDndButton type="text" />
             <Spacer />
-            <Button onClick={resetForm}>{t('common.reset')}</Button>
+            <Button onClick={resetForm} variant="ghost" leftIcon={<PiArrowCounterClockwiseBold />}>
+              {t('common.reset')}
+            </Button>
           </ButtonGroup>
           {!isEmpty && <FormLayout />}
           {isEmpty && <EmptyStateEditMode />}
