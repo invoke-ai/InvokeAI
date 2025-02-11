@@ -19,6 +19,7 @@ import {
   extractClosestCenterOrEdge,
 } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import {
   formContainerChildrenReordered,
   formElementAdded,
@@ -26,9 +27,10 @@ import {
   formRootReordered,
   selectFormIsEmpty,
 } from 'features/nodes/store/workflowSlice';
-import type { FieldIdentifier, FieldInputTemplate } from 'features/nodes/types/field';
+import type { FieldIdentifier, FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
-import { buildNodeFieldElement, isContainerElement } from 'features/nodes/types/workflow';
+import { buildNodeFieldElement, isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -76,6 +78,29 @@ const getElement = <T extends FormElement>(id: ElementId, guard?: (el: FormEleme
   }
 };
 
+const getInitialValue = (el: FormElement): StatefulFieldValue => {
+  if (!isNodeFieldElement(el)) {
+    return undefined;
+  }
+  const { nodeId, fieldName } = el.data.fieldIdentifier;
+  const { nodes } = selectNodesSlice(getStore().getState());
+  const node = nodes.find((n) => n.id === nodeId);
+
+  // The node or input not existing as we add it to the builder indicates something is wrong, but we don't want to
+  // throw an error here as it could break the builder. Can we handle this better?
+  if (!node) {
+    return undefined;
+  }
+  if (!isInvocationNode(node)) {
+    return undefined;
+  }
+  const input = node.data.inputs[fieldName];
+  if (!input) {
+    return undefined;
+  }
+  return input.value;
+};
+
 const getLayout = () => {
   return getStore().getState().workflow.form.layout;
 };
@@ -100,7 +125,7 @@ const getAllowedDropRegions = (element: FormElement): CenterOrEdge[] => {
     if (parentContainer.data.layout === 'row') {
       dropRegions.push('left', 'right');
     } else {
-      // parentContainer.data.layout === 'row'
+      // parentContainer.data.layout === 'column'
       dropRegions.push('top', 'bottom');
     }
   }
@@ -155,6 +180,7 @@ export const useBuilderDndMonitor = () => {
               formElementAdded({
                 element: sourceElement,
                 index: undefined,
+                initialValue: getInitialValue(sourceElement),
               }),
               sourceElement.id
             );
@@ -187,6 +213,7 @@ export const useBuilderDndMonitor = () => {
             dispatchAndFlash(
               formElementAdded({
                 element: sourceElement,
+                initialValue: getInitialValue(sourceElement),
               }),
               sourceElement.id
             );
@@ -208,6 +235,7 @@ export const useBuilderDndMonitor = () => {
               formElementAdded({
                 element: sourceElement,
                 index,
+                initialValue: getInitialValue(sourceElement),
               }),
               sourceElement.id
             );
@@ -222,6 +250,7 @@ export const useBuilderDndMonitor = () => {
               formElementAdded({
                 element: sourceElement,
                 index: undefined,
+                initialValue: getInitialValue(sourceElement),
               }),
               sourceElement.id
             );
@@ -243,6 +272,7 @@ export const useBuilderDndMonitor = () => {
               formElementAdded({
                 element: sourceElement,
                 index,
+                initialValue: getInitialValue(sourceElement),
               }),
               sourceElement.id
             );
