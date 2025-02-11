@@ -164,11 +164,11 @@ const useAddFormElementDnd = (
             return buildFormElementDndData(element);
           }
           if (type === 'heading') {
-            const element = buildHeading('default heading');
+            const element = buildHeading('');
             return buildFormElementDndData(element);
           }
           if (type === 'text') {
-            const element = buildText('default text');
+            const element = buildText('');
             return buildFormElementDndData(element);
           }
           assert(false);
