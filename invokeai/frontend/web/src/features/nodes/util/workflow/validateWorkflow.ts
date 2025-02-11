@@ -2,6 +2,7 @@ import { parseify } from 'common/util/serialize';
 import type { Templates } from 'features/nodes/store/types';
 import {
   isBoardFieldInputInstance,
+  isImageFieldCollectionInputInstance,
   isImageFieldInputInstance,
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
@@ -128,6 +129,16 @@ export const validateWorkflow = async (
           const message = t('nodes.imageAccessError', { image_name: input.value.image_name });
           warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
           input.value = undefined;
+        }
+      }
+      if (fieldTemplate.type.name === 'ImageField' && isImageFieldCollectionInputInstance(input) && input.value) {
+        for (const { image_name } of [...input.value]) {
+          const hasAccess = await checkImageAccess(image_name);
+          if (!hasAccess) {
+            const message = t('nodes.imageAccessError', { image_name });
+            warnings.push({ message, data: parseify({ node, nodeTemplate: template, input }) });
+            input.value = input.value.filter((image) => image.image_name !== image_name);
+          }
         }
       }
       if (fieldTemplate.type.name === 'BoardField' && isBoardFieldInputInstance(input) && input.value) {
