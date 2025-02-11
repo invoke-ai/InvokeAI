@@ -1,7 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, forwardRef, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { NodeFieldElementResetToInitialValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/NodeFieldElementResetToInitialValueIconButton';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
@@ -52,7 +51,7 @@ export const FormElementEditModeHeader = memo(
     return (
       <Flex ref={ref} sx={sx} data-depth={depth}>
         <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
-          {getHeaderLabel(element)} ({element.id})
+          {getHeaderLabel(element)}
         </Text>
         <Spacer />
         {isContainerElement(element) && <ContainerElementSettings element={element} />}
