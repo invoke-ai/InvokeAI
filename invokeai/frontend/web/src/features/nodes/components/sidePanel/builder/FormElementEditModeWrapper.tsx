@@ -15,15 +15,15 @@ const wrapperSx: SystemStyleObject = {
   '&[data-element-type="divider"]&[data-layout="row"]': {
     flex: '0 1 0',
   },
+  borderRadius: 'base',
 };
 
 const innerSx: SystemStyleObject = {
   position: 'relative',
   flexDir: 'column',
-  boxShadow: '0 0 0 1px var(--invoke-colors-base-750)',
-  borderRadius: 'base',
   alignItems: 'center',
   justifyContent: 'flex-start',
+  borderRadius: 'base',
   w: 'full',
   h: 'full',
   '&[data-is-dragging="true"]': {
@@ -64,7 +64,17 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
         data-layout={containerCtx?.layout}
       >
         <FormElementEditModeHeader ref={dragHandleRef} element={element} />
-        <Flex w="full" h="full" p={4} gap={4}>
+        <Flex
+          w="full"
+          h="full"
+          p={4}
+          gap={4}
+          borderWidth={1}
+          borderColor="base.800"
+          borderRadius="base"
+          borderTopRadius="unset"
+          borderTop="unset"
+        >
           {children}
         </Flex>
       </Flex>
