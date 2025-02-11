@@ -5,11 +5,7 @@ import { ContainerElementSettings } from 'features/nodes/components/sidePanel/bu
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
-import {
-  type FormElement,
-  isContainerElement,
-  isNodeFieldElement,
-} from 'features/nodes/types/workflow';
+import { type FormElement, isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,9 +14,9 @@ import { PiXBold } from 'react-icons/pi';
 const getHeaderLabel = (el: FormElement) => {
   if (isContainerElement(el)) {
     if (el.data.layout === 'column') {
-      return 'Column';
+      return 'Container (column layout)';
     }
-    return 'Row';
+    return 'Container (row layout)';
   }
   return startCase(el.type);
 };

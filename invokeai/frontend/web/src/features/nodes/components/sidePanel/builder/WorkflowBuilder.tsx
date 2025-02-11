@@ -37,8 +37,7 @@ export const WorkflowBuilder = memo(() => {
         <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
           {mode === 'edit' && (
             <ButtonGroup isAttached={false} justifyContent="center">
-              <AddFormElementDndButton type="row" />
-              <AddFormElementDndButton type="column" />
+              <AddFormElementDndButton type="container" />
               <AddFormElementDndButton type="divider" />
               <AddFormElementDndButton type="heading" />
               <AddFormElementDndButton type="text" />
@@ -94,7 +93,7 @@ const EmptyStateEditMode = memo(() => {
 EmptyStateEditMode.displayName = 'EmptyStateEditMode';
 
 const useAddFormElementDnd = (
-  type: Exclude<FormElement['type'], 'node-field' | 'container'> | 'row' | 'column',
+  type: Exclude<FormElement['type'], 'node-field'>,
   draggableRef: RefObject<HTMLElement>
 ) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -109,12 +108,8 @@ const useAddFormElementDnd = (
       draggable({
         element: draggableElement,
         getInitialData: () => {
-          if (type === 'row') {
+          if (type === 'container') {
             const element = buildContainer('row', []);
-            return buildFormElementDndData(element);
-          }
-          if (type === 'column') {
-            const element = buildContainer('column', []);
             return buildFormElementDndData(element);
           }
           if (type === 'divider') {
