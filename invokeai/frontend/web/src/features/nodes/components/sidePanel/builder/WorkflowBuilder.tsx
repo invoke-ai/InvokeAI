@@ -33,7 +33,7 @@ export const WorkflowBuilder = memo(() => {
 
   return (
     <ScrollableContent>
-      <Flex justifyContent="center" w="full" h="full" p={4}>
+      <Flex justifyContent="center" w="full" h="full">
         <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
           {mode === 'edit' && (
             <ButtonGroup isAttached={false} justifyContent="center">
