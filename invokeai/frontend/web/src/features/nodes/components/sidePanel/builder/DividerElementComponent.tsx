@@ -18,6 +18,7 @@ const sx: SystemStyleObject = {
   '&[data-layout="row"]': {
     height: '100%',
     width: '1px',
+    minH: 32,
   },
 };
 
