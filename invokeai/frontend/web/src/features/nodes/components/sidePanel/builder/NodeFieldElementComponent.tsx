@@ -1,8 +1,9 @@
-import { Flex, FormControl, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormHelperText, FormLabel, Input, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
+import { NodeFieldElementResetToInitialValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/NodeFieldElementResetToInitialValueIconButton';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
 import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
 import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
@@ -41,7 +42,7 @@ NodeFieldElementComponent.displayName = 'NodeFieldElementComponent';
 
 const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
-  const { fieldIdentifier, showLabel, showDescription } = data;
+  const { fieldIdentifier, showDescription } = data;
   const label = useInputFieldLabel(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const description = useInputFieldDescription(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplate(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
@@ -55,7 +56,11 @@ const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldElement }
   return (
     <Flex id={id} className={NODE_FIELD_CLASS_NAME} flex="1 1 0">
       <FormControl flex="1 1 0" orientation="vertical">
-        {showLabel && <FormLabel>{_label}</FormLabel>}
+        <Flex w="full" gap={4}>
+          <FormLabel>{_label}</FormLabel>
+          <Spacer />
+          <NodeFieldElementResetToInitialValueIconButton element={el} />
+        </Flex>
         <Flex w="full" gap={4}>
           <InputFieldRenderer
             nodeId={fieldIdentifier.nodeId}
@@ -73,13 +78,13 @@ NodeFieldElementComponentViewMode.displayName = 'NodeFieldElementComponentViewMo
 
 const NodeFieldElementComponentEditMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
-  const { fieldIdentifier, showLabel, showDescription } = data;
+  const { fieldIdentifier, showDescription } = data;
 
   return (
     <FormElementEditModeWrapper element={el}>
       <Flex id={id} className={NODE_FIELD_CLASS_NAME} flex="1 1 0">
         <FormControl flex="1 1 0" orientation="vertical">
-          {showLabel && <NodeFieldEditableLabel el={el} />}
+          <NodeFieldEditableLabel el={el} />
           <Flex w="full" gap={4}>
             <InputFieldRenderer
               nodeId={fieldIdentifier.nodeId}
@@ -120,9 +125,13 @@ const NodeFieldEditableLabel = memo(({ el }: { el: NodeFieldElement }) => {
 
   if (!editable.isEditing) {
     return (
-      <FormLabel onDoubleClick={editable.startEditing} cursor="text">
-        {editable.value}
-      </FormLabel>
+      <Flex w="full" gap={4}>
+        <FormLabel onDoubleClick={editable.startEditing} cursor="text">
+          {editable.value}
+        </FormLabel>
+        <Spacer />
+        <NodeFieldElementResetToInitialValueIconButton element={el} />
+      </Flex>
     );
   }
 

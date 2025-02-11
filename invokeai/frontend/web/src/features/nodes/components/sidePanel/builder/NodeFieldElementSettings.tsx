@@ -32,16 +32,12 @@ import { PiWrenchFill } from 'react-icons/pi';
 
 export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldElement }) => {
   const { id, data } = element;
-  const { showLabel, showDescription, fieldIdentifier } = data;
+  const { showDescription, fieldIdentifier } = data;
   const { nodeId, fieldName } = fieldIdentifier;
   const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
 
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-
-  const toggleShowLabel = useCallback(() => {
-    dispatch(formElementNodeFieldDataChanged({ id, changes: { showLabel: !showLabel } }));
-  }, [dispatch, id, showLabel]);
 
   const toggleShowDescription = useCallback(() => {
     dispatch(formElementNodeFieldDataChanged({ id, changes: { showDescription: !showDescription } }));
@@ -71,11 +67,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
       </PopoverTrigger>
       <PopoverContent>
         <PopoverArrow />
-        <PopoverBody>
-          <FormControl>
-            <FormLabel flex={1}>{t('workflows.builder.label')}</FormLabel>
-            <Switch size="sm" isChecked={showLabel} onChange={toggleShowLabel} />
-          </FormControl>
+        <PopoverBody minW={48}>
           <FormControl>
             <FormLabel flex={1}>{t('workflows.builder.description')}</FormLabel>
             <Switch size="sm" isChecked={showDescription} onChange={toggleShowDescription} />
