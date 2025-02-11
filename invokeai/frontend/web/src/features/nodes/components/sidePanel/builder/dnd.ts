@@ -148,7 +148,7 @@ export const useBuilderDndMonitor = () => {
         //#region Dragging onto the root
         if (isRootDndData(targetData)) {
           if (isAddingNewElement) {
-            log.debug('Adding new element to empty root');
+            log.trace('Adding new element to empty root');
             dispatchAndFlash(
               formElementAdded({
                 element: sourceData.element,
@@ -161,7 +161,7 @@ export const useBuilderDndMonitor = () => {
           }
 
           if (!isAddingNewElement && sourceData.element.parentId !== undefined) {
-            log.debug('Reparenting element from container to empty root');
+            log.trace('Reparenting element from container to empty root');
             dispatchAndFlash(
               formElementReparented({
                 id: sourceData.element.id,
@@ -180,7 +180,7 @@ export const useBuilderDndMonitor = () => {
           const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
 
           if (isAddingNewElement && targetData.element.parentId === undefined && closestEdgeOfTarget === 'center') {
-            log.debug('Adding new element to empty container');
+            log.trace('Adding new element to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementAdded({
@@ -193,7 +193,7 @@ export const useBuilderDndMonitor = () => {
           }
 
           if (isAddingNewElement && targetData.element.parentId === undefined && closestEdgeOfTarget !== 'center') {
-            log.debug('Inserting new element into root');
+            log.trace('Inserting new element into root');
             const layout = getLayout();
             const indexOfTarget = layout.indexOf(targetData.element.id);
             const index = getReorderDestinationIndex({
@@ -214,7 +214,7 @@ export const useBuilderDndMonitor = () => {
           }
 
           if (isAddingNewElement && targetData.element.parentId !== undefined && closestEdgeOfTarget === 'center') {
-            log.debug('Adding new element to empty container');
+            log.trace('Adding new element to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementAdded({
@@ -228,7 +228,7 @@ export const useBuilderDndMonitor = () => {
           }
 
           if (isAddingNewElement && targetData.element.parentId !== undefined && closestEdgeOfTarget !== 'center') {
-            log.debug('Inserting new element into container');
+            log.trace('Inserting new element into container');
             const container = getElement(targetData.element.parentId, isContainerElement);
             const indexOfTarget = container.data.children.indexOf(targetData.element.id);
             const index = getReorderDestinationIndex({
@@ -254,7 +254,7 @@ export const useBuilderDndMonitor = () => {
             sourceData.element.parentId === undefined &&
             closestEdgeOfTarget === 'center'
           ) {
-            log.debug('Reparenting element from root to empty container');
+            log.trace('Reparenting element from root to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
@@ -273,7 +273,7 @@ export const useBuilderDndMonitor = () => {
             sourceData.element.parentId === undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
-            log.debug('Moving element within root');
+            log.trace('Moving element within root');
             const layout = getLayout();
             const startIndex = layout.indexOf(sourceData.element.id);
             const indexOfTarget = layout.indexOf(targetData.element.id);
@@ -300,7 +300,7 @@ export const useBuilderDndMonitor = () => {
             targetData.element.parentId === sourceData.element.parentId &&
             closestEdgeOfTarget === 'center'
           ) {
-            log.debug('Reparenting element from a container to an empty container with same parent');
+            log.trace('Reparenting element from a container to an empty container with same parent');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
@@ -320,7 +320,7 @@ export const useBuilderDndMonitor = () => {
             targetData.element.parentId === sourceData.element.parentId &&
             closestEdgeOfTarget !== 'center'
           ) {
-            log.debug('Moving element within container');
+            log.trace('Moving element within container');
             const container = getElement(targetData.element.parentId, isContainerElement);
             const startIndex = container.data.children.indexOf(sourceData.element.id);
             const indexOfTarget = container.data.children.indexOf(targetData.element.id);
@@ -348,7 +348,7 @@ export const useBuilderDndMonitor = () => {
             targetData.element.parentId !== sourceData.element.parentId &&
             closestEdgeOfTarget === 'center'
           ) {
-            log.debug('Reparenting element from one container to an empty container with different parent');
+            log.trace('Reparenting element from one container to an empty container with different parent');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
@@ -368,7 +368,7 @@ export const useBuilderDndMonitor = () => {
             targetData.element.parentId !== sourceData.element.parentId &&
             closestEdgeOfTarget !== 'center'
           ) {
-            log.debug('Moving element from one container to another');
+            log.trace('Moving element from one container to another');
             const container = getElement(targetData.element.parentId, isContainerElement);
             const indexOfTarget = container.data.children.indexOf(targetData.element.id);
             const index = getReorderDestinationIndex({
@@ -394,7 +394,7 @@ export const useBuilderDndMonitor = () => {
             sourceData.element.parentId !== undefined &&
             closestEdgeOfTarget === 'center'
           ) {
-            log.debug('Reparenting element from container to empty container');
+            log.trace('Reparenting element from container to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
@@ -412,7 +412,7 @@ export const useBuilderDndMonitor = () => {
             sourceData.element.parentId !== undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
-            log.debug('Reparenting element from container to root');
+            log.trace('Reparenting element from container to root');
             const layout = getLayout();
             const indexOfTarget = layout.indexOf(targetData.element.id);
             const index = getReorderDestinationIndex({
@@ -438,7 +438,7 @@ export const useBuilderDndMonitor = () => {
             sourceData.element.parentId === undefined &&
             closestEdgeOfTarget === 'center'
           ) {
-            log.debug('Reparenting element from root to empty container');
+            log.trace('Reparenting element from root to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
@@ -457,7 +457,7 @@ export const useBuilderDndMonitor = () => {
             sourceData.element.parentId === undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
-            log.debug('Reparenting element from root to container');
+            log.trace('Reparenting element from root to container');
             const container = getElement(targetData.element.parentId, isContainerElement);
             const indexOfTarget = container.data.children.indexOf(targetData.element.id);
             const index = getReorderDestinationIndex({
