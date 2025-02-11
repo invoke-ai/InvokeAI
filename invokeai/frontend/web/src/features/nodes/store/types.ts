@@ -34,7 +34,6 @@ export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   _version: 1;
   isTouched: boolean;
   mode: WorkflowMode;
-  formMode: WorkflowMode;
   originalExposedFieldValues: FieldIdentifierWithValue[];
   searchTerm: string;
   orderBy?: WorkflowRecordOrderBy;

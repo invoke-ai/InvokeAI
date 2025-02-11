@@ -1,18 +1,18 @@
 import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
-import { type NodeFieldStringConfig, zStringComponent } from 'features/nodes/types/workflow';
+import { type NodeFieldStringSettings, zStringComponent } from 'features/nodes/types/workflow';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const NodeFieldElementStringSettings = memo(({ id, config }: { id: string; config: NodeFieldStringConfig }) => {
+export const NodeFieldElementStringSettings = memo(({ id, config }: { id: string; config: NodeFieldStringSettings }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const onChangeComponent = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
-      const newConfig: NodeFieldStringConfig = {
+      const newConfig: NodeFieldStringSettings = {
         ...config,
         component: zStringComponent.parse(e.target.value),
       };

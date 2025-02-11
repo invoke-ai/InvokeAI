@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { AutosizeTextarea } from 'features/nodes/components/sidePanel/builder/AutosizeTextarea';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
-import { formElementHeadingDataChanged, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
+import { formElementHeadingDataChanged, selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { HeadingElement } from 'features/nodes/types/workflow';
 import { HEADING_CLASS_NAME, isHeadingElement } from 'features/nodes/types/workflow';
 import { memo, useCallback, useRef } from 'react';
@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 export const HeadingElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowFormMode);
+  const mode = useAppSelector(selectWorkflowMode);
 
   if (!el || !isHeadingElement(el)) {
     return null;

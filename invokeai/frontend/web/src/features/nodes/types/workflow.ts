@@ -108,26 +108,26 @@ export const getFloatFieldSettingsDefaults = (): NodeFieldFloatSettings => zNode
 export type NodeFieldFloatSettings = z.infer<typeof zNodeFieldFloatSettings>;
 
 const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
-const zIntegerFieldConfig = z.object({
+const zNodeFieldIntegerSettings = z.object({
   type: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
   component: zNumberComponent.default('number-input'),
 });
-export const getIntegerFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
-export type NodeFieldIntegerConfig = z.infer<typeof zIntegerFieldConfig>;
+export type NodeFieldIntegerSettings = z.infer<typeof zNodeFieldIntegerSettings>;
+export const getIntegerFieldSettingsDefaults = (): NodeFieldIntegerSettings => zNodeFieldIntegerSettings.parse({});
 
 export const zStringComponent = z.enum(['input', 'textarea']);
 const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
-const zStringFieldConfig = z.object({
+const zNodeFieldStringSettings = z.object({
   type: z.literal(STRING_FIELD_CONFIG_TYPE).default(STRING_FIELD_CONFIG_TYPE),
   component: zStringComponent.default('input'),
 });
-export const getStringFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
-export type NodeFieldStringConfig = z.infer<typeof zStringFieldConfig>;
+export type NodeFieldStringSettings = z.infer<typeof zNodeFieldStringSettings>;
+export const getStringFieldSettingsDefaults = (): NodeFieldStringSettings => zNodeFieldStringSettings.parse({});
 
 const zNodeFieldData = z.object({
   fieldIdentifier: zFieldIdentifier,
   showDescription: z.boolean().default(true),
-  settings: z.union([zNodeFieldFloatSettings, zIntegerFieldConfig, zStringFieldConfig]).optional(),
+  settings: z.union([zNodeFieldFloatSettings, zNodeFieldIntegerSettings, zNodeFieldStringSettings]).optional(),
 });
 const zNodeFieldElement = zElementBase.extend({
   type: z.literal(NODE_FIELD_TYPE),

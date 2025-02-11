@@ -76,7 +76,6 @@ const initialWorkflowState: WorkflowState = {
   orderBy: undefined, // initial value is decided in component
   orderDirection: 'DESC',
   categorySections: {},
-  formMode: 'view',
   ...getBlankWorkflow(),
 };
 
@@ -227,10 +226,6 @@ export const workflowSlice = createSlice({
     },
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
-    },
-    formModeChanged: (state, action: PayloadAction<{ mode: 'view' | 'edit' }>) => {
-      const { mode } = action.payload;
-      state.formMode = mode;
     },
   },
   extraReducers: (builder) => {
@@ -390,7 +385,6 @@ export const {
   formElementNodeFieldDataChanged,
   formElementNodeFieldInitialValueChanged,
   formElementContainerDataChanged,
-  formModeChanged,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -415,7 +409,6 @@ const createWorkflowSelector = <T>(selector: Selector<WorkflowState, T>) =>
 export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.name);
 export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
-export const selectWorkflowFormMode = createWorkflowSelector((workflow) => workflow.formMode);
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
 export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => workflow.searchTerm);
 export const selectWorkflowOrderBy = createWorkflowSelector((workflow) => workflow.orderBy);

@@ -11,13 +11,7 @@ import {
   useRootDnd,
 } from 'features/nodes/components/sidePanel/builder/dnd';
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
-import {
-  formModeChanged,
-  formReset,
-  selectFormIsEmpty,
-  selectFormLayout,
-  selectWorkflowFormMode,
-} from 'features/nodes/store/workflowSlice';
+import { formReset, selectFormIsEmpty, selectFormLayout, selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
@@ -28,21 +22,13 @@ import { assert } from 'tsafe';
 
 export const WorkflowBuilder = memo(() => {
   const { t } = useTranslation();
-  const mode = useAppSelector(selectWorkflowFormMode);
+  const mode = useAppSelector(selectWorkflowMode);
   const dispatch = useAppDispatch();
   const isEmpty = useAppSelector(selectFormIsEmpty);
   useBuilderDndMonitor();
 
   const resetForm = useCallback(() => {
     dispatch(formReset());
-  }, [dispatch]);
-
-  const setToViewMode = useCallback(() => {
-    dispatch(formModeChanged({ mode: 'view' }));
-  }, [dispatch]);
-
-  const setToEditMode = useCallback(() => {
-    dispatch(formModeChanged({ mode: 'edit' }));
   }, [dispatch]);
 
   return (
@@ -56,19 +42,11 @@ export const WorkflowBuilder = memo(() => {
               <AddFormElementDndButton type="divider" />
               <AddFormElementDndButton type="heading" />
               <AddFormElementDndButton type="text" />
+              <Spacer />
               <Button onClick={resetForm}>{t('common.reset')}</Button>
-              <Spacer />
-              <Button onClick={setToViewMode}>{t('common.view')}</Button>
-            </ButtonGroup>
-          )}
-          {mode === 'view' && !isEmpty && (
-            <ButtonGroup>
-              <Spacer />
-              <Button onClick={setToEditMode}>{t('common.edit')}</Button>
             </ButtonGroup>
           )}
           {!isEmpty && <FormLayout />}
-          {mode === 'view' && isEmpty && <EmptyStateViewMode />}
           {mode === 'edit' && isEmpty && <EmptyStateEditMode />}
         </Flex>
       </Flex>
@@ -77,7 +55,7 @@ export const WorkflowBuilder = memo(() => {
 });
 WorkflowBuilder.displayName = 'WorkflowBuilder';
 
-const FormLayout = memo(() => {
+export const FormLayout = memo(() => {
   const layout = useAppSelector(selectFormLayout);
 
   return (
@@ -89,24 +67,6 @@ const FormLayout = memo(() => {
   );
 });
 FormLayout.displayName = 'FormLayout';
-
-const EmptyStateViewMode = memo(() => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const setToEditMode = useCallback(() => {
-    dispatch(formModeChanged({ mode: 'edit' }));
-  }, [dispatch]);
-
-  return (
-    <Flex flexDir="column" gap={4} w="full" h="full" justifyContent="center" alignItems="center">
-      <Text variant="subtext" fontSize="md">
-        {t('workflows.builder.emptyRootPlaceholderViewMode')}
-      </Text>
-      <Button onClick={setToEditMode}>{t('common.edit')}</Button>
-    </Flex>
-  );
-});
-EmptyStateViewMode.displayName = 'EmptyStateViewMode';
 
 const EmptyStateEditMode = memo(() => {
   const { t } = useTranslation();
@@ -135,8 +95,7 @@ EmptyStateEditMode.displayName = 'EmptyStateEditMode';
 
 const useAddFormElementDnd = (
   type: Exclude<FormElement['type'], 'node-field' | 'container'> | 'row' | 'column',
-  draggableRef: RefObject<HTMLElement>,
-  isEnabled = true
+  draggableRef: RefObject<HTMLElement>
 ) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -149,7 +108,6 @@ const useAddFormElementDnd = (
       firefoxDndFix(draggableElement),
       draggable({
         element: draggableElement,
-        canDrag: () => isEnabled,
         getInitialData: () => {
           if (type === 'row') {
             const element = buildContainer('row', []);
@@ -181,7 +139,7 @@ const useAddFormElementDnd = (
         },
       })
     );
-  }, [draggableRef, isEnabled, type]);
+  }, [draggableRef, type]);
 
   return isDragging;
 };

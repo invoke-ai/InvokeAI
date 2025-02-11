@@ -1,6 +1,5 @@
 import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { WorkflowBuilder } from 'features/nodes/components/sidePanel/builder/WorkflowBuilder';
-import WorkflowLinearTab from 'features/nodes/components/sidePanel/workflow/WorkflowLinearTab';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,7 +13,6 @@ const WorkflowFieldsLinearViewPanel = () => {
       <Tabs variant="line" display="flex" w="full" h="full" flexDir="column">
         <TabList>
           <Tab>{t('workflows.builder.builder')}</Tab>
-          <Tab>{t('common.linear')}</Tab>
           <Tab>{t('common.details')}</Tab>
           <Tab>JSON</Tab>
         </TabList>
@@ -22,9 +20,6 @@ const WorkflowFieldsLinearViewPanel = () => {
         <TabPanels>
           <TabPanel>
             <WorkflowBuilder />
-          </TabPanel>
-          <TabPanel>
-            <WorkflowLinearTab />
           </TabPanel>
           <TabPanel>
             <WorkflowGeneralTab />

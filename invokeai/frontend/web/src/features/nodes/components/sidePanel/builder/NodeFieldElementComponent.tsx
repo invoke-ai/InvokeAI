@@ -1,4 +1,4 @@
-import { Flex, FormControl, FormHelperText, FormLabel, Input, Spacer } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormHelperText, FormLabel, Input, Spacer, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
@@ -9,14 +9,14 @@ import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDesc
 import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { fieldDescriptionChanged, fieldLabelChanged } from 'features/nodes/store/nodesSlice';
-import { selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { isNodeFieldElement, NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo, useCallback, useMemo, useRef } from 'react';
 
 export const NodeFieldElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowFormMode);
+  const mode = useAppSelector(selectWorkflowMode);
 
   if (!el || !isNodeFieldElement(el)) {
     return null;
@@ -145,7 +145,7 @@ const NodeFieldEditableDescription = memo(({ el }: { el: NodeFieldElement }) => 
   const dispatch = useAppDispatch();
   const description = useInputFieldDescription(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplate(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const onChange = useCallback(
     (description: string) => {
@@ -171,6 +171,6 @@ const NodeFieldEditableDescription = memo(({ el }: { el: NodeFieldElement }) => 
     return <FormHelperText onDoubleClick={editable.startEditing}>{editable.value}</FormHelperText>;
   }
 
-  return <Input ref={inputRef} variant="outline" {...editable.inputProps} />;
+  return <Textarea ref={inputRef} variant="outline" {...editable.inputProps} />;
 });
 NodeFieldEditableDescription.displayName = 'NodeFieldEditableDescription';

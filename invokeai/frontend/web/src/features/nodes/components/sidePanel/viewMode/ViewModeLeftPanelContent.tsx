@@ -1,27 +1,25 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
-import { InputFieldViewMode } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldViewMode';
+import { FormLayout } from 'features/nodes/components/sidePanel/builder/WorkflowBuilder';
 import { ViewContextProvider } from 'features/nodes/contexts/ViewContext';
-import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
+import { selectFormIsEmpty } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
 import { memo } from 'react';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import { EmptyState } from './EmptyState';
 
-const selectExposedFields = createMemoizedSelector(selectWorkflowSlice, (workflow) => workflow.exposedFields);
-
 export const ViewModeLeftPanelContent = memo(() => {
   return (
     <ViewContextProvider view="view-mode-linear">
       <Box position="relative" w="full" h="full">
         <ScrollableContent>
-          <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} w="full" h="full">
-            <ViewModeLeftPanelContentInner />
+          <Flex justifyContent="center" w="full" h="full" p={4}>
+            <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
+              <ViewModeLeftPanelContentInner />
+            </Flex>
           </Flex>
         </ScrollableContent>
       </Box>
@@ -32,24 +30,16 @@ ViewModeLeftPanelContent.displayName = 'ViewModeLeftPanelContent';
 
 const ViewModeLeftPanelContentInner = memo(() => {
   const { isLoading } = useGetOpenAPISchemaQuery();
-  const exposedFields = useAppSelector(selectExposedFields);
+  const isEmpty = useAppSelector(selectFormIsEmpty);
 
   if (isLoading) {
     return <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />;
   }
 
-  if (exposedFields.length === 0) {
+  if (isEmpty) {
     return <EmptyState />;
   }
 
-  return (
-    <>
-      {exposedFields.map(({ nodeId, fieldName }) => (
-        <InputFieldGate key={`${nodeId}.${fieldName}`} nodeId={nodeId} fieldName={fieldName}>
-          <InputFieldViewMode nodeId={nodeId} fieldName={fieldName} />
-        </InputFieldGate>
-      ))}
-    </>
-  );
+  return <FormLayout />;
 });
 ViewModeLeftPanelContentInner.displayName = ' ViewModeLeftPanelContentInner';
