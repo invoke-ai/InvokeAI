@@ -11,8 +11,7 @@ import { modelsApi } from 'services/api/endpoints/models';
 export const checkModelAccess = async (key: string): Promise<boolean> => {
   const { dispatch } = getStore();
   try {
-    const req = dispatch(modelsApi.endpoints.getModelConfig.initiate(key));
-    req.unsubscribe();
+    const req = dispatch(modelsApi.endpoints.getModelConfig.initiate(key, { forceRefetch: true, subscribe: false }));
     const result = await req.unwrap();
     return Boolean(result);
   } catch {
@@ -28,8 +27,7 @@ export const checkModelAccess = async (key: string): Promise<boolean> => {
 export const checkImageAccess = async (name: string): Promise<boolean> => {
   const { dispatch } = getStore();
   try {
-    const req = dispatch(imagesApi.endpoints.getImageDTO.initiate(name));
-    req.unsubscribe();
+    const req = dispatch(imagesApi.endpoints.getImageDTO.initiate(name, { forceRefetch: true, subscribe: false }));
     const result = await req.unwrap();
     return Boolean(result);
   } catch {
@@ -45,8 +43,9 @@ export const checkImageAccess = async (name: string): Promise<boolean> => {
 export const checkBoardAccess = async (id: string): Promise<boolean> => {
   const { dispatch } = getStore();
   try {
-    const req = dispatch(boardsApi.endpoints.listAllBoards.initiate({ include_archived: true }));
-    req.unsubscribe();
+    const req = dispatch(
+      boardsApi.endpoints.listAllBoards.initiate({ include_archived: true }, { forceRefetch: true, subscribe: false })
+    );
     const result = await req.unwrap();
     return result.some((b) => b.board_id === id);
   } catch {
