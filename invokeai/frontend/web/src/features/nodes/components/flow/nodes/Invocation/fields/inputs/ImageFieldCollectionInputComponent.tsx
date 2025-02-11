@@ -17,7 +17,7 @@ import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTempla
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiExclamationMarkBold } from 'react-icons/pi';
+import { PiExclamationMarkBold, PiXBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -132,7 +132,21 @@ const ImageGridItemContent = memo(
     }
 
     if (!query.data) {
-      return <IAINoContentFallback icon={PiExclamationMarkBold} />;
+      return (
+        <>
+          <IAINoContentFallback icon={PiExclamationMarkBold} />
+          <DndImageIcon
+            onClick={onClickRemove}
+            icon={<PiXBold />}
+            tooltip="Remove Image from Collection"
+            position="absolute"
+            flexDir="column"
+            top={1}
+            insetInlineEnd={1}
+            gap={1}
+          />
+        </>
+      );
     }
 
     return (
@@ -149,8 +163,8 @@ const ImageGridItemContent = memo(
         />
         <DndImageIcon
           onClick={onClickRemove}
-          icon={<PiArrowCounterClockwiseBold />}
-          tooltip="Reset Image"
+          icon={<PiXBold />}
+          tooltip="Remove Image from Collection"
           position="absolute"
           flexDir="column"
           top={1}
