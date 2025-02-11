@@ -627,7 +627,9 @@ export const useNodeFieldDnd = (
         element: draggableElement,
         dragHandle: dragHandleElement,
         getInitialData: () => {
-          const element = buildNodeFieldElement(fieldIdentifier.nodeId, fieldIdentifier.fieldName, fieldTemplate.type);
+          const { nodeId, fieldName } = fieldIdentifier;
+          const { type } = fieldTemplate;
+          const element = buildNodeFieldElement(nodeId, fieldName, type);
           return buildFormElementDndData(element);
         },
         onDragStart: () => {
@@ -638,7 +640,7 @@ export const useNodeFieldDnd = (
         },
       })
     );
-  }, [dragHandleRef, draggableRef, fieldIdentifier, fieldTemplate.type]);
+  }, [dragHandleRef, draggableRef, fieldIdentifier, fieldTemplate]);
 
   return isDragging;
 };
