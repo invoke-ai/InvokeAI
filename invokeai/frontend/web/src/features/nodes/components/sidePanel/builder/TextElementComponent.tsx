@@ -1,4 +1,4 @@
-import type { TextProps } from '@invoke-ai/ui-library';
+import type { SystemStyleObject, TextProps } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
@@ -8,6 +8,7 @@ import { formElementTextDataChanged, selectWorkflowFormMode, useElement } from '
 import type { TextElement } from 'features/nodes/types/workflow';
 import { isTextElement, TEXT_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const TextElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
@@ -38,10 +39,19 @@ const TextElementComponentViewMode = memo(({ el }: { el: TextElement }) => {
 });
 TextElementComponentViewMode.displayName = 'TextElementComponentViewMode';
 
+const textSx: SystemStyleObject = {
+  fontSize: 'md',
+  overflowWrap: 'anywhere',
+  '&[data-is-empty="true"]': {
+    opacity: 0.3,
+  },
+};
+
 const TextContentDisplay = memo(({ content, ...rest }: { content: string } & TextProps) => {
+  const { t } = useTranslation();
   return (
-    <Text fontSize="md" overflowWrap="anywhere" {...rest}>
-      {content || 'Edit to add text'}
+    <Text sx={textSx} data-is-empty={content === ''} {...rest}>
+      {content || t('workflows.builder.textPlaceholder')}
     </Text>
   );
 });
@@ -61,6 +71,7 @@ const TextElementComponentEditMode = memo(({ el }: { el: TextElement }) => {
 TextElementComponentEditMode.displayName = 'TextElementComponentEditMode';
 
 const EditableText = memo(({ el }: { el: TextElement }) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { id, data } = el;
   const { content } = data;
@@ -87,7 +98,7 @@ const EditableText = memo(({ el }: { el: TextElement }) => {
   return (
     <AutosizeTextarea
       ref={ref}
-      placeholder="Text"
+      placeholder={t('workflows.builder.textPlaceholder')}
       {...editable.inputProps}
       fontSize="md"
       variant="outline"
