@@ -126,7 +126,6 @@ export type NodeFieldStringConfig = z.infer<typeof zStringFieldConfig>;
 
 const zNodeFieldData = z.object({
   fieldIdentifier: zFieldIdentifier,
-  showLabel: z.boolean().default(true),
   showDescription: z.boolean().default(true),
   settings: z.union([zNodeFieldFloatSettings, zIntegerFieldConfig, zStringFieldConfig]).optional(),
 });
@@ -163,7 +162,6 @@ export const buildNodeFieldElement = (
     data: {
       fieldIdentifier: { nodeId, fieldName },
       settings,
-      showLabel: true,
       showDescription: true,
     },
   };
