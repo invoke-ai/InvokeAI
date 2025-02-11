@@ -8,12 +8,13 @@ import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions'
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
-import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { isImageFieldInputInstance } from 'features/nodes/types/field';
+import { fieldImageCollectionValueChanged, fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { isImageFieldCollectionInputInstance, isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { forEach, intersectionBy } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import type { Param0 } from 'tsafe';
 
 const log = logger('gallery');
 
@@ -21,6 +22,7 @@ const log = logger('gallery');
 
 // Some utils to delete images from different parts of the app
 const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+  const actions: Param0<typeof dispatch>[] = [];
   state.nodes.present.nodes.forEach((node) => {
     if (!isInvocationNode(node)) {
       return;
@@ -28,16 +30,28 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 
     forEach(node.data.inputs, (input) => {
       if (isImageFieldInputInstance(input) && input.value?.image_name === imageDTO.image_name) {
-        dispatch(
+        actions.push(
           fieldImageValueChanged({
             nodeId: node.data.id,
             fieldName: input.name,
             value: undefined,
           })
         );
+        return;
+      }
+      if (isImageFieldCollectionInputInstance(input)) {
+        actions.push(
+          fieldImageCollectionValueChanged({
+            nodeId: node.data.id,
+            fieldName: input.name,
+            value: input.value?.filter((value) => value?.image_name !== imageDTO.image_name),
+          })
+        );
       }
     });
   });
+
+  actions.forEach(dispatch);
 };
 
 const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
