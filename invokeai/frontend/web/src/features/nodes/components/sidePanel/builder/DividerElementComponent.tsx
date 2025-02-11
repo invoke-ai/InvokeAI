@@ -3,7 +3,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
-import { selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { DividerElement } from 'features/nodes/types/workflow';
 import { DIVIDER_CLASS_NAME, isDividerElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
@@ -23,7 +23,7 @@ const sx: SystemStyleObject = {
 
 export const DividerElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowFormMode);
+  const mode = useAppSelector(selectWorkflowMode);
 
   if (!el || !isDividerElement(el)) {
     return;

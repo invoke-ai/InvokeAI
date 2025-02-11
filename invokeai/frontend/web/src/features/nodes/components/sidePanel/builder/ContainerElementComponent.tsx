@@ -11,7 +11,7 @@ import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/
 import { HeadingElementComponent } from 'features/nodes/components/sidePanel/builder/HeadingElementComponent';
 import { NodeFieldElementComponent } from 'features/nodes/components/sidePanel/builder/NodeFieldElementComponent';
 import { TextElementComponent } from 'features/nodes/components/sidePanel/builder/TextElementComponent';
-import { selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
   CONTAINER_CLASS_NAME,
@@ -39,7 +39,7 @@ const sx: SystemStyleObject = {
 
 const ContainerElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowFormMode);
+  const mode = useAppSelector(selectWorkflowMode);
 
   if (!el || !isContainerElement(el)) {
     return null;
@@ -69,7 +69,7 @@ const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }
           ))}
           {children.length === 0 && (
             <Flex p={4} w="full" h="full" alignItems="center" justifyContent="center">
-              <Text variant="subtext">{t('workflows.builder.emptyContainerPlaceholderViewMode')}</Text>
+              <Text variant="subtext">{t('workflows.builder.containerPlaceholder')}</Text>
             </Flex>
           )}
         </Flex>
@@ -95,7 +95,7 @@ const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }
             ))}
             {children.length === 0 && (
               <Flex p={4} w="full" h="full" alignItems="center" justifyContent="center">
-                <Text variant="subtext">{t('workflows.builder.emptyContainerPlaceholderEditMode')}</Text>
+                <Text variant="subtext">{t('workflows.builder.containerPlaceholderDesc')}</Text>
               </Flex>
             )}
           </Flex>

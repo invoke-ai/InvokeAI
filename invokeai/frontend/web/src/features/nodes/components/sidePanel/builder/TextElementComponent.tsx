@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { AutosizeTextarea } from 'features/nodes/components/sidePanel/builder/AutosizeTextarea';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
-import { formElementTextDataChanged, selectWorkflowFormMode, useElement } from 'features/nodes/store/workflowSlice';
+import { formElementTextDataChanged, selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
 import type { TextElement } from 'features/nodes/types/workflow';
 import { isTextElement, TEXT_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo, useCallback, useRef } from 'react';
@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 export const TextElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
-  const mode = useAppSelector(selectWorkflowFormMode);
+  const mode = useAppSelector(selectWorkflowMode);
 
   if (!el || !isTextElement(el)) {
     return null;
