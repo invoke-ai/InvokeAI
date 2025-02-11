@@ -137,38 +137,39 @@ export const useBuilderDndMonitor = () => {
         }
 
         const targetData = target.data;
-        const sourceData = source.data;
 
-        if (!isFormElementDndData(sourceData)) {
+        if (!isFormElementDndData(source.data)) {
           return;
         }
 
-        const isAddingNewElement = !elementExists(sourceData.element.id);
+        const sourceElement = source.data.element;
+
+        const isAddingNewElement = !elementExists(sourceElement.id);
 
         //#region Dragging onto the root
         if (isRootDndData(targetData)) {
           if (isAddingNewElement) {
             log.trace('Adding new element to empty root');
+            sourceElement.parentId = undefined;
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
-                containerId: undefined,
+                element: sourceElement,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
 
-          if (!isAddingNewElement && sourceData.element.parentId !== undefined) {
+          if (!isAddingNewElement && sourceElement.parentId !== undefined) {
             log.trace('Reparenting element from container to empty root');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: undefined,
+                id: sourceElement.id,
+                newParentId: undefined,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -182,12 +183,12 @@ export const useBuilderDndMonitor = () => {
           if (isAddingNewElement && targetData.element.parentId === undefined && closestEdgeOfTarget === 'center') {
             log.trace('Adding new element to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            sourceElement.parentId = targetData.element.id;
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
-                containerId: targetData.element.id,
+                element: sourceElement,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -202,13 +203,13 @@ export const useBuilderDndMonitor = () => {
               closestEdgeOfTarget,
               axis: 'vertical',
             });
+            sourceElement.parentId = undefined;
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
-                containerId: undefined,
+                element: sourceElement,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -216,13 +217,13 @@ export const useBuilderDndMonitor = () => {
           if (isAddingNewElement && targetData.element.parentId !== undefined && closestEdgeOfTarget === 'center') {
             log.trace('Adding new element to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
+            sourceElement.parentId = targetData.element.id;
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
-                containerId: targetData.element.id,
+                element: sourceElement,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -237,13 +238,13 @@ export const useBuilderDndMonitor = () => {
               closestEdgeOfTarget,
               axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
             });
+            sourceElement.parentId = container.id;
             dispatchAndFlash(
               formElementAdded({
-                element: sourceData.element,
-                containerId: container.id,
+                element: sourceElement,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -251,18 +252,18 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId === undefined &&
-            sourceData.element.parentId === undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget === 'center'
           ) {
             log.trace('Reparenting element from root to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                newParentId: targetData.element.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -270,12 +271,12 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId === undefined &&
-            sourceData.element.parentId === undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.trace('Moving element within root');
             const layout = getLayout();
-            const startIndex = layout.indexOf(sourceData.element.id);
+            const startIndex = layout.indexOf(sourceElement.id);
             const indexOfTarget = layout.indexOf(targetData.element.id);
             const reorderedLayout = reorderWithEdge({
               list: layout,
@@ -288,7 +289,7 @@ export const useBuilderDndMonitor = () => {
               formRootReordered({
                 layout: reorderedLayout,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -296,19 +297,19 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId === sourceData.element.parentId &&
+            sourceElement.parentId !== undefined &&
+            targetData.element.parentId === sourceElement.parentId &&
             closestEdgeOfTarget === 'center'
           ) {
             log.trace('Reparenting element from a container to an empty container with same parent');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                newParentId: targetData.element.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -316,13 +317,13 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId === sourceData.element.parentId &&
+            sourceElement.parentId !== undefined &&
+            targetData.element.parentId === sourceElement.parentId &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.trace('Moving element within container');
             const container = getElement(targetData.element.parentId, isContainerElement);
-            const startIndex = container.data.children.indexOf(sourceData.element.id);
+            const startIndex = container.data.children.indexOf(sourceElement.id);
             const indexOfTarget = container.data.children.indexOf(targetData.element.id);
             const reorderedLayout = reorderWithEdge({
               list: container.data.children,
@@ -333,10 +334,10 @@ export const useBuilderDndMonitor = () => {
             });
             dispatchAndFlash(
               formContainerChildrenReordered({
-                containerId: container.id,
+                id: container.id,
                 children: reorderedLayout,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -344,19 +345,19 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId !== sourceData.element.parentId &&
+            sourceElement.parentId !== undefined &&
+            targetData.element.parentId !== sourceElement.parentId &&
             closestEdgeOfTarget === 'center'
           ) {
             log.trace('Reparenting element from one container to an empty container with different parent');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                newParentId: targetData.element.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -364,8 +365,8 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId !== undefined &&
-            sourceData.element.parentId !== undefined &&
-            targetData.element.parentId !== sourceData.element.parentId &&
+            sourceElement.parentId !== undefined &&
+            targetData.element.parentId !== sourceElement.parentId &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.trace('Moving element from one container to another');
@@ -379,11 +380,11 @@ export const useBuilderDndMonitor = () => {
             });
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: container.id,
+                id: sourceElement.id,
+                newParentId: container.id,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -391,25 +392,25 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId === undefined &&
-            sourceData.element.parentId !== undefined &&
+            sourceElement.parentId !== undefined &&
             closestEdgeOfTarget === 'center'
           ) {
             log.trace('Reparenting element from container to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                newParentId: targetData.element.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
           if (
             !isAddingNewElement &&
             targetData.element.parentId === undefined &&
-            sourceData.element.parentId !== undefined &&
+            sourceElement.parentId !== undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.trace('Reparenting element from container to root');
@@ -423,11 +424,11 @@ export const useBuilderDndMonitor = () => {
             });
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: undefined,
+                id: sourceElement.id,
+                newParentId: undefined,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -435,18 +436,18 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId !== undefined &&
-            sourceData.element.parentId === undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget === 'center'
           ) {
             log.trace('Reparenting element from root to empty container');
             assert(isContainerElement(targetData.element), 'Expected target to be a container');
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.id,
+                id: sourceElement.id,
+                newParentId: targetData.element.id,
                 index: undefined,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
@@ -454,7 +455,7 @@ export const useBuilderDndMonitor = () => {
           if (
             !isAddingNewElement &&
             targetData.element.parentId !== undefined &&
-            sourceData.element.parentId === undefined &&
+            sourceElement.parentId === undefined &&
             closestEdgeOfTarget !== 'center'
           ) {
             log.trace('Reparenting element from root to container');
@@ -468,18 +469,18 @@ export const useBuilderDndMonitor = () => {
             });
             dispatchAndFlash(
               formElementReparented({
-                id: sourceData.element.id,
-                containerId: targetData.element.parentId,
+                id: sourceElement.id,
+                newParentId: targetData.element.parentId,
                 index,
               }),
-              sourceData.element.id
+              sourceElement.id
             );
             return;
           }
         }
         //#endregion
 
-        log.warn(parseify({ targetData, sourceData }), 'Unhandled drop event!');
+        log.warn(parseify({ target, source }), 'Unhandled drop event!');
       },
     });
   }, [dispatchAndFlash]);
