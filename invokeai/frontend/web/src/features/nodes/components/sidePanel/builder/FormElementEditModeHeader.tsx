@@ -29,13 +29,15 @@ const sx: SystemStyleObject = {
   minH: 8,
   maxH: 8,
   borderTopRadius: 'inherit',
-  borderColor: 'inherit',
+  borderColor: 'base.800',
   alignItems: 'center',
   cursor: 'grab',
+  color: 'base.300',
+  borderBottomWidth: 1,
   bg: 'base.700',
   '&[data-depth="0"]': { bg: 'base.800' },
-  '&[data-depth="1"]': { bg: 'base.800' },
-  '&[data-depth="2"]': { bg: 'base.750' },
+  '&[data-depth="1"]': { bg: 'base.750' },
+  '&[data-depth="2"]': { bg: 'base.700' },
 };
 
 export const FormElementEditModeHeader = memo(
