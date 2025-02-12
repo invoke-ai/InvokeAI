@@ -14,6 +14,8 @@ import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
+import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
+import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -31,6 +33,9 @@ export const GenerationSettingsAccordion = memo(() => {
   const activeTabName = useAppSelector(selectActiveTab);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
+  const isUpscaling = useMemo(() => {
+    return activeTabName === 'upscaling';
+  }, [activeTabName]);
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectLoRAsSlice, (loras) => {
@@ -75,9 +80,12 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && !isSD3 && <ParamScheduler />}
+              {!isFLUX && !isSD3 && !isUpscaling && <ParamScheduler />}
+              {isUpscaling && <ParamUpscaleScheduler />}
               <ParamSteps />
-              {isFLUX ? <ParamGuidance /> : <ParamCFGScale />}
+              {isFLUX && <ParamGuidance />}
+              {isUpscaling && <ParamUpscaleCFGScale />}
+              {!isFLUX && !isUpscaling && <ParamCFGScale />}
             </FormControlGroup>
           </Flex>
         </Expander>
