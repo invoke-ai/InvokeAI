@@ -152,7 +152,7 @@ type UseGalleryNavigationReturn = {
 /**
  * Provides access to the gallery navigation via arrow keys.
  * Also provides information about the current image's position in the gallery,
- * useful for determining whether to load more images or display navigatin
+ * useful for determining whether to load more images or display navigation
  * buttons.
  */
 export const useGalleryNavigation = (): UseGalleryNavigationReturn => {

@@ -75,7 +75,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.log.trace('Rendering staging area');
     const stagingArea = this.manager.stateApi.runSelector(selectCanvasStagingAreaSlice);
 
-    const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
+    const { x, y } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 
     this.selectedImage = stagingArea.stagedImages[stagingArea.selectedStagedImageIndex] ?? null;
@@ -83,27 +83,51 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
     if (this.selectedImage) {
       const { imageDTO } = this.selectedImage;
+      const image = imageDTOToImageWithDims(imageDTO);
+
+      /**
+       * When the final output image of a generation is received, we should clear that generation's last progress image.
+       *
+       * It's possible that we have already rendered the progress image from the next generation before the output image
+       * from the previous is fully loaded/rendered. This race condition results in a flicker:
+       * - LAST GENERATION: Render the final progress image
+       * - LAST GENERATION: Start loading the final output image...
+       * - NEXT GENERATION: Render the first progress image
+       * - LAST GENERATION: ...Finish loading the final output image & render it, clearing the progress image <-- Flicker!
+       * - NEXT GENERATION: Render the next progress image
+       *
+       * We can detect the race condition by stashing the session ID of the last progress image when we begin loading
+       * that session's output image. After we render it, if the progress image's session ID is the same as the one we
+       * stashed, we know that we have not yet gotten that next generation's first progress image. We can clear the
+       * progress image without causing a flicker.
+       */
+      const lastProgressEventSessionId = this.manager.progressImage.$lastProgressEvent.get()?.session_id;
+      const hideProgressIfSameSession = () => {
+        const currentProgressEventSessionId = this.manager.progressImage.$lastProgressEvent.get()?.session_id;
+        if (lastProgressEventSessionId === currentProgressEventSessionId) {
+          this.manager.progressImage.$lastProgressEvent.set(null);
+        }
+      };
 
       if (!this.image) {
-        const { image_name } = imageDTO;
         this.image = new CanvasObjectImage(
           {
             id: 'staging-area-image',
             type: 'image',
-            image: {
-              image_name: image_name,
-              width,
-              height,
-            },
+            image,
           },
           this
         );
+        await this.image.update(this.image.state, true);
         this.konva.group.add(this.image.konva.group);
-      }
-
-      if (!this.image.isLoading && !this.image.isError) {
-        await this.image.update({ ...this.image.state, image: imageDTOToImageWithDims(imageDTO) }, true);
-        this.manager.progressImage.$lastProgressEvent.set(null);
+        hideProgressIfSameSession();
+      } else if (this.image.isLoading) {
+        // noop - just wait for the image to load
+      } else if (this.image.state.image.image_name !== image.image_name) {
+        await this.image.update({ ...this.image.state, image }, true);
+        hideProgressIfSameSession();
+      } else if (this.image.isError) {
+        hideProgressIfSameSession();
       }
       this.image.konva.group.visible(shouldShowStagedImage);
     } else {
@@ -136,6 +160,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       selectedImage: this.selectedImage,
       $shouldShowStagedImage: this.$shouldShowStagedImage.get(),
       $isStaging: this.$isStaging.get(),
+      image: this.image?.repr() ?? null,
     };
   };
 }

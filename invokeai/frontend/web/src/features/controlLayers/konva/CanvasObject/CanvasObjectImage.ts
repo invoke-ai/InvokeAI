@@ -1,5 +1,6 @@
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
@@ -7,7 +8,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
-import { loadImage } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, loadImage } from 'features/controlLayers/konva/util';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
@@ -94,36 +95,41 @@ export class CanvasObjectImage extends CanvasModuleBase {
   }
 
   updateImageSource = async (imageName: string) => {
-    try {
-      this.log.trace({ imageName }, 'Updating image source');
+    this.log.trace({ imageName }, 'Updating image source');
 
-      this.isLoading = true;
-      this.konva.group.visible(true);
+    this.isLoading = true;
+    this.konva.group.visible(true);
 
-      if (!this.konva.image) {
-        this.konva.placeholder.group.visible(false);
-        this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
-      }
-
-      const imageDTO = await getImageDTOSafe(imageName);
-      if (imageDTO === null) {
-        this.onFailedToLoadImage();
-        return;
-      }
-
-      this.imageElement = await loadImage(imageDTO.image_url);
-      await this.updateImageElement();
-    } catch {
-      this.onFailedToLoadImage();
+    if (!this.konva.image) {
+      this.konva.placeholder.group.visible(false);
+      this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
     }
+
+    const imageDTO = await getImageDTOSafe(imageName);
+    if (imageDTO === null) {
+      // ImageDTO not found (or network error)
+      this.onFailedToLoadImage(t('controlLayers.unableToFindImage', 'Unable to find image'));
+      return;
+    }
+
+    const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url));
+    if (imageElementResult.isErr()) {
+      // Image loading failed (e.g. the URL to the "physical" image is invalid)
+      this.onFailedToLoadImage(t('controlLayers.unableToLoadImage', 'Unable to load image'));
+      return;
+    }
+
+    this.imageElement = imageElementResult.value;
+
+    await this.updateImageElement();
   };
 
-  onFailedToLoadImage = () => {
-    this.log({ image: this.state.image }, 'Failed to load image');
+  onFailedToLoadImage = (message: string) => {
+    this.log({ image: this.state.image }, message);
     this.konva.image?.visible(false);
     this.isLoading = false;
     this.isError = true;
-    this.konva.placeholder.text.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+    this.konva.placeholder.text.text(message);
     this.konva.placeholder.group.visible(true);
   };
 
@@ -140,6 +146,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
             image: this.imageElement,
             width,
             height,
+            visible: true,
           });
         } else {
           this.log.trace('Creating new Konva image');
@@ -202,6 +209,10 @@ export class CanvasObjectImage extends CanvasModuleBase {
       isLoading: this.isLoading,
       isError: this.isError,
       state: deepClone(this.state),
+      konva: {
+        group: getKonvaNodeDebugAttrs(this.konva.group),
+        image: this.konva.image ? getKonvaNodeDebugAttrs(this.konva.image) : null,
+      },
     };
   };
 }

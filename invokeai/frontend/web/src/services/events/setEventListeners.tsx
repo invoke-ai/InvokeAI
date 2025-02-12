@@ -8,7 +8,7 @@ import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import ErrorToastDescription, { ErrorToastTitle } from 'features/toast/ErrorToastDescription';
+import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { forEach, isNil, round } from 'lodash-es';
@@ -400,14 +400,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
       toast({
         id: `INVOCATION_ERROR_${error_type}`,
-        title: (
-          <ErrorToastTitle
-            errorType={error_type}
-            errorMessage={error_message}
-            sessionId={sessionId}
-            isLocal={isLocal}
-          />
-        ),
+        title: getTitle(error_type),
         status: 'error',
         duration: null,
         updateDescription: isLocal,

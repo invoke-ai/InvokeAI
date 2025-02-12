@@ -1,25 +1,21 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useClipboard } from 'common/hooks/useClipboard';
 import { ExternalLink } from 'features/gallery/components/ImageViewer/NoContentForViewer';
+import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
 
-type Props = { errorType: string; errorMessage?: string | null; sessionId: string; isLocal: boolean };
+type DescriptionProps = { errorType: string; errorMessage?: string | null; sessionId: string; isLocal: boolean };
 
-export const ErrorToastTitle = ({ errorType }: Props) => {
-  const { t } = useTranslation();
-
-  if (errorType === 'OutOfMemoryError') {
-    return t('toast.outOfMemoryError');
-  }
-
-  return t('toast.serverError');
+export const getTitle = (errorType: string) => {
+  return errorType === 'OutOfMemoryError' ? t('toast.outOfMemoryError') : t('toast.serverError');
 };
 
-export default function ErrorToastDescription({ errorType, isLocal, sessionId, errorMessage }: Props) {
+export default function ErrorToastDescription({ errorType, isLocal, sessionId, errorMessage }: DescriptionProps) {
   const { t } = useTranslation();
   const clipboard = useClipboard();
+
   const description = useMemo(() => {
     if (errorType === 'OutOfMemoryError') {
       if (isLocal) {
@@ -39,7 +35,7 @@ export default function ErrorToastDescription({ errorType, isLocal, sessionId, e
     }
   }, [errorMessage, errorType, isLocal, t]);
 
-  const copySessionId = useCallback(() => clipboard.writeText(sessionId), [clipboard, sessionId]);
+  const copySessionId = useCallback(() => clipboard.writeText(sessionId), [sessionId, clipboard]);
 
   return (
     <Flex flexDir="column">
