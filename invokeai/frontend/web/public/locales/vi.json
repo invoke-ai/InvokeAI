@@ -117,7 +117,8 @@
         "unstarImage": "Ngừng Gắn Sao Cho Ảnh",
         "compareHelp2": "Nhấn <Kbd>M</Kbd> để tuần hoàn trong chế độ so sánh.",
         "boardsSettings": "Thiết Lập Bảng",
-        "imagesSettings": "Cài Đặt Thư Viện Ảnh"
+        "imagesSettings": "Cài Đặt Thư Viện Ảnh",
+        "assets": "Tài Nguyên"
     },
     "common": {
         "ipAdapter": "IP Adapter",
@@ -303,7 +304,11 @@
         "completedIn": "Hoàn tất trong",
         "graphQueued": "Đồ Thị Đã Vào Hàng",
         "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng",
-        "batchSize": "Kích Thước Lô"
+        "batchSize": "Kích Thước Lô",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Huỷ tất cả mục đang xếp hàng ngoại trừ mục hiện tại, sẽ dừng các mục đang chờ nhưng cho phép các mục đang chạy được hoàn tất.",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Bạn có chắc muốn huỷ tất cả mục đang chờ?",
+        "cancelAllExceptCurrentTooltip": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại",
+        "confirm": "Đồng Ý"
     },
     "hotkeys": {
         "canvas": {
@@ -1797,7 +1802,10 @@
             "newControlLayer": "Layer Điều Khiển Được Mới",
             "newRasterLayer": "Layer Dạng Raster Mới",
             "bboxGroup": "Được Tạo Từ Hộp Giới Hạn",
-            "canvasGroup": "Canvas"
+            "canvasGroup": "Canvas",
+            "copyCanvasToClipboard": "Sao Chép Canvas Vào Clipboard",
+            "copyToClipboard": "Sao Chép Vào Clipboard",
+            "copyBboxToClipboard": "Sao Chép Hộp Giới Hạn Vào Clipboard"
         },
         "stagingArea": {
             "saveToGallery": "Lưu Vào Thư Viện",
@@ -1914,6 +1922,30 @@
                 "gaussian_type": "Gaussian",
                 "noise_color": "Màu Nhiễu",
                 "size": "Cỡ Nhiễu"
+            },
+            "adjust_image": {
+                "channel": "Kênh Màu",
+                "cyan": "Lục Lam (Cmyk)",
+                "value_setting": "Giá Trị",
+                "scale_values": "Giá Trị Theo Tỉ Lệ",
+                "red": "Đỏ (Rgba)",
+                "green": "Lục (rGba)",
+                "blue": "Lam (rgBa)",
+                "alpha": "Độ Trong Suốt (rgbA)",
+                "luminosity": "Độ Sáng (Lab)",
+                "magenta": "Hồng Đỏ (cMyk)",
+                "yellow": "Vàng (cmYk)",
+                "description": "Điều chỉnh kênh màu được chọn của ảnh.",
+                "black": "Đen (cmyK)",
+                "cr": "Cr (ycC)",
+                "label": "Điều Chỉnh Ảnh",
+                "value": "Độ Sáng (hsV)",
+                "saturation": "Độ Bão Hoà (hSv)",
+                "hue": "Vùng Màu (Hsv)",
+                "a": "A (lAb)",
+                "b": "B (laB)",
+                "y": "Y (Ycc)",
+                "cb": "Cb (yCc)"
             }
         },
         "transform": {
@@ -1992,6 +2024,20 @@
             "rgReferenceImagesNotSupported": "Ảnh Mẫu Khu Vực không được hỗ trợ cho model cơ sở được chọn",
             "rgAutoNegativeNotSupported": "Tự Động Đảo Chiều không được hỗ trợ cho model cơ sở được chọn",
             "rgNoRegion": "không có khu vực được vẽ"
+        },
+        "pasteTo": "Dán Vào",
+        "pasteToAssets": "Tài Nguyên",
+        "pasteToAssetsDesc": "Dán Vào Tài Nguyên",
+        "pasteToBbox": "Hộp Giới Hạn",
+        "pasteToBboxDesc": "Layer Mới (Trong Hộp Giới Hạn)",
+        "pasteToCanvas": "Canvas",
+        "pasteToCanvasDesc": "Layer Mới (Trong Canvas)",
+        "pastedTo": "Dán Vào {{destination}}",
+        "regionCopiedToClipboard": "Sao Chép {{region}} Vào Clipboard",
+        "copyRegionError": "Lỗi khi sao chép {{region}}",
+        "errors": {
+            "unableToLoadImage": "Không Thể Tải Hình Ảnh",
+            "unableToFindImage": "Không Thể Tìm Hình Ảnh"
         }
     },
     "stylePresets": {
@@ -2123,7 +2169,12 @@
         "problemDownloadingImage": "Không Thể Tải Xuống Ảnh",
         "problemCopyingLayer": "Không Thể Sao Chép Layer",
         "problemSavingLayer": "Không Thể Lưu Layer",
-        "outOfMemoryErrorDescLocal": "Làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi để hạn chế OOM (Tràn bộ nhớ)."
+        "outOfMemoryErrorDescLocal": "Làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi để hạn chế OOM (Tràn bộ nhớ).",
+        "unableToCopy": "Không Thể Sao Chép",
+        "unableToCopyDesc_theseSteps": "các bước sau",
+        "unableToCopyDesc": "Trình duyệt của bạn không hỗ trợ tính năng clipboard. Người dùng Firefox có thể khắc phục theo ",
+        "pasteSuccess": "Dán Vào {{destination}}",
+        "pasteFailed": "Dán Thất Bại"
     },
     "ui": {
         "tabs": {
@@ -2218,11 +2269,12 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Chế độ VRAM thấp",
-            "Trình quản lý bộ nhớ động",
-            "Tải model nhanh hơn",
-            "Ít lỗi bộ nhớ hơn",
-            "Mở rộng khả năng xử lý hàng loạt workflow"
+            "Cải thiện các thiết lập mặc định của VRAM",
+            "Xoá bộ nhớ đệm của model theo yêu cầu",
+            "Mở rộng khả năng tương thích LoRA trên FLUX",
+            "Bộ lọc điều chỉnh ảnh trên Canvas",
+            "Huỷ tất cả trừ mục đang xếp hàng hiện tại",
+            "Sao chép và dán trên Canvas"
         ]
     },
     "upsell": {
