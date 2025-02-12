@@ -108,18 +108,6 @@ export const singleCanvasEntityDndSource: DndSource<SingleCanvasEntityDndSourceD
   getData: buildGetData(_singleCanvasEntity.key, _singleCanvasEntity.type),
 };
 
-const _singleWorkflowField = buildTypeAndKey('single-workflow-field');
-type SingleWorkflowFieldDndSourceData = DndData<
-  typeof _singleWorkflowField.type,
-  typeof _singleWorkflowField.key,
-  { fieldIdentifier: FieldIdentifier }
->;
-export const singleWorkflowFieldDndSource: DndSource<SingleWorkflowFieldDndSourceData> = {
-  ..._singleWorkflowField,
-  typeGuard: buildTypeGuard(_singleWorkflowField.key),
-  getData: buildGetData(_singleWorkflowField.key, _singleWorkflowField.type),
-};
-
 type DndTarget<TargetData extends DndData, SourceData extends DndData> = {
   key: symbol;
   type: TargetData['type'];

@@ -5,11 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  FieldIdentifierWithValue,
-  WorkflowMode,
-  WorkflowsState as WorkflowState,
-} from 'features/nodes/store/types';
+import type { WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
@@ -23,7 +19,7 @@ import type {
   WorkflowV3,
 } from 'features/nodes/types/workflow';
 import { isContainerElement, isHeadingElement, isNodeFieldElement, isTextElement } from 'features/nodes/types/workflow';
-import { isEqual, omit, uniqBy } from 'lodash-es';
+import { isEqual } from 'lodash-es';
 import { useMemo } from 'react';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
@@ -70,7 +66,6 @@ const initialWorkflowState: WorkflowState = {
   _version: 1,
   isTouched: false,
   mode: 'view',
-  originalExposedFieldValues: [],
   formFieldInitialValues: {},
   searchTerm: '',
   orderBy: undefined, // initial value is decided in component
@@ -98,28 +93,6 @@ export const workflowSlice = createSlice({
     categorySectionsChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
       const { id, isOpen } = action.payload;
       state.categorySections[id] = isOpen;
-    },
-    workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifierWithValue>) => {
-      state.exposedFields = uniqBy(
-        state.exposedFields.concat(omit(action.payload, 'value')),
-        (field) => `${field.nodeId}-${field.fieldName}`
-      );
-      state.originalExposedFieldValues = uniqBy(
-        state.originalExposedFieldValues.concat(action.payload),
-        (field) => `${field.nodeId}-${field.fieldName}`
-      );
-      state.isTouched = true;
-    },
-    workflowExposedFieldRemoved: (state, action: PayloadAction<FieldIdentifier>) => {
-      state.exposedFields = state.exposedFields.filter((field) => !isEqual(field, action.payload));
-      state.originalExposedFieldValues = state.originalExposedFieldValues.filter(
-        (field) => !isEqual(omit(field, 'value'), action.payload)
-      );
-      state.isTouched = true;
-    },
-    workflowExposedFieldsReordered: (state, action: PayloadAction<FieldIdentifier[]>) => {
-      state.exposedFields = action.payload;
-      state.isTouched = true;
     },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
       state.name = action.payload;
@@ -229,31 +202,8 @@ export const workflowSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(workflowLoaded, (state, action) => {
+    builder.addCase(workflowLoaded, (state, action): WorkflowState => {
       const { nodes, edges: _edges, ...workflowExtra } = action.payload;
-
-      const originalExposedFieldValues: FieldIdentifierWithValue[] = [];
-
-      workflowExtra.exposedFields.forEach((field) => {
-        const node = nodes.find((n) => n.id === field.nodeId);
-
-        if (!isInvocationNode(node)) {
-          return;
-        }
-
-        const input = node.data.inputs[field.fieldName];
-
-        if (!input) {
-          return;
-        }
-
-        const originalExposedFieldValue = {
-          nodeId: field.nodeId,
-          fieldName: field.fieldName,
-          value: input.value,
-        };
-        originalExposedFieldValues.push(originalExposedFieldValue);
-      });
 
       const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
 
@@ -266,13 +216,13 @@ export const workflowSlice = createSlice({
         const node = nodes.find((n) => n.id === nodeId);
 
         if (!isInvocationNode(node)) {
-          return;
+          continue;
         }
 
         const field = node.data.inputs[fieldName];
 
         if (!field) {
-          return;
+          continue;
         }
 
         formFieldInitialValues[el.id] = field.value;
@@ -281,7 +231,6 @@ export const workflowSlice = createSlice({
       return {
         ...deepClone(initialWorkflowState),
         ...deepClone(workflowExtra),
-        originalExposedFieldValues,
         formFieldInitialValues,
         mode: state.mode,
       };
@@ -357,9 +306,6 @@ export const workflowSlice = createSlice({
 
 export const {
   workflowModeChanged,
-  workflowExposedFieldAdded,
-  workflowExposedFieldRemoved,
-  workflowExposedFieldsReordered,
   workflowNameChanged,
   workflowCategoryChanged,
   workflowDescriptionChanged,
@@ -383,7 +329,6 @@ export const {
   formElementHeadingDataChanged,
   formElementTextDataChanged,
   formElementNodeFieldDataChanged,
-  formElementNodeFieldInitialValueChanged,
   formElementContainerDataChanged,
 } = workflowSlice.actions;
 
