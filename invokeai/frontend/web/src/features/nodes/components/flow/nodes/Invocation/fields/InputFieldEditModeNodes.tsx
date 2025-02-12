@@ -9,7 +9,6 @@ import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInva
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { memo, useCallback, useRef, useState } from 'react';
 
-import { InputFieldAddRemoveLinearViewIconButton } from './InputFieldAddRemoveLinearViewIconButton';
 import { InputFieldRenderer } from './InputFieldRenderer';
 import { InputFieldTitle } from './InputFieldTitle';
 import { InputFieldWrapper } from './InputFieldWrapper';
@@ -84,7 +83,6 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
               <>
                 <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
                 <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
-                <InputFieldAddRemoveLinearViewIconButton nodeId={nodeId} fieldName={fieldName} />
               </>
             )}
           </Flex>
