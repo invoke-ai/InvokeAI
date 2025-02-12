@@ -172,7 +172,8 @@
         "imagesTab": "Immagini create e salvate in Invoke.",
         "assetsTab": "File che hai caricato per usarli nei tuoi progetti.",
         "boardsSettings": "Impostazioni Bacheche",
-        "imagesSettings": "Impostazioni Immagini Galleria"
+        "imagesSettings": "Impostazioni Immagini Galleria",
+        "assets": "Risorse"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -832,7 +833,12 @@
         "uploadFailedInvalidUploadDesc_withCount_one": "Devi caricare al massimo 1 immagine PNG o JPEG.",
         "uploadFailedInvalidUploadDesc_withCount_many": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
         "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
-        "outOfMemoryErrorDescLocal": "Segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent> per ridurre gli OOM."
+        "outOfMemoryErrorDescLocal": "Segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent> per ridurre gli OOM.",
+        "pasteFailed": "Incolla non riuscita",
+        "pasteSuccess": "Incollato su {{destination}}",
+        "unableToCopy": "Impossibile copiare",
+        "unableToCopyDesc": "Il tuo browser non supporta l'accesso agli appunti. Gli utenti di Firefox potrebbero risolvere il problema seguendo ",
+        "unableToCopyDesc_theseSteps": "questi passaggi"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -2092,7 +2098,10 @@
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
             "saveToGalleryGroup": "Salva nella Galleria",
             "newInpaintMask": "Nuova maschera Inpaint",
-            "newRegionalGuidance": "Nuova Guida Regionale"
+            "newRegionalGuidance": "Nuova Guida Regionale",
+            "copyToClipboard": "Copia negli appunti",
+            "copyCanvasToClipboard": "Copia la tela negli appunti",
+            "copyBboxToClipboard": "Copia il riquadro di delimitazione negli appunti"
         },
         "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
         "copyRasterLayerTo": "Copia $t(controlLayers.rasterLayer) in",
@@ -2155,7 +2164,17 @@
             "ipAdapterIncompatibleBaseModel": "modello base dell'immagine di riferimento incompatibile",
             "ipAdapterNoImageSelected": "nessuna immagine di riferimento selezionata",
             "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato"
-        }
+        },
+        "pasteTo": "Incolla su",
+        "pasteToBboxDesc": "Nuovo livello (nel riquadro di delimitazione)",
+        "pasteToAssets": "Risorse",
+        "copyRegionError": "Errore durante la copia di {{region}}",
+        "pasteToAssetsDesc": "Incolla in Risorse",
+        "pasteToBbox": "Riquadro di delimitazione",
+        "pasteToCanvas": "Tela",
+        "pasteToCanvasDesc": "Nuovo livello (nella Tela)",
+        "pastedTo": "Incollato su {{destination}}",
+        "regionCopiedToClipboard": "{{region}} Copiato negli appunti"
     },
     "ui": {
         "tabs": {
@@ -2254,11 +2273,12 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Modalità Bassa-VRAM",
-            "Gestione dinamica della memoria",
-            "Tempi di caricamento del modello più rapidi",
-            "Meno errori di memoria",
-            "Funzionalità lotto del flusso di lavoro ampliate"
+            "Impostazioni predefinite VRAM migliorate",
+            "Cancellazione della cache del modello su richiesta",
+            "Compatibilità estesa FLUX LoRA",
+            "Filtro Regola Immagine su Tela",
+            "Annulla tutto tranne l'elemento della coda corrente",
+            "Copia da e incolla sulla Tela"
         ]
     },
     "system": {
