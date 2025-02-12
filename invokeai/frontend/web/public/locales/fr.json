@@ -301,7 +301,9 @@
         "hfTokenHelperText": "Un token HF est requis pour utiliser certains modèles. Cliquez ici pour créer ou obtenir votre token.",
         "hfTokenInvalid": "Token HF invalide ou manquant",
         "hfForbidden": "Vous n'avez pas accès à ce modèle HF.",
-        "hfTokenInvalidErrorMessage2": "Mettre à jour dans le "
+        "hfTokenInvalidErrorMessage2": "Mettre à jour dans le ",
+        "controlLora": "Controle LoRA",
+        "urlUnauthorizedErrorMessage2": "Découvrir comment ici."
     },
     "parameters": {
         "images": "Images",
@@ -332,7 +334,7 @@
         "showOptionsPanel": "Afficher le panneau latéral (O ou T)",
         "invoke": {
             "noPrompts": "Aucun prompts généré",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} entrée manquante",
+            "missingInputForField": "entrée manquante",
             "missingFieldTemplate": "Modèle de champ manquant",
             "invoke": "Invoke",
             "addingImagesTo": "Ajouter des images à",
@@ -353,7 +355,9 @@
             "canvasIsCompositing": "La toile est en train de composer",
             "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}} : trop peu d'éléments, minimum {{minItems}}",
             "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}} : trop d'éléments, maximum {{maxItems}}",
-            "canvasIsSelectingObject": "La toile est occupée (sélection d'objet)"
+            "canvasIsSelectingObject": "La toile est occupée (sélection d'objet)",
+            "emptyBatches": "lots vides",
+            "batchNodeNotConnected": "Noeud de lots non connecté : {{label}}"
         },
         "negativePromptPlaceholder": "Prompt Négatif",
         "positivePromptPlaceholder": "Prompt Positif",
@@ -1630,7 +1634,26 @@
         "boardAccessError": "Impossible de trouver la planche {{board_id}}, réinitialisation à la valeur par défaut",
         "workflowHelpText": "Besoin d'aide ? Consultez notre guide sur <LinkComponent>Comment commencer avec les Workflows</LinkComponent>.",
         "noWorkflows": "Aucun Workflows",
-        "noMatchingWorkflows": "Aucun Workflows correspondant"
+        "noMatchingWorkflows": "Aucun Workflows correspondant",
+        "arithmeticSequence": "Séquence Arithmétique",
+        "uniformRandomDistribution": "Distribution Aléatoire Uniforme",
+        "noBatchGroup": "aucun groupe",
+        "generatorLoading": "chargement",
+        "generatorLoadFromFile": "Charger depuis un Fichier",
+        "dynamicPromptsRandom": "Prompts Dynamiques (Aléatoire)",
+        "integerRangeGenerator": "Générateur d'interval d'entiers",
+        "generateValues": "Générer Valeurs",
+        "linearDistribution": "Distribution Linéaire",
+        "floatRangeGenerator": "Générateur d'interval de nombres décimaux",
+        "generatorNRandomValues_one": "{{count}} valeur aléatoire",
+        "generatorNRandomValues_many": "{{count}} valeurs aléatoires",
+        "generatorNRandomValues_other": "{{count}} valeurs aléatoires",
+        "dynamicPromptsCombinatorial": "Prompts Dynamiques (Combinatoire)",
+        "parseString": "Analyser la chaine de charactères",
+        "internalDesc": "Cette invocation est utilisée internalement par Invoke. En fonction des mises à jours il est possible que des changements y soit effectués ou qu'elle soit supprimé sans prévention.",
+        "splitOn": "Diviser sur",
+        "generatorNoValues": "vide",
+        "addItem": "Ajouter un élément"
     },
     "models": {
         "noMatchingModels": "Aucun modèle correspondant",
