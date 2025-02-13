@@ -49,6 +49,8 @@ export type ParamsState = {
   optimizedDenoisingEnabled: boolean;
   iterations: number;
   scheduler: ParameterScheduler;
+  upscaleScheduler: ParameterScheduler;
+  upscaleCfgScale: ParameterCFGScale;
   seed: ParameterSeed;
   shouldRandomizeSeed: boolean;
   steps: ParameterSteps;
@@ -96,6 +98,8 @@ const initialState: ParamsState = {
   optimizedDenoisingEnabled: true,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
+  upscaleScheduler: 'kdpm_2',
+  upscaleCfgScale: 2,
   seed: 0,
   shouldRandomizeSeed: true,
   steps: 30,
@@ -139,6 +143,9 @@ export const paramsSlice = createSlice({
     setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
     },
+    setUpscaleCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
+      state.upscaleCfgScale = action.payload;
+    },
     setGuidance: (state, action: PayloadAction<ParameterGuidance>) => {
       state.guidance = action.payload;
     },
@@ -148,6 +155,10 @@ export const paramsSlice = createSlice({
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.scheduler = action.payload;
     },
+    setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
+      state.upscaleScheduler = action.payload;
+    },
+
     setSeed: (state, action: PayloadAction<number>) => {
       state.seed = action.payload;
       state.shouldRandomizeSeed = false;
@@ -315,6 +326,8 @@ export const {
   setCfgRescaleMultiplier,
   setGuidance,
   setScheduler,
+  setUpscaleScheduler,
+  setUpscaleCfgScale,
   setSeed,
   setImg2imgStrength,
   setOptimizedDenoisingEnabled,
@@ -408,6 +421,9 @@ export const selectShouldRandomizeSeed = createParamsSelector((params) => params
 export const selectVAEPrecision = createParamsSelector((params) => params.vaePrecision);
 export const selectIterations = createParamsSelector((params) => params.iterations);
 export const selectShouldUseCPUNoise = createParamsSelector((params) => params.shouldUseCpuNoise);
+
+export const selectUpscaleScheduler = createParamsSelector((params) => params.upscaleScheduler);
+export const selectUpscaleCfgScale = createParamsSelector((params) => params.upscaleCfgScale);
 
 export const selectRefinerCFGScale = createParamsSelector((params) => params.refinerCFGScale);
 export const selectRefinerModel = createParamsSelector((params) => params.refinerModel);
