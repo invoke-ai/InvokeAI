@@ -287,9 +287,11 @@ class MetadataFieldExtractorInvocation(BaseInvocation):
     key: str = InputField(description="The key in the image's metadata to extract the value from")
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        metadata = context.images.get_metadata(image_name=self.image.image_name)
+        image_name = self.image.image_name
+
+        metadata = context.images.get_metadata(image_name=image_name)
         if not metadata:
-            raise ValueError("No metadata found on image")
+            raise ValueError(f"No metadata found on image {image_name}")
 
         try:
             val = metadata.root[self.key]
@@ -297,4 +299,4 @@ class MetadataFieldExtractorInvocation(BaseInvocation):
                 raise ValueError(f"Metadata at key '{self.key}' must be a string")
             return StringOutput(value=val)
         except KeyError as e:
-            raise ValueError(f"No key {self.key} found in metadata") from e
+            raise ValueError(f"No key '{self.key}' found in the metadata for {image_name}") from e
