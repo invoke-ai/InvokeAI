@@ -278,7 +278,13 @@ class CoreMetadataInvocation(BaseInvocation):
     model_config = ConfigDict(extra="allow")
 
 
-@invocation("metadata_field_extractor", title="Metadata Field Extractor", tags=["metadata"], category="metadata", version="1.0.0")
+@invocation(
+    "metadata_field_extractor",
+    title="Metadata Field Extractor",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+)
 class MetadataFieldExtractorInvocation(BaseInvocation):
     """Extracts the text value from an image's metadata given a key.
     Raises an error if the image has no metadata or if the value is not a string (nesting not permitted)."""
