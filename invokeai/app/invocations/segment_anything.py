@@ -185,9 +185,9 @@ class SegmentAnythingInvocation(BaseInvocation):
             # Find the largest mask.
             return [max(masks, key=lambda x: float(x.sum()))]
         elif self.mask_filter == "highest_box_score":
-            assert (
-                bounding_boxes is not None
-            ), "Bounding boxes must be provided to use the 'highest_box_score' mask filter."
+            assert bounding_boxes is not None, (
+                "Bounding boxes must be provided to use the 'highest_box_score' mask filter."
+            )
             assert len(masks) == len(bounding_boxes)
             # Find the index of the bounding box with the highest score.
             # Note that we fallback to -1.0 if the score is None. This is mainly to satisfy the type checker. In most

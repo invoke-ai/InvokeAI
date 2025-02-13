@@ -212,12 +212,12 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
     assert job.bytes > 0, "expected download bytes to be positive"
     assert job.bytes == job.total_bytes, "expected download bytes to equal total bytes"
     assert job.download_path == tmp_path / "sdxl-turbo"
-    assert Path(
-        tmp_path, "sdxl-turbo/model_index.json"
-    ).exists(), f"expected {tmp_path}/sdxl-turbo/model_inded.json to exist"
-    assert Path(
-        tmp_path, "sdxl-turbo/text_encoder/config.json"
-    ).exists(), f"expected {tmp_path}/sdxl-turbo/text_encoder/config.json to exist"
+    assert Path(tmp_path, "sdxl-turbo/model_index.json").exists(), (
+        f"expected {tmp_path}/sdxl-turbo/model_inded.json to exist"
+    )
+    assert Path(tmp_path, "sdxl-turbo/text_encoder/config.json").exists(), (
+        f"expected {tmp_path}/sdxl-turbo/text_encoder/config.json to exist"
+    )
 
     assert events == {DownloadJobStatus.RUNNING, DownloadJobStatus.COMPLETED}
     queue.stop()

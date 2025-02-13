@@ -70,7 +70,7 @@ def get_pretty_snapshot_diff(snapshot_1: Optional[MemorySnapshot], snapshot_2: O
 
     def get_msg_line(prefix: str, val1: int, val2: int) -> str:
         diff = val2 - val1
-        return f"{prefix: <30} ({(diff/GB):+5.3f}): {(val1/GB):5.3f}GB -> {(val2/GB):5.3f}GB\n"
+        return f"{prefix: <30} ({(diff / GB):+5.3f}): {(val1 / GB):5.3f}GB -> {(val2 / GB):5.3f}GB\n"
 
     msg = ""
 

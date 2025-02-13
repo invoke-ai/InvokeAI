@@ -192,7 +192,7 @@ class ModelCache:
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
         self._logger.debug(
-            f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size/MB:.2f}MB)"
+            f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
 
     @synchronized
@@ -303,7 +303,7 @@ class ModelCache:
         # 2. If the model can't fit fully into VRAM, then unload all other models and load as much of the model as
         #    possible.
         vram_bytes_freed = self._offload_unlocked_models(model_vram_needed, working_mem_bytes)
-        self._logger.debug(f"Unloaded models (if necessary): vram_bytes_freed={(vram_bytes_freed/MB):.2f}MB")
+        self._logger.debug(f"Unloaded models (if necessary): vram_bytes_freed={(vram_bytes_freed / MB):.2f}MB")
 
         # Check the updated vram_available after offloading.
         vram_available = self._get_vram_available(working_mem_bytes)
@@ -317,7 +317,7 @@ class ModelCache:
             vram_bytes_freed_from_own_model = self._move_model_to_ram(cache_entry, -vram_available)
             vram_available = self._get_vram_available(working_mem_bytes)
             self._logger.debug(
-                f"Unloaded {vram_bytes_freed_from_own_model/MB:.2f}MB from the model being locked ({cache_entry.key})."
+                f"Unloaded {vram_bytes_freed_from_own_model / MB:.2f}MB from the model being locked ({cache_entry.key})."
             )
 
         # Move as much of the model as possible into VRAM.
@@ -333,10 +333,12 @@ class ModelCache:
         self._logger.info(
             f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
             f"{self._execution_device.type} device in {(time.time() - start_time):.2f}s. "
-            f"Total model size: {model_total_bytes/MB:.2f}MB, "
-            f"VRAM: {model_cur_vram_bytes/MB:.2f}MB ({loaded_percent:.1%})"
+            f"Total model size: {model_total_bytes / MB:.2f}MB, "
+            f"VRAM: {model_cur_vram_bytes / MB:.2f}MB ({loaded_percent:.1%})"
         )
-        self._logger.debug(f"Loaded model onto execution device: model_bytes_loaded={(model_bytes_loaded/MB):.2f}MB, ")
+        self._logger.debug(
+            f"Loaded model onto execution device: model_bytes_loaded={(model_bytes_loaded / MB):.2f}MB, "
+        )
         self._logger.debug(
             f"After loading: {self._get_vram_state_str(model_cur_vram_bytes, model_total_bytes, vram_available)}"
         )
@@ -495,10 +497,10 @@ class ModelCache:
         """Helper function for preparing a VRAM state log string."""
         model_cur_vram_bytes_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         return (
-            f"model_total={model_total_bytes/MB:.0f} MB, "
-            + f"model_vram={model_cur_vram_bytes/MB:.0f} MB ({model_cur_vram_bytes_percent:.1%} %), "
+            f"model_total={model_total_bytes / MB:.0f} MB, "
+            + f"model_vram={model_cur_vram_bytes / MB:.0f} MB ({model_cur_vram_bytes_percent:.1%} %), "
             # + f"vram_total={int(self._max_vram_cache_size * GB)/MB:.0f} MB, "
-            + f"vram_available={(vram_available/MB):.0f} MB, "
+            + f"vram_available={(vram_available / MB):.0f} MB, "
         )
 
     def _offload_unlocked_models(self, vram_bytes_required: int, working_mem_bytes: Optional[int] = None) -> int:
@@ -509,7 +511,7 @@ class ModelCache:
             int: The number of bytes freed based on believed model sizes. The actual change in VRAM may be different.
         """
         self._logger.debug(
-            f"Offloading unlocked models with goal of making room for {vram_bytes_required/MB:.2f}MB of VRAM."
+            f"Offloading unlocked models with goal of making room for {vram_bytes_required / MB:.2f}MB of VRAM."
         )
         vram_bytes_freed = 0
         # TODO(ryand): Give more thought to the offloading policy used here.
@@ -527,7 +529,7 @@ class ModelCache:
             cache_entry_bytes_freed = self._move_model_to_ram(cache_entry, vram_bytes_to_free)
             if cache_entry_bytes_freed > 0:
                 self._logger.debug(
-                    f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed/MB):.0f} MB."
+                    f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
                 )
             vram_bytes_freed += cache_entry_bytes_freed
 
@@ -609,7 +611,7 @@ class ModelCache:
         external references to the model, there's nothing that the cache can do about it, and those models will not be
         garbage-collected.
         """
-        self._logger.debug(f"Making room for {bytes_needed/MB:.2f}MB of RAM.")
+        self._logger.debug(f"Making room for {bytes_needed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="Before dropping models:")
 
         ram_bytes_available = self._get_ram_available()
@@ -625,7 +627,7 @@ class ModelCache:
             if not cache_entry.is_locked:
                 ram_bytes_freed += cache_entry.cached_model.total_bytes()
                 self._logger.debug(
-                    f"Dropping {model_key} from RAM cache to free {(cache_entry.cached_model.total_bytes()/MB):.2f}MB."
+                    f"Dropping {model_key} from RAM cache to free {(cache_entry.cached_model.total_bytes() / MB):.2f}MB."
                 )
                 self._delete_cache_entry(cache_entry)
                 del cache_entry
@@ -650,7 +652,7 @@ class ModelCache:
             gc.collect()
 
         TorchDevice.empty_cache()
-        self._logger.debug(f"Dropped {models_cleared} models to free {ram_bytes_freed/MB:.2f}MB of RAM.")
+        self._logger.debug(f"Dropped {models_cleared} models to free {ram_bytes_freed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="After dropping models:")
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
