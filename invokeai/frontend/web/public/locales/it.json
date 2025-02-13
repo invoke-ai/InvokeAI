@@ -1198,15 +1198,11 @@
         },
         "compositingMaskAdjustments": {
             "heading": "Regolazioni della maschera",
-            "paragraphs": [
-                "Regola la maschera."
-            ]
+            "paragraphs": ["Regola la maschera."]
         },
         "compositingCoherenceMode": {
             "heading": "Modalità",
-            "paragraphs": [
-                "Metodo utilizzato per creare un'immagine coerente con l'area mascherata appena generata."
-            ]
+            "paragraphs": ["Metodo utilizzato per creare un'immagine coerente con l'area mascherata appena generata."]
         },
         "clipSkip": {
             "paragraphs": [
@@ -1217,9 +1213,7 @@
         },
         "compositingCoherencePass": {
             "heading": "Passaggio di Coerenza",
-            "paragraphs": [
-                "Un secondo ciclo di riduzione del rumore aiuta a comporre l'immagine Inpaint/Outpaint."
-            ]
+            "paragraphs": ["Un secondo ciclo di riduzione del rumore aiuta a comporre l'immagine Inpaint/Outpaint."]
         },
         "paramNegativeConditioning": {
             "paragraphs": [
@@ -1230,9 +1224,7 @@
         },
         "compositingBlurMethod": {
             "heading": "Metodo di sfocatura",
-            "paragraphs": [
-                "Il metodo di sfocatura applicato all'area mascherata."
-            ]
+            "paragraphs": ["Il metodo di sfocatura applicato all'area mascherata."]
         },
         "paramPositiveConditioning": {
             "heading": "Prompt positivo",
@@ -1337,14 +1329,10 @@
         },
         "dynamicPromptsMaxPrompts": {
             "heading": "Numero massimo di prompt",
-            "paragraphs": [
-                "Limita il numero di prompt che possono essere generati da Prompt Dinamici."
-            ]
+            "paragraphs": ["Limita il numero di prompt che possono essere generati da Prompt Dinamici."]
         },
         "infillMethod": {
-            "paragraphs": [
-                "Metodo di riempimento durante il processo di Outpaint o Inpaint."
-            ],
+            "paragraphs": ["Metodo di riempimento durante il processo di Outpaint o Inpaint."],
             "heading": "Metodo di riempimento"
         },
         "controlNetWeight": {
@@ -1363,9 +1351,7 @@
             ]
         },
         "controlNetControlMode": {
-            "paragraphs": [
-                "Attribuisce più peso al prompt oppure a ControlNet."
-            ],
+            "paragraphs": ["Attribuisce più peso al prompt oppure a ControlNet."],
             "heading": "Modalità di controllo"
         },
         "paramSteps": {
@@ -1377,9 +1363,7 @@
         },
         "lora": {
             "heading": "LoRA",
-            "paragraphs": [
-                "Modelli concettuali utilizzati insieme ai modelli di base."
-            ]
+            "paragraphs": ["Modelli concettuali utilizzati insieme ai modelli di base."]
         },
         "controlNet": {
             "paragraphs": [
@@ -1408,9 +1392,7 @@
         },
         "loraWeight": {
             "heading": "Peso",
-            "paragraphs": [
-                "Peso del LoRA. Un peso maggiore comporterà un impatto maggiore sull'immagine finale."
-            ]
+            "paragraphs": ["Peso del LoRA. Un peso maggiore comporterà un impatto maggiore sull'immagine finale."]
         },
         "paramAspect": {
             "heading": "Aspetto",
@@ -1421,9 +1403,7 @@
         },
         "paramHeight": {
             "heading": "Altezza",
-            "paragraphs": [
-                "Altezza dell'immagine generata. Deve essere un multiplo di 8."
-            ]
+            "paragraphs": ["Altezza dell'immagine generata. Deve essere un multiplo di 8."]
         },
         "paramHrf": {
             "heading": "Abilita correzione alta risoluzione",
@@ -1433,9 +1413,7 @@
         },
         "paramUpscaleMethod": {
             "heading": "Metodo di ampliamento",
-            "paragraphs": [
-                "Metodo utilizzato per ampliare l'immagine per la correzione ad alta risoluzione."
-            ]
+            "paragraphs": ["Metodo utilizzato per ampliare l'immagine per la correzione ad alta risoluzione."]
         },
         "patchmatchDownScaleSize": {
             "heading": "Ridimensiona",
@@ -1445,9 +1423,7 @@
             ]
         },
         "paramWidth": {
-            "paragraphs": [
-                "Larghezza dell'immagine generata. Deve essere un multiplo di 8."
-            ],
+            "paragraphs": ["Larghezza dell'immagine generata. Deve essere un multiplo di 8."],
             "heading": "Larghezza"
         },
         "refinerModel": {
@@ -1493,15 +1469,11 @@
         },
         "seamlessTilingXAxis": {
             "heading": "Piastrella senza giunte sull'asse X",
-            "paragraphs": [
-                "Affianca senza soluzione di continuità un'immagine lungo l'asse orizzontale."
-            ]
+            "paragraphs": ["Affianca senza soluzione di continuità un'immagine lungo l'asse orizzontale."]
         },
         "seamlessTilingYAxis": {
             "heading": "Piastrella senza giunte sull'asse Y",
-            "paragraphs": [
-                "Affianca senza soluzione di continuità un'immagine lungo l'asse verticale."
-            ]
+            "paragraphs": ["Affianca senza soluzione di continuità un'immagine lungo l'asse verticale."]
         },
         "refinerPositiveAestheticScore": {
             "heading": "Punteggio estetico positivo",
@@ -1517,16 +1489,12 @@
             ]
         },
         "compositingMaskBlur": {
-            "paragraphs": [
-                "Il raggio di sfocatura della maschera."
-            ],
+            "paragraphs": ["Il raggio di sfocatura della maschera."],
             "heading": "Sfocatura maschera"
         },
         "compositingCoherenceEdgeSize": {
             "heading": "Dimensione del bordo",
-            "paragraphs": [
-                "La dimensione del bordo del passaggio di coerenza."
-            ]
+            "paragraphs": ["La dimensione del bordo del passaggio di coerenza."]
         },
         "ipAdapterMethod": {
             "heading": "Modalità",
@@ -1578,9 +1546,7 @@
             ]
         },
         "regionalReferenceImage": {
-            "paragraphs": [
-                "Pennello per applicare un'immagine di riferimento ad aree specifiche."
-            ],
+            "paragraphs": ["Pennello per applicare un'immagine di riferimento ad aree specifiche."],
             "heading": "Immagine di riferimento Regionale"
         },
         "rasterLayer": {
@@ -1591,9 +1557,7 @@
         },
         "regionalGuidance": {
             "heading": "Guida Regionale",
-            "paragraphs": [
-                "Pennello per guidare la posizione in cui devono apparire gli elementi dei prompt globali."
-            ]
+            "paragraphs": ["Pennello per guidare la posizione in cui devono apparire gli elementi dei prompt globali."]
         },
         "regionalGuidanceAndReferenceImage": {
             "heading": "Guida regionale e immagine di riferimento regionale",
@@ -1604,14 +1568,10 @@
         },
         "globalReferenceImage": {
             "heading": "Immagine di riferimento Globale",
-            "paragraphs": [
-                "Applica un'immagine di riferimento per influenzare l'intera generazione."
-            ]
+            "paragraphs": ["Applica un'immagine di riferimento per influenzare l'intera generazione."]
         },
         "inpainting": {
-            "paragraphs": [
-                "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
-            ]
+            "paragraphs": ["Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."]
         }
     },
     "sdxl": {
@@ -2174,7 +2134,11 @@
         "pasteToCanvas": "Tela",
         "pasteToCanvasDesc": "Nuovo livello (nella Tela)",
         "pastedTo": "Incollato su {{destination}}",
-        "regionCopiedToClipboard": "{{region}} Copiato negli appunti"
+        "regionCopiedToClipboard": "{{region}} Copiato negli appunti",
+        "errors": {
+            "unableToFindImage": "Impossibile trovare l'immagine",
+            "unableToLoadImage": "Impossibile caricare l'immagine"
+        }
     },
     "ui": {
         "tabs": {
