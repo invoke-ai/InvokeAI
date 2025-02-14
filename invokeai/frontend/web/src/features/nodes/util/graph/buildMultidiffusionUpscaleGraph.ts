@@ -62,6 +62,7 @@ export const buildMultidiffusionUpscaleGraph = async (
     type: 'i2l',
     id: getPrefixedId('i2l'),
     fp32: vaePrecision === 'fp32',
+    tile_size: 1024,
     tiled: true,
   });
 
@@ -71,6 +72,7 @@ export const buildMultidiffusionUpscaleGraph = async (
     type: 'l2i',
     id: getPrefixedId('l2i'),
     fp32: vaePrecision === 'fp32',
+    tile_size: 1024,
     tiled: true,
     board: getBoardField(state),
     is_intermediate: false,
