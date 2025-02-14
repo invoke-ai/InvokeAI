@@ -7,7 +7,7 @@ import {
   useConnectionValidationResult,
   useIsConnectionInProgress,
   useIsConnectionStartField,
-} from 'features/nodes/hooks/useInputFieldConnectionState';
+} from 'features/nodes/hooks/useFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
 import { useInputFieldTemplateTitle } from 'features/nodes/hooks/useInputFieldTemplateTitle';

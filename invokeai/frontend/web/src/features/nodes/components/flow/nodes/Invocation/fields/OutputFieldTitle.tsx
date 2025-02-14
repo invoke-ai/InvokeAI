@@ -5,7 +5,7 @@ import {
   useConnectionValidationResult,
   useIsConnectionInProgress,
   useIsConnectionStartField,
-} from 'features/nodes/hooks/useInputFieldConnectionState';
+} from 'features/nodes/hooks/useFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
