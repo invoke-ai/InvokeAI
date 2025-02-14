@@ -1,35 +1,53 @@
 import { useStore } from '@nanostores/react';
+import type { HandleType } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $edgePendingUpdate, $pendingConnection, $templates } from 'features/nodes/store/nodesSlice';
+import {
+  $edgePendingUpdate,
+  $isConnectionInProgress,
+  $pendingConnection,
+  $templates,
+} from 'features/nodes/store/nodesSlice';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeConnectionErrorSelector';
 import { useMemo } from 'react';
 
-export const useInputFieldConnectionState = (nodeId: string, fieldName: string) => {
+export const useConnectionValidationResult = (nodeId: string, fieldName: string, handleType: HandleType) => {
   const pendingConnection = useStore($pendingConnection);
   const templates = useStore($templates);
   const edgePendingUpdate = useStore($edgePendingUpdate);
 
   const selectValidationResult = useMemo(
-    () => makeConnectionErrorSelector(templates, nodeId, fieldName, 'target'),
-    [templates, nodeId, fieldName]
+    () => makeConnectionErrorSelector(templates, nodeId, fieldName, handleType, pendingConnection, edgePendingUpdate),
+    [templates, nodeId, fieldName, handleType, pendingConnection, edgePendingUpdate]
   );
 
-  const isConnectionInProgress = useMemo(() => Boolean(pendingConnection), [pendingConnection]);
+  const validationResult = useAppSelector(selectValidationResult);
+  return validationResult;
+};
+
+export const useIsConnectionStartField = (nodeId: string, fieldName: string, handleType: HandleType) => {
+  const pendingConnection = useStore($pendingConnection);
+
   const isConnectionStartField = useMemo(() => {
     if (!pendingConnection) {
       return false;
     }
-    return (
-      pendingConnection.nodeId === nodeId &&
-      pendingConnection.handleId === fieldName &&
-      pendingConnection.fieldTemplate.fieldKind === 'input'
-    );
-  }, [fieldName, nodeId, pendingConnection]);
-  const validationResult = useAppSelector((s) => selectValidationResult(s, pendingConnection, edgePendingUpdate));
+    if (pendingConnection.nodeId !== nodeId || pendingConnection.handleId !== fieldName) {
+      return false;
+    }
+    if (handleType === 'source' && pendingConnection.fieldTemplate.fieldKind === 'output') {
+      return true;
+    }
+    if (handleType === 'target' && pendingConnection.fieldTemplate.fieldKind === 'input') {
+      return true;
+    }
+    return false;
+  }, [fieldName, handleType, nodeId, pendingConnection]);
 
-  return {
-    isConnectionInProgress,
-    isConnectionStartField,
-    validationResult,
-  };
+  return isConnectionStartField;
+};
+
+export const useIsConnectionInProgress = () => {
+  const isConnectionInProgress = useStore($isConnectionInProgress);
+
+  return isConnectionInProgress;
 };

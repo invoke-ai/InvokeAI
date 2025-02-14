@@ -2,19 +2,21 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Tooltip } from '@invoke-ai/ui-library';
 import { Handle, Position } from '@xyflow/react';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
+import {
+  useConnectionValidationResult,
+  useIsConnectionInProgress,
+  useIsConnectionStartField,
+} from 'features/nodes/hooks/useInputFieldConnectionState';
+import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
-import type { ValidationResult } from 'features/nodes/store/util/validateConnection';
 import { HANDLE_TOOLTIP_OPEN_DELAY, MODEL_TYPES } from 'features/nodes/types/constants';
-import type { FieldOutputTemplate } from 'features/nodes/types/field';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  fieldTemplate: FieldOutputTemplate;
-  isConnectionInProgress: boolean;
-  isConnectionStartField: boolean;
-  validationResult: ValidationResult;
+  nodeId: string;
+  fieldName: string;
 };
 
 const sx = {
@@ -57,12 +59,15 @@ const handleStyles = {
   insetInlineEnd: '-0.5rem',
 } satisfies CSSProperties;
 
-export const OutputFieldHandle = memo((props: Props) => {
-  const { fieldTemplate, isConnectionInProgress, isConnectionStartField, validationResult } = props;
+export const OutputFieldHandle = memo(({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
+  const fieldTemplate = useOutputFieldTemplate(nodeId, fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const fieldColor = useMemo(() => getFieldColor(fieldTemplate.type), [fieldTemplate.type]);
   const isModelField = useMemo(() => MODEL_TYPES.some((t) => t === fieldTemplate.type.name), [fieldTemplate.type]);
+  const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'source');
+  const isConnectionInProgress = useIsConnectionInProgress();
+  const validationResult = useConnectionValidationResult(nodeId, fieldName, 'source');
 
   const tooltip = useMemo(() => {
     if (isConnectionInProgress && validationResult.messageTKey) {
