@@ -9,7 +9,8 @@ import type { DndListTargetState } from 'features/dnd/types';
  */
 const line = {
   thickness: 2,
-  backgroundColor: 'base.500',
+  backgroundColor: 'red',
+  // backgroundColor: 'base.500',
 };
 
 type DropIndicatorProps = {
@@ -104,7 +105,7 @@ function DndDropIndicatorInternal({ edge, gap = '0px' }: DropIndicatorProps) {
   );
 }
 
-export const DndListDropIndicator = ({ dndState }: { dndState: DndListTargetState }) => {
+export const DndListDropIndicator = ({ dndState, gap }: { dndState: DndListTargetState; gap?: string }) => {
   if (dndState.type !== 'is-dragging-over') {
     return null;
   }
@@ -117,7 +118,7 @@ export const DndListDropIndicator = ({ dndState }: { dndState: DndListTargetStat
     <DndDropIndicatorInternal
       edge={dndState.closestEdge}
       // This is the gap between items in the list, used to calculate the position of the drop indicator
-      gap="var(--invoke-space-2)"
+      gap={gap || 'var(--invoke-space-2)'}
     />
   );
 };

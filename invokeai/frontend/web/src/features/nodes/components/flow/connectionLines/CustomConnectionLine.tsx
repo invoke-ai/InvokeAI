@@ -1,4 +1,6 @@
 import { useStore } from '@nanostores/react';
+import type { ConnectionLineComponentProps } from '@xyflow/react';
+import { getBezierPath } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
@@ -6,8 +8,6 @@ import { $pendingConnection } from 'features/nodes/store/nodesSlice';
 import { selectShouldAnimateEdges, selectShouldColorEdges } from 'features/nodes/store/workflowSettingsSlice';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
-import type { ConnectionLineComponentProps } from 'reactflow';
-import { getBezierPath } from 'reactflow';
 
 const pathStyles: CSSProperties = { opacity: 0.8 };
 

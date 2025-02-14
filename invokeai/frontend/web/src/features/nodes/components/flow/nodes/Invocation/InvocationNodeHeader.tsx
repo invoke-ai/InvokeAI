@@ -5,7 +5,7 @@ import InvocationNodeClassificationIcon from 'features/nodes/components/flow/nod
 import { memo } from 'react';
 
 import InvocationNodeCollapsedHandles from './InvocationNodeCollapsedHandles';
-import InvocationNodeInfoIcon from './InvocationNodeInfoIcon';
+import { InvocationNodeInfoIcon } from './InvocationNodeInfoIcon';
 import InvocationNodeStatusIndicator from './InvocationNodeStatusIndicator';
 
 type Props = {

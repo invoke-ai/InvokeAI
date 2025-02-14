@@ -12,6 +12,7 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { CommandEmpty, CommandItem, CommandList, CommandRoot } from 'cmdk';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -31,6 +32,7 @@ import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupied
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
@@ -41,8 +43,8 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCircuitryBold, PiFlaskBold, PiHammerBold, PiLightningFill } from 'react-icons/pi';
-import type { EdgeChange, NodeChange } from 'reactflow';
 import type { S } from 'services/api/types';
+import { objectEntries } from 'tsafe';
 
 const useThrottle = <T,>(value: T, limit: number) => {
   const [throttledValue, setThrottledValue] = useState(value);
@@ -95,8 +97,8 @@ const useAddNode = () => {
       node.selected = true;
 
       // Deselect all other nodes and edges
-      const nodeChanges: NodeChange[] = [{ type: 'add', item: node }];
-      const edgeChanges: EdgeChange[] = [];
+      const nodeChanges: NodeChange<AnyNode>[] = [{ type: 'add', item: node }];
+      const edgeChanges: EdgeChange<AnyEdge>[] = [];
       nodes.forEach(({ id, selected }) => {
         if (selected) {
           nodeChanges.push({ type: 'select', id, selected: false });
@@ -381,11 +383,11 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
         if (filter(template, searchTerm)) {
           const candidateFields = pendingConnection.handleType === 'source' ? template.inputs : template.outputs;
 
-          for (const field of Object.values(candidateFields)) {
+          for (const [_fieldName, fieldTemplate] of objectEntries(candidateFields)) {
             const sourceType =
-              pendingConnection.handleType === 'source' ? field.type : pendingConnection.fieldTemplate.type;
+              pendingConnection.handleType === 'source' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
             const targetType =
-              pendingConnection.handleType === 'target' ? field.type : pendingConnection.fieldTemplate.type;
+              pendingConnection.handleType === 'target' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
 
             if (validateConnectionTypes(sourceType, targetType)) {
               _items.push({

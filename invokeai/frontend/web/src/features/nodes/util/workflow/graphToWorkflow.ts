@@ -37,6 +37,10 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
     exposedFields: [],
     edges: [],
     nodes: [],
+    form: {
+      elements: {},
+      layout: [],
+    },
   };
 
   // Convert nodes

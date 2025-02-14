@@ -2,7 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Divider, Flex, FormLabel, Grid, GridItem, IconButton, Input } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
+import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { fieldStringCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type {
   StringFieldCollectionInputInstance,
@@ -32,7 +32,7 @@ export const StringFieldCollectionInputComponent = memo(
     const { t } = useTranslation();
     const store = useAppStore();
 
-    const isInvalid = useFieldIsInvalid(nodeId, field.name);
+    const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
 
     const onRemoveString = useCallback(
       (index: number) => {

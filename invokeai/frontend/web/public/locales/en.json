@@ -187,7 +187,10 @@
         "values": "Values",
         "resetToDefaults": "Reset to Defaults",
         "seed": "Seed",
-        "combinatorial": "Combinatorial"
+        "combinatorial": "Combinatorial",
+        "layout": "Layout",
+        "row": "Row",
+        "column": "Column"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -931,6 +934,7 @@
         "noWorkflows": "No Workflows",
         "noMatchingWorkflows": "No Matching Workflows",
         "noWorkflow": "No Workflow",
+        "unableToUpdateNode": "Node update failed: node {{node}} of type {{type}} (may require deleting and recreating)",
         "mismatchedVersion": "Invalid node: node {{node}} of type {{type}} has mismatched version (try updating?)",
         "missingTemplate": "Invalid node: node {{node}} of type {{type}} missing template (not installed?)",
         "sourceNodeDoesNotExist": "Invalid edge: source/output node {{node}} does not exist",
@@ -938,6 +942,7 @@
         "sourceNodeFieldDoesNotExist": "Invalid edge: source/output field {{node}}.{{field}} does not exist",
         "targetNodeFieldDoesNotExist": "Invalid edge: target/input field {{node}}.{{field}} does not exist",
         "deletedInvalidEdge": "Deleted invalid edge {{source}} -> {{target}}",
+        "deletedMissingNodeFieldFormElement": "Deleted missing form field: node {{nodeId}} field {{fieldName}}",
         "noConnectionInProgress": "No connection in progress",
         "node": "Node",
         "nodeOutputs": "Node Outputs",
@@ -952,6 +957,7 @@
         "nodeVersion": "Node Version",
         "noOutputRecorded": "No outputs recorded",
         "notes": "Notes",
+        "description": "Description",
         "notesDescription": "Add notes about your workflow",
         "problemSettingTitle": "Problem Setting Title",
         "resetToDefaultValue": "Reset to default value",
@@ -1694,7 +1700,26 @@
         "download": "Download",
         "copyShareLink": "Copy Share Link",
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
-        "delete": "Delete"
+        "delete": "Delete",
+        "builder": {
+            "builder": "Builder",
+            "layout": "Layout",
+            "row": "Row",
+            "column": "Column",
+            "label": "Label",
+            "description": "Description",
+            "component": "Component",
+            "numberInput": "Number Input",
+            "slider": "Slider",
+            "both": "Both",
+            "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
+            "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",
+            "containerPlaceholder": "Empty Container",
+            "containerPlaceholderDesc": "Drag a form element or node field into this container.",
+            "headingPlaceholder": "Empty Heading",
+            "textPlaceholder": "Empty Text",
+            "workflowBuilderAlphaWarning": "The workflow builder is currently in alpha. There may be breaking changes before the stable release."
+        }
     },
     "controlLayers": {
         "regional": "Regional",

@@ -1,4 +1,4 @@
-import { Box } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { hexToRGBA, rgbaToHex } from 'common/util/colorCodeTransformers';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
@@ -49,7 +49,7 @@ const ColorFieldInputComponent = (props: FieldComponentProps<ColorFieldInputInst
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Flex flexDir="column" gap={2} w="full">
       <HexColorInput
         style={{
           background: colorTokenToCssVar('base.700'),
@@ -67,7 +67,7 @@ const ColorFieldInputComponent = (props: FieldComponentProps<ColorFieldInputInst
         alpha
       />
       <RgbaColorPicker className="nodrag" color={color} onChange={handleValueChanged} style={{ width: '100%' }} />
-    </Box>
+    </Flex>
   );
 };
 

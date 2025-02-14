@@ -28,6 +28,7 @@ const workflowKeys = [
   'exposedFields',
   'meta',
   'id',
+  'form',
 ] satisfies (keyof WorkflowV3)[];
 
 type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV3;

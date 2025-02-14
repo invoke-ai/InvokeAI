@@ -4,7 +4,8 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import NotesTextarea from 'features/nodes/components/flow/nodes/Invocation/NotesTextarea';
+import { InvocationNodeNotesTextarea } from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeNotesTextarea';
+import { useNodeIsInvocationNode } from 'features/nodes/hooks/useNodeIsInvocationNode';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectLastSelectedNode, selectNodesSlice } from 'features/nodes/store/selectors';
@@ -55,6 +56,7 @@ type ContentProps = {
 const Content = memo((props: ContentProps) => {
   const { t } = useTranslation();
   const needsUpdate = useNodeNeedsUpdate(props.nodeId);
+  const isInvocationNode = useNodeIsInvocationNode(props.nodeId);
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
@@ -74,7 +76,7 @@ const Content = memo((props: ContentProps) => {
               </Text>
             </FormControl>
           </HStack>
-          <NotesTextarea nodeId={props.nodeId} />
+          {isInvocationNode && <InvocationNodeNotesTextarea nodeId={props.nodeId} />}
         </Flex>
       </ScrollableContent>
     </Box>

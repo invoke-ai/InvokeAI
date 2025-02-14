@@ -1,9 +1,10 @@
+import type { HandleType } from '@xyflow/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, PendingConnection, Templates } from 'features/nodes/store/types';
 import { buildRejectResult, validateConnection } from 'features/nodes/store/util/validateConnection';
-import type { Edge, HandleType } from 'reactflow';
+import type { AnyEdge } from 'features/nodes/types/invocation';
 
 /**
  * Creates a selector that validates a pending connection.
@@ -26,9 +27,9 @@ export const makeConnectionErrorSelector = (
   return createMemoizedSelector(
     selectNodesSlice,
     (state: RootState, pendingConnection: PendingConnection | null) => pendingConnection,
-    (state: RootState, pendingConnection: PendingConnection | null, edgePendingUpdate: Edge | null) =>
+    (state: RootState, pendingConnection: PendingConnection | null, edgePendingUpdate: AnyEdge | null) =>
       edgePendingUpdate,
-    (nodesSlice: NodesState, pendingConnection: PendingConnection | null, edgePendingUpdate: Edge | null) => {
+    (nodesSlice: NodesState, pendingConnection: PendingConnection | null, edgePendingUpdate: AnyEdge | null) => {
       const { nodes, edges } = nodesSlice;
 
       if (!pendingConnection) {

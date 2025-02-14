@@ -1,4 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
+import { getConnectedEdges } from '@xyflow/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { AppConfig } from 'app/types/invokeai';
 import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
@@ -40,14 +41,13 @@ import {
   validateNumberFieldCollectionValue,
   validateStringFieldCollectionValue,
 } from 'features/nodes/types/fieldValidators';
-import type { InvocationNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import type { AnyEdge, InvocationNode } from 'features/nodes/types/invocation';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import i18n from 'i18next';
 import { forEach, groupBy, upperFirst } from 'lodash-es';
-import { getConnectedEdges } from 'reactflow';
 import { assert } from 'tsafe';
 
 /**
@@ -70,7 +70,7 @@ export type Reason = { prefix?: string; content: string };
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
-export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNode[], edges: InvocationNodeEdge[]) => {
+export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNode[], edges: AnyEdge[]) => {
   if (batchNode.data.type === 'image_batch') {
     assert(isImageFieldCollectionInputInstance(batchNode.data.inputs.images));
     const ownValue = batchNode.data.inputs.images.value ?? [];

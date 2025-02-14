@@ -2,13 +2,10 @@ import { type FieldType, isCollection, isSingleOrCollection } from 'features/nod
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const useFieldTypeName = (fieldType?: FieldType): string => {
+export const useFieldTypeName = (fieldType: FieldType): string => {
   const { t } = useTranslation();
 
   const name = useMemo(() => {
-    if (!fieldType) {
-      return '';
-    }
     const { name } = fieldType;
     if (isCollection(fieldType)) {
       return t('nodes.collectionFieldType', { name });

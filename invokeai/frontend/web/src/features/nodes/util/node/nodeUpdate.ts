@@ -34,7 +34,9 @@ const getMayUpdateNode = (node: InvocationNode, template: InvocationTemplate): b
  * - Create a new node data object with the latest version of the template.
  * - Recursively merge new node data object into the node to be updated.
  *
- * @param node The node to updated.
+ * The input node is not mutated; a new object is returned.
+ *
+ * @param node The node to be updated.
  * @param template The invocation template to update to.
  * @throws {NodeUpdateError} If the node is not an invocation node.
  */
