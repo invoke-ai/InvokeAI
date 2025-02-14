@@ -9,7 +9,7 @@ import type { SetNonNullable } from 'type-fest';
 
 type Connection = SetNonNullable<NullableConnection>;
 
-export type ValidationResult =
+type ValidationResult =
   | {
       isValid: true;
       messageTKey?: string;
