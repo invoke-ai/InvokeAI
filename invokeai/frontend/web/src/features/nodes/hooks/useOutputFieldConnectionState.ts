@@ -10,8 +10,8 @@ export const useOutputFieldConnectionState = (nodeId: string, fieldName: string)
   const edgePendingUpdate = useStore($edgePendingUpdate);
 
   const selectValidationResult = useMemo(
-    () => makeConnectionErrorSelector(templates, nodeId, fieldName, 'source'),
-    [templates, nodeId, fieldName]
+    () => makeConnectionErrorSelector(templates, nodeId, fieldName, 'source', pendingConnection, edgePendingUpdate),
+    [templates, nodeId, fieldName, pendingConnection, edgePendingUpdate]
   );
 
   const isConnectionInProgress = useMemo(() => Boolean(pendingConnection), [pendingConnection]);
@@ -25,7 +25,7 @@ export const useOutputFieldConnectionState = (nodeId: string, fieldName: string)
       pendingConnection.fieldTemplate.fieldKind === 'output'
     );
   }, [fieldName, nodeId, pendingConnection]);
-  const validationResult = useAppSelector((s) => selectValidationResult(s, pendingConnection, edgePendingUpdate));
+  const validationResult = useAppSelector(selectValidationResult);
 
   return {
     isConnectionInProgress,

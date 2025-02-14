@@ -3,7 +3,6 @@ import { InputFieldDescriptionPopover } from 'features/nodes/components/flow/nod
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
 import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/dnd';
-import { useInputFieldConnectionState } from 'features/nodes/hooks/useInputFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
@@ -25,10 +24,6 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
   const [isHovered, setIsHovered] = useState(false);
   const isInvalid = useInputFieldIsInvalid(nodeId, fieldName);
   const isConnected = useInputFieldIsConnected(nodeId, fieldName);
-  const { isConnectionInProgress, isConnectionStartField, validationResult } = useInputFieldConnectionState(
-    nodeId,
-    fieldName
-  );
 
   const onMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -44,20 +39,10 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
     return (
       <InputFieldWrapper>
         <FormControl isInvalid={isInvalid} isDisabled={isConnected} px={2}>
-          <InputFieldTitle
-            nodeId={nodeId}
-            fieldName={fieldName}
-            isInvalid={isInvalid}
-            isDisabled={(isConnectionInProgress && !validationResult.isValid && !isConnectionStartField) || isConnected}
-          />
+          <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
         </FormControl>
 
-        <InputFieldHandle
-          fieldTemplate={fieldTemplate}
-          isConnectionInProgress={isConnectionInProgress}
-          isConnectionStartField={isConnectionStartField}
-          validationResult={validationResult}
-        />
+        <InputFieldHandle nodeId={nodeId} fieldName={fieldName} />
       </InputFieldWrapper>
     );
   }
@@ -90,14 +75,7 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
         </Flex>
       </FormControl>
 
-      {fieldTemplate.input !== 'direct' && (
-        <InputFieldHandle
-          fieldTemplate={fieldTemplate}
-          isConnectionInProgress={isConnectionInProgress}
-          isConnectionStartField={isConnectionStartField}
-          validationResult={validationResult}
-        />
-      )}
+      {fieldTemplate.input !== 'direct' && <InputFieldHandle nodeId={nodeId} fieldName={fieldName} />}
     </InputFieldWrapper>
   );
 });

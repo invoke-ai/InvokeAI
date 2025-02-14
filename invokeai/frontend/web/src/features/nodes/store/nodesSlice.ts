@@ -535,6 +535,7 @@ export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<AnyEdge[]>([]);
 export const $edgesToCopiedNodes = atom<AnyEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
+export const $isConnectionInProgress = computed($pendingConnection, (pendingConnection) => pendingConnection !== null);
 export const $edgePendingUpdate = atom<AnyEdge | null>(null);
 export const $didUpdateEdge = atom(false);
 export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);

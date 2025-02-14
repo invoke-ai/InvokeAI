@@ -3,6 +3,12 @@ import { Input, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { InputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldTooltipContent';
+import {
+  useConnectionValidationResult,
+  useIsConnectionInProgress,
+  useIsConnectionStartField,
+} from 'features/nodes/hooks/useInputFieldConnectionState';
+import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
 import { useInputFieldTemplateTitle } from 'features/nodes/hooks/useInputFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
@@ -30,15 +36,18 @@ interface Props {
   nodeId: string;
   fieldName: string;
   isInvalid?: boolean;
-  isDisabled?: boolean;
 }
 
 export const InputFieldTitle = memo((props: Props) => {
-  const { nodeId, fieldName, isInvalid, isDisabled } = props;
+  const { nodeId, fieldName, isInvalid } = props;
   const inputRef = useRef<HTMLInputElement>(null);
   const label = useInputFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useInputFieldTemplateTitle(nodeId, fieldName);
   const { t } = useTranslation();
+  const isConnected = useInputFieldIsConnected(nodeId, fieldName);
+  const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
+  const isConnectionInProgress = useIsConnectionInProgress();
+  const validationResult = useConnectionValidationResult(nodeId, fieldName, 'target');
 
   const dispatch = useAppDispatch();
   const defaultTitle = useMemo(() => fieldTemplateTitle || t('nodes.unknownField'), [fieldTemplateTitle, t]);
@@ -66,7 +75,9 @@ export const InputFieldTitle = memo((props: Props) => {
           sx={labelSx}
           noOfLines={1}
           data-is-invalid={isInvalid}
-          data-is-disabled={isDisabled}
+          data-is-disabled={
+            (isConnectionInProgress && !validationResult.isValid && !isConnectionStartField) || isConnected
+          }
           onDoubleClick={editable.startEditing}
         >
           {editable.value}
