@@ -1,0 +1,30 @@
+{
+  "_class_name": "AutoencoderKL",
+  "_diffusers_version": "0.8.0",
+  "_name_or_path": "hf-models/stable-diffusion-v2-768x768/vae",
+  "act_fn": "silu",
+  "block_out_channels": [
+    128,
+    256,
+    512,
+    512
+  ],
+  "down_block_types": [
+    "DownEncoderBlock2D",
+    "DownEncoderBlock2D",
+    "DownEncoderBlock2D",
+    "DownEncoderBlock2D"
+  ],
+  "in_channels": 3,
+  "latent_channels": 4,
+  "layers_per_block": 2,
+  "norm_num_groups": 32,
+  "out_channels": 3,
+  "sample_size": 768,
+  "up_block_types": [
+    "UpDecoderBlock2D",
+    "UpDecoderBlock2D",
+    "UpDecoderBlock2D",
+    "UpDecoderBlock2D"
+  ]
+}
