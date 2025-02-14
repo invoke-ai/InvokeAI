@@ -50,25 +50,25 @@ export const useInputFieldIsInvalid = (nodeId: string, fieldName: string) => {
 
       // Else special handling for individual field types
 
-      if (isImageFieldCollectionInputInstance(field) && isImageFieldCollectionInputTemplate(template)) {
+      if (isImageFieldCollectionInputTemplate(template) && isImageFieldCollectionInputInstance(field)) {
         if (validateImageFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
       }
 
-      if (isStringFieldCollectionInputInstance(field) && isStringFieldCollectionInputTemplate(template)) {
+      if (isStringFieldCollectionInputTemplate(template) && isStringFieldCollectionInputInstance(field)) {
         if (validateStringFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
       }
 
-      if (isIntegerFieldCollectionInputInstance(field) && isIntegerFieldCollectionInputTemplate(template)) {
+      if (isIntegerFieldCollectionInputTemplate(template) && isIntegerFieldCollectionInputInstance(field)) {
         if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
       }
 
-      if (isFloatFieldCollectionInputInstance(field) && isFloatFieldCollectionInputTemplate(template)) {
+      if (isFloatFieldCollectionInputTemplate(template) && isFloatFieldCollectionInputInstance(field)) {
         if (validateNumberFieldCollectionValue(field.value, template).length > 0) {
           return true;
         }
