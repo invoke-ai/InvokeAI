@@ -35,7 +35,7 @@ export const WorkflowBuilder = memo(() => {
     <ScrollableContent>
       <Flex justifyContent="center" w="full" h="full">
         <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
-          <Alert status="warning" variant="subtle" borderRadius="base">
+          <Alert status="warning" variant="subtle" borderRadius="base" flexShrink={0}>
             <AlertIcon />
             <AlertDescription fontSize="sm">{t('workflows.builder.workflowBuilderAlphaWarning')}</AlertDescription>
           </Alert>
