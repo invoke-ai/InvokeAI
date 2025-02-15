@@ -27,6 +27,7 @@ import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterM
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useReadinessWatcher } from 'features/queue/store/readiness';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
@@ -101,6 +102,7 @@ const HookIsolator = memo(
     const dispatch = useAppDispatch();
 
     // singleton!
+    useReadinessWatcher();
     useSocketIO();
     useGlobalModifiersInit();
     useGlobalHotkeys();
