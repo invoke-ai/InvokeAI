@@ -32,7 +32,7 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
         <Icon
           as={PiCaretUpBold}
           transform={isOpen ? 'rotate(0deg)' : 'rotate(180deg)'}
-          transitionProperty="common"
+          transitionProperty="transform"
           transitionDuration="normal"
         />
       }
