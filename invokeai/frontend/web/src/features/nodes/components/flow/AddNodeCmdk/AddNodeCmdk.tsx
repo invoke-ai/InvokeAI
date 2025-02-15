@@ -19,13 +19,13 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
+  $addNodeCmdk,
   $cursorPos,
   $edgePendingUpdate,
   $pendingConnection,
   $templates,
   edgesChanged,
   nodesChanged,
-  useAddNodeCmdk,
 } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
@@ -142,19 +142,25 @@ const cmdkRootSx: SystemStyleObject = {
 
 export const AddNodeCmdk = memo(() => {
   const { t } = useTranslation();
-  const addNodeCmdk = useAddNodeCmdk();
   const inputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const addNode = useAddNode();
   const tab = useAppSelector(selectActiveTab);
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const isOpen = useStore($addNodeCmdk);
+  const open = useCallback(() => {
+    $addNodeCmdk.set(true);
+  }, []);
+  const close = useCallback(() => {
+    $addNodeCmdk.set(false);
+  }, []);
 
   useRegisteredHotkeys({
     id: 'addNode',
     category: 'workflows',
-    callback: addNodeCmdk.setTrue,
+    callback: open,
     options: { enabled: tab === 'workflows', preventDefault: true },
-    dependencies: [addNodeCmdk.setTrue, tab],
+    dependencies: [open, tab],
   });
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -162,10 +168,10 @@ export const AddNodeCmdk = memo(() => {
   }, []);
 
   const onClose = useCallback(() => {
-    addNodeCmdk.setFalse();
+    close();
     setSearchTerm('');
     $pendingConnection.set(null);
-  }, [addNodeCmdk]);
+  }, [close]);
 
   const onSelect = useCallback(
     (value: string) => {
@@ -176,14 +182,7 @@ export const AddNodeCmdk = memo(() => {
   );
 
   return (
-    <Modal
-      isOpen={addNodeCmdk.isTrue}
-      onClose={onClose}
-      useInert={false}
-      initialFocusRef={inputRef}
-      size="xl"
-      isCentered
-    >
+    <Modal isOpen={isOpen} onClose={onClose} useInert={false} initialFocusRef={inputRef} size="xl" isCentered>
       <ModalOverlay />
       <ModalContent h="512" maxH="70%">
         <ModalBody p={2} h="full" sx={cmdkRootSx}>
