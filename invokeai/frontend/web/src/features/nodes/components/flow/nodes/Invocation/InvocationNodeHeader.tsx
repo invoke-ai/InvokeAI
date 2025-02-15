@@ -11,9 +11,6 @@ import InvocationNodeStatusIndicator from './InvocationNodeStatusIndicator';
 type Props = {
   nodeId: string;
   isOpen: boolean;
-  label: string;
-  type: string;
-  selected: boolean;
 };
 
 const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
