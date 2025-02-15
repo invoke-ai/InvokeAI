@@ -1,4 +1,3 @@
-import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
 import { getStore } from 'app/store/nanostores/store';
 import type { paths } from 'services/api/schema';
 import type { S } from 'services/api/types';
@@ -138,7 +137,7 @@ export const {
  */
 export const getStylePreset = (
   style_preset_id: string,
-  options?: StartQueryActionCreatorOptions
+  options?: Parameters<typeof stylePresetsApi.endpoints.getStylePreset.initiate>[1]
 ): Promise<S['StylePresetRecordWithImage']> => {
   const _options = {
     subscribe: false,

@@ -1,4 +1,3 @@
-import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
 import type { BoardId } from 'features/gallery/store/types';
@@ -561,7 +560,7 @@ export const {
  */
 export const getImageDTOSafe = async (
   image_name: string,
-  options?: StartQueryActionCreatorOptions
+  options?: Parameters<typeof imagesApi.endpoints.getImageDTO.initiate>[1]
 ): Promise<ImageDTO | null> => {
   const _options = {
     subscribe: false,
@@ -581,7 +580,10 @@ export const getImageDTOSafe = async (
  * @param options The options for the query. By default, the query will not subscribe to the store.
  * @raises Error if the image is not found or there is an error fetching the image
  */
-export const getImageDTO = (image_name: string, options?: StartQueryActionCreatorOptions): Promise<ImageDTO> => {
+export const getImageDTO = (
+  image_name: string,
+  options?: Parameters<typeof imagesApi.endpoints.getImageDTO.initiate>[1]
+): Promise<ImageDTO> => {
   const _options = {
     subscribe: false,
     ...options,
@@ -599,7 +601,7 @@ export const getImageDTO = (image_name: string, options?: StartQueryActionCreato
  */
 export const getImageMetadata = (
   image_name: string,
-  options?: StartQueryActionCreatorOptions
+  options?: Parameters<typeof imagesApi.endpoints.getImageMetadata.initiate>[1]
 ): Promise<JsonObject | undefined> => {
   const _options = {
     subscribe: false,
