@@ -25,8 +25,6 @@ const baseEdgeSx: SystemStyleObject = {
     opacity: '1 !important',
   },
   '&[data-should-animate-edges="true"]': {
-    // This fixes an performance issue with the animation of connection edges on chrome. Seems to be a deep chrome bug.
-    strokeDashoffset: 'unset !important',
     animation: 'dashdraw 0.5s linear infinite !important',
     '&[data-selected="true"], &[data-are-connected-nodes-selected="true"]': {
       strokeDasharray: '5 !important',
