@@ -61,7 +61,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
   }, [data.settings, fieldTemplate]);
 
   return (
-    <Popover placement="top">
+    <Popover placement="top" isLazy lazyBehavior="unmount">
       <PopoverTrigger>
         <IconButton aria-label="settings" icon={<PiWrenchFill />} variant="link" size="sm" alignSelf="stretch" />
       </PopoverTrigger>
