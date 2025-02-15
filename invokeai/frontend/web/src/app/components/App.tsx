@@ -53,17 +53,7 @@ interface Props {
 }
 
 const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
-  const language = useAppSelector(selectLanguage);
-  const logger = useLogger('system');
-  const dispatch = useAppDispatch();
   const clearStorage = useClearStorage();
-
-  // singleton!
-  useSocketIO();
-  useGlobalModifiersInit();
-  useGlobalHotkeys();
-  useGetOpenAPISchemaQuery();
-  useSyncLoggingConfig();
 
   const handleReset = useCallback(() => {
     clearStorage();
@@ -71,31 +61,12 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
     return false;
   }, [clearStorage]);
 
-  useEffect(() => {
-    i18n.changeLanguage(language);
-  }, [language]);
-
-  useEffect(() => {
-    if (size(config)) {
-      logger.info({ config }, 'Received config');
-      dispatch(configChanged(config));
-    }
-  }, [dispatch, config, logger]);
-
-  useEffect(() => {
-    dispatch(appStarted());
-  }, [dispatch]);
-
-  useStudioInitAction(studioInitAction);
-  useStarterModelsToast();
-  useSyncQueueStatus();
-  useFocusRegionWatcher();
-
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
       <Box id="invoke-app-wrapper" w="100dvw" h="100dvh" position="relative" overflow="hidden">
         <AppContent />
       </Box>
+      <HookIsolator config={config} studioInitAction={studioInitAction} />
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
@@ -122,3 +93,41 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
 };
 
 export default memo(App);
+
+const HookIsolator = memo(
+  ({ config, studioInitAction }: { config: PartialAppConfig; studioInitAction?: StudioInitAction }) => {
+    const language = useAppSelector(selectLanguage);
+    const logger = useLogger('system');
+    const dispatch = useAppDispatch();
+
+    // singleton!
+    useSocketIO();
+    useGlobalModifiersInit();
+    useGlobalHotkeys();
+    useGetOpenAPISchemaQuery();
+    useSyncLoggingConfig();
+
+    useEffect(() => {
+      i18n.changeLanguage(language);
+    }, [language]);
+
+    useEffect(() => {
+      if (size(config)) {
+        logger.info({ config }, 'Received config');
+        dispatch(configChanged(config));
+      }
+    }, [dispatch, config, logger]);
+
+    useEffect(() => {
+      dispatch(appStarted());
+    }, [dispatch]);
+
+    useStudioInitAction(studioInitAction);
+    useStarterModelsToast();
+    useSyncQueueStatus();
+    useFocusRegionWatcher();
+
+    return null;
+  }
+);
+HookIsolator.displayName = 'HookIsolator';
