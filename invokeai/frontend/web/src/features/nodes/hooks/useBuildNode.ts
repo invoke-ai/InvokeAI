@@ -1,20 +1,23 @@
 import { useStore } from '@nanostores/react';
-import { useReactFlow } from '@xyflow/react';
 import { $templates } from 'features/nodes/store/nodesSlice';
+import { $flow } from 'features/nodes/store/reactFlowInstance';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { AnyNode, InvocationTemplate } from 'features/nodes/types/invocation';
 import { buildCurrentImageNode } from 'features/nodes/util/node/buildCurrentImageNode';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildNotesNode } from 'features/nodes/util/node/buildNotesNode';
 import { useCallback } from 'react';
+import { assert } from 'tsafe';
 
 export const useBuildNode = () => {
   const templates = useStore($templates);
-  const { screenToFlowPosition } = useReactFlow();
 
   return useCallback(
     // string here is "any invocation type"
     (type: string | 'current_image' | 'notes'): AnyNode => {
+      const flow = $flow.get();
+      assert(flow !== null);
+
       let _x = window.innerWidth / 2;
       let _y = window.innerHeight / 2;
 
@@ -26,7 +29,7 @@ export const useBuildNode = () => {
         _y = rect.height / 2 - NODE_WIDTH / 2 + rect.top;
       }
 
-      const position = screenToFlowPosition({
+      const position = flow.screenToFlowPosition({
         x: _x,
         y: _y,
       });
@@ -45,6 +48,6 @@ export const useBuildNode = () => {
 
       return buildInvocationNode(position, template);
     },
-    [screenToFlowPosition, templates]
+    [templates]
   );
 };

@@ -4,12 +4,12 @@ import { useUpdateNodeInternals } from '@xyflow/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
+  $addNodeCmdk,
   $didUpdateEdge,
   $edgePendingUpdate,
   $pendingConnection,
   $templates,
   edgesChanged,
-  useAddNodeCmdk,
 } from 'features/nodes/store/nodesSlice';
 import { selectNodes, selectNodesSlice } from 'features/nodes/store/selectors';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
@@ -22,7 +22,6 @@ export const useConnection = () => {
   const store = useAppStore();
   const templates = useStore($templates);
   const updateNodeInternals = useUpdateNodeInternals();
-  const addNodeCmdk = useAddNodeCmdk();
 
   const onConnectStart = useCallback<OnConnectStart>(
     (event, { nodeId, handleId, handleType }) => {
@@ -109,9 +108,9 @@ export const useConnection = () => {
       $pendingConnection.set(null);
     } else {
       // The mouse is not over a node - we should open the add node popover
-      addNodeCmdk.setTrue();
+      $addNodeCmdk.set(true);
     }
-  }, [addNodeCmdk, store, templates, updateNodeInternals]);
+  }, [store, templates, updateNodeInternals]);
 
   const api = useMemo(() => ({ onConnectStart, onConnect, onConnectEnd }), [onConnectStart, onConnect, onConnectEnd]);
   return api;
