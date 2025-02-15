@@ -1,22 +1,15 @@
 import type { TooltipProps } from '@invoke-ai/ui-library';
 import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { $templates } from 'features/nodes/store/nodesSlice';
 import type { Reason } from 'features/queue/store/readiness';
 import {
-  buildSelectIsReadyToEnqueueCanvasTab,
-  buildSelectIsReadyToEnqueueUpscaleTab,
-  buildSelectIsReadyToEnqueueWorkflowsTab,
-  buildSelectReasonsWhyCannotEnqueueCanvasTab,
-  buildSelectReasonsWhyCannotEnqueueUpscaleTab,
-  buildSelectReasonsWhyCannotEnqueueWorkflowsTab,
+  $isReadyToEnqueue,
+  $reasonsWhyCannotEnqueue,
   selectPromptsCount,
   selectWorkflowsBatchSize,
 } from 'features/queue/store/readiness';
@@ -26,7 +19,6 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import { $isConnected } from 'services/events/stores';
 
 type Props = TooltipProps & {
   prepend?: boolean;
@@ -60,56 +52,8 @@ const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
 TooltipContent.displayName = 'TooltipContent';
 
 const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isConnected = useStore($isConnected);
-  const canvasManager = useCanvasManagerSafe();
-  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
-  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
-  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
-  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
-  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
-
-  const selectIsReady = useMemo(
-    () =>
-      buildSelectIsReadyToEnqueueCanvasTab({
-        isConnected,
-        canvasIsFiltering,
-        canvasIsTransforming,
-        canvasIsRasterizing,
-        canvasIsSelectingObject,
-        canvasIsCompositing,
-      }),
-    [
-      isConnected,
-      canvasIsCompositing,
-      canvasIsFiltering,
-      canvasIsRasterizing,
-      canvasIsSelectingObject,
-      canvasIsTransforming,
-    ]
-  );
-
-  const selectReasons = useMemo(
-    () =>
-      buildSelectReasonsWhyCannotEnqueueCanvasTab({
-        isConnected,
-        canvasIsFiltering,
-        canvasIsTransforming,
-        canvasIsRasterizing,
-        canvasIsSelectingObject,
-        canvasIsCompositing,
-      }),
-    [
-      isConnected,
-      canvasIsCompositing,
-      canvasIsFiltering,
-      canvasIsRasterizing,
-      canvasIsSelectingObject,
-      canvasIsTransforming,
-    ]
-  );
-
-  const isReady = useAppSelector(selectIsReady);
-  const reasons = useAppSelector(selectReasons);
+  const isReady = useStore($isReadyToEnqueue);
+  const reasons = useStore($reasonsWhyCannotEnqueue);
 
   return (
     <Flex flexDir="column" gap={1}>
@@ -129,13 +73,8 @@ const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }
 CanvasTabTooltipContent.displayName = 'CanvasTabTooltipContent';
 
 const UpscaleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isConnected = useStore($isConnected);
-
-  const selectIsReady = useMemo(() => buildSelectIsReadyToEnqueueUpscaleTab({ isConnected }), [isConnected]);
-  const selectReasons = useMemo(() => buildSelectReasonsWhyCannotEnqueueUpscaleTab({ isConnected }), [isConnected]);
-
-  const isReady = useAppSelector(selectIsReady);
-  const reasons = useAppSelector(selectReasons);
+  const isReady = useStore($isReadyToEnqueue);
+  const reasons = useStore($reasonsWhyCannotEnqueue);
 
   return (
     <Flex flexDir="column" gap={1}>
@@ -153,20 +92,8 @@ const UpscaleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean 
 UpscaleTabTooltipContent.displayName = 'UpscaleTabTooltipContent';
 
 const WorkflowsTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isConnected = useStore($isConnected);
-  const templates = useStore($templates);
-
-  const selectIsReady = useMemo(
-    () => buildSelectIsReadyToEnqueueWorkflowsTab({ isConnected, templates }),
-    [isConnected, templates]
-  );
-  const selectReasons = useMemo(
-    () => buildSelectReasonsWhyCannotEnqueueWorkflowsTab({ isConnected, templates }),
-    [isConnected, templates]
-  );
-
-  const isReady = useAppSelector(selectIsReady);
-  const reasons = useAppSelector(selectReasons);
+  const isReady = useStore($isReadyToEnqueue);
+  const reasons = useStore($reasonsWhyCannotEnqueue);
 
   return (
     <Flex flexDir="column" gap={1}>
