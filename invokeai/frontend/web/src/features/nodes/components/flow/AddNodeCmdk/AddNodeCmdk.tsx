@@ -40,34 +40,12 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memoize } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCircuitryBold, PiFlaskBold, PiHammerBold, PiLightningFill } from 'react-icons/pi';
 import type { S } from 'services/api/types';
 import { objectEntries } from 'tsafe';
-
-const useThrottle = <T,>(value: T, limit: number) => {
-  const [throttledValue, setThrottledValue] = useState(value);
-  const lastRan = useRef(Date.now());
-
-  useEffect(() => {
-    const handler = setTimeout(
-      function () {
-        if (Date.now() - lastRan.current >= limit) {
-          setThrottledValue(value);
-          lastRan.current = Date.now();
-        }
-      },
-      limit - (Date.now() - lastRan.current)
-    );
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, limit]);
-
-  return throttledValue;
-};
+import { useDebounce } from 'use-debounce';
 
 const useAddNode = () => {
   const { t } = useTranslation();
@@ -169,7 +147,7 @@ export const AddNodeCmdk = memo(() => {
   const [searchTerm, setSearchTerm] = useState('');
   const addNode = useAddNode();
   const tab = useAppSelector(selectActiveTab);
-  const throttledSearchTerm = useThrottle(searchTerm, 100);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
   useRegisteredHotkeys({
     id: 'addNode',
@@ -226,7 +204,7 @@ export const AddNodeCmdk = memo(() => {
                     />
                   </CommandEmpty>
                   <CommandList>
-                    <NodeCommandList searchTerm={throttledSearchTerm} onSelect={onSelect} />
+                    <NodeCommandList searchTerm={debouncedSearchTerm} onSelect={onSelect} />
                   </CommandList>
                 </ScrollableContent>
               </Box>
