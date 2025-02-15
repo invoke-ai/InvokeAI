@@ -1,5 +1,5 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
-import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
@@ -34,7 +34,7 @@ import type {
 } from 'services/api/types';
 
 const buildSelectControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) =>
-  createMemoizedAppSelector(selectCanvasSlice, (canvas) => {
+  createSelector(selectCanvasSlice, (canvas) => {
     const layer = selectEntityOrThrow(canvas, entityIdentifier, 'ControlLayerControlAdapter');
     return layer.controlAdapter;
   });
