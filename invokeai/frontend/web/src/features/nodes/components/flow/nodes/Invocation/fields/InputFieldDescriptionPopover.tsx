@@ -32,7 +32,7 @@ export const InputFieldDescriptionPopover = memo(({ nodeId, fieldName }: Props) 
   );
 
   return (
-    <Popover>
+    <Popover isLazy lazyBehavior="unmount">
       <PopoverTrigger>
         <IconButton
           variant="ghost"
