@@ -284,8 +284,8 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.log.error({ error: serializeError(filterResult.error) }, 'Error filtering');
       this.$isProcessing.set(false);
       // Clean up the abort controller as needed
-      if (!this.abortController.signal.aborted) {
-        this.abortController.abort();
+      if (!controller.signal.aborted) {
+        controller.abort();
       }
       this.abortController = null;
       return;
@@ -324,8 +324,8 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.$isProcessing.set(false);
 
     // Clean up the abort controller as needed
-    if (!this.abortController.signal.aborted) {
-      this.abortController.abort();
+    if (!controller.signal.aborted) {
+      controller.abort();
     }
 
     this.abortController = null;
