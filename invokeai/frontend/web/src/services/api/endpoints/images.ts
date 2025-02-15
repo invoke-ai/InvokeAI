@@ -12,6 +12,7 @@ import type {
   UploadImageArg,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
 import type { ApiTagDescription } from '..';
@@ -52,15 +53,21 @@ export const imagesApi = api.injectEndpoints({
           'FetchOnReconnect',
         ];
       },
-      onQueryStarted(_, { dispatch, queryFulfilled }) {
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
         // Populate the getImageDTO cache with these images. This makes image selection smoother, because it doesn't
         // need to re-fetch image data when the user selects an image. The getImageDTO cache keeps data for the default
         // of 60s, so this data won't stick around too long.
-        queryFulfilled.then(({ data }) => {
-          for (const imageDTO of data.items) {
-            dispatch(imagesApi.util.upsertQueryData('getImageDTO', imageDTO.image_name, imageDTO));
-          }
-        });
+        const res = await queryFulfilled;
+        const imageDTOs = res.data.items;
+        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
+        for (const imageDTO of imageDTOs) {
+          updates.push({
+            endpointName: 'getImageDTO',
+            arg: imageDTO.image_name,
+            value: imageDTO,
+          });
+        }
+        dispatch(imagesApi.util.upsertQueryEntries(updates));
       },
     }),
     getIntermediatesCount: build.query<number, void>({
