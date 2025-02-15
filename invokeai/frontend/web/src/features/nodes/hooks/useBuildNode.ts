@@ -10,7 +10,7 @@ import { useCallback } from 'react';
 
 export const useBuildNode = () => {
   const templates = useStore($templates);
-  const flow = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
 
   return useCallback(
     // string here is "any invocation type"
@@ -26,7 +26,7 @@ export const useBuildNode = () => {
         _y = rect.height / 2 - NODE_WIDTH / 2 + rect.top;
       }
 
-      const position = flow.screenToFlowPosition({
+      const position = screenToFlowPosition({
         x: _x,
         y: _y,
       });
@@ -45,6 +45,6 @@ export const useBuildNode = () => {
 
       return buildInvocationNode(position, template);
     },
-    [templates, flow]
+    [screenToFlowPosition, templates]
   );
 };
