@@ -32,7 +32,7 @@ export const ContainerElementSettings = memo(({ element }: { element: ContainerE
   }, [dispatch, id]);
 
   return (
-    <Popover>
+    <Popover isLazy lazyBehavior="unmount">
       <PopoverTrigger>
         <IconButton aria-label="settings" icon={<PiWrenchFill />} variant="link" size="sm" alignSelf="stretch" />
       </PopoverTrigger>
