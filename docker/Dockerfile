@@ -13,13 +13,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         git
 
 # Install `uv` for package management
-COPY --from=ghcr.io/astral-sh/uv:0.5.21 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.6.0 /uv /uvx /bin/
 
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV INVOKEAI_SRC=/opt/invokeai
 ENV PYTHON_VERSION=3.11
 ENV UV_PYTHON=3.11
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT="$VIRTUAL_ENV"
 ENV UV_INDEX="https://download.pytorch.org/whl/cu124"
 
 ARG GPU_DRIVER=cuda
@@ -27,8 +30,10 @@ ARG GPU_DRIVER=cuda
 ARG BUILDPLATFORM
 
 # Switch to the `ubuntu` user to work around dependency issues with uv-installed python
-RUN mkdir -p ${INVOKEAI_SRC} && \
-    chmod -R a+w /opt
+RUN mkdir -p ${VIRTUAL_ENV} && \
+    mkdir -p ${INVOKEAI_SRC} && \
+    chmod -R a+w /opt && \
+    mkdir ~ubuntu/.cache && chown ubuntu: ~ubuntu/.cache
 USER ubuntu
 
 # Install python
@@ -107,24 +112,27 @@ RUN apt update && apt install -y --no-install-recommends \
     apt-get clean && apt-get autoclean
 
 ENV INVOKEAI_SRC=/opt/invokeai
+ENV VIRTUAL_ENV=/opt/venv
+ENV UV_PROJECT_ENVIRONMENT="$VIRTUAL_ENV"
 ENV PYTHON_VERSION=3.11
 ENV INVOKEAI_ROOT=/invokeai
 ENV INVOKEAI_HOST=0.0.0.0
 ENV INVOKEAI_PORT=9090
-ENV PATH="$INVOKEAI_SRC/.venv/bin:$INVOKEAI_SRC:$PATH"
+ENV PATH="$VIRTUAL_ENV/bin:$INVOKEAI_SRC:$PATH"
 ENV CONTAINER_UID=${CONTAINER_UID:-1000}
 ENV CONTAINER_GID=${CONTAINER_GID:-1000}
 
 # Install `uv` for package management
 # and install python for the ubuntu user (expected to exist on ubuntu >=24.x)
 # this is too tiny to optimize with multi-stage builds, but maybe we'll come back to it
-COPY --from=ghcr.io/astral-sh/uv:0.5.21 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.6.0 /uv /uvx /bin/
 USER ubuntu
 RUN uv python install ${PYTHON_VERSION}
 USER root
 
 # --link requires buldkit w/ dockerfile syntax 1.4
 COPY --link --from=builder ${INVOKEAI_SRC} ${INVOKEAI_SRC}
+COPY --link --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/web/dist
 
 # Link amdgpu.ids for ROCm builds
