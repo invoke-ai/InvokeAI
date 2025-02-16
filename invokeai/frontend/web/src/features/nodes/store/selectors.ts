@@ -3,12 +3,11 @@ import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
-import type { InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
+import type { AnyNode, InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import type { Node } from 'reactflow';
 import { assert } from 'tsafe';
 
-export const selectNode = (nodesSlice: NodesState, nodeId: string): Node => {
+export const selectNode = (nodesSlice: NodesState, nodeId: string): AnyNode => {
   const node = nodesSlice.nodes.find((node) => node.id === nodeId);
   assert(node !== undefined, `Node ${nodeId} not found`);
   return node;
@@ -17,6 +16,14 @@ export const selectNode = (nodesSlice: NodesState, nodeId: string): Node => {
 export const selectInvocationNode = (nodesSlice: NodesState, nodeId: string): InvocationNode => {
   const node = nodesSlice.nodes.find((node) => node.id === nodeId);
   assert(isInvocationNode(node), `Node ${nodeId} is not an invocation node`);
+  return node;
+};
+
+export const selectInvocationNodeSafe = (nodesSlice: NodesState, nodeId: string): InvocationNode | undefined => {
+  const node = nodesSlice.nodes.find((node) => node.id === nodeId);
+  if (!isInvocationNode(node)) {
+    return undefined;
+  }
   return node;
 };
 

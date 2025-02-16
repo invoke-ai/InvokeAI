@@ -49,7 +49,7 @@ class SAMPointsField(BaseModel):
     title="Segment Anything",
     tags=["prompt", "segmentation"],
     category="segmentation",
-    version="1.1.0",
+    version="1.2.0",
 )
 class SegmentAnythingInvocation(BaseInvocation):
     """Runs a Segment Anything Model."""
@@ -96,8 +96,10 @@ class SegmentAnythingInvocation(BaseInvocation):
             # masks contains bool values, so we merge them via max-reduce.
             combined_mask, _ = torch.stack(masks).max(dim=0)
 
+        # Unsqueeze the channel dimension.
+        combined_mask = combined_mask.unsqueeze(0)
         mask_tensor_name = context.tensors.save(combined_mask)
-        height, width = combined_mask.shape
+        _, height, width = combined_mask.shape
         return MaskOutput(mask=TensorField(tensor_name=mask_tensor_name), width=width, height=height)
 
     @staticmethod

@@ -275,6 +275,9 @@ export const modelsApi = api.injectEndpoints({
         }
       },
     }),
+    emptyModelCache: build.mutation<void, void>({
+      query: () => ({ url: buildModelsUrl('empty_model_cache'), method: 'POST' }),
+    }),
   }),
 });
 
@@ -295,6 +298,7 @@ export const {
   useGetStarterModelsQuery,
   useGetHFTokenStatusQuery,
   useSetHFTokenMutation,
+  useEmptyModelCacheMutation,
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();

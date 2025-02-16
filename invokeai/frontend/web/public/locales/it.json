@@ -97,7 +97,15 @@
         "ok": "Ok",
         "generating": "Generazione",
         "loadingModel": "Caricamento del modello",
-        "warnings": "Avvisi"
+        "warnings": "Avvisi",
+        "step": "Passo",
+        "values": "Valori",
+        "start": "Inizio",
+        "end": "Fine",
+        "resetToDefaults": "Ripristina le impostazioni predefinite",
+        "seed": "Seme",
+        "combinatorial": "Combinatorio",
+        "count": "Quantità"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -108,7 +116,6 @@
         "deleteImage_many": "Elimina {{count}} immagini",
         "deleteImage_other": "Elimina {{count}} immagini",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
-        "assets": "Risorse",
         "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
         "loading": "Caricamento in corso",
@@ -165,7 +172,8 @@
         "imagesTab": "Immagini create e salvate in Invoke.",
         "assetsTab": "File che hai caricato per usarli nei tuoi progetti.",
         "boardsSettings": "Impostazioni Bacheche",
-        "imagesSettings": "Impostazioni Immagini Galleria"
+        "imagesSettings": "Impostazioni Immagini Galleria",
+        "assets": "Risorse"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -668,7 +676,7 @@
             "addingImagesTo": "Aggiungi immagini a",
             "systemDisconnected": "Sistema disconnesso",
             "missingNodeTemplate": "Modello di nodo mancante",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: ingresso mancante",
+            "missingInputForField": "ingresso mancante",
             "missingFieldTemplate": "Modello di campo mancante",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), altezza riquadro è {{height}}",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza riquadro è {{width}}",
@@ -681,11 +689,22 @@
             "canvasIsRasterizing": "La tela è occupata (sta rasterizzando)",
             "canvasIsCompositing": "La tela è occupata (in composizione)",
             "canvasIsFiltering": "La tela è occupata (sta filtrando)",
-            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi elementi, massimo {{maxItems}}",
+            "collectionTooManyItems": "troppi elementi, massimo {{maxItems}}",
             "canvasIsSelectingObject": "La tela è occupata (selezione dell'oggetto)",
-            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: troppi pochi elementi, minimo {{minItems}}",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} raccolta vuota",
-            "fluxModelMultipleControlLoRAs": "È possibile utilizzare solo 1 Controllo LoRA alla volta"
+            "collectionTooFewItems": "troppi pochi elementi, minimo {{minItems}}",
+            "fluxModelMultipleControlLoRAs": "È possibile utilizzare solo 1 Controllo LoRA alla volta",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (incr max)",
+            "collectionStringTooLong": "troppo lungo, massimo {{maxLength}}",
+            "batchNodeNotConnected": "Nodo Lotto non connesso: {{label}}",
+            "batchNodeEmptyCollection": "Alcuni nodi lotto hanno raccolte vuote",
+            "emptyBatches": "lotti vuoti",
+            "batchNodeCollectionSizeMismatch": "Le dimensioni della raccolta nel Lotto {{batchGroupId}} non corrispondono",
+            "invalidBatchConfigurationCannotCalculate": "Configurazione lotto non valida; impossibile calcolare",
+            "collectionStringTooShort": "troppo corto, minimo {{minLength}}",
+            "collectionNumberNotMultipleOf": "{{value}} non è multiplo di {{multipleOf}}",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (incr min)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (excl max)",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (excl min)"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -813,7 +832,13 @@
         "imagesWillBeAddedTo": "Le immagini caricate verranno aggiunte alle risorse della bacheca {{boardName}}.",
         "uploadFailedInvalidUploadDesc_withCount_one": "Devi caricare al massimo 1 immagine PNG o JPEG.",
         "uploadFailedInvalidUploadDesc_withCount_many": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
-        "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG o JPEG."
+        "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
+        "outOfMemoryErrorDescLocal": "Segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent> per ridurre gli OOM.",
+        "pasteFailed": "Incolla non riuscita",
+        "pasteSuccess": "Incollato su {{destination}}",
+        "unableToCopy": "Impossibile copiare",
+        "unableToCopyDesc": "Il tuo browser non supporta l'accesso agli appunti. Gli utenti di Firefox potrebbero risolvere il problema seguendo ",
+        "unableToCopyDesc_theseSteps": "questi passaggi"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -972,7 +997,25 @@
         "noWorkflows": "Nessun flusso di lavoro",
         "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>.",
         "specialDesc": "Questa invocazione comporta una gestione speciale nell'applicazione. Ad esempio, i nodi Lotto vengono utilizzati per mettere in coda più grafici da un singolo flusso di lavoro.",
-        "internalDesc": "Questa invocazione è utilizzata internamente da Invoke. Potrebbe subire modifiche significative durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento."
+        "internalDesc": "Questa invocazione è utilizzata internamente da Invoke. Potrebbe subire modifiche significative durante gli aggiornamenti dell'app e potrebbe essere rimossa in qualsiasi momento.",
+        "addItem": "Aggiungi elemento",
+        "generateValues": "Genera valori",
+        "generatorNoValues": "vuoto",
+        "linearDistribution": "Distribuzione lineare",
+        "parseString": "Analizza stringa",
+        "splitOn": "Diviso su",
+        "noBatchGroup": "nessun gruppo",
+        "generatorLoading": "caricamento",
+        "generatorLoadFromFile": "Carica da file",
+        "dynamicPromptsRandom": "Prompt dinamici (casuali)",
+        "dynamicPromptsCombinatorial": "Prompt dinamici (combinatori)",
+        "floatRangeGenerator": "Generatore di intervalli di numeri in virgola mobile",
+        "integerRangeGenerator": "Generatore di intervalli di numeri interi",
+        "uniformRandomDistribution": "Distribuzione casuale uniforme",
+        "generatorNRandomValues_one": "{{count}} valore casuale",
+        "generatorNRandomValues_many": "{{count}} valori casuali",
+        "generatorNRandomValues_other": "{{count}} valori casuali",
+        "arithmeticSequence": "Sequenza aritmetica"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1094,7 +1137,11 @@
         "generation": "Generazione",
         "other": "Altro",
         "gallery": "Galleria",
-        "batchSize": "Dimensione del lotto"
+        "batchSize": "Dimensione del lotto",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Vuoi davvero annullare tutti gli elementi in coda in sospeso?",
+        "confirm": "Conferma",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "L'annullamento di tutti gli elementi della coda, eccetto quello corrente, interromperà gli elementi in sospeso ma consentirà il completamento di quello in corso.",
+        "cancelAllExceptCurrentTooltip": "Annulla tutto tranne l'elemento corrente"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1138,7 +1185,8 @@
         "dynamicPrompts": "Prompt dinamici",
         "promptsPreview": "Anteprima dei prompt",
         "showDynamicPrompts": "Mostra prompt dinamici",
-        "loading": "Generazione prompt dinamici..."
+        "loading": "Generazione prompt dinamici...",
+        "promptsToGenerate": "Prompt da generare"
     },
     "popovers": {
         "paramScheduler": {
@@ -1907,7 +1955,43 @@
             },
             "forMoreControl": "Per un maggiore controllo, fare clic su Avanzate qui sotto.",
             "advanced": "Avanzate",
-            "processingLayerWith": "Elaborazione del livello con il filtro {{type}}."
+            "processingLayerWith": "Elaborazione del livello con il filtro {{type}}.",
+            "img_blur": {
+                "label": "Sfoca immagine",
+                "description": "Sfoca il livello selezionato.",
+                "blur_type": "Tipo di sfocatura",
+                "blur_radius": "Raggio",
+                "gaussian_type": "Gaussiana"
+            },
+            "img_noise": {
+                "size": "Dimensione del rumore",
+                "salt_and_pepper_type": "Sale e pepe",
+                "gaussian_type": "Gaussiano",
+                "noise_color": "Rumore colorato",
+                "description": "Aggiunge rumore al livello selezionato.",
+                "noise_type": "Tipo di rumore",
+                "label": "Aggiungi rumore",
+                "noise_amount": "Quantità"
+            },
+            "adjust_image": {
+                "description": "Regola il canale selezionato di un'immagine.",
+                "alpha": "Alfa (RGBA)",
+                "label": "Regola l'immagine",
+                "blue": "Blu (RGBA)",
+                "luminosity": "Luminosità (LAB)",
+                "channel": "Canale",
+                "value_setting": "Valore",
+                "scale_values": "Scala i valori",
+                "red": "Rosso (RGBA)",
+                "green": "Verde (RGBA)",
+                "cyan": "Ciano (CMYK)",
+                "magenta": "Magenta (CMYK)",
+                "yellow": "Giallo (CMYK)",
+                "black": "Nero (CMYK)",
+                "hue": "Tonalità (HSV)",
+                "saturation": "Saturazione (HSV)",
+                "value": "Valore (HSV)"
+            }
         },
         "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",
         "regionalGuidance_withCount_hidden": "Guida regionale ({{count}} nascosti)",
@@ -2014,7 +2098,10 @@
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
             "saveToGalleryGroup": "Salva nella Galleria",
             "newInpaintMask": "Nuova maschera Inpaint",
-            "newRegionalGuidance": "Nuova Guida Regionale"
+            "newRegionalGuidance": "Nuova Guida Regionale",
+            "copyToClipboard": "Copia negli appunti",
+            "copyCanvasToClipboard": "Copia la tela negli appunti",
+            "copyBboxToClipboard": "Copia il riquadro di delimitazione negli appunti"
         },
         "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
         "copyRasterLayerTo": "Copia $t(controlLayers.rasterLayer) in",
@@ -2077,7 +2164,17 @@
             "ipAdapterIncompatibleBaseModel": "modello base dell'immagine di riferimento incompatibile",
             "ipAdapterNoImageSelected": "nessuna immagine di riferimento selezionata",
             "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato"
-        }
+        },
+        "pasteTo": "Incolla su",
+        "pasteToBboxDesc": "Nuovo livello (nel riquadro di delimitazione)",
+        "pasteToAssets": "Risorse",
+        "copyRegionError": "Errore durante la copia di {{region}}",
+        "pasteToAssetsDesc": "Incolla in Risorse",
+        "pasteToBbox": "Riquadro di delimitazione",
+        "pasteToCanvas": "Tela",
+        "pasteToCanvasDesc": "Nuovo livello (nella Tela)",
+        "pastedTo": "Incollato su {{destination}}",
+        "regionCopiedToClipboard": "{{region}} Copiato negli appunti"
     },
     "ui": {
         "tabs": {
@@ -2166,10 +2263,9 @@
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
         "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
-        "importModels": "Importa modelli",
-        "downloadStarterModels": "Scarica i modelli per iniziare",
-        "noModelsInstalled": "Sembra che tu non abbia installato alcun modello",
-        "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
+        "noModelsInstalled": "Sembra che non hai installato alcun modello! Puoi <DownloadStarterModelsButton>scaricare un pacchetto di modelli di avvio</DownloadStarterModelsButton> o <ImportModelsButton>importare modelli</ImportModelsButton>.",
+        "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
+        "lowVRAMMode": "Per prestazioni ottimali, segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent>."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Novità in Invoke",
@@ -2177,7 +2273,12 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "<StrongComponent>Livelli di controllo Flux</StrongComponent>: nuovi modelli di controllo per il rilevamento dei bordi e la mappatura della profondità sono ora supportati per i modelli di Flux dev."
+            "Impostazioni predefinite VRAM migliorate",
+            "Cancellazione della cache del modello su richiesta",
+            "Compatibilità estesa FLUX LoRA",
+            "Filtro Regola Immagine su Tela",
+            "Annulla tutto tranne l'elemento della coda corrente",
+            "Copia da e incolla sulla Tela"
         ]
     },
     "system": {
@@ -2267,5 +2368,10 @@
         "watch": "Guarda",
         "studioSessionsDesc1": "Dai un'occhiata a <StudioSessionsPlaylistLink /> per approfondimenti su Invoke.",
         "studioSessionsDesc2": "Unisciti al nostro <DiscordLink /> per partecipare alle sessioni live e fare domande. Le sessioni vengono caricate sulla playlist la settimana successiva."
+    },
+    "modelCache": {
+        "clear": "Cancella la cache del modello",
+        "clearSucceeded": "Cache del modello cancellata",
+        "clearFailed": "Problema durante la cancellazione della cache del modello"
     }
 }

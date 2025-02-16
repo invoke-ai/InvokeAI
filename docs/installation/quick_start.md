@@ -99,6 +99,20 @@ We recommend watching our [Getting Started Playlist](https://www.youtube.com/pla
 - Using control layers and reference guides.
 - Refining images with advanced workflows.
 
+## Troubleshooting
+
+If installation fails, retrying the install in Repair Mode may fix it. There's a checkbox to enable this on the Review step of the install flow.
+
+If that doesn't fix it, [clearing the `uv` cache](https://docs.astral.sh/uv/reference/cli/#uv-cache-clean) might do the trick:
+
+- Open and start the dev console (button at the bottom-left of the launcher).
+- Run `uv cache clean`.
+- Retry the installation. Enable Repair Mode for good measure.
+
+If you are still unable to install, try installing to a different location and see if that works.
+
+If you still have problems, ask for help on the Invoke [discord](https://discord.gg/ZmtBAhwWhy).
+
 ## Other Installation Methods
 
 - You can install the Invoke application as a python package. See our [manual install](./manual.md) docs.

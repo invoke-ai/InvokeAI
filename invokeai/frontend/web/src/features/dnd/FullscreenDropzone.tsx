@@ -4,13 +4,17 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Heading } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
+import { setFileToPaste } from 'features/controlLayers/components/CanvasPasteModal';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import type { DndTargetState } from 'features/dnd/types';
+import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { uploadImages } from 'services/api/endpoints/images';
@@ -71,6 +75,8 @@ export const FullscreenDropzone = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
   const [dndState, setDndState] = useState<DndTargetState>('idle');
+  const activeTab = useAppSelector(selectActiveTab);
+  const isImageViewerOpen = useStore($imageViewer);
 
   const validateAndUploadFiles = useCallback(
     (files: File[]) => {
@@ -92,6 +98,15 @@ export const FullscreenDropzone = memo(() => {
         });
         return;
       }
+
+      // While on the canvas tab and when pasting a single image, canvas may want to create a new layer. Let it handle
+      // the paste event.
+      const [firstImageFile] = files;
+      if (!isImageViewerOpen && activeTab === 'canvas' && files.length === 1 && firstImageFile) {
+        setFileToPaste(firstImageFile);
+        return;
+      }
+
       const autoAddBoardId = selectAutoAddBoardId(getState());
 
       const uploadArgs: UploadImageArg[] = files.map((file, i) => ({
@@ -104,7 +119,7 @@ export const FullscreenDropzone = memo(() => {
 
       uploadImages(uploadArgs);
     },
-    [maxImageUploadCount, t]
+    [activeTab, isImageViewerOpen, maxImageUploadCount, t]
   );
 
   const onPaste = useCallback(

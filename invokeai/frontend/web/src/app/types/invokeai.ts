@@ -23,6 +23,7 @@ export type AppFeature =
   | 'pauseQueue'
   | 'resumeQueue'
   | 'invocationCache'
+  | 'modelCache'
   | 'bulkDownload'
   | 'starterModels'
   | 'hfToken';

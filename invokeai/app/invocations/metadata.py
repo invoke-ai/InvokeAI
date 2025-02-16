@@ -18,6 +18,7 @@ from invokeai.app.invocations.fields import (
     UIType,
 )
 from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 from invokeai.version.invokeai_version import __version__
@@ -275,3 +276,33 @@ class CoreMetadataInvocation(BaseInvocation):
         return MetadataOutput(metadata=MetadataField.model_validate(as_dict))
 
     model_config = ConfigDict(extra="allow")
+
+
+@invocation(
+    "metadata_field_extractor",
+    title="Metadata Field Extractor",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+)
+class MetadataFieldExtractorInvocation(BaseInvocation):
+    """Extracts the text value from an image's metadata given a key.
+    Raises an error if the image has no metadata or if the value is not a string (nesting not permitted)."""
+
+    image: ImageField = InputField(description="The image to extract metadata from")
+    key: str = InputField(description="The key in the image's metadata to extract the value from")
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        image_name = self.image.image_name
+
+        metadata = context.images.get_metadata(image_name=image_name)
+        if not metadata:
+            raise ValueError(f"No metadata found on image {image_name}")
+
+        try:
+            val = metadata.root[self.key]
+            if not isinstance(val, str):
+                raise ValueError(f"Metadata at key '{self.key}' must be a string")
+            return StringOutput(value=val)
+        except KeyError as e:
+            raise ValueError(f"No key '{self.key}' found in the metadata for {image_name}") from e

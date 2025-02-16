@@ -14,6 +14,10 @@ describe('validateWorkflow', () => {
     tags: '',
     notes: '',
     exposedFields: [],
+    form: {
+      elements: {},
+      layout: [],
+    },
     meta: { version: '3.0.0', category: 'user' },
     nodes: [
       {
@@ -33,6 +37,7 @@ describe('validateWorkflow', () => {
             model: {
               name: 'model',
               label: '',
+              description: '',
               value: {
                 key: '2c85d9e7-12cd-4e59-bb94-96d4502e99d4',
                 hash: 'random:aadc6641321ba17a324788ef1691f3584b382f0e7fa4a90be169f2a4ac77435c',
@@ -62,17 +67,19 @@ describe('validateWorkflow', () => {
             board: {
               name: 'board',
               label: '',
+              description: '',
               value: { board_id: '99a08f09-8232-4b74-94a2-f8e136d62f8c' },
             },
-            metadata: { name: 'metadata', label: 'Metadata' },
+            metadata: { name: 'metadata', label: 'Metadata', description: '' },
             image: {
               name: 'image',
               label: '',
+              description: '',
               value: { image_name: '96c124c8-f62f-4d4f-9788-72218469f298.png' },
             },
-            width: { name: 'width', label: '', value: 512 },
-            height: { name: 'height', label: '', value: 512 },
-            resample_mode: { name: 'resample_mode', label: '', value: 'bicubic' },
+            width: { name: 'width', label: '', value: 512, description: '' },
+            height: { name: 'height', label: '', value: 512, description: '' },
+            resample_mode: { name: 'resample_mode', label: '', value: 'bicubic', description: '' },
           },
         },
         position: { x: -46.428806920557236, y: -479.6641524207518 },

@@ -3,7 +3,7 @@ import type { AppDispatch, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
-import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
+import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { CANVAS_OUTPUT_PREFIX } from 'features/nodes/util/graph/graphBuilderUtils';
 import { boardsApi } from 'services/api/endpoints/boards';

@@ -1,8 +1,8 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCopyLayerToClipboard } from 'features/controlLayers/hooks/copyHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { useCopyLayerToClipboard } from 'features/controlLayers/hooks/useCopyLayerToClipboard';
 import { useEntityIsEmpty } from 'features/controlLayers/hooks/useEntityIsEmpty';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

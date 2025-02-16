@@ -10,14 +10,14 @@ import { addImagesToNodeImageFieldCollectionDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import { useFieldIsInvalid } from 'features/nodes/hooks/useFieldIsInvalid';
+import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageField } from 'features/nodes/types/common';
 import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiExclamationMarkBold } from 'react-icons/pi';
+import { PiExclamationMarkBold, PiXBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -39,7 +39,7 @@ export const ImageFieldCollectionInputComponent = memo(
     const { nodeId, field } = props;
     const store = useAppStore();
 
-    const isInvalid = useFieldIsInvalid(nodeId, field.name);
+    const isInvalid = useInputFieldIsInvalid(nodeId, field.name);
 
     const dndTargetData = useMemo<AddImagesToNodeImageFieldCollection>(
       () =>
@@ -132,7 +132,21 @@ const ImageGridItemContent = memo(
     }
 
     if (!query.data) {
-      return <IAINoContentFallback icon={<PiExclamationMarkBold />} />;
+      return (
+        <>
+          <IAINoContentFallback icon={PiExclamationMarkBold} />
+          <DndImageIcon
+            onClick={onClickRemove}
+            icon={<PiXBold />}
+            tooltip="Remove Image from Collection"
+            position="absolute"
+            flexDir="column"
+            top={1}
+            insetInlineEnd={1}
+            gap={1}
+          />
+        </>
+      );
     }
 
     return (
@@ -149,8 +163,8 @@ const ImageGridItemContent = memo(
         />
         <DndImageIcon
           onClick={onClickRemove}
-          icon={<PiArrowCounterClockwiseBold />}
-          tooltip="Reset Image"
+          icon={<PiXBold />}
+          tooltip="Remove Image from Collection"
           position="absolute"
           flexDir="column"
           top={1}

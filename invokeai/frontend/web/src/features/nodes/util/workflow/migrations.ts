@@ -12,7 +12,7 @@ import { zWorkflowV2 } from 'features/nodes/types/v2/workflow';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import { t } from 'i18next';
-import { forEach } from 'lodash-es';
+import { forEach, get } from 'lodash-es';
 import { z } from 'zod';
 
 /**
@@ -86,17 +86,20 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
     throw new WorkflowVersionError(t('nodes.unableToGetWorkflowVersion'));
   }
 
-  let workflow = deepClone(data) as WorkflowV1 | WorkflowV2 | WorkflowV3;
+  let workflow = deepClone(data);
 
-  if (workflow.meta.version === '1.0.0') {
+  if (get(workflow, 'meta.version') === '1.0.0') {
     const v1 = zWorkflowV1.parse(workflow);
     workflow = migrateV1toV2(v1);
   }
 
-  if (workflow.meta.version === '2.0.0') {
+  if (get(workflow, 'meta.version') === '2.0.0') {
     const v2 = zWorkflowV2.parse(workflow);
     workflow = migrateV2toV3(v2);
   }
 
-  return workflow as WorkflowV3;
+  // We should now have a V3 workflow
+  const migratedWorkflow = zWorkflowV3.parse(workflow);
+
+  return migratedWorkflow;
 };

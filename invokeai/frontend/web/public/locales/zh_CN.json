@@ -107,7 +107,6 @@
         "noImagesInGallery": "无图像可用于显示",
         "deleteImage_other": "删除{{count}}张图片",
         "deleteImagePermanent": "删除的图片无法被恢复。",
-        "assets": "素材",
         "autoAssignBoardOnClick": "点击后自动分配面板",
         "featuresWillReset": "如果您删除该图像，这些功能会立即被重置。",
         "loading": "加载中",

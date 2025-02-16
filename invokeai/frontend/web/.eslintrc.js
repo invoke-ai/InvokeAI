@@ -23,6 +23,12 @@ module.exports = {
         property: 'randomUUID',
         message: 'Use of crypto.randomUUID is not allowed as it is not available in all browsers.',
       },
+      {
+        object: 'navigator',
+        property: 'clipboard',
+        message:
+          'The Clipboard API is not available by default in Firefox. Use the `useClipboard` hook instead, which wraps clipboard access to prevent errors.',
+      },
     ],
   },
   overrides: [

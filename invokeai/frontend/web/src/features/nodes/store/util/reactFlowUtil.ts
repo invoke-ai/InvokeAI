@@ -1,4 +1,5 @@
-import type { Connection, Edge } from 'reactflow';
+import type { Connection } from '@xyflow/react';
+import type { AnyEdge } from 'features/nodes/types/invocation';
 import { assert } from 'tsafe';
 
 /**
@@ -19,7 +20,7 @@ const getEdgeId = (connection: Connection): string => {
  * @returns The edge
  * @throws If the connection is invalid (e.g. missing source, sourcehandle, target, or targetHandle)
  */
-export const connectionToEdge = (connection: Connection): Edge => {
+export const connectionToEdge = (connection: Connection): AnyEdge => {
   const { source, sourceHandle, target, targetHandle } = connection;
   assert(source && sourceHandle && target && targetHandle, 'Invalid connection');
   return {

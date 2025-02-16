@@ -19,12 +19,12 @@ import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/stor
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
-  CanvasEntityState,
   CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasRenderableEntityIdentifier,
+  CanvasRenderableEntityState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
@@ -82,7 +82,7 @@ export const createNewCanvasEntityFromImage = (arg: {
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
   dispatch: AppDispatch;
   getState: () => RootState;
-  overrides?: Partial<Pick<CanvasEntityState, 'isEnabled' | 'isLocked' | 'name'>>;
+  overrides?: Partial<Pick<CanvasRenderableEntityState, 'isEnabled' | 'isLocked' | 'name' | 'position'>>;
 }) => {
   const { type, imageDTO, dispatch, getState, overrides: _overrides } = arg;
   const state = getState();

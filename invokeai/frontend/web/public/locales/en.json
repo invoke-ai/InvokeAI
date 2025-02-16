@@ -186,7 +186,11 @@
         "max": "Max",
         "values": "Values",
         "resetToDefaults": "Reset to Defaults",
-        "seed": "Seed"
+        "seed": "Seed",
+        "combinatorial": "Combinatorial",
+        "layout": "Layout",
+        "row": "Row",
+        "column": "Column"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -218,9 +222,13 @@
         "pauseSucceeded": "Processor Paused",
         "pauseFailed": "Problem Pausing Processor",
         "cancel": "Cancel",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Canceling all queue items except the current one will stop pending items but allow the in-progress one to finish.",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Are you sure you want to cancel all pending queue items?",
+        "cancelAllExceptCurrentTooltip": "Cancel All Except Current Item",
         "cancelTooltip": "Cancel Current Item",
         "cancelSucceeded": "Item Canceled",
         "cancelFailed": "Problem Canceling Item",
+        "confirm": "Confirm",
         "prune": "Prune",
         "pruneTooltip": "Prune {{item_count}} Completed Items",
         "pruneSucceeded": "Pruned {{item_count}} Completed Items from Queue",
@@ -293,10 +301,15 @@
         "disableFailed": "Problem Disabling Invocation Cache",
         "useCache": "Use Cache"
     },
+    "modelCache": {
+        "clear": "Clear Model Cache",
+        "clearSucceeded": "Model Cache Cleared",
+        "clearFailed": "Problem Clearing Model Cache"
+    },
     "gallery": {
         "gallery": "Gallery",
-        "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assets": "Assets",
+        "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assetsTab": "Files you’ve uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
         "autoSwitchNewImages": "Auto-Switch to New Images",
@@ -868,6 +881,10 @@
         "generatorNRandomValues_one": "{{count}} random value",
         "generatorNRandomValues_other": "{{count}} random values",
         "generatorNoValues": "empty",
+        "generatorLoading": "loading",
+        "generatorLoadFromFile": "Load from File",
+        "dynamicPromptsRandom": "Dynamic Prompts (Random)",
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Combinatorial)",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
         "addLinearView": "Add to Linear View",
@@ -917,6 +934,7 @@
         "noWorkflows": "No Workflows",
         "noMatchingWorkflows": "No Matching Workflows",
         "noWorkflow": "No Workflow",
+        "unableToUpdateNode": "Node update failed: node {{node}} of type {{type}} (may require deleting and recreating)",
         "mismatchedVersion": "Invalid node: node {{node}} of type {{type}} has mismatched version (try updating?)",
         "missingTemplate": "Invalid node: node {{node}} of type {{type}} missing template (not installed?)",
         "sourceNodeDoesNotExist": "Invalid edge: source/output node {{node}} does not exist",
@@ -924,6 +942,7 @@
         "sourceNodeFieldDoesNotExist": "Invalid edge: source/output field {{node}}.{{field}} does not exist",
         "targetNodeFieldDoesNotExist": "Invalid edge: target/input field {{node}}.{{field}} does not exist",
         "deletedInvalidEdge": "Deleted invalid edge {{source}} -> {{target}}",
+        "deletedMissingNodeFieldFormElement": "Deleted missing form field: node {{nodeId}} field {{fieldName}}",
         "noConnectionInProgress": "No connection in progress",
         "node": "Node",
         "nodeOutputs": "Node Outputs",
@@ -938,6 +957,7 @@
         "nodeVersion": "Node Version",
         "noOutputRecorded": "No outputs recorded",
         "notes": "Notes",
+        "description": "Description",
         "notesDescription": "Add notes about your workflow",
         "problemSettingTitle": "Problem Setting Title",
         "resetToDefaultValue": "Reset to default value",
@@ -1133,7 +1153,8 @@
             "perPromptLabel": "Seed per Image",
             "perPromptDesc": "Use a different seed for each image"
         },
-        "loading": "Generating Dynamic Prompts..."
+        "loading": "Generating Dynamic Prompts...",
+        "promptsToGenerate": "Prompts to Generate"
     },
     "sdxl": {
         "cfgScale": "CFG Scale",
@@ -1233,6 +1254,8 @@
         "problemCopyingLayer": "Unable to Copy Layer",
         "problemSavingLayer": "Unable to Save Layer",
         "problemDownloadingImage": "Unable to Download Image",
+        "pasteSuccess": "Pasted to {{destination}}",
+        "pasteFailed": "Paste Failed",
         "prunedQueue": "Pruned Queue",
         "sentToCanvas": "Sent to Canvas",
         "sentToUpscale": "Sent to Upscale",
@@ -1249,7 +1272,10 @@
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
         "workflowDeleted": "Workflow Deleted",
-        "problemDeletingWorkflow": "Problem Deleting Workflow"
+        "problemDeletingWorkflow": "Problem Deleting Workflow",
+        "unableToCopy": "Unable to Copy",
+        "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
+        "unableToCopyDesc_theseSteps": "these steps"
     },
     "popovers": {
         "clipSkip": {
@@ -1674,7 +1700,26 @@
         "download": "Download",
         "copyShareLink": "Copy Share Link",
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
-        "delete": "Delete"
+        "delete": "Delete",
+        "builder": {
+            "builder": "Builder",
+            "layout": "Layout",
+            "row": "Row",
+            "column": "Column",
+            "label": "Label",
+            "description": "Description",
+            "component": "Component",
+            "numberInput": "Number Input",
+            "slider": "Slider",
+            "both": "Both",
+            "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
+            "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",
+            "containerPlaceholder": "Empty Container",
+            "containerPlaceholderDesc": "Drag a form element or node field into this container.",
+            "headingPlaceholder": "Empty Heading",
+            "textPlaceholder": "Empty Text",
+            "workflowBuilderAlphaWarning": "The workflow builder is currently in alpha. There may be breaking changes before the stable release."
+        }
     },
     "controlLayers": {
         "regional": "Regional",
@@ -1689,6 +1734,8 @@
         "cropLayerToBbox": "Crop Layer to Bbox",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
+        "regionCopiedToClipboard": "{{region}} Copied to Clipboard",
+        "copyRegionError": "Error copying {{region}}",
         "newGlobalReferenceImageOk": "Created Global Reference Image",
         "newGlobalReferenceImageError": "Problem Creating Global Reference Image",
         "newRegionalReferenceImageOk": "Created Regional Reference Image",
@@ -1799,6 +1846,14 @@
         "newControlLayer": "New $t(controlLayers.controlLayer)",
         "newInpaintMask": "New $t(controlLayers.inpaintMask)",
         "newRegionalGuidance": "New $t(controlLayers.regionalGuidance)",
+        "pasteTo": "Paste To",
+        "pasteToAssets": "Assets",
+        "pasteToAssetsDesc": "Paste to Assets",
+        "pasteToBbox": "Bbox",
+        "pasteToBboxDesc": "New Layer (in Bbox)",
+        "pasteToCanvas": "Canvas",
+        "pasteToCanvasDesc": "New Layer (in Canvas)",
+        "pastedTo": "Pasted to {{destination}}",
         "transparency": "Transparency",
         "enableTransparencyEffect": "Enable Transparency Effect",
         "disableTransparencyEffect": "Disable Transparency Effect",
@@ -1842,6 +1897,10 @@
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn"
+        },
+        "errors": {
+            "unableToFindImage": "Unable to find image",
+            "unableToLoadImage": "Unable to Load Image"
         },
         "controlMode": {
             "controlMode": "Control Mode",
@@ -1983,6 +2042,30 @@
                 "salt_and_pepper_type": "Salt and Pepper",
                 "noise_color": "Colored Noise",
                 "size": "Noise Size"
+            },
+            "adjust_image": {
+                "label": "Adjust Image",
+                "description": "Adjusts the selected channel of an image.",
+                "channel": "Channel",
+                "value_setting": "Value",
+                "scale_values": "Scale Values",
+                "red": "Red (RGBA)",
+                "green": "Green (RGBA)",
+                "blue": "Blue (RGBA)",
+                "alpha": "Alpha (RGBA)",
+                "cyan": "Cyan (CMYK)",
+                "magenta": "Magenta (CMYK)",
+                "yellow": "Yellow (CMYK)",
+                "black": "Black (CMYK)",
+                "hue": "Hue (HSV)",
+                "saturation": "Saturation (HSV)",
+                "value": "Value (HSV)",
+                "luminosity": "Luminosity (LAB)",
+                "a": "A (LAB)",
+                "b": "B (LAB)",
+                "y": "Y (YCbCr)",
+                "cb": "Cb (YCbCr)",
+                "cr": "Cr (YCbCr)"
             }
         },
         "transform": {
@@ -2056,7 +2139,10 @@
             "newRasterLayer": "New Raster Layer",
             "newInpaintMask": "New Inpaint Mask",
             "newRegionalGuidance": "New Regional Guidance",
-            "cropCanvasToBbox": "Crop Canvas to Bbox"
+            "cropCanvasToBbox": "Crop Canvas to Bbox",
+            "copyToClipboard": "Copy to Clipboard",
+            "copyCanvasToClipboard": "Copy Canvas to Clipboard",
+            "copyBboxToClipboard": "Copy Bbox to Clipboard"
         },
         "stagingArea": {
             "accept": "Accept",
@@ -2190,7 +2276,14 @@
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
-        "items": ["Low-VRAM mode", "Dynamic memory management", "Faster model loading times", "Fewer memory errors"],
+        "items": [
+            "Improved VRAM setting defaults",
+            "On-demand model cache clearing",
+            "Expanded FLUX LoRA compatibility",
+            "Canvas Adjust Image filter",
+            "Cancel all but current queue item",
+            "Copy from and paste to Canvas"
+        ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"

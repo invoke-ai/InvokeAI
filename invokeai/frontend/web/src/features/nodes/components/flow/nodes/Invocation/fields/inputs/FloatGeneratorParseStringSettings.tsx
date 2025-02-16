@@ -1,4 +1,5 @@
-import { Flex, FormControl, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormLabel, Input } from '@invoke-ai/ui-library';
+import { GeneratorTextareaWithFileUpload } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/GeneratorTextareaWithFileUpload';
 import type { FloatGeneratorParseString } from 'features/nodes/types/field';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -19,8 +20,8 @@ export const FloatGeneratorParseStringSettings = memo(({ state, onChange }: Floa
   );
 
   const onChangeInput = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
-      onChange({ ...state, input: e.target.value });
+    (input: string) => {
+      onChange({ ...state, input });
     },
     [onChange, state]
   );
@@ -31,17 +32,7 @@ export const FloatGeneratorParseStringSettings = memo(({ state, onChange }: Floa
         <FormLabel>{t('nodes.splitOn')}</FormLabel>
         <Input value={state.splitOn} onChange={onChangeSplitOn} />
       </FormControl>
-      <FormControl orientation="vertical">
-        <FormLabel>{t('common.input')}</FormLabel>
-        <Textarea
-          className="nowheel nodrag nopan"
-          value={state.input}
-          onChange={onChangeInput}
-          p={2}
-          resize="none"
-          rows={5}
-        />
-      </FormControl>
+      <GeneratorTextareaWithFileUpload value={state.input} onChange={onChangeInput} />
     </Flex>
   );
 });

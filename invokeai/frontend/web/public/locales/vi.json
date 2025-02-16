@@ -86,7 +86,6 @@
         "bulkDownloadRequestedDesc": "Yêu cầu tải xuống đang được chuẩn bị. Vui lòng chờ trong giây lát.",
         "starImage": "Gắn Sao Cho Ảnh",
         "openViewer": "Mở Trình Xem",
-        "assets": "Tài Nguyên",
         "viewerImage": "Trình Xem Ảnh",
         "sideBySide": "Cạnh Nhau",
         "alwaysShowImageSizeBadge": "Luôn Hiển Thị Kích Thước Ảnh",
@@ -118,7 +117,8 @@
         "unstarImage": "Ngừng Gắn Sao Cho Ảnh",
         "compareHelp2": "Nhấn <Kbd>M</Kbd> để tuần hoàn trong chế độ so sánh.",
         "boardsSettings": "Thiết Lập Bảng",
-        "imagesSettings": "Cài Đặt Thư Viện Ảnh"
+        "imagesSettings": "Cài Đặt Thư Viện Ảnh",
+        "assets": "Tài Nguyên"
     },
     "common": {
         "ipAdapter": "IP Adapter",
@@ -220,7 +220,17 @@
         "tab": "Tab",
         "loadingModel": "Đang Tải Model",
         "generating": "Đang Tạo Sinh",
-        "warnings": "Cảnh Báo"
+        "warnings": "Cảnh Báo",
+        "count": "Đếm",
+        "step": "Bước",
+        "values": "Giá Trị",
+        "start": "Bắt Đầu",
+        "end": "Kết Thúc",
+        "min": "Tối Thiểu",
+        "max": "Tối Đa",
+        "resetToDefaults": "Đặt Lại Về Mặc Định",
+        "seed": "Hạt Giống",
+        "combinatorial": "Tổ Hợp"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -294,7 +304,11 @@
         "completedIn": "Hoàn tất trong",
         "graphQueued": "Đồ Thị Đã Vào Hàng",
         "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng",
-        "batchSize": "Kích Thước Lô"
+        "batchSize": "Kích Thước Lô",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Huỷ tất cả mục đang xếp hàng ngoại trừ mục hiện tại, sẽ dừng các mục đang chờ nhưng cho phép các mục đang chạy được hoàn tất.",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Bạn có chắc muốn huỷ tất cả mục đang chờ?",
+        "cancelAllExceptCurrentTooltip": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại",
+        "confirm": "Đồng Ý"
     },
     "hotkeys": {
         "canvas": {
@@ -965,7 +979,23 @@
         "outputFieldTypeParseError": "Không thể phân tích loại dữ liệu đầu ra của {{node}}.{{field}} ({{message}})",
         "modelAccessError": "Không thể tìm thấy model {{key}}, chuyển về mặc định",
         "internalDesc": "Trình kích hoạt này được dùng bên trong bởi Invoke. Nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng và có thể bị xoá bất cứ lúc nào.",
-        "specialDesc": "Trình kích hoạt này có một số xử lý đặc biệt trong ứng dụng. Ví dụ, Node Hàng Loạt được dùng để xếp vào nhiều đồ thị từ một workflow."
+        "specialDesc": "Trình kích hoạt này có một số xử lý đặc biệt trong ứng dụng. Ví dụ, Node Hàng Loạt được dùng để xếp vào nhiều đồ thị từ một workflow.",
+        "addItem": "Thêm Mục",
+        "generateValues": "Cho Ra Giá Trị",
+        "floatRangeGenerator": "Phạm Vị Tạo Ra Số Thực",
+        "integerRangeGenerator": "Phạm Vị Tạo Ra Số Nguyên",
+        "linearDistribution": "Phân Bố Tuyến Tính",
+        "uniformRandomDistribution": "Phân Bố Ngẫu Nhiên Đồng Nhất",
+        "parseString": "Phân Tích Chuỗi",
+        "noBatchGroup": "không có nhóm",
+        "generatorNoValues": "trống",
+        "splitOn": "Tách Ở",
+        "arithmeticSequence": "Cấp Số Cộng",
+        "generatorNRandomValues_other": "{{count}} giá trị ngẫu nhiên",
+        "generatorLoading": "đang tải",
+        "generatorLoadFromFile": "Tải Từ Tệp",
+        "dynamicPromptsRandom": "Dynamic Prompts (Ngẫu Nhiên)",
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Tổ Hợp)"
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -1433,13 +1463,24 @@
             "missingNodeTemplate": "Thiếu mẫu trình bày node",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), chiều dài hộp giới hạn là {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), tỉ lệ chiều rộng hộp giới hạn là {{width}}",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}}: thiếu đầu vào",
+            "missingInputForField": "thiếu đầu vào",
             "missingFieldTemplate": "Thiếu vùng mẫu trình bày",
-            "collectionEmpty": "{{nodeLabel}} -> {{fieldLabel}} tài nguyên trống",
-            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}}: quá ít mục, tối thiểu {{minItems}}",
-            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}}: quá nhiều mục, tối đa {{maxItems}}",
+            "collectionTooFewItems": "quá ít mục, tối thiểu là {{minItems}}",
+            "collectionTooManyItems": "quá nhiều mục, tối đa là {{maxItems}}",
             "canvasIsSelectingObject": "Canvas đang bận (đang chọn đồ vật)",
-            "fluxModelMultipleControlLoRAs": "Chỉ có thể dùng 1 LoRA Điều Khiển Được"
+            "fluxModelMultipleControlLoRAs": "Chỉ có thể dùng 1 LoRA Điều Khiển Được",
+            "collectionStringTooLong": "quá dài, tối đa là {{maxLength}}",
+            "collectionStringTooShort": "quá ngắn, tối thiểu là {{minLength}}",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (giá trị tối đa)",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (giá trị tối thiểu)",
+            "collectionNumberNotMultipleOf": "{{value}} không phải bội của {{multipleOf}}",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (giá trị chọn lọc tối thiểu)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (giá trị chọn lọc tối đa)",
+            "batchNodeCollectionSizeMismatch": "Kích cỡ tài nguyên không phù hợp với Lô {{batchGroupId}}",
+            "emptyBatches": "lô trống",
+            "batchNodeNotConnected": "Node Hàng Loạt chưa được kết nối: {{label}}",
+            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng",
+            "invalidBatchConfigurationCannotCalculate": "Thiết lập lô không hợp lệ; không thể tính toán"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -1458,8 +1499,8 @@
         "recallMetadata": "Gợi Lại Metadata",
         "clipSkip": "CLIP Skip",
         "general": "Cài Đặt Chung",
-        "boxBlur": "Box Blur",
-        "gaussianBlur": "Gaussian Blur",
+        "boxBlur": "Làm Mờ Dạng Box",
+        "gaussianBlur": "Làm Mờ Dạng Gaussian",
         "staged": "Staged (Tăng khử nhiễu có hệ thống)",
         "scaledHeight": "Tỉ Lệ Dài",
         "cancel": {
@@ -1512,11 +1553,12 @@
             "perPromptLabel": "Một Hạt Giống Mỗi Ảnh",
             "perIterationLabel": "Hạt Giống Mỗi Lần Lặp Lại"
         },
-        "loading": "Tạo Sinh Dùng Dynamic Prompt...",
+        "loading": "Tạo Sinh Bằng Dynamic Prompt...",
         "showDynamicPrompts": "HIện Dynamic Prompt",
         "maxPrompts": "Số Lệnh Tối Đa",
         "promptsPreview": "Xem Trước Lệnh",
-        "dynamicPrompts": "Dynamic Prompt"
+        "dynamicPrompts": "Dynamic Prompt",
+        "promptsToGenerate": "Lệnh Để Tạo Sinh"
     },
     "settings": {
         "beta": "Beta",
@@ -1760,7 +1802,10 @@
             "newControlLayer": "Layer Điều Khiển Được Mới",
             "newRasterLayer": "Layer Dạng Raster Mới",
             "bboxGroup": "Được Tạo Từ Hộp Giới Hạn",
-            "canvasGroup": "Canvas"
+            "canvasGroup": "Canvas",
+            "copyCanvasToClipboard": "Sao Chép Canvas Vào Clipboard",
+            "copyToClipboard": "Sao Chép Vào Clipboard",
+            "copyBboxToClipboard": "Sao Chép Hộp Giới Hạn Vào Clipboard"
         },
         "stagingArea": {
             "saveToGallery": "Lưu Vào Thư Viện",
@@ -1859,7 +1904,49 @@
             },
             "advanced": "Nâng Cao",
             "processingLayerWith": "Đang xử lý layer với bộ lọc {{type}}.",
-            "forMoreControl": "Để kiểm soát tốt hơn, bấm vào mục Nâng Cao bên dưới."
+            "forMoreControl": "Để kiểm soát tốt hơn, bấm vào mục Nâng Cao bên dưới.",
+            "img_blur": {
+                "description": "Làm mờ layer được chọn.",
+                "blur_type": "Dạng Làm Mờ",
+                "blur_radius": "Radius",
+                "gaussian_type": "Gaussian",
+                "label": "Làm Mờ Ảnh",
+                "box_type": "Box"
+            },
+            "img_noise": {
+                "salt_and_pepper_type": "Salt and Pepper",
+                "noise_amount": "Lượng Nhiễu",
+                "label": "Độ Nhiễu Ảnh",
+                "description": "Tăng độ nhiễu vào layer được chọn.",
+                "noise_type": "Dạng Nhiễu",
+                "gaussian_type": "Gaussian",
+                "noise_color": "Màu Nhiễu",
+                "size": "Cỡ Nhiễu"
+            },
+            "adjust_image": {
+                "channel": "Kênh Màu",
+                "cyan": "Lục Lam (Cmyk)",
+                "value_setting": "Giá Trị",
+                "scale_values": "Giá Trị Theo Tỉ Lệ",
+                "red": "Đỏ (Rgba)",
+                "green": "Lục (rGba)",
+                "blue": "Lam (rgBa)",
+                "alpha": "Độ Trong Suốt (rgbA)",
+                "luminosity": "Độ Sáng (Lab)",
+                "magenta": "Hồng Đỏ (cMyk)",
+                "yellow": "Vàng (cmYk)",
+                "description": "Điều chỉnh kênh màu được chọn của ảnh.",
+                "black": "Đen (cmyK)",
+                "cr": "Cr (ycC)",
+                "label": "Điều Chỉnh Ảnh",
+                "value": "Độ Sáng (hsV)",
+                "saturation": "Độ Bão Hoà (hSv)",
+                "hue": "Vùng Màu (Hsv)",
+                "a": "A (lAb)",
+                "b": "B (laB)",
+                "y": "Y (Ycc)",
+                "cb": "Cb (yCc)"
+            }
         },
         "transform": {
             "fitModeCover": "Che Phủ",
@@ -1937,6 +2024,20 @@
             "rgReferenceImagesNotSupported": "Ảnh Mẫu Khu Vực không được hỗ trợ cho model cơ sở được chọn",
             "rgAutoNegativeNotSupported": "Tự Động Đảo Chiều không được hỗ trợ cho model cơ sở được chọn",
             "rgNoRegion": "không có khu vực được vẽ"
+        },
+        "pasteTo": "Dán Vào",
+        "pasteToAssets": "Tài Nguyên",
+        "pasteToAssetsDesc": "Dán Vào Tài Nguyên",
+        "pasteToBbox": "Hộp Giới Hạn",
+        "pasteToBboxDesc": "Layer Mới (Trong Hộp Giới Hạn)",
+        "pasteToCanvas": "Canvas",
+        "pasteToCanvasDesc": "Layer Mới (Trong Canvas)",
+        "pastedTo": "Dán Vào {{destination}}",
+        "regionCopiedToClipboard": "Sao Chép {{region}} Vào Clipboard",
+        "copyRegionError": "Lỗi khi sao chép {{region}}",
+        "errors": {
+            "unableToLoadImage": "Không Thể Tải Hình Ảnh",
+            "unableToFindImage": "Không Thể Tìm Hình Ảnh"
         }
     },
     "stylePresets": {
@@ -2067,7 +2168,13 @@
         "problemCopyingImage": "Không Thể Sao Chép Ảnh",
         "problemDownloadingImage": "Không Thể Tải Xuống Ảnh",
         "problemCopyingLayer": "Không Thể Sao Chép Layer",
-        "problemSavingLayer": "Không Thể Lưu Layer"
+        "problemSavingLayer": "Không Thể Lưu Layer",
+        "outOfMemoryErrorDescLocal": "Làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi để hạn chế OOM (Tràn bộ nhớ).",
+        "unableToCopy": "Không Thể Sao Chép",
+        "unableToCopyDesc_theseSteps": "các bước sau",
+        "unableToCopyDesc": "Trình duyệt của bạn không hỗ trợ tính năng clipboard. Người dùng Firefox có thể khắc phục theo ",
+        "pasteSuccess": "Dán Vào {{destination}}",
+        "pasteFailed": "Dán Thất Bại"
     },
     "ui": {
         "tabs": {
@@ -2153,9 +2260,8 @@
         "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Cần thêm hướng dẫn? Xem thử <LinkComponent>Bắt Đầu Làm Quen</LinkComponent> để biết thêm mẹo khai thác toàn bộ tiềm năng của Invoke Studio.",
         "toGetStarted": "Để bắt đầu, hãy nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
-        "downloadStarterModels": "Tải Xuống Model Khởi Đầu",
-        "importModels": "Nhập Vào Model",
-        "noModelsInstalled": "Hình như bạn không có model nào được tải cả"
+        "noModelsInstalled": "Dường như bạn chưa tải model nào cả! Bạn có thể <DownloadStarterModelsButton>tải xuống các model khởi đầu</DownloadStarterModelsButton> hoặc <ImportModelsButton>nhập vào thêm model</ImportModelsButton>.",
+        "lowVRAMMode": "Cho hiệu suất tốt nhất, hãy làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Có Gì Mới Ở Invoke",
@@ -2163,7 +2269,12 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "<StrongComponent>Hướng Dẫn Khu Vực FLUX (beta)</StrongComponent>: Bản beta của Hướng Dẫn Khu Vực FLUX của chúng ta đã có mắt tại bảng điều khiển lệnh khu vực."
+            "Cải thiện các thiết lập mặc định của VRAM",
+            "Xoá bộ nhớ đệm của model theo yêu cầu",
+            "Mở rộng khả năng tương thích LoRA trên FLUX",
+            "Bộ lọc điều chỉnh ảnh trên Canvas",
+            "Huỷ tất cả trừ mục đang xếp hàng hiện tại",
+            "Sao chép và dán trên Canvas"
         ]
     },
     "upsell": {
@@ -2233,5 +2344,10 @@
         },
         "controlCanvas": "Điều Khiển Canvas",
         "watch": "Xem"
+    },
+    "modelCache": {
+        "clearSucceeded": "Cache Model Đã Được Dọn",
+        "clearFailed": "Có Vấn Đề Khi Dọn Cache Model",
+        "clear": "Dọn Cache Model"
     }
 }

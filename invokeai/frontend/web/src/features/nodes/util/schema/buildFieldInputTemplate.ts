@@ -34,6 +34,7 @@ import type {
   StatelessFieldInputTemplate,
   StringFieldCollectionInputTemplate,
   StringFieldInputTemplate,
+  StringGeneratorFieldInputTemplate,
   T2IAdapterModelFieldInputTemplate,
   T5EncoderModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
@@ -41,6 +42,7 @@ import type {
 import {
   getFloatGeneratorArithmeticSequenceDefaults,
   getIntegerGeneratorArithmeticSequenceDefaults,
+  getStringGeneratorParseStringDefaults,
   isFloatCollectionFieldType,
   isImageCollectionFieldType,
   isIntegerCollectionFieldType,
@@ -669,6 +671,20 @@ const buildIntegerGeneratorFieldInputTemplate: FieldInputTemplateBuilder<Integer
   return template;
 };
 
+const buildStringGeneratorFieldInputTemplate: FieldInputTemplateBuilder<StringGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: StringGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getStringGeneratorParseStringDefaults(),
+  };
+
+  return template;
+};
+
 export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
   BoardField: buildBoardFieldInputTemplate,
   BooleanField: buildBooleanFieldInputTemplate,
@@ -699,6 +715,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   ControlLoRAModelField: buildControlLoRAModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
+  StringGeneratorField: buildStringGeneratorFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (

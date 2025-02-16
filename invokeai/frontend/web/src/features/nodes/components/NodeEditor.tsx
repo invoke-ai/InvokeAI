@@ -1,5 +1,3 @@
-import 'reactflow/dist/style.css';
-
 import { Flex } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { useFocusRegion } from 'common/hooks/focus';

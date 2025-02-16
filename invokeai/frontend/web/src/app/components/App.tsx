@@ -12,10 +12,12 @@ import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
+import { CanvasPasteModal } from 'features/controlLayers/components/CanvasPasteModal';
 import {
   NewCanvasSessionDialog,
   NewGallerySessionDialog,
 } from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
@@ -23,6 +25,7 @@ import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModa
 import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
+import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
@@ -97,6 +100,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
+      <CancelAllExceptCurrentQueueItemConfirmationAlertDialog />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
@@ -110,6 +114,9 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <ImageContextMenu />
       <FullscreenDropzone />
       <VideosModal />
+      <CanvasManagerProviderGate>
+        <CanvasPasteModal />
+      </CanvasManagerProviderGate>
     </ErrorBoundary>
   );
 };

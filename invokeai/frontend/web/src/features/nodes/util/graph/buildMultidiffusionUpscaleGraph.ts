@@ -13,7 +13,15 @@ import { getBoardField, getPresetModifiedPrompts } from './graphBuilderUtils';
 export const buildMultidiffusionUpscaleGraph = async (
   state: RootState
 ): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt'> }> => {
-  const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.params;
+  const {
+    model,
+    upscaleCfgScale: cfg_scale,
+    upscaleScheduler: scheduler,
+    steps,
+    vaePrecision,
+    seed,
+    vae,
+  } = state.params;
   const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
 
   assert(model, 'No model found in state');
@@ -54,6 +62,7 @@ export const buildMultidiffusionUpscaleGraph = async (
     type: 'i2l',
     id: getPrefixedId('i2l'),
     fp32: vaePrecision === 'fp32',
+    tile_size: 1024,
     tiled: true,
   });
 
@@ -63,6 +72,7 @@ export const buildMultidiffusionUpscaleGraph = async (
     type: 'l2i',
     id: getPrefixedId('l2i'),
     fp32: vaePrecision === 'fp32',
+    tile_size: 1024,
     tiled: true,
     board: getBoardField(state),
     is_intermediate: false,

@@ -1,5 +1,5 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import { Combobox, FormControl } from '@invoke-ai/ui-library';
+import { Combobox } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldBoardValueChanged } from 'features/nodes/store/nodesSlice';
 import type { BoardFieldInputInstance, BoardFieldInputTemplate } from 'features/nodes/types/field';
@@ -57,15 +57,15 @@ const BoardFieldInputComponent = (props: FieldComponentProps<BoardFieldInputInst
   const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 
   return (
-    <FormControl className="nowheel nodrag" isDisabled={!hasBoards}>
-      <Combobox
-        value={value}
-        options={options}
-        onChange={onChange}
-        placeholder={t('boards.selectBoard')}
-        noOptionsMessage={noOptionsMessage}
-      />
-    </FormControl>
+    <Combobox
+      className="nowheel nodrag"
+      value={value}
+      options={options}
+      onChange={onChange}
+      placeholder={t('boards.selectBoard')}
+      noOptionsMessage={noOptionsMessage}
+      isDisabled={!hasBoards}
+    />
   );
 };
 

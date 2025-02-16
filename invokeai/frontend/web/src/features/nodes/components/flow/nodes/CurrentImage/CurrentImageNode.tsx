@@ -1,5 +1,6 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import type { NodeProps } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { DndImage } from 'features/dnd/DndImage';
@@ -12,7 +13,6 @@ import { motion } from 'framer-motion';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { NodeProps } from 'reactflow';
 import { $lastProgressEvent } from 'services/events/stores';
 
 const CurrentImageNode = (props: NodeProps) => {

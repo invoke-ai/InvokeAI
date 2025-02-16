@@ -1,4 +1,5 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
+import type { Node, NodeProps } from '@xyflow/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
@@ -7,9 +8,8 @@ import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
 import type { NotesNodeData } from 'features/nodes/types/invocation';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
-import type { NodeProps } from 'reactflow';
 
-const NotesNode = (props: NodeProps<NotesNodeData>) => {
+const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
   const { id: nodeId, data, selected } = props;
   const { notes, isOpen } = data;
   const dispatch = useAppDispatch();
