@@ -49,7 +49,7 @@ WORKDIR ${INVOKEAI_SRC}
 # x86_64/CUDA is the default
 RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    --mount=type=bind,source=invokeai,target=invokeai \
+    --mount=type=bind,source=invokeai/version,target=invokeai/version \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
       UV_INDEX="https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
