@@ -15,3 +15,10 @@ export const useNodeTemplate = (nodeId: string): InvocationTemplate => {
   }, [templates, type]);
   return template;
 };
+
+export const useNodeTemplateSafe = (nodeId: string): InvocationTemplate | null => {
+  const templates = useStore($templates);
+  const type = useNodeType(nodeId);
+  const template = useMemo(() => templates[type] ?? null, [templates, type]);
+  return template;
+};
