@@ -58,7 +58,7 @@ RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
 
 #### Build the Web UI ------------------------------------
 
-FROM node:20-slim AS web-builder
+FROM docker.io/node:22-slim AS web-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack use pnpm@8.x
