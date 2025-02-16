@@ -10,18 +10,18 @@ import {
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeConnectionErrorSelector';
 import { useMemo } from 'react';
 
-export const useConnectionValidationResult = (nodeId: string, fieldName: string, handleType: HandleType) => {
+export const useConnectionErrorTKey = (nodeId: string, fieldName: string, handleType: HandleType): string | null => {
   const pendingConnection = useStore($pendingConnection);
   const templates = useStore($templates);
   const edgePendingUpdate = useStore($edgePendingUpdate);
 
-  const selectValidationResult = useMemo(
+  const selectConnectionError = useMemo(
     () => makeConnectionErrorSelector(templates, nodeId, fieldName, handleType, pendingConnection, edgePendingUpdate),
     [templates, nodeId, fieldName, handleType, pendingConnection, edgePendingUpdate]
   );
 
-  const validationResult = useAppSelector(selectValidationResult);
-  return validationResult;
+  const connectionError = useAppSelector(selectConnectionError);
+  return connectionError;
 };
 
 export const useIsConnectionStartField = (nodeId: string, fieldName: string, handleType: HandleType) => {

@@ -1,8 +1,8 @@
+import { createSelector } from '@reduxjs/toolkit';
 import type { HandleType } from '@xyflow/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, PendingConnection, Templates } from 'features/nodes/store/types';
-import { buildRejectResult, validateConnection } from 'features/nodes/store/util/validateConnection';
+import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { AnyEdge } from 'features/nodes/types/invocation';
 
 /**
@@ -25,18 +25,18 @@ export const makeConnectionErrorSelector = (
   pendingConnection: PendingConnection | null,
   edgePendingUpdate: AnyEdge | null
 ) => {
-  return createMemoizedSelector(selectNodesSlice, (nodesSlice: NodesState) => {
+  return createSelector(selectNodesSlice, (nodesSlice: NodesState): string | null => {
     const { nodes, edges } = nodesSlice;
 
     if (!pendingConnection) {
-      return buildRejectResult('nodes.noConnectionInProgress');
+      return 'nodes.noConnectionInProgress';
     }
 
     if (handleType === pendingConnection.handleType) {
       if (handleType === 'source') {
-        return buildRejectResult('nodes.cannotConnectOutputToOutput');
+        return 'nodes.cannotConnectOutputToOutput';
       }
-      return buildRejectResult('nodes.cannotConnectInputToInput');
+      return 'nodes.cannotConnectInputToInput';
     }
 
     // we have to figure out which is the target and which is the source
