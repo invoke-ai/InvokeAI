@@ -146,6 +146,7 @@ export const AddNodeCmdk = memo(() => {
   const [searchTerm, setSearchTerm] = useState('');
   const addNode = useAddNode();
   const tab = useAppSelector(selectActiveTab);
+  // Filtering the list is expensive - debounce the search term to avoid stutters
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
   const isOpen = useStore($addNodeCmdk);
   const open = useCallback(() => {

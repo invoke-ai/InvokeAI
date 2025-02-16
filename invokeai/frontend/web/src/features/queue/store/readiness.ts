@@ -67,6 +67,9 @@ import { assert } from 'tsafe';
  *
  * For example, the canvas tab needs to check the status of the canvas manager before enqueuing, while the workflows
  * tab needs to check the status of the nodes and their connections.
+ *
+ * A global store that contains the reasons why the app is not ready to enqueue generations. State changes are debounced
+ * to reduce the number of times we run the fairly involved readiness checks.
  */
 
 const LAYER_TYPE_TO_TKEY = {

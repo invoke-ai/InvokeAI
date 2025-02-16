@@ -123,6 +123,9 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
   const field = useInputFieldInstance(nodeId, fieldName);
   const template = useInputFieldTemplate(nodeId, fieldName);
 
+  // When deciding which component to render, first we check the type of the template, which is more efficient than the
+  // instance type check. The instance type check uses zod and is slower.
+
   if (isStringFieldCollectionInputTemplate(template)) {
     if (!isStringFieldCollectionInputInstance(field)) {
       return null;

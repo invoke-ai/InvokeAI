@@ -178,6 +178,11 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     );
   }, [imageDTO, element, store, dndId]);
 
+  // Perf optimization:
+  // The gallery image component can be heavy and re-render often. We want to track hovering state without causing
+  // unnecessary re-renders. To do this, we use a local atom - which has a stable reference - in the image component -
+  // and then pass the atom to the hover icons component, which subscribes to the atom and re-renders when the atom
+  // changes.
   const $isHovered = useMemo(() => atom(false), []);
 
   const onMouseOver = useCallback(() => {
