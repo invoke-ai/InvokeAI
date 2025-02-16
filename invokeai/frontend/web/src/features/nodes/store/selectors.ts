@@ -27,11 +27,6 @@ export const selectInvocationNodeSafe = (nodesSlice: NodesState, nodeId: string)
   return node;
 };
 
-export const selectInvocationNodeType = (nodesSlice: NodesState, nodeId: string): string => {
-  const node = selectInvocationNode(nodesSlice, nodeId);
-  return node.data.type;
-};
-
 export const selectNodeData = (nodesSlice: NodesState, nodeId: string): InvocationNodeData => {
   const node = selectInvocationNode(nodesSlice, nodeId);
   return node.data;
