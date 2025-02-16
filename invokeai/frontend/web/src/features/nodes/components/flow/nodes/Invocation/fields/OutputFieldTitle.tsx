@@ -2,7 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Text, Tooltip } from '@invoke-ai/ui-library';
 import { OutputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldTooltipContent';
 import {
-  useConnectionValidationResult,
+  useConnectionErrorTKey,
   useIsConnectionInProgress,
   useIsConnectionStartField,
 } from 'features/nodes/hooks/useFieldConnectionState';
@@ -31,7 +31,7 @@ export const OutputFieldTitle = memo(({ nodeId, fieldName }: Props) => {
   const isConnected = useInputFieldIsConnected(nodeId, fieldName);
   const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'source');
   const isConnectionInProgress = useIsConnectionInProgress();
-  const validationResult = useConnectionValidationResult(nodeId, fieldName, 'source');
+  const connectionErrorTKey = useConnectionErrorTKey(nodeId, fieldName, 'source');
 
   return (
     <Tooltip
@@ -41,7 +41,7 @@ export const OutputFieldTitle = memo(({ nodeId, fieldName }: Props) => {
     >
       <Text
         data-is-disabled={
-          (isConnectionInProgress && !validationResult.isValid && !isConnectionStartField) || isConnected
+          (isConnectionInProgress && connectionErrorTKey !== null && !isConnectionStartField) || isConnected
         }
         sx={sx}
       >

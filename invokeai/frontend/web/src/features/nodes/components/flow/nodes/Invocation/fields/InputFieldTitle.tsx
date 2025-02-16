@@ -4,7 +4,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { InputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldTooltipContent';
 import {
-  useConnectionValidationResult,
+  useConnectionErrorTKey,
   useIsConnectionInProgress,
   useIsConnectionStartField,
 } from 'features/nodes/hooks/useFieldConnectionState';
@@ -47,7 +47,7 @@ export const InputFieldTitle = memo((props: Props) => {
   const isConnected = useInputFieldIsConnected(nodeId, fieldName);
   const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
   const isConnectionInProgress = useIsConnectionInProgress();
-  const validationResult = useConnectionValidationResult(nodeId, fieldName, 'target');
+  const connectionError = useConnectionErrorTKey(nodeId, fieldName, 'target');
 
   const dispatch = useAppDispatch();
   const defaultTitle = useMemo(() => fieldTemplateTitle || t('nodes.unknownField'), [fieldTemplateTitle, t]);
@@ -76,7 +76,7 @@ export const InputFieldTitle = memo((props: Props) => {
           noOfLines={1}
           data-is-invalid={isInvalid}
           data-is-disabled={
-            (isConnectionInProgress && !validationResult.isValid && !isConnectionStartField) || isConnected
+            (isConnectionInProgress && connectionError !== null && !isConnectionStartField) || isConnected
           }
           onDoubleClick={editable.startEditing}
         >

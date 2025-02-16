@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
@@ -13,18 +14,22 @@ type Props = {
   isOpen: boolean;
 };
 
+const sx: SystemStyleObject = {
+  borderTopRadius: 'base',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  h: 8,
+  textAlign: 'center',
+  color: 'base.200',
+  borderBottomRadius: 'base',
+  '&[data-is-open="true"]': {
+    borderBottomRadius: 0,
+  },
+};
+
 const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
   return (
-    <Flex
-      layerStyle="nodeHeader"
-      borderTopRadius="base"
-      borderBottomRadius={isOpen ? 0 : 'base'}
-      alignItems="center"
-      justifyContent="space-between"
-      h={8}
-      textAlign="center"
-      color="base.200"
-    >
+    <Flex layerStyle="nodeHeader" sx={sx} data-is-open={isOpen}>
       <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
       <InvocationNodeClassificationIcon nodeId={nodeId} />
       <NodeTitle nodeId={nodeId} />

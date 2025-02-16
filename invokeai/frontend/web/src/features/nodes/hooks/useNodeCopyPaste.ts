@@ -126,7 +126,7 @@ const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
     assert(!isNil(targetHandle));
 
     // Validate the edge before adding it
-    const validationResult = validateConnection(
+    const connectionErrorTKey = validateConnection(
       { source, sourceHandle, target, targetHandle },
       validationNodes,
       validationEdges,
@@ -135,10 +135,10 @@ const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
       true
     );
     // If the edge is invalid, log a warning and skip it
-    if (!validationResult.isValid) {
+    if (connectionErrorTKey !== null) {
       log.warn(
         { edge: { source, sourceHandle, target, targetHandle } },
-        `Invalid edge, cannot paste: ${t(validationResult.messageTKey)}`
+        `Invalid edge, cannot paste: ${t(connectionErrorTKey)}`
       );
       return;
     }

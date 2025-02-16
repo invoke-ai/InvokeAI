@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Grid, GridItem } from '@invoke-ai/ui-library';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { OutputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldGate';
@@ -20,6 +21,18 @@ type Props = {
   isOpen: boolean;
 };
 
+const sx: SystemStyleObject = {
+  flexDirection: 'column',
+  w: 'full',
+  h: 'full',
+  py: 2,
+  gap: 1,
+  borderBottomRadius: 'base',
+  '&[data-with-footer="true"]': {
+    borderBottomRadius: 0,
+  },
+};
+
 const InvocationNode = ({ nodeId, isOpen }: Props) => {
   const withFooter = useWithFooter(nodeId);
 
@@ -28,15 +41,7 @@ const InvocationNode = ({ nodeId, isOpen }: Props) => {
       <InvocationNodeHeader nodeId={nodeId} isOpen={isOpen} />
       {isOpen && (
         <>
-          <Flex
-            layerStyle="nodeBody"
-            flexDirection="column"
-            w="full"
-            h="full"
-            py={2}
-            gap={1}
-            borderBottomRadius={withFooter ? 0 : 'base'}
-          >
+          <Flex layerStyle="nodeBody" sx={sx} data-with-footer={withFooter}>
             <Flex flexDir="column" px={2} w="full" h="full">
               <Grid gridTemplateColumns="1fr auto" gridAutoRows="1fr">
                 <ConnectionFields nodeId={nodeId} />

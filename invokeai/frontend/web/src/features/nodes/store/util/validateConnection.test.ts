@@ -3,13 +3,13 @@ import { set } from 'lodash-es';
 import { describe, expect, it } from 'vitest';
 
 import { add, buildEdge, buildNode, collect, img_resize, main_model_loader, sub, templates } from './testUtils';
-import { buildAcceptResult, buildRejectResult, validateConnection } from './validateConnection';
+import { validateConnection } from './validateConnection';
 
 describe(validateConnection.name, () => {
   it('should reject invalid connection to self', () => {
     const c = { source: 'add', sourceHandle: 'value', target: 'add', targetHandle: 'a' };
     const r = validateConnection(c, [], [], templates, null);
-    expect(r).toEqual(buildRejectResult('nodes.cannotConnectToSelf'));
+    expect(r).toEqual('nodes.cannotConnectToSelf');
   });
 
   describe('missing nodes', () => {
@@ -19,12 +19,12 @@ describe(validateConnection.name, () => {
 
     it('should reject missing source node', () => {
       const r = validateConnection(c, [n2], [], templates, null);
-      expect(r).toEqual(buildRejectResult('nodes.missingNode'));
+      expect(r).toEqual('nodes.missingNode');
     });
 
     it('should reject missing target node', () => {
       const r = validateConnection(c, [n1], [], templates, null);
-      expect(r).toEqual(buildRejectResult('nodes.missingNode'));
+      expect(r).toEqual('nodes.missingNode');
     });
   });
 
@@ -36,12 +36,12 @@ describe(validateConnection.name, () => {
 
     it('should reject missing source template', () => {
       const r = validateConnection(c, nodes, [], { sub }, null);
-      expect(r).toEqual(buildRejectResult('nodes.missingInvocationTemplate'));
+      expect(r).toEqual('nodes.missingInvocationTemplate');
     });
 
     it('should reject missing target template', () => {
       const r = validateConnection(c, nodes, [], { add }, null);
-      expect(r).toEqual(buildRejectResult('nodes.missingInvocationTemplate'));
+      expect(r).toEqual('nodes.missingInvocationTemplate');
     });
   });
 
@@ -53,13 +53,13 @@ describe(validateConnection.name, () => {
     it('should reject missing source field template', () => {
       const c = { source: n1.id, sourceHandle: 'invalid', target: n2.id, targetHandle: 'a' };
       const r = validateConnection(c, nodes, [], templates, null);
-      expect(r).toEqual(buildRejectResult('nodes.missingFieldTemplate'));
+      expect(r).toEqual('nodes.missingFieldTemplate');
     });
 
     it('should reject missing target field template', () => {
       const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'invalid' };
       const r = validateConnection(c, nodes, [], templates, null);
-      expect(r).toEqual(buildRejectResult('nodes.missingFieldTemplate'));
+      expect(r).toEqual('nodes.missingFieldTemplate');
     });
   });
 
@@ -69,19 +69,19 @@ describe(validateConnection.name, () => {
     it('should accept non-duplicate connections', () => {
       const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'a' };
       const r = validateConnection(c, [n1, n2], [], templates, null);
-      expect(r).toEqual(buildAcceptResult());
+      expect(r).toEqual(null);
     });
     it('should reject duplicate connections', () => {
       const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'a' };
       const e = buildEdge(n1.id, 'value', n2.id, 'a');
       const r = validateConnection(c, [n1, n2], [e], templates, null);
-      expect(r).toEqual(buildRejectResult('nodes.cannotDuplicateConnection'));
+      expect(r).toEqual('nodes.cannotDuplicateConnection');
     });
     it('should accept duplicate connections if the duplicate is an ignored edge', () => {
       const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'a' };
       const e = buildEdge(n1.id, 'value', n2.id, 'a');
       const r = validateConnection(c, [n1, n2], [e], templates, e);
-      expect(r).toEqual(buildAcceptResult());
+      expect(r).toEqual(null);
     });
   });
 
@@ -95,7 +95,7 @@ describe(validateConnection.name, () => {
     const n2 = buildNode(addWithDirectAField);
     const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'a' };
     const r = validateConnection(c, [n1, n2], [], { add, addWithDirectAField }, null);
-    expect(r).toEqual(buildRejectResult('nodes.cannotConnectToDirectInput'));
+    expect(r).toEqual('nodes.cannotConnectToDirectInput');
   });
 
   it('should reject connection to a collect node with mismatched item types', () => {
@@ -107,7 +107,7 @@ describe(validateConnection.name, () => {
     const edges = [e1];
     const c = { source: n3.id, sourceHandle: 'vae', target: n2.id, targetHandle: 'item' };
     const r = validateConnection(c, nodes, edges, templates, null);
-    expect(r).toEqual(buildRejectResult('nodes.cannotMixAndMatchCollectionItemTypes'));
+    expect(r).toEqual('nodes.cannotMixAndMatchCollectionItemTypes');
   });
 
   it('should accept connection to a collect node with matching item types', () => {
@@ -119,7 +119,7 @@ describe(validateConnection.name, () => {
     const edges = [e1];
     const c = { source: n3.id, sourceHandle: 'value', target: n2.id, targetHandle: 'item' };
     const r = validateConnection(c, nodes, edges, templates, null);
-    expect(r).toEqual(buildAcceptResult());
+    expect(r).toEqual(null);
   });
 
   it('should reject connections to target field that is already connected', () => {
@@ -131,7 +131,7 @@ describe(validateConnection.name, () => {
     const edges = [e1];
     const c = { source: n3.id, sourceHandle: 'value', target: n2.id, targetHandle: 'a' };
     const r = validateConnection(c, nodes, edges, templates, null);
-    expect(r).toEqual(buildRejectResult('nodes.inputMayOnlyHaveOneConnection'));
+    expect(r).toEqual('nodes.inputMayOnlyHaveOneConnection');
   });
 
   it('should accept connections to target field that is already connected (ignored edge)', () => {
@@ -143,7 +143,7 @@ describe(validateConnection.name, () => {
     const edges = [e1];
     const c = { source: n3.id, sourceHandle: 'value', target: n2.id, targetHandle: 'a' };
     const r = validateConnection(c, nodes, edges, templates, e1);
-    expect(r).toEqual(buildAcceptResult());
+    expect(r).toEqual(null);
   });
 
   it('should reject connections between invalid types', () => {
@@ -152,7 +152,7 @@ describe(validateConnection.name, () => {
     const nodes = [n1, n2];
     const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'image' };
     const r = validateConnection(c, nodes, [], templates, null);
-    expect(r).toEqual(buildRejectResult('nodes.fieldTypesMustMatch'));
+    expect(r).toEqual('nodes.fieldTypesMustMatch');
   });
 
   it('should reject connections that would create cycles', () => {
@@ -163,14 +163,14 @@ describe(validateConnection.name, () => {
     const edges = [e1];
     const c = { source: n2.id, sourceHandle: 'value', target: n1.id, targetHandle: 'a' };
     const r = validateConnection(c, nodes, edges, templates, null);
-    expect(r).toEqual(buildRejectResult('nodes.connectionWouldCreateCycle'));
+    expect(r).toEqual('nodes.connectionWouldCreateCycle');
   });
 
   describe('non-strict mode', () => {
     it('should reject connections from self to self in non-strict mode', () => {
       const c = { source: 'add', sourceHandle: 'value', target: 'add', targetHandle: 'a' };
       const r = validateConnection(c, [], [], templates, null, false);
-      expect(r).toEqual(buildRejectResult('nodes.cannotConnectToSelf'));
+      expect(r).toEqual('nodes.cannotConnectToSelf');
     });
     it('should reject connections that create cycles in non-strict mode', () => {
       const n1 = buildNode(add);
@@ -180,7 +180,7 @@ describe(validateConnection.name, () => {
       const edges = [e1];
       const c = { source: n2.id, sourceHandle: 'value', target: n1.id, targetHandle: 'a' };
       const r = validateConnection(c, nodes, edges, templates, null, false);
-      expect(r).toEqual(buildRejectResult('nodes.connectionWouldCreateCycle'));
+      expect(r).toEqual('nodes.connectionWouldCreateCycle');
     });
     it('should otherwise allow invalid connections in non-strict mode', () => {
       const n1 = buildNode(add);
@@ -188,7 +188,7 @@ describe(validateConnection.name, () => {
       const nodes = [n1, n2];
       const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'image' };
       const r = validateConnection(c, nodes, [], templates, null, false);
-      expect(r).toEqual(buildAcceptResult());
+      expect(r).toEqual(null);
     });
   });
 });

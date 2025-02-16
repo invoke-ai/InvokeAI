@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, FormControl, Spacer } from '@invoke-ai/ui-library';
 import { InputFieldDescriptionPopover } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldDescriptionPopover';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
@@ -6,6 +7,7 @@ import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/dnd
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useRef, useState } from 'react';
 
 import { InputFieldRenderer } from './InputFieldRenderer';
@@ -19,11 +21,72 @@ interface Props {
 
 export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
+  const isInvalid = useInputFieldIsInvalid(nodeId, fieldName);
+  const isConnected = useInputFieldIsConnected(nodeId, fieldName);
+
+  if (fieldTemplate.input === 'connection' || isConnected) {
+    return (
+      <ConnectedOrConnectionField
+        nodeId={nodeId}
+        fieldName={fieldName}
+        isInvalid={isInvalid}
+        isConnected={isConnected}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
+  return (
+    <DirectField
+      nodeId={nodeId}
+      fieldName={fieldName}
+      isInvalid={isInvalid}
+      isConnected={isConnected}
+      fieldTemplate={fieldTemplate}
+    />
+  );
+});
+
+InputFieldEditModeNodes.displayName = 'InputFieldEditModeNodes';
+
+type CommonProps = {
+  nodeId: string;
+  fieldName: string;
+  isInvalid: boolean;
+  isConnected: boolean;
+  fieldTemplate: FieldInputTemplate;
+};
+
+const ConnectedOrConnectionField = memo(({ nodeId, fieldName, isInvalid, isConnected }: CommonProps) => {
+  return (
+    <InputFieldWrapper>
+      <FormControl isInvalid={isInvalid} isDisabled={isConnected} px={2}>
+        <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
+      </FormControl>
+      <InputFieldHandle nodeId={nodeId} fieldName={fieldName} />
+    </InputFieldWrapper>
+  );
+});
+ConnectedOrConnectionField.displayName = 'ConnectedOrConnectionField';
+
+const directFieldSx: SystemStyleObject = {
+  orientation: 'vertical',
+  px: 2,
+  '&[data-is-dragging="true"]': {
+    opacity: 0.3,
+  },
+  // Without pointerEvents prop, disabled inputs don't trigger reactflow events. For example, when making a
+  // connection, the mouse up to end the connection won't fire, leaving the connection in-progress.
+  pointerEvents: 'auto',
+  '&[data-is-connected="true"]': {
+    pointerEvents: 'none',
+  },
+};
+
+const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemplate }: CommonProps) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const isInvalid = useInputFieldIsInvalid(nodeId, fieldName);
-  const isConnected = useInputFieldIsConnected(nodeId, fieldName);
 
   const onMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -35,30 +98,15 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
 
   const isDragging = useNodeFieldDnd({ nodeId, fieldName }, fieldTemplate, draggableRef, dragHandleRef);
 
-  if (fieldTemplate.input === 'connection' || isConnected) {
-    return (
-      <InputFieldWrapper>
-        <FormControl isInvalid={isInvalid} isDisabled={isConnected} px={2}>
-          <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
-        </FormControl>
-
-        <InputFieldHandle nodeId={nodeId} fieldName={fieldName} />
-      </InputFieldWrapper>
-    );
-  }
-
   return (
     <InputFieldWrapper>
       <FormControl
         ref={draggableRef}
         isInvalid={isInvalid}
         isDisabled={isConnected}
-        // Without pointerEvents prop, disabled inputs don't trigger reactflow events. For example, when making a
-        // connection, the mouse up to end the connection won't fire, leaving the connection in-progress.
-        pointerEvents={isConnected ? 'none' : 'auto'}
-        orientation="vertical"
-        px={2}
-        opacity={isDragging ? 0.3 : 1}
+        sx={directFieldSx}
+        data-is-connected={isConnected}
+        data-is-dragging={isDragging}
       >
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
           <Flex className="nodrag" ref={dragHandleRef} gap={1}>
@@ -79,5 +127,4 @@ export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
     </InputFieldWrapper>
   );
 });
-
-InputFieldEditModeNodes.displayName = 'InputFieldEditModeNodes';
+DirectField.displayName = 'DirectField';
