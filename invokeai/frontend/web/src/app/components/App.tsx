@@ -95,6 +95,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
 
 export default memo(App);
 
+// Running these hooks in a separate component ensures we do not inadvertently rerender the entire app when they change.
 const HookIsolator = memo(
   ({ config, studioInitAction }: { config: PartialAppConfig; studioInitAction?: StudioInitAction }) => {
     const language = useAppSelector(selectLanguage);

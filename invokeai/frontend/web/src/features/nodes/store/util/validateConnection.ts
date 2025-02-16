@@ -35,6 +35,10 @@ const getTargetEqualityPredicate =
     return e.target === c.target && e.targetHandle === c.targetHandle;
   };
 
+/**
+ * Validates a connection between two fields
+ * @returns A translation key for an error if the connection is invalid, otherwise null
+ */
 export const validateConnection: ValidateConnectionFunc = (
   c,
   nodes,

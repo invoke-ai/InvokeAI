@@ -50,6 +50,9 @@ export const useInputFieldIsInvalid = (nodeId: string, fieldName: string) => {
 
       // Else special handling for individual field types
 
+      // Check the template type first - it's the most efficient. If that passes, check the instance type, which uses
+      // zod and therefore is slower.
+
       if (isImageFieldCollectionInputTemplate(template) && isImageFieldCollectionInputInstance(field)) {
         if (validateImageFieldCollectionValue(field.value, template).length > 0) {
           return true;

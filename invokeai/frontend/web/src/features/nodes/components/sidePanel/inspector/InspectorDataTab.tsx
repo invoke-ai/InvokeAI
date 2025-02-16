@@ -12,6 +12,7 @@ const selector = createSelector(selectNodesSlice, (nodes) => selectLastSelectedN
 const InspectorDataTab = () => {
   const { t } = useTranslation();
   const lastSelectedNodeData = useAppSelector(selector);
+  // This is debounced to prevent re-rendering the whole component when the user changes the node's values quickly
   const [debouncedLastSelectedNodeData] = useDebounce(lastSelectedNodeData, 300);
 
   if (!debouncedLastSelectedNodeData) {

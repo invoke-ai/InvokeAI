@@ -19,6 +19,9 @@ type NodeWrapperProps = PropsWithChildren & {
   width?: ChakraProps['w'];
 };
 
+// Animations are disabled as a performance optimization - they can cause massive slowdowns in large workflows - even
+// when the animations are GPU-accelerated CSS.
+
 const containerSx: SystemStyleObject = {
   h: 'full',
   position: 'relative',
