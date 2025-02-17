@@ -427,6 +427,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Batch enqueued');
   });
 
+  socket.on('queue_items_retried', (data) => {
+    log.debug({ data }, 'Queue items retried');
+  });
+
   socket.on('bulk_download_started', (data) => {
     log.debug({ data }, 'Bulk gallery download preparation started');
   });
