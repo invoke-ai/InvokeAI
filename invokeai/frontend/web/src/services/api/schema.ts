@@ -1158,6 +1158,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/retry_items_by_id": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Retry Items By Id
+         * @description Immediately cancels all queue items with the given origin
+         */
+        put: operations["retry_items_by_id"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/clear": {
         parameters: {
             query?: never;
@@ -15291,6 +15311,27 @@ export type components = {
             session_id: string;
         };
         /**
+         * QueueItemsRetriedEvent
+         * @description Event model for queue_items_retried
+         */
+        QueueItemsRetriedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Retried Item Ids
+             * @description The IDs of the queue items that were retried
+             */
+            retried_item_ids: number[];
+        };
+        /**
          * Random Float
          * @description Outputs a single random float
          */
@@ -15708,6 +15749,19 @@ export type components = {
          * @enum {string}
          */
         ResourceOrigin: "internal" | "external";
+        /** RetryItemsResult */
+        RetryItemsResult: {
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Retried Item Ids
+             * @description The IDs of the queue items that were retried
+             */
+            retried_item_ids: number[];
+        };
         /**
          * Round Float
          * @description Rounds a float to a specified number of decimal places.
@@ -17107,6 +17161,11 @@ export type components = {
              * @description The field values that were used for this queue item
              */
             field_values?: components["schemas"]["NodeFieldValue"][] | null;
+            /**
+             * Retried From Item Id
+             * @description The item_id of the queue item that this item was retried from
+             */
+            retried_from_item_id?: number | null;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
@@ -17197,6 +17256,11 @@ export type components = {
              * @description The field values that were used for this queue item
              */
             field_values?: components["schemas"]["NodeFieldValue"][] | null;
+            /**
+             * Retried From Item Id
+             * @description The item_id of the queue item that this item was retried from
+             */
+            retried_from_item_id?: number | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
@@ -22092,6 +22156,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelByDestinationResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_items_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": number[];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryItemsResult"];
                 };
             };
             /** @description Validation Error */
