@@ -234,6 +234,9 @@ class SessionQueueItemWithoutGraph(BaseModel):
     field_values: Optional[list[NodeFieldValue]] = Field(
         default=None, description="The field values that were used for this queue item"
     )
+    retried_from_item_id: Optional[int] = Field(
+        default=None, description="The item_id of the queue item that this item was retried from"
+    )
 
     @classmethod
     def queue_item_dto_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemDTO":
@@ -342,6 +345,11 @@ class EnqueueBatchResult(BaseModel):
     requested: int = Field(description="The total number of queue items requested to be enqueued")
     batch: Batch = Field(description="The batch that was enqueued")
     priority: int = Field(description="The priority of the enqueued batch")
+
+
+class RetryItemsResult(BaseModel):
+    queue_id: str = Field(description="The ID of the queue")
+    retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
 
 
 class ClearResult(BaseModel):
@@ -481,6 +489,7 @@ class SessionQueueValueToInsert(NamedTuple):
     workflow: Optional[str]  # workflow json
     origin: str | None
     destination: str | None
+    retried_from_item_id: int | None = None
 
 
 ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
@@ -493,16 +502,16 @@ def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new
         session.id = uuid_string()
         values_to_insert.append(
             SessionQueueValueToInsert(
-                queue_id,  # queue_id
-                session.model_dump_json(warnings=False, exclude_none=True),  # session (json)
-                session.id,  # session_id
-                batch.batch_id,  # batch_id
+                queue_id=queue_id,
+                session=session.model_dump_json(warnings=False, exclude_none=True),  # as json
+                session_id=session.id,
+                batch_id=batch.batch_id,
                 # must use pydantic_encoder bc field_values is a list of models
-                json.dumps(field_values, default=to_jsonable_python) if field_values else None,  # field_values (json)
-                priority,  # priority
-                json.dumps(workflow, default=to_jsonable_python) if workflow else None,  # workflow (json)
-                batch.origin,  # origin
-                batch.destination,  # destination
+                field_values=json.dumps(field_values, default=to_jsonable_python) if field_values else None,  # as json
+                priority=priority,
+                workflow=json.dumps(workflow, default=to_jsonable_python) if workflow else None,  # as json
+                origin=batch.origin,
+                destination=batch.destination,
             )
         )
     return values_to_insert
