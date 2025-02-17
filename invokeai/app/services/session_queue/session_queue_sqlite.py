@@ -1,6 +1,9 @@
+import json
 import sqlite3
 import threading
 from typing import Optional, Union, cast
+
+from pydantic_core import to_jsonable_python
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
@@ -18,11 +21,13 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     PruneResult,
+    RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
+    SessionQueueValueToInsert,
     calc_session_count,
     prepare_values_to_insert,
 )
@@ -130,8 +135,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             self.__cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )
@@ -761,3 +766,71 @@ class SqliteSessionQueue(SessionQueueBase):
             canceled=counts.get("canceled", 0),
             total=total,
         )
+
+    def retry_items_by_id(self, queue_id: str, item_ids: list[int]) -> RetryItemsResult:
+        """Retries the given queue items"""
+        try:
+            self.__lock.acquire()
+
+            values_to_insert: list[SessionQueueValueToInsert] = []
+            retried_item_ids: list[int] = []
+
+            for item_id in item_ids:
+                queue_item = self.get_queue_item(item_id)
+
+                if queue_item.status not in ("failed", "canceled"):
+                    continue
+
+                retried_item_ids.append(item_id)
+
+                field_values_json = (
+                    json.dumps(queue_item.field_values, default=to_jsonable_python) if queue_item.field_values else None
+                )
+                workflow_json = (
+                    json.dumps(queue_item.workflow, default=to_jsonable_python) if queue_item.workflow else None
+                )
+                cloned_session = GraphExecutionState(graph=queue_item.session.graph)
+                cloned_session_json = cloned_session.model_dump_json(warnings=False, exclude_none=True)
+
+                retried_from_item_id = (
+                    queue_item.retried_from_item_id
+                    if queue_item.retried_from_item_id is not None
+                    else queue_item.item_id
+                )
+
+                value_to_insert = SessionQueueValueToInsert(
+                    queue_id=queue_item.queue_id,
+                    batch_id=queue_item.batch_id,
+                    destination=queue_item.destination,
+                    field_values=field_values_json,
+                    origin=queue_item.origin,
+                    priority=queue_item.priority,
+                    workflow=workflow_json,
+                    session=cloned_session_json,
+                    session_id=cloned_session.id,
+                    retried_from_item_id=retried_from_item_id,
+                )
+                values_to_insert.append(value_to_insert)
+
+            # TODO(psyche): Handle max queue size?
+
+            self.__cursor.executemany(
+                """--sql
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                values_to_insert,
+            )
+
+            self.__conn.commit()
+        except Exception:
+            self.__conn.rollback()
+            raise
+        finally:
+            self.__lock.release()
+        retry_result = RetryItemsResult(
+            queue_id=queue_id,
+            retried_item_ids=retried_item_ids,
+        )
+        self.__invoker.services.events.emit_queue_items_retried(retry_result)
+        return retry_result

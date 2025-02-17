@@ -10,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     BatchStatus,
     EnqueueBatchResult,
+    RetryItemsResult,
     SessionQueueItem,
     SessionQueueStatus,
 )
@@ -287,6 +288,22 @@ class BatchEnqueuedEvent(QueueEventBase):
             enqueued=enqueue_result.enqueued,
             requested=enqueue_result.requested,
             priority=enqueue_result.priority,
+        )
+
+
+@payload_schema.register
+class QueueItemsRetriedEvent(QueueEventBase):
+    """Event model for queue_items_retried"""
+
+    __event_name__ = "queue_items_retried"
+
+    retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
+
+    @classmethod
+    def build(cls, retry_result: RetryItemsResult) -> "QueueItemsRetriedEvent":
+        return cls(
+            queue_id=retry_result.queue_id,
+            retried_item_ids=retry_result.retried_item_ids,
         )
 
 
