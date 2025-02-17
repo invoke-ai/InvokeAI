@@ -6,6 +6,7 @@ import { useOriginText } from 'features/queue/components/QueueList/useOriginText
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +32,7 @@ const sx: ChakraProps['sx'] = {
 
 const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
   const { t } = useTranslation();
+  const isRetryEnabled = useFeatureStatus('retryQueueItem');
   const handleToggle = useCallback(() => {
     context.toggleQueueItem(item.item_id);
   }, [context, item.item_id]);
@@ -118,7 +120,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
-            {!isFailed && (
+            {(!isFailed || !isRetryEnabled) && (
               <IconButton
                 onClick={handleCancelQueueItem}
                 isDisabled={isCanceled}
@@ -127,7 +129,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
                 icon={<PiXBold />}
               />
             )}
-            {isFailed && (
+            {isFailed && isRetryEnabled && (
               <IconButton
                 onClick={handleRetryQueueItem}
                 isLoading={isLoadingRetryQueueItem}

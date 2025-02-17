@@ -6,6 +6,7 @@ import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { get } from 'lodash-es';
 import type { ReactNode } from 'react';
 import { memo, useMemo } from 'react';
@@ -21,6 +22,7 @@ type Props = {
 const QueueItemComponent = ({ queueItemDTO }: Props) => {
   const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
   const { t } = useTranslation();
+  const isRetryEnabled = useFeatureStatus('retryQueueItem');
   const { cancelBatch, isLoading: isLoadingCancelBatch, isCanceled: isBatchCanceled } = useCancelBatch(batch_id);
 
   const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } = useCancelQueueItem(item_id);
@@ -70,7 +72,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         <QueueItemData label={t('queue.batch')} data={batch_id} />
         <QueueItemData label={t('queue.session')} data={session_id} />
         <ButtonGroup size="xs" orientation="vertical">
-          {!isFailed && (
+          {(!isFailed || !isRetryEnabled) && (
             <Button
               onClick={cancelQueueItem}
               isLoading={isLoadingCancelQueueItem}
@@ -82,7 +84,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
               {t('queue.cancelItem')}
             </Button>
           )}
-          {isFailed && (
+          {isFailed && isRetryEnabled && (
             <Button
               onClick={retryQueueItem}
               isLoading={isLoadingRetryQueueItem}
