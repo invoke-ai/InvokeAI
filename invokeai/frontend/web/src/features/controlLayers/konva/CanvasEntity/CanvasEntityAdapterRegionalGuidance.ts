@@ -59,11 +59,11 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
       this.syncOpacity();
     }
     if (!prevState || this.state.fill !== prevState.fill) {
-      // On first render, we must force the update
-      this.renderer.updateCompositingRectFill(!prevState);
+      // On first render, or when the fill changes, we must force the update
+      this.renderer.updateCompositingRectFill(true);
     }
-    if (!prevState) {
-      // On first render, we must force the updates
+    if (!prevState || this.state.objects !== prevState.objects) {
+      // On first render, or when the objects change, we must force the update
       this.renderer.updateCompositingRectSize(true);
       this.renderer.updateCompositingRectPosition(true);
     }
