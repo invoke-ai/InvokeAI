@@ -233,11 +233,6 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (!this.parent.getCanDraw()) {
-      this.setVisibility(false);
-      return;
-    }
-
     const cursorPos = this.parent.$cursorPos.get();
 
     if (!cursorPos) {
