@@ -3,13 +3,17 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
+import {
+  addElement,
+  removeElement,
+  reparentElement,
+} from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
 import type { WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
-  BuilderForm,
   ContainerElement,
   ElementId,
   FormElement,
@@ -174,7 +178,7 @@ export const workflowSlice = createSlice({
     formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
       const { form } = state;
       const { id } = action.payload;
-      removeElement({ id, form });
+      removeElement({ form, id });
       delete state.formFieldInitialValues[id];
     },
     formContainerChildrenReordered: (state, action: PayloadAction<{ id: string; children: string[] }>) => {
@@ -383,84 +387,4 @@ export const useElement = (id: string): FormElement | undefined => {
   const selector = useMemo(() => buildSelectElement(id), [id]);
   const element = useAppSelector(selector);
   return element;
-};
-
-const removeElement = (args: { form: BuilderForm; id: string }) => {
-  const { id, form } = args;
-
-  const element = form.elements[id];
-
-  // Bail if the element doesn't exist
-  if (!element) {
-    return;
-  }
-
-  if (form.rootElementId === id || !element.parentId) {
-    // Can't remove the root element
-    return;
-  }
-
-  delete form.elements[id];
-
-  const parent = form.elements[element.parentId];
-  if (!parent || !isContainerElement(parent)) {
-    return;
-  }
-  parent.data.children = parent.data.children.filter((childId) => childId !== id);
-};
-
-const reparentElement = (args: { form: BuilderForm; id: string; newParentId: string; index: number }) => {
-  const { form, id, newParentId, index } = args;
-  const { elements } = form;
-
-  const element = elements[id];
-
-  // Bail if the element doesn't exist
-  if (!element) {
-    return;
-  }
-
-  if (!element.parentId) {
-    // Can't reparent the root element
-    return;
-  }
-
-  if (newParentId === element.parentId) {
-    // Nothing to do
-    return;
-  }
-
-  const oldParent = elements[element.parentId];
-  if (!oldParent || !isContainerElement(oldParent)) {
-    // This should never happen
-    return;
-  }
-
-  const newParent = elements[newParentId];
-  if (!newParent || !isContainerElement(newParent)) {
-    return;
-  }
-
-  newParent.data.children.splice(index, 0, id);
-  oldParent.data.children = oldParent.data.children.filter((elementId) => elementId !== id);
-  element.parentId = newParentId;
-};
-
-const addElement = (args: { form: BuilderForm; element: FormElement; index: number }): boolean => {
-  const { form, element, index } = args;
-  const { elements } = form;
-
-  if (!element.parentId) {
-    // We cannot add a root element
-    return false;
-  }
-
-  const parent = elements[element.parentId];
-  if (!parent || !isContainerElement(parent)) {
-    return false;
-  }
-
-  elements[element.id] = element;
-  parent.data.children.splice(index, 0, element.id);
-  return true;
 };

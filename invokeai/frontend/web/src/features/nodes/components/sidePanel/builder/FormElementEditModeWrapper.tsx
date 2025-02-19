@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
-import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd';
+import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import {
