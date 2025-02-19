@@ -80,7 +80,7 @@ describe('workflow builder form manipulation', () => {
         index: 0,
       });
 
-      expect(getElement(form, el.id, isContainerElement).parentId).toBe(form.rootElementId);
+      expect(getElement(form, el.id).parentId).toBe(form.rootElementId);
     });
 
     it('should add the element at the given index', () => {
