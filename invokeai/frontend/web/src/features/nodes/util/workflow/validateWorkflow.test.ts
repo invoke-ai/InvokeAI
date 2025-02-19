@@ -1,9 +1,11 @@
 import { img_resize, main_model_loader } from 'features/nodes/store/util/testUtils';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { getDefaultForm } from 'features/nodes/types/workflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { get } from 'lodash-es';
 import { describe, expect, it } from 'vitest';
 
+//TODO(psyche): Test workflow validation for form builder fields
 describe('validateWorkflow', () => {
   const workflow: WorkflowV3 = {
     name: '',
@@ -14,10 +16,7 @@ describe('validateWorkflow', () => {
     tags: '',
     notes: '',
     exposedFields: [],
-    form: {
-      elements: {},
-      layout: [],
-    },
+    form: getDefaultForm(),
     meta: { version: '3.0.0', category: 'user' },
     nodes: [
       {

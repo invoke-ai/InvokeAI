@@ -57,34 +57,6 @@ const zWorkflowEdgeCollapsed = zWorkflowEdgeBase.extend({
 const zWorkflowEdge = z.union([zWorkflowEdgeDefault, zWorkflowEdgeCollapsed]);
 // #endregion
 
-// #region Workflow
-export const zWorkflowV3 = z.object({
-  id: z.string().min(1).optional(),
-  name: z.string(),
-  author: z.string(),
-  description: z.string(),
-  version: z.string(),
-  contact: z.string(),
-  tags: z.string(),
-  notes: z.string(),
-  nodes: z.array(zWorkflowNode),
-  edges: z.array(zWorkflowEdge),
-  exposedFields: z.array(zFieldIdentifier),
-  meta: z.object({
-    category: zWorkflowCategory.default('user'),
-    version: z.literal('3.0.0'),
-  }),
-  form: z
-    .object({
-      elements: z.record(z.lazy(() => zFormElement)),
-      layout: z.array(z.lazy(() => zElementId)),
-    })
-    // Catch must be a function else changes to the workflows parsed with this schema will mutate the catch value D:
-    .catch(() => ({ elements: {}, layout: [] })),
-});
-export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
-// #endregion
-
 // #region Workflow Builder
 const zElementId = z.string().trim().min(1);
 export type ElementId = z.infer<typeof zElementId>;
@@ -257,3 +229,44 @@ export const buildContainer = (
 const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElement, zTextElement, zDividerElement]);
 
 export type FormElement = z.infer<typeof zFormElement>;
+
+export const getDefaultForm = () => {
+  const rootElement = buildContainer('column', []);
+  return {
+    elements: {
+      [rootElement.id]: rootElement,
+    },
+    rootElementId: rootElement.id,
+  };
+};
+
+const zBuilderForm = z
+  .object({
+    elements: z.record(zFormElement),
+    rootElementId: zElementId,
+  })
+  .default(getDefaultForm);
+export type BuilderForm = z.infer<typeof zBuilderForm>;
+//# endregion
+
+// #region Workflow
+export const zWorkflowV3 = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string(),
+  author: z.string(),
+  description: z.string(),
+  version: z.string(),
+  contact: z.string(),
+  tags: z.string(),
+  notes: z.string(),
+  nodes: z.array(zWorkflowNode),
+  edges: z.array(zWorkflowEdge),
+  exposedFields: z.array(zFieldIdentifier),
+  meta: z.object({
+    category: zWorkflowCategory.default('user'),
+    version: z.literal('3.0.0'),
+  }),
+  form: zBuilderForm,
+});
+export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
+// #endregion

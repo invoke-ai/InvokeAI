@@ -7,7 +7,7 @@ import {
 import { getReorderDestinationIndex } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/get-reorder-destination-index';
 import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge';
 import { logger } from 'app/logging/logger';
-import { getStore } from 'app/store/nanostores/store';
+import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
@@ -20,16 +20,17 @@ import {
 } from 'features/nodes/components/sidePanel/builder/center-or-closest-edge';
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
+import type { NodesState } from 'features/nodes/store/types';
 import {
   formContainerChildrenReordered,
   formElementAdded,
   formElementReparented,
-  formRootReordered,
-  selectFormIsEmpty,
+  selectFormRootElementId,
+  selectWorkflowSlice,
 } from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier, FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import type { ElementId, FormElement } from 'features/nodes/types/workflow';
+import type { BuilderForm, ElementId, FormElement } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -38,17 +39,6 @@ import type { Param0 } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('dnd');
-
-const uniqueRootKey = Symbol('root');
-type RootDndData = {
-  [uniqueRootKey]: true;
-};
-const buildRootDndData = (): RootDndData => ({
-  [uniqueRootKey]: true,
-});
-const isRootDndData = (data: Record<string | symbol, unknown>): data is RootDndData => {
-  return uniqueRootKey in data;
-};
 
 const uniqueFormElementDndKey = Symbol('form-element');
 type FormElementDndData = {
@@ -63,12 +53,16 @@ const isFormElementDndData = (data: Record<string | symbol, unknown>): data is F
   return uniqueFormElementDndKey in data;
 };
 
-const elementExists = (id: ElementId): boolean => {
-  return getStore().getState().workflow.form?.elements[id] !== undefined;
+const elementExists = (form: BuilderForm, id: ElementId): boolean => {
+  return form.elements[id] !== undefined;
 };
 
-const getElement = <T extends FormElement>(id: ElementId, guard?: (el: FormElement) => el is T): T => {
-  const el = getStore().getState().workflow.form?.elements[id];
+const getElement = <T extends FormElement>(
+  form: BuilderForm,
+  id: ElementId,
+  guard?: (el: FormElement) => el is T
+): T => {
+  const el = form.elements[id];
   assert(el);
   if (guard) {
     assert(guard(el));
@@ -78,12 +72,11 @@ const getElement = <T extends FormElement>(id: ElementId, guard?: (el: FormEleme
   }
 };
 
-const getInitialValue = (el: FormElement): StatefulFieldValue => {
+const getInitialValue = (nodes: NodesState['nodes'], el: FormElement): StatefulFieldValue => {
   if (!isNodeFieldElement(el)) {
     return undefined;
   }
   const { nodeId, fieldName } = el.data.fieldIdentifier;
-  const { nodes } = selectNodesSlice(getStore().getState());
   const node = nodes.find((n) => n.id === nodeId);
 
   // The node or input not existing as we add it to the builder indicates something is wrong, but we don't want to
@@ -101,10 +94,6 @@ const getInitialValue = (el: FormElement): StatefulFieldValue => {
   return input.value;
 };
 
-const getLayout = () => {
-  return getStore().getState().workflow.form.layout;
-};
-
 const flashElement = (elementId: ElementId) => {
   const element = document.querySelector(`#${getEditModeWrapperId(elementId)}`);
   if (element instanceof HTMLElement) {
@@ -112,7 +101,7 @@ const flashElement = (elementId: ElementId) => {
   }
 };
 
-const getAllowedDropRegions = (element: FormElement): CenterOrEdge[] => {
+const getAllowedDropRegions = (form: BuilderForm, element: FormElement): CenterOrEdge[] => {
   const dropRegions: CenterOrEdge[] = [];
 
   if (isContainerElement(element) && element.data.children.length === 0) {
@@ -121,7 +110,7 @@ const getAllowedDropRegions = (element: FormElement): CenterOrEdge[] => {
 
   // Parent is a container
   if (element.parentId !== undefined) {
-    const parentContainer = getElement(element.parentId, isContainerElement);
+    const parentContainer = getElement(form, element.parentId, isContainerElement);
     if (parentContainer.data.layout === 'row') {
       dropRegions.push('left', 'right');
     } else {
@@ -138,6 +127,54 @@ const getAllowedDropRegions = (element: FormElement): CenterOrEdge[] => {
   return dropRegions;
 };
 
+const useGetElement = () => {
+  const store = useAppStore();
+  const _getElement = useCallback(
+    <T extends FormElement>(id: ElementId, guard?: (el: FormElement) => el is T): T => {
+      const { form } = selectWorkflowSlice(store.getState());
+      return getElement(form, id, guard);
+    },
+    [store]
+  );
+  return _getElement;
+};
+
+const useElementExists = () => {
+  const store = useAppStore();
+  const _elementExists = useCallback(
+    (id: ElementId): boolean => {
+      const { form } = selectWorkflowSlice(store.getState());
+      return elementExists(form, id);
+    },
+    [store]
+  );
+  return _elementExists;
+};
+
+const useGetAllowedDropRegions = () => {
+  const store = useAppStore();
+  const _getAllowedDropRegions = useCallback(
+    (element: FormElement): CenterOrEdge[] => {
+      const { form } = selectWorkflowSlice(store.getState());
+      return getAllowedDropRegions(form, element);
+    },
+    [store]
+  );
+  return _getAllowedDropRegions;
+};
+
+const useGetInitialValue = () => {
+  const store = useAppStore();
+  const _getInitialValue = useCallback(
+    (element: FormElement): StatefulFieldValue => {
+      const { nodes } = selectNodesSlice(store.getState());
+      return getInitialValue(nodes, element);
+    },
+    [store]
+  );
+  return _getInitialValue;
+};
+
 export const useBuilderDndMonitor = () => {
   useAssertSingleton('useBuilderDndMonitor');
   const dispatch = useAppDispatch();
@@ -151,6 +188,10 @@ export const useBuilderDndMonitor = () => {
     },
     [dispatch]
   );
+
+  const getElement = useGetElement();
+  const getInitialValue = useGetInitialValue();
+  const elementExists = useElementExists();
 
   useEffect(() => {
     return monitorForElements({
@@ -171,37 +212,6 @@ export const useBuilderDndMonitor = () => {
 
         const isAddingNewElement = !elementExists(sourceElement.id);
 
-        //#region Dragging onto the root
-        if (isRootDndData(targetData)) {
-          if (isAddingNewElement) {
-            log.trace('Adding new element to empty root');
-            sourceElement.parentId = undefined;
-            dispatchAndFlash(
-              formElementAdded({
-                element: sourceElement,
-                index: undefined,
-                initialValue: getInitialValue(sourceElement),
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (!isAddingNewElement && sourceElement.parentId !== undefined) {
-            log.trace('Reparenting element from container to empty root');
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: undefined,
-                index: undefined,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-        }
-        //#endregion
-
         //#region Form elements
         if (isFormElementDndData(targetData)) {
           const targetElement = targetData.element;
@@ -211,354 +221,121 @@ export const useBuilderDndMonitor = () => {
           }
           const closestEdgeOfTarget = extractClosestCenterOrEdge(targetData);
 
-          if (isAddingNewElement && targetElement.parentId === undefined && closestEdgeOfTarget === 'center') {
-            log.trace('Adding new element to empty container');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
-            sourceElement.parentId = targetElement.id;
-            dispatchAndFlash(
-              formElementAdded({
-                element: sourceElement,
-                initialValue: getInitialValue(sourceElement),
-              }),
-              sourceElement.id
-            );
-            return;
+          /**
+           * There are 5 cases to handle:
+           * 1. Adding a new element to an empty container
+           * 2. Adding a new element to a container with children (dropped on edge of container child)
+           * 3. Reparenting an element to an empty container
+           * 4. Reparenting an element to a container with children (dropped on edge of container child)
+           * 5. Moving an element within a container
+           *
+           * We can determine which case we're in by checking the following:
+           * - Check if the element already exists in the form. If it doesn't, we're adding a new element.
+           * - Check if the closest edge of the target is 'center'. If it is, we're either adding a new element or reparenting to an empty container.
+           * - If the closest edge of the target is not 'center', we're either reparenting to a container with children or moving an element within a container, in which case we compare the parent of the source and target elements.
+           *
+           */
+
+          if (isAddingNewElement) {
+            if (closestEdgeOfTarget === 'center') {
+              log.trace('Adding new element to empty container');
+              assert(isContainerElement(targetElement), 'Expected target to be a container');
+              sourceElement.parentId = targetElement.id;
+              dispatchAndFlash(
+                formElementAdded({
+                  element: sourceElement,
+                  initialValue: getInitialValue(sourceElement),
+                  index: 0,
+                }),
+                sourceElement.id
+              );
+              return;
+            } else {
+              log.trace('Adding new element to container with children (dropped on edge of container child)');
+              assert(targetElement.parentId !== undefined, 'Expected target to have a parent');
+              const parent = getElement(targetElement.parentId, isContainerElement);
+              const indexOfTarget = parent.data.children.indexOf(targetElement.id);
+              const index = getReorderDestinationIndex({
+                startIndex: indexOfTarget + 1,
+                indexOfTarget,
+                closestEdgeOfTarget,
+                axis: parent.data.layout === 'row' ? 'horizontal' : 'vertical',
+              });
+              sourceElement.parentId = parent.id;
+              dispatchAndFlash(
+                formElementAdded({
+                  element: sourceElement,
+                  index,
+                  initialValue: getInitialValue(sourceElement),
+                }),
+                sourceElement.id
+              );
+              return;
+            }
+          } else {
+            if (closestEdgeOfTarget === 'center') {
+              log.trace('Reparenting element to an empty container');
+              assert(isContainerElement(targetElement), 'Expected target to be a container');
+              dispatchAndFlash(
+                formElementReparented({
+                  id: sourceElement.id,
+                  newParentId: targetElement.id,
+                  index: 0,
+                }),
+                sourceElement.id
+              );
+              return;
+            } else if (targetElement.parentId === sourceElement.parentId) {
+              log.trace('Moving element within container');
+              assert(targetElement.parentId !== undefined, 'Expected target to have a parent');
+              const container = getElement(targetElement.parentId, isContainerElement);
+              const startIndex = container.data.children.indexOf(sourceElement.id);
+              const indexOfTarget = container.data.children.indexOf(targetElement.id);
+              const reorderedLayout = reorderWithEdge({
+                list: container.data.children,
+                startIndex,
+                indexOfTarget,
+                closestEdgeOfTarget,
+                axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
+              });
+              dispatchAndFlash(
+                formContainerChildrenReordered({
+                  id: container.id,
+                  children: reorderedLayout,
+                }),
+                sourceElement.id
+              );
+              return;
+            } else if (targetElement.parentId !== sourceElement.parentId) {
+              log.trace('Reparenting element to container with children (dropped on edge of container child)');
+              assert(targetElement.parentId !== undefined, 'Expected target to have a parent');
+              const container = getElement(targetElement.parentId, isContainerElement);
+              const indexOfTarget = container.data.children.indexOf(targetElement.id);
+              const index = getReorderDestinationIndex({
+                startIndex: container.data.children.length + 1,
+                indexOfTarget,
+                closestEdgeOfTarget,
+                axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
+              });
+              dispatchAndFlash(
+                formElementReparented({
+                  id: sourceElement.id,
+                  newParentId: container.id,
+                  index,
+                }),
+                sourceElement.id
+              );
+              return;
+            }
           }
 
-          if (isAddingNewElement && targetElement.parentId === undefined && closestEdgeOfTarget !== 'center') {
-            log.trace('Inserting new element into root');
-            const layout = getLayout();
-            const indexOfTarget = layout.indexOf(targetElement.id);
-            const index = getReorderDestinationIndex({
-              startIndex: indexOfTarget + 1,
-              indexOfTarget,
-              closestEdgeOfTarget,
-              axis: 'vertical',
-            });
-            sourceElement.parentId = undefined;
-            dispatchAndFlash(
-              formElementAdded({
-                element: sourceElement,
-                index,
-                initialValue: getInitialValue(sourceElement),
-              }),
-              sourceElement.id
-            );
-            return;
-          }
+          //#endregion
 
-          if (isAddingNewElement && targetElement.parentId !== undefined && closestEdgeOfTarget === 'center') {
-            log.trace('Adding new element to empty container');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
-            sourceElement.parentId = targetElement.id;
-            dispatchAndFlash(
-              formElementAdded({
-                element: sourceElement,
-                index: undefined,
-                initialValue: getInitialValue(sourceElement),
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (isAddingNewElement && targetElement.parentId !== undefined && closestEdgeOfTarget !== 'center') {
-            log.trace('Inserting new element into container');
-            const container = getElement(targetElement.parentId, isContainerElement);
-            const indexOfTarget = container.data.children.indexOf(targetElement.id);
-            const index = getReorderDestinationIndex({
-              startIndex: indexOfTarget + 1,
-              indexOfTarget,
-              closestEdgeOfTarget,
-              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
-            });
-            sourceElement.parentId = container.id;
-            dispatchAndFlash(
-              formElementAdded({
-                element: sourceElement,
-                index,
-                initialValue: getInitialValue(sourceElement),
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId === undefined &&
-            sourceElement.parentId === undefined &&
-            closestEdgeOfTarget !== 'center'
-          ) {
-            log.trace('Moving element within root');
-            const layout = getLayout();
-            const startIndex = layout.indexOf(sourceElement.id);
-            const indexOfTarget = layout.indexOf(targetElement.id);
-            const reorderedLayout = reorderWithEdge({
-              list: layout,
-              startIndex,
-              indexOfTarget,
-              closestEdgeOfTarget,
-              axis: 'vertical',
-            });
-            dispatchAndFlash(
-              formRootReordered({
-                layout: reorderedLayout,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId !== undefined &&
-            sourceElement.parentId !== undefined &&
-            targetElement.parentId === sourceElement.parentId &&
-            closestEdgeOfTarget === 'center'
-          ) {
-            log.trace('Reparenting element from a container to an empty container with same parent');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: targetElement.id,
-                index: undefined,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId !== undefined &&
-            sourceElement.parentId !== undefined &&
-            targetElement.parentId === sourceElement.parentId &&
-            closestEdgeOfTarget !== 'center'
-          ) {
-            log.trace('Moving element within container');
-            const container = getElement(targetElement.parentId, isContainerElement);
-            const startIndex = container.data.children.indexOf(sourceElement.id);
-            const indexOfTarget = container.data.children.indexOf(targetElement.id);
-            const reorderedLayout = reorderWithEdge({
-              list: container.data.children,
-              startIndex,
-              indexOfTarget,
-              closestEdgeOfTarget,
-              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
-            });
-            dispatchAndFlash(
-              formContainerChildrenReordered({
-                id: container.id,
-                children: reorderedLayout,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId !== undefined &&
-            sourceElement.parentId !== undefined &&
-            targetElement.parentId !== sourceElement.parentId &&
-            closestEdgeOfTarget === 'center'
-          ) {
-            log.trace('Reparenting element from one container to an empty container with different parent');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: targetElement.id,
-                index: undefined,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId !== undefined &&
-            sourceElement.parentId !== undefined &&
-            targetElement.parentId !== sourceElement.parentId &&
-            closestEdgeOfTarget !== 'center'
-          ) {
-            log.trace('Moving element from one container to another');
-            const container = getElement(targetElement.parentId, isContainerElement);
-            const indexOfTarget = container.data.children.indexOf(targetElement.id);
-            const index = getReorderDestinationIndex({
-              startIndex: container.data.children.length + 1,
-              indexOfTarget,
-              closestEdgeOfTarget,
-              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
-            });
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: container.id,
-                index,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId === undefined &&
-            sourceElement.parentId !== undefined &&
-            closestEdgeOfTarget === 'center'
-          ) {
-            log.trace('Reparenting element from container to empty container');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: targetElement.id,
-                index: undefined,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId === undefined &&
-            sourceElement.parentId !== undefined &&
-            closestEdgeOfTarget !== 'center'
-          ) {
-            log.trace('Reparenting element from container to root');
-            const layout = getLayout();
-            const indexOfTarget = layout.indexOf(targetElement.id);
-            const index = getReorderDestinationIndex({
-              startIndex: layout.length + 1,
-              indexOfTarget,
-              closestEdgeOfTarget,
-              axis: 'vertical',
-            });
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: undefined,
-                index,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId === undefined &&
-            sourceElement.parentId === undefined &&
-            closestEdgeOfTarget === 'center'
-          ) {
-            log.trace('Reparenting element from root to empty container');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: targetElement.id,
-                index: undefined,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId !== undefined &&
-            sourceElement.parentId === undefined &&
-            closestEdgeOfTarget === 'center'
-          ) {
-            log.trace('Reparenting element from root to empty container');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: targetElement.id,
-                index: undefined,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
-
-          if (
-            !isAddingNewElement &&
-            targetElement.parentId !== undefined &&
-            sourceElement.parentId === undefined &&
-            closestEdgeOfTarget !== 'center'
-          ) {
-            log.trace('Reparenting element from root to container');
-            const container = getElement(targetElement.parentId, isContainerElement);
-            const indexOfTarget = container.data.children.indexOf(targetElement.id);
-            const index = getReorderDestinationIndex({
-              startIndex: indexOfTarget + 1,
-              indexOfTarget,
-              closestEdgeOfTarget,
-              axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
-            });
-            dispatchAndFlash(
-              formElementReparented({
-                id: sourceElement.id,
-                newParentId: targetElement.parentId,
-                index,
-              }),
-              sourceElement.id
-            );
-            return;
-          }
+          log.warn(parseify({ target, source }), 'Unhandled drop event!');
         }
-        //#endregion
-
-        log.warn(parseify({ target, source }), 'Unhandled drop event!');
       },
     });
-  }, [dispatchAndFlash]);
-};
-
-export const useRootDnd = (ref: RefObject<HTMLElement>) => {
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const isEmpty = useAppSelector(selectFormIsEmpty);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) {
-      return;
-    }
-    return dropTargetForElements({
-      element,
-      canDrop: ({ source }) => isFormElementDndData(source.data) && isEmpty,
-      getData: () => buildRootDndData(),
-      onDrag: ({ location, source }) => {
-        const innermostDropTargetElement = location.current.dropTargets.at(0)?.element;
-
-        // If the innermost target is not this draggable element, bail. We only want to react when dragging over _this_ element.
-        if (!innermostDropTargetElement || innermostDropTargetElement !== element) {
-          setIsDraggingOver(false);
-          return;
-        }
-
-        // Don't allow reparanting to the same container
-        if (source.element === element) {
-          setIsDraggingOver(false);
-          return;
-        }
-        setIsDraggingOver(true);
-      },
-      onDragLeave: () => {
-        setIsDraggingOver(false);
-      },
-      onDrop: () => {
-        setIsDraggingOver(false);
-      },
-    });
-  }, [isEmpty, ref]);
-
-  return isDraggingOver;
+  }, [dispatchAndFlash, elementExists, getElement, getInitialValue]);
 };
 
 export const useFormElementDnd = (
@@ -566,8 +343,11 @@ export const useFormElementDnd = (
   draggableRef: RefObject<HTMLElement>,
   dragHandleRef: RefObject<HTMLElement>
 ) => {
+  const rootElementId = useAppSelector(selectFormRootElementId);
   const [isDragging, setIsDragging] = useState(false);
   const [activeDropRegion, setActiveDropRegion] = useState<CenterOrEdge | null>(null);
+  const getElement = useGetElement();
+  const getAllowedDropRegions = useGetAllowedDropRegions();
 
   useEffect(() => {
     const draggableElement = draggableRef.current;
@@ -575,11 +355,11 @@ export const useFormElementDnd = (
     if (!draggableElement || !dragHandleElement) {
       return;
     }
-    const _element = getElement(elementId);
 
     return combine(
       firefoxDndFix(draggableElement),
       draggable({
+        canDrag: () => elementId !== rootElementId,
         element: draggableElement,
         dragHandle: dragHandleElement,
         getInitialData: () => {
@@ -638,7 +418,7 @@ export const useFormElementDnd = (
         },
       })
     );
-  }, [dragHandleRef, draggableRef, elementId]);
+  }, [dragHandleRef, draggableRef, elementId, getAllowedDropRegions, getElement, rootElementId]);
 
   return [activeDropRegion, isDragging] as const;
 };

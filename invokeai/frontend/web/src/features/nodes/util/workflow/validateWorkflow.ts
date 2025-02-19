@@ -8,7 +8,12 @@ import {
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { buildNodeFieldElement, isNodeFieldElement, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
+import {
+  buildContainer,
+  buildNodeFieldElement,
+  isNodeFieldElement,
+  isWorkflowInvocationNode,
+} from 'features/nodes/types/workflow';
 import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import type { JsonObject } from 'type-fest';
@@ -224,8 +229,15 @@ export const validateWorkflow = async (
     }
   });
 
-  if (_workflow.exposedFields.length > 0 && Object.values(_workflow.form.elements).length === 0) {
-    // Migrated exposed fields to form elements
+  // Migrated exposed fields to form elements if they exist and the form does not
+  if (_workflow.exposedFields.length > 0 && !_workflow.form) {
+    const rootElement = buildContainer('row', []);
+
+    _workflow.form = {
+      elements: { [rootElement.id]: rootElement },
+      rootElementId: rootElement.id,
+    };
+
     for (const { nodeId, fieldName } of _workflow.exposedFields) {
       const node = nodes.find(({ id }) => id === nodeId);
       if (!node) {
@@ -241,24 +253,27 @@ export const validateWorkflow = async (
       }
       const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
       _workflow.form.elements[element.id] = element;
-      _workflow.form.layout.push(element.id);
+      rootElement.data.children.push(element.id);
     }
   }
 
-  for (const element of Object.values(_workflow.form.elements)) {
-    if (!isNodeFieldElement(element)) {
-      continue;
-    }
-    const { nodeId, fieldName } = element.data.fieldIdentifier;
-    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === nodeId);
-    const field = node?.data.inputs[fieldName];
-    if (!field) {
-      // The form element field no longer exists on the node
-      delete _workflow.form.elements[element.id];
-      warnings.push({
-        message: t('nodes.deletedMissingNodeFieldFormElement', { nodeId, fieldName }),
-        data: { nodeId, fieldName },
-      });
+  // If the form exists, remove any form elements that no longer have a corresponding node field
+  if (_workflow.form) {
+    for (const element of Object.values(_workflow.form.elements)) {
+      if (!isNodeFieldElement(element)) {
+        continue;
+      }
+      const { nodeId, fieldName } = element.data.fieldIdentifier;
+      const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === nodeId);
+      const field = node?.data.inputs[fieldName];
+      if (!field) {
+        // The form element field no longer exists on the node
+        delete _workflow.form.elements[element.id];
+        warnings.push({
+          message: t('nodes.deletedMissingNodeFieldFormElement', { nodeId, fieldName }),
+          data: { nodeId, fieldName },
+        });
+      }
     }
   }
 

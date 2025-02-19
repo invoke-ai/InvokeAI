@@ -9,6 +9,7 @@ import type { WorkflowMode, WorkflowsState as WorkflowState } from 'features/nod
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
+  BuilderForm,
   ContainerElement,
   ElementId,
   FormElement,
@@ -18,7 +19,14 @@ import type {
   WorkflowCategory,
   WorkflowV3,
 } from 'features/nodes/types/workflow';
-import { isContainerElement, isHeadingElement, isNodeFieldElement, isTextElement } from 'features/nodes/types/workflow';
+import {
+  buildContainer,
+  getDefaultForm,
+  isContainerElement,
+  isHeadingElement,
+  isNodeFieldElement,
+  isTextElement,
+} from 'features/nodes/types/workflow';
 import { isEqual } from 'lodash-es';
 import { useMemo } from 'react';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
@@ -55,10 +63,7 @@ const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
     exposedFields: [],
     meta: { version: '3.0.0', category: 'user' },
     id: undefined,
-    form: {
-      elements: {},
-      layout: [],
-    },
+    form: getDefaultForm(),
   };
 };
 
@@ -134,9 +139,10 @@ export const workflowSlice = createSlice({
       state.isTouched = false;
     },
     formReset: (state) => {
+      const rootElement = buildContainer('column', []);
       state.form = {
-        elements: {},
-        layout: [],
+        elements: { [rootElement.id]: rootElement },
+        rootElementId: rootElement.id,
       };
     },
     formElementNodeFieldInitialValueChanged: (
@@ -154,7 +160,7 @@ export const workflowSlice = createSlice({
       state,
       action: PayloadAction<{
         element: FormElement;
-        index?: number;
+        index: number;
         initialValue?: StatefulFieldValue;
       }>
     ) => {
@@ -171,19 +177,16 @@ export const workflowSlice = createSlice({
       removeElement({ id, form });
       delete state.formFieldInitialValues[id];
     },
-    formRootReordered: (state, action: PayloadAction<{ layout: string[] }>) => {
-      const { layout } = action.payload;
-      state.form.layout = layout;
-    },
     formContainerChildrenReordered: (state, action: PayloadAction<{ id: string; children: string[] }>) => {
+      const { form } = state;
       const { id, children } = action.payload;
-      const container = state.form.elements[id];
+      const container = form.elements[id];
       if (!container || !isContainerElement(container)) {
         return;
       }
       container.data.children = children;
     },
-    formElementReparented: (state, action: PayloadAction<{ id: string; newParentId?: string; index?: number }>) => {
+    formElementReparented: (state, action: PayloadAction<{ id: string; newParentId: string; index: number }>) => {
       const { form } = state;
       const { id, newParentId, index } = action.payload;
       reparentElement({ form, id, newParentId, index });
@@ -207,25 +210,27 @@ export const workflowSlice = createSlice({
 
       const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
 
-      for (const el of Object.values(workflowExtra.form.elements)) {
-        if (!isNodeFieldElement(el)) {
-          continue;
+      if (workflowExtra.form) {
+        for (const el of Object.values(workflowExtra.form.elements)) {
+          if (!isNodeFieldElement(el)) {
+            continue;
+          }
+          const { nodeId, fieldName } = el.data.fieldIdentifier;
+
+          const node = nodes.find((n) => n.id === nodeId);
+
+          if (!isInvocationNode(node)) {
+            continue;
+          }
+
+          const field = node.data.inputs[fieldName];
+
+          if (!field) {
+            continue;
+          }
+
+          formFieldInitialValues[el.id] = field.value;
         }
-        const { nodeId, fieldName } = el.data.fieldIdentifier;
-
-        const node = nodes.find((n) => n.id === nodeId);
-
-        if (!isInvocationNode(node)) {
-          continue;
-        }
-
-        const field = node.data.inputs[fieldName];
-
-        if (!field) {
-          continue;
-        }
-
-        formFieldInitialValues[el.id] = field.value;
       }
 
       return {
@@ -264,15 +269,19 @@ export const workflowSlice = createSlice({
       });
       state.exposedFields = state.exposedFields.filter((field) => !fieldsToRemove.some((f) => isEqual(f, field)));
 
-      for (const el of Object.values(state.form?.elements || {})) {
-        if (!isNodeFieldElement(el)) {
-          continue;
-        }
-        const { nodeId } = el.data.fieldIdentifier;
-        const removeIndex = action.payload.findLastIndex((change) => change.type === 'remove' && change.id === nodeId);
-        const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
-        if (removeIndex > addIndex) {
-          removeElement({ form: state.form, id: el.id });
+      if (state.form) {
+        for (const el of Object.values(state.form?.elements || {})) {
+          if (!isNodeFieldElement(el)) {
+            continue;
+          }
+          const { nodeId } = el.data.fieldIdentifier;
+          const removeIndex = action.payload.findLastIndex(
+            (change) => change.type === 'remove' && change.id === nodeId
+          );
+          const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
+          if (removeIndex > addIndex) {
+            removeElement({ form: state.form, id: el.id });
+          }
         }
       }
 
@@ -324,7 +333,6 @@ export const {
   formElementAdded,
   formElementRemoved,
   formElementReparented,
-  formRootReordered,
   formContainerChildrenReordered,
   formElementHeadingDataChanged,
   formElementTextDataChanged,
@@ -367,8 +375,9 @@ export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflo
   return noNodes && !isTouched && !savedWorkflow;
 });
 
-export const selectFormLayout = createWorkflowSelector((workflow) => workflow.form.layout);
-export const selectFormIsEmpty = createWorkflowSelector((workflow) => workflow.form.layout.length === 0);
+export const selectFormRootElementId = createWorkflowSelector((workflow) => {
+  return workflow.form.rootElementId;
+});
 const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
 export const useElement = (id: string): FormElement | undefined => {
   const selector = useMemo(() => buildSelectElement(id), [id]);
@@ -376,7 +385,7 @@ export const useElement = (id: string): FormElement | undefined => {
   return element;
 };
 
-const removeElement = (args: { form: NonNullable<WorkflowV3['form']>; id: string }) => {
+const removeElement = (args: { form: BuilderForm; id: string }) => {
   const { id, form } = args;
 
   const element = form.elements[id];
@@ -386,12 +395,12 @@ const removeElement = (args: { form: NonNullable<WorkflowV3['form']>; id: string
     return;
   }
 
-  delete form.elements[id];
-
-  if (!element.parentId) {
-    form.layout = form.layout.filter((elId) => elId !== id);
+  if (form.rootElementId === id || !element.parentId) {
+    // Can't remove the root element
     return;
   }
+
+  delete form.elements[id];
 
   const parent = form.elements[element.parentId];
   if (!parent || !isContainerElement(parent)) {
@@ -400,12 +409,7 @@ const removeElement = (args: { form: NonNullable<WorkflowV3['form']>; id: string
   parent.data.children = parent.data.children.filter((childId) => childId !== id);
 };
 
-const reparentElement = (args: {
-  form: NonNullable<WorkflowV3['form']>;
-  id: string;
-  newParentId?: string;
-  index?: number;
-}) => {
+const reparentElement = (args: { form: BuilderForm; id: string; newParentId: string; index: number }) => {
   const { form, id, newParentId, index } = args;
   const { elements } = form;
 
@@ -416,70 +420,47 @@ const reparentElement = (args: {
     return;
   }
 
+  if (!element.parentId) {
+    // Can't reparent the root element
+    return;
+  }
+
   if (newParentId === element.parentId) {
     // Nothing to do
     return;
   }
 
-  // Reparenting from container to root
-  if (newParentId === undefined && element.parentId !== undefined) {
-    const oldParent = elements[element.parentId];
-    if (!oldParent || !isContainerElement(oldParent)) {
-      // This should never happen
-      return;
-    }
-
-    form.layout.splice(index ?? form.layout.length, 0, id);
-    oldParent.data.children = oldParent.data.children.filter((elementId) => elementId !== id);
-    element.parentId = newParentId;
+  const oldParent = elements[element.parentId];
+  if (!oldParent || !isContainerElement(oldParent)) {
+    // This should never happen
+    return;
   }
 
-  // Reparenting from one container to another container
-  if (newParentId !== undefined && element.parentId !== undefined) {
-    const oldParent = elements[element.parentId];
-    if (!oldParent || !isContainerElement(oldParent)) {
-      return;
-    }
-    const newParent = elements[newParentId];
-    if (!newParent || !isContainerElement(newParent)) {
-      return;
-    }
-    newParent.data.children.splice(index ?? newParent.data.children.length, 0, id);
-    oldParent.data.children = oldParent.data.children.filter((elementId) => elementId !== id);
-    element.parentId = newParentId;
+  const newParent = elements[newParentId];
+  if (!newParent || !isContainerElement(newParent)) {
+    return;
   }
 
-  // Reparenting from root to container
-  if (newParentId !== undefined && element.parentId === undefined) {
-    const newParent = elements[newParentId];
-    if (!newParent || !isContainerElement(newParent)) {
-      return;
-    }
-    newParent.data.children.splice(index ?? newParent.data.children.length, 0, id);
-    form.layout = form.layout.filter((elementId) => elementId !== id);
-    element.parentId = newParentId;
-  }
-
-  // We should never get here!
+  newParent.data.children.splice(index, 0, id);
+  oldParent.data.children = oldParent.data.children.filter((elementId) => elementId !== id);
+  element.parentId = newParentId;
 };
 
-const addElement = (args: { form: NonNullable<WorkflowV3['form']>; element: FormElement; index?: number }): boolean => {
+const addElement = (args: { form: BuilderForm; element: FormElement; index: number }): boolean => {
   const { form, element, index } = args;
   const { elements } = form;
 
-  // Adding to the root
   if (!element.parentId) {
-    form.elements[element.id] = element;
-    form.layout.splice(index ?? form.layout.length, 0, element.id);
-    return true;
+    // We cannot add a root element
+    return false;
   }
 
-  const container = elements[element.parentId];
-  if (!container || !isContainerElement(container)) {
+  const parent = elements[element.parentId];
+  if (!parent || !isContainerElement(parent)) {
     return false;
   }
 
   elements[element.id] = element;
-  container.data.children.splice(index ?? container.data.children.length, 0, element.id);
+  parent.data.children.splice(index, 0, element.id);
   return true;
 };
