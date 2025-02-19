@@ -95,35 +95,35 @@ describe('validateWorkflow', () => {
       resolve(false);
     });
   it('should reset images that are inaccessible', async () => {
-    const validationResult = await validateWorkflow(
+    const validationResult = await validateWorkflow({
       workflow,
-      { img_resize, main_model_loader },
-      resolveFalse,
-      resolveTrue,
-      resolveTrue
-    );
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveFalse,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
     expect(validationResult.warnings.length).toBe(1);
     expect(get(validationResult, 'workflow.nodes[1].data.inputs.image.value')).toBeUndefined();
   });
   it('should reset boards that are inaccessible', async () => {
-    const validationResult = await validateWorkflow(
+    const validationResult = await validateWorkflow({
       workflow,
-      { img_resize, main_model_loader },
-      resolveTrue,
-      resolveFalse,
-      resolveTrue
-    );
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveFalse,
+      checkModelAccess: resolveTrue,
+    });
     expect(validationResult.warnings.length).toBe(1);
     expect(get(validationResult, 'workflow.nodes[1].data.inputs.board.value')).toBeUndefined();
   });
   it('should reset models that are inaccessible', async () => {
-    const validationResult = await validateWorkflow(
+    const validationResult = await validateWorkflow({
       workflow,
-      { img_resize, main_model_loader },
-      resolveTrue,
-      resolveTrue,
-      resolveFalse
-    );
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveFalse,
+    });
     expect(validationResult.warnings.length).toBe(1);
     expect(get(validationResult, 'workflow.nodes[0].data.inputs.model.value')).toBeUndefined();
   });
