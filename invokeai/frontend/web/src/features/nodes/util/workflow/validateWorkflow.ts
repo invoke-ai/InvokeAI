@@ -4,6 +4,7 @@ import {
   isBoardFieldInputInstance,
   isImageFieldCollectionInputInstance,
   isImageFieldInputInstance,
+  isModelFieldType,
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
@@ -24,21 +25,6 @@ type ValidateWorkflowResult = {
   workflow: WorkflowV3;
   warnings: WorkflowWarning[];
 };
-
-const MODEL_FIELD_TYPES = [
-  'ModelIdentifier',
-  'MainModelField',
-  'SDXLMainModelField',
-  'FluxMainModelField',
-  'SD3MainModelField',
-  'SDXLRefinerModelField',
-  'VAEModelField',
-  'LoRAModelField',
-  'ControlNetModelField',
-  'IPAdapterModelField',
-  'T2IAdapterModelField',
-  'SpandrelImageToImageModelField',
-];
 
 /**
  * Parses and validates a workflow:
@@ -123,7 +109,7 @@ export const validateWorkflow = async (
 
       // We need to confirm that all images, boards and models are accessible before loading,
       // else the workflow could end up with stale data an an error state.
-      if (fieldTemplate.type.name === 'ImageField' && isImageFieldInputInstance(input) && input.value) {
+      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldInputInstance(input)) {
         const hasAccess = await checkImageAccess(input.value.image_name);
         if (!hasAccess) {
           const message = t('nodes.imageAccessError', { image_name: input.value.image_name });
@@ -131,7 +117,7 @@ export const validateWorkflow = async (
           input.value = undefined;
         }
       }
-      if (fieldTemplate.type.name === 'ImageField' && isImageFieldCollectionInputInstance(input) && input.value) {
+      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldCollectionInputInstance(input)) {
         for (const { image_name } of [...input.value]) {
           const hasAccess = await checkImageAccess(image_name);
           if (!hasAccess) {
@@ -141,7 +127,7 @@ export const validateWorkflow = async (
           }
         }
       }
-      if (fieldTemplate.type.name === 'BoardField' && isBoardFieldInputInstance(input) && input.value) {
+      if (fieldTemplate.type.name === 'BoardField' && input.value && isBoardFieldInputInstance(input)) {
         const hasAccess = await checkBoardAccess(input.value.board_id);
         if (!hasAccess) {
           const message = t('nodes.boardAccessError', { board_id: input.value.board_id });
@@ -149,11 +135,7 @@ export const validateWorkflow = async (
           input.value = undefined;
         }
       }
-      if (
-        MODEL_FIELD_TYPES.includes(fieldTemplate.type.name) &&
-        isModelIdentifierFieldInputInstance(input) &&
-        input.value
-      ) {
+      if (isModelFieldType(fieldTemplate.type) && input.value && isModelIdentifierFieldInputInstance(input)) {
         const hasAccess = await checkModelAccess(input.value.key);
         if (!hasAccess) {
           const message = t('nodes.modelAccessError', { key: input.value.key });
