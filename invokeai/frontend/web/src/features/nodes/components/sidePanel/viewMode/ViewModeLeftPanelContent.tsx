@@ -2,9 +2,9 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { FormLayout } from 'features/nodes/components/sidePanel/builder/WorkflowBuilder';
+import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
 import { ViewContextProvider } from 'features/nodes/contexts/ViewContext';
-import { selectFormIsEmpty } from 'features/nodes/store/workflowSlice';
+import { selectFormRootElementId } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
 import { memo } from 'react';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
@@ -30,16 +30,16 @@ ViewModeLeftPanelContent.displayName = 'ViewModeLeftPanelContent';
 
 const ViewModeLeftPanelContentInner = memo(() => {
   const { isLoading } = useGetOpenAPISchemaQuery();
-  const isEmpty = useAppSelector(selectFormIsEmpty);
+  const rootElementId = useAppSelector(selectFormRootElementId);
 
   if (isLoading) {
     return <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />;
   }
 
-  if (isEmpty) {
+  if (!rootElementId) {
     return <EmptyState />;
   }
 
-  return <FormLayout />;
+  return <FormElementComponent id={rootElementId} />;
 });
 ViewModeLeftPanelContentInner.displayName = ' ViewModeLeftPanelContentInner';

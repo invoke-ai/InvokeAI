@@ -4,6 +4,7 @@ import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { getDefaultForm } from 'features/nodes/types/workflow';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { forEach } from 'lodash-es';
 import type { NonNullableGraph } from 'services/api/types';
@@ -37,10 +38,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
     exposedFields: [],
     edges: [],
     nodes: [],
-    form: {
-      elements: {},
-      layout: [],
-    },
+    form: getDefaultForm(),
   };
 
   // Convert nodes

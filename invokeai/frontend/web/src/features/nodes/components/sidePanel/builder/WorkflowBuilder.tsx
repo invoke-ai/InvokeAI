@@ -1,17 +1,12 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { Alert, AlertDescription, AlertIcon, Button, ButtonGroup, Flex, Spacer, Text } from '@invoke-ai/ui-library';
+import { Alert, AlertDescription, AlertIcon, Button, ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
 import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
-import {
-  buildFormElementDndData,
-  useBuilderDndMonitor,
-  useRootDnd,
-} from 'features/nodes/components/sidePanel/builder/dnd';
-import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
-import { formReset, selectFormIsEmpty, selectFormLayout } from 'features/nodes/store/workflowSlice';
+import { buildFormElementDndData, useBuilderDndMonitor } from 'features/nodes/components/sidePanel/builder/dnd';
+import { formReset, selectFormRootElementId } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
@@ -24,7 +19,7 @@ import { assert } from 'tsafe';
 export const WorkflowBuilder = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isEmpty = useAppSelector(selectFormIsEmpty);
+  const rootElementId = useAppSelector(selectFormRootElementId);
   useBuilderDndMonitor();
 
   const resetForm = useCallback(() => {
@@ -49,52 +44,15 @@ export const WorkflowBuilder = memo(() => {
               {t('common.reset')}
             </Button>
           </ButtonGroup>
-          {!isEmpty && <FormLayout />}
-          {isEmpty && <EmptyStateEditMode />}
+          <Flex>
+            <FormElementComponent id={rootElementId} />
+          </Flex>
         </Flex>
       </Flex>
     </ScrollableContent>
   );
 });
 WorkflowBuilder.displayName = 'WorkflowBuilder';
-
-export const FormLayout = memo(() => {
-  const layout = useAppSelector(selectFormLayout);
-
-  return (
-    <Flex flexDir="column" gap={4} w="full" borderRadius="base">
-      {layout.map((id) => (
-        <FormElementComponent key={id} id={id} />
-      ))}
-    </Flex>
-  );
-});
-FormLayout.displayName = 'FormLayout';
-
-const EmptyStateEditMode = memo(() => {
-  const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
-  const isDragging = useRootDnd(ref);
-
-  return (
-    <Flex
-      id={getEditModeWrapperId('root')}
-      ref={ref}
-      w="full"
-      h="full"
-      bg={isDragging ? 'base.800' : undefined}
-      p={4}
-      borderRadius="base"
-      alignItems="center"
-      justifyContent="center"
-    >
-      <Text variant="subtext" fontSize="md">
-        {t('workflows.builder.emptyRootPlaceholderEditMode')}
-      </Text>
-    </Flex>
-  );
-});
-EmptyStateEditMode.displayName = 'EmptyStateEditMode';
 
 const useAddFormElementDnd = (
   type: Exclude<FormElement['type'], 'node-field'>,

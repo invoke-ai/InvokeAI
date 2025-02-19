@@ -4,7 +4,11 @@ import { useContainerContext } from 'features/nodes/components/sidePanel/builder
 import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
-import { EDIT_MODE_WRAPPER_CLASS_NAME, getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
+import {
+  EDIT_MODE_WRAPPER_CLASS_NAME,
+  getEditModeWrapperId,
+  useIsRootElement,
+} from 'features/nodes/components/sidePanel/builder/shared';
 import type { FormElement } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
 import { memo, useRef } from 'react';
@@ -46,6 +50,7 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [activeDropRegion, isDragging] = useFormElementDnd(element.id, draggableRef, dragHandleRef);
   const containerCtx = useContainerContext();
+  const isRootElement = useIsRootElement(element.id);
 
   return (
     <Flex
@@ -53,6 +58,7 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
       ref={draggableRef}
       className={EDIT_MODE_WRAPPER_CLASS_NAME}
       sx={wrapperSx}
+      data-is-root={isRootElement}
       data-element-type={element.type}
       data-layout={containerCtx?.layout}
     >
