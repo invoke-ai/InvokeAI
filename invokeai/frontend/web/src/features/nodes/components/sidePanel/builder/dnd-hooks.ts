@@ -200,12 +200,12 @@ export const useBuilderDndMonitor = () => {
               log.error(parseify({ target, source }), 'Expected target to be a container');
               return;
             }
-            sourceElement.parentId = targetElement.id;
             dispatchAndFlash(
               formElementAdded({
                 element: sourceElement,
-                initialValue: getInitialValue(sourceElement),
+                parentId: targetElement.id,
                 index: 0,
+                initialValue: getInitialValue(sourceElement),
               }),
               sourceElement.id
             );
@@ -224,10 +224,10 @@ export const useBuilderDndMonitor = () => {
               closestEdgeOfTarget,
               axis: parent.data.layout === 'row' ? 'horizontal' : 'vertical',
             });
-            sourceElement.parentId = parent.id;
             dispatchAndFlash(
               formElementAdded({
                 element: sourceElement,
+                parentId: parent.id,
                 index,
                 initialValue: getInitialValue(sourceElement),
               }),
