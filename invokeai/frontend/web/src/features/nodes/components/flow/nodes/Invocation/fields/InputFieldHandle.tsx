@@ -10,7 +10,8 @@ import {
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { type FieldInputTemplate,isModelFieldType } from 'features/nodes/types/field';
+import type { FieldInputTemplate } from 'features/nodes/types/field';
+import { isModelFieldType } from 'features/nodes/types/field';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
