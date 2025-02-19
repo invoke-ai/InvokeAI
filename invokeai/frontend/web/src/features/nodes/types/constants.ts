@@ -24,27 +24,6 @@ export const SHARED_NODE_PROPERTIES: Partial<AnyNode> = {
 };
 
 /**
- * Model types' handles are rendered as squares in the UI.
- */
-export const MODEL_TYPES = [
-  'IPAdapterModelField',
-  'ControlNetModelField',
-  'LoRAModelField',
-  'MainModelField',
-  'FluxMainModelField',
-  'SD3MainModelField',
-  'SDXLMainModelField',
-  'SDXLRefinerModelField',
-  'VaeModelField',
-  'UNetField',
-  'VAEField',
-  'CLIPField',
-  'T2IAdapterModelField',
-  'T5EncoderField',
-  'SpandrelImageToImageModelField',
-];
-
-/**
  * Colors for each field type - applies to their handles and edges.
  */
 export const FIELD_COLORS: { [key: string]: string } = {

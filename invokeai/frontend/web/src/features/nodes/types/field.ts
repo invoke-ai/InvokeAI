@@ -278,6 +278,38 @@ export const isStatefulFieldType = (fieldType: FieldType): fieldType is Stateful
 const zFieldType = z.union([zStatefulFieldType, zStatelessFieldType]);
 export type FieldType = z.infer<typeof zFieldType>;
 
+const modelFieldTypeNames = [
+  // Stateful model fields
+  zModelIdentifierFieldType.shape.name.value,
+  zMainModelFieldType.shape.name.value,
+  zSDXLMainModelFieldType.shape.name.value,
+  zSD3MainModelFieldType.shape.name.value,
+  zFluxMainModelFieldType.shape.name.value,
+  zSDXLRefinerModelFieldType.shape.name.value,
+  zVAEModelFieldType.shape.name.value,
+  zLoRAModelFieldType.shape.name.value,
+  zControlNetModelFieldType.shape.name.value,
+  zIPAdapterModelFieldType.shape.name.value,
+  zT2IAdapterModelFieldType.shape.name.value,
+  zSpandrelImageToImageModelFieldType.shape.name.value,
+  zT5EncoderModelFieldType.shape.name.value,
+  zCLIPEmbedModelFieldType.shape.name.value,
+  zCLIPLEmbedModelFieldType.shape.name.value,
+  zCLIPGEmbedModelFieldType.shape.name.value,
+  zControlLoRAModelFieldType.shape.name.value,
+  zFluxVAEModelFieldType.shape.name.value,
+  // Stateless model fields
+  'UNetField',
+  'VAEField',
+  'CLIPField',
+  'T5EncoderField',
+  'TransformerField',
+  'ControlLoRAField',
+];
+export const isModelFieldType = (fieldType: FieldType) => {
+  return (modelFieldTypeNames as string[]).includes(fieldType.name);
+};
+
 export const isSingle = (fieldType: FieldType): boolean => fieldType.cardinality === zCardinality.enum.SINGLE;
 export const isCollection = (fieldType: FieldType): boolean => fieldType.cardinality === zCardinality.enum.COLLECTION;
 export const isSingleOrCollection = (fieldType: FieldType): boolean =>

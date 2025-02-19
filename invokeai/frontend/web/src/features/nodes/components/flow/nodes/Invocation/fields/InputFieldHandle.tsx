@@ -9,8 +9,8 @@ import {
 } from 'features/nodes/hooks/useFieldConnectionState';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
-import { HANDLE_TOOLTIP_OPEN_DELAY, MODEL_TYPES } from 'features/nodes/types/constants';
-import type { FieldInputTemplate } from 'features/nodes/types/field';
+import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
+import { type FieldInputTemplate,isModelFieldType } from 'features/nodes/types/field';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,7 +64,7 @@ export const InputFieldHandle = memo(({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const fieldColor = useMemo(() => getFieldColor(fieldTemplate.type), [fieldTemplate.type]);
-  const isModelField = useMemo(() => MODEL_TYPES.some((t) => t === fieldTemplate.type.name), [fieldTemplate.type]);
+  const isModelField = useMemo(() => isModelFieldType(fieldTemplate.type), [fieldTemplate.type]);
   const isConnectionInProgress = useIsConnectionInProgress();
 
   if (isConnectionInProgress) {
