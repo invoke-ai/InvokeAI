@@ -48,7 +48,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
   }, [batchGroupId, editable.value, t]);
 
   return (
-    <Flex overflow="hidden" w="full" h="full" alignItems="center" justifyContent="center" cursor="text">
+    <Flex overflow="hidden" w="full" h="full" alignItems="center" justifyContent="center">
       {!editable.isEditing && (
         <Text fontWeight="semibold" color={batchGroupColorToken} onDoubleClick={editable.startEditing}>
           {titleWithBatchGroupId}
