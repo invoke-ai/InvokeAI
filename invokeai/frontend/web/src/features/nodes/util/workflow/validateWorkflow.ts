@@ -26,6 +26,14 @@ type WorkflowWarning = {
   data: JsonObject;
 };
 
+type ValidateWorkflowArgs = {
+  workflow: unknown;
+  templates: Templates;
+  checkImageAccess: (name: string) => Promise<boolean>;
+  checkBoardAccess: (id: string) => Promise<boolean>;
+  checkModelAccess: (key: string) => Promise<boolean>;
+};
+
 type ValidateWorkflowResult = {
   workflow: WorkflowV3;
   warnings: WorkflowWarning[];
@@ -37,18 +45,11 @@ type ValidateWorkflowResult = {
  * - Validates the workflow against the node templates, warning if the template is not known.
  * - Attempts to update nodes which have a mismatched version.
  * - Removes edges which are invalid.
- * @param workflow The raw workflow object (e.g. JSON.parse(stringifiedWorkflow))
- * @param templates The node templates to validate against.
- * @throws {WorkflowVersionError} If the workflow version is not recognized.
+ * - Reset image, board and model fields which are not accessible
  * @throws {z.ZodError} If there is a validation error.
  */
-export const validateWorkflow = async (
-  workflow: unknown,
-  templates: Templates,
-  checkImageAccess: (name: string) => Promise<boolean>,
-  checkBoardAccess: (id: string) => Promise<boolean>,
-  checkModelAccess: (key: string) => Promise<boolean>
-): Promise<ValidateWorkflowResult> => {
+export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<ValidateWorkflowResult> => {
+  const { workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess } = args;
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 
