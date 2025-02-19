@@ -78,14 +78,14 @@ export const reparentElement = (args: {
     return false;
   }
 
-  if (!element.parentId) {
+  if (form.rootElementId === element.id || !element.parentId) {
     // Can't reparent the root element
     return false;
   }
 
   if (newParentId === element.parentId) {
-    // Nothing to do
-    return false;
+    // Nothing to do if the element is already a child of the new parent
+    return true;
   }
 
   const oldParent = elements[element.parentId];
@@ -116,20 +116,21 @@ export const reparentElement = (args: {
  *
  * @returns True if the element was added, false otherwise
  */
-export const addElement = (args: { form: BuilderForm; element: FormElement; index: number }): boolean => {
-  const { form, element, index } = args;
+export const addElement = (args: {
+  form: BuilderForm;
+  element: FormElement;
+  parentId: string;
+  index: number;
+}): boolean => {
+  const { form, element, parentId, index } = args;
   const { elements } = form;
 
-  if (!element.parentId) {
-    // We cannot add a root element
-    return false;
-  }
-
-  const parent = elements[element.parentId];
+  const parent = elements[parentId];
   if (!parent || !isContainerElement(parent)) {
     return false;
   }
 
+  element.parentId = parentId;
   elements[element.id] = element;
   parent.data.children.splice(index, 0, element.id);
   return true;
