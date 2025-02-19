@@ -4,13 +4,14 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
-import { useIsRootElement } from 'features/nodes/components/sidePanel/builder/shared';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import { type FormElement, isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
+
+import { useIsRootElement } from './dnd-hooks';
 
 const sx: SystemStyleObject = {
   w: 'full',

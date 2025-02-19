@@ -1,17 +1,18 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
-import {
-  EDIT_MODE_WRAPPER_CLASS_NAME,
-  getEditModeWrapperId,
-  useIsRootElement,
-} from 'features/nodes/components/sidePanel/builder/shared';
+import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import type { FormElement } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
 import { memo, useRef } from 'react';
+
+import { useIsRootElement } from './dnd-hooks';
+
+const EDIT_MODE_WRAPPER_CLASS_NAME = getPrefixedId('edit-mode-wrapper', '-');
 
 const wrapperSx: SystemStyleObject = {
   position: 'relative',
