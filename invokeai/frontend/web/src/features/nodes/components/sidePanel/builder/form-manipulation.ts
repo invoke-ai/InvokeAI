@@ -125,6 +125,11 @@ export const addElement = (args: {
   const { form, element, parentId, index } = args;
   const { elements } = form;
 
+  if (element.id in elements) {
+    // Element already exists
+    return false;
+  }
+
   const parent = elements[parentId];
   if (!parent || !isContainerElement(parent)) {
     return false;
