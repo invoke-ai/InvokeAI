@@ -41,7 +41,6 @@ import type { RefObject } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { Param0 } from 'tsafe';
-import { assert } from 'tsafe';
 
 const log = logger('dnd');
 
@@ -197,7 +196,10 @@ export const useBuilderDndMonitor = () => {
         if (isAddingNewElement) {
           if (closestEdgeOfTarget === 'center') {
             log.trace('Adding new element to empty container');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
+            if (!isContainerElement(targetElement)) {
+              log.error(parseify({ target, source }), 'Expected target to be a container');
+              return;
+            }
             sourceElement.parentId = targetElement.id;
             dispatchAndFlash(
               formElementAdded({
@@ -210,7 +212,10 @@ export const useBuilderDndMonitor = () => {
             return;
           } else {
             log.trace('Adding new element to container with children (dropped on edge of container child)');
-            assert(targetElement.parentId !== undefined, 'Expected target to have a parent');
+            if (targetElement.parentId === undefined) {
+              log.error(parseify({ target, source }), 'Expected target to have a parent');
+              return;
+            }
             const parent = getElement(targetElement.parentId, isContainerElement);
             const indexOfTarget = parent.data.children.indexOf(targetElement.id);
             const index = getReorderDestinationIndex({
@@ -233,7 +238,10 @@ export const useBuilderDndMonitor = () => {
         } else {
           if (closestEdgeOfTarget === 'center') {
             log.trace('Reparenting element to an empty container');
-            assert(isContainerElement(targetElement), 'Expected target to be a container');
+            if (!isContainerElement(targetElement)) {
+              log.error(parseify({ target, source }), 'Expected target to be a container');
+              return;
+            }
             dispatchAndFlash(
               formElementReparented({
                 id: sourceElement.id,
@@ -245,7 +253,10 @@ export const useBuilderDndMonitor = () => {
             return;
           } else if (targetElement.parentId === sourceElement.parentId) {
             log.trace('Moving element within container');
-            assert(targetElement.parentId !== undefined, 'Expected target to have a parent');
+            if (targetElement.parentId === undefined) {
+              log.error(parseify({ target, source }), 'Expected target to have a parent');
+              return;
+            }
             const container = getElement(targetElement.parentId, isContainerElement);
             const startIndex = container.data.children.indexOf(sourceElement.id);
             const indexOfTarget = container.data.children.indexOf(targetElement.id);
@@ -266,7 +277,10 @@ export const useBuilderDndMonitor = () => {
             return;
           } else if (targetElement.parentId !== sourceElement.parentId) {
             log.trace('Reparenting element to container with children (dropped on edge of container child)');
-            assert(targetElement.parentId !== undefined, 'Expected target to have a parent');
+            if (targetElement.parentId === undefined) {
+              log.error(parseify({ target, source }), 'Expected target to have a parent');
+              return;
+            }
             const container = getElement(targetElement.parentId, isContainerElement);
             const indexOfTarget = container.data.children.indexOf(targetElement.id);
             const index = getReorderDestinationIndex({
@@ -284,10 +298,10 @@ export const useBuilderDndMonitor = () => {
               sourceElement.id
             );
             return;
+          } else {
+            // This should never happen
+            log.error(parseify({ target, source }), 'Unhandled drop event!');
           }
-
-          // This should never happen
-          log.warn(parseify({ target, source }), 'Unhandled drop event!');
         }
       },
     });
