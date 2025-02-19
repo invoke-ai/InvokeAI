@@ -38,7 +38,7 @@ import type { FieldIdentifier, FieldInputTemplate, StatefulFieldValue } from 'fe
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, isContainerElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { Param0 } from 'tsafe';
 
@@ -450,4 +450,15 @@ export const useNodeFieldDnd = (
   }, [dragHandleRef, draggableRef, fieldIdentifier, fieldTemplate]);
 
   return isDragging;
+};
+
+/**
+ * Hook that returns whether an element is the root element.
+ * @param elementId The id of the element
+ * @returns Whether the element is the root element
+ */
+export const useIsRootElement = (elementId: string) => {
+  const rootElementId = useAppSelector(selectFormRootElementId);
+  const isRootElement = useMemo(() => rootElementId === elementId, [rootElementId, elementId]);
+  return isRootElement;
 };
