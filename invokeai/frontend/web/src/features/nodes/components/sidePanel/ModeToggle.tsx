@@ -1,4 +1,4 @@
-import { Flex, IconButton } from '@invoke-ai/ui-library';
+import { Badge, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import type { MouseEventHandler } from 'react';
@@ -30,14 +30,27 @@ export const ModeToggle = () => {
   return (
     <Flex justifyContent="flex-end">
       {mode === 'view' && (
-        <IconButton
-          aria-label={t('nodes.editMode')}
-          tooltip={t('nodes.editMode')}
-          onClick={onClickEdit}
-          icon={<PiPencilBold />}
-          variant="outline"
-          size="sm"
-        />
+        <Flex pos="relative">
+          <Badge
+            pos="absolute"
+            insetInlineStart="-8px"
+            insetBlockStart="-8px"
+            colorScheme="invokeRed"
+            zIndex="docked"
+            shadow="dark-lg"
+            userSelect="none"
+          >
+            !
+          </Badge>
+          <IconButton
+            aria-label={t('nodes.editMode')}
+            tooltip={t('nodes.editMode')}
+            onClick={onClickEdit}
+            icon={<PiPencilBold />}
+            variant="outline"
+            size="sm"
+          />
+        </Flex>
       )}
       {mode === 'edit' && (
         <IconButton

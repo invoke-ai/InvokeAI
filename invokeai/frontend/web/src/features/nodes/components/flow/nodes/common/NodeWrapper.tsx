@@ -1,6 +1,6 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
-import type { NodeChange } from '@xyflow/react';
+import { useReactFlow, type NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
@@ -93,6 +93,8 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const opacity = useAppSelector(selectNodeOpacity);
   const { onCloseGlobal } = useGlobalMenuClose();
 
+  const { setCenter } = useReactFlow();
+
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
@@ -112,9 +114,24 @@ const NodeWrapper = (props: NodeWrapperProps) => {
     [onCloseGlobal, store, dispatch, nodeId]
   );
 
+  const handleDoubleClick = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        const nodes = selectNodes(store.getState());
+        const node = nodes.find((node) => node.id === nodeId);
+        if (node) {
+          setCenter(node.position.x + NODE_WIDTH / 2, node.position.y, { zoom: 1 });
+        }
+      }
+      onCloseGlobal();
+    },
+    [onCloseGlobal, store, nodeId, setCenter]
+  );
+
   return (
     <Box
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onMouseEnter={handleMouseOver}
       onMouseLeave={handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
