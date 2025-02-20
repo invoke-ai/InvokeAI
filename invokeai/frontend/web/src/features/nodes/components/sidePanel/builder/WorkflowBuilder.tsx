@@ -22,7 +22,7 @@ export const WorkflowBuilder = memo(() => {
   return (
     <Flex justifyContent="center" w="full" h="full">
       <Flex flexDir="column" w="full" maxW="768px" gap={2}>
-        <ButtonGroup isAttached={false} justifyContent="center" size="md">
+        <ButtonGroup isAttached={false} justifyContent="center" size="sm">
           <AddFormElementDndButton type="container" />
           <AddFormElementDndButton type="divider" />
           <AddFormElementDndButton type="heading" />
