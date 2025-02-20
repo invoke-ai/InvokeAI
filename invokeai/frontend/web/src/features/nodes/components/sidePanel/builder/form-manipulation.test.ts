@@ -110,6 +110,58 @@ describe('workflow builder form manipulation', () => {
       expect(getElement(form, form.rootElementId, isContainerElement).data.children[1]).toBe(el1.id);
     });
 
+    it('should add the element to the end if the index is out of bounds', () => {
+      const form = getDefaultForm();
+      const el = buildText('foo');
+      addElement({
+        form,
+        element: el,
+        parentId: form.rootElementId,
+        index: 100,
+      });
+      expect(getElement(form, form.rootElementId, isContainerElement).data.children[0]).toBe(el.id);
+    });
+
+    it('should add the element to the end if the index is undefined', () => {
+      const form = getDefaultForm();
+      const el = buildText('foo');
+      addElement({
+        form,
+        element: el,
+        parentId: form.rootElementId,
+      });
+      expect(getElement(form, form.rootElementId, isContainerElement).data.children[0]).toBe(el.id);
+      const el2 = buildText('foo');
+      addElement({
+        form,
+        element: el2,
+        parentId: form.rootElementId,
+      });
+      expect(getElement(form, form.rootElementId, isContainerElement).data.children[0]).toBe(el.id);
+      expect(getElement(form, form.rootElementId, isContainerElement).data.children[1]).toBe(el2.id);
+    });
+
+    it('should add the element counting from the end if the index is negative', () => {
+      const form = getDefaultForm();
+      const el = buildText('foo');
+      addElement({
+        form,
+        element: el,
+        parentId: form.rootElementId,
+        index: -1,
+      });
+      expect(getElement(form, form.rootElementId, isContainerElement).data.children[0]).toBe(el.id);
+      const el2 = buildText('foo');
+      addElement({
+        form,
+        element: el2,
+        parentId: form.rootElementId,
+        index: -1,
+      });
+      expect(getElement(form, form.rootElementId, isContainerElement).data.children[0]).toBe(el2.id);
+      expect(getElement(form, form.rootElementId, isContainerElement).data.children[1]).toBe(el.id);
+    });
+
     it('should return true if the element was added', () => {
       const form = getDefaultForm();
 
