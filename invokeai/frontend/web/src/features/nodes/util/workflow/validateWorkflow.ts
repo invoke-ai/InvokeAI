@@ -253,6 +253,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
         continue;
       }
       const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
+      element.data.showDescription = false;
       addElement({
         form: _workflow.form,
         element,
