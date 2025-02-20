@@ -1,9 +1,10 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
-import { type NodeChange, useReactFlow } from '@xyflow/react';
+import type { NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { nodesChanged } from 'features/nodes/store/nodesSlice';
 import { selectNodes } from 'features/nodes/store/selectors';
 import { selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
@@ -84,7 +85,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
   const store = useAppStore();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
-  const flow = useReactFlow();
+  const zoomToNode = useZoomToNode();
 
   const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
@@ -133,9 +134,9 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         // This target is marked as not fitting the view on double click
         return;
       }
-      flow.fitView({ duration: 300, maxZoom: 1.5, nodes: [{ id: nodeId }] });
+      zoomToNode(nodeId);
     },
-    [flow, nodeId]
+    [nodeId, zoomToNode]
   );
 
   return (
