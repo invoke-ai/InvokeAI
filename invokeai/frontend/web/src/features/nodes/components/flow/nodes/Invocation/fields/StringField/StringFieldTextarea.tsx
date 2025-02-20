@@ -15,7 +15,6 @@ export const StringFieldTextarea = memo(
         value={value}
         onChange={onChange}
         h="full"
-        resize="none"
         fontSize="sm"
         p={2}
       />
