@@ -65,7 +65,7 @@ const isFormElementDndData = (data: Record<string | symbol, unknown>): data is F
 const flashElement = (elementId: ElementId) => {
   const element = document.querySelector(`#${getEditModeWrapperId(elementId)}`);
   if (element instanceof HTMLElement) {
-    triggerPostMoveFlash(element, colorTokenToCssVar('base.700'));
+    triggerPostMoveFlash(element, colorTokenToCssVar('base.800'));
   }
 };
 

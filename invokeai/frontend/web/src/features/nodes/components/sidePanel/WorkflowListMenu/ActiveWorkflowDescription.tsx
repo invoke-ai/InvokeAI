@@ -11,7 +11,7 @@ export const ActiveWorkflowDescription = memo(() => {
   }
 
   return (
-    <Text color="base.300" fontStyle="italic" noOfLines={1}>
+    <Text color="base.300" fontStyle="italic" noOfLines={1} pb={2}>
       {description}
     </Text>
   );

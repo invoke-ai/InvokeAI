@@ -4,7 +4,7 @@ import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/wo
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiEyeBold, PiPencilBold } from 'react-icons/pi';
+import { PiEyeBold, PiPencilSimpleFill } from 'react-icons/pi';
 
 export const WorkflowViewEditToggleButton = memo(() => {
   const dispatch = useAppDispatch();
@@ -33,8 +33,8 @@ export const WorkflowViewEditToggleButton = memo(() => {
         aria-label={t('nodes.editMode')}
         tooltip={t('nodes.editMode')}
         onClick={onClickEdit}
-        icon={<PiPencilBold />}
-        variant="outline"
+        icon={<PiPencilSimpleFill />}
+        variant="ghost"
         size="sm"
       />
     );
@@ -47,7 +47,7 @@ export const WorkflowViewEditToggleButton = memo(() => {
       tooltip={t('nodes.viewMode')}
       onClick={onClickView}
       icon={<PiEyeBold />}
-      variant="outline"
+      variant="ghost"
       size="sm"
     />
   );

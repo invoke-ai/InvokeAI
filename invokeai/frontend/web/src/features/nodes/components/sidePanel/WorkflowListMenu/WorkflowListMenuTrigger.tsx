@@ -2,7 +2,7 @@ import { IconButton, Popover, PopoverBody, PopoverContent, PopoverTrigger, Porta
 import { WorkflowListMenuContent } from 'features/nodes/components/sidePanel/WorkflowListMenu/WorkflowListMenuContent';
 import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold } from 'react-icons/pi';
+import { PiFolderOpenFill } from 'react-icons/pi';
 
 export const WorkflowListMenuTrigger = () => {
   const workflowListMenu = useWorkflowListMenu();
@@ -11,7 +11,13 @@ export const WorkflowListMenuTrigger = () => {
   return (
     <Popover isOpen={workflowListMenu.isOpen} onClose={workflowListMenu.close} onOpen={workflowListMenu.open}>
       <PopoverTrigger>
-        <IconButton aria-label={t('stylePresets.viewList')} variant="ghost" icon={<PiCaretDownBold />} size="sm" />
+        <IconButton
+          aria-label={t('workflows.openLibrary')}
+          tooltip={t('workflows.openLibrary')}
+          variant="ghost"
+          icon={<PiFolderOpenFill />}
+          size="sm"
+        />
       </PopoverTrigger>
       <Portal appendToParentPortal={false}>
         <PopoverContent p={4} w={512} maxW="full" minH={512} maxH="full">
