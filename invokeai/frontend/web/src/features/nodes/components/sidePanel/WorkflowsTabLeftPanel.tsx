@@ -14,7 +14,7 @@ const WorkflowsTabLeftPanel = () => {
   return (
     <Flex w="full" h="full" gap={2} flexDir="column">
       <ActiveWorkflowNameAndActions />
-      <ActiveWorkflowDescription />
+      {mode === 'view' && <ActiveWorkflowDescription />}
       {mode === 'view' && <ViewModeLeftPanelContent />}
       {mode === 'edit' && <EditModeLeftPanelContent />}
     </Flex>
