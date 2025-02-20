@@ -1,7 +1,7 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Button, ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
+import { Button, Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
@@ -35,17 +35,17 @@ export const WorkflowBuilder = memo(() => {
   return (
     <Flex justifyContent="center" w="full" h="full">
       <Flex flexDir="column" w="full" maxW="768px" gap={2}>
-        <ButtonGroup isAttached={false} justifyContent="center" size="sm">
+        <Flex w="full" alignItems="center" gap={2}>
           <AddFormElementDndButton type="container" />
           <AddFormElementDndButton type="divider" />
           <AddFormElementDndButton type="heading" />
           <AddFormElementDndButton type="text" />
-          <Button variant="ghost" tooltip={t('workflows.builder.nodeFieldTooltip')}>
+          <Button size="sm" variant="ghost" tooltip={t('workflows.builder.nodeFieldTooltip')}>
             {t('workflows.builder.nodeField')}
           </Button>
           <Spacer />
           <WorkflowBuilderEditMenu />
-        </ButtonGroup>
+        </Flex>
         <ScrollableContent>
           <Flex sx={sx} data-is-empty={isFormEmpty}>
             <FormElementComponent id={rootElementId} />
@@ -109,7 +109,16 @@ const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormE
   const isDragging = useAddFormElementDnd(type, draggableRef);
 
   return (
-    <Button as="div" ref={draggableRef} variant="outline" cursor="grab" borderStyle="dashed" isDisabled={isDragging}>
+    // Must be as div for draggable to work correctly
+    <Button
+      as="div"
+      ref={draggableRef}
+      variant="outline"
+      cursor="grab"
+      borderStyle="dashed"
+      isDisabled={isDragging}
+      size="sm"
+    >
       {startCase(type)}
     </Button>
   );
