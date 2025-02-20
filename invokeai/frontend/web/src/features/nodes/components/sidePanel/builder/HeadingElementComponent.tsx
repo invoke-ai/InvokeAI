@@ -53,9 +53,11 @@ const HeadingElementComponentEditMode = memo(({ el }: { el: HeadingElement }) =>
   );
 });
 
+const FONT_SIZE = '2xl';
+
 const headingSx: SystemStyleObject = {
   fontWeight: 'bold',
-  fontSize: '4xl',
+  fontSize: FONT_SIZE,
   '&[data-is-empty="true"]': {
     opacity: 0.3,
   },
@@ -111,7 +113,7 @@ const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
       resize="none"
       p={2}
       fontWeight="bold"
-      fontSize="4xl"
+      fontSize={FONT_SIZE}
     />
   );
 });
