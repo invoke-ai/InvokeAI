@@ -13,9 +13,11 @@ import { buildContainer, buildDivider, buildHeading, buildText } from 'features/
 import { startCase } from 'lodash-es';
 import type { RefObject } from 'react';
 import { memo, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
 export const WorkflowBuilder = memo(() => {
+  const { t } = useTranslation();
   const rootElementId = useAppSelector(selectFormRootElementId);
   useBuilderDndMonitor();
 
@@ -27,6 +29,9 @@ export const WorkflowBuilder = memo(() => {
           <AddFormElementDndButton type="divider" />
           <AddFormElementDndButton type="heading" />
           <AddFormElementDndButton type="text" />
+          <Button variant="ghost" tooltip={t('workflows.builder.nodeFieldTooltip')}>
+            {t('workflows.builder.nodeField')}
+          </Button>
           <Spacer />
           <WorkflowBuilderEditMenu />
         </ButtonGroup>
