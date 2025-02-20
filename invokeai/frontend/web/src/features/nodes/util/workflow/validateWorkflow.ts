@@ -1,5 +1,5 @@
 import { parseify } from 'common/util/serialize';
-import { addElement, getElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
+import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { Templates } from 'features/nodes/store/types';
 import {
   isBoardFieldInputInstance,
@@ -12,7 +12,6 @@ import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import {
   buildNodeFieldElement,
   getDefaultForm,
-  isContainerElement,
   isNodeFieldElement,
   isWorkflowInvocationNode,
 } from 'features/nodes/types/workflow';
@@ -233,11 +232,8 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
   });
 
   // Migrated exposed fields to form elements if they exist and the form does not
-  const rootElement = getElement(_workflow.form, _workflow.form.rootElementId, isContainerElement);
-  if (
-    (_workflow.exposedFields.length > 0 && rootElement.data.children.length === 0) ||
-    Object.keys(_workflow.form.elements).length > 0
-  ) {
+  // Note: If the form is invalid per its zod schema, it will be reset to a default, empty form!
+  if (_workflow.exposedFields.length > 0 && getIsFormEmpty(_workflow.form)) {
     _workflow.form = getDefaultForm();
 
     // Reverse the fields so that we can insert each at index 0 without needing to shift the index
