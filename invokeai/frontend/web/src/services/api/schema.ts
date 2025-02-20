@@ -19468,6 +19468,13 @@ export type components = {
                 [key: string]: components["schemas"]["JsonValue"];
             }[];
             /**
+             * Form
+             * @description The form of the workflow.
+             */
+            form?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /**
              * Id
              * @description The id of the workflow.
              */
@@ -19633,6 +19640,13 @@ export type components = {
             edges: {
                 [key: string]: components["schemas"]["JsonValue"];
             }[];
+            /**
+             * Form
+             * @description The form of the workflow.
+             */
+            form?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
         };
         /**
          * Zoe (Depth) Processor
