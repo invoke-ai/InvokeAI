@@ -1,4 +1,5 @@
 import { parseify } from 'common/util/serialize';
+import { addElement, getElement } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { Templates } from 'features/nodes/store/types';
 import {
   isBoardFieldInputInstance,
@@ -9,8 +10,9 @@ import {
 } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import {
-  buildContainer,
   buildNodeFieldElement,
+  getDefaultForm,
+  isContainerElement,
   isNodeFieldElement,
   isWorkflowInvocationNode,
 } from 'features/nodes/types/workflow';
@@ -231,15 +233,17 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
   });
 
   // Migrated exposed fields to form elements if they exist and the form does not
-  if (_workflow.exposedFields.length > 0 && !_workflow.form) {
-    const rootElement = buildContainer('row', []);
+  const rootElement = getElement(_workflow.form, _workflow.form.rootElementId, isContainerElement);
+  if (
+    (_workflow.exposedFields.length > 0 && rootElement.data.children.length === 0) ||
+    Object.keys(_workflow.form.elements).length > 0
+  ) {
+    _workflow.form = getDefaultForm();
 
-    _workflow.form = {
-      elements: { [rootElement.id]: rootElement },
-      rootElementId: rootElement.id,
-    };
+    // Reverse the fields so that we can insert each at index 0 without needing to shift the index
+    const reverseExposedFields = [..._workflow.exposedFields].reverse();
 
-    for (const { nodeId, fieldName } of _workflow.exposedFields) {
+    for (const { nodeId, fieldName } of reverseExposedFields) {
       const node = nodes.find(({ id }) => id === nodeId);
       if (!node) {
         continue;
@@ -253,28 +257,30 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
         continue;
       }
       const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
-      _workflow.form.elements[element.id] = element;
-      rootElement.data.children.push(element.id);
+      addElement({
+        form: _workflow.form,
+        element,
+        parentId: _workflow.form.rootElementId,
+        index: 0,
+      });
     }
   }
 
   // If the form exists, remove any form elements that no longer have a corresponding node field
-  if (_workflow.form) {
-    for (const element of Object.values(_workflow.form.elements)) {
-      if (!isNodeFieldElement(element)) {
-        continue;
-      }
-      const { nodeId, fieldName } = element.data.fieldIdentifier;
-      const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === nodeId);
-      const field = node?.data.inputs[fieldName];
-      if (!field) {
-        // The form element field no longer exists on the node
-        delete _workflow.form.elements[element.id];
-        warnings.push({
-          message: t('nodes.deletedMissingNodeFieldFormElement', { nodeId, fieldName }),
-          data: { nodeId, fieldName },
-        });
-      }
+  for (const element of Object.values(_workflow.form.elements)) {
+    if (!isNodeFieldElement(element)) {
+      continue;
+    }
+    const { nodeId, fieldName } = element.data.fieldIdentifier;
+    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === nodeId);
+    const field = node?.data.inputs[fieldName];
+    if (!field) {
+      // The form element field no longer exists on the node
+      delete _workflow.form.elements[element.id];
+      warnings.push({
+        message: t('nodes.deletedMissingNodeFieldFormElement', { nodeId, fieldName }),
+        data: { nodeId, fieldName },
+      });
     }
   }
 

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 //TODO(psyche): Test workflow validation for form builder fields
 describe('validateWorkflow', () => {
-  const workflow: WorkflowV3 = {
+  const getWorkflow = (): WorkflowV3 => ({
     name: '',
     author: '',
     description: '',
@@ -85,7 +85,7 @@ describe('validateWorkflow', () => {
       },
     ],
     edges: [],
-  };
+  });
   const resolveTrue = (): Promise<boolean> =>
     new Promise((resolve) => {
       resolve(true);
@@ -96,7 +96,7 @@ describe('validateWorkflow', () => {
     });
   it('should reset images that are inaccessible', async () => {
     const validationResult = await validateWorkflow({
-      workflow,
+      workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveFalse,
       checkBoardAccess: resolveTrue,
@@ -107,7 +107,7 @@ describe('validateWorkflow', () => {
   });
   it('should reset boards that are inaccessible', async () => {
     const validationResult = await validateWorkflow({
-      workflow,
+      workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
       checkBoardAccess: resolveFalse,
@@ -118,7 +118,7 @@ describe('validateWorkflow', () => {
   });
   it('should reset models that are inaccessible', async () => {
     const validationResult = await validateWorkflow({
-      workflow,
+      workflow: getWorkflow(),
       templates: { img_resize, main_model_loader },
       checkImageAccess: resolveTrue,
       checkBoardAccess: resolveTrue,
