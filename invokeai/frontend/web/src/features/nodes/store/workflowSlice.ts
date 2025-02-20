@@ -182,15 +182,6 @@ export const workflowSlice = createSlice({
       removeElement({ form, id });
       delete state.formFieldInitialValues[id];
     },
-    formContainerChildrenReordered: (state, action: PayloadAction<{ id: string; children: string[] }>) => {
-      const { form } = state;
-      const { id, children } = action.payload;
-      const container = form.elements[id];
-      if (!container || !isContainerElement(container)) {
-        return;
-      }
-      container.data.children = children;
-    },
     formElementReparented: (state, action: PayloadAction<{ id: string; newParentId: string; index: number }>) => {
       const { form } = state;
       const { id, newParentId, index } = action.payload;
@@ -338,7 +329,6 @@ export const {
   formElementAdded,
   formElementRemoved,
   formElementReparented,
-  formContainerChildrenReordered,
   formElementHeadingDataChanged,
   formElementTextDataChanged,
   formElementNodeFieldDataChanged,
