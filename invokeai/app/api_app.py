@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import mimetypes
-import socket
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -17,8 +16,6 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from torch.backends.mps import is_available as is_mps_available
 
-# for PyCharm:
-# noinspection PyUnresolvedReferences
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
 from invokeai.app.api.dependencies import ApiDependencies
@@ -39,6 +36,10 @@ from invokeai.app.api.sockets import SocketIO
 from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.custom_openapi import get_openapi_func
+
+# for PyCharm:
+# noinspection PyUnresolvedReferences
+from invokeai.app.util.startup_utils import find_open_port
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -211,17 +212,6 @@ def check_cudnn(logger: logging.Logger) -> None:
 
 
 def invoke_api() -> None:
-    def find_port(port: int) -> int:
-        """Find a port not in use starting at given port"""
-        # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
-        # https://github.com/WaylonWalker
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1)
-            if s.connect_ex(("localhost", port)) == 0:
-                return find_port(port=port + 1)
-            else:
-                return port
-
     if app_config.dev_reload:
         try:
             import jurigged
@@ -234,7 +224,7 @@ def invoke_api() -> None:
             jurigged.watch(logger=InvokeAILogger.get_logger(name="jurigged").info)
 
     global port
-    port = find_port(app_config.port)
+    port = find_open_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
 
