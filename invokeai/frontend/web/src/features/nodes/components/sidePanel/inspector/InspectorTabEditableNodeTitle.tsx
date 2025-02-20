@@ -12,7 +12,7 @@ type Props = {
   title?: string;
 };
 
-const EditableNodeTitle = ({ nodeId, title }: Props) => {
+const InspectorTabEditableNodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
   const label = useNodeLabel(nodeId);
   const templateTitle = useNodeTemplateTitle(nodeId);
@@ -32,7 +32,7 @@ const EditableNodeTitle = ({ nodeId, title }: Props) => {
   });
 
   return (
-    <Flex w="full" alignItems="center" justifyContent="center">
+    <Flex w="full" alignItems="center">
       {!editable.isEditing && (
         <Text size="sm" fontWeight="semibold" userSelect="none" onDoubleClick={editable.startEditing}>
           {editable.value}
@@ -50,4 +50,4 @@ const EditableNodeTitle = ({ nodeId, title }: Props) => {
   );
 };
 
-export default memo(EditableNodeTitle);
+export default memo(InspectorTabEditableNodeTitle);

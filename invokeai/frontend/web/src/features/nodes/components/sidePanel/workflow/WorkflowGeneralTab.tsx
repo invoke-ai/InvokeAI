@@ -85,37 +85,47 @@ const WorkflowGeneralTab = () => {
     <ScrollableContent>
       <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
         <FormControlGroup orientation="vertical" formControlProps={formControlProps}>
-          <Flex gap={2} w="full">
-            <FormControl>
-              <FormLabel>{t('nodes.workflowName')}</FormLabel>
-              <Input value={name} onChange={handleChangeName} />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
-              <Input value={version} onChange={handleChangeVersion} />
-            </FormControl>
-          </Flex>
-          <Flex gap={2} w="full">
-            <FormControl>
-              <FormLabel>{t('nodes.workflowAuthor')}</FormLabel>
-              <Input value={author} onChange={handleChangeAuthor} />
-            </FormControl>
-            <FormControl>
-              <FormLabel>{t('nodes.workflowContact')}</FormLabel>
-              <Input value={contact} onChange={handleChangeContact} />
-            </FormControl>
-          </Flex>
+          <FormControl>
+            <FormLabel>{t('nodes.workflowName')}</FormLabel>
+            <Input variant="darkFilled" value={name} onChange={handleChangeName} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
+            <Input variant="darkFilled" value={version} onChange={handleChangeVersion} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('nodes.workflowAuthor')}</FormLabel>
+            <Input variant="darkFilled" value={author} onChange={handleChangeAuthor} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('nodes.workflowContact')}</FormLabel>
+            <Input variant="darkFilled" value={contact} onChange={handleChangeContact} />
+          </FormControl>
           <FormControl>
             <FormLabel>{t('nodes.workflowTags')}</FormLabel>
-            <Input value={tags} onChange={handleChangeTags} />
+            <Input variant="darkFilled" value={tags} onChange={handleChangeTags} />
           </FormControl>
           <FormControl>
             <FormLabel>{t('nodes.workflowDescription')}</FormLabel>
-            <Textarea onChange={handleChangeDescription} value={description} fontSize="sm" resize="none" rows={3} />
+            <Textarea
+              variant="darkFilled"
+              onChange={handleChangeDescription}
+              value={description}
+              fontSize="sm"
+              resize="none"
+              rows={3}
+            />
           </FormControl>
           <FormControl>
             <FormLabel>{t('nodes.workflowNotes')}</FormLabel>
-            <Textarea onChange={handleChangeNotes} value={notes} fontSize="sm" resize="none" rows={10} />
+            <Textarea
+              variant="darkFilled"
+              onChange={handleChangeNotes}
+              value={notes}
+              fontSize="sm"
+              resize="none"
+              rows={10}
+            />
           </FormControl>
         </FormControlGroup>
       </Flex>

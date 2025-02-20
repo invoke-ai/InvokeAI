@@ -27,8 +27,11 @@ import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const sx: SystemStyleObject = {
-  gap: 4,
+  gap: 2,
   flex: '1 1 0',
+  '&[data-depth="0"]': {
+    flex: 1,
+  },
   '&[data-container-layout="column"]': {
     flexDir: 'column',
   },
@@ -63,7 +66,7 @@ const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }
   return (
     <DepthContextProvider depth={depth + 1}>
       <ContainerContextProvider id={id} layout={layout}>
-        <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-layout={layout}>
+        <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-layout={layout} data-depth={depth}>
           {children.map((childId) => (
             <FormElementComponent key={childId} id={childId} />
           ))}
@@ -89,7 +92,7 @@ const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }
     <FormElementEditModeWrapper element={el}>
       <DepthContextProvider depth={depth + 1}>
         <ContainerContextProvider id={id} layout={layout}>
-          <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-layout={layout}>
+          <Flex id={id} className={CONTAINER_CLASS_NAME} sx={sx} data-container-layout={layout} data-depth={depth}>
             {children.map((childId) => (
               <FormElementComponent key={childId} id={childId} />
             ))}

@@ -9,11 +9,11 @@ import { WorkflowList } from './WorkflowList';
 import WorkflowSearch from './WorkflowSearch';
 import { WorkflowSortControl } from './WorkflowSortControl';
 
-export const WorkflowListMenu = memo(() => {
+export const WorkflowListMenuContent = memo(() => {
   const workflowCategories = useStore($workflowCategories);
 
   return (
-    <Flex w="full" h="full" flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
+    <Flex w="full" h="full" flexDir="column" gap={2}>
       <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <WorkflowSearch />
         <WorkflowSortControl />
@@ -31,4 +31,4 @@ export const WorkflowListMenu = memo(() => {
   );
 });
 
-WorkflowListMenu.displayName = 'WorkflowListMenu';
+WorkflowListMenuContent.displayName = 'WorkflowListMenuContent';

@@ -54,7 +54,7 @@ const NodeFieldElementComponentViewMode = memo(({ el }: { el: NodeFieldElement }
   );
 
   return (
-    <Flex id={id} className={NODE_FIELD_CLASS_NAME} flex="1 1 0">
+    <Flex id={id} className={NODE_FIELD_CLASS_NAME}>
       <FormControl flex="1 1 0" orientation="vertical">
         <Flex w="full" gap={4}>
           <FormLabel>{_label}</FormLabel>

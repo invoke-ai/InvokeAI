@@ -19,7 +19,7 @@ const InspectorDataTab = () => {
     return <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />;
   }
 
-  return <DataViewer data={debouncedLastSelectedNodeData} label="Node Data" />;
+  return <DataViewer data={debouncedLastSelectedNodeData} label="Node Data" bg="base.850" color="base.200" />;
 };
 
 export default memo(InspectorDataTab);

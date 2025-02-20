@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
+import { useContainerContext, useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
@@ -46,11 +46,27 @@ const innerSx: SystemStyleObject = {
   },
 };
 
+const contentWrapperSx: SystemStyleObject = {
+  w: 'full',
+  h: 'full',
+  p: 2,
+  gap: 2,
+  borderWidth: 1,
+  borderRadius: 'base',
+  borderTopRadius: 'unset',
+  borderTop: 'unset',
+  borderColor: 'baseAlpha.250',
+  '&[data-depth="0"]': { borderColor: 'baseAlpha.100' },
+  '&[data-depth="1"]': { borderColor: 'baseAlpha.150' },
+  '&[data-depth="2"]': { borderColor: 'baseAlpha.200' },
+};
+
 export const FormElementEditModeWrapper = memo(({ element, children }: PropsWithChildren<{ element: FormElement }>) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [activeDropRegion, isDragging] = useFormElementDnd(element.id, draggableRef, dragHandleRef);
   const containerCtx = useContainerContext();
+  const depth = useDepthContext();
   const isRootElement = useIsRootElement(element.id);
 
   return (
@@ -71,17 +87,7 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
         data-layout={containerCtx?.layout}
       >
         <FormElementEditModeHeader ref={dragHandleRef} element={element} />
-        <Flex
-          w="full"
-          h="full"
-          p={4}
-          gap={4}
-          borderWidth={1}
-          borderColor="base.800"
-          borderRadius="base"
-          borderTopRadius="unset"
-          borderTop="unset"
-        >
+        <Flex sx={contentWrapperSx} data-depth={depth}>
           {children}
         </Flex>
       </Flex>

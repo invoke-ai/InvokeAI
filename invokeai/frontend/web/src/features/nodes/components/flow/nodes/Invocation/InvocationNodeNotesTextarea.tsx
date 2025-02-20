@@ -23,7 +23,7 @@ export const InvocationNodeNotesTextarea = memo(({ nodeId }: Props) => {
   return (
     <FormControl orientation="vertical" h="full">
       <FormLabel>{t('nodes.notes')}</FormLabel>
-      <Textarea value={notes} onChange={handleNotesChanged} rows={10} resize="none" />
+      <Textarea value={notes} onChange={handleNotesChanged} rows={10} resize="none" variant="darkFilled" />
     </FormControl>
   );
 });
