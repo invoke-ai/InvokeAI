@@ -3,6 +3,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import InvocationNodeClassificationIcon from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeClassificationIcon';
+import { useNodeIsInvalid } from 'features/nodes/hooks/useNodeIsInvalid';
 import { memo } from 'react';
 
 import InvocationNodeCollapsedHandles from './InvocationNodeCollapsedHandles';
@@ -25,11 +26,16 @@ const sx: SystemStyleObject = {
   '&[data-is-open="true"]': {
     borderBottomRadius: 0,
   },
+  '&[data-is-invalid="true"]': {
+    color: 'error.300',
+  },
 };
 
 const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
+  const isInvalid = useNodeIsInvalid(nodeId);
+
   return (
-    <Flex layerStyle="nodeHeader" sx={sx} data-is-open={isOpen}>
+    <Flex layerStyle="nodeHeader" sx={sx} data-is-open={isOpen} data-is-invalid={isInvalid}>
       <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
       <InvocationNodeClassificationIcon nodeId={nodeId} />
       <NodeTitle nodeId={nodeId} />
