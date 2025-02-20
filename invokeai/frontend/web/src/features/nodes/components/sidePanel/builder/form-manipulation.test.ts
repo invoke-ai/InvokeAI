@@ -4,6 +4,7 @@ import {
   elementExists,
   getAllowedDropRegions,
   getElement,
+  getIsFormEmpty,
   removeElement,
   reparentElement,
   validateFormStructure,
@@ -906,6 +907,25 @@ describe('workflow builder form manipulation', () => {
         rootElementId: el.id,
       };
       expect(validateFormStructure(form)).toBe(false);
+    });
+  });
+
+  describe('getIsFormEmpty', () => {
+    it('should return true if the form is empty', () => {
+      const form = getDefaultForm();
+      expect(getIsFormEmpty(form)).toBe(true);
+    });
+
+    it('should return false if the form is not empty', () => {
+      const form = getDefaultForm();
+      const el = buildText('foo');
+      addElement({
+        form,
+        element: el,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      expect(getIsFormEmpty(form)).toBe(false);
     });
   });
 });
