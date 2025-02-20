@@ -1727,7 +1727,6 @@
             "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
             "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",
             "containerPlaceholder": "Empty Container",
-            "containerPlaceholderDesc": "Drag a form element or node field into this container.",
             "headingPlaceholder": "Empty Heading",
             "textPlaceholder": "Empty Text",
             "workflowBuilderAlphaWarning": "The workflow builder is currently in alpha. There may be breaking changes before the stable release."

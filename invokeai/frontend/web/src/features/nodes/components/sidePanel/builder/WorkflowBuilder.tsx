@@ -1,5 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -7,7 +8,7 @@ import { firefoxDndFix } from 'features/dnd/util';
 import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
 import { buildFormElementDndData, useBuilderDndMonitor } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { WorkflowBuilderEditMenu } from 'features/nodes/components/sidePanel/builder/WorkflowBuilderMenu';
-import { selectFormRootElementId } from 'features/nodes/store/workflowSlice';
+import { selectFormRootElementId, selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
@@ -16,9 +17,19 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
+const sx: SystemStyleObject = {
+  pt: 3,
+  '&[data-is-empty="true"]': {
+    w: 'full',
+    h: 'full',
+    pt: 0,
+  },
+};
+
 export const WorkflowBuilder = memo(() => {
   const { t } = useTranslation();
   const rootElementId = useAppSelector(selectFormRootElementId);
+  const isFormEmpty = useAppSelector(selectIsFormEmpty);
   useBuilderDndMonitor();
 
   return (
@@ -36,7 +47,7 @@ export const WorkflowBuilder = memo(() => {
           <WorkflowBuilderEditMenu />
         </ButtonGroup>
         <ScrollableContent>
-          <Flex>
+          <Flex sx={sx} data-is-empty={isFormEmpty}>
             <FormElementComponent id={rootElementId} />
           </Flex>
         </ScrollableContent>

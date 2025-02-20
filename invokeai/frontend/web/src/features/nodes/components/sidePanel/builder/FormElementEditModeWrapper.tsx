@@ -20,6 +20,10 @@ const wrapperSx: SystemStyleObject = {
   '&[data-element-type="divider"]&[data-layout="row"]': {
     flex: '0 1 0',
   },
+  '&[data-is-root="true"]': {
+    w: 'full',
+    h: 'full',
+  },
   borderRadius: 'base',
 };
 
@@ -86,10 +90,21 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
         data-element-type={element.type}
         data-layout={containerCtx?.layout}
       >
-        <FormElementEditModeHeader ref={dragHandleRef} element={element} />
-        <Flex sx={contentWrapperSx} data-depth={depth}>
-          {children}
-        </Flex>
+        {!isRootElement && (
+          // Non-root elements get the header and content wrapper
+          <>
+            <FormElementEditModeHeader ref={dragHandleRef} element={element} />
+            <Flex sx={contentWrapperSx} data-depth={depth}>
+              {children}
+            </Flex>
+          </>
+        )}
+        {isRootElement && (
+          // But the root does not - helps the builder to look less busy
+          <Flex ref={dragHandleRef} w="full" h="full">
+            {children}
+          </Flex>
+        )}
       </Flex>
       <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
     </Flex>
