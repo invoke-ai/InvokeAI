@@ -23,6 +23,8 @@ export const SHARED_NODE_PROPERTIES: Partial<AnyNode> = {
   dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
 };
 
+export const NO_FIT_ON_DOUBLE_CLICK_CLASS = 'no-fit-on-double-click';
+
 /**
  * Colors for each field type - applies to their handles and edges.
  */

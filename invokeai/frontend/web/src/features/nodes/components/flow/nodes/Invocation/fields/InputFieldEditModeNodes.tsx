@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, FormControl, Spacer } from '@invoke-ai/ui-library';
+import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { InputFieldDescriptionPopover } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldDescriptionPopover';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
@@ -57,12 +57,12 @@ type CommonProps = {
   fieldTemplate: FieldInputTemplate;
 };
 
-const ConnectedOrConnectionField = memo(({ nodeId, fieldName, isInvalid, isConnected }: CommonProps) => {
+const ConnectedOrConnectionField = memo(({ nodeId, fieldName, isInvalid }: CommonProps) => {
   return (
     <InputFieldWrapper>
-      <FormControl isInvalid={isInvalid} isDisabled={isConnected} px={2}>
+      <Flex px={2}>
         <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
-      </FormControl>
+      </Flex>
       <InputFieldHandle nodeId={nodeId} fieldName={fieldName} />
     </InputFieldWrapper>
   );
@@ -70,8 +70,10 @@ const ConnectedOrConnectionField = memo(({ nodeId, fieldName, isInvalid, isConne
 ConnectedOrConnectionField.displayName = 'ConnectedOrConnectionField';
 
 const directFieldSx: SystemStyleObject = {
-  orientation: 'vertical',
+  w: 'full',
   px: 2,
+  flexDir: 'column',
+  gap: 1,
   '&[data-is-dragging="true"]': {
     opacity: 0.3,
   },
@@ -100,31 +102,28 @@ const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemp
 
   return (
     <InputFieldWrapper>
-      <FormControl
+      <Flex
         ref={draggableRef}
-        isInvalid={isInvalid}
-        isDisabled={isConnected}
         sx={directFieldSx}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         data-is-connected={isConnected}
         data-is-dragging={isDragging}
       >
-        <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
-          <Flex gap={1}>
-            <Flex className="nodrag" ref={dragHandleRef}>
-              <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} isDragging={isDragging} />
-            </Flex>
-            <Spacer />
-            {isHovered && (
-              <>
-                <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
-                <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
-              </>
-            )}
+        <Flex gap={1}>
+          <Flex ref={dragHandleRef}>
+            <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} isDragging={isDragging} />
           </Flex>
-          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+          <Spacer />
+          {isHovered && (
+            <>
+              <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
+              <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
+            </>
+          )}
         </Flex>
-      </FormControl>
-
+        <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+      </Flex>
       {fieldTemplate.input !== 'direct' && <InputFieldHandle nodeId={nodeId} fieldName={fieldName} />}
     </InputFieldWrapper>
   );
