@@ -4,7 +4,7 @@ import { useFocusRegion } from 'common/hooks/focus';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
-import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
+import { HorizontalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
 import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -94,7 +94,7 @@ const GalleryPanelContent = () => {
             <BoardsListWrapper />
           </Flex>
         </Panel>
-        <ResizeHandle id="gallery-panel-handle" {...boardsListPanel.resizeHandleProps} />
+        <HorizontalResizeHandle id="gallery-panel-handle" {...boardsListPanel.resizeHandleProps} />
         <Panel id="gallery-wrapper-panel" minSize={20}>
           <Gallery />
         </Panel>
