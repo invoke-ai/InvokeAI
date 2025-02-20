@@ -1,4 +1,5 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { validateFormStructure } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { z } from 'zod';
 
 import type { FieldType } from './field';
@@ -230,7 +231,7 @@ const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElem
 
 export type FormElement = z.infer<typeof zFormElement>;
 
-export const getDefaultForm = () => {
+export const getDefaultForm = (): BuilderForm => {
   const rootElement = buildContainer('column', []);
   return {
     elements: {
@@ -240,13 +241,22 @@ export const getDefaultForm = () => {
   };
 };
 
-const zBuilderForm = z
-  .object({
-    elements: z.record(zFormElement),
-    rootElementId: zElementId,
-  })
-  .default(getDefaultForm);
+const zBuilderForm = z.object({
+  elements: z.record(zFormElement),
+  rootElementId: zElementId,
+});
+
 export type BuilderForm = z.infer<typeof zBuilderForm>;
+
+// Need to separate the form vaidation from the schema due to circular dependencies
+const zValidatedBuilderForm = zBuilderForm
+  .default(getDefaultForm)
+  .refine((val) => val.rootElementId in val.elements, {
+    message: 'rootElementId must be a valid element id',
+  })
+  .refine((val) => validateFormStructure(val), {
+    message: 'Form structure is invalid',
+  });
 //# endregion
 
 // #region Workflow
@@ -266,7 +276,8 @@ export const zWorkflowV3 = z.object({
     category: zWorkflowCategory.default('user'),
     version: z.literal('3.0.0'),
   }),
-  form: zBuilderForm,
+  // Use the validated form schema!
+  form: zValidatedBuilderForm,
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion

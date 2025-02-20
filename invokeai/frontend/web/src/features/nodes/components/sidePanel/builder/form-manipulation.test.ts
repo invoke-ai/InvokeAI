@@ -6,8 +6,9 @@ import {
   getElement,
   removeElement,
   reparentElement,
+  validateFormStructure,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
-import type { ContainerElement } from 'features/nodes/types/workflow';
+import type { BuilderForm, ContainerElement } from 'features/nodes/types/workflow';
 import {
   buildContainer,
   buildText,
@@ -754,6 +755,157 @@ describe('workflow builder form manipulation', () => {
       ).toBe(false);
 
       expect(form).toEqual(prevForm);
+    });
+  });
+
+  describe('validateFormStructure', () => {
+    it('should be happy with the default form', () => {
+      const form = getDefaultForm();
+      expect(validateFormStructure(form)).toBe(true);
+    });
+
+    it('should return true if all children are reachable and there are no extra elements', () => {
+      const form = getDefaultForm();
+      const container1 = buildContainer('row', []);
+      addElement({
+        form,
+        element: container1,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      const container2 = buildContainer('row', []);
+      addElement({
+        form,
+        element: container2,
+        parentId: container1.id,
+        index: 0,
+      });
+      const child = buildText('foo');
+      addElement({
+        form,
+        element: child,
+        parentId: container2.id,
+        index: 0,
+      });
+
+      expect(validateFormStructure(form)).toBe(true);
+    });
+
+    it('should return false if a child is not reachable', () => {
+      const form = getDefaultForm();
+      const parent = buildContainer('row', []);
+      addElement({
+        form,
+        element: parent,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      const el = buildText('foo');
+      addElement({
+        form,
+        element: el,
+        parentId: parent.id,
+        index: 0,
+      });
+      el.parentId = 'non-existent-parent';
+      parent.data.children = ['non-existent-child'];
+
+      expect(validateFormStructure(form)).toBe(false);
+    });
+
+    it("should return false if a non-root child's parent does not exist", () => {
+      const form = getDefaultForm();
+      const parent = buildContainer('row', []);
+      addElement({
+        form,
+        element: parent,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      const el = buildText('foo');
+      addElement({
+        form,
+        element: el,
+        parentId: parent.id,
+        index: 0,
+      });
+      el.parentId = 'non-existent-parent';
+      expect(validateFormStructure(form)).toBe(false);
+    });
+
+    it('should be OK with the root not having a parent', () => {
+      // This test is the same as the default form
+      const form = getDefaultForm();
+      const rootElement = form.elements[form.rootElementId];
+      assert(rootElement !== undefined);
+      expect(rootElement.parentId).toBeUndefined();
+      expect(validateFormStructure(form)).toBe(true);
+    });
+
+    it("should return false if a child's parent is not a container", () => {
+      const form = getDefaultForm();
+      const notAContainer = buildText('foo');
+      addElement({
+        form,
+        element: notAContainer,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      const el = buildText('bar');
+      addElement({
+        form,
+        element: el,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      el.parentId = notAContainer.id;
+      expect(validateFormStructure(form)).toBe(false);
+    });
+
+    it("should return false if the child's parent does not have the child in its children list", () => {
+      const form = getDefaultForm();
+      const parent = buildContainer('row', []);
+      addElement({
+        form,
+        element: parent,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      const el = buildText('foo');
+      addElement({
+        form,
+        element: el,
+        parentId: parent.id,
+        index: 0,
+      });
+      parent.data.children = [];
+      expect(validateFormStructure(form)).toBe(false);
+    });
+
+    it('should return false if there are extra elements', () => {
+      const form = getDefaultForm();
+      const parent = buildContainer('row', []);
+      addElement({
+        form,
+        element: parent,
+        parentId: form.rootElementId,
+        index: 0,
+      });
+      const el = buildText('foo');
+      el.parentId = parent.id;
+      form.elements[el.id] = el;
+      expect(validateFormStructure(form)).toBe(false);
+    });
+
+    it('should return false if the root element is not a container', () => {
+      const el = buildText('foo');
+      const form: BuilderForm = {
+        elements: {
+          [el.id]: el,
+        },
+        rootElementId: el.id,
+      };
+      expect(validateFormStructure(form)).toBe(false);
     });
   });
 });
