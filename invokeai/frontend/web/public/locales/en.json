@@ -954,6 +954,7 @@
         "nodeSearch": "Search for nodes",
         "nodeTemplate": "Node Template",
         "nodeType": "Node Type",
+        "nodeName": "Node Name",
         "noFieldsLinearview": "No fields added to Linear View",
         "noFieldsViewMode": "This workflow has no selected fields to display. View the full workflow to configure values.",
         "workflowHelpText": "Need Help? Check out our guide to <LinkComponent>Getting Started with Workflows</LinkComponent>.",
@@ -1707,7 +1708,7 @@
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
         "delete": "Delete",
         "builder": {
-            "builder": "Builder",
+            "builder": "Form Builder",
             "layout": "Layout",
             "row": "Row",
             "column": "Column",

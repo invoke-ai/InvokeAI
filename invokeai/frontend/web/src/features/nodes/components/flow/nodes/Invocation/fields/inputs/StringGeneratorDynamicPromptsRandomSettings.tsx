@@ -1,6 +1,5 @@
 import { Checkbox, CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { GeneratorTextareaWithFileUpload } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/GeneratorTextareaWithFileUpload';
-import { useViewContext } from 'features/nodes/contexts/ViewContext';
 import type { StringGeneratorDynamicPromptsRandom } from 'features/nodes/types/field';
 import { isNil, random } from 'lodash-es';
 import { memo, useCallback, useEffect, useMemo } from 'react';
@@ -15,7 +14,6 @@ type StringGeneratorDynamicPromptsRandomSettingsProps = {
 export const StringGeneratorDynamicPromptsRandomSettings = memo(
   ({ state, onChange }: StringGeneratorDynamicPromptsRandomSettingsProps) => {
     const { t } = useTranslation();
-    const view = useViewContext();
     const loadingValues = useMemo(() => [`<${t('nodes.generatorLoading')}>`], [t]);
 
     const onChangeInput = useCallback(
@@ -59,7 +57,7 @@ export const StringGeneratorDynamicPromptsRandomSettings = memo(
       }
 
       onChange({ ...state, values: data.prompts });
-    }, [data, isLoading, onChange, state, view]);
+    }, [data, isLoading, onChange, state]);
 
     return (
       <Flex gap={2} flexDir="column">

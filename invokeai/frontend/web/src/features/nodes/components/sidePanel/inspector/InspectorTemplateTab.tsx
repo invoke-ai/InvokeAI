@@ -31,6 +31,6 @@ const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
   const template = useNodeTemplate(nodeId);
 
-  return <DataViewer data={template} label={t('nodes.nodeTemplate')} />;
+  return <DataViewer data={template} label={t('nodes.nodeTemplate')} bg="base.850" color="base.200" />;
 });
 Content.displayName = 'Content';

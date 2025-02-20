@@ -11,7 +11,7 @@ import { selectLastSelectedNodeId } from 'features/nodes/store/selectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import EditableNodeTitle from './details/EditableNodeTitle';
+import InspectorTabEditableNodeTitle from './InspectorTabEditableNodeTitle';
 
 const InspectorDetailsTab = () => {
   const { t } = useTranslation();
@@ -42,17 +42,20 @@ const Content = memo(({ nodeId }: { nodeId: string }) => {
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
-        <Flex flexDir="column" position="relative" w="full" h="full" p={1} gap={2}>
-          <EditableNodeTitle nodeId={nodeId} />
+        <Flex flexDir="column" position="relative" w="full" h="full" gap={1}>
+          <FormControl>
+            <FormLabel m={0}>{t('nodes.nodeName')}</FormLabel>
+            <InspectorTabEditableNodeTitle nodeId={nodeId} />
+          </FormControl>
           <HStack>
             <FormControl>
-              <FormLabel>{t('nodes.nodeType')}</FormLabel>
+              <FormLabel m={0}>{t('nodes.nodeType')}</FormLabel>
               <Text fontSize="sm" fontWeight="semibold">
                 {template.title}
               </Text>
             </FormControl>
             <FormControl isInvalid={needsUpdate}>
-              <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
+              <FormLabel m={0}>{t('nodes.nodeVersion')}</FormLabel>
               <Text fontSize="sm" fontWeight="semibold">
                 {version}
               </Text>

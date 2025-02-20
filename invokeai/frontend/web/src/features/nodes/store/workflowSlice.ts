@@ -362,6 +362,13 @@ export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflo
 export const selectFormRootElementId = createWorkflowSelector((workflow) => {
   return workflow.form.rootElementId;
 });
+export const selectIsFormEmpty = createWorkflowSelector((workflow) => {
+  const rootElement = workflow.form.elements[workflow.form.rootElementId];
+  if (!rootElement || !isContainerElement(rootElement)) {
+    return true;
+  }
+  return rootElement.data.children.length === 0;
+});
 const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
 export const useElement = (id: string): FormElement | undefined => {
   const selector = useMemo(() => buildSelectElement(id), [id]);

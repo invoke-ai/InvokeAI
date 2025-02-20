@@ -11,7 +11,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyInvocationOutput, ImageOutput } from 'services/api/types';
 
-import ImageOutputPreview from './outputs/ImageOutputPreview';
+import ImageOutputPreview from './ImageOutputPreview';
 
 const InspectorOutputsTab = () => {
   const lastSelectedNodeId = useAppSelector(selectLastSelectedNodeId);
@@ -53,7 +53,7 @@ const Content = memo(({ nodeId }: { nodeId: string }) => {
               <ImageOutputPreview key={getKey(result, i)} output={result as ImageOutput} />
             ))
           ) : (
-            <DataViewer data={nes.outputs} label={t('nodes.nodeOutputs')} />
+            <DataViewer data={nes.outputs} label={t('nodes.nodeOutputs')} bg="base.850" color="base.200" />
           )}
         </Flex>
       </ScrollableContent>

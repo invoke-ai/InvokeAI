@@ -27,29 +27,29 @@ export const WorkflowBuilder = memo(() => {
   }, [dispatch]);
 
   return (
-    <ScrollableContent>
-      <Flex justifyContent="center" w="full" h="full">
-        <Flex flexDir="column" w="full" h="full" maxW="768px" gap={4}>
-          <Alert status="warning" variant="subtle" borderRadius="base" flexShrink={0}>
-            <AlertIcon />
-            <AlertDescription fontSize="sm">{t('workflows.builder.workflowBuilderAlphaWarning')}</AlertDescription>
-          </Alert>
-          <ButtonGroup isAttached={false} justifyContent="center">
-            <AddFormElementDndButton type="container" />
-            <AddFormElementDndButton type="divider" />
-            <AddFormElementDndButton type="heading" />
-            <AddFormElementDndButton type="text" />
-            <Spacer />
-            <Button onClick={resetForm} variant="ghost" leftIcon={<PiArrowCounterClockwiseBold />}>
-              {t('common.reset')}
-            </Button>
-          </ButtonGroup>
+    <Flex justifyContent="center" w="full" h="full">
+      <Flex flexDir="column" w="full" maxW="768px" gap={4}>
+        <Alert status="warning" variant="subtle" borderRadius="base" flexShrink={0}>
+          <AlertIcon />
+          <AlertDescription fontSize="sm">{t('workflows.builder.workflowBuilderAlphaWarning')}</AlertDescription>
+        </Alert>
+        <ButtonGroup isAttached={false} justifyContent="center">
+          <AddFormElementDndButton type="container" />
+          <AddFormElementDndButton type="divider" />
+          <AddFormElementDndButton type="heading" />
+          <AddFormElementDndButton type="text" />
+          <Spacer />
+          <Button onClick={resetForm} variant="ghost" leftIcon={<PiArrowCounterClockwiseBold />}>
+            {t('common.reset')}
+          </Button>
+        </ButtonGroup>
+        <ScrollableContent>
           <Flex>
             <FormElementComponent id={rootElementId} />
           </Flex>
-        </Flex>
+        </ScrollableContent>
       </Flex>
-    </ScrollableContent>
+    </Flex>
   );
 });
 WorkflowBuilder.displayName = 'WorkflowBuilder';
