@@ -154,7 +154,7 @@ export const workflowSlice = createSlice({
       action: PayloadAction<{
         element: FormElement;
         parentId: ElementId;
-        index: number;
+        index?: number;
         initialValue?: StatefulFieldValue;
       }>
     ) => {

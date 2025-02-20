@@ -120,7 +120,7 @@ export const addElement = (args: {
   form: BuilderForm;
   element: FormElement;
   parentId: string;
-  index: number;
+  index?: number;
 }): boolean => {
   const { form, element, parentId, index } = args;
   const { elements } = form;
@@ -137,7 +137,7 @@ export const addElement = (args: {
 
   element.parentId = parentId;
   elements[element.id] = element;
-  parent.data.children.splice(index, 0, element.id);
+  parent.data.children.splice(index ?? parent.data.children.length, 0, element.id);
   return true;
 };
 
