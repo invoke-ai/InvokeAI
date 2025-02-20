@@ -7,7 +7,6 @@ import {
   getIsFormEmpty,
   removeElement,
   reparentElement,
-  validateFormStructure,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { BuilderForm, ContainerElement } from 'features/nodes/types/workflow';
 import {
@@ -16,6 +15,7 @@ import {
   getDefaultForm,
   isContainerElement,
   isNodeFieldElement,
+  validateFormStructure,
 } from 'features/nodes/types/workflow';
 import type { Equals } from 'tsafe';
 import { assert, AssertionError } from 'tsafe';
