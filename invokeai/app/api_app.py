@@ -59,10 +59,6 @@ logger.info(f"Using torch device: {torch_device_name}")
 
 loop = asyncio.new_event_loop()
 
-# We may change the port if the default is in use, this global variable is used to store the port so that we can log
-# the correct port when the server starts in the lifespan handler.
-port = app_config.port
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -71,7 +67,7 @@ async def lifespan(app: FastAPI):
 
     # Log the server address when it starts - in case the network log level is not high enough to see the startup log
     proto = "https" if app_config.ssl_certfile else "http"
-    msg = f"Invoke running on {proto}://{app_config.host}:{port} (Press CTRL+C to quit)"
+    msg = f"Invoke running on {proto}://{app_config.host}:{app_config.port} (Press CTRL+C to quit)"
 
     # Logging this way ignores the logger's log level and _always_ logs the message
     record = logger.makeRecord(
@@ -192,17 +188,17 @@ def invoke_api() -> None:
     if app_config.dev_reload:
         enable_dev_reload()
 
-    global port
-    port = find_open_port(app_config.port)
-    if port != app_config.port:
-        logger.warn(f"Port {app_config.port} in use, using port {port}")
+    orig_config_port = app_config.port
+    app_config.port = find_open_port(app_config.port)
+    if orig_config_port != app_config.port:
+        logger.warning(f"Port {orig_config_port} is already in use. Using port {app_config.port}.")
 
     check_cudnn(logger)
 
     config = uvicorn.Config(
         app=app,
         host=app_config.host,
-        port=port,
+        port=app_config.port,
         loop="asyncio",
         log_level=app_config.log_level_network,
         ssl_certfile=app_config.ssl_certfile,
@@ -217,7 +213,3 @@ def invoke_api() -> None:
         uvicorn_logger.addHandler(hdlr)
 
     loop.run_until_complete(server.serve())
-
-
-if __name__ == "__main__":
-    invoke_api()
