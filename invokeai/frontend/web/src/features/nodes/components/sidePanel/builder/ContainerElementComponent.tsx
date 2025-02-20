@@ -27,7 +27,7 @@ import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const sx: SystemStyleObject = {
-  gap: 2,
+  gap: 4,
   flex: '1 1 0',
   '&[data-depth="0"]': {
     flex: 1,
@@ -71,7 +71,7 @@ const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }
             <FormElementComponent key={childId} id={childId} />
           ))}
           {children.length === 0 && (
-            <Flex p={4} w="full" h="full" alignItems="center" justifyContent="center">
+            <Flex p={8} w="full" h="full" alignItems="center" justifyContent="center">
               <Text variant="subtext">{t('workflows.builder.containerPlaceholder')}</Text>
             </Flex>
           )}
@@ -97,7 +97,7 @@ const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }
               <FormElementComponent key={childId} id={childId} />
             ))}
             {children.length === 0 && (
-              <Flex p={4} w="full" h="full" alignItems="center" justifyContent="center">
+              <Flex p={8} w="full" h="full" alignItems="center" justifyContent="center">
                 <Text variant="subtext">{t('workflows.builder.containerPlaceholderDesc')}</Text>
               </Flex>
             )}

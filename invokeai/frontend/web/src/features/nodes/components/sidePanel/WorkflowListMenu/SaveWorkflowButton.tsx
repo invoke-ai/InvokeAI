@@ -37,7 +37,7 @@ const SaveWorkflowButton = () => {
       icon={<PiFloppyDiskBold />}
       onClick={handleClickSave}
       pointerEvents="auto"
-      variant="outline"
+      variant="ghost"
       size="sm"
     />
   );

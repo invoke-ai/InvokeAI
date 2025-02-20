@@ -21,12 +21,12 @@ const sx: SystemStyleObject = {
   maxH: 8,
   borderTopRadius: 'base',
   alignItems: 'center',
-  cursor: 'grab',
   color: 'base.300',
   bg: 'baseAlpha.250',
   '&[data-depth="0"]': { bg: 'baseAlpha.100' },
   '&[data-depth="1"]': { bg: 'baseAlpha.150' },
   '&[data-depth="2"]': { bg: 'baseAlpha.200' },
+  '&[data-is-root="false"]': { cursor: 'grab' },
 };
 
 export const FormElementEditModeHeader = memo(
@@ -42,18 +42,20 @@ export const FormElementEditModeHeader = memo(
       dispatch(formElementRemoved({ id: element.id }));
     }, [dispatch, element.id, isRootElement]);
     const label = useMemo(() => {
-      if (isContainerElement(element)) {
-        const baseLabel = isRootElement ? 'Root Container' : 'Container';
-        if (element.data.layout === 'column') {
-          return `${baseLabel} (column layout)`;
-        }
-        return `${baseLabel} (row layout)`;
+      if (isRootElement) {
+        return 'Root Container';
+      }
+      if (isContainerElement(element) && element.data.layout === 'column') {
+        return `Container (column layout)`;
+      }
+      if (isContainerElement(element) && element.data.layout === 'row') {
+        return `Container (row layout)`;
       }
       return startCase(element.type);
     }, [element, isRootElement]);
 
     return (
-      <Flex ref={ref} sx={sx} data-depth={depth}>
+      <Flex ref={ref} sx={sx} data-depth={depth} data-is-root={isRootElement}>
         <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
           {label}
         </Text>

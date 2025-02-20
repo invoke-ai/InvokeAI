@@ -36,7 +36,7 @@ const innerSx: SystemStyleObject = {
   },
   '&[data-active-drop-region="center"]': {
     opacity: 1,
-    bg: 'base.700',
+    bg: 'base.850',
   },
   '&[data-element-type="divider"]&[data-layout="row"]': {
     w: 'min-content',
@@ -49,8 +49,8 @@ const innerSx: SystemStyleObject = {
 const contentWrapperSx: SystemStyleObject = {
   w: 'full',
   h: 'full',
-  p: 2,
-  gap: 2,
+  p: 4,
+  gap: 4,
   borderWidth: 1,
   borderRadius: 'base',
   borderTopRadius: 'unset',

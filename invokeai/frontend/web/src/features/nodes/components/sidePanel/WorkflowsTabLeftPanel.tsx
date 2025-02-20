@@ -1,4 +1,4 @@
-import { Divider, Flex } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { EditModeLeftPanelContent } from 'features/nodes/components/sidePanel/EditModeLeftPanelContent';
 import { ActiveWorkflowDescription } from 'features/nodes/components/sidePanel/WorkflowListMenu/ActiveWorkflowDescription';
@@ -15,7 +15,6 @@ const WorkflowsTabLeftPanel = () => {
     <Flex w="full" h="full" gap={2} flexDir="column">
       <ActiveWorkflowNameAndActions />
       <ActiveWorkflowDescription />
-      <Divider />
       {mode === 'view' && <ViewModeLeftPanelContent />}
       {mode === 'edit' && <EditModeLeftPanelContent />}
     </Flex>

@@ -1707,7 +1707,9 @@
         "copyShareLink": "Copy Share Link",
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
         "delete": "Delete",
+        "openLibrary": "Open Library",
         "builder": {
+            "resetForm": "Reset Form",
             "builder": "Form Builder",
             "layout": "Layout",
             "row": "Row",

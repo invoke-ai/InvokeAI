@@ -22,7 +22,7 @@ export const NewWorkflowButton = memo(() => {
   return (
     <IconButton
       onClick={onClickNewWorkflow}
-      variant="outline"
+      variant="ghost"
       size="sm"
       aria-label={t('nodes.newWorkflow')}
       tooltip={t('nodes.newWorkflow')}
