@@ -1,6 +1,5 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { getConnectedEdges } from '@xyflow/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -24,29 +23,21 @@ import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldPr
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
+import { getInvocationNodeErrors } from 'features/nodes/store/util/fieldValidators';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import {
   isFloatFieldCollectionInputInstance,
-  isFloatFieldCollectionInputTemplate,
   isFloatGeneratorFieldInputInstance,
   isImageFieldCollectionInputInstance,
-  isImageFieldCollectionInputTemplate,
   isIntegerFieldCollectionInputInstance,
-  isIntegerFieldCollectionInputTemplate,
   isIntegerGeneratorFieldInputInstance,
   isStringFieldCollectionInputInstance,
-  isStringFieldCollectionInputTemplate,
   isStringGeneratorFieldInputInstance,
   resolveFloatGeneratorField,
   resolveIntegerGeneratorField,
   resolveStringGeneratorField,
 } from 'features/nodes/types/field';
-import {
-  validateImageFieldCollectionValue,
-  validateNumberFieldCollectionValue,
-  validateStringFieldCollectionValue,
-} from 'features/nodes/types/fieldValidators';
 import type { AnyEdge, InvocationNode } from 'features/nodes/types/invocation';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
@@ -55,7 +46,7 @@ import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
-import { debounce, forEach, groupBy, upperFirst } from 'lodash-es';
+import { debounce, groupBy, upperFirst } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
 import { $isConnected } from 'services/events/stores';
@@ -327,61 +318,16 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
         return;
       }
 
-      const nodeTemplate = templates[node.data.type];
+      const errors = getInvocationNodeErrors(node.data.id, templates, nodes);
 
-      if (!nodeTemplate) {
-        // Node type not found
-        reasons.push({ content: i18n.t('parameters.invoke.missingNodeTemplate') });
-        return;
+      for (const error of errors) {
+        if (error.type === 'node-error') {
+          reasons.push({ content: error.issue });
+        } else {
+          // error.type === 'field-error'
+          reasons.push({ prefix: error.prefix, content: error.issue });
+        }
       }
-
-      const connectedEdges = getConnectedEdges([node], nodes.edges);
-
-      forEach(node.data.inputs, (field) => {
-        const fieldTemplate = nodeTemplate.inputs[field.name];
-        const hasConnection = connectedEdges.some(
-          (edge) => edge.target === node.id && edge.targetHandle === field.name
-        );
-
-        if (!fieldTemplate) {
-          reasons.push({ content: i18n.t('parameters.invoke.missingFieldTemplate') });
-          return;
-        }
-
-        const prefix = `${node.data.label || nodeTemplate.title} -> ${field.label || fieldTemplate.title}`;
-
-        if (fieldTemplate.required && field.value === undefined && !hasConnection) {
-          reasons.push({ prefix, content: i18n.t('parameters.invoke.missingInputForField') });
-        } else if (
-          field.value &&
-          isImageFieldCollectionInputInstance(field) &&
-          isImageFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateImageFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        } else if (
-          field.value &&
-          isStringFieldCollectionInputInstance(field) &&
-          isStringFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateStringFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        } else if (
-          field.value &&
-          isIntegerFieldCollectionInputInstance(field) &&
-          isIntegerFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        } else if (
-          field.value &&
-          isFloatFieldCollectionInputInstance(field) &&
-          isFloatFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        }
-      });
     });
   }
 
