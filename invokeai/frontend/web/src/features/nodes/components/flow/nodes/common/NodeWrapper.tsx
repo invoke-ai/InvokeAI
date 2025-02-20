@@ -1,15 +1,11 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
-import type { NodeChange } from '@xyflow/react';
-import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
-import { nodesChanged } from 'features/nodes/store/nodesSlice';
-import { selectNodes } from 'features/nodes/store/selectors';
 import { selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
 import { DRAG_HANDLE_CLASSNAME, NO_FIT_ON_DOUBLE_CLICK_CLASS, NODE_WIDTH } from 'features/nodes/types/constants';
-import type { AnyNode } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { MouseEvent, PropsWithChildren } from 'react';
 import { memo, useCallback } from 'react';
@@ -83,36 +79,14 @@ const selectionOverlaySx: SystemStyleObject = {
 
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
-  const store = useAppStore();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
   const zoomToNode = useZoomToNode();
 
   const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
 
-  const dispatch = useAppDispatch();
-
   const opacity = useAppSelector(selectNodeOpacity);
-  const { onCloseGlobal } = useGlobalMenuClose();
-
-  const handleClick = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-        const nodes = selectNodes(store.getState());
-        const nodeChanges: NodeChange<AnyNode>[] = [];
-        nodes.forEach(({ id, selected }) => {
-          if (selected !== (id === nodeId)) {
-            nodeChanges.push({ type: 'select', id, selected: id === nodeId });
-          }
-        });
-        if (nodeChanges.length > 0) {
-          dispatch(nodesChanged(nodeChanges));
-        }
-      }
-      onCloseGlobal();
-    },
-    [onCloseGlobal, store, dispatch, nodeId]
-  );
+  const globalMenu = useGlobalMenuClose();
 
   const onDoubleClick = useCallback(
     (e: MouseEvent) => {
@@ -141,7 +115,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   return (
     <Box
-      onClick={handleClick}
+      onClick={globalMenu.onCloseGlobal}
       onDoubleClick={onDoubleClick}
       onMouseEnter={handleMouseOver}
       onMouseLeave={handleMouseOut}
