@@ -369,6 +369,10 @@ export const selectIsFormEmpty = createWorkflowSelector((workflow) => {
   }
   return rootElement.data.children.length === 0;
 });
+export const selectFormInitialValues = createWorkflowSelector((workflow) => workflow.formFieldInitialValues);
+export const selectNodeFieldElements = createWorkflowSelector((workflow) =>
+  Object.values(workflow.form.elements).filter(isNodeFieldElement)
+);
 const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
 export const useElement = (id: string): FormElement | undefined => {
   const selector = useMemo(() => buildSelectElement(id), [id]);

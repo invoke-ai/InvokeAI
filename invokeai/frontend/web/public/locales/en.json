@@ -1709,7 +1709,8 @@
         "delete": "Delete",
         "openLibrary": "Open Library",
         "builder": {
-            "resetForm": "Reset Form",
+            "deleteAllElements": "Delete All Form Elements",
+            "resetAllNodeFields": "Reset All Node Fields",
             "builder": "Form Builder",
             "layout": "Layout",
             "row": "Row",

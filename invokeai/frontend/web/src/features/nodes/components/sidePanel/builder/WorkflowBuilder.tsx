@@ -1,30 +1,23 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Button, ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
 import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
 import { buildFormElementDndData, useBuilderDndMonitor } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
-import { formReset, selectFormRootElementId } from 'features/nodes/store/workflowSlice';
+import { WorkflowBuilderEditMenu } from 'features/nodes/components/sidePanel/builder/WorkflowBuilderMenu';
+import { selectFormRootElementId } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
 import type { RefObject } from 'react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
+import { memo, useEffect, useRef, useState } from 'react';
 import { assert } from 'tsafe';
 
 export const WorkflowBuilder = memo(() => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const rootElementId = useAppSelector(selectFormRootElementId);
   useBuilderDndMonitor();
-
-  const resetForm = useCallback(() => {
-    dispatch(formReset());
-  }, [dispatch]);
 
   return (
     <Flex justifyContent="center" w="full" h="full">
@@ -35,9 +28,7 @@ export const WorkflowBuilder = memo(() => {
           <AddFormElementDndButton type="heading" />
           <AddFormElementDndButton type="text" />
           <Spacer />
-          <Button onClick={resetForm} variant="ghost" leftIcon={<PiArrowCounterClockwiseBold />}>
-            {t('workflows.builder.resetForm')}
-          </Button>
+          <WorkflowBuilderEditMenu />
         </ButtonGroup>
         <ScrollableContent>
           <Flex>
