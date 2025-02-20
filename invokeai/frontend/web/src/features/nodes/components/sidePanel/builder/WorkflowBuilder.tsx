@@ -35,7 +35,7 @@ export const WorkflowBuilder = memo(() => {
   return (
     <Flex justifyContent="center" w="full" h="full">
       <Flex flexDir="column" w="full" maxW="768px" gap={2}>
-        <Flex w="full" alignItems="center" gap={2}>
+        <Flex w="full" alignItems="center" gap={2} pt={3}>
           <AddFormElementDndButton type="container" />
           <AddFormElementDndButton type="divider" />
           <AddFormElementDndButton type="heading" />
@@ -118,6 +118,8 @@ const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormE
       borderStyle="dashed"
       isDisabled={isDragging}
       size="sm"
+      _active={{ borderStyle: 'dashed' }}
+      _disabled={{ borderStyle: 'dashed', opacity: 0.5 }}
     >
       {startCase(type)}
     </Button>
