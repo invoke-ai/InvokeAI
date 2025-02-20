@@ -28,8 +28,8 @@ import {
 import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import {
-  formContainerChildrenReordered,
   formElementAdded,
+  formElementContainerDataChanged,
   formElementReparented,
   selectFormRootElementId,
   selectWorkflowSlice,
@@ -260,7 +260,7 @@ export const useBuilderDndMonitor = () => {
             const container = getElement(targetElement.parentId, isContainerElement);
             const startIndex = container.data.children.indexOf(sourceElement.id);
             const indexOfTarget = container.data.children.indexOf(targetElement.id);
-            const reorderedLayout = reorderWithEdge({
+            const reorderedChildren = reorderWithEdge({
               list: container.data.children,
               startIndex,
               indexOfTarget,
@@ -268,9 +268,9 @@ export const useBuilderDndMonitor = () => {
               axis: container.data.layout === 'row' ? 'horizontal' : 'vertical',
             });
             dispatchAndFlash(
-              formContainerChildrenReordered({
+              formElementContainerDataChanged({
                 id: container.id,
-                children: reorderedLayout,
+                changes: { children: reorderedChildren },
               }),
               sourceElement.id
             );
