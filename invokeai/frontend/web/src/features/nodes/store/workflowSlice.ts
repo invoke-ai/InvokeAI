@@ -149,17 +149,6 @@ export const workflowSlice = createSlice({
         rootElementId: rootElement.id,
       };
     },
-    formElementNodeFieldInitialValueChanged: (
-      state,
-      action: PayloadAction<{ id: ElementId; value: StatefulFieldValue }>
-    ) => {
-      const { id, value } = action.payload;
-      const element = state.form?.elements[id];
-      if (!element || !isNodeFieldElement(element)) {
-        return;
-      }
-      state.formFieldInitialValues[id] = value;
-    },
     formElementAdded: (
       state,
       action: PayloadAction<{
