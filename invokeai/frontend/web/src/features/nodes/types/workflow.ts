@@ -250,7 +250,7 @@ export type BuilderForm = z.infer<typeof zBuilderForm>;
 
 // Need to separate the form vaidation from the schema due to circular dependencies
 const zValidatedBuilderForm = zBuilderForm
-  .default(getDefaultForm)
+  .catch(getDefaultForm)
   .refine((val) => val.rootElementId in val.elements, {
     message: 'rootElementId must be a valid element id',
   })
