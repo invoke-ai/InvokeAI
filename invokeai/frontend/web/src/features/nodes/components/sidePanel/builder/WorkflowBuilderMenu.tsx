@@ -15,7 +15,7 @@ export const WorkflowBuilderEditMenu = memo(() => {
   }, [store]);
   return (
     <Menu placement="bottom-end">
-      <MenuButton as={IconButton} icon={<PiDotsThreeBold />} variant="ghost" />
+      <MenuButton as={IconButton} icon={<PiDotsThreeBold />} variant="ghost" size="sm" />
       <MenuList>
         <MenuItem icon={<PiArrowCounterClockwiseBold />} onClick={resetAllNodeFields}>
           {t('workflows.builder.resetAllNodeFields')}
