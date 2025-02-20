@@ -6,6 +6,7 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectShouldAnimateEdges, selectShouldShowEdgeLabels } from 'features/nodes/store/workflowSettingsSlice';
+import { NO_DRAG_CLASS, NO_PAN_CLASS } from 'features/nodes/types/constants';
 import type { DefaultInvocationNodeEdge } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 
@@ -114,7 +115,7 @@ const InvocationDefaultEdge = ({
       {label && shouldShowEdgeLabels && (
         <EdgeLabelRenderer>
           <Flex
-            className="nodrag nopan"
+            className={`${NO_DRAG_CLASS} ${NO_PAN_CLASS}`}
             transform={`translate(-50%, -50%) translate(${labelX}px,${labelY}px)`}
             data-selected={selected}
             sx={edgeLabelWrapperSx}

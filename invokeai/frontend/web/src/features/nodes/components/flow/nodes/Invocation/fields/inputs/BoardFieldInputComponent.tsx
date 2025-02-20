@@ -2,6 +2,7 @@ import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldBoardValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { BoardFieldInputInstance, BoardFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,7 +59,7 @@ const BoardFieldInputComponent = (props: FieldComponentProps<BoardFieldInputInst
 
   return (
     <Combobox
-      className="nowheel nodrag"
+      className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
       value={value}
       options={options}
       onChange={onChange}

@@ -3,7 +3,7 @@ import { Icon, IconButton } from '@invoke-ai/ui-library';
 import { useUpdateNodeInternals } from '@xyflow/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { nodeIsOpenChanged } from 'features/nodes/store/nodesSlice';
-import { NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
+import { NO_DRAG_CLASS, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback } from 'react';
 import { PiCaretUpBold } from 'react-icons/pi';
 
@@ -32,7 +32,7 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
 
   return (
     <IconButton
-      className={`nodrag ${NO_FIT_ON_DOUBLE_CLICK_CLASS}`}
+      className={`${NO_DRAG_CLASS} ${NO_FIT_ON_DOUBLE_CLICK_CLASS}`}
       onClick={handleClick}
       aria-label="Minimize"
       minW={8}

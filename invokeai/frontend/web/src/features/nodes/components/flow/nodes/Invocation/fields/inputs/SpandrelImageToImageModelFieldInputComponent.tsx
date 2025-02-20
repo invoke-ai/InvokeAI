@@ -2,6 +2,7 @@ import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldSpandrelImageToImageModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type {
   SpandrelImageToImageModelFieldInputInstance,
   SpandrelImageToImageModelFieldInputTemplate,
@@ -45,7 +46,7 @@ const SpandrelImageToImageModelFieldInputComponent = (
 
   return (
     <Tooltip label={value?.description}>
-      <FormControl className="nowheel nodrag" isInvalid={!value}>
+      <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isInvalid={!value}>
         <Combobox value={value} placeholder="Pick one" options={options} onChange={onChange} />
       </FormControl>
     </Tooltip>

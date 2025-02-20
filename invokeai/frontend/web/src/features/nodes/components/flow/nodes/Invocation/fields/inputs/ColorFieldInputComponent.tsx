@@ -3,6 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { hexToRGBA, rgbaToHex } from 'common/util/colorCodeTransformers';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { fieldColorValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { ColorFieldInputInstance, ColorFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import type { RgbaColor } from 'react-colorful';
@@ -60,13 +61,18 @@ const ColorFieldInputComponent = (props: FieldComponentProps<ColorFieldInputInst
           paddingBlock: 4,
           outline: 'none',
         }}
-        className="nodrag"
+        className={NO_DRAG_CLASS}
         color={rgbaToHex(color, true)}
         onChange={handleValueChanged}
         prefixed
         alpha
       />
-      <RgbaColorPicker className="nodrag" color={color} onChange={handleValueChanged} style={{ width: '100%' }} />
+      <RgbaColorPicker
+        className={NO_DRAG_CLASS}
+        color={color}
+        onChange={handleValueChanged}
+        style={{ width: '100%' }}
+      />
     </Flex>
   );
 };
