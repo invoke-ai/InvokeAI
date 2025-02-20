@@ -36,9 +36,20 @@ export const selectFieldInputInstance = (
   nodesSlice: NodesState,
   nodeId: string,
   fieldName: string
+): FieldInputInstance => {
+  const data = selectNodeData(nodesSlice, nodeId);
+  const field = data.inputs[fieldName];
+  assert(field !== undefined, `Field ${fieldName} not found in node ${nodeId}`);
+  return field;
+};
+
+export const selectFieldInputInstanceSafe = (
+  nodesSlice: NodesState,
+  nodeId: string,
+  fieldName: string
 ): FieldInputInstance | null => {
   const data = selectNodeData(nodesSlice, nodeId);
-  return data?.inputs[fieldName] ?? null;
+  return data.inputs[fieldName] ?? null;
 };
 
 export const selectLastSelectedNode = (nodesSlice: NodesState) => {
