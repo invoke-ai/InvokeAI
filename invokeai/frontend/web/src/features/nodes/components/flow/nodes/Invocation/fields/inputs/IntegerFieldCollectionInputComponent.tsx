@@ -14,6 +14,7 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { fieldIntegerCollectionValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type {
   IntegerFieldCollectionInputInstance,
   IntegerFieldCollectionInputTemplate,
@@ -112,7 +113,7 @@ export const IntegerFieldCollectionInputComponent = memo(
 
     return (
       <Flex
-        className="nodrag"
+        className={NO_DRAG_CLASS}
         position="relative"
         w="full"
         h="auto"
@@ -133,7 +134,7 @@ export const IntegerFieldCollectionInputComponent = memo(
           <>
             <Divider />
             <OverlayScrollbarsComponent
-              className="nowheel"
+              className={NO_WHEEL_CLASS}
               defer
               style={overlayScrollbarsStyles}
               options={overlayscrollbarsOptions}
@@ -203,7 +204,7 @@ const IntegerListItemContent = memo(
             max={max}
             step={step}
             fineStep={fineStep}
-            className="nodrag"
+            className={NO_DRAG_CLASS}
             flexGrow={1}
           />
         </GridItem>

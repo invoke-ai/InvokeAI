@@ -10,6 +10,7 @@ import {
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
 import { fieldDescriptionChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -59,7 +60,7 @@ const Content = memo(({ nodeId, fieldName }: Props) => {
     <FormControl orientation="vertical">
       <FormLabel>{t('nodes.description')}</FormLabel>
       <Textarea
-        className="nodrag nopan nowheel"
+        className={`${NO_DRAG_CLASS} ${NO_PAN_CLASS} ${NO_WHEEL_CLASS}`}
         fontSize="sm"
         value={description ?? ''}
         onChange={onChange}

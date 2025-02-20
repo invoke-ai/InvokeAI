@@ -5,6 +5,7 @@ import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/Node
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_PAN_CLASS } from 'features/nodes/types/constants';
 import type { NotesNodeData } from 'features/nodes/types/invocation';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -38,7 +39,7 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
         <>
           <Flex
             layerStyle="nodeBody"
-            className="nopan"
+            className={NO_PAN_CLASS}
             cursor="auto"
             flexDirection="column"
             borderBottomRadius="base"
@@ -47,8 +48,15 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
             p={2}
             gap={1}
           >
-            <Flex className="nopan" w="full" h="full" flexDir="column">
-              <Textarea className="nodrag" value={notes} onChange={handleChange} rows={8} resize="none" fontSize="sm" />
+            <Flex className={NO_PAN_CLASS} w="full" h="full" flexDir="column">
+              <Textarea
+                className={NO_DRAG_CLASS}
+                value={notes}
+                onChange={handleChange}
+                rows={8}
+                resize="none"
+                fontSize="sm"
+              />
             </Flex>
           </Flex>
         </>

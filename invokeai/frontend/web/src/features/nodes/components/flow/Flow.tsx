@@ -44,6 +44,7 @@ import {
 } from 'features/nodes/store/selectors';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/store/workflowSettingsSlice';
+import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { CSSProperties, MouseEvent } from 'react';
@@ -356,6 +357,9 @@ export const Flow = memo(() => {
       selectionMode={selectionMode}
       elevateEdgesOnSelect
       nodeDragThreshold={1}
+      noDragClassName={NO_DRAG_CLASS}
+      noWheelClassName={NO_WHEEL_CLASS}
+      noPanClassName={NO_PAN_CLASS}
     >
       <Background />
     </ReactFlow>

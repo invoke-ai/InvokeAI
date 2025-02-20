@@ -8,6 +8,7 @@ import { setNodeImageFieldImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -63,7 +64,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   );
 
   return (
-    <Flex position="relative" className="nodrag" w="full" h={32} alignItems="stretch">
+    <Flex position="relative" className={NO_DRAG_CLASS} w="full" h={32} alignItems="stretch">
       {!imageDTO && (
         <UploadImageButton
           w="full"

@@ -24,6 +24,9 @@ export const SHARED_NODE_PROPERTIES: Partial<AnyNode> = {
 };
 
 export const NO_FIT_ON_DOUBLE_CLICK_CLASS = 'no-fit-on-double-click';
+export const NO_DRAG_CLASS = 'no-drag';
+export const NO_WHEEL_CLASS = 'no-wheel';
+export const NO_PAN_CLASS = 'no-pan';
 
 /**
  * Colors for each field type - applies to their handles and edges.
