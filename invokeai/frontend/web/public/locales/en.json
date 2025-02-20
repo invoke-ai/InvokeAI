@@ -902,6 +902,8 @@
         "missingNode": "Missing invocation node",
         "missingInvocationTemplate": "Missing invocation template",
         "missingFieldTemplate": "Missing field template",
+        "missingSourceOrTargetNode": "Missing source or target node",
+        "missingSourceOrTargetHandle": "Missing source or target handle",
         "nodePack": "Node pack",
         "collection": "Collection",
         "singleFieldType": "{{name}} (Single)",
