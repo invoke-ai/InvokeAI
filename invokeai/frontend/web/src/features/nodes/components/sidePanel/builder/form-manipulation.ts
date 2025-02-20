@@ -314,3 +314,17 @@ export const validateFormStructure = (form: BuilderForm): boolean => {
 
   return isRootElementAContainer && noMissingChildren && noExtraElements;
 };
+
+/**
+ * Checks if a form is empty.
+ * A form is empty if it only contains the root element and the root element has no children.
+ * @param form The form to check
+ * @returns True if the form is empty, false otherwise
+ */
+export const getIsFormEmpty = (form: BuilderForm): boolean => {
+  const rootElement = form.elements[form.rootElementId];
+  if (!rootElement || !isContainerElement(rootElement)) {
+    return true;
+  }
+  return Object.keys(form.elements).length === 1 && rootElement.data.children.length === 0;
+};
