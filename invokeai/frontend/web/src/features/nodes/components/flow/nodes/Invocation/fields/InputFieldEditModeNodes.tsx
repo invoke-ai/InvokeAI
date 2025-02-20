@@ -109,8 +109,10 @@ const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemp
         data-is-dragging={isDragging}
       >
         <Flex flexDir="column" w="full" gap={1} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
-          <Flex className="nodrag" ref={dragHandleRef} gap={1}>
-            <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} />
+          <Flex gap={1}>
+            <Flex className="nodrag" ref={dragHandleRef}>
+              <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} isDragging={isDragging} />
+            </Flex>
             <Spacer />
             {isHovered && (
               <>

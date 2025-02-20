@@ -36,10 +36,11 @@ interface Props {
   nodeId: string;
   fieldName: string;
   isInvalid?: boolean;
+  isDragging?: boolean;
 }
 
 export const InputFieldTitle = memo((props: Props) => {
-  const { nodeId, fieldName, isInvalid } = props;
+  const { nodeId, fieldName, isInvalid, isDragging } = props;
   const inputRef = useRef<HTMLInputElement>(null);
   const label = useInputFieldLabel(nodeId, fieldName);
   const fieldTemplateTitle = useInputFieldTemplateTitle(nodeId, fieldName);
@@ -70,6 +71,7 @@ export const InputFieldTitle = memo((props: Props) => {
         label={<InputFieldTooltipContent nodeId={nodeId} fieldName={fieldName} />}
         openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
         placement="top"
+        isDisabled={isDragging}
       >
         <Text
           sx={labelSx}
