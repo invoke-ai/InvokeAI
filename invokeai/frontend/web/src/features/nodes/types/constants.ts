@@ -24,9 +24,10 @@ export const SHARED_NODE_PROPERTIES: Partial<AnyNode> = {
 };
 
 export const NO_FIT_ON_DOUBLE_CLICK_CLASS = 'no-fit-on-double-click';
-export const NO_DRAG_CLASS = 'no-drag';
-export const NO_WHEEL_CLASS = 'no-wheel';
-export const NO_PAN_CLASS = 'no-pan';
+// These are the reactflow classes that are used to disable dragging, panning, and zooming.
+export const NO_DRAG_CLASS = 'nodrag';
+export const NO_WHEEL_CLASS = 'nowheel';
+export const NO_PAN_CLASS = 'nopan';
 
 /**
  * Colors for each field type - applies to their handles and edges.
