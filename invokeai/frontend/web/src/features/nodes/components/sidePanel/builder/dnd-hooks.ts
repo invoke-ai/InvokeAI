@@ -322,7 +322,7 @@ export const useFormElementDnd = (
   draggableRef: RefObject<HTMLElement>,
   dragHandleRef: RefObject<HTMLElement>
 ) => {
-  const rootElementId = useAppSelector(selectFormRootElementId);
+  const isRootElement = useIsRootElement(elementId);
   const [isDragging, setIsDragging] = useState(false);
   const [activeDropRegion, setActiveDropRegion] = useState<CenterOrEdge | null>(null);
   const getElement = useGetElement();
@@ -340,7 +340,7 @@ export const useFormElementDnd = (
       firefoxDndFix(draggableElement),
       draggable({
         // Don't allow dragging the root element
-        canDrag: () => elementId !== rootElementId,
+        canDrag: () => !isRootElement,
         element: draggableElement,
         dragHandle: dragHandleElement,
         getInitialData: () => {
@@ -356,7 +356,7 @@ export const useFormElementDnd = (
       }),
       dropTargetForElements({
         element: draggableElement,
-        getIsSticky: () => elementId !== rootElementId,
+        getIsSticky: () => !isRootElement,
         canDrop: ({ source }) =>
           isFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId,
         getData: ({ input }) => {
@@ -399,7 +399,7 @@ export const useFormElementDnd = (
         },
       })
     );
-  }, [dragHandleRef, draggableRef, elementId, getAllowedDropRegions, getElement, rootElementId]);
+  }, [dragHandleRef, draggableRef, elementId, getAllowedDropRegions, getElement, isRootElement]);
 
   return [activeDropRegion, isDragging] as const;
 };
