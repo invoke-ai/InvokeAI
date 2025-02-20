@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { InputFieldAddToFormRoot } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldAddToFormRoot';
 import { InputFieldDescriptionPopover } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldDescriptionPopover';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldResetToDefaultValueIconButton';
@@ -119,6 +120,7 @@ const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemp
             <>
               <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
               <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
+              <InputFieldAddToFormRoot nodeId={nodeId} fieldName={fieldName} />
             </>
           )}
         </Flex>
