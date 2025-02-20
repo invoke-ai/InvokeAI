@@ -1,7 +1,7 @@
 import { Box } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { ViewContextProvider } from 'features/nodes/contexts/ViewContext';
-import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
+import { HorizontalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
@@ -36,7 +36,7 @@ export const EditModeLeftPanelContent = memo(() => {
             <Panel id="workflow" collapsible minSize={25}>
               <WorkflowFieldsLinearViewPanel />
             </Panel>
-            <ResizeHandle onDoubleClick={handleDoubleClickHandle} />
+            <HorizontalResizeHandle onDoubleClick={handleDoubleClickHandle} />
             <Panel id="inspector" collapsible minSize={25}>
               <WorkflowNodeInspectorPanel />
             </Panel>
