@@ -11,7 +11,7 @@ export const ActiveWorkflowName = memo(() => {
 
   if (workflowName) {
     return (
-      <Text colorScheme="invokeBlue" fontWeight="semibold" fontSize="md" justifySelf="flex-start" noOfLines={1}>
+      <Text fontWeight="semibold" fontSize="md" justifySelf="flex-start" noOfLines={1}>
         {workflowName}
       </Text>
     );
@@ -19,7 +19,7 @@ export const ActiveWorkflowName = memo(() => {
 
   // activeWorkflowName is always a string - if it is an empty string, it implies we do not have a workflow selected
   return (
-    <Text fontSize="sm" fontWeight="semibold" color="base.300" noOfLines={1}>
+    <Text fontSize="md" fontWeight="semibold" color="base.300" noOfLines={1}>
       {t('workflows.chooseWorkflowFromLibrary')}
     </Text>
   );
