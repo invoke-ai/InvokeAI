@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 import socket
 
 import torch
@@ -53,3 +54,11 @@ def apply_monkeypatches() -> None:
 
     if torch.backends.mps.is_available():
         import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+
+
+def register_mime_types() -> None:
+    """Register additional mime types for windows."""
+    # Fix for windows mimetypes registry entries being borked.
+    # see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
+    mimetypes.add_type("application/javascript", ".js")
+    mimetypes.add_type("text/css", ".css")

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -33,23 +32,22 @@ from invokeai.app.api.sockets import SocketIO
 from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.custom_openapi import get_openapi_func
-
-# for PyCharm:
-# noinspection PyUnresolvedReferences
-from invokeai.app.util.startup_utils import apply_monkeypatches, check_cudnn, enable_dev_reload, find_open_port
+from invokeai.app.util.startup_utils import (
+    apply_monkeypatches,
+    check_cudnn,
+    enable_dev_reload,
+    find_open_port,
+    register_mime_types,
+)
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()
 
 apply_monkeypatches()
-
+register_mime_types()
 
 logger = InvokeAILogger.get_logger(config=app_config)
-# fix for windows mimetypes registry entries being borked
-# see https://github.com/invoke-ai/InvokeAI/discussions/3684#discussioncomment-6391352
-mimetypes.add_type("application/javascript", ".js")
-mimetypes.add_type("text/css", ".css")
 
 torch_device_name = TorchDevice.get_torch_device_name()
 logger.info(f"Using torch device: {torch_device_name}")
