@@ -2,13 +2,7 @@ import uvicorn
 
 from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.startup_utils import (
-    apply_monkeypatches,
-    check_cudnn,
-    enable_dev_reload,
-    find_open_port,
-    register_mime_types,
-)
+from invokeai.app.util.torch_cuda_allocator import enable_torch_cuda_malloc
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
@@ -31,6 +25,20 @@ def run_app() -> None:
     app_config = get_config()
 
     logger = InvokeAILogger.get_logger(config=app_config)
+
+    # Configure the torch CUDA memory allocator.
+    # NOTE: It is important that this happens before torch is imported.
+    if app_config.use_cuda_malloc:
+        enable_torch_cuda_malloc()
+
+    # Import from startup_utils here to avoid importing torch before enable_torch_cuda_malloc() is called.
+    from invokeai.app.util.startup_utils import (
+        apply_monkeypatches,
+        check_cudnn,
+        enable_dev_reload,
+        find_open_port,
+        register_mime_types,
+    )
 
     # Find an open port, and modify the config accordingly.
     orig_config_port = app_config.port

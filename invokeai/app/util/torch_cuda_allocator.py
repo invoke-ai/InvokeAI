@@ -23,7 +23,7 @@ def enable_torch_cuda_malloc():
     """Configure the PyTorch CUDA memory allocator to use the cudaMallocAsync memory allocator backend."""
 
     # Raise if the PYTORCH_CUDA_ALLOC_CONF environment variable is already set.
-    prev_cuda_alloc_conf = os.environ.get("PYTORCH_CUDA_ALLOC_CONF")
+    prev_cuda_alloc_conf = os.environ.get("PYTORCH_CUDA_ALLOC_CONF", None)
     if prev_cuda_alloc_conf is not None:
         raise RuntimeError(
             f"Attempted to configure the PyTorch CUDA memory allocator, but PYTORCH_CUDA_ALLOC_CONF is already set to "
