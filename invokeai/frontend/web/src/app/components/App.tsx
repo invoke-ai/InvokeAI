@@ -36,6 +36,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
 import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
+import { LoadWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { NewWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -75,6 +76,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <CancelAllExceptCurrentQueueItemConfirmationAlertDialog />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
+      <LoadWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
       <DeleteWorkflowDialog />
       <ShareWorkflowModal />
