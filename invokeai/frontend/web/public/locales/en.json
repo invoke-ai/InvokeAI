@@ -1725,6 +1725,8 @@
             "description": "Description",
             "component": "Component",
             "numberInput": "Number Input",
+            "singleLine": "Single Line",
+            "multiLine": "Multi Line",
             "slider": "Slider",
             "both": "Both",
             "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
