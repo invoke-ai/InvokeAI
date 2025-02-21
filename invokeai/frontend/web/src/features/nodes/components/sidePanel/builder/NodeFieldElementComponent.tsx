@@ -135,7 +135,16 @@ const NodeFieldEditableLabel = memo(({ el }: { el: NodeFieldElement }) => {
     );
   }
 
-  return <Input ref={inputRef} variant="outline" {...editable.inputProps} />;
+  return (
+    <Input
+      ref={inputRef}
+      variant="outline"
+      p={1}
+      px={2}
+      _focusVisible={{ borderRadius: 'base', h: 'unset' }}
+      {...editable.inputProps}
+    />
+  );
 });
 NodeFieldEditableLabel.displayName = 'NodeFieldEditableLabel';
 
@@ -171,6 +180,16 @@ const NodeFieldEditableDescription = memo(({ el }: { el: NodeFieldElement }) => 
     return <FormHelperText onDoubleClick={editable.startEditing}>{editable.value}</FormHelperText>;
   }
 
-  return <Textarea ref={inputRef} variant="outline" {...editable.inputProps} />;
+  return (
+    <Textarea
+      ref={inputRef}
+      variant="outline"
+      fontSize="sm"
+      p={1}
+      px={2}
+      _focusVisible={{ borderRadius: 'base', h: 'unset' }}
+      {...editable.inputProps}
+    />
+  );
 });
 NodeFieldEditableDescription.displayName = 'NodeFieldEditableDescription';
