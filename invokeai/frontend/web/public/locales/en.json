@@ -1719,6 +1719,7 @@
             "row": "Row",
             "column": "Column",
             "nodeField": "Node Field",
+            "zoomToNode": "Zoom to Node",
             "nodeFieldTooltip": "To add a node field, click the small plus sign button on the field in the Workflow Editor, or drag the field by its name into the form.",
             "addToForm": "Add to Form",
             "label": "Label",

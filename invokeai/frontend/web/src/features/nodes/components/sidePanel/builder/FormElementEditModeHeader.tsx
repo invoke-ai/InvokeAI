@@ -4,13 +4,14 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
+import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
-import type { FormElement } from 'features/nodes/types/workflow';
+import type { FormElement, NodeFieldElement } from 'features/nodes/types/workflow';
 import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiGpsFixBold, PiXBold } from 'react-icons/pi';
 
 const sx: SystemStyleObject = {
   w: 'full',
@@ -36,6 +37,7 @@ export const FormElementEditModeHeader = memo(
         <Label element={element} />
         <Spacer />
         {isContainerElement(element) && <ContainerElementSettings element={element} />}
+        {isNodeFieldElement(element) && <ZoomToNodeButton element={element} />}
         {isNodeFieldElement(element) && <NodeFieldElementSettings element={element} />}
         <RemoveElementButton element={element} />
       </Flex>
@@ -43,6 +45,27 @@ export const FormElementEditModeHeader = memo(
   })
 );
 FormElementEditModeHeader.displayName = 'FormElementEditModeHeader';
+
+const ZoomToNodeButton = memo(({ element }: { element: NodeFieldElement }) => {
+  const { t } = useTranslation();
+  const zoomToNode = useZoomToNode();
+  const onClick = useCallback(() => {
+    zoomToNode(element.data.fieldIdentifier.nodeId);
+  }, [element.data.fieldIdentifier.nodeId, zoomToNode]);
+
+  return (
+    <IconButton
+      tooltip={t('workflows.builder.zoomToNode')}
+      aria-label={t('workflows.builder.zoomToNode')}
+      onClick={onClick}
+      icon={<PiGpsFixBold />}
+      variant="link"
+      size="sm"
+      alignSelf="stretch"
+    />
+  );
+});
+ZoomToNodeButton.displayName = 'ZoomToNodeButton';
 
 const RemoveElementButton = memo(({ element }: { element: FormElement }) => {
   const { t } = useTranslation();
