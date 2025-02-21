@@ -56,7 +56,7 @@ export const FormElementEditModeHeader = memo(
 
     return (
       <Flex ref={ref} sx={sx} data-depth={depth} data-is-root={isRootElement}>
-        <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
+        <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all" userSelect="none">
           {label}
         </Text>
         <Spacer />
