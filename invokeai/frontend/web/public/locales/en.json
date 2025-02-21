@@ -1004,6 +1004,7 @@
         "unknownOutput": "Unknown output: {{name}}",
         "updateNode": "Update Node",
         "updateApp": "Update App",
+        "loadingTemplates": "Loading {{name}}",
         "updateAllNodes": "Update Nodes",
         "allNodesUpdated": "All Nodes Updated",
         "unableToUpdateNodes_one": "Unable to update {{count}} node",
