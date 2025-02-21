@@ -21,7 +21,7 @@ const sx: SystemStyleObject = {
   maxH: 8,
   borderTopRadius: 'base',
   alignItems: 'center',
-  color: 'base.300',
+  color: 'base.500',
   bg: 'baseAlpha.250',
   '&[data-depth="0"]': { bg: 'baseAlpha.100' },
   '&[data-depth="1"]': { bg: 'baseAlpha.150' },
