@@ -26,8 +26,8 @@ export const NodeFieldElementStringSettings = memo(
       <FormControl>
         <FormLabel flex={1}>{t('workflows.builder.component')}</FormLabel>
         <Select value={config.component} onChange={onChangeComponent} size="sm">
-          <option value="input">{t('workflows.builder.input')}</option>
-          <option value="textarea">{t('workflows.builder.textarea')}</option>
+          <option value="input">{t('workflows.builder.singleLine')}</option>
+          <option value="textarea">{t('workflows.builder.multiLine')}</option>
         </Select>
       </FormControl>
     );
