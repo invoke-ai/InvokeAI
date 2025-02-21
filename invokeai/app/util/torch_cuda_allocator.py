@@ -10,13 +10,8 @@ def is_torch_cuda_malloc_enabled():
     if not torch.cuda.is_available():
         return False
 
-    # Allocate something on a CUDA device so that there are memory stats to check.
-    _ = torch.zeros(1, device="cuda")
-
-    # Many of the memory stats are populated when using the native torch memory allocator, but fixed at 0 when using the
-    # cudaMallocAsync memory allocator. The "active.all.allocated" stat is one that is not populated when using the
-    # cudaMallocAsync memory allocator, so we can use it to chek if the cudaMallocAsync memory allocator is being used.
-    return torch.cuda.memory_stats()["active.all.allocated"] == 0
+    allocator_backend = torch.cuda.get_allocator_backend()
+    return allocator_backend == "cudaMallocAsync"
 
 
 def enable_torch_cuda_malloc():
