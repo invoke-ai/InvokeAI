@@ -1,6 +1,7 @@
 import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url, LIST_TAG } from '..';
+import { Workflow, WorkflowWithoutID } from '../types';
 
 /**
  * Builds an endpoint URL for the workflows router
@@ -41,13 +42,22 @@ export const workflowsApi = api.injectEndpoints({
     }),
     createWorkflow: build.mutation<
       paths['/api/v1/workflows/']['post']['responses']['200']['content']['application/json'],
-      paths['/api/v1/workflows/']['post']['requestBody']['content']['application/json']['workflow']
+      { workflow: WorkflowWithoutID; image: File | null }
     >({
-      query: (workflow) => ({
-        url: buildWorkflowsUrl(),
-        method: 'POST',
-        body: { workflow },
-      }),
+      query: ({ workflow, image }) => {
+        const formData = new FormData();
+        if (image) {
+          formData.append('image', image);
+        }
+
+        formData.append('workflow', JSON.stringify(workflow));
+
+        return {
+          url: buildWorkflowsUrl(),
+          method: 'POST',
+          body: formData,
+        };
+      },
       invalidatesTags: [
         { type: 'Workflow', id: LIST_TAG },
         { type: 'WorkflowsRecent', id: LIST_TAG },
@@ -55,14 +65,22 @@ export const workflowsApi = api.injectEndpoints({
     }),
     updateWorkflow: build.mutation<
       paths['/api/v1/workflows/i/{workflow_id}']['patch']['responses']['200']['content']['application/json'],
-      paths['/api/v1/workflows/i/{workflow_id}']['patch']['requestBody']['content']['application/json']['workflow']
+      { workflow: Workflow; image: File | null }
     >({
-      query: (workflow) => ({
-        url: buildWorkflowsUrl(`i/${workflow.id}`),
-        method: 'PATCH',
-        body: { workflow },
-      }),
-      invalidatesTags: (response, error, workflow) => [
+      query: ({ workflow, image }) => {
+        const formData = new FormData();
+        if (image) {
+          formData.append('image', image);
+        }
+        formData.append('workflow', JSON.stringify(workflow));
+
+        return {
+          url: buildWorkflowsUrl(`i/${workflow.id}`),
+          method: 'PATCH',
+          body: formData,
+        };
+      },
+      invalidatesTags: (response, error, { workflow }) => [
         { type: 'WorkflowsRecent', id: LIST_TAG },
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow.id },
