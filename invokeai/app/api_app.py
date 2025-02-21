@@ -13,9 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from torch.backends.mps import is_available as is_mps_available
 
-import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
@@ -38,15 +36,13 @@ from invokeai.app.util.custom_openapi import get_openapi_func
 
 # for PyCharm:
 # noinspection PyUnresolvedReferences
-from invokeai.app.util.startup_utils import check_cudnn, enable_dev_reload, find_open_port
+from invokeai.app.util.startup_utils import apply_monkeypatches, check_cudnn, enable_dev_reload, find_open_port
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()
 
-
-if is_mps_available():
-    import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
+apply_monkeypatches()
 
 
 logger = InvokeAILogger.get_logger(config=app_config)
