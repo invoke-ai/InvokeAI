@@ -44,3 +44,12 @@ def enable_dev_reload() -> None:
         ) from e
     else:
         jurigged.watch(logger=InvokeAILogger.get_logger(name="jurigged").info)
+
+
+def apply_monkeypatches() -> None:
+    """Apply monkeypatches to fix issues with third-party libraries."""
+
+    import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
+
+    if torch.backends.mps.is_available():
+        import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
