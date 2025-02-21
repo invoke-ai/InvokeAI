@@ -91,6 +91,7 @@ class InvokeAIAppConfig(BaseSettings):
         ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
         vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
         lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
+        use_cuda_malloc: Use CUDA's built-in async memory allocator rather than PyTorch's native memory allocator. This can reduce VRAM usage and improve performance in many cases, but can cause a regression on certain systems.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
@@ -168,6 +169,9 @@ class InvokeAIAppConfig(BaseSettings):
     ram:                Optional[float] = Field(default=None, gt=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
     vram:               Optional[float] = Field(default=None, ge=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
     lazy_offload:                  bool = Field(default=True,               description="DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.")
+
+    # PyTorch Memory Allocator
+    use_cuda_malloc:               bool = Field(default=False,              description="Use CUDA's built-in async memory allocator rather than PyTorch's native memory allocator. This can reduce VRAM usage and improve performance in many cases, but can cause a regression on certain systems.")
 
     # DEVICE
     device:                      DEVICE = Field(default="auto",             description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.")
