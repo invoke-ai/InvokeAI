@@ -12,7 +12,7 @@ export const ActiveWorkflowNameAndActions = memo(() => {
   const mode = useAppSelector(selectWorkflowMode);
 
   return (
-    <Flex w="full" alignItems="center" gap={2} minW={0}>
+    <Flex w="full" alignItems="center" gap={1} minW={0}>
       <WorkflowListMenuTrigger />
       <Spacer />
       {mode === 'edit' && <SaveWorkflowButton />}
