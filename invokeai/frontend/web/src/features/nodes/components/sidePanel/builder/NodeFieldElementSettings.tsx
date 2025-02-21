@@ -69,7 +69,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
         <PopoverArrow />
         <PopoverBody minW={48}>
           <FormControl>
-            <FormLabel flex={1}>{t('workflows.builder.description')}</FormLabel>
+            <FormLabel flex={1}>{t('workflows.builder.showDescription')}</FormLabel>
             <Switch size="sm" isChecked={showDescription} onChange={toggleShowDescription} />
           </FormControl>
           {settings?.type === 'integer-field-config' && <NodeFieldElementIntegerConfig id={id} config={settings} />}
