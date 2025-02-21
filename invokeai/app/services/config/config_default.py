@@ -72,6 +72,7 @@ class InvokeAIAppConfig(BaseSettings):
         outputs_dir: Path to directory for outputs.
         custom_nodes_dir: Path to directory for custom nodes.
         style_presets_dir: Path to directory for style presets.
+        workflow_thumbnails_dir: Path to directory for workflow thumbnails.
         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
@@ -142,6 +143,7 @@ class InvokeAIAppConfig(BaseSettings):
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
+    workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
 
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')
@@ -303,6 +305,11 @@ class InvokeAIAppConfig(BaseSettings):
     def style_presets_path(self) -> Path:
         """Path to the style presets directory, resolved to an absolute path.."""
         return self._resolve(self.style_presets_dir)
+
+    @property
+    def workflow_thumbnails_path(self) -> Path:
+        """Path to the workflow thumbnails directory, resolved to an absolute path.."""
+        return self._resolve(self.workflow_thumbnails_dir)
 
     @property
     def convert_cache_path(self) -> Path:

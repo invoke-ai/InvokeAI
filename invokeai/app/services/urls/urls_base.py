@@ -18,3 +18,8 @@ class UrlServiceBase(ABC):
     def get_style_preset_image_url(self, style_preset_id: str) -> str:
         """Gets the URL for a style preset image"""
         pass
+
+    @abstractmethod
+    def get_workflow_thumbnail_url(self, workflow_id: str) -> str:
+        """Gets the URL for a workflow thumbnail"""
+        pass
