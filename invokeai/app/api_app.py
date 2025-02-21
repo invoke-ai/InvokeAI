@@ -3,7 +3,6 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -32,25 +31,10 @@ from invokeai.app.api.sockets import SocketIO
 from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.custom_openapi import get_openapi_func
-from invokeai.app.util.startup_utils import (
-    apply_monkeypatches,
-    check_cudnn,
-    enable_dev_reload,
-    find_open_port,
-    register_mime_types,
-)
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()
-
-apply_monkeypatches()
-register_mime_types()
-
 logger = InvokeAILogger.get_logger(config=app_config)
-
-torch_device_name = TorchDevice.get_torch_device_name()
-logger.info(f"Using torch device: {torch_device_name}")
 
 loop = asyncio.new_event_loop()
 
@@ -182,34 +166,3 @@ except RuntimeError:
 app.mount(
     "/static", NoCacheStaticFiles(directory=Path(web_root_path, "static/")), name="static"
 )  # docs favicon is in here
-
-
-def invoke_api() -> None:
-    if app_config.dev_reload:
-        enable_dev_reload()
-
-    orig_config_port = app_config.port
-    app_config.port = find_open_port(app_config.port)
-    if orig_config_port != app_config.port:
-        logger.warning(f"Port {orig_config_port} is already in use. Using port {app_config.port}.")
-
-    check_cudnn(logger)
-
-    config = uvicorn.Config(
-        app=app,
-        host=app_config.host,
-        port=app_config.port,
-        loop="asyncio",
-        log_level=app_config.log_level_network,
-        ssl_certfile=app_config.ssl_certfile,
-        ssl_keyfile=app_config.ssl_keyfile,
-    )
-    server = uvicorn.Server(config)
-
-    # replace uvicorn's loggers with InvokeAI's for consistent appearance
-    uvicorn_logger = InvokeAILogger.get_logger("uvicorn")
-    uvicorn_logger.handlers.clear()
-    for hdlr in logger.handlers:
-        uvicorn_logger.addHandler(hdlr)
-
-    loop.run_until_complete(server.serve())
