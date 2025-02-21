@@ -11,14 +11,17 @@ import {
   workflowNameChanged,
   workflowNotesChanged,
   workflowTagsChanged,
+  workflowThumbnailChanged,
   workflowVersionChanged,
 } from 'features/nodes/store/workflowSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { WorkflowThumbnailField } from './WorkflowThumbnailField';
+
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
-  const { author, name, description, tags, version, contact, notes } = workflow;
+  const { author, name, description, tags, version, contact, notes, thumbnail } = workflow;
 
   return {
     name,
@@ -28,11 +31,12 @@ const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
     version,
     contact,
     notes,
+    thumbnail,
   };
 });
 
 const WorkflowGeneralTab = () => {
-  const { author, name, description, tags, version, contact, notes } = useAppSelector(selector);
+  const { author, name, description, tags, version, contact, notes, thumbnail } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChangeName = useCallback(
@@ -79,6 +83,13 @@ const WorkflowGeneralTab = () => {
     [dispatch]
   );
 
+  const handleChangeThumbnail = useCallback(
+    (localImageUrl: string | null) => {
+      dispatch(workflowThumbnailChanged(localImageUrl));
+    },
+    [dispatch]
+  );
+
   const { t } = useTranslation();
 
   return (
@@ -89,9 +100,14 @@ const WorkflowGeneralTab = () => {
             <FormLabel>{t('nodes.workflowName')}</FormLabel>
             <Input variant="darkFilled" value={name} onChange={handleChangeName} />
           </FormControl>
+
           <FormControl>
             <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
             <Input variant="darkFilled" value={version} onChange={handleChangeVersion} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Thumbnail</FormLabel>
+            <WorkflowThumbnailField imageUrl={thumbnail} onChange={handleChangeThumbnail} />
           </FormControl>
           <FormControl>
             <FormLabel>{t('nodes.workflowAuthor')}</FormLabel>

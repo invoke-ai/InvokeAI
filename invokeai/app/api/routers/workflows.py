@@ -1,18 +1,27 @@
+import io
+import traceback
 from typing import Optional
+import json
 
-from fastapi import APIRouter, Body, HTTPException, Path, Query
+from fastapi import APIRouter, Body, File, HTTPException, Path, Query, UploadFile, Form
+from fastapi.responses import FileResponse
+from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.model_manager import IMAGE_MAX_AGE
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
-    Workflow,
+    WorkflowValidator,
     WorkflowCategory,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
     WorkflowRecordListItemDTO,
     WorkflowRecordOrderBy,
-    WorkflowWithoutID,
+    WorkflowWithoutIDValidator,
+)
+from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_common import (
+    WorkflowThumbnailFileNotFoundException,
 )
 
 workflows_router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
@@ -30,7 +39,10 @@ async def get_workflow(
 ) -> WorkflowRecordDTO:
     """Gets a workflow"""
     try:
-        return ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow_id)
+        workflow = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        workflow.thumbnail_url = thumbnail_url
+        return workflow
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -43,10 +55,42 @@ async def get_workflow(
     },
 )
 async def update_workflow(
-    workflow: Workflow = Body(description="The updated workflow", embed=True),
+    workflow: str = Form(description="The updated workflow"),
+    image: Optional[UploadFile] = File(description="The image file to upload", default=None),
 ) -> WorkflowRecordDTO:
     """Updates a workflow"""
-    return ApiDependencies.invoker.services.workflow_records.update(workflow=workflow)
+
+    # parsed_data = json.loads(workflow)
+    validated_workflow = WorkflowValidator.validate_json(workflow)
+
+    if image is not None:
+        if not image.content_type or not image.content_type.startswith("image"):
+            raise HTTPException(status_code=415, detail="Not an image")
+
+        contents = await image.read()
+        try:
+            pil_image = Image.open(io.BytesIO(contents))
+
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(traceback.format_exc())
+            raise HTTPException(status_code=415, detail="Failed to read image")
+
+        try:
+            ApiDependencies.invoker.services.workflow_thumbnails.save(
+                workflow_id=validated_workflow.id, image=pil_image
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+    else:
+        try:
+            ApiDependencies.invoker.services.workflow_thumbnails.delete(workflow_id=validated_workflow.id)
+        except WorkflowThumbnailFileNotFoundException:
+            pass
+
+    updated_workflow = ApiDependencies.invoker.services.workflow_records.update(workflow=validated_workflow)
+    thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(validated_workflow.id)
+    updated_workflow.thumbnail_url = thumbnail_url
+    return updated_workflow
 
 
 @workflows_router.delete(
@@ -58,6 +102,7 @@ async def delete_workflow(
 ) -> None:
     """Deletes a workflow"""
     ApiDependencies.invoker.services.workflow_records.delete(workflow_id)
+    ApiDependencies.invoker.services.workflow_thumbnails.delete(workflow_id)
 
 
 @workflows_router.post(
@@ -68,10 +113,37 @@ async def delete_workflow(
     },
 )
 async def create_workflow(
-    workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
+    workflow: str = Form(description="The workflow to create"),
+    image: Optional[UploadFile] = File(description="The image file to upload", default=None),
 ) -> WorkflowRecordDTO:
     """Creates a workflow"""
-    return ApiDependencies.invoker.services.workflow_records.create(workflow=workflow)
+
+    # parsed_data = json.loads(workflow)
+    validated_workflow = WorkflowWithoutIDValidator.validate_json(workflow)
+
+    new_workflow = ApiDependencies.invoker.services.workflow_records.create(workflow=validated_workflow)
+
+    if image is not None:
+        if not image.content_type or not image.content_type.startswith("image"):
+            raise HTTPException(status_code=415, detail="Not an image")
+
+        contents = await image.read()
+        try:
+            pil_image = Image.open(io.BytesIO(contents))
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(traceback.format_exc())
+            raise HTTPException(status_code=415, detail="Failed to read image")
+
+        try:
+            ApiDependencies.invoker.services.workflow_thumbnails.save(
+                workflow_id=new_workflow.workflow_id, image=pil_image
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
+
+    thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(new_workflow.workflow_id)
+    new_workflow.thumbnail_url = thumbnail_url
+    return new_workflow
 
 
 @workflows_router.get(
@@ -92,6 +164,35 @@ async def list_workflows(
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
 ) -> PaginatedResults[WorkflowRecordListItemDTO]:
     """Gets a page of workflows"""
-    return ApiDependencies.invoker.services.workflow_records.get_many(
+    workflows = ApiDependencies.invoker.services.workflow_records.get_many(
         order_by=order_by, direction=direction, page=page, per_page=per_page, query=query, category=category
     )
+    for workflow in workflows.items:
+        workflow.thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow.workflow_id)
+    return workflows
+
+
+@workflows_router.get(
+    "i/{workflow_id}/thumbnail",
+    operation_id="get_workflow_thumbnail",
+    responses={
+        200: {"description": "Thumbnail retrieved successfully"},
+        404: {"description": "Thumbnail not found"},
+    },
+)
+async def get_workflow_thumbnail(
+    workflow_id: str,
+) -> FileResponse:
+    """Gets the thumbnail for a workflow"""
+    try:
+        path = ApiDependencies.invoker.services.workflow_thumbnails.get_path(workflow_id)
+        response = FileResponse(
+            path,
+            media_type="image/png",
+            filename=f"{workflow_id}.png",
+            content_disposition_type="inline",
+        )
+        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        return response
+    except WorkflowThumbnailFileNotFoundException:
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
