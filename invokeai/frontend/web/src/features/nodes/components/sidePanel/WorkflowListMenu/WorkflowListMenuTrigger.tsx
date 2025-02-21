@@ -1,4 +1,14 @@
-import { Box, Button, Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger, Portal } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Button,
+  Flex,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Portal,
+  Text,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -32,8 +42,17 @@ export const WorkflowListMenuTrigger = () => {
       initialFocusRef={searchInputRef}
     >
       <PopoverTrigger>
-        <Button variant="ghost" rightIcon={<PiFolderOpenFill />}>
-          {workflowName || t('workflows.chooseWorkflowFromLibrary')}
+        <Button variant="ghost" rightIcon={<PiFolderOpenFill />} size="sm">
+          <Text
+            display="auto"
+            noOfLines={1}
+            overflow="hidden"
+            textOverflow="ellipsis"
+            whiteSpace="nowrap"
+            wordBreak="break-all"
+          >
+            {workflowName || t('workflows.chooseWorkflowFromLibrary')}
+          </Text>
         </Button>
       </PopoverTrigger>
       <Portal>
