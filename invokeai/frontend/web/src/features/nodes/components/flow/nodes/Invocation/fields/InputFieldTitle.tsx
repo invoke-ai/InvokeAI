@@ -12,7 +12,7 @@ import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsCo
 import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
 import { useInputFieldTemplateTitle } from 'features/nodes/hooks/useInputFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
-import { HANDLE_TOOLTIP_OPEN_DELAY, NO_DRAG_CLASS, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
+import { HANDLE_TOOLTIP_OPEN_DELAY, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -88,7 +88,7 @@ export const InputFieldTitle = memo((props: Props) => {
         isDisabled={isDragging}
       >
         <Text
-          className={`${NO_DRAG_CLASS} ${NO_FIT_ON_DOUBLE_CLICK_CLASS}`}
+          className={NO_FIT_ON_DOUBLE_CLICK_CLASS}
           sx={labelSx}
           noOfLines={1}
           data-is-invalid={isInvalid}
@@ -104,7 +104,6 @@ export const InputFieldTitle = memo((props: Props) => {
   return (
     <Input
       ref={inputRef}
-      className={NO_DRAG_CLASS}
       variant="outline"
       {...editable.inputProps}
       _focusVisible={{ borderRadius: 'base', h: 'unset', px: 2 }}

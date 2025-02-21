@@ -8,6 +8,7 @@ import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/dnd
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useRef, useState } from 'react';
 
@@ -112,7 +113,7 @@ const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemp
         data-is-dragging={isDragging}
       >
         <Flex gap={1}>
-          <Flex ref={dragHandleRef}>
+          <Flex className={NO_DRAG_CLASS} ref={dragHandleRef}>
             <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} isDragging={isDragging} />
           </Flex>
           <Spacer />
