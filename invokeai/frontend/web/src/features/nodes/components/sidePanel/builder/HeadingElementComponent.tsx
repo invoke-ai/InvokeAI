@@ -111,9 +111,11 @@ const EditableHeading = memo(({ el }: { el: HeadingElement }) => {
       minRows={1}
       maxRows={10}
       resize="none"
-      p={2}
+      p={1}
+      px={2}
       fontWeight="bold"
       fontSize={FONT_SIZE}
+      _focusVisible={{ borderRadius: 'base', h: 'unset' }}
     />
   );
 });
