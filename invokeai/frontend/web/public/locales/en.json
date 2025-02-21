@@ -973,6 +973,8 @@
         "newWorkflow": "New Workflow",
         "newWorkflowDesc": "Create a new workflow?",
         "newWorkflowDesc2": "Your current workflow has unsaved changes.",
+        "loadWorkflowDesc": "Load workflow?",
+        "loadWorkflowDesc2": "Your current workflow has unsaved changes.",
         "clearWorkflow": "Clear Workflow",
         "clearWorkflowDesc": "Clear this workflow and start a new one?",
         "clearWorkflowDesc2": "Your current workflow has unsaved changes.",
