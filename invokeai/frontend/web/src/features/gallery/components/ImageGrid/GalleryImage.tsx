@@ -18,7 +18,6 @@ import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid
 import { SizedSkeletonLoader } from 'features/gallery/components/ImageGrid/SizedSkeletonLoader';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import { atom } from 'nanostores';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -178,20 +177,15 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     );
   }, [imageDTO, element, store, dndId]);
 
-  // Perf optimization:
-  // The gallery image component can be heavy and re-render often. We want to track hovering state without causing
-  // unnecessary re-renders. To do this, we use a local atom - which has a stable reference - in the image component -
-  // and then pass the atom to the hover icons component, which subscribes to the atom and re-renders when the atom
-  // changes.
-  const $isHovered = useMemo(() => atom(false), []);
+  const [isHovered, setIsHovered] = useState(false);
 
   const onMouseOver = useCallback(() => {
-    $isHovered.set(true);
-  }, [$isHovered]);
+    setIsHovered(true);
+  }, []);
 
   const onMouseOut = useCallback(() => {
-    $isHovered.set(false);
-  }, [$isHovered]);
+    setIsHovered(false);
+  }, []);
 
   const onClick = useCallback<MouseEventHandler<HTMLDivElement>>(
     (e) => {
@@ -247,7 +241,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
             maxH="full"
             borderRadius="base"
           />
-          <GalleryImageHoverIcons imageDTO={imageDTO} $isHovered={$isHovered} />
+          <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
         </Flex>
       </Box>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
