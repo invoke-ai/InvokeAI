@@ -3,12 +3,14 @@ import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
+  formFieldInitialValuesChanged,
   workflowCategoryChanged,
   workflowIDChanged,
   workflowNameChanged,
   workflowSaved,
 } from 'features/nodes/store/workflowSlice';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/useGetFormInitialValues';
 import { newWorkflowSaved } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +35,8 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [createWorkflow, createWorkflowResult] = useCreateWorkflowMutation();
+  const getFormFieldInitialValues = useGetFormFieldInitialValues();
+
   const toast = useToast();
   const toastRef = useRef<ToastId | undefined>();
   const saveWorkflowAs = useCallback(
@@ -57,6 +61,8 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         dispatch(workflowNameChanged(data.workflow.name));
         dispatch(workflowCategoryChanged(data.workflow.meta.category));
         dispatch(workflowSaved());
+        // When a workflow is saved, the form field initial values are updated to the current form field values
+        dispatch(formFieldInitialValuesChanged({ formFieldInitialValues: getFormFieldInitialValues() }));
         dispatch(newWorkflowSaved({ category }));
 
         onSuccess && onSuccess();
@@ -80,7 +86,7 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         }
       }
     },
-    [toast, createWorkflow, dispatch, t]
+    [toast, t, createWorkflow, dispatch, getFormFieldInitialValues]
   );
   return {
     saveWorkflowAs,

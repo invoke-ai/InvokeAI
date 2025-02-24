@@ -10,10 +10,11 @@ import {
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
-import type { WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import type { NodesState, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
+  BuilderForm,
   ContainerElement,
   ElementId,
   FormElement,
@@ -188,35 +189,19 @@ export const workflowSlice = createSlice({
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
     },
+    formFieldInitialValuesChanged: (
+      state,
+      action: PayloadAction<{ formFieldInitialValues: WorkflowState['formFieldInitialValues'] }>
+    ) => {
+      const { formFieldInitialValues } = action.payload;
+      state.formFieldInitialValues = formFieldInitialValues;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action): WorkflowState => {
       const { nodes, edges: _edges, ...workflowExtra } = action.payload;
 
-      const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
-
-      if (workflowExtra.form) {
-        for (const el of Object.values(workflowExtra.form.elements)) {
-          if (!isNodeFieldElement(el)) {
-            continue;
-          }
-          const { nodeId, fieldName } = el.data.fieldIdentifier;
-
-          const node = nodes.find((n) => n.id === nodeId);
-
-          if (!isInvocationNode(node)) {
-            continue;
-          }
-
-          const field = node.data.inputs[fieldName];
-
-          if (!field) {
-            continue;
-          }
-
-          formFieldInitialValues[el.id] = field.value;
-        }
-      }
+      const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
 
       return {
         ...deepClone(initialWorkflowState),
@@ -322,6 +307,7 @@ export const {
   formElementTextDataChanged,
   formElementNodeFieldDataChanged,
   formElementContainerDataChanged,
+  formFieldInitialValuesChanged,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -343,6 +329,34 @@ export const selectWorkflowSlice = (state: RootState) => state.workflow;
 const createWorkflowSelector = <T>(selector: Selector<WorkflowState, T>) =>
   createSelector(selectWorkflowSlice, selector);
 
+// The form builder's initial values are based on the current values of the node fields in the workflow.
+export const getFormFieldInitialValues = (form: BuilderForm, nodes: NodesState['nodes']) => {
+  const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
+
+  for (const el of Object.values(form.elements)) {
+    if (!isNodeFieldElement(el)) {
+      continue;
+    }
+    const { nodeId, fieldName } = el.data.fieldIdentifier;
+
+    const node = nodes.find((n) => n.id === nodeId);
+
+    if (!isInvocationNode(node)) {
+      continue;
+    }
+
+    const field = node.data.inputs[fieldName];
+
+    if (!field) {
+      continue;
+    }
+
+    formFieldInitialValues[el.id] = field.value;
+  }
+
+  return formFieldInitialValues;
+};
+
 export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.name);
 export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
@@ -351,6 +365,7 @@ export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => wor
 export const selectWorkflowOrderBy = createWorkflowSelector((workflow) => workflow.orderBy);
 export const selectWorkflowOrderDirection = createWorkflowSelector((workflow) => workflow.orderDirection);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
+export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
 
 export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
   const noNodes = !nodes.nodes.length;
