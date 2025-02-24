@@ -533,7 +533,7 @@ const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTem
   const template: BoardFieldInputTemplate = {
     ...baseField,
     type: fieldType,
-    default: schemaObject.default ?? undefined,
+    default: schemaObject.default ?? 'auto',
   };
 
   return template;

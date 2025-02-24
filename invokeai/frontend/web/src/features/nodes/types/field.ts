@@ -642,7 +642,7 @@ export const isImageFieldCollectionInputTemplate = buildTemplateTypeGuard<ImageF
 // #endregion
 
 // #region BoardField
-export const zBoardFieldValue = zBoardField.optional();
+export const zBoardFieldValue = z.union([zBoardField, z.enum(['none', 'auto'])]).optional();
 const zBoardFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zBoardFieldValue,
 });
