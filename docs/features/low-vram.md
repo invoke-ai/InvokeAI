@@ -86,23 +86,25 @@ But, if your GPU has enough VRAM to hold models fully, you might get a perf boos
 # As an example, if your system has 32GB of RAM and no other heavy processes, setting the `max_cache_ram_gb` to 28GB
 # might be a good value to achieve aggressive model caching.
 max_cache_ram_gb: 28
+
 # The default max cache VRAM size is adjusted dynamically based on the amount of available VRAM (taking into
 # consideration the VRAM used by other processes).
-# You can override the default value by setting `max_cache_vram_gb`. Note that this value takes precedence over the
-# `device_working_mem_gb`.
-# It is recommended to set the VRAM cache size to be as large as possible while leaving enough room for the working
-# memory of the tasks you will be doing. For example, on a 24GB GPU that will be running unquantized FLUX without any
-# auxiliary models, 18GB might be a good value.
-max_cache_vram_gb: 18
+# You can override the default value by setting `max_cache_vram_gb`.
+# CAUTION: Most users should not manually set this value. See warning below.
+max_cache_vram_gb: 16
 ```
 
-!!! tip "Max safe value for `max_cache_vram_gb`"
+!!! warning "Max safe value for `max_cache_vram_gb`"
 
-    To determine the max safe value for `max_cache_vram_gb`, subtract `device_working_mem_gb` from your GPU's VRAM. As described below, the default for `device_working_mem_gb` is 3GB.
+    Most users should not manually configure the `max_cache_vram_gb`. This configuration value takes precedence over the `device_working_mem_gb` and any operations that explicitly reserve additional working memory (e.g. VAE decode). As such, manually configuring it increases the likelihood of encountering out-of-memory errors.
+
+    For users who wish to configure `max_cache_vram_gb`, the max safe value can be determined by subtracting `device_working_mem_gb` from your GPU's VRAM. As described below, the default for `device_working_mem_gb` is 3GB.
 
     For example, if you have a 12GB GPU, the max safe value for `max_cache_vram_gb` is `12GB - 3GB = 9GB`.
 
     If you had increased `device_working_mem_gb` to 4GB, then the max safe value for `max_cache_vram_gb` is `12GB - 4GB = 8GB`.
+
+    Most users who override `max_cache_vram_gb` are doing so because they wish to use significantly less VRAM, and should be setting `max_cache_vram_gb` to a value significantly less than the 'max safe value'.
 
 ### Working memory
 
