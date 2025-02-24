@@ -1,5 +1,6 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
@@ -17,7 +18,8 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
       const state = getState();
       const nodes = selectNodesSlice(state);
       const workflow = state.workflow;
-      const graph = buildNodesGraph(nodes);
+      const templates = $templates.get();
+      const graph = buildNodesGraph(state, templates);
       const builtWorkflow = buildWorkflowWithValidation({
         nodes: nodes.nodes,
         edges: nodes.edges,
