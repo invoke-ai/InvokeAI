@@ -34,7 +34,7 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
         try:
             self._validate_storage_folders()
             image_path = self._workflow_thumbnail_folder / (workflow_id + ".webp")
-            thumbnail = make_thumbnail(image, 512)
+            thumbnail = make_thumbnail(image, 256)
             thumbnail.save(image_path, format="webp")
 
         except Exception as e:

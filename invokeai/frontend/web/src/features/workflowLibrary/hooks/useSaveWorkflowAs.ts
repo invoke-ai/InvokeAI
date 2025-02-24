@@ -1,11 +1,9 @@
 import type { ToastId } from '@invoke-ai/ui-library';
 import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   formFieldInitialValuesChanged,
-  selectWorkflowThumbnail,
   workflowCategoryChanged,
   workflowIDChanged,
   workflowNameChanged,
@@ -16,7 +14,6 @@ import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/use
 import { newWorkflowSaved } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSelector } from 'react-redux';
 import { useCreateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
 
 type SaveWorkflowAsArg = {
@@ -40,7 +37,6 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
   const [createWorkflow, createWorkflowResult] = useCreateWorkflowMutation();
   const getFormFieldInitialValues = useGetFormFieldInitialValues();
 
-  const thumbnail = useSelector(selectWorkflowThumbnail);
   const toast = useToast();
   const toastRef = useRef<ToastId | undefined>();
   const saveWorkflowAs = useCallback(
@@ -59,10 +55,8 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         workflow.id = undefined;
         workflow.name = newName;
         workflow.meta.category = category;
-        const blob = thumbnail ? await convertImageUrlToBlob(thumbnail) : null;
-        const image = blob ? new File([blob], 'thumbnail.png', { type: 'image/png' }) : null;
 
-        const data = await createWorkflow({ workflow, image }).unwrap();
+        const data = await createWorkflow(workflow).unwrap();
         dispatch(workflowIDChanged(data.workflow.id));
         dispatch(workflowNameChanged(data.workflow.name));
         dispatch(workflowCategoryChanged(data.workflow.meta.category));
@@ -92,7 +86,7 @@ export const useSaveWorkflowAs: UseSaveWorkflowAs = () => {
         }
       }
     },
-    [toast, t, createWorkflow, dispatch, getFormFieldInitialValues, thumbnail]
+    [toast, t, createWorkflow, dispatch, getFormFieldInitialValues]
   );
   return {
     saveWorkflowAs,

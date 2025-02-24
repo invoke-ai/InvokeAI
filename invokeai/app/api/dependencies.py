@@ -122,7 +122,7 @@ class ApiDependencies:
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
-        workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder / "thumbnails")
+        workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
 
         services = InvocationServices(
             board_image_records=board_image_records,

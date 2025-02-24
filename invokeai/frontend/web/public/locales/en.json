@@ -149,6 +149,7 @@
         "safetensors": "Safetensors",
         "save": "Save",
         "saveAs": "Save As",
+        "saveChanges": "Save Changes",
         "settingsLabel": "Settings",
         "simple": "Simple",
         "somethingWentWrong": "Something went wrong",
@@ -1721,6 +1722,8 @@
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
         "delete": "Delete",
         "openLibrary": "Open Library",
+        "workflowThumbnail": "Workflow Thumbnail",
+        "saveChanges": "Save Changes",
         "builder": {
             "deleteAllElements": "Delete All Form Elements",
             "resetAllNodeFields": "Reset All Node Fields",
