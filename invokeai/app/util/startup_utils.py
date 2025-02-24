@@ -4,8 +4,6 @@ import socket
 
 import torch
 
-from invokeai.backend.util.logging import InvokeAILogger
-
 
 def find_open_port(port: int) -> int:
     """Find a port not in use starting at given port"""
@@ -37,6 +35,8 @@ def check_cudnn(logger: logging.Logger) -> None:
 
 def enable_dev_reload() -> None:
     """Enable hot reloading on python file changes during development."""
+    from invokeai.backend.util.logging import InvokeAILogger
+
     try:
         import jurigged
     except ImportError as e:
