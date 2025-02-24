@@ -1,7 +1,6 @@
 import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url, LIST_TAG } from '..';
-import { Workflow, WorkflowWithoutID } from '../types';
 
 /**
  * Builds an endpoint URL for the workflows router
@@ -42,22 +41,13 @@ export const workflowsApi = api.injectEndpoints({
     }),
     createWorkflow: build.mutation<
       paths['/api/v1/workflows/']['post']['responses']['200']['content']['application/json'],
-      { workflow: WorkflowWithoutID; image: File | null }
+      paths['/api/v1/workflows/']['post']['requestBody']['content']['application/json']['workflow']
     >({
-      query: ({ workflow, image }) => {
-        const formData = new FormData();
-        if (image) {
-          formData.append('image', image);
-        }
-
-        formData.append('workflow', JSON.stringify(workflow));
-
-        return {
-          url: buildWorkflowsUrl(),
-          method: 'POST',
-          body: formData,
-        };
-      },
+      query: (workflow) => ({
+        url: buildWorkflowsUrl(),
+        method: 'POST',
+        body: { workflow },
+      }),
       invalidatesTags: [
         { type: 'Workflow', id: LIST_TAG },
         { type: 'WorkflowsRecent', id: LIST_TAG },
@@ -65,22 +55,14 @@ export const workflowsApi = api.injectEndpoints({
     }),
     updateWorkflow: build.mutation<
       paths['/api/v1/workflows/i/{workflow_id}']['patch']['responses']['200']['content']['application/json'],
-      { workflow: Workflow; image: File | null }
+      paths['/api/v1/workflows/i/{workflow_id}']['patch']['requestBody']['content']['application/json']['workflow']
     >({
-      query: ({ workflow, image }) => {
-        const formData = new FormData();
-        if (image) {
-          formData.append('image', image);
-        }
-        formData.append('workflow', JSON.stringify(workflow));
-
-        return {
-          url: buildWorkflowsUrl(`i/${workflow.id}`),
-          method: 'PATCH',
-          body: formData,
-        };
-      },
-      invalidatesTags: (response, error, { workflow }) => [
+      query: (workflow) => ({
+        url: buildWorkflowsUrl(`i/${workflow.id}`),
+        method: 'PATCH',
+        body: { workflow },
+      }),
+      invalidatesTags: (response, error, workflow) => [
         { type: 'WorkflowsRecent', id: LIST_TAG },
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow.id },
@@ -96,13 +78,41 @@ export const workflowsApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
     }),
+    setWorkflowThumbnail: build.mutation<void, { workflow_id: string; image: File }>({
+      query: ({ workflow_id, image }) => {
+        const formData = new FormData();
+        formData.append('image', image);
+        return {
+          url: buildWorkflowsUrl(`i/${workflow_id}/thumbnail`),
+          method: 'PUT',
+          body: formData,
+        };
+      },
+      invalidatesTags: (result, error, { workflow_id }) => [
+        { type: 'Workflow', id: workflow_id },
+        { type: 'WorkflowsRecent', id: LIST_TAG },
+      ],
+    }),
+    deleteWorkflowThumbnail: build.mutation<void, string>({
+      query: (workflow_id) => ({
+        url: buildWorkflowsUrl(`i/${workflow_id}/thumbnail`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, workflow_id) => [
+        { type: 'Workflow', id: workflow_id },
+        { type: 'WorkflowsRecent', id: LIST_TAG },
+      ],
+    }),
   }),
 });
 
 export const {
   useLazyGetWorkflowQuery,
+  useGetWorkflowQuery,
   useCreateWorkflowMutation,
   useDeleteWorkflowMutation,
   useUpdateWorkflowMutation,
   useListWorkflowsQuery,
+  useSetWorkflowThumbnailMutation,
+  useDeleteWorkflowThumbnailMutation,
 } = workflowsApi;

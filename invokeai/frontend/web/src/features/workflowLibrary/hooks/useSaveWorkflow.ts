@@ -2,15 +2,13 @@ import type { ToastId } from '@invoke-ai/ui-library';
 import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
-import { selectWorkflowThumbnail, workflowIDChanged, workflowSaved } from 'features/nodes/store/workflowSlice';
+import { workflowIDChanged, workflowSaved } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { workflowUpdated } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSelector } from 'react-redux';
 import { useCreateWorkflowMutation, useUpdateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
 import type { SetRequired } from 'type-fest';
-import { convertImageUrlToBlob } from '../../../common/util/convertImageUrlToBlob';
 
 type UseSaveLibraryWorkflowReturn = {
   saveWorkflow: () => Promise<void>;
@@ -26,7 +24,6 @@ export const isWorkflowWithID = (workflow: WorkflowV3): workflow is SetRequired<
 export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const thumbnail = useSelector(selectWorkflowThumbnail);
   const [updateWorkflow, updateWorkflowResult] = useUpdateWorkflowMutation();
   const [createWorkflow, createWorkflowResult] = useCreateWorkflowMutation();
   const toast = useToast();
@@ -43,13 +40,11 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
       isClosable: false,
     });
     try {
-      const blob = thumbnail ? await convertImageUrlToBlob(thumbnail) : null;
-      const image = blob ? new File([blob], 'thumbnail.png', { type: 'image/png' }) : null;
       if (isWorkflowWithID(workflow)) {
-        await updateWorkflow({ workflow, image }).unwrap();
+        await updateWorkflow(workflow).unwrap();
         dispatch(workflowUpdated());
       } else {
-        const data = await createWorkflow({ workflow, image }).unwrap();
+        const data = await createWorkflow(workflow).unwrap();
         dispatch(workflowIDChanged(data.workflow.id));
       }
       dispatch(workflowSaved());
@@ -74,7 +69,7 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
         toast.close(toastRef.current);
       }
     }
-  }, [updateWorkflow, dispatch, toast, t, createWorkflow, thumbnail]);
+  }, [updateWorkflow, dispatch, toast, t, createWorkflow]);
   return {
     saveWorkflow,
     isLoading: updateWorkflowResult.isLoading || createWorkflowResult.isLoading,

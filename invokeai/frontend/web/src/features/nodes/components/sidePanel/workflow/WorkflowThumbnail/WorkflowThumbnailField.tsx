@@ -10,7 +10,7 @@ export const WorkflowThumbnailField = ({
   onChange,
 }: {
   imageUrl: string | null;
-  onChange: (localImageUrl: string | null) => void;
+  onChange: (localThumbnailUrl: string | null) => void;
 }) => {
   const [thumbnail, setThumbnail] = useState<File | null>(null);
 
@@ -48,7 +48,8 @@ export const WorkflowThumbnailField = ({
 
   const handleResetImage = useCallback(() => {
     setThumbnail(null);
-  }, []);
+    onChange(null);
+  }, [onChange]);
 
   const { getInputProps, getRootProps } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
@@ -64,9 +65,8 @@ export const WorkflowThumbnailField = ({
           src={URL.createObjectURL(thumbnail)}
           objectFit="cover"
           objectPosition="50% 50%"
-          w={65}
-          h={65}
-          minWidth={65}
+          w={100}
+          h={100}
           borderRadius="base"
         />
         <IconButton
@@ -89,8 +89,8 @@ export const WorkflowThumbnailField = ({
       <Tooltip label={t('stylePresets.uploadImage')}>
         <Flex
           as={Button}
-          w={65}
-          h={65}
+          w={100}
+          h={100}
           opacity={0.3}
           borderRadius="base"
           alignItems="center"

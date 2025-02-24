@@ -101,7 +101,6 @@ class WorkflowRecordDTOBase(BaseModel):
     created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the workflow.")
     updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the workflow.")
     opened_at: Union[datetime.datetime, str] = Field(description="The opened timestamp of the workflow.")
-    thumbnail_url: str | None = Field(default=None, description="The URL of the workflow thumbnail.")
 
 
 class WorkflowRecordDTO(WorkflowRecordDTOBase):
@@ -122,3 +121,11 @@ class WorkflowRecordListItemDTO(WorkflowRecordDTOBase):
 
 
 WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
+
+
+class WorkflowRecordWithThumbnailDTO(WorkflowRecordDTO):
+    thumbnail_url: str | None = Field(default=None, description="The URL of the workflow thumbnail.")
+
+
+class WorkflowRecordListItemWithThumbnailDTO(WorkflowRecordListItemDTO):
+    thumbnail_url: str | None = Field(default=None, description="The URL of the workflow thumbnail.")
