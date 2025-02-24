@@ -109,10 +109,6 @@ export const workflowSlice = createSlice({
       state.name = action.payload;
       state.isTouched = true;
     },
-    workflowThumbnailChanged: (state, action: PayloadAction<string | null>) => {
-      state.thumbnail = action.payload;
-      state.isTouched = true;
-    },
     workflowCategoryChanged: (state, action: PayloadAction<WorkflowCategory | undefined>) => {
       if (action.payload) {
         state.meta.category = action.payload;
