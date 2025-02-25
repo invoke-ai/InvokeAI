@@ -230,7 +230,10 @@
         "max": "Tối Đa",
         "resetToDefaults": "Đặt Lại Về Mặc Định",
         "seed": "Hạt Giống",
-        "combinatorial": "Tổ Hợp"
+        "combinatorial": "Tổ Hợp",
+        "column": "Cột",
+        "layout": "Bố Cục",
+        "row": "Hàng"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -305,10 +308,13 @@
         "graphQueued": "Đồ Thị Đã Vào Hàng",
         "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng",
         "batchSize": "Kích Thước Lô",
-        "cancelAllExceptCurrentQueueItemAlertDialog": "Huỷ tất cả mục đang xếp hàng ngoại trừ mục hiện tại, sẽ dừng các mục đang chờ nhưng cho phép các mục đang chạy được hoàn tất.",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Huỷ tất cả mục đang xếp hàng ngoại trừ việc nó sẽ dừng các mục đang chờ nhưng cho phép các mục đang chạy được hoàn tất.",
         "cancelAllExceptCurrentQueueItemAlertDialog2": "Bạn có chắc muốn huỷ tất cả mục đang chờ?",
         "cancelAllExceptCurrentTooltip": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại",
-        "confirm": "Đồng Ý"
+        "confirm": "Đồng Ý",
+        "retrySucceeded": "Mục Đã Thử Lại",
+        "retryFailed": "Có Vấn Đề Khi Thử Lại Mục",
+        "retryItem": "Thử Lại Mục"
     },
     "hotkeys": {
         "canvas": {
@@ -995,7 +1001,9 @@
         "generatorLoading": "đang tải",
         "generatorLoadFromFile": "Tải Từ Tệp",
         "dynamicPromptsRandom": "Dynamic Prompts (Ngẫu Nhiên)",
-        "dynamicPromptsCombinatorial": "Dynamic Prompts (Tổ Hợp)"
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Tổ Hợp)",
+        "missingSourceOrTargetNode": "Thiếu nguồn hoặc node mục tiêu",
+        "missingSourceOrTargetHandle": "Thiếu nguồn hoặc mục tiêu xử lý"
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
