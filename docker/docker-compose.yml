@@ -52,3 +52,11 @@ services:
       - /dev/dri:/dev/dri
     profiles:
       - rocm
+
+  invokeai-rocm57:
+    <<: *invokeai
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    profiles:
+      - rocm57
