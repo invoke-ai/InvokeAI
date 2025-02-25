@@ -6,13 +6,13 @@ import { atom } from 'nanostores';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeleteWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
-import type { WorkflowRecordListItemDTO } from 'services/api/types';
+import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
-const $workflowToDelete = atom<WorkflowRecordListItemDTO | null>(null);
+const $workflowToDelete = atom<WorkflowRecordListItemWithThumbnailDTO | null>(null);
 const clearWorkflowToDelete = () => $workflowToDelete.set(null);
 
 export const useDeleteWorkflow = () => {
-  const deleteWorkflow = useCallback((workflow: WorkflowRecordListItemDTO) => {
+  const deleteWorkflow = useCallback((workflow: WorkflowRecordListItemWithThumbnailDTO) => {
     $workflowToDelete.set(workflow);
   }, []);
 

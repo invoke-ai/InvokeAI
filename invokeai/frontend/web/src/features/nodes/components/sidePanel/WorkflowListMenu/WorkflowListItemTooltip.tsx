@@ -1,9 +1,9 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import dateFormat, { masks } from 'dateformat';
 import { useTranslation } from 'react-i18next';
-import type { WorkflowRecordListItemDTO } from 'services/api/types';
+import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
-export const WorkflowListItemTooltip = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
+export const WorkflowListItemTooltip = ({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
   const { t } = useTranslation();
   return (
     <Flex flexDir="column" gap={1}>
