@@ -50,7 +50,7 @@ export const GalleryPagination = memo(() => {
         variant="ghost"
       />
       <JumpTo />
-      <Tooltip label={`Select all (${total})`}>
+      <Tooltip label={`${t('gallery.selectAll')} (${total})`}>
         <IconButton
           variant="outline"
           size="sm"
