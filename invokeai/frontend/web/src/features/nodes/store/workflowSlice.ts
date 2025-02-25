@@ -5,6 +5,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import {
   addElement,
+  getElement,
   removeElement,
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
@@ -376,6 +377,9 @@ export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflo
 
 export const selectFormRootElementId = createWorkflowSelector((workflow) => {
   return workflow.form.rootElementId;
+});
+export const selectFormRootElement = createWorkflowSelector((workflow) => {
+  return getElement(workflow.form, workflow.form.rootElementId, isContainerElement);
 });
 export const selectIsFormEmpty = createWorkflowSelector((workflow) => {
   const rootElement = workflow.form.elements[workflow.form.rootElementId];
