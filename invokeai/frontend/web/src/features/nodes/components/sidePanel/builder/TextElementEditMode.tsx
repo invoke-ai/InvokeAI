@@ -13,6 +13,7 @@ import { TextElementContentEditable } from './TextElementContentEditable';
 export const sx: SystemStyleObject = {
   position: 'relative',
   borderRadius: 'base',
+  minW: 32,
   '&[data-parent-layout="column"]': {
     w: 'full',
     h: 'min-content',

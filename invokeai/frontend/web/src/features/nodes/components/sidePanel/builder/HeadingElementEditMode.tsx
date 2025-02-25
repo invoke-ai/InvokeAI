@@ -13,6 +13,7 @@ import { memo, useRef } from 'react';
 const sx: SystemStyleObject = {
   position: 'relative',
   borderRadius: 'base',
+  minW: 32,
   '&[data-parent-layout="column"]': {
     w: 'full',
     h: 'min-content',
