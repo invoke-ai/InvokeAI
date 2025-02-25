@@ -26,20 +26,8 @@ import type { NodesState, Templates } from 'features/nodes/store/types';
 import { getInvocationNodeErrors } from 'features/nodes/store/util/fieldValidators';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
-import {
-  isFloatFieldCollectionInputInstance,
-  isFloatGeneratorFieldInputInstance,
-  isImageFieldCollectionInputInstance,
-  isIntegerFieldCollectionInputInstance,
-  isIntegerGeneratorFieldInputInstance,
-  isStringFieldCollectionInputInstance,
-  isStringGeneratorFieldInputInstance,
-  resolveFloatGeneratorField,
-  resolveIntegerGeneratorField,
-  resolveStringGeneratorField,
-} from 'features/nodes/types/field';
-import type { AnyEdge, InvocationNode } from 'features/nodes/types/invocation';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
+import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
@@ -50,7 +38,6 @@ import { debounce, groupBy, upperFirst } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
 import { $isConnected } from 'services/events/stores';
-import { assert } from 'tsafe';
 
 /**
  * This file contains selectors and utilities for determining the app is ready to enqueue generations. The handling
@@ -190,67 +177,6 @@ export const useReadinessWatcher = () => {
 };
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
-
-export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNode[], edges: AnyEdge[]) => {
-  if (batchNode.data.type === 'image_batch') {
-    assert(isImageFieldCollectionInputInstance(batchNode.data.inputs.images));
-    const ownValue = batchNode.data.inputs.images.value ?? [];
-    // no generators for images yet
-    return ownValue;
-  } else if (batchNode.data.type === 'string_batch') {
-    assert(isStringFieldCollectionInputInstance(batchNode.data.inputs.strings));
-    const ownValue = batchNode.data.inputs.strings.value;
-    const edgeToStrings = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'strings');
-
-    if (!edgeToStrings) {
-      return ownValue ?? [];
-    }
-
-    const generatorNode = nodes.find((node) => node.id === edgeToStrings.source);
-    assert(generatorNode, 'Missing edge from string generator to string batch');
-
-    const generatorField = generatorNode.data.inputs['generator'];
-    assert(isStringGeneratorFieldInputInstance(generatorField), 'Invalid string generator');
-
-    const generatorValue = resolveStringGeneratorField(generatorField);
-    return generatorValue;
-  } else if (batchNode.data.type === 'float_batch') {
-    assert(isFloatFieldCollectionInputInstance(batchNode.data.inputs.floats));
-    const ownValue = batchNode.data.inputs.floats.value;
-    const edgeToFloats = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'floats');
-
-    if (!edgeToFloats) {
-      return ownValue ?? [];
-    }
-
-    const generatorNode = nodes.find((node) => node.id === edgeToFloats.source);
-    assert(generatorNode, 'Missing edge from float generator to float batch');
-
-    const generatorField = generatorNode.data.inputs['generator'];
-    assert(isFloatGeneratorFieldInputInstance(generatorField), 'Invalid float generator');
-
-    const generatorValue = resolveFloatGeneratorField(generatorField);
-    return generatorValue;
-  } else if (batchNode.data.type === 'integer_batch') {
-    assert(isIntegerFieldCollectionInputInstance(batchNode.data.inputs.integers));
-    const ownValue = batchNode.data.inputs.integers.value;
-    const incomers = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'integers');
-
-    if (!incomers) {
-      return ownValue ?? [];
-    }
-
-    const generatorNode = nodes.find((node) => node.id === incomers.source);
-    assert(generatorNode, 'Missing edge from integer generator to integer batch');
-
-    const generatorField = generatorNode.data.inputs['generator'];
-    assert(isIntegerGeneratorFieldInputInstance(generatorField), 'Invalid integer generator field');
-
-    const generatorValue = resolveIntegerGeneratorField(generatorField);
-    return generatorValue;
-  }
-  assert(false, 'Invalid batch node type');
-};
 
 const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
   isConnected: boolean;
