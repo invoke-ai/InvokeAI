@@ -1,6 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useContainerContext, useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
@@ -10,19 +9,13 @@ import type { FormElement } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
 import { memo, useRef } from 'react';
 
-import { useIsRootElement } from './dnd-hooks';
-
-const EDIT_MODE_WRAPPER_CLASS_NAME = getPrefixedId('edit-mode-wrapper', '-');
+export const EDIT_MODE_WRAPPER_CLASS_NAME = 'edit-mode-wrapper';
 
 const wrapperSx: SystemStyleObject = {
   position: 'relative',
   flex: '1 1 0',
   '&[data-element-type="divider"]&[data-layout="row"]': {
     flex: '0 1 0',
-  },
-  '&[data-is-root="true"]': {
-    w: 'full',
-    h: 'full',
   },
   borderRadius: 'base',
 };
@@ -71,7 +64,6 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
   const [activeDropRegion, isDragging] = useFormElementDnd(element.id, draggableRef, dragHandleRef);
   const containerCtx = useContainerContext();
   const depth = useDepthContext();
-  const isRootElement = useIsRootElement(element.id);
 
   return (
     <Flex
@@ -79,7 +71,6 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
       ref={draggableRef}
       className={EDIT_MODE_WRAPPER_CLASS_NAME}
       sx={wrapperSx}
-      data-is-root={isRootElement}
       data-element-type={element.type}
       data-layout={containerCtx?.layout}
     >
@@ -90,21 +81,10 @@ export const FormElementEditModeWrapper = memo(({ element, children }: PropsWith
         data-element-type={element.type}
         data-layout={containerCtx?.layout}
       >
-        {!isRootElement && (
-          // Non-root elements get the header and content wrapper
-          <>
-            <FormElementEditModeHeader ref={dragHandleRef} element={element} />
-            <Flex sx={contentWrapperSx} data-depth={depth}>
-              {children}
-            </Flex>
-          </>
-        )}
-        {isRootElement && (
-          // But the root does not - helps the builder to look less busy
-          <Flex ref={dragHandleRef} w="full" h="full">
-            {children}
-          </Flex>
-        )}
+        <FormElementEditModeHeader ref={dragHandleRef} element={element} />
+        <Flex sx={contentWrapperSx} data-depth={depth}>
+          {children}
+        </Flex>
       </Flex>
       <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
     </Flex>

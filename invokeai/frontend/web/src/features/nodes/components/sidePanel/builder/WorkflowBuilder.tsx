@@ -23,9 +23,9 @@ import { assert } from 'tsafe';
 
 const sx: SystemStyleObject = {
   pt: 3,
+  w: 'full',
+  h: 'full',
   '&[data-is-empty="true"]': {
-    w: 'full',
-    h: 'full',
     pt: 0,
   },
 };
