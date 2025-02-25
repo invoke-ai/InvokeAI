@@ -58,6 +58,7 @@ def mock_services() -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
+        workflow_thumbnails=None,  # type: ignore
     )
 
 

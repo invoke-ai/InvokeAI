@@ -1410,6 +1410,34 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workflows/i/{workflow_id}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workflow Thumbnail
+         * @description Gets a workflow's thumbnail image
+         */
+        get: operations["get_workflow_thumbnail"];
+        /**
+         * Set Workflow Thumbnail
+         * @description Sets a workflow's thumbnail image
+         */
+        put: operations["set_workflow_thumbnail"];
+        post?: never;
+        /**
+         * Delete Workflow Thumbnail
+         * @description Removes a workflow's thumbnail image
+         */
+        delete: operations["delete_workflow_thumbnail"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/style_presets/i/{style_preset_id}": {
         parameters: {
             query?: never;
@@ -2328,6 +2356,15 @@ export type components = {
              * @description The names of the images to remove
              */
             image_names: string[];
+        };
+        /** Body_set_workflow_thumbnail */
+        Body_set_workflow_thumbnail: {
+            /**
+             * Image
+             * Format: binary
+             * @description The image file to upload
+             */
+            image: Blob;
         };
         /** Body_star_images_in_list */
         Body_star_images_in_list: {
@@ -14826,8 +14863,8 @@ export type components = {
             /** Ui Order */
             ui_order: number | null;
         };
-        /** PaginatedResults[WorkflowRecordListItemDTO] */
-        PaginatedResults_WorkflowRecordListItemDTO_: {
+        /** PaginatedResults[WorkflowRecordListItemWithThumbnailDTO] */
+        PaginatedResults_WorkflowRecordListItemWithThumbnailDTO_: {
             /**
              * Page
              * @description Current Page
@@ -14852,7 +14889,7 @@ export type components = {
              * Items
              * @description Items
              */
-            items: components["schemas"]["WorkflowRecordListItemDTO"][];
+            items: components["schemas"]["WorkflowRecordListItemWithThumbnailDTO"][];
         };
         /**
          * Pair Tile with Image
@@ -19541,8 +19578,8 @@ export type components = {
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
-        /** WorkflowRecordListItemDTO */
-        WorkflowRecordListItemDTO: {
+        /** WorkflowRecordListItemWithThumbnailDTO */
+        WorkflowRecordListItemWithThumbnailDTO: {
             /**
              * Workflow Id
              * @description The id of the workflow.
@@ -19575,6 +19612,11 @@ export type components = {
             description: string;
             /** @description The description of the workflow. */
             category: components["schemas"]["WorkflowCategory"];
+            /**
+             * Thumbnail Url
+             * @description The URL of the workflow thumbnail.
+             */
+            thumbnail_url?: string | null;
         };
         /**
          * WorkflowRecordOrderBy
@@ -19582,6 +19624,41 @@ export type components = {
          * @enum {string}
          */
         WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "name";
+        /** WorkflowRecordWithThumbnailDTO */
+        WorkflowRecordWithThumbnailDTO: {
+            /**
+             * Workflow Id
+             * @description The id of the workflow.
+             */
+            workflow_id: string;
+            /**
+             * Name
+             * @description The name of the workflow.
+             */
+            name: string;
+            /**
+             * Created At
+             * @description The created timestamp of the workflow.
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description The updated timestamp of the workflow.
+             */
+            updated_at: string;
+            /**
+             * Opened At
+             * @description The opened timestamp of the workflow.
+             */
+            opened_at: string;
+            /** @description The workflow. */
+            workflow: components["schemas"]["Workflow"];
+            /**
+             * Thumbnail Url
+             * @description The URL of the workflow thumbnail.
+             */
+            thumbnail_url?: string | null;
+        };
         /** WorkflowWithoutID */
         WorkflowWithoutID: {
             /**
@@ -22534,7 +22611,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["WorkflowRecordDTO"];
+                    "application/json": components["schemas"]["WorkflowRecordWithThumbnailDTO"];
                 };
             };
             /** @description Validation Error */
@@ -22641,7 +22718,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedResults_WorkflowRecordListItemDTO_"];
+                    "application/json": components["schemas"]["PaginatedResults_WorkflowRecordListItemWithThumbnailDTO_"];
                 };
             };
             /** @description Validation Error */
@@ -22667,6 +22744,120 @@ export interface operations {
                 "application/json": components["schemas"]["Body_create_workflow"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_workflow_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the workflow thumbnail to get */
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workflow thumbnail was fetched successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The workflow thumbnail could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_workflow_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_set_workflow_thumbnail"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_workflow_thumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

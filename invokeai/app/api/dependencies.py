@@ -36,6 +36,7 @@ from invokeai.app.services.style_preset_images.style_preset_images_disk import S
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
@@ -83,6 +84,7 @@ class ApiDependencies:
 
         model_images_folder = config.models_path
         style_presets_folder = config.style_presets_path
+        workflow_thumbnails_folder = config.workflow_thumbnails_path
 
         db = init_db(config=config, logger=logger, image_files=image_files)
 
@@ -120,6 +122,7 @@ class ApiDependencies:
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
+        workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -147,6 +150,7 @@ class ApiDependencies:
             conditioning=conditioning,
             style_preset_records=style_preset_records,
             style_preset_image_files=style_preset_image_files,
+            workflow_thumbnails=workflow_thumbnails,
         )
 
         ApiDependencies.invoker = Invoker(services)

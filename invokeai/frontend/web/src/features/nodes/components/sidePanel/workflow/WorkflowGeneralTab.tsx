@@ -1,5 +1,6 @@
 import type { FormControlProps } from '@invoke-ai/ui-library';
 import { Flex, FormControl, FormControlGroup, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -16,11 +17,15 @@ import {
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
+
+import { WorkflowThumbnailEditor } from './WorkflowThumbnail/WorkflowThumbnailEditor';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
-  const { author, name, description, tags, version, contact, notes } = workflow;
+  const { id, author, name, description, tags, version, contact, notes } = workflow;
 
   return {
+    id,
     name,
     author,
     description,
@@ -32,8 +37,10 @@ const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
 });
 
 const WorkflowGeneralTab = () => {
-  const { author, name, description, tags, version, contact, notes } = useAppSelector(selector);
+  const { id, author, name, description, tags, version, contact, notes } = useAppSelector(selector);
   const dispatch = useAppDispatch();
+
+  const { data } = useGetWorkflowQuery(id ?? skipToken);
 
   const handleChangeName = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -88,6 +95,10 @@ const WorkflowGeneralTab = () => {
           <FormControl>
             <FormLabel>{t('nodes.workflowName')}</FormLabel>
             <Input variant="darkFilled" value={name} onChange={handleChangeName} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>{t('workflows.workflowThumbnail')}</FormLabel>
+            <WorkflowThumbnailEditor thumbnailUrl={data?.thumbnail_url || null} workflowId={id} />
           </FormControl>
           <FormControl>
             <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
