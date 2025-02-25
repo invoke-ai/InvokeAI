@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -64,7 +65,7 @@ export const $reasonsWhyCannotEnqueue = atom<Reason[]>([]);
 export const $isReadyToEnqueue = computed($reasonsWhyCannotEnqueue, (reasons) => reasons.length === 0);
 
 const debouncedUpdateReasons = debounce(
-  (
+  async (
     tab: TabName,
     isConnected: boolean,
     canvas: CanvasState,
@@ -82,39 +83,36 @@ const debouncedUpdateReasons = debounce(
     config: AppConfig
   ) => {
     if (tab === 'canvas') {
-      $reasonsWhyCannotEnqueue.set(
-        getReasonsWhyCannotEnqueueCanvasTab({
-          isConnected,
-          canvas,
-          params,
-          dynamicPrompts,
-          canvasIsFiltering,
-          canvasIsTransforming,
-          canvasIsRasterizing,
-          canvasIsCompositing,
-          canvasIsSelectingObject,
-        })
-      );
+      const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
+        isConnected,
+        canvas,
+        params,
+        dynamicPrompts,
+        canvasIsFiltering,
+        canvasIsTransforming,
+        canvasIsRasterizing,
+        canvasIsCompositing,
+        canvasIsSelectingObject,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
-      $reasonsWhyCannotEnqueue.set(
-        getReasonsWhyCannotEnqueueWorkflowsTab({
-          isConnected,
-          nodes,
-          workflowSettings,
-          templates,
-        })
-      );
+      const reasons = getReasonsWhyCannotEnqueueWorkflowsTab({
+        isConnected,
+        nodes,
+        workflowSettings,
+        templates,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'upscaling') {
-      $reasonsWhyCannotEnqueue.set(
-        getReasonsWhyCannotEnqueueUpscaleTab({
-          isConnected,
-          upscale,
-          config,
-          params,
-        })
-      );
+      const reasons = getReasonsWhyCannotEnqueueUpscaleTab({
+        isConnected,
+        upscale,
+        config,
+        params,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
     } else {
-      $reasonsWhyCannotEnqueue.set([]);
+      $reasonsWhyCannotEnqueue.set(EMPTY_ARRAY);
     }
   },
   300
