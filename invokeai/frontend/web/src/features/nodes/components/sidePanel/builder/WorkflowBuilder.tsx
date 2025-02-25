@@ -124,23 +124,20 @@ const useAddFormElementDnd = (
   return isDragging;
 };
 
+const addFormElementButtonSx: SystemStyleObject = {
+  cursor: 'grab',
+  borderStyle: 'dashed',
+  _active: { borderStyle: 'dashed' },
+  _disabled: { borderStyle: 'dashed', opacity: 0.5 },
+};
+
 const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormElementDnd>[0] }) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const isDragging = useAddFormElementDnd(type, draggableRef);
 
   return (
     // Must be as div for draggable to work correctly
-    <Button
-      as="div"
-      ref={draggableRef}
-      variant="outline"
-      cursor="grab"
-      borderStyle="dashed"
-      isDisabled={isDragging}
-      size="sm"
-      _active={{ borderStyle: 'dashed' }}
-      _disabled={{ borderStyle: 'dashed', opacity: 0.5 }}
-    >
+    <Button as="div" ref={draggableRef} size="sm" isDisabled={isDragging} variant="outline" sx={addFormElementButtonSx}>
       {startCase(type)}
     </Button>
   );
