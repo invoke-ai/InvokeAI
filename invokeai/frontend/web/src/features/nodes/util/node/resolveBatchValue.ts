@@ -1,3 +1,4 @@
+import type { AppStore } from 'app/store/store';
 import {
   isFloatFieldCollectionInputInstance,
   isFloatGeneratorFieldInputInstance,
@@ -13,7 +14,12 @@ import {
 import type { AnyEdge, InvocationNode } from 'features/nodes/types/invocation';
 import { assert } from 'tsafe';
 
-export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNode[], edges: AnyEdge[]) => {
+export const resolveBatchValue = async (
+  batchNode: InvocationNode,
+  nodes: InvocationNode[],
+  edges: AnyEdge[],
+  store: AppStore
+) => {
   if (batchNode.data.type === 'image_batch') {
     assert(isImageFieldCollectionInputInstance(batchNode.data.inputs.images));
     const ownValue = batchNode.data.inputs.images.value ?? [];
@@ -34,7 +40,7 @@ export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNo
     const generatorField = generatorNode.data.inputs['generator'];
     assert(isStringGeneratorFieldInputInstance(generatorField), 'Invalid string generator');
 
-    const generatorValue = resolveStringGeneratorField(generatorField);
+    const generatorValue = await resolveStringGeneratorField(generatorField, store);
     return generatorValue;
   } else if (batchNode.data.type === 'float_batch') {
     assert(isFloatFieldCollectionInputInstance(batchNode.data.inputs.floats));
