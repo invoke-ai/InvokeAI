@@ -25,7 +25,6 @@ import {
   getElement,
   getInitialValue,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
-import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import {
   formElementAdded,
@@ -64,7 +63,7 @@ const isFormElementDndData = (data: Record<string | symbol, unknown>): data is F
  * @param elementId The id of the element to flash
  */
 const flashElement = (elementId: ElementId) => {
-  const element = document.querySelector(`#${getEditModeWrapperId(elementId)}`);
+  const element = document.querySelector(`#${elementId}`);
   if (element instanceof HTMLElement) {
     triggerPostMoveFlash(element, colorTokenToCssVar('base.800'));
   }
@@ -358,7 +357,8 @@ export const useFormElementDnd = (
       }),
       dropTargetForElements({
         element: draggableElement,
-        getIsSticky: () => true,
+        // TODO(psyche): This causes a kinda jittery behaviour - need a better heuristic to determine stickiness
+        getIsSticky: () => false,
         canDrop: ({ source }) =>
           isFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId,
         getData: ({ input }) => {
