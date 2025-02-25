@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   ContainerContextProvider,
@@ -7,7 +7,7 @@ import {
   useDepthContext,
 } from 'features/nodes/components/sidePanel/builder/contexts';
 import { DividerElementComponent } from 'features/nodes/components/sidePanel/builder/DividerElementComponent';
-import { useIsRootElement } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
+import { useIsRootElement, useRootElementDropTarget } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { FormElementEditModeWrapper } from 'features/nodes/components/sidePanel/builder/FormElementEditModeWrapper';
 import { HeadingElementComponent } from 'features/nodes/components/sidePanel/builder/HeadingElementComponent';
 import { NodeFieldElementComponent } from 'features/nodes/components/sidePanel/builder/NodeFieldElementComponent';
@@ -22,31 +22,26 @@ import {
   isNodeFieldElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-const sx: SystemStyleObject = {
-  gap: 4,
-  flex: '1 1 0',
-  '&[data-depth="0"]': {
-    flex: 1,
-  },
-  '&[data-container-layout="column"]': {
-    flexDir: 'column',
-  },
-  '&[data-container-layout="row"]': {
-    flexDir: 'row',
-  },
-};
-
 const ContainerElementComponent = memo(({ id }: { id: string }) => {
   const el = useElement(id);
   const mode = useAppSelector(selectWorkflowMode);
+  const isRootElement = useIsRootElement(id);
 
   if (!el || !isContainerElement(el)) {
     return null;
+  }
+
+  if (isRootElement && mode === 'view') {
+    return <RootContainerElementComponentViewMode el={el} />;
+  }
+
+  if (isRootElement && mode === 'edit') {
+    return <RootContainerElementComponentEditMode el={el} />;
   }
 
   if (mode === 'view') {
@@ -57,6 +52,90 @@ const ContainerElementComponent = memo(({ id }: { id: string }) => {
   return <ContainerElementComponentEditMode el={el} />;
 });
 ContainerElementComponent.displayName = 'ContainerElementComponent';
+
+const rootViewModeSx: SystemStyleObject = {
+  position: 'relative',
+  alignItems: 'center',
+  borderRadius: 'base',
+  w: 'full',
+  h: 'full',
+  gap: 4,
+  display: 'flex',
+  flex: 1,
+  '&[data-container-layout="column"]': {
+    flexDir: 'column',
+    alignItems: 'flex-start',
+  },
+  '&[data-container-layout="row"]': {
+    flexDir: 'row',
+  },
+};
+
+const RootContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
+  const { id, data } = el;
+  const { children, layout } = data;
+
+  return (
+    <DepthContextProvider depth={0}>
+      <ContainerContextProvider id={id} layout={layout}>
+        <Box id={id} className={CONTAINER_CLASS_NAME} sx={rootViewModeSx} data-container-layout={layout} data-depth={0}>
+          {children.map((childId) => (
+            <FormElementComponent key={childId} id={childId} />
+          ))}
+        </Box>
+      </ContainerContextProvider>
+    </DepthContextProvider>
+  );
+});
+RootContainerElementComponentViewMode.displayName = 'RootContainerElementComponentViewMode';
+
+const rootEditModeSx: SystemStyleObject = {
+  ...rootViewModeSx,
+  '&[data-is-dragging-over="true"]': {
+    opacity: 1,
+    bg: 'base.850',
+  },
+};
+
+const RootContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }) => {
+  const { id, data } = el;
+  const { children, layout } = data;
+  const ref = useRef<HTMLDivElement>(null);
+  const isDraggingOver = useRootElementDropTarget(ref);
+
+  return (
+    <DepthContextProvider depth={0}>
+      <ContainerContextProvider id={id} layout={layout}>
+        <Flex
+          ref={ref}
+          id={id}
+          className={CONTAINER_CLASS_NAME}
+          sx={rootEditModeSx}
+          data-container-layout={layout}
+          data-depth={0}
+          data-is-dragging-over={isDraggingOver}
+        >
+          {children.map((childId) => (
+            <FormElementComponent key={childId} id={childId} />
+          ))}
+          {children.length === 0 && <RootPlaceholder />}
+        </Flex>
+      </ContainerContextProvider>
+    </DepthContextProvider>
+  );
+});
+RootContainerElementComponentEditMode.displayName = 'RootContainerElementComponentEditMode';
+
+const sx: SystemStyleObject = {
+  gap: 4,
+  flex: '1 1 0',
+  '&[data-container-layout="column"]': {
+    flexDir: 'column',
+  },
+  '&[data-container-layout="row"]': {
+    flexDir: 'row',
+  },
+};
 
 const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
   const { t } = useTranslation();
@@ -87,7 +166,6 @@ const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }
   const depth = useDepthContext();
   const { id, data } = el;
   const { children, layout } = data;
-  const isRootElement = useIsRootElement(id);
 
   return (
     <FormElementEditModeWrapper element={el}>
@@ -97,8 +175,7 @@ const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }
             {children.map((childId) => (
               <FormElementComponent key={childId} id={childId} />
             ))}
-            {children.length === 0 && isRootElement && <RootPlaceholder />}
-            {children.length === 0 && !isRootElement && <NonRootPlaceholder />}
+            {children.length === 0 && <NonRootPlaceholder />}
           </Flex>
         </ContainerContextProvider>
       </DepthContextProvider>
