@@ -1,8 +1,9 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { useAppStore } from 'app/store/nanostores/store';
 import { $true } from 'app/store/nanostores/util';
+import type { AppDispatch, AppStore } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
@@ -80,7 +81,8 @@ const debouncedUpdateReasons = debounce(
     workflowSettings: WorkflowSettingsState,
     templates: Templates,
     upscale: UpscaleState,
-    config: AppConfig
+    config: AppConfig,
+    store: AppStore
   ) => {
     if (tab === 'canvas') {
       const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
@@ -96,10 +98,11 @@ const debouncedUpdateReasons = debounce(
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
-      const reasons = getReasonsWhyCannotEnqueueWorkflowsTab({
+      const reasons = await getReasonsWhyCannotEnqueueWorkflowsTab({
+        dispatch: store.dispatch,
+        nodesState: nodes,
+        workflowSettingsState: workflowSettings,
         isConnected,
-        nodes,
-        workflowSettings,
         templates,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
@@ -120,6 +123,7 @@ const debouncedUpdateReasons = debounce(
 
 export const useReadinessWatcher = () => {
   useAssertSingleton('useReadinessWatcher');
+  const store = useAppStore();
   const canvasManager = useCanvasManagerSafe();
   const tab = useAppSelector(selectActiveTab);
   const canvas = useAppSelector(selectCanvasSlice);
@@ -153,9 +157,11 @@ export const useReadinessWatcher = () => {
       workflowSettings,
       templates,
       upscale,
-      config
+      config,
+      store
     );
   }, [
+    store,
     canvas,
     canvasIsCompositing,
     canvasIsFiltering,
@@ -176,21 +182,23 @@ export const useReadinessWatcher = () => {
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
-const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
+const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {
+  dispatch: AppDispatch;
+  nodesState: NodesState;
+  workflowSettingsState: WorkflowSettingsState;
   isConnected: boolean;
-  nodes: NodesState;
-  workflowSettings: WorkflowSettingsState;
   templates: Templates;
-}): Reason[] => {
-  const { isConnected, nodes, workflowSettings, templates } = arg;
+}): Promise<Reason[]> => {
+  const { dispatch, nodesState, workflowSettingsState, isConnected, templates } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
     reasons.push(disconnectedReason(i18n.t));
   }
 
-  if (workflowSettings.shouldValidateGraph) {
-    const invocationNodes = nodes.nodes.filter(isInvocationNode);
+  if (workflowSettingsState.shouldValidateGraph) {
+    const { nodes, edges } = nodesState;
+    const invocationNodes = nodes.filter(isInvocationNode);
     const batchNodes = invocationNodes.filter(isBatchNode);
     const executableNodes = invocationNodes.filter(isExecutableNode);
 
@@ -199,7 +207,7 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
     }
 
     for (const node of batchNodes) {
-      if (nodes.edges.find((e) => e.source === node.id) === undefined) {
+      if (edges.find((e) => e.source === node.id) === undefined) {
         reasons.push({ content: i18n.t('parameters.invoke.batchNodeNotConnected', { label: node.data.label }) });
       }
     }
@@ -212,7 +220,7 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
         const groupBatchSizes: number[] = [];
 
         for (const node of batchNodes) {
-          const size = resolveBatchValue(node, invocationNodes, nodes.edges).length;
+          const size = (await resolveBatchValue({ dispatch, nodesState, node })).length;
           if (batchGroupId === 'None') {
             // Ungrouped batch nodes may have differing collection sizes
             batchSizes.push(size);
@@ -237,12 +245,12 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
       }
     }
 
-    executableNodes.forEach((node) => {
+    invocationNodes.forEach((node) => {
       if (!isInvocationNode(node)) {
         return;
       }
 
-      const errors = getInvocationNodeErrors(node.data.id, templates, nodes);
+      const errors = getInvocationNodeErrors(node.data.id, templates, nodesState);
 
       for (const error of errors) {
         if (error.type === 'node-error') {
@@ -489,82 +497,4 @@ export const selectPromptsCount = createSelector(
   selectParamsSlice,
   selectDynamicPromptsSlice,
   (params, dynamicPrompts) => (getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1)
-);
-
-const buildSelectGroupBatchSizes = (batchGroupId: string) =>
-  createMemoizedSelector(selectNodesSlice, ({ nodes, edges }) => {
-    const invocationNodes = nodes.filter(isInvocationNode);
-    return invocationNodes
-      .filter(isBatchNode)
-      .filter((node) => node.data.inputs['batch_group_id']?.value === batchGroupId)
-      .map((batchNodes) => resolveBatchValue(batchNodes, invocationNodes, edges).length);
-  });
-
-const selectUngroupedBatchSizes = buildSelectGroupBatchSizes('None');
-const selectGroup1BatchSizes = buildSelectGroupBatchSizes('Group 1');
-const selectGroup2BatchSizes = buildSelectGroupBatchSizes('Group 2');
-const selectGroup3BatchSizes = buildSelectGroupBatchSizes('Group 3');
-const selectGroup4BatchSizes = buildSelectGroupBatchSizes('Group 4');
-const selectGroup5BatchSizes = buildSelectGroupBatchSizes('Group 5');
-
-export const selectWorkflowsBatchSize = createSelector(
-  selectUngroupedBatchSizes,
-  selectGroup1BatchSizes,
-  selectGroup2BatchSizes,
-  selectGroup3BatchSizes,
-  selectGroup4BatchSizes,
-  selectGroup5BatchSizes,
-  (
-    ungroupedBatchSizes,
-    group1BatchSizes,
-    group2BatchSizes,
-    group3BatchSizes,
-    group4BatchSizes,
-    group5BatchSizes
-  ): number | 'EMPTY_BATCHES' | 'NO_BATCHES' => {
-    // All batch nodes _must_ have a populated collection
-
-    const allBatchSizes = [
-      ...ungroupedBatchSizes,
-      ...group1BatchSizes,
-      ...group2BatchSizes,
-      ...group3BatchSizes,
-      ...group4BatchSizes,
-      ...group5BatchSizes,
-    ];
-
-    // There are no batch nodes
-    if (allBatchSizes.length === 0) {
-      return 'NO_BATCHES';
-    }
-
-    // All batch nodes must have a populated collection
-    if (allBatchSizes.some((size) => size === 0)) {
-      return 'EMPTY_BATCHES';
-    }
-
-    for (const group of [group1BatchSizes, group2BatchSizes, group3BatchSizes, group4BatchSizes, group5BatchSizes]) {
-      // Ignore groups with no batch nodes
-      if (group.length === 0) {
-        continue;
-      }
-      // Grouped batch nodes must have the same collection size
-      if (group.some((size) => size !== group[0])) {
-        return 'EMPTY_BATCHES';
-      }
-    }
-
-    // Total batch size = product of all ungrouped batches and each grouped batch
-    const totalBatchSize = [
-      ...ungroupedBatchSizes,
-      // In case of no batch nodes in a group, fall back to 1 for the product calculation
-      group1BatchSizes[0] ?? 1,
-      group2BatchSizes[0] ?? 1,
-      group3BatchSizes[0] ?? 1,
-      group4BatchSizes[0] ?? 1,
-      group5BatchSizes[0] ?? 1,
-    ].reduce((acc, size) => acc * size, 1);
-
-    return totalBatchSize;
-  }
 );
