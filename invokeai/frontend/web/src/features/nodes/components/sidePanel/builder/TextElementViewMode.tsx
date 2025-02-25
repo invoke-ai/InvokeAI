@@ -8,7 +8,7 @@ export const TextElementViewMode = memo(({ el }: { el: TextElement }) => {
   const { content } = data;
 
   return (
-    <Flex id={id} className={TEXT_CLASS_NAME} w="full">
+    <Flex id={id} className={TEXT_CLASS_NAME} w="full" minW={32}>
       <TextElementContent content={content} />
     </Flex>
   );
