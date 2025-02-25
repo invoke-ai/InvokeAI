@@ -14773,7 +14773,7 @@ export type components = {
              * Limit
              * @description Limit of items to get
              */
-            limit: number;
+            limit: number | null;
             /**
              * Offset
              * @description Offset from which to retrieve items
@@ -14796,7 +14796,7 @@ export type components = {
              * Limit
              * @description Limit of items to get
              */
-            limit: number;
+            limit: number | null;
             /**
              * Offset
              * @description Offset from which to retrieve items
@@ -21189,7 +21189,7 @@ export interface operations {
                 /** @description The page offset */
                 offset?: number;
                 /** @description The number of images per page */
-                limit?: number;
+                limit?: number | null;
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
                 /** @description Whether to sort by starred images first */

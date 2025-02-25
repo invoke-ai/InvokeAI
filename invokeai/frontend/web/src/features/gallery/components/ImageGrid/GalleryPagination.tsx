@@ -1,11 +1,16 @@
-import { Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { Button, Flex, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { ELLIPSIS, useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
+import { useSelectAll } from 'features/gallery/hooks/useSelectAll';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { BiSelectMultiple } from 'react-icons/bi';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 import { JumpTo } from './JumpTo';
 
 export const GalleryPagination = memo(() => {
+  const { t } = useTranslation();
+  const selectAll = useSelectAll();
   const { goPrev, goNext, isPrevEnabled, isNextEnabled, pageButtons, goToPage, currentPage, total } =
     useGalleryPagination();
 
@@ -45,6 +50,15 @@ export const GalleryPagination = memo(() => {
         variant="ghost"
       />
       <JumpTo />
+      <Tooltip label={`Select all (${total})`}>
+        <IconButton
+          variant="outline"
+          size="sm"
+          icon={<BiSelectMultiple />}
+          aria-label={t('gallery.selectAll')}
+          onClick={selectAll}
+        />
+      </Tooltip>
     </Flex>
   );
 });

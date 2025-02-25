@@ -31,6 +31,22 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
       : skipToken
 );
 
+export const selectListAllImagesQueryArgs = createMemoizedSelector(
+  selectGallerySlice,
+  (gallery): ListImagesArgs | SkipToken =>
+    gallery.limit
+      ? {
+          board_id: gallery.selectedBoardId,
+          categories: gallery.galleryView === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+          offset: 0,
+          limit: undefined,
+          is_intermediate: false,
+          starred_first: gallery.starredFirst,
+          order_dir: gallery.orderDir,
+        }
+      : skipToken
+);
+
 export const selectListBoardsQueryArgs = createMemoizedSelector(
   selectGallerySlice,
   (gallery): ListBoardsArgs => ({
