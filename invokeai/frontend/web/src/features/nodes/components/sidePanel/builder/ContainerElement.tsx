@@ -143,10 +143,15 @@ const ContainerElementComponentEditMode = memo(({ el }: { el: ContainerElement }
       return;
     }
 
+    if (layout === 'column') {
+      // No need to auto-scroll for column layout
+      return;
+    }
+
     return autoScrollForElements({
       element,
     });
-  });
+  }, [layout]);
 
   return (
     <DepthContextProvider depth={depth + 1}>
