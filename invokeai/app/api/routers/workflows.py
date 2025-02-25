@@ -1,7 +1,8 @@
-from typing import Optional
 import io
 import traceback
-from fastapi import APIRouter, Body, HTTPException, Path, Query, File, UploadFile
+from typing import Optional
+
+from fastapi import APIRouter, Body, File, HTTPException, Path, Query, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
 
@@ -15,8 +16,8 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowRecordDTO,
     WorkflowRecordListItemWithThumbnailDTO,
     WorkflowRecordOrderBy,
-    WorkflowWithoutID,
     WorkflowRecordWithThumbnailDTO,
+    WorkflowWithoutID,
 )
 
 IMAGE_MAX_AGE = 31536000
