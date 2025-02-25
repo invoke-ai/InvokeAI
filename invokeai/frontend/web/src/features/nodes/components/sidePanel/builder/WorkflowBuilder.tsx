@@ -7,11 +7,11 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
-import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
+import { RootContainerElementEditMode } from 'features/nodes/components/sidePanel/builder/ContainerElement';
 import { buildFormElementDndData, useBuilderDndMonitor } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { WorkflowBuilderEditMenu } from 'features/nodes/components/sidePanel/builder/WorkflowBuilderMenu';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
-import { selectFormRootElementId, selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
+import { selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
@@ -23,9 +23,9 @@ import { assert } from 'tsafe';
 
 const sx: SystemStyleObject = {
   pt: 3,
+  w: 'full',
+  h: 'full',
   '&[data-is-empty="true"]': {
-    w: 'full',
-    h: 'full',
     pt: 0,
   },
 };
@@ -60,7 +60,6 @@ WorkflowBuilder.displayName = 'WorkflowBuilder';
 
 const WorkflowBuilderContent = memo(() => {
   const { t } = useTranslation();
-  const rootElementId = useAppSelector(selectFormRootElementId);
   const isFormEmpty = useAppSelector(selectIsFormEmpty);
   const openApiSchemaQuery = useGetOpenAPISchemaQuery();
   const loadedTemplates = useStore($hasTemplates);
@@ -71,7 +70,7 @@ const WorkflowBuilderContent = memo(() => {
 
   return (
     <Flex sx={sx} data-is-empty={isFormEmpty}>
-      <FormElementComponent id={rootElementId} />
+      <RootContainerElementEditMode />
     </Flex>
   );
 });
@@ -124,23 +123,20 @@ const useAddFormElementDnd = (
   return isDragging;
 };
 
+const addFormElementButtonSx: SystemStyleObject = {
+  cursor: 'grab',
+  borderStyle: 'dashed',
+  _active: { borderStyle: 'dashed' },
+  _disabled: { borderStyle: 'dashed', opacity: 0.5 },
+};
+
 const AddFormElementDndButton = ({ type }: { type: Parameters<typeof useAddFormElementDnd>[0] }) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const isDragging = useAddFormElementDnd(type, draggableRef);
 
   return (
     // Must be as div for draggable to work correctly
-    <Button
-      as="div"
-      ref={draggableRef}
-      variant="outline"
-      cursor="grab"
-      borderStyle="dashed"
-      isDisabled={isDragging}
-      size="sm"
-      _active={{ borderStyle: 'dashed' }}
-      _disabled={{ borderStyle: 'dashed', opacity: 0.5 }}
-    >
+    <Button as="div" ref={draggableRef} size="sm" isDisabled={isDragging} variant="outline" sx={addFormElementButtonSx}>
       {startCase(type)}
     </Button>
   );

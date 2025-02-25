@@ -1,6 +1,7 @@
 import type { ContainerElement, ElementId } from 'features/nodes/types/workflow';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo } from 'react';
+import { assert } from 'tsafe';
 
 type ContainerContextValue = {
   id: ElementId;
@@ -17,6 +18,10 @@ ContainerContextProvider.displayName = 'ContainerContextProvider';
 
 export const useContainerContext = () => {
   const container = useContext(ContainerContext);
+  assert(
+    container !== null,
+    'useContainerContext must be used inside a ContainerContextProvider and cannot be used by the root container'
+  );
   return container;
 };
 
