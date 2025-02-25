@@ -70,7 +70,7 @@ const zElementBase = z.object({
 export const zNumberComponent = z.enum(['number-input', 'slider', 'number-input-and-slider']);
 
 const NODE_FIELD_TYPE = 'node-field';
-export const NODE_FIELD_CLASS_NAME = getPrefixedId(NODE_FIELD_TYPE, '-');
+export const NODE_FIELD_CLASS_NAME = `form-builder-${NODE_FIELD_TYPE}`;
 const FLOAT_FIELD_SETTINGS_TYPE = 'float-field-config';
 const zNodeFieldFloatSettings = z.object({
   type: z.literal(FLOAT_FIELD_SETTINGS_TYPE).default(FLOAT_FIELD_SETTINGS_TYPE),
@@ -141,7 +141,7 @@ export const buildNodeFieldElement = (
 };
 
 const HEADING_TYPE = 'heading';
-export const HEADING_CLASS_NAME = getPrefixedId(HEADING_TYPE, '-');
+export const HEADING_CLASS_NAME = `form-builder-${HEADING_TYPE}`;
 const zHeadingElement = zElementBase.extend({
   type: z.literal(HEADING_TYPE),
   data: z.object({ content: z.string() }),
@@ -162,7 +162,7 @@ export const buildHeading = (
 };
 
 const TEXT_TYPE = 'text';
-export const TEXT_CLASS_NAME = getPrefixedId(TEXT_TYPE, '-');
+export const TEXT_CLASS_NAME = `form-builder-${TEXT_TYPE}`;
 const zTextElement = zElementBase.extend({
   type: z.literal(TEXT_TYPE),
   data: z.object({ content: z.string() }),
@@ -183,7 +183,7 @@ export const buildText = (
 };
 
 const DIVIDER_TYPE = 'divider';
-export const DIVIDER_CLASS_NAME = getPrefixedId(DIVIDER_TYPE, '-');
+export const DIVIDER_CLASS_NAME = `form-builder-${DIVIDER_TYPE}`;
 const zDividerElement = zElementBase.extend({
   type: z.literal(DIVIDER_TYPE),
 });
@@ -199,7 +199,8 @@ export const buildDivider = (parentId?: NodeFieldElement['parentId']): DividerEl
 };
 
 const CONTAINER_TYPE = 'container';
-export const CONTAINER_CLASS_NAME = getPrefixedId(CONTAINER_TYPE, '-');
+export const CONTAINER_CLASS_NAME = `form-builder-${CONTAINER_TYPE}`;
+export const ROOT_CONTAINER_CLASS_NAME = `form-builder-root-${CONTAINER_TYPE}`;
 const zContainerElement = zElementBase.extend({
   type: z.literal(CONTAINER_TYPE),
   data: z.object({

@@ -7,11 +7,11 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { firefoxDndFix } from 'features/dnd/util';
-import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
+import { RootContainerElementEditMode } from 'features/nodes/components/sidePanel/builder/ContainerElement';
 import { buildFormElementDndData, useBuilderDndMonitor } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { WorkflowBuilderEditMenu } from 'features/nodes/components/sidePanel/builder/WorkflowBuilderMenu';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
-import { selectFormRootElementId, selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
+import { selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
@@ -60,7 +60,6 @@ WorkflowBuilder.displayName = 'WorkflowBuilder';
 
 const WorkflowBuilderContent = memo(() => {
   const { t } = useTranslation();
-  const rootElementId = useAppSelector(selectFormRootElementId);
   const isFormEmpty = useAppSelector(selectIsFormEmpty);
   const openApiSchemaQuery = useGetOpenAPISchemaQuery();
   const loadedTemplates = useStore($hasTemplates);
@@ -71,7 +70,7 @@ const WorkflowBuilderContent = memo(() => {
 
   return (
     <Flex sx={sx} data-is-empty={isFormEmpty}>
-      <FormElementComponent id={rootElementId} />
+      <RootContainerElementEditMode />
     </Flex>
   );
 });
