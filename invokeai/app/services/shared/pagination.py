@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -22,7 +22,7 @@ class OffsetPaginatedResults(BaseModel, Generic[GenericBaseModel]):
     Generic must be a Pydantic model
     """
 
-    limit: int = Field(description="Limit of items to get")
+    limit: Optional[int] = Field(description="Limit of items to get")
     offset: int = Field(description="Offset from which to retrieve items")
     total: int = Field(description="Total number of items in result")
     items: list[GenericBaseModel] = Field(description="Items")

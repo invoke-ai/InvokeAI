@@ -206,7 +206,7 @@ class ImageService(ImageServiceABC):
     def get_many(
         self,
         offset: int = 0,
-        limit: int = 10,
+        limit: Optional[int] = None,
         starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
