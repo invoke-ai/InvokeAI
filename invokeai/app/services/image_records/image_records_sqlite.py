@@ -143,7 +143,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
     def get_many(
         self,
         offset: int = 0,
-        limit: int = 10,
+        limit: Optional[int] = None,
         starred_first: bool = True,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
@@ -232,7 +232,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             # Add all the parameters
             images_params = query_params.copy()
             # Add the pagination parameters
-            images_params.extend([limit, offset])
+            sql_limit = -1 if limit is None else limit
+            images_params.extend([sql_limit, offset])
 
             # Build the list of images, deserializing each row
             self._cursor.execute(images_query, images_params)

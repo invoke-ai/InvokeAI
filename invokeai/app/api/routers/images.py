@@ -323,7 +323,7 @@ async def list_image_dtos(
         description="The board id to filter by. Use 'none' to find images without a board.",
     ),
     offset: int = Query(default=0, description="The page offset"),
-    limit: int = Query(default=10, description="The number of images per page"),
+    limit: Optional[int] = Query(default=None, description="The number of images per page"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
