@@ -6,7 +6,7 @@ import { HEADING_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 
 const sx: SystemStyleObject = {
-  flex: '1 0 0',
+  flex: '0 1 0',
 };
 
 export const HeadingElementViewMode = memo(({ el }: { el: HeadingElement }) => {
