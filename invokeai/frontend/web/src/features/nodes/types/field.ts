@@ -1,5 +1,8 @@
-import { isNil, trim } from 'lodash-es';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import type { AppStore } from 'app/store/store';
+import { isNil, random, trim } from 'lodash-es';
 import MersenneTwister from 'mtwist';
+import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
@@ -1409,9 +1412,32 @@ const zStringGeneratorDynamicPromptsCombinatorial = z.object({
 export type StringGeneratorDynamicPromptsCombinatorial = z.infer<typeof zStringGeneratorDynamicPromptsCombinatorial>;
 const getStringGeneratorDynamicPromptsCombinatorialDefaults = () =>
   zStringGeneratorDynamicPromptsCombinatorial.parse({});
-const getStringGeneratorDynamicPromptsCombinatorialValues = (generator: StringGeneratorDynamicPromptsCombinatorial) => {
-  const { values } = generator;
-  return values ?? [];
+const getStringGeneratorDynamicPromptsCombinatorialValues = async (
+  generator: StringGeneratorDynamicPromptsCombinatorial,
+  store: AppStore
+): Promise<string[]> => {
+  const { input, maxPrompts } = generator;
+  const req = store.dispatch(
+    utilitiesApi.endpoints.dynamicPrompts.initiate(
+      {
+        prompt: input,
+        max_prompts: maxPrompts,
+        combinatorial: true,
+      },
+      {
+        subscribe: false,
+      }
+    )
+  );
+  try {
+    const { prompts, error } = await req.unwrap();
+    if (error) {
+      return EMPTY_ARRAY;
+    }
+    return prompts;
+  } catch {
+    return EMPTY_ARRAY;
+  }
 };
 
 export const StringGeneratorDynamicPromptsRandomType = 'string_generator_dynamic_prompts_random';
@@ -1424,9 +1450,33 @@ const zStringGeneratorDynamicPromptsRandom = z.object({
 });
 export type StringGeneratorDynamicPromptsRandom = z.infer<typeof zStringGeneratorDynamicPromptsRandom>;
 const getStringGeneratorDynamicPromptsRandomDefaults = () => zStringGeneratorDynamicPromptsRandom.parse({});
-const getStringGeneratorDynamicPromptsRandomValues = (generator: StringGeneratorDynamicPromptsRandom) => {
-  const { values } = generator;
-  return values ?? [];
+const getStringGeneratorDynamicPromptsRandomValues = async (
+  generator: StringGeneratorDynamicPromptsRandom,
+  store: AppStore
+): Promise<string[]> => {
+  const { input, seed, count } = generator;
+  const req = store.dispatch(
+    utilitiesApi.endpoints.dynamicPrompts.initiate(
+      {
+        prompt: input,
+        max_prompts: count,
+        combinatorial: false,
+        seed: seed ?? random(),
+      },
+      {
+        subscribe: false,
+      }
+    )
+  );
+  try {
+    const { prompts, error } = await req.unwrap();
+    if (error) {
+      return EMPTY_ARRAY;
+    }
+    return prompts;
+  } catch {
+    return EMPTY_ARRAY;
+  }
 };
 
 export const zStringGeneratorFieldValue = z.union([
@@ -1453,7 +1503,7 @@ export const isStringGeneratorFieldInputTemplate = buildTemplateTypeGuard<String
   zStringGeneratorFieldType.shape.name.value
 );
 
-export const resolveStringGeneratorField = ({ value }: StringGeneratorFieldInputInstance) => {
+export const resolveStringGeneratorField = async ({ value }: StringGeneratorFieldInputInstance, store: AppStore) => {
   if (value.values) {
     return value.values;
   }
@@ -1461,10 +1511,10 @@ export const resolveStringGeneratorField = ({ value }: StringGeneratorFieldInput
     return getStringGeneratorParseStringValues(value);
   }
   if (value.type === StringGeneratorDynamicPromptsRandomType) {
-    return getStringGeneratorDynamicPromptsRandomValues(value);
+    return await getStringGeneratorDynamicPromptsRandomValues(value, store);
   }
   if (value.type === StringGeneratorDynamicPromptsCombinatorialType) {
-    return getStringGeneratorDynamicPromptsCombinatorialValues(value);
+    return await getStringGeneratorDynamicPromptsCombinatorialValues(value, store);
   }
   assert(false, 'Invalid string generator type');
 };
