@@ -21,13 +21,13 @@ import { atom } from 'nanostores';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
-import type { WorkflowRecordListItemDTO } from 'services/api/types';
+import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
-const $workflowToShare = atom<WorkflowRecordListItemDTO | null>(null);
+const $workflowToShare = atom<WorkflowRecordListItemWithThumbnailDTO | null>(null);
 const clearWorkflowToShare = () => $workflowToShare.set(null);
 
 export const useShareWorkflow = () => {
-  const copyWorkflowLink = useCallback((workflow: WorkflowRecordListItemDTO) => {
+  const copyWorkflowLink = useCallback((workflow: WorkflowRecordListItemWithThumbnailDTO) => {
     $workflowToShare.set(workflow);
   }, []);
 

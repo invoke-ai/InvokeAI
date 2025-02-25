@@ -263,7 +263,7 @@ export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
 export type SQLiteDirection = S['SQLiteDirection'];
-export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
+export type WorkflowRecordListItemWithThumbnailDTO = S['WorkflowRecordListItemWithThumbnailDTO'];
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 
