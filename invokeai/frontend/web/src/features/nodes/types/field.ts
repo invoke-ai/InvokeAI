@@ -1,5 +1,5 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
-import type { AppStore } from 'app/store/store';
+import type { AppDispatch } from 'app/store/store';
 import { isNil, random, trim } from 'lodash-es';
 import MersenneTwister from 'mtwist';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
@@ -1414,10 +1414,10 @@ const getStringGeneratorDynamicPromptsCombinatorialDefaults = () =>
   zStringGeneratorDynamicPromptsCombinatorial.parse({});
 const getStringGeneratorDynamicPromptsCombinatorialValues = async (
   generator: StringGeneratorDynamicPromptsCombinatorial,
-  store: AppStore
+  dispatch: AppDispatch
 ): Promise<string[]> => {
   const { input, maxPrompts } = generator;
-  const req = store.dispatch(
+  const req = dispatch(
     utilitiesApi.endpoints.dynamicPrompts.initiate(
       {
         prompt: input,
@@ -1452,10 +1452,10 @@ export type StringGeneratorDynamicPromptsRandom = z.infer<typeof zStringGenerato
 const getStringGeneratorDynamicPromptsRandomDefaults = () => zStringGeneratorDynamicPromptsRandom.parse({});
 const getStringGeneratorDynamicPromptsRandomValues = async (
   generator: StringGeneratorDynamicPromptsRandom,
-  store: AppStore
+  dispatch: AppDispatch
 ): Promise<string[]> => {
   const { input, seed, count } = generator;
-  const req = store.dispatch(
+  const req = dispatch(
     utilitiesApi.endpoints.dynamicPrompts.initiate(
       {
         prompt: input,
@@ -1503,7 +1503,10 @@ export const isStringGeneratorFieldInputTemplate = buildTemplateTypeGuard<String
   zStringGeneratorFieldType.shape.name.value
 );
 
-export const resolveStringGeneratorField = async ({ value }: StringGeneratorFieldInputInstance, store: AppStore) => {
+export const resolveStringGeneratorField = async (
+  { value }: StringGeneratorFieldInputInstance,
+  dispatch: AppDispatch
+) => {
   if (value.values) {
     return value.values;
   }
@@ -1511,10 +1514,10 @@ export const resolveStringGeneratorField = async ({ value }: StringGeneratorFiel
     return getStringGeneratorParseStringValues(value);
   }
   if (value.type === StringGeneratorDynamicPromptsRandomType) {
-    return await getStringGeneratorDynamicPromptsRandomValues(value, store);
+    return await getStringGeneratorDynamicPromptsRandomValues(value, dispatch);
   }
   if (value.type === StringGeneratorDynamicPromptsCombinatorialType) {
-    return await getStringGeneratorDynamicPromptsCombinatorialValues(value, store);
+    return await getStringGeneratorDynamicPromptsCombinatorialValues(value, dispatch);
   }
   assert(false, 'Invalid string generator type');
 };

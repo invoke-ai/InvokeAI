@@ -16,13 +16,13 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
       enqueueRequested.match(action) && action.payload.tabName === 'workflows',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
-      const nodes = selectNodesSlice(state);
+      const nodesState = selectNodesSlice(state);
       const workflow = state.workflow;
       const templates = $templates.get();
       const graph = buildNodesGraph(state, templates);
       const builtWorkflow = buildWorkflowWithValidation({
-        nodes: nodes.nodes,
-        edges: nodes.edges,
+        nodes: nodesState.nodes,
+        edges: nodesState.edges,
         workflow,
       });
 
@@ -33,7 +33,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
 
       const data: Batch['data'] = [];
 
-      const invocationNodes = nodes.nodes.filter(isInvocationNode);
+      const invocationNodes = nodesState.nodes.filter(isInvocationNode);
       const batchNodes = invocationNodes.filter(isBatchNode);
 
       // Handle zipping batch nodes. First group the batch nodes by their batch_group_id
@@ -44,9 +44,11 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         const zippedBatchDataCollectionItems: NonNullable<Batch['data']>[number] = [];
 
         for (const node of batchNodes) {
-          const value = resolveBatchValue(node, invocationNodes, nodes.edges);
+          const value = await resolveBatchValue({ nodesState, node, dispatch });
           const sourceHandle = node.data.type === 'image_batch' ? 'image' : 'value';
-          const edgesFromBatch = nodes.edges.filter((e) => e.source === node.id && e.sourceHandle === sourceHandle);
+          const edgesFromBatch = nodesState.edges.filter(
+            (e) => e.source === node.id && e.sourceHandle === sourceHandle
+          );
           if (batchGroupId !== 'None') {
             // If this batch node has a batch_group_id, we will zip the data collection items
             for (const edge of edgesFromBatch) {

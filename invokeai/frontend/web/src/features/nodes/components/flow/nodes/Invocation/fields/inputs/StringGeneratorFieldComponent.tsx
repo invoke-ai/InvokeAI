@@ -1,5 +1,4 @@
 import { Flex, Select, Text } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { StringGeneratorDynamicPromptsCombinatorialSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorDynamicPromptsCombinatorialSettings';
@@ -29,7 +28,6 @@ export const StringGeneratorFieldInputComponent = memo(
     const { nodeId, field } = props;
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
-    const store = useAppStore();
 
     const onChange = useCallback(
       (value: StringGeneratorFieldInputInstance['value']) => {
@@ -62,14 +60,14 @@ export const StringGeneratorFieldInputComponent = memo(
     const resolveAndSetValuesAsString = useMemo(
       () =>
         debounce(async (field: StringGeneratorFieldInputInstance) => {
-          const resolvedValues = await resolveStringGeneratorField(field, store);
+          const resolvedValues = await resolveStringGeneratorField(field, dispatch);
           if (resolvedValues.length === 0) {
             setResolvedValuesAsString(`<${t('nodes.generatorNoValues')}>`);
           } else {
             setResolvedValuesAsString(resolvedValues.join(', '));
           }
         }, 300),
-      [store, t]
+      [dispatch, t]
     );
     useEffect(() => {
       resolveAndSetValuesAsString(field);
