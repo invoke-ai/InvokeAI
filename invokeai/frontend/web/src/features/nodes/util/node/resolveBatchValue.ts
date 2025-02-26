@@ -1,14 +1,17 @@
 import type { AppDispatch } from 'app/store/store';
 import type { NodesState } from 'features/nodes/store/types';
+import type { ImageField } from 'features/nodes/types/common';
 import {
   isFloatFieldCollectionInputInstance,
   isFloatGeneratorFieldInputInstance,
   isImageFieldCollectionInputInstance,
+  isImageGeneratorFieldInputInstance,
   isIntegerFieldCollectionInputInstance,
   isIntegerGeneratorFieldInputInstance,
   isStringFieldCollectionInputInstance,
   isStringGeneratorFieldInputInstance,
   resolveFloatGeneratorField,
+  resolveImageGeneratorField,
   resolveIntegerGeneratorField,
   resolveStringGeneratorField,
 } from 'features/nodes/types/field';
@@ -20,7 +23,7 @@ export const resolveBatchValue = async (arg: {
   dispatch: AppDispatch;
   nodesState: NodesState;
   node: InvocationNode;
-}) => {
+}): Promise<number[] | string[] | ImageField[]> => {
   const { node, dispatch, nodesState } = arg;
   const { nodes, edges } = nodesState;
   const invocationNodes = nodes.filter(isInvocationNode);
@@ -28,8 +31,20 @@ export const resolveBatchValue = async (arg: {
   if (node.data.type === 'image_batch') {
     assert(isImageFieldCollectionInputInstance(node.data.inputs.images));
     const ownValue = node.data.inputs.images.value ?? [];
-    // no generators for images yet
-    return ownValue;
+    const incomers = edges.find((edge) => edge.target === node.id && edge.targetHandle === 'images');
+
+    if (!incomers) {
+      return ownValue ?? [];
+    }
+
+    const generatorNode = invocationNodes.find((node) => node.id === incomers.source);
+    assert(generatorNode, 'Missing edge from image generator to image batch');
+
+    const generatorField = generatorNode.data.inputs['generator'];
+    assert(isImageGeneratorFieldInputInstance(generatorField), 'Invalid image generator field');
+
+    const generatorValue = await resolveImageGeneratorField(generatorField, dispatch);
+    return generatorValue;
   } else if (node.data.type === 'string_batch') {
     assert(isStringFieldCollectionInputInstance(node.data.inputs.strings));
     const ownValue = node.data.inputs.strings.value;

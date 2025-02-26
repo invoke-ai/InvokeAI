@@ -18,6 +18,7 @@ import type {
   FluxVAEModelFieldInputTemplate,
   ImageFieldCollectionInputTemplate,
   ImageFieldInputTemplate,
+  ImageGeneratorFieldInputTemplate,
   IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
@@ -41,6 +42,7 @@ import type {
 } from 'features/nodes/types/field';
 import {
   getFloatGeneratorArithmeticSequenceDefaults,
+  getImageGeneratorImagesFromBoardDefaults,
   getIntegerGeneratorArithmeticSequenceDefaults,
   getStringGeneratorParseStringDefaults,
   isFloatCollectionFieldType,
@@ -685,6 +687,20 @@ const buildStringGeneratorFieldInputTemplate: FieldInputTemplateBuilder<StringGe
   return template;
 };
 
+const buildImageGeneratorFieldInputTemplate: FieldInputTemplateBuilder<ImageGeneratorFieldInputTemplate> = ({
+  // schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ImageGeneratorFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: getImageGeneratorImagesFromBoardDefaults(),
+  };
+
+  return template;
+};
+
 export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
   BoardField: buildBoardFieldInputTemplate,
   BooleanField: buildBooleanFieldInputTemplate,
@@ -716,6 +732,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,
+  ImageGeneratorField: buildImageGeneratorFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (
