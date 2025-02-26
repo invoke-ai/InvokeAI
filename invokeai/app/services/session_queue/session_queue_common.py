@@ -1,6 +1,5 @@
 import datetime
 import json
-from copy import deepcopy
 from itertools import chain, product
 from typing import Generator, Literal, Optional, TypeAlias, Union, cast
 
@@ -407,7 +406,7 @@ class IsFullResult(BaseModel):
 # region Util
 
 
-def create_graph_nfv_tuples(batch: Batch, maximum: int) -> Generator[tuple[dict, list[dict]], None, None]:
+def create_graph_nfv_tuples(batch: Batch, maximum: int) -> Generator[tuple[str, str, list[dict]], None, None]:
     """
     Create all graph permutations from the given batch data and graph. Yields tuples
     of the form (graph, batch_data_items) where batch_data_items is the list of BatchDataItems
@@ -419,6 +418,8 @@ def create_graph_nfv_tuples(batch: Batch, maximum: int) -> Generator[tuple[dict,
     data: list[list[tuple[dict]]] = []
     batch_data_collection = batch.data if batch.data is not None else []
     graph_as_dict = batch.graph.model_dump(warnings=False, exclude_none=True)
+    session_dict = GraphExecutionState(graph=Graph()).model_dump(warnings=False, exclude_none=True)
+
     for batch_datum_list in batch_data_collection:
         # each batch_datum_list needs to be convered to NodeFieldValues and then zipped
 
@@ -439,13 +440,17 @@ def create_graph_nfv_tuples(batch: Batch, maximum: int) -> Generator[tuple[dict,
                 return
             flat_node_field_values = list(chain.from_iterable(d))
 
-            # I think we must deep copy here, because each set of field values can reference different nodes. If that
-            # is not accurate, we could remove this deepcopy for performance.
-            graph_as_dict_clone = deepcopy(graph_as_dict)
-            for item in flat_node_field_values:
-                graph_as_dict_clone["nodes"][item["node_path"]][item["field_name"]] = item["value"]
+            # The fields that are injected for each the same for all graphs. Therefore, we can mutate the graph dict
+            # in place and then serialize it to json for each session. It's functionally the same as creating a new
+            # graph dict for each session, but is more efficient.
+            session_id = uuid_string()
+            session_dict["id"] = session_id
 
-            yield (graph_as_dict_clone, flat_node_field_values)
+            for item in flat_node_field_values:
+                graph_as_dict["nodes"][item["node_path"]][item["field_name"]] = item["value"]
+
+            session_dict["graph"] = graph_as_dict
+            yield (session_id, json.dumps(session_dict, default=to_jsonable_python), flat_node_field_values)
             count += 1
 
 
@@ -470,31 +475,23 @@ def calc_session_count(batch: Batch) -> int:
 
 def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new_queue_items: int) -> list[tuple]:
     values_to_insert: list[tuple] = []
-    session_dict = GraphExecutionState(graph=Graph()).model_dump(warnings=False, exclude_none=True)
     # pydantic's to_jsonable_python handles serialization of any python object, including sets, which json.dumps does
     # not support by default. Apparently there are sets somewhere in the graph.
 
     # The same workflow is used for all sessions in the batch - serialize it once
     workflow_json = json.dumps(batch.workflow, default=to_jsonable_python) if batch.workflow else None
 
-    for graph, field_values in create_graph_nfv_tuples(batch, max_new_queue_items):
+    for session_id, session_json, field_values in create_graph_nfv_tuples(batch, max_new_queue_items):
         # As a perf optimization, we can mutate the session_dict in place. This is safe because we dump it to json
         # as part of the tuple construction
 
-        # Sessions must have unique id
-        session_dict["id"] = uuid_string()
-
-        # Update the graph in the session_dict with the new graph w/ field values
-        session_dict["graph"] = graph
-
-        session_json = json.dumps(session_dict, default=to_jsonable_python)
         field_values_json = json.dumps(field_values, default=to_jsonable_python) if field_values else None
 
         values_to_insert.append(
             (
                 queue_id,
                 session_json,
-                session_dict["id"],
+                session_id,
                 batch.batch_id,
                 field_values_json,
                 priority,
