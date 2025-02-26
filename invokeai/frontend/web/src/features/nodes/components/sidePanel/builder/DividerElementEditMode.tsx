@@ -10,7 +10,7 @@ import type { DividerElement } from 'features/nodes/types/workflow';
 import { DIVIDER_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo, useRef } from 'react';
 
-export const sx: SystemStyleObject = {
+const sx: SystemStyleObject = {
   position: 'relative',
   borderRadius: 'base',
   '&[data-parent-layout="column"]': {

@@ -3,7 +3,7 @@ import { Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const textSx: SystemStyleObject = {
+const textSx: SystemStyleObject = {
   fontSize: 'md',
   overflowWrap: 'anywhere',
   '&[data-is-empty="true"]': {
