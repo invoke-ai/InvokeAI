@@ -1,7 +1,6 @@
 import json
 import sqlite3
 import threading
-import time
 from typing import Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
@@ -122,16 +121,12 @@ class SqliteSessionQueue(SessionQueueBase):
                 priority = self._get_highest_priority(queue_id) + 1
 
             requested_count = calc_session_count(batch)
-            # time the prepare_values_to_insert function
-            time_start = time.time()
             values_to_insert = prepare_values_to_insert(
                 queue_id=queue_id,
                 batch=batch,
                 priority=priority,
                 max_new_queue_items=max_new_queue_items,
             )
-            time_end = time.time()
-            self.__invoker.services.logger.warning(f"prepare_values_to_insert took {time_end - time_start} seconds")
             enqueued_count = len(values_to_insert)
 
             if requested_count > enqueued_count:
