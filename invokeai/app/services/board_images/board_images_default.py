@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Optional
 
 from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
 from invokeai.app.services.image_records.image_records_common import ImageCategory
@@ -26,7 +26,7 @@ class BoardImagesService(BoardImagesServiceABC):
 
     def get_all_board_image_names_for_board(
         self,
-        board_id: str | Literal["none"],
+        board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
     ) -> list[str]:
