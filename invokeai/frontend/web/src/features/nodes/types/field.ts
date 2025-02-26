@@ -1,11 +1,14 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
 import type { AppDispatch } from 'app/store/store';
+import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { isNil, random, trim } from 'lodash-es';
 import MersenneTwister from 'mtwist';
+import { boardsApi } from 'services/api/endpoints/boards';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
+import type { ImageField } from './common';
 import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
 
 /**
@@ -242,6 +245,10 @@ const zStringGeneratorFieldType = zFieldTypeBase.extend({
   name: z.literal('StringGeneratorField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zImageGeneratorFieldType = zFieldTypeBase.extend({
+  name: z.literal('ImageGeneratorField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
@@ -273,6 +280,7 @@ const zStatefulFieldType = z.union([
   zFloatGeneratorFieldType,
   zIntegerGeneratorFieldType,
   zStringGeneratorFieldType,
+  zImageGeneratorFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -1522,6 +1530,75 @@ export const getStringGeneratorDefaults = (type: StringGeneratorFieldValue['type
 };
 // #endregion
 
+// #region ImageGeneratorField
+export const ImageGeneratorImagesFromBoardType = 'image_generator_images_from_board';
+const zImageGeneratorImagesFromBoard = z.object({
+  type: z.literal(ImageGeneratorImagesFromBoardType).default(ImageGeneratorImagesFromBoardType),
+  board_id: z.string().trim().min(1).optional().default('none'),
+  category: z.union([z.literal('images'), z.literal('assets')]).default('images'),
+});
+export type ImageGeneratorImagesFromBoard = z.infer<typeof zImageGeneratorImagesFromBoard>;
+export const getImageGeneratorImagesFromBoardDefaults = () => zImageGeneratorImagesFromBoard.parse({});
+const getImageGeneratorImagesFromBoardValues = async (
+  generator: ImageGeneratorImagesFromBoard,
+  dispatch: AppDispatch
+) => {
+  const { board_id, category } = generator;
+  const req = dispatch(
+    boardsApi.endpoints.listAllImageNamesForBoard.initiate(
+      {
+        board_id: board_id ?? 'none',
+        categories: category === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+        is_intermediate: false,
+      },
+      { subscribe: false }
+    )
+  );
+  try {
+    const imageNames = await req.unwrap();
+    return imageNames.map((image_name) => ({ image_name }));
+  } catch {
+    return EMPTY_ARRAY;
+  }
+};
+
+export const zImageGeneratorFieldValue = zImageGeneratorImagesFromBoard;
+const zImageGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zImageGeneratorFieldValue,
+});
+const zImageGeneratorFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zImageGeneratorFieldType,
+  originalType: zFieldType.optional(),
+  default: zImageGeneratorFieldValue,
+});
+const zImageGeneratorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zImageGeneratorFieldType,
+});
+export type ImageGeneratorFieldValue = z.infer<typeof zImageGeneratorFieldValue>;
+export type ImageGeneratorFieldInputInstance = z.infer<typeof zImageGeneratorFieldInputInstance>;
+export type ImageGeneratorFieldInputTemplate = z.infer<typeof zImageGeneratorFieldInputTemplate>;
+export const isImageGeneratorFieldInputInstance = buildInstanceTypeGuard(zImageGeneratorFieldInputInstance);
+export const isImageGeneratorFieldInputTemplate = buildTemplateTypeGuard<ImageGeneratorFieldInputTemplate>(
+  zImageGeneratorFieldType.shape.name.value
+);
+
+export const resolveImageGeneratorField = async (
+  { value }: ImageGeneratorFieldInputInstance,
+  dispatch: AppDispatch
+): Promise<ImageField[]> => {
+  if (value.type === ImageGeneratorImagesFromBoardType) {
+    return await getImageGeneratorImagesFromBoardValues(value, dispatch);
+  }
+  assert(false, 'Invalid image generator type');
+};
+export const getImageGeneratorDefaults = (type: ImageGeneratorFieldValue['type']) => {
+  if (type === ImageGeneratorImagesFromBoardType) {
+    return getImageGeneratorImagesFromBoardDefaults();
+  }
+  assert(false, 'Invalid string generator type');
+};
+// #endregion
+
 // #region StatelessField
 /**
  * StatelessField is a catchall for stateless fields with no UI input components. They do not
@@ -1603,6 +1680,7 @@ export const zStatefulFieldValue = z.union([
   zFloatGeneratorFieldValue,
   zIntegerGeneratorFieldValue,
   zStringGeneratorFieldValue,
+  zImageGeneratorFieldValue,
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1643,6 +1721,7 @@ const zStatefulFieldInputInstance = z.union([
   zFloatGeneratorFieldInputInstance,
   zIntegerGeneratorFieldInputInstance,
   zStringGeneratorFieldInputInstance,
+  zImageGeneratorFieldInputInstance,
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
@@ -1686,6 +1765,7 @@ const zStatefulFieldInputTemplate = z.union([
   zFloatGeneratorFieldInputTemplate,
   zIntegerGeneratorFieldInputTemplate,
   zStringGeneratorFieldInputTemplate,
+  zImageGeneratorFieldInputTemplate,
 ]);
 
 export const zFieldInputTemplate = z.union([zStatefulFieldInputTemplate, zStatelessFieldInputTemplate]);
@@ -1722,6 +1802,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zFloatGeneratorFieldOutputTemplate,
   zIntegerGeneratorFieldOutputTemplate,
   zStringGeneratorFieldOutputTemplate,
+  zImageGeneratorFieldOutputTemplate,
 ]);
 
 export const zFieldOutputTemplate = z.union([zStatefulFieldOutputTemplate, zStatelessFieldOutputTemplate]);

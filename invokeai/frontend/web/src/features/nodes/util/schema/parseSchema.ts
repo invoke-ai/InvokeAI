@@ -58,9 +58,6 @@ const isAllowedOutputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_OUTPUT_FIELD_NAMES.includes(fieldName)) {
     return false;
   }
-  if (nodeType === 'image_batch' && fieldName !== 'image') {
-    return false;
-  }
   return true;
 };
 
@@ -74,6 +71,9 @@ const isBatchInputField = (nodeType: string, fieldName: string) => {
   if (nodeType === 'string_batch' && fieldName === 'strings') {
     return true;
   }
+  if (nodeType === 'image_batch' && fieldName === 'images') {
+    return true;
+  }
   return false;
 };
 
@@ -85,6 +85,9 @@ const isBatchOutputField = (nodeType: string, fieldName: string) => {
     return true;
   }
   if (nodeType === 'string_generator' && fieldName === 'strings') {
+    return true;
+  }
+  if (nodeType === 'image_generator' && fieldName === 'images') {
     return true;
   }
   return false;
