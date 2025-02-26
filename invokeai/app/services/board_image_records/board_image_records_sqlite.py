@@ -1,6 +1,6 @@
 import sqlite3
 import threading
-from typing import Literal, Optional, cast
+from typing import Optional, cast
 
 from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
 from invokeai.app.services.image_records.image_records_common import (
@@ -103,7 +103,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
 
     def get_all_board_image_names_for_board(
         self,
-        board_id: str | Literal["none"],
+        board_id: str,
         categories: list[ImageCategory] | None,
         is_intermediate: bool | None,
     ) -> list[str]:
@@ -118,14 +118,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 FROM images
                 LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1
+                AND board_images.board_id = ?
                 """
-
-            # Add the board_id filter
-            if board_id == "none":
-                stmt += "AND board_images.board_id IS NULL"
-            else:
-                stmt += "AND board_images.board_id = ?"
-                params.append(board_id)
+            params.append(board_id)
 
             # Add the category filter
             if categories is not None:

@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Optional, Union
 
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
@@ -146,7 +146,7 @@ async def list_boards(
     response_model=list[str],
 )
 async def list_all_board_image_names(
-    board_id: str | Literal["none"] = Path(description="The id of the board"),
+    board_id: str = Path(description="The id of the board"),
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of image to include."),
     is_intermediate: bool | None = Query(default=None, description="Whether to list intermediate images."),
 ) -> list[str]:
