@@ -3,7 +3,7 @@
 # Thanks to @skunworkxdark for the original implementation!
 
 import copy
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, TypeVar, Union
 
 from pydantic import model_validator
 
@@ -119,8 +119,10 @@ CORE_LABELS_VAE = Literal[
     "vae",
 ]
 
+T = TypeVar("T")
 
-def append_list(item_cls: type[Any], new_item: Any, items: Union[Any, list[Any], None] = None) -> list[Any]:
+
+def append_list(item_cls: type[T], new_item: T, items: Union[T, list[T], None] = None) -> list[T]:
     """Combines any number of items or lists into a single list,
     ensuring consistency in type.
 
@@ -142,7 +144,7 @@ def append_list(item_cls: type[Any], new_item: Any, items: Union[Any, list[Any],
     if items is None:
         return [new_item]
 
-    result: list[item_cls] = []
+    result: list[T] = []
 
     if isinstance(items, item_cls):
         result.append(items)
