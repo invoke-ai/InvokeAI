@@ -112,7 +112,8 @@
         "column": "列",
         "board": "ボード",
         "seed": "シード",
-        "combinatorial": "組み合わせ"
+        "combinatorial": "組み合わせ",
+        "aboutHeading": "想像力をこの手に"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
