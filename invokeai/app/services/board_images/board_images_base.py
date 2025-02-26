@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Literal, Optional
+
+from invokeai.app.services.image_records.image_records_common import ImageCategory
 
 
 class BoardImagesServiceABC(ABC):
@@ -25,7 +27,9 @@ class BoardImagesServiceABC(ABC):
     @abstractmethod
     def get_all_board_image_names_for_board(
         self,
-        board_id: str,
+        board_id: str | Literal["none"],
+        categories: list[ImageCategory] | None,
+        is_intermediate: bool | None,
     ) -> list[str]:
         """Gets all board images for a board, as a list of the image names."""
         pass
