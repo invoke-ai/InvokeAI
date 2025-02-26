@@ -24,7 +24,7 @@ export const useMouseOverNode = (nodeId: string) => {
   return { isMouseOverNode, handleMouseOver, handleMouseOut };
 };
 
-export const $mouseOverFormField = atom<string | null>(null);
+const $mouseOverFormField = atom<string | null>(null);
 
 export const useMouseOverFormField = (nodeId: string) => {
   const [isMouseOverFormField, setIsMouseOverFormField] = useState(false);
