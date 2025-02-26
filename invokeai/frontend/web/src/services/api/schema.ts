@@ -2288,19 +2288,6 @@ export type components = {
              */
             file: Blob;
         };
-        /** Body_list_all_board_image_names */
-        Body_list_all_board_image_names: {
-            /**
-             * Categories
-             * @description The categories of image to include.
-             */
-            categories?: components["schemas"]["ImageCategory"][] | null;
-            /**
-             * Is Intermediate
-             * @description Whether to list intermediate images.
-             */
-            is_intermediate?: boolean | null;
-        };
         /** Body_parse_dynamicprompts */
         Body_parse_dynamicprompts: {
             /**
@@ -9200,7 +9187,7 @@ export type components = {
         };
         /**
          * Image Generator
-         * @description Generated a range of boards for use in a batched generation
+         * @description Generated a collection of images for use in a batched generation
          */
         ImageGenerator: {
             /**
@@ -21644,7 +21631,12 @@ export interface operations {
     };
     list_all_board_image_names: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The categories of image to include. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate images. */
+                is_intermediate?: boolean | null;
+            };
             header?: never;
             path: {
                 /** @description The id of the board */
@@ -21652,11 +21644,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["Body_list_all_board_image_names"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
