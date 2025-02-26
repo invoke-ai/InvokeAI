@@ -16,6 +16,7 @@ const sx: SystemStyleObject = {
   },
   '&[data-parent-layout="row"]': {
     flex: '1 1 0',
+    minW: 32,
   },
 };
 
