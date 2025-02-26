@@ -39,7 +39,7 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
 
         # with context.models.load(self.vllm_model) as vllm_model:
         with context.models.load_by_attrs(
-            name="llava-onevision-qwen2-0.5b-ov-hf", base=BaseModelType.Any, type=ModelType.LlavaOnevision
+            name="LLaVA Onevision Qwen2 0.5B", base=BaseModelType.Any, type=ModelType.LlavaOnevision
         ) as vllm_model:
             assert isinstance(vllm_model, LlavaOnevisionModel)
             output = vllm_model.run(
