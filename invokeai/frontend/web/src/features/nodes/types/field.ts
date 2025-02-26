@@ -1228,7 +1228,6 @@ const zIntegerGeneratorArithmeticSequence = z.object({
   start: z.number().int().default(0),
   step: z.number().int().default(1),
   count: z.number().int().default(10),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorArithmeticSequence = z.infer<typeof zIntegerGeneratorArithmeticSequence>;
 export const getIntegerGeneratorArithmeticSequenceDefaults = () => zIntegerGeneratorArithmeticSequence.parse({});
@@ -1247,7 +1246,6 @@ const zIntegerGeneratorLinearDistribution = z.object({
   start: z.number().int().default(0),
   end: z.number().int().default(10),
   count: z.number().int().default(10),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorLinearDistribution = z.infer<typeof zIntegerGeneratorLinearDistribution>;
 const getIntegerGeneratorLinearDistributionDefaults = () => zIntegerGeneratorLinearDistribution.parse({});
@@ -1267,7 +1265,6 @@ const zIntegerGeneratorUniformRandomDistribution = z.object({
   max: z.number().int().default(10),
   count: z.number().int().default(10),
   seed: z.number().int().nullish(),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorUniformRandomDistribution = z.infer<typeof zIntegerGeneratorUniformRandomDistribution>;
 const getIntegerGeneratorUniformRandomDistributionDefaults = () => zIntegerGeneratorUniformRandomDistribution.parse({});
@@ -1283,7 +1280,6 @@ const zIntegerGeneratorParseString = z.object({
   type: z.literal(IntegerGeneratorParseStringType).default(IntegerGeneratorParseStringType),
   input: z.string().default('1,2,3,4,5,6,7,8,9,10'),
   splitOn: z.string().default(','),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorParseString = z.infer<typeof zIntegerGeneratorParseString>;
 const getIntegerGeneratorParseStringDefaults = () => zIntegerGeneratorParseString.parse({});
@@ -1337,9 +1333,6 @@ export const isIntegerGeneratorFieldInputInstance = buildInstanceTypeGuard(zInte
 export const isIntegerGeneratorFieldInputTemplate =
   buildTemplateTypeGuard<IntegerGeneratorFieldInputTemplate>('IntegerGeneratorField');
 export const resolveIntegerGeneratorField = ({ value }: IntegerGeneratorFieldInputInstance) => {
-  if (value.values) {
-    return value.values;
-  }
   if (value.type === IntegerGeneratorArithmeticSequenceType) {
     return getIntegerGeneratorArithmeticSequenceValues(value);
   }
@@ -1377,7 +1370,6 @@ const zStringGeneratorParseString = z.object({
   type: z.literal(StringGeneratorParseStringType).default(StringGeneratorParseStringType),
   input: z.string().default('foo,bar,baz,qux'),
   splitOn: z.string().default(','),
-  values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorParseString = z.infer<typeof zStringGeneratorParseString>;
 export const getStringGeneratorParseStringDefaults = () => zStringGeneratorParseString.parse({});
@@ -1407,7 +1399,6 @@ const zStringGeneratorDynamicPromptsCombinatorial = z.object({
     .default(StringGeneratorDynamicPromptsCombinatorialType),
   input: z.string().default('a super {cute|ferocious} {dog|cat}'),
   maxPrompts: z.number().int().gte(1).default(10),
-  values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorDynamicPromptsCombinatorial = z.infer<typeof zStringGeneratorDynamicPromptsCombinatorial>;
 const getStringGeneratorDynamicPromptsCombinatorialDefaults = () =>
@@ -1446,7 +1437,6 @@ const zStringGeneratorDynamicPromptsRandom = z.object({
   input: z.string().default('a super {cute|ferocious} {dog|cat}'),
   count: z.number().int().gte(1).default(10),
   seed: z.number().int().nullish(),
-  values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorDynamicPromptsRandom = z.infer<typeof zStringGeneratorDynamicPromptsRandom>;
 const getStringGeneratorDynamicPromptsRandomDefaults = () => zStringGeneratorDynamicPromptsRandom.parse({});
@@ -1507,9 +1497,6 @@ export const resolveStringGeneratorField = async (
   { value }: StringGeneratorFieldInputInstance,
   dispatch: AppDispatch
 ) => {
-  if (value.values) {
-    return value.values;
-  }
   if (value.type === StringGeneratorParseStringType) {
     return getStringGeneratorParseStringValues(value);
   }
