@@ -8,7 +8,7 @@ import { FormElementEditModeContent } from 'features/nodes/components/sidePanel/
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { NodeFieldElementDescriptionEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementDescriptionEditable';
 import { NodeFieldElementLabelEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabelEditable';
-import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo, useRef } from 'react';
@@ -68,7 +68,7 @@ const nodeFieldOverlaySx: SystemStyleObject = {
   transitionProperty: 'none',
   pointerEvents: 'none',
   display: 'none',
-  '&[data-is-mouse-over-node="true"]': {
+  '&[data-is-mouse-over-node-or-form-field="true"]': {
     display: 'block',
     bg: 'invokeBlueAlpha.100',
   },
@@ -76,7 +76,13 @@ const nodeFieldOverlaySx: SystemStyleObject = {
 
 const NodeFieldElementOverlay = memo(({ element }: { element: NodeFieldElement }) => {
   const mouseOverNode = useMouseOverNode(element.data.fieldIdentifier.nodeId);
+  const mouseOverFormField = useMouseOverFormField(element.data.fieldIdentifier.nodeId);
 
-  return <Box sx={nodeFieldOverlaySx} data-is-mouse-over-node={mouseOverNode.isMouseOverNode} />;
+  return (
+    <Box
+      sx={nodeFieldOverlaySx}
+      data-is-mouse-over-node-or-form-field={mouseOverNode.isMouseOverNode || mouseOverFormField.isMouseOverFormField}
+    />
+  );
 });
 NodeFieldElementOverlay.displayName = 'NodeFieldElementOverlay';
