@@ -10,7 +10,7 @@ import { memo, useRef } from 'react';
 
 import { TextElementContentEditable } from './TextElementContentEditable';
 
-export const sx: SystemStyleObject = {
+const sx: SystemStyleObject = {
   position: 'relative',
   borderRadius: 'base',
   minW: 32,

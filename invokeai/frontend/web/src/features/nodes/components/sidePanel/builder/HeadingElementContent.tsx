@@ -3,7 +3,7 @@ import { Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const headingSx: SystemStyleObject = {
+const headingSx: SystemStyleObject = {
   fontWeight: 'bold',
   fontSize: '2xl',
   '&[data-is-empty="true"]': {

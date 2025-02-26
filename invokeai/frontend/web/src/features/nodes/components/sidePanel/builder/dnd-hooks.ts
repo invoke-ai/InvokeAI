@@ -505,7 +505,7 @@ export const useNodeFieldDnd = (
  * @param elementId The id of the element
  * @returns Whether the element is the root element
  */
-export const useIsRootElement = (elementId: string) => {
+const useIsRootElement = (elementId: string) => {
   const rootElementId = useAppSelector(selectFormRootElementId);
   const isRootElement = useMemo(() => rootElementId === elementId, [rootElementId, elementId]);
   return isRootElement;
