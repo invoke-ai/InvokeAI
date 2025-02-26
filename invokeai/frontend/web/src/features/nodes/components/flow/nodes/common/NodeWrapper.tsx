@@ -16,8 +16,8 @@ type NodeWrapperProps = PropsWithChildren & {
   width?: ChakraProps['w'];
 };
 
-// Animations are disabled as a performance optimization - they can cause massive slowdowns in large workflows - even
-// when the animations are GPU-accelerated CSS.
+// Certain CSS transitions are disabled as a performance optimization - they can cause massive slowdowns in large
+// workflows even when the animations are GPU-accelerated CSS.
 
 const containerSx: SystemStyleObject = {
   h: 'full',
@@ -41,11 +41,13 @@ const containerSx: SystemStyleObject = {
   '&[data-is-mouse-over-node="true"] .node-selection-overlay': {
     opacity: 1,
     display: 'block',
+    bg: 'invokeBlueAlpha.100',
   },
   _hover: {
     '& .node-selection-overlay': {
       display: 'block',
       shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
+      bg: 'unset',
     },
     '&[data-is-selected="true"] .node-selection-overlay': {
       display: 'block',
