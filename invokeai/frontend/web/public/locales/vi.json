@@ -1494,8 +1494,7 @@
             "batchNodeCollectionSizeMismatch": "Kích cỡ tài nguyên không phù hợp với Lô {{batchGroupId}}",
             "emptyBatches": "lô trống",
             "batchNodeNotConnected": "Node Hàng Loạt chưa được kết nối: {{label}}",
-            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng",
-            "invalidBatchConfigurationCannotCalculate": "Thiết lập lô không hợp lệ; không thể tính toán"
+            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
