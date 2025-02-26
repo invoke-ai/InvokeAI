@@ -568,7 +568,7 @@ ValueToInsertTuple: TypeAlias = tuple[
     str | None,  # workflow (optional, as stringified JSON)
     str | None,  # origin (optional)
     str | None,  # destination (optional)
-    str | None,  # retried_from_item_id (optional, this is always None for new items)
+    int | None,  # retried_from_item_id (optional, this is always None for new items)
 ]
 """A type alias for the tuple of values to insert into the session queue table."""
 
