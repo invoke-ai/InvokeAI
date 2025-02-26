@@ -15,7 +15,7 @@ from invokeai.backend.model_manager.load.model_loader_registry import ModelLoade
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LlavaOnevision, format=ModelFormat.Diffusers)
-class SpandrelImageToImageModelLoader(ModelLoader):
+class LlavaOnevisionModelLoader(ModelLoader):
     """Class for loading LLaVA Onevision VLLM models."""
 
     def _load_model(
@@ -24,7 +24,7 @@ class SpandrelImageToImageModelLoader(ModelLoader):
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if submodel_type is not None:
-            raise ValueError("Unexpected submodel requested for Spandrel model.")
+            raise ValueError("Unexpected submodel requested for LLaVA OneVision model.")
 
         model_path = Path(config.path)
         model = LlavaOnevisionModel.load_from_path(model_path)
