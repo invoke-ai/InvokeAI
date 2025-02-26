@@ -212,7 +212,7 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {
       }
     }
 
-    if (batchNodes.length > 1) {
+    if (batchNodes.length > 0) {
       const batchSizes: number[] = [];
       const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['batch_group_id']?.value);
       for (const [batchGroupId, batchNodes] of Object.entries(groupedBatchNodes)) {
