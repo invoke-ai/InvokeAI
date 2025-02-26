@@ -25,6 +25,38 @@ const containerSx: SystemStyleObject = {
   borderRadius: 'base',
   transitionProperty: 'none',
   cursor: 'grab',
+  // The action buttons are hidden by default and shown on hover
+  '& .node-selection-overlay': {
+    display: 'none',
+    position: 'absolute',
+    top: 0,
+    insetInlineEnd: 0,
+    bottom: 0,
+    insetInlineStart: 0,
+    borderRadius: 'base',
+    transitionProperty: 'none',
+    pointerEvents: 'none',
+    opacity: 0.5,
+  },
+  '&[data-is-mouse-over-node="true"] .node-selection-overlay': {
+    opacity: 1,
+    display: 'block',
+  },
+  _hover: {
+    '& .node-selection-overlay': {
+      display: 'block',
+      shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
+    },
+    '&[data-is-selected="true"] .node-selection-overlay': {
+      display: 'block',
+      opacity: 1,
+      shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
+    },
+  },
+  '&[data-is-selected="true"] .node-selection-overlay': {
+    display: 'block',
+    shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
+  },
 };
 
 const shadowsSx: SystemStyleObject = {
@@ -50,36 +82,16 @@ const inProgressSx: SystemStyleObject = {
   transitionProperty: 'none',
   opacity: 0.7,
   zIndex: -1,
-  visibility: 'hidden',
+  display: 'none',
   shadow: '0 0 0 2px var(--invoke-colors-yellow-400), 0 0 20px 2px var(--invoke-colors-orange-700)',
   '&[data-is-in-progress="true"]': {
-    visibility: 'visible',
-  },
-};
-
-const selectionOverlaySx: SystemStyleObject = {
-  position: 'absolute',
-  top: 0,
-  insetInlineEnd: 0,
-  bottom: 0,
-  insetInlineStart: 0,
-  borderRadius: 'base',
-  transitionProperty: 'none',
-  pointerEvents: 'none',
-  visibility: 'hidden',
-  opacity: 0.5,
-  '&[data-is-selected="true"], &[data-is-hovered="true"]': { visibility: 'visible' },
-  '&[data-is-selected="true"]': { shadow: '0 0 0 3px var(--invoke-colors-blue-300)' },
-  '&[data-is-hovered="true"]': { shadow: '0 0 0 2px var(--invoke-colors-blue-300)' },
-  '&[data-is-selected="true"][data-is-hovered="true"]': {
-    opacity: 1,
-    shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
+    display: 'block',
   },
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
-  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
+  const mouseOverNode = useMouseOverNode(nodeId);
   const zoomToNode = useZoomToNode();
 
   const executionState = useNodeExecutionState(nodeId);
@@ -117,17 +129,19 @@ const NodeWrapper = (props: NodeWrapperProps) => {
     <Box
       onClick={globalMenu.onCloseGlobal}
       onDoubleClick={onDoubleClick}
-      onMouseEnter={handleMouseOver}
-      onMouseLeave={handleMouseOut}
+      onMouseOver={mouseOverNode.handleMouseOver}
+      onMouseOut={mouseOverNode.handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
       sx={containerSx}
       width={width || NODE_WIDTH}
       opacity={opacity}
+      data-is-selected={selected}
+      data-is-mouse-over-node={mouseOverNode.isMouseOverNode}
     >
       <Box sx={shadowsSx} />
       <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
       {children}
-      <Box sx={selectionOverlaySx} data-is-selected={selected} data-is-hovered={isMouseOverNode} />
+      <Box className="node-selection-overlay" />
     </Box>
   );
 };
