@@ -9,7 +9,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     BatchDatum,
     NodeFieldValue,
     calc_session_count,
-    create_graph_nfv_tuples,
+    create_session_nfv_tuples,
     prepare_values_to_insert,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
@@ -42,7 +42,7 @@ def batch_graph() -> Graph:
 
 def test_create_sessions_from_batch_with_runs(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    t = list(create_graph_nfv_tuples(batch=b, maximum=1000))
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 2 list[BatchDatum] * length 2 * 2 runs = 8
     assert len(t) == 8
 
@@ -90,28 +90,28 @@ def test_create_sessions_from_batch_with_runs(batch_data_collection, batch_graph
 
 def test_create_sessions_from_batch_without_runs(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection)
-    t = list(create_graph_nfv_tuples(batch=b, maximum=1000))
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 2 list[BatchDatum] * length 2 * 1 runs = 8
     assert len(t) == 4
 
 
 def test_create_sessions_from_batch_without_batch(batch_graph):
     b = Batch(graph=batch_graph, runs=2)
-    t = list(create_graph_nfv_tuples(batch=b, maximum=1000))
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 2 runs
     assert len(t) == 2
 
 
 def test_create_sessions_from_batch_without_batch_or_runs(batch_graph):
     b = Batch(graph=batch_graph)
-    t = list(create_graph_nfv_tuples(batch=b, maximum=1000))
+    t = list(create_session_nfv_tuples(batch=b, maximum=1000))
     # 1 run
     assert len(t) == 1
 
 
 def test_create_sessions_from_batch_with_runs_and_max(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
-    t = list(create_graph_nfv_tuples(batch=b, maximum=5))
+    t = list(create_session_nfv_tuples(batch=b, maximum=5))
     # 2 list[BatchDatum] * length 2 * 2 runs = 8, but max is 5
     assert len(t) == 5
 
