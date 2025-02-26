@@ -38,8 +38,8 @@ class LlavaOnevisionModel(RawModel):
 
         conversation = [{"role": "user", "content": content}]
         prompt = self._processor.apply_chat_template(conversation, add_generation_prompt=True)
-        inputs = self._processor(images=images, text=prompt, return_tensors="pt").to(device=device, dtype=dtype)
-        output = self._vllm_model.generate(**inputs, max_new_tokens=200, do_sample=False)
+        inputs = self._processor(images=images or None, text=prompt, return_tensors="pt").to(device=device, dtype=dtype)
+        output = self._vllm_model.generate(**inputs, max_new_tokens=400, do_sample=False)
         output_str: str = self._processor.decode(output[0][2:], skip_special_tokens=True)
         # The output_str will include the prompt, so we extract the response.
         response = output_str.split("assistant\n", 1)[1].strip()

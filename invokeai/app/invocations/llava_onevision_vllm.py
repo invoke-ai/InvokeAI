@@ -14,7 +14,7 @@ from invokeai.backend.util.devices import TorchDevice
 class LlavaOnevisionVllmInvocation(BaseInvocation):
     """Run a LLaVA OneVision VLLM model."""
 
-    image: list[ImageField] | ImageField | None = InputField(description="Input image.")
+    images: list[ImageField] | ImageField | None = InputField(default=None, description="Input image.")
     prompt: str = InputField(
         default="",
         description="Input text prompt.",
@@ -27,10 +27,10 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
     # )
 
     def _get_images(self, context: InvocationContext) -> list[Image]:
-        if self.image is None:
+        if self.images is None:
             return []
 
-        image_fields = self.image if isinstance(self.image, list) else [self.image]
+        image_fields = self.images if isinstance(self.images, list) else [self.images]
         return [context.images.get_pil(image_field.image_name, "RGB") for image_field in image_fields]
 
     @torch.no_grad()
