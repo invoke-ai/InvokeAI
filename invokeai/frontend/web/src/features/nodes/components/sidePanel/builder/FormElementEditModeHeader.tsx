@@ -4,6 +4,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
+import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import type { FormElement, NodeFieldElement } from 'features/nodes/types/workflow';
@@ -56,13 +57,17 @@ FormElementEditModeHeader.displayName = 'FormElementEditModeHeader';
 
 const ZoomToNodeButton = memo(({ element }: { element: NodeFieldElement }) => {
   const { t } = useTranslation();
+  const { nodeId } = element.data.fieldIdentifier;
   const zoomToNode = useZoomToNode();
+  const mouseOverNode = useMouseOverNode(nodeId);
   const onClick = useCallback(() => {
-    zoomToNode(element.data.fieldIdentifier.nodeId);
-  }, [element.data.fieldIdentifier.nodeId, zoomToNode]);
+    zoomToNode(nodeId);
+  }, [nodeId, zoomToNode]);
 
   return (
     <IconButton
+      onMouseOver={mouseOverNode.handleMouseOver}
+      onMouseOut={mouseOverNode.handleMouseOut}
       tooltip={t('workflows.builder.zoomToNode')}
       aria-label={t('workflows.builder.zoomToNode')}
       onClick={onClick}

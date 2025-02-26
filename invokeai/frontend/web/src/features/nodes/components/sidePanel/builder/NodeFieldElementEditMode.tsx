@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, FormControl } from '@invoke-ai/ui-library';
+import { Box, Flex, FormControl } from '@invoke-ai/ui-library';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
@@ -8,6 +8,7 @@ import { FormElementEditModeContent } from 'features/nodes/components/sidePanel/
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { NodeFieldElementDescriptionEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementDescriptionEditable';
 import { NodeFieldElementLabelEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabelEditable';
+import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo, useRef } from 'react';
@@ -49,9 +50,33 @@ export const NodeFieldElementEditMode = memo(({ el }: { el: NodeFieldElement }) 
           {showDescription && <NodeFieldElementDescriptionEditable el={el} />}
         </FormControl>
       </FormElementEditModeContent>
+      <NodeFieldElementOverlay element={el} />
       <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
     </Flex>
   );
 });
 
 NodeFieldElementEditMode.displayName = 'NodeFieldElementEditMode';
+
+const nodeFieldOverlaySx: SystemStyleObject = {
+  position: 'absolute',
+  top: 0,
+  insetInlineEnd: 0,
+  bottom: 0,
+  insetInlineStart: 0,
+  borderRadius: 'base',
+  transitionProperty: 'none',
+  pointerEvents: 'none',
+  display: 'none',
+  '&[data-is-mouse-over-node="true"]': {
+    display: 'block',
+    bg: 'invokeBlueAlpha.100',
+  },
+};
+
+const NodeFieldElementOverlay = memo(({ element }: { element: NodeFieldElement }) => {
+  const mouseOverNode = useMouseOverNode(element.data.fieldIdentifier.nodeId);
+
+  return <Box sx={nodeFieldOverlaySx} data-is-mouse-over-node={mouseOverNode.isMouseOverNode} />;
+});
+NodeFieldElementOverlay.displayName = 'NodeFieldElementOverlay';
