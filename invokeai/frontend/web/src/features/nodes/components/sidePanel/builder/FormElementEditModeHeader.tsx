@@ -31,6 +31,9 @@ const sx: SystemStyleObject = {
   '&[data-is-dragging="true"]': {
     opacity: 0.3,
   },
+  _hover: {
+    bg: 'baseAlpha.300',
+  },
 };
 
 type Props = Omit<FlexProps, 'sx'> & { element: FormElement; dragHandleRef: RefObject<HTMLDivElement> };
