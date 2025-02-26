@@ -51,7 +51,6 @@ ContainerElement.displayName = 'ContainerElementComponent';
 
 const containerViewModeSx: SystemStyleObject = {
   gap: 4,
-  flex: '1 0 0',
   '&[data-self-layout="column"]': {
     flexDir: 'column',
     alignItems: 'stretch',
@@ -63,11 +62,20 @@ const containerViewModeSx: SystemStyleObject = {
     overflowY: 'visible',
     h: 'min-content',
   },
+  '&[data-parent-layout="column"]': {
+    w: 'full',
+    h: 'min-content',
+  },
+  '&[data-parent-layout="row"]': {
+    flex: '1 1 0',
+    minW: 32,
+  },
 };
 
 const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }) => {
   const { t } = useTranslation();
   const depth = useDepthContext();
+  const containerCtx = useContainerContext();
   const { id, data } = el;
   const { children, layout } = data;
 
@@ -80,6 +88,7 @@ const ContainerElementComponentViewMode = memo(({ el }: { el: ContainerElement }
           sx={containerViewModeSx}
           data-self-layout={layout}
           data-depth={depth}
+          data-parent-layout={containerCtx.layout}
         >
           {children.map((childId) => (
             <FormElementComponent key={childId} id={childId} />
