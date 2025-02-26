@@ -1,7 +1,8 @@
 import datetime
 import json
+from copy import deepcopy
 from itertools import chain, product
-from typing import Generator, Iterable, Literal, NamedTuple, Optional, TypeAlias, Union, cast
+from typing import Generator, Literal, Optional, TypeAlias, Union, cast
 
 from pydantic import (
     AliasChoices,
@@ -406,23 +407,7 @@ class IsFullResult(BaseModel):
 # region Util
 
 
-def populate_graph(graph: Graph, node_field_values: Iterable[NodeFieldValue]) -> Graph:
-    """
-    Populates the given graph with the given batch data items.
-    """
-    graph_clone = graph.model_copy(deep=True)
-    for item in node_field_values:
-        node = graph_clone.get_node(item.node_path)
-        if node is None:
-            continue
-        setattr(node, item.field_name, item.value)
-        graph_clone.update_node(item.node_path, node)
-    return graph_clone
-
-
-def create_session_nfv_tuples(
-    batch: Batch, maximum: int
-) -> Generator[tuple[GraphExecutionState, list[NodeFieldValue], Optional[WorkflowWithoutID]], None, None]:
+def create_graph_nfv_tuples(batch: Batch, maximum: int) -> Generator[tuple[dict, list[dict]], None, None]:
     """
     Create all graph permutations from the given batch data and graph. Yields tuples
     of the form (graph, batch_data_items) where batch_data_items is the list of BatchDataItems
@@ -431,15 +416,16 @@ def create_session_nfv_tuples(
 
     # TODO: Should this be a class method on Batch?
 
-    data: list[list[tuple[NodeFieldValue]]] = []
+    data: list[list[tuple[dict]]] = []
     batch_data_collection = batch.data if batch.data is not None else []
+    graph_as_dict = batch.graph.model_dump(warnings=False, exclude_none=True)
     for batch_datum_list in batch_data_collection:
         # each batch_datum_list needs to be convered to NodeFieldValues and then zipped
 
-        node_field_values_to_zip: list[list[NodeFieldValue]] = []
+        node_field_values_to_zip: list[list[dict]] = []
         for batch_datum in batch_datum_list:
             node_field_values = [
-                NodeFieldValue(node_path=batch_datum.node_path, field_name=batch_datum.field_name, value=item)
+                {"node_path": batch_datum.node_path, "field_name": batch_datum.field_name, "value": item}
                 for item in batch_datum.items
             ]
             node_field_values_to_zip.append(node_field_values)
@@ -452,8 +438,14 @@ def create_session_nfv_tuples(
             if count >= maximum:
                 return
             flat_node_field_values = list(chain.from_iterable(d))
-            graph = populate_graph(batch.graph, flat_node_field_values)
-            yield (GraphExecutionState(graph=graph), flat_node_field_values, batch.workflow)
+
+            # I think we must deep copy here, because each set of field values can reference different nodes. If that
+            # is not accurate, we could remove this deepcopy for performance.
+            graph_as_dict_clone = deepcopy(graph_as_dict)
+            for item in flat_node_field_values:
+                graph_as_dict_clone["nodes"][item["node_path"]][item["field_name"]] = item["value"]
+
+            yield (graph_as_dict_clone, flat_node_field_values)
             count += 1
 
 
@@ -476,42 +468,40 @@ def calc_session_count(batch: Batch) -> int:
     return len(data_product) * batch.runs
 
 
-class SessionQueueValueToInsert(NamedTuple):
-    """A tuple of values to insert into the session_queue table"""
+def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new_queue_items: int) -> list[tuple]:
+    values_to_insert: list[tuple] = []
+    session_dict = GraphExecutionState(graph=Graph()).model_dump(warnings=False, exclude_none=True)
+    # pydantic's to_jsonable_python handles serialization of any python object, including sets, which json.dumps does
+    # not support by default. Apparently there are sets somewhere in the graph.
 
-    # Careful with the ordering of this - it must match the insert statement
-    queue_id: str  # queue_id
-    session: str  # session json
-    session_id: str  # session_id
-    batch_id: str  # batch_id
-    field_values: Optional[str]  # field_values json
-    priority: int  # priority
-    workflow: Optional[str]  # workflow json
-    origin: str | None
-    destination: str | None
-    retried_from_item_id: int | None = None
+    # The same workflow is used for all sessions in the batch - serialize it once
+    workflow_json = json.dumps(batch.workflow, default=to_jsonable_python) if batch.workflow else None
 
+    for graph, field_values in create_graph_nfv_tuples(batch, max_new_queue_items):
+        # As a perf optimization, we can mutate the session_dict in place. This is safe because we dump it to json
+        # as part of the tuple construction
 
-ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
+        # Sessions must have unique id
+        session_dict["id"] = uuid_string()
 
+        # Update the graph in the session_dict with the new graph w/ field values
+        session_dict["graph"] = graph
 
-def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new_queue_items: int) -> ValuesToInsert:
-    values_to_insert: ValuesToInsert = []
-    for session, field_values, workflow in create_session_nfv_tuples(batch, max_new_queue_items):
-        # sessions must have unique id
-        session.id = uuid_string()
+        session_json = json.dumps(session_dict, default=to_jsonable_python)
+        field_values_json = json.dumps(field_values, default=to_jsonable_python) if field_values else None
+
         values_to_insert.append(
-            SessionQueueValueToInsert(
-                queue_id=queue_id,
-                session=session.model_dump_json(warnings=False, exclude_none=True),  # as json
-                session_id=session.id,
-                batch_id=batch.batch_id,
-                # must use pydantic_encoder bc field_values is a list of models
-                field_values=json.dumps(field_values, default=to_jsonable_python) if field_values else None,  # as json
-                priority=priority,
-                workflow=json.dumps(workflow, default=to_jsonable_python) if workflow else None,  # as json
-                origin=batch.origin,
-                destination=batch.destination,
+            (
+                queue_id,
+                session_json,
+                session_dict["id"],
+                batch.batch_id,
+                field_values_json,
+                priority,
+                workflow_json,
+                batch.origin,
+                batch.destination,
+                None,
             )
         )
     return values_to_insert

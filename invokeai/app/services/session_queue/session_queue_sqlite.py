@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import threading
+import time
 from typing import Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
@@ -27,7 +28,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemDTO,
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
-    SessionQueueValueToInsert,
     calc_session_count,
     prepare_values_to_insert,
 )
@@ -122,12 +122,16 @@ class SqliteSessionQueue(SessionQueueBase):
                 priority = self._get_highest_priority(queue_id) + 1
 
             requested_count = calc_session_count(batch)
+            # time the prepare_values_to_insert function
+            time_start = time.time()
             values_to_insert = prepare_values_to_insert(
                 queue_id=queue_id,
                 batch=batch,
                 priority=priority,
                 max_new_queue_items=max_new_queue_items,
             )
+            time_end = time.time()
+            self.__invoker.services.logger.warning(f"prepare_values_to_insert took {time_end - time_start} seconds")
             enqueued_count = len(values_to_insert)
 
             if requested_count > enqueued_count:
@@ -772,7 +776,7 @@ class SqliteSessionQueue(SessionQueueBase):
         try:
             self.__lock.acquire()
 
-            values_to_insert: list[SessionQueueValueToInsert] = []
+            values_to_insert: list[tuple] = []
             retried_item_ids: list[int] = []
 
             for item_id in item_ids:
@@ -798,17 +802,17 @@ class SqliteSessionQueue(SessionQueueBase):
                     else queue_item.item_id
                 )
 
-                value_to_insert = SessionQueueValueToInsert(
-                    queue_id=queue_item.queue_id,
-                    batch_id=queue_item.batch_id,
-                    destination=queue_item.destination,
-                    field_values=field_values_json,
-                    origin=queue_item.origin,
-                    priority=queue_item.priority,
-                    workflow=workflow_json,
-                    session=cloned_session_json,
-                    session_id=cloned_session.id,
-                    retried_from_item_id=retried_from_item_id,
+                value_to_insert = (
+                    queue_item.queue_id,
+                    queue_item.batch_id,
+                    queue_item.destination,
+                    field_values_json,
+                    queue_item.origin,
+                    queue_item.priority,
+                    workflow_json,
+                    cloned_session_json,
+                    cloned_session.id,
+                    retried_from_item_id,
                 )
                 values_to_insert.append(value_to_insert)
 
