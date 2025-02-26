@@ -1,7 +1,7 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
+import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
@@ -41,13 +41,16 @@ const containerSx: SystemStyleObject = {
   '&[data-is-mouse-over-node="true"] .node-selection-overlay': {
     opacity: 1,
     display: 'block',
+  },
+  '&[data-is-mouse-over-form-field="true"] .node-selection-overlay': {
+    opacity: 1,
+    display: 'block',
     bg: 'invokeBlueAlpha.100',
   },
   _hover: {
     '& .node-selection-overlay': {
       display: 'block',
       shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
-      bg: 'unset',
     },
     '&[data-is-selected="true"] .node-selection-overlay': {
       display: 'block',
@@ -94,6 +97,7 @@ const inProgressSx: SystemStyleObject = {
 const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
   const mouseOverNode = useMouseOverNode(nodeId);
+  const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode();
 
   const executionState = useNodeExecutionState(nodeId);
@@ -138,7 +142,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       width={width || NODE_WIDTH}
       opacity={opacity}
       data-is-selected={selected}
-      data-is-mouse-over-node={mouseOverNode.isMouseOverNode}
+      data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
     >
       <Box sx={shadowsSx} />
       <Box sx={inProgressSx} data-is-in-progress={isInProgress} />
