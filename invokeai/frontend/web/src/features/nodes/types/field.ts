@@ -1534,7 +1534,7 @@ export const getStringGeneratorDefaults = (type: StringGeneratorFieldValue['type
 export const ImageGeneratorImagesFromBoardType = 'image_generator_images_from_board';
 const zImageGeneratorImagesFromBoard = z.object({
   type: z.literal(ImageGeneratorImagesFromBoardType).default(ImageGeneratorImagesFromBoardType),
-  board_id: z.string().trim().min(1).optional().default('none'),
+  board_id: z.string().trim().min(1).optional(),
   category: z.union([z.literal('images'), z.literal('assets')]).default('images'),
 });
 export type ImageGeneratorImagesFromBoard = z.infer<typeof zImageGeneratorImagesFromBoard>;
@@ -1544,10 +1544,13 @@ const getImageGeneratorImagesFromBoardValues = async (
   dispatch: AppDispatch
 ) => {
   const { board_id, category } = generator;
+  if (!board_id) {
+    return EMPTY_ARRAY;
+  }
   const req = dispatch(
     boardsApi.endpoints.listAllImageNamesForBoard.initiate(
       {
-        board_id: board_id ?? 'none',
+        board_id,
         categories: category === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
         is_intermediate: false,
       },

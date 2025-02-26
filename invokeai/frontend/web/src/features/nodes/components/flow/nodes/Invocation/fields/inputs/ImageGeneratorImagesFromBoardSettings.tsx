@@ -1,5 +1,6 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { ImageGeneratorImagesFromBoard } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
@@ -49,31 +50,21 @@ const BoardCombobox = ({
   board_id,
   onChange: _onChange,
 }: {
-  board_id: string;
+  board_id: string | undefined;
   onChange: (board_id: string) => void;
 }) => {
   const { t } = useTranslation();
   const listAllBoardsQuery = useListAllBoardsQuery(listAllBoardsQueryArg);
 
-  const noneOption = useMemo<ComboboxOption>(() => {
-    return {
-      label: `${t('common.none')} (${t('boards.uncategorized')})`,
-      value: 'none',
-    };
-  }, [t]);
-
   const options = useMemo<ComboboxOption[]>(() => {
-    const _options: ComboboxOption[] = [noneOption];
-    if (listAllBoardsQuery.data) {
-      for (const board of listAllBoardsQuery.data) {
-        _options.push({
-          label: board.board_name,
-          value: board.board_id,
-        });
-      }
+    if (!listAllBoardsQuery.data) {
+      return EMPTY_ARRAY;
     }
-    return _options;
-  }, [listAllBoardsQuery.data, noneOption]);
+    return listAllBoardsQuery.data.map((board) => ({
+      label: board.board_name,
+      value: board.board_id,
+    }));
+  }, [listAllBoardsQuery.data]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -87,13 +78,7 @@ const BoardCombobox = ({
     [_onChange]
   );
 
-  const value = useMemo(() => {
-    if (board_id === 'none') {
-      return noneOption;
-    }
-    const boardOption = options.find((o) => o.value === board_id);
-    return boardOption ?? noneOption;
-  }, [board_id, options, noneOption]);
+  const value = useMemo(() => options.find((o) => o.value === board_id) ?? null, [board_id, options]);
 
   const noOptionsMessage = useCallback(() => t('boards.noMatching'), [t]);
 
