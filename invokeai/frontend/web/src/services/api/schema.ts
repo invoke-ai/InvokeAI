@@ -21640,7 +21640,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description The id of the board */
-                board_id: string | "none";
+                board_id: string;
             };
             cookie?: never;
         };
