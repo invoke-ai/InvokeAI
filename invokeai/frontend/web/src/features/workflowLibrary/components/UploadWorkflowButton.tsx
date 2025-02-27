@@ -1,5 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { saveWorkflowAs } from 'features/workflowLibrary/components/SaveWorkflowAsDialog';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useCallback, useRef } from 'react';
@@ -10,12 +10,12 @@ import { PiUploadSimpleBold } from 'react-icons/pi';
 const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const workflowListMenu = useWorkflowListMenu();
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
   const loadWorkflowFromFile = useLoadWorkflowFromFile({
     resetRef,
     onSuccess: (workflow) => {
-      workflowListMenu.close();
+      workflowLibraryModal.close();
       saveWorkflowAs(workflow);
     },
   });

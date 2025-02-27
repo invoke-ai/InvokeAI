@@ -26,7 +26,8 @@ import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicP
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
-import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
+import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/ShareWorkflowModal';
+import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
@@ -50,7 +51,6 @@ import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 import { useSocketIO } from 'services/events/useSocketIO';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
-
 const DEFAULT_CONFIG = {};
 
 interface Props {
@@ -129,6 +129,7 @@ const ModalIsolator = memo(() => {
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
+      <WorkflowLibraryModal />
       <CancelAllExceptCurrentQueueItemConfirmationAlertDialog />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
