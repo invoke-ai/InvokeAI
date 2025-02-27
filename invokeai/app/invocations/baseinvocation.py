@@ -44,8 +44,6 @@ if TYPE_CHECKING:
 
 logger = InvokeAILogger.get_logger()
 
-CUSTOM_NODE_PACK_SUFFIX = "__invokeai-custom-node"
-
 
 class InvalidVersionError(ValueError):
     pass
