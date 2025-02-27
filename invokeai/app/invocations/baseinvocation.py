@@ -238,6 +238,11 @@ class BaseInvocation(ABC, BaseModel):
         """Gets the invocation's output annotation (i.e. the return annotation of its `invoke()` method)."""
         return signature(cls.invoke).return_annotation
 
+    @classmethod
+    def get_invocation_for_type(cls, invocation_type: str) -> BaseInvocation | None:
+        """Gets the invocation class for a given invocation type."""
+        return cls.get_invocations_map().get(invocation_type)
+
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocation]) -> None:
         """Adds various UI-facing attributes to the invocation's OpenAPI schema."""
