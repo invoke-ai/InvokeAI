@@ -14,6 +14,11 @@ class FluxTextConditioning:
 
 
 @dataclass
+class FluxReduxConditioning:
+    redux_embeddings: torch.Tensor
+
+
+@dataclass
 class FluxRegionalTextConditioning:
     # Concatenated text embeddings.
     # Shape: (1, concatenated_txt_seq_len, 4096)
