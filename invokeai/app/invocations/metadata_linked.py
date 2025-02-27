@@ -361,7 +361,7 @@ class MetadataToIntegerInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Float",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
@@ -377,7 +377,7 @@ class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
     )
-    default_value: int = InputField(description="The default float to use if not found in the metadata")
+    default_value: float = InputField(description="The default float to use if not found in the metadata")
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
