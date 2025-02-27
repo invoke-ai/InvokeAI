@@ -10,7 +10,7 @@ import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInva
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useRef } from 'react';
 
 import { InputFieldRenderer } from './InputFieldRenderer';
 import { InputFieldTitle } from './InputFieldTitle';
@@ -85,45 +85,36 @@ const directFieldSx: SystemStyleObject = {
   '&[data-is-connected="true"]': {
     pointerEvents: 'none',
   },
+  // The action buttons are hidden by default and shown on hover
+  '& .direct-field-action-buttons': {
+    display: 'none',
+  },
+  _hover: {
+    '& .direct-field-action-buttons': {
+      display: 'inline-flex',
+    },
+  },
 };
 
 const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemplate }: CommonProps) => {
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
-
-  const onMouseEnter = useCallback(() => {
-    setIsHovered(true);
-  }, []);
-
-  const onMouseLeave = useCallback(() => {
-    setIsHovered(false);
-  }, []);
 
   const isDragging = useNodeFieldDnd({ nodeId, fieldName }, fieldTemplate, draggableRef, dragHandleRef);
 
   return (
     <InputFieldWrapper>
-      <Flex
-        ref={draggableRef}
-        sx={directFieldSx}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        data-is-connected={isConnected}
-        data-is-dragging={isDragging}
-      >
+      <Flex ref={draggableRef} sx={directFieldSx} data-is-connected={isConnected} data-is-dragging={isDragging}>
         <Flex gap={1}>
           <Flex className={NO_DRAG_CLASS} ref={dragHandleRef}>
             <InputFieldTitle nodeId={nodeId} fieldName={fieldName} isInvalid={isInvalid} isDragging={isDragging} />
           </Flex>
           <Spacer />
-          {isHovered && (
-            <>
-              <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
-              <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
-              <InputFieldAddToFormRoot nodeId={nodeId} fieldName={fieldName} />
-            </>
-          )}
+          <Flex className="direct-field-action-buttons">
+            <InputFieldDescriptionPopover nodeId={nodeId} fieldName={fieldName} />
+            <InputFieldResetToDefaultValueIconButton nodeId={nodeId} fieldName={fieldName} />
+            <InputFieldAddToFormRoot nodeId={nodeId} fieldName={fieldName} />
+          </Flex>
         </Flex>
         <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
       </Flex>

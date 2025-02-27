@@ -699,7 +699,6 @@
             "batchNodeEmptyCollection": "Alcuni nodi lotto hanno raccolte vuote",
             "emptyBatches": "lotti vuoti",
             "batchNodeCollectionSizeMismatch": "Le dimensioni della raccolta nel Lotto {{batchGroupId}} non corrispondono",
-            "invalidBatchConfigurationCannotCalculate": "Configurazione lotto non valida; impossibile calcolare",
             "collectionStringTooShort": "troppo corto, minimo {{minLength}}",
             "collectionNumberNotMultipleOf": "{{value}} non è multiplo di {{multipleOf}}",
             "collectionNumberLTMin": "{{value}} < {{minimum}} (incr min)",
@@ -2174,7 +2173,11 @@
         "pasteToCanvas": "Tela",
         "pasteToCanvasDesc": "Nuovo livello (nella Tela)",
         "pastedTo": "Incollato su {{destination}}",
-        "regionCopiedToClipboard": "{{region}} Copiato negli appunti"
+        "regionCopiedToClipboard": "{{region}} Copiato negli appunti",
+        "errors": {
+            "unableToFindImage": "Impossibile trovare l'immagine",
+            "unableToLoadImage": "Impossibile caricare l'immagine"
+        }
     },
     "ui": {
         "tabs": {

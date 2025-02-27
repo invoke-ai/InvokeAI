@@ -2,8 +2,9 @@ import type { ToastId } from '@invoke-ai/ui-library';
 import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
-import { workflowIDChanged, workflowSaved } from 'features/nodes/store/workflowSlice';
+import { formFieldInitialValuesChanged, workflowIDChanged, workflowSaved } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/useGetFormInitialValues';
 import { workflowUpdated } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,7 @@ export const isWorkflowWithID = (workflow: WorkflowV3): workflow is SetRequired<
 export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const getFormFieldInitialValues = useGetFormFieldInitialValues();
   const [updateWorkflow, updateWorkflowResult] = useUpdateWorkflowMutation();
   const [createWorkflow, createWorkflowResult] = useCreateWorkflowMutation();
   const toast = useToast();
@@ -48,6 +50,8 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
         dispatch(workflowIDChanged(data.workflow.id));
       }
       dispatch(workflowSaved());
+      // When a workflow is saved, the form field initial values are updated to the current form field values
+      dispatch(formFieldInitialValuesChanged({ formFieldInitialValues: getFormFieldInitialValues() }));
       toast.update(toastRef.current, {
         title: t('workflows.workflowSaved'),
         status: 'success',
@@ -69,7 +73,7 @@ export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {
         toast.close(toastRef.current);
       }
     }
-  }, [updateWorkflow, dispatch, toast, t, createWorkflow]);
+  }, [toast, t, dispatch, getFormFieldInitialValues, updateWorkflow, createWorkflow]);
   return {
     saveWorkflow,
     isLoading: updateWorkflowResult.isLoading || createWorkflowResult.isLoading,

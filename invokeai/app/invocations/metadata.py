@@ -284,6 +284,7 @@ class CoreMetadataInvocation(BaseInvocation):
     tags=["metadata"],
     category="metadata",
     version="1.0.0",
+    classification=Classification.Deprecated,
 )
 class MetadataFieldExtractorInvocation(BaseInvocation):
     """Extracts the text value from an image's metadata given a key.

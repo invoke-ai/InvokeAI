@@ -36,6 +36,7 @@ from invokeai.app.api.routers import (
     workflows,
 )
 from invokeai.app.api.sockets import SocketIO
+from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.devices import TorchDevice
@@ -62,6 +63,11 @@ loop = asyncio.new_event_loop()
 # We may change the port if the default is in use, this global variable is used to store the port so that we can log
 # the correct port when the server starts in the lifespan handler.
 port = app_config.port
+
+# Load custom nodes. This must be done after importing the Graph class, which itself imports all modules from the
+# invocations module. The ordering here is implicit, but important - we want to load custom nodes after all the
+# core nodes have been imported so that we can catch when a custom node clobbers a core node.
+load_custom_nodes(custom_nodes_path=app_config.custom_nodes_path)
 
 
 @asynccontextmanager

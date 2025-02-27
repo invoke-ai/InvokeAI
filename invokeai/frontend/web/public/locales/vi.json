@@ -63,7 +63,7 @@
         "compareImage": "So Sánh Ảnh",
         "compareHelp4": "Nhấn <Kbd>Z</Kbd> hoặc <Kbd>Esc</Kbd> để thoát.",
         "compareHelp3": "Nhấn <Kbd>C</Kbd> để đổi ảnh được so sánh.",
-        "compareHelp1": "Giữ <Kbd>Alt</Kbd> khi bấm vào ảnh trong thư viện hoặc dùng phím mũi tên để đổi ảnh dùng cho so sánh.",
+        "compareHelp1": "Giữ <Kbd>Alt</Kbd> khi bấm vào ảnh trong thư viện ảnh hoặc dùng phím mũi tên để đổi ảnh dùng cho so sánh.",
         "showArchivedBoards": "Hiển Thị Bảng Được Lưu Trữ",
         "drop": "Thả",
         "copy": "Sao Chép",
@@ -76,11 +76,11 @@
         "deleteImagePermanent": "Ảnh đã xoá không thể phục hồi.",
         "exitSearch": "Thoát Tìm Kiếm Hình Ảnh",
         "exitBoardSearch": "Thoát Tìm Kiểm Bảng",
-        "gallery": "Thư Viện",
+        "gallery": "Thư Viện Ảnh",
         "galleryImageSize": "Kích Thước Ảnh",
         "downloadSelection": "Tải xuống Phần Được Lựa Chọn",
         "bulkDownloadRequested": "Chuẩn Bị Tải Xuống",
-        "unableToLoad": "Không Thể Tải Thư viện",
+        "unableToLoad": "Không Thể Tải Thư viện Ảnh",
         "newestFirst": "Mới Nhất Trước",
         "showStarredImagesFirst": "Hiển Thị Ảnh Gắn Sao Trước",
         "bulkDownloadRequestedDesc": "Yêu cầu tải xuống đang được chuẩn bị. Vui lòng chờ trong giây lát.",
@@ -103,7 +103,7 @@
         "displaySearch": "Tìm Kiếm Hình Ảnh",
         "selectAnImageToCompare": "Chọn Ảnh Để So Sánh",
         "slider": "Thanh Trượt",
-        "gallerySettings": "Cài Đặt Thư Viện",
+        "gallerySettings": "Cài Đặt Thư Viện Ảnh",
         "image": "hình ảnh",
         "noImageSelected": "Không Có Ảnh Được Chọn",
         "noImagesInGallery": "Không Có Ảnh Để Hiển Thị",
@@ -117,7 +117,7 @@
         "unstarImage": "Ngừng Gắn Sao Cho Ảnh",
         "compareHelp2": "Nhấn <Kbd>M</Kbd> để tuần hoàn trong chế độ so sánh.",
         "boardsSettings": "Thiết Lập Bảng",
-        "imagesSettings": "Cài Đặt Thư Viện Ảnh",
+        "imagesSettings": "Cài Đặt Ảnh Trong Thư Viện Ảnh",
         "assets": "Tài Nguyên"
     },
     "common": {
@@ -230,7 +230,10 @@
         "max": "Tối Đa",
         "resetToDefaults": "Đặt Lại Về Mặc Định",
         "seed": "Hạt Giống",
-        "combinatorial": "Tổ Hợp"
+        "combinatorial": "Tổ Hợp",
+        "column": "Cột",
+        "layout": "Bố Cục",
+        "row": "Hàng"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -285,7 +288,7 @@
         "cancelBatch": "Huỷ Bỏ Lô",
         "status": "Trạng Thái",
         "pending": "Đang Chờ",
-        "gallery": "Thư Viện",
+        "gallery": "Thư Viện Ảnh",
         "front": "trước",
         "batch": "Lô",
         "origin": "Nguồn Gốc",
@@ -305,10 +308,13 @@
         "graphQueued": "Đồ Thị Đã Vào Hàng",
         "batchQueuedDesc_other": "Thêm {{count}} phiên vào {{direction}} của hàng",
         "batchSize": "Kích Thước Lô",
-        "cancelAllExceptCurrentQueueItemAlertDialog": "Huỷ tất cả mục đang xếp hàng ngoại trừ mục hiện tại, sẽ dừng các mục đang chờ nhưng cho phép các mục đang chạy được hoàn tất.",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Huỷ tất cả mục đang xếp hàng ngoại trừ việc nó sẽ dừng các mục đang chờ nhưng cho phép các mục đang chạy được hoàn tất.",
         "cancelAllExceptCurrentQueueItemAlertDialog2": "Bạn có chắc muốn huỷ tất cả mục đang chờ?",
         "cancelAllExceptCurrentTooltip": "Huỷ Bỏ Tất Cả Ngoại Trừ Mục Hiện Tại",
-        "confirm": "Đồng Ý"
+        "confirm": "Đồng Ý",
+        "retrySucceeded": "Mục Đã Thử Lại",
+        "retryFailed": "Có Vấn Đề Khi Thử Lại Mục",
+        "retryItem": "Thử Lại Mục"
     },
     "hotkeys": {
         "canvas": {
@@ -514,16 +520,16 @@
         },
         "gallery": {
             "galleryNavRight": {
-                "desc": "Sang phải theo mạng lưới thư viện, chọn hình ảnh đó. Nếu đến cuối hàng, qua hàng tiếp theo. Nếu đến hình ảnh cuối cùng, qua trang tiếp theo.",
+                "desc": "Sang phải theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu đến cuối hàng, qua hàng tiếp theo. Nếu đến hình ảnh cuối cùng, qua trang tiếp theo.",
                 "title": "Sang Phải"
             },
             "galleryNavDown": {
                 "title": "Đi Xuống",
-                "desc": "Đi xuống theo mạng lưới thư viện, chọn hình ảnh đó. Nếu xuống cuối cùng trang, sang trang tiếp theo."
+                "desc": "Đi xuống theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu xuống cuối cùng trang, sang trang tiếp theo."
             },
             "galleryNavLeft": {
                 "title": "Sang Trái",
-                "desc": "Sang trái theo mạng lưới thư viện, chọn hình ảnh đó. Nếu đến đầu hàng, về lại hàng trước đó. Nếu đến hình ảnh đầu tiên, về lại trang trước đó."
+                "desc": "Sang trái theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu đến đầu hàng, về lại hàng trước đó. Nếu đến hình ảnh đầu tiên, về lại trang trước đó."
             },
             "galleryNavUpAlt": {
                 "title": "Đi Lên (So Sánh Ảnh)",
@@ -535,7 +541,7 @@
             },
             "galleryNavUp": {
                 "title": "Đi Lên",
-                "desc": "Đi lên theo mạng lưới thư viện, chọn hình ảnh đó. Nếu lên trên cùng trang, về lại trang trước đó."
+                "desc": "Đi lên theo mạng lưới thư viện ảnh, chọn hình ảnh đó. Nếu lên trên cùng trang, về lại trang trước đó."
             },
             "galleryNavRightAlt": {
                 "title": "Sang Phải (So Sánh Ảnh)",
@@ -545,7 +551,7 @@
                 "title": "Chọn Tất Cả Trên Trang",
                 "desc": "Chọn tất cả ảnh trên trang hiện tại."
             },
-            "title": "Thư Viện",
+            "title": "Thư Viện Ảnh",
             "galleryNavDownAlt": {
                 "title": "Đi Xuống (So Sánh Ảnh)",
                 "desc": "Giống với \"Đi Xuống\", nhưng là chọn ảnh được so sánh, mở chế độ so sánh nếu chưa được mở."
@@ -964,7 +970,7 @@
         "versionUnknown": " Phiên Bản Không Rõ",
         "workflowContact": "Thông Tin Liên Lạc",
         "workflowName": "Tên",
-        "saveToGallery": "Lưu Vào Thư Viện",
+        "saveToGallery": "Lưu Vào Thư Viện Ảnh",
         "connectionWouldCreateCycle": "Kết nối này sẽ tạo ra vòng lặp",
         "addNode": "Thêm Node",
         "unsupportedAnyOfLength": "quá nhiều dữ liệu hợp nhất: {{count}}",
@@ -995,7 +1001,16 @@
         "generatorLoading": "đang tải",
         "generatorLoadFromFile": "Tải Từ Tệp",
         "dynamicPromptsRandom": "Dynamic Prompts (Ngẫu Nhiên)",
-        "dynamicPromptsCombinatorial": "Dynamic Prompts (Tổ Hợp)"
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Tổ Hợp)",
+        "missingSourceOrTargetNode": "Thiếu nguồn hoặc node mục tiêu",
+        "missingSourceOrTargetHandle": "Thiếu nguồn hoặc mục tiêu xử lý",
+        "deletedMissingNodeFieldFormElement": "Xóa vùng nhập bị thiếu: vùng {{fieldName}} của node {{nodeId}}",
+        "description": "Mô Tả",
+        "loadWorkflowDesc": "Tải workflow?",
+        "loadWorkflowDesc2": "Workflow hiện tại của bạn có những điều chỉnh chưa được lưu.",
+        "loadingTemplates": "Đang Tải {{name}}",
+        "nodeName": "Tên Node",
+        "unableToUpdateNode": "Cập nhật node thất bại: node {{node}} thuộc dạng {{type}} (có thể cần xóa và tạo lại)"
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -1479,8 +1494,7 @@
             "batchNodeCollectionSizeMismatch": "Kích cỡ tài nguyên không phù hợp với Lô {{batchGroupId}}",
             "emptyBatches": "lô trống",
             "batchNodeNotConnected": "Node Hàng Loạt chưa được kết nối: {{label}}",
-            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng",
-            "invalidBatchConfigurationCannotCalculate": "Thiết lập lô không hợp lệ; không thể tính toán"
+            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -1582,14 +1596,14 @@
         "clearIntermediates": "Dọn Sạch Sản Phẩm Trung Gian",
         "clearIntermediatesDisabled": "Hàng đợi phải trống để dọn dẹp các sản phẩm trung gian",
         "clearIntermediatesDesc1": "Dọn dẹp các sản phẩm trung gian sẽ làm mới trạng thái của Canvas và ControlNet.",
-        "clearIntermediatesDesc2": "Các sản phẩm ảnh trung gian là sản phẩm phụ trong quá trình tạo sinh, khác với ảnh trong thư viện. Xoá sản phẩm trung gian sẽ giúp làm trống ổ đĩa.",
+        "clearIntermediatesDesc2": "Các sản phẩm ảnh trung gian là sản phẩm phụ trong quá trình tạo sinh, khác với ảnh trong thư viện ảnh. Xoá sản phẩm trung gian sẽ giúp làm trống ổ đĩa.",
         "resetWebUI": "Khởi Động Lại Giao Diện Web",
         "showProgressInViewer": "Hiển Thị Hình Ảnh Đang Xử Lý Trong Trình Xem",
         "ui": "Giao Diện Người Dùng",
-        "clearIntermediatesDesc3": "Ảnh trong thư viện sẽ không bị xoá.",
+        "clearIntermediatesDesc3": "Ảnh trong thư viện ảnh sẽ không bị xoá.",
         "informationalPopoversDisabled": "Hộp Thoại Hỗ Trợ Thông Tin Đã Tắt",
         "resetComplete": "Giao diện web đã được khởi động lại.",
-        "resetWebUIDesc2": "Nếu ảnh không được xuất hiện trong thư viện hoặc điều gì đó không ổn đang diễn ra, hãy thử khởi động lại trước khi báo lỗi trên Github.",
+        "resetWebUIDesc2": "Nếu ảnh không được xuất hiện trong thư viện ảnh hoặc điều gì đó không ổn đang diễn ra, hãy thử khởi động lại trước khi báo lỗi trên Github.",
         "displayInProgress": "Hiển Thị Hình Ảnh Đang Xử Lý",
         "intermediatesClearedFailed": "Có Vấn Đề Khi Dọn Sạch Sản Phẩm Trung Gian",
         "enableInvisibleWatermark": "Bật Chế Độ Ẩn Watermark",
@@ -1617,7 +1631,7 @@
         "width": "Chiều Rộng",
         "negativePrompt": "Lệnh Tiêu Cực",
         "removeBookmark": "Bỏ Đánh Dấu",
-        "saveBboxToGallery": "Lưu Hộp Giới Hạn Vào Thư Viện",
+        "saveBboxToGallery": "Lưu Hộp Giới Hạn Vào Thư Viện Ảnh",
         "global": "Toàn Vùng",
         "pullBboxIntoReferenceImageError": "Có Vấn Đề Khi Chuyển Hộp Giới Hạn Thành Ảnh Mẫu",
         "clearHistory": "Xoá Lịch Sử",
@@ -1625,12 +1639,12 @@
         "mergeVisibleOk": "Đã gộp layer",
         "saveLayerToAssets": "Lưu Layer Vào Khu Tài Nguyên",
         "canvas": "Canvas",
-        "savedToGalleryOk": "Đã Lưu Vào Thư Viện",
+        "savedToGalleryOk": "Đã Lưu Vào Thư Viện Ảnh",
         "addGlobalReferenceImage": "Thêm $t(controlLayers.globalReferenceImage)",
         "clipToBbox": "Chuyển Nét Thành Hộp Giới Hạn",
         "moveToFront": "Chuyển Lên Trước",
         "mergeVisible": "Gộp Layer Đang Hiển Thị",
-        "savedToGalleryError": "Lỗi khi lưu vào thư viện",
+        "savedToGalleryError": "Lỗi khi lưu vào thư viện ảnh",
         "moveToBack": "Chuyển Về Sau",
         "moveBackward": "Chuyển Xuống Cuối",
         "newGlobalReferenceImageError": "Có Vấn Đề Khi Tạo Ảnh Mẫu Toàn Vùng",
@@ -1650,7 +1664,7 @@
         "regional": "Khu Vực",
         "regionIsEmpty": "Vùng được chọn trống",
         "bookmark": "Đánh Dấu Để Đổi Nhanh",
-        "saveCanvasToGallery": "Lưu Canvas Vào Thư Viện",
+        "saveCanvasToGallery": "Lưu Canvas Vào Thư Viện Ảnh",
         "cropLayerToBbox": "Xén Layer Vào Hộp Giới Hạn",
         "mergeDown": "Gộp Xuống",
         "mergeVisibleError": "Lỗi khi gộp layer",
@@ -1718,11 +1732,11 @@
         "pullBboxIntoLayer": "Chuyển Hộp Giới Hạn Vào Layer",
         "addInpaintMask": "Thêm $t(controlLayers.inpaintMask)",
         "addRegionalGuidance": "Thêm $t(controlLayers.regionalGuidance)",
-        "sendToGallery": "Chuyển Tới Thư Viện",
+        "sendToGallery": "Đã Chuyển Tới Thư Viện Ảnh",
         "unlocked": "Mở Khoá",
         "addReferenceImage": "Thêm $t(controlLayers.referenceImage)",
         "sendingToCanvas": "Chuyển Ảnh Tạo Sinh Vào Canvas",
-        "sendingToGallery": "Chuyển Ảnh Tạo Sinh Vào Thư Viện",
+        "sendingToGallery": "Chuyển Ảnh Tạo Sinh Vào Thư Viện Ảnh",
         "viewProgressOnCanvas": "Xem quá trình xử lý và ảnh đầu ra trong <Btn>Canvas</Btn>.",
         "inpaintMask_withCount_other": "Lớp Phủ Inpaint",
         "regionalGuidance_withCount_other": "Chỉ Dẫn Khu Vực",
@@ -1733,7 +1747,7 @@
         "copyRasterLayerTo": "Sao Chép $t(controlLayers.rasterLayer) Tới",
         "copyControlLayerTo": "Sao Chép $t(controlLayers.controlLayer) Tới",
         "newRegionalGuidance": "$t(controlLayers.regionalGuidance) Mới",
-        "newGallerySessionDesc": "Nó sẽ dọn sạch canvas và các thiết lập trừ model được chọn. Các ảnh được tạo sinh sẽ được chuyển đến thư viện.",
+        "newGallerySessionDesc": "Nó sẽ dọn sạch canvas và các thiết lập trừ model được chọn. Các ảnh được tạo sinh sẽ được chuyển đến thư viện ảnh.",
         "stagingOnCanvas": "Hiển thị hình ảnh lên",
         "pullBboxIntoReferenceImage": "Chuyển Hộp Giới Hạn Vào Ảnh Mẫu",
         "maskFill": "Lấp Đầy Lớp Phủ",
@@ -1755,8 +1769,8 @@
         "deleteReferenceImage": "Xoá Ảnh Mẫu",
         "inpaintMasks_withCount_visible": "Lớp Phủ Inpaint ({{count}})",
         "disableTransparencyEffect": "Tắt Hiệu Ứng Trong Suốt",
-        "newGallerySession": "Phiên Thư Viện Mới",
-        "sendToGalleryDesc": "Bấm 'Kích Hoạt' sẽ tiến hành tạo sinh và lưu ảnh vào thư viện.",
+        "newGallerySession": "Phiên Thư Viện Ảnh Mới",
+        "sendToGalleryDesc": "Bấm 'Kích Hoạt' sẽ tiến hành tạo sinh và lưu ảnh vào thư viện ảnh.",
         "opacity": "Độ Mờ Đục",
         "rectangle": "Hình Chữ Nhật",
         "addNegativePrompt": "Thêm $t(controlLayers.negativePrompt)",
@@ -1791,13 +1805,13 @@
             "process": "Xử Lý"
         },
         "canvasContextMenu": {
-            "saveBboxToGallery": "Lưu Hộp Giới Hạn Vào Thư Viện",
+            "saveBboxToGallery": "Lưu Hộp Giới Hạn Vào Thư Viện Ảnh",
             "newGlobalReferenceImage": "Ảnh Mẫu Toàn Vùng Mới",
             "cropCanvasToBbox": "Xén Canvas Vào Hộp Giới Hạn",
             "newRegionalGuidance": "Chỉ Dẫn Khu Vực Mới",
-            "saveToGalleryGroup": "Lưu Vào Thư Viện",
+            "saveToGalleryGroup": "Lưu Vào Thư Viện Ảnh",
             "newInpaintMask": "Lớp Phủ Inpaint Mới",
-            "saveCanvasToGallery": "Lưu Canvas Vào Thư Viện",
+            "saveCanvasToGallery": "Lưu Canvas Vào Thư Viện Ảnh",
             "newRegionalReferenceImage": "Ảnh Mẫu Khu Vực Mới",
             "newControlLayer": "Layer Điều Khiển Được Mới",
             "newRasterLayer": "Layer Dạng Raster Mới",
@@ -1808,7 +1822,7 @@
             "copyBboxToClipboard": "Sao Chép Hộp Giới Hạn Vào Clipboard"
         },
         "stagingArea": {
-            "saveToGallery": "Lưu Vào Thư Viện",
+            "saveToGallery": "Lưu Vào Thư Viện Ảnh",
             "accept": "Chấp Nhận",
             "discard": "Bỏ Đi",
             "previous": "Trước",
@@ -2090,7 +2104,7 @@
         "enableLogging": "Bật Chế Độ Ghi Log",
         "logNamespaces": {
             "models": "Models",
-            "gallery": "Thư Viện",
+            "gallery": "Thư Viện Ảnh",
             "config": "Cấu Hình",
             "queue": "Queue",
             "workflows": "Workflow",
@@ -2178,7 +2192,7 @@
     },
     "ui": {
         "tabs": {
-            "gallery": "Thư Viện",
+            "gallery": "Thư Viện Ảnh",
             "models": "Models",
             "generation": "Generation (Máy Tạo Sinh)",
             "upscaling": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)",
@@ -2210,7 +2224,7 @@
         "savingWorkflow": "Đang Lưu Workflow...",
         "ascending": "Tăng Dần",
         "loading": "Đang Tải Workflow",
-        "chooseWorkflowFromLibrary": "Chọn Workflow Từ Túi Đồ",
+        "chooseWorkflowFromLibrary": "Chọn Workflow Từ Thư Viện",
         "workflows": "Workflow",
         "copyShareLinkForWorkflow": "Sao Chép Liên Kết Chia Sẻ Cho Workflow",
         "openWorkflow": "Mở Workflow",
@@ -2230,11 +2244,38 @@
         "convertGraph": "Chuyển Đổi Đồ Thị",
         "saveWorkflowToProject": "Lưu Workflow Vào Dự Án",
         "workflowName": "Tên Workflow",
-        "workflowLibrary": "Túi Đồ",
+        "workflowLibrary": "Thư Viện",
         "opened": "Ngày Mở",
         "deleteWorkflow": "Xoá Workflow",
         "workflowEditorMenu": "Menu Biên Tập Viên Workflow",
-        "uploadAndSaveWorkflow": "Tải Lên Túi Đồ"
+        "uploadAndSaveWorkflow": "Tải Lên Thư Viện",
+        "openLibrary": "Mở Thư Viện",
+        "builder": {
+            "resetAllNodeFields": "Khởi Động Lại Tất Cả Vùng Cho Node",
+            "builder": "Trình Tạo Vùng Nhập",
+            "layout": "Bố Cục",
+            "row": "Hàng",
+            "zoomToNode": "Phóng To Vào Node",
+            "addToForm": "Thêm Vào Vùng Nhập",
+            "label": "Nhãn Tên",
+            "showDescription": "Hiện Dòng Mô Tả",
+            "component": "Thành Phần",
+            "numberInput": "Nhập Số",
+            "singleLine": "Một Dòng",
+            "multiLine": "Nhiều Dòng",
+            "slider": "Thanh Trượt",
+            "both": "Cả Hai",
+            "emptyRootPlaceholderViewMode": "Chọn Chỉnh Sửa để bắt đầu tạo nên một vùng nhập cho workflow này.",
+            "emptyRootPlaceholderEditMode": "Kéo thành phần vùng nhập hoặc vùng cho node vào đây để bắt đầu.",
+            "containerPlaceholder": "Hộp Chứa Trống",
+            "headingPlaceholder": "Đầu Dòng Trống",
+            "textPlaceholder": "Mô Tả Trống",
+            "column": "Cột",
+            "deleteAllElements": "Xóa Tất Cả Thành Phần Vùng Nhập",
+            "nodeField": "Vùng Cho Node",
+            "nodeFieldTooltip": "Để thêm vùng cho node, bấm vào dấu cộng nhỏ trên vùng trong Vùng Biên Tập Workflow, hoặc kéo vùng theo tên của nó vào vùng nhập.",
+            "workflowBuilderAlphaWarning": "Trình tạo workflow đang trong giai đoạn alpha. Nó có thể xuất hiện những thay đổi đột ngột trước khi chính thức được phát hành."
+        }
     },
     "upscaling": {
         "missingUpscaleInitialImage": "Thiếu ảnh dùng để upscale",
@@ -2257,9 +2298,9 @@
         "incompatibleBaseModelDesc": "Upscale chỉ hỗ trợ cho model phiên bản SD1.5 và SDXL. Đổi model chính để bật lại tính năng upscale."
     },
     "newUserExperience": {
-        "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStartedLocal": "Để bắt đầu, hãy chắc chắn đã tải xuống hoặc thêm vào model cần để chạy Invoke. Sau đó, nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện Ảnh</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Cần thêm hướng dẫn? Xem thử <LinkComponent>Bắt Đầu Làm Quen</LinkComponent> để biết thêm mẹo khai thác toàn bộ tiềm năng của Invoke Studio.",
-        "toGetStarted": "Để bắt đầu, hãy nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStarted": "Để bắt đầu, hãy nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện Ảnh</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
         "noModelsInstalled": "Dường như bạn chưa tải model nào cả! Bạn có thể <DownloadStarterModelsButton>tải xuống các model khởi đầu</DownloadStarterModelsButton> hoặc <ImportModelsButton>nhập vào thêm model</ImportModelsButton>.",
         "lowVRAMMode": "Cho hiệu suất tốt nhất, hãy làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi."
     },
@@ -2306,8 +2347,8 @@
                 "title": "Upscale (Nâng Cấp Chất Lượng Hình Ảnh)"
             },
             "howDoIGenerateAndSaveToTheGallery": {
-                "title": "Làm Sao Để Tôi Tạo Sinh Và Lưu Vào Thư Viện?",
-                "description": "Các bước để tạo sinh và lưu ảnh vào thư viện."
+                "title": "Làm Sao Để Tôi Tạo Sinh Và Lưu Vào Thư Viện Ảnh?",
+                "description": "Các bước để tạo sinh và lưu ảnh vào thư viện ảnh."
             },
             "howDoIEditOnTheCanvas": {
                 "description": "Hướng dẫn chỉnh sửa ảnh trực tiếp trên canvas.",

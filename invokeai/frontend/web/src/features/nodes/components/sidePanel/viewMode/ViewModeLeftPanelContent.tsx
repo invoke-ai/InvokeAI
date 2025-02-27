@@ -3,10 +3,10 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { FormElementComponent } from 'features/nodes/components/sidePanel/builder/ContainerElementComponent';
+import { RootContainerElementViewMode } from 'features/nodes/components/sidePanel/builder/ContainerElement';
 import { EmptyState } from 'features/nodes/components/sidePanel/viewMode/EmptyState';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
-import { selectFormRootElementId, selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
+import { selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
 import { t } from 'i18next';
 import { memo } from 'react';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
@@ -25,7 +25,6 @@ ViewModeLeftPanelContent.displayName = 'ViewModeLeftPanelContent';
 const ViewModeLeftPanelContentInner = memo(() => {
   const { isLoading } = useGetOpenAPISchemaQuery();
   const loadedTemplates = useStore($hasTemplates);
-  const rootElementId = useAppSelector(selectFormRootElementId);
   const isFormEmpty = useAppSelector(selectIsFormEmpty);
 
   if (isLoading || !loadedTemplates) {
@@ -37,8 +36,8 @@ const ViewModeLeftPanelContentInner = memo(() => {
   }
 
   return (
-    <Flex flexDir="column" w="full" maxW="768px">
-      <FormElementComponent id={rootElementId} />
+    <Flex w="full" h="full" justifyContent="center">
+      <RootContainerElementViewMode />
     </Flex>
   );
 });

@@ -265,7 +265,11 @@ class ImageService(ImageServiceABC):
 
     def delete_images_on_board(self, board_id: str):
         try:
-            image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
+            image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
+                board_id,
+                categories=None,
+                is_intermediate=None,
+            )
             for image_name in image_names:
                 self.__invoker.services.image_files.delete(image_name)
             self.__invoker.services.image_records.delete_many(image_names)
@@ -278,7 +282,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Failed to delete image files")
             raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem deleting image records and files")
+            self.__invoker.services.logger.error(f"Problem deleting image records and files: {str(e)}")
             raise e
 
     def delete_intermediates(self) -> int:

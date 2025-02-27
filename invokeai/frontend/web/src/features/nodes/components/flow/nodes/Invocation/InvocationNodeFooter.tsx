@@ -1,5 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
+import { useIsExecutableNode } from 'features/nodes/hooks/useIsBatchNode';
 import { useNodeHasImageOutput } from 'features/nodes/hooks/useNodeHasImageOutput';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -16,6 +17,7 @@ const props: ChakraProps = { w: 'unset' };
 
 const InvocationNodeFooter = ({ nodeId }: Props) => {
   const hasImageOutput = useNodeHasImageOutput(nodeId);
+  const isExecutableNode = useIsExecutableNode(nodeId);
   const isCacheEnabled = useFeatureStatus('invocationCache');
   return (
     <Flex
@@ -30,8 +32,8 @@ const InvocationNodeFooter = ({ nodeId }: Props) => {
       justifyContent="space-between"
     >
       <FormControlGroup formControlProps={props} formLabelProps={props}>
-        {isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
-        {hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
+        {isExecutableNode && isCacheEnabled && <UseCacheCheckbox nodeId={nodeId} />}
+        {isExecutableNode && hasImageOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
       </FormControlGroup>
     </Flex>
   );

@@ -135,6 +135,9 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
         }
       }
       if (fieldTemplate.type.name === 'BoardField' && input.value && isBoardFieldInputInstance(input)) {
+        if (input.value === 'none' || input.value === 'auto') {
+          continue;
+        }
         const hasAccess = await checkBoardAccess(input.value.board_id);
         if (!hasAccess) {
           const message = t('nodes.boardAccessError', { board_id: input.value.board_id });

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
@@ -44,46 +46,46 @@ def test_create_sessions_from_batch_with_runs(batch_data_collection, batch_graph
     # 2 list[BatchDatum] * length 2 * 2 runs = 8
     assert len(t) == 8
 
-    assert t[0][0].graph.get_node("1").prompt == "Banana sushi"
-    assert t[0][0].graph.get_node("2").prompt == "Strawberry sushi"
-    assert t[0][0].graph.get_node("3").prompt == "Orange sushi"
-    assert t[0][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[0][1])["graph"]["nodes"]["1"]["prompt"] == "Banana sushi"
+    assert json.loads(t[0][1])["graph"]["nodes"]["2"]["prompt"] == "Strawberry sushi"
+    assert json.loads(t[0][1])["graph"]["nodes"]["3"]["prompt"] == "Orange sushi"
+    assert json.loads(t[0][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
-    assert t[1][0].graph.get_node("1").prompt == "Banana sushi"
-    assert t[1][0].graph.get_node("2").prompt == "Strawberry sushi"
-    assert t[1][0].graph.get_node("3").prompt == "Apple sushi"
-    assert t[1][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[1][1])["graph"]["nodes"]["1"]["prompt"] == "Banana sushi"
+    assert json.loads(t[1][1])["graph"]["nodes"]["2"]["prompt"] == "Strawberry sushi"
+    assert json.loads(t[1][1])["graph"]["nodes"]["3"]["prompt"] == "Apple sushi"
+    assert json.loads(t[1][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
-    assert t[2][0].graph.get_node("1").prompt == "Grape sushi"
-    assert t[2][0].graph.get_node("2").prompt == "Blueberry sushi"
-    assert t[2][0].graph.get_node("3").prompt == "Orange sushi"
-    assert t[2][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[2][1])["graph"]["nodes"]["1"]["prompt"] == "Grape sushi"
+    assert json.loads(t[2][1])["graph"]["nodes"]["2"]["prompt"] == "Blueberry sushi"
+    assert json.loads(t[2][1])["graph"]["nodes"]["3"]["prompt"] == "Orange sushi"
+    assert json.loads(t[2][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
-    assert t[3][0].graph.get_node("1").prompt == "Grape sushi"
-    assert t[3][0].graph.get_node("2").prompt == "Blueberry sushi"
-    assert t[3][0].graph.get_node("3").prompt == "Apple sushi"
-    assert t[3][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[3][1])["graph"]["nodes"]["1"]["prompt"] == "Grape sushi"
+    assert json.loads(t[3][1])["graph"]["nodes"]["2"]["prompt"] == "Blueberry sushi"
+    assert json.loads(t[3][1])["graph"]["nodes"]["3"]["prompt"] == "Apple sushi"
+    assert json.loads(t[3][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
     # repeat for second run
-    assert t[4][0].graph.get_node("1").prompt == "Banana sushi"
-    assert t[4][0].graph.get_node("2").prompt == "Strawberry sushi"
-    assert t[4][0].graph.get_node("3").prompt == "Orange sushi"
-    assert t[4][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[4][1])["graph"]["nodes"]["1"]["prompt"] == "Banana sushi"
+    assert json.loads(t[4][1])["graph"]["nodes"]["2"]["prompt"] == "Strawberry sushi"
+    assert json.loads(t[4][1])["graph"]["nodes"]["3"]["prompt"] == "Orange sushi"
+    assert json.loads(t[4][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
-    assert t[5][0].graph.get_node("1").prompt == "Banana sushi"
-    assert t[5][0].graph.get_node("2").prompt == "Strawberry sushi"
-    assert t[5][0].graph.get_node("3").prompt == "Apple sushi"
-    assert t[5][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[5][1])["graph"]["nodes"]["1"]["prompt"] == "Banana sushi"
+    assert json.loads(t[5][1])["graph"]["nodes"]["2"]["prompt"] == "Strawberry sushi"
+    assert json.loads(t[5][1])["graph"]["nodes"]["3"]["prompt"] == "Apple sushi"
+    assert json.loads(t[5][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
-    assert t[6][0].graph.get_node("1").prompt == "Grape sushi"
-    assert t[6][0].graph.get_node("2").prompt == "Blueberry sushi"
-    assert t[6][0].graph.get_node("3").prompt == "Orange sushi"
-    assert t[6][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[6][1])["graph"]["nodes"]["1"]["prompt"] == "Grape sushi"
+    assert json.loads(t[6][1])["graph"]["nodes"]["2"]["prompt"] == "Blueberry sushi"
+    assert json.loads(t[6][1])["graph"]["nodes"]["3"]["prompt"] == "Orange sushi"
+    assert json.loads(t[6][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
-    assert t[7][0].graph.get_node("1").prompt == "Grape sushi"
-    assert t[7][0].graph.get_node("2").prompt == "Blueberry sushi"
-    assert t[7][0].graph.get_node("3").prompt == "Apple sushi"
-    assert t[7][0].graph.get_node("4").prompt == "Nissan"
+    assert json.loads(t[7][1])["graph"]["nodes"]["1"]["prompt"] == "Grape sushi"
+    assert json.loads(t[7][1])["graph"]["nodes"]["2"]["prompt"] == "Blueberry sushi"
+    assert json.loads(t[7][1])["graph"]["nodes"]["3"]["prompt"] == "Apple sushi"
+    assert json.loads(t[7][1])["graph"]["nodes"]["4"]["prompt"] == "Nissan"
 
 
 def test_create_sessions_from_batch_without_runs(batch_data_collection, batch_graph):
@@ -127,7 +129,7 @@ def test_prepare_values_to_insert(batch_data_collection, batch_graph):
 
     GraphExecutionStateValidator = TypeAdapter(GraphExecutionState)
     # graph should be serialized
-    ges = GraphExecutionStateValidator.validate_json(values[0].session)
+    ges = GraphExecutionStateValidator.validate_json(values[0][1])
 
     # graph values should be populated
     assert ges.graph.get_node("1").prompt == "Banana sushi"
@@ -136,26 +138,26 @@ def test_prepare_values_to_insert(batch_data_collection, batch_graph):
     assert ges.graph.get_node("4").prompt == "Nissan"
 
     # session ids should match deserialized graph
-    assert [v.session_id for v in values] == [GraphExecutionStateValidator.validate_json(v.session).id for v in values]
+    assert [v[2] for v in values] == [GraphExecutionStateValidator.validate_json(v[1]).id for v in values]
 
     # should unique session ids
-    sids = [v.session_id for v in values]
+    sids = [v[2] for v in values]
     assert len(sids) == len(set(sids))
 
     NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])
     # should have 3 node field values
-    assert isinstance(values[0].field_values, str)
-    assert len(NodeFieldValueValidator.validate_json(values[0].field_values)) == 3
+    assert isinstance(values[0][4], str)
+    assert len(NodeFieldValueValidator.validate_json(values[0][4])) == 3
 
     # should have batch id and priority
-    assert all(v.batch_id == b.batch_id for v in values)
-    assert all(v.priority == 0 for v in values)
+    assert all(v[3] == b.batch_id for v in values)
+    assert all(v[5] == 0 for v in values)
 
 
 def test_prepare_values_to_insert_with_priority(batch_data_collection, batch_graph):
     b = Batch(graph=batch_graph, data=batch_data_collection, runs=2)
     values = prepare_values_to_insert(queue_id="default", batch=b, priority=1, max_new_queue_items=1000)
-    assert all(v.priority == 1 for v in values)
+    assert all(v[5] == 1 for v in values)
 
 
 def test_prepare_values_to_insert_with_max(batch_data_collection, batch_graph):

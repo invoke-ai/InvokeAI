@@ -21,6 +21,7 @@ import type {
   FluxVAEModelFieldValue,
   ImageFieldCollectionValue,
   ImageFieldValue,
+  ImageGeneratorFieldValue,
   IntegerFieldCollectionValue,
   IntegerFieldValue,
   IntegerGeneratorFieldValue,
@@ -55,6 +56,7 @@ import {
   zFluxVAEModelFieldValue,
   zImageFieldCollectionValue,
   zImageFieldValue,
+  zImageGeneratorFieldValue,
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIntegerGeneratorFieldValue,
@@ -422,6 +424,9 @@ export const nodesSlice = createSlice({
     fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StringGeneratorFieldValue>) => {
       fieldValueReducer(state, action, zStringGeneratorFieldValue);
     },
+    fieldImageGeneratorValueChanged: (state, action: FieldValueAction<ImageGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zImageGeneratorFieldValue);
+    },
     fieldDescriptionChanged: (state, action: PayloadAction<{ nodeId: string; fieldName: string; val?: string }>) => {
       const { nodeId, fieldName, val } = action.payload;
       const field = getField(nodeId, fieldName, state);
@@ -514,6 +519,7 @@ export const {
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
+  fieldImageGeneratorValueChanged,
   fieldDescriptionChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,

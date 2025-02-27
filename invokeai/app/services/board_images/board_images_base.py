@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from invokeai.app.services.image_records.image_records_common import ImageCategory
+
 
 class BoardImagesServiceABC(ABC):
     """High-level service for board-image relationship management."""
@@ -26,6 +28,8 @@ class BoardImagesServiceABC(ABC):
     def get_all_board_image_names_for_board(
         self,
         board_id: str,
+        categories: list[ImageCategory] | None,
+        is_intermediate: bool | None,
     ) -> list[str]:
         """Gets all board images for a board, as a list of the image names."""
         pass

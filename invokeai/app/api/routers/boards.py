@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
+from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -87,7 +88,9 @@ async def delete_board(
     try:
         if include_images is True:
             deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
-                board_id=board_id
+                board_id=board_id,
+                categories=None,
+                is_intermediate=None,
             )
             ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
@@ -98,7 +101,9 @@ async def delete_board(
             )
         else:
             deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
-                board_id=board_id
+                board_id=board_id,
+                categories=None,
+                is_intermediate=None,
             )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
@@ -142,10 +147,14 @@ async def list_boards(
 )
 async def list_all_board_image_names(
     board_id: str = Path(description="The id of the board"),
+    categories: list[ImageCategory] | None = Query(default=None, description="The categories of image to include."),
+    is_intermediate: bool | None = Query(default=None, description="Whether to list intermediate images."),
 ) -> list[str]:
     """Gets a list of images for a board"""
 
     image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
         board_id,
+        categories,
+        is_intermediate,
     )
     return image_names

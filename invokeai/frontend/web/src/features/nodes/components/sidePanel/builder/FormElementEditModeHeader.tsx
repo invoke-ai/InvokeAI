@@ -1,14 +1,16 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, forwardRef, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
+import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
+import { useMouseOverFormField } from 'features/nodes/hooks/useMouseOverNode';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import type { FormElement, NodeFieldElement } from 'features/nodes/types/workflow';
 import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { startCase } from 'lodash-es';
+import type { RefObject } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGpsFixBold, PiXBold } from 'react-icons/pi';
@@ -23,38 +25,49 @@ const sx: SystemStyleObject = {
   alignItems: 'center',
   color: 'base.500',
   bg: 'baseAlpha.250',
+  cursor: 'grab',
   '&[data-depth="0"]': { bg: 'baseAlpha.100' },
   '&[data-depth="1"]': { bg: 'baseAlpha.150' },
   '&[data-depth="2"]': { bg: 'baseAlpha.200' },
+  '&[data-is-dragging="true"]': {
+    opacity: 0.3,
+  },
+  _hover: {
+    bg: 'baseAlpha.300',
+  },
 };
 
-export const FormElementEditModeHeader = memo(
-  forwardRef(({ element }: { element: FormElement }, ref) => {
-    const depth = useDepthContext();
+type Props = Omit<FlexProps, 'sx'> & { element: FormElement; dragHandleRef: RefObject<HTMLDivElement> };
 
-    return (
-      <Flex ref={ref} sx={sx} data-depth={depth}>
-        <Label element={element} />
-        <Spacer />
-        {isContainerElement(element) && <ContainerElementSettings element={element} />}
-        {isNodeFieldElement(element) && <ZoomToNodeButton element={element} />}
-        {isNodeFieldElement(element) && <NodeFieldElementSettings element={element} />}
-        <RemoveElementButton element={element} />
-      </Flex>
-    );
-  })
-);
+export const FormElementEditModeHeader = memo(({ element, dragHandleRef, ...rest }: Props) => {
+  const depth = useDepthContext();
+
+  return (
+    <Flex ref={dragHandleRef} sx={sx} data-depth={depth} {...rest}>
+      <Label element={element} />
+      <Spacer />
+      {isContainerElement(element) && <ContainerElementSettings element={element} />}
+      {isNodeFieldElement(element) && <ZoomToNodeButton element={element} />}
+      {isNodeFieldElement(element) && <NodeFieldElementSettings element={element} />}
+      <RemoveElementButton element={element} />
+    </Flex>
+  );
+});
 FormElementEditModeHeader.displayName = 'FormElementEditModeHeader';
 
 const ZoomToNodeButton = memo(({ element }: { element: NodeFieldElement }) => {
   const { t } = useTranslation();
+  const { nodeId } = element.data.fieldIdentifier;
   const zoomToNode = useZoomToNode();
+  const mouseOverFormField = useMouseOverFormField(nodeId);
   const onClick = useCallback(() => {
-    zoomToNode(element.data.fieldIdentifier.nodeId);
-  }, [element.data.fieldIdentifier.nodeId, zoomToNode]);
+    zoomToNode(nodeId);
+  }, [nodeId, zoomToNode]);
 
   return (
     <IconButton
+      onMouseOver={mouseOverFormField.handleMouseOver}
+      onMouseOut={mouseOverFormField.handleMouseOut}
       tooltip={t('workflows.builder.zoomToNode')}
       aria-label={t('workflows.builder.zoomToNode')}
       onClick={onClick}

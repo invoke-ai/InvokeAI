@@ -1,10 +1,8 @@
 import { CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { GeneratorTextareaWithFileUpload } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/GeneratorTextareaWithFileUpload';
 import type { StringGeneratorDynamicPromptsCombinatorial } from 'features/nodes/types/field';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDynamicPromptsQuery } from 'services/api/endpoints/utilities';
-import { useDebounce } from 'use-debounce';
 
 type StringGeneratorDynamicPromptsCombinatorialSettingsProps = {
   state: StringGeneratorDynamicPromptsCombinatorial;
@@ -13,40 +11,19 @@ type StringGeneratorDynamicPromptsCombinatorialSettingsProps = {
 export const StringGeneratorDynamicPromptsCombinatorialSettings = memo(
   ({ state, onChange }: StringGeneratorDynamicPromptsCombinatorialSettingsProps) => {
     const { t } = useTranslation();
-    const loadingValues = useMemo(() => [`<${t('nodes.generatorLoading')}>`], [t]);
 
     const onChangeInput = useCallback(
       (input: string) => {
-        onChange({ ...state, input, values: loadingValues });
+        onChange({ ...state, input });
       },
-      [onChange, state, loadingValues]
+      [onChange, state]
     );
     const onChangeMaxPrompts = useCallback(
       (v: number) => {
-        onChange({ ...state, maxPrompts: v, values: loadingValues });
+        onChange({ ...state, maxPrompts: v });
       },
-      [onChange, state, loadingValues]
+      [onChange, state]
     );
-
-    const arg = useMemo(() => {
-      return { prompt: state.input, max_prompts: state.maxPrompts, combinatorial: true };
-    }, [state]);
-    const [debouncedArg] = useDebounce(arg, 300);
-
-    const { data, isLoading } = useDynamicPromptsQuery(debouncedArg);
-
-    useEffect(() => {
-      if (isLoading) {
-        return;
-      }
-
-      if (!data) {
-        onChange({ ...state, values: [] });
-        return;
-      }
-
-      onChange({ ...state, values: data.prompts });
-    }, [data, isLoading, onChange, state]);
 
     return (
       <Flex gap={2} flexDir="column">

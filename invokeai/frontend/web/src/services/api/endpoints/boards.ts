@@ -1,7 +1,9 @@
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import queryString from 'query-string';
 import type {
   BoardDTO,
   CreateBoardArg,
+  ImageCategory,
   ListBoardsArgs,
   OffsetPaginatedResults_ImageDTO_,
   UpdateBoardArg,
@@ -47,12 +49,16 @@ export const boardsApi = api.injectEndpoints({
       },
     }),
 
-    listAllImageNamesForBoard: build.query<Array<string>, string>({
-      query: (board_id) => ({
-        url: buildBoardsUrl(`${board_id}/image_names`),
+    listAllImageNamesForBoard: build.query<
+      Array<string>,
+      { board_id: string | 'none'; categories: ImageCategory[] | undefined; is_intermediate: boolean | undefined }
+    >({
+      query: ({ board_id, categories, is_intermediate }) => ({
+        url: buildBoardsUrl(
+          `${board_id}/image_names?${queryString.stringify({ categories, is_intermediate }, { arrayFormat: 'none' })}`
+        ),
       }),
-      providesTags: (result, error, arg) => [{ type: 'ImageNameList', id: arg }, 'FetchOnReconnect'],
-      keepUnusedDataFor: 0,
+      providesTags: (result, error, arg) => [{ type: 'ImageNameList', id: JSON.stringify(arg) }, 'FetchOnReconnect'],
     }),
 
     getBoardImagesTotal: build.query<{ total: number }, string | undefined>({

@@ -265,13 +265,9 @@ class ImageInvocation(BaseInvocation):
     image: ImageField = InputField(description="The image to load")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        image_dto = context.images.get_dto(self.image.image_name)
 
-        return ImageOutput(
-            image=ImageField(image_name=self.image.image_name),
-            width=image.width,
-            height=image.height,
-        )
+        return ImageOutput.build(image_dto=image_dto)
 
 
 @invocation(
