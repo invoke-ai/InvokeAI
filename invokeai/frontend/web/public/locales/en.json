@@ -2301,12 +2301,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Improved VRAM setting defaults",
-            "On-demand model cache clearing",
-            "Expanded FLUX LoRA compatibility",
-            "Canvas Adjust Image filter",
-            "Cancel all but current queue item",
-            "Copy from and paste to Canvas"
+            "Workflow Editor: New drag-and-drop form builder for easier workflow creation.",
+            "Other improvements: Faster batch queuing, better upscaling, improved color picker, and metadata nodes."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
