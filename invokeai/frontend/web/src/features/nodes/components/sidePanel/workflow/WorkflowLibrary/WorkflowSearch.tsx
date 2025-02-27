@@ -1,4 +1,4 @@
-import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowSearchTerm, workflowSearchTermChanged } from 'features/nodes/store/workflowSlice';
 import type { ChangeEvent, KeyboardEvent, RefObject } from 'react';
@@ -46,26 +46,28 @@ export const WorkflowSearch = memo(({ searchInputRef }: { searchInputRef: RefObj
   }, [searchInputRef]);
 
   return (
-    <InputGroup>
-      <Input
-        ref={searchInputRef}
-        placeholder={t('stylePresets.searchByName')}
-        value={searchTerm}
-        onKeyDown={handleKeydown}
-        onChange={handleChange}
-      />
-      {searchTerm && searchTerm.length && (
-        <InputRightElement h="full" pe={2}>
-          <IconButton
-            onClick={clearWorkflowSearch}
-            size="sm"
-            variant="link"
-            aria-label={t('boards.clearSearch')}
-            icon={<PiXBold />}
-          />
-        </InputRightElement>
-      )}
-    </InputGroup>
+    <Flex justifyContent="flex-end" w="300px">
+      <InputGroup>
+        <Input
+          ref={searchInputRef}
+          placeholder={t('stylePresets.searchByName')}
+          value={searchTerm}
+          onKeyDown={handleKeydown}
+          onChange={handleChange}
+        />
+        {searchTerm && searchTerm.length && (
+          <InputRightElement h="full" pe={2}>
+            <IconButton
+              onClick={clearWorkflowSearch}
+              size="sm"
+              variant="link"
+              aria-label={t('boards.clearSearch')}
+              icon={<PiXBold />}
+            />
+          </InputRightElement>
+        )}
+      </InputGroup>
+    </Flex>
   );
 });
 

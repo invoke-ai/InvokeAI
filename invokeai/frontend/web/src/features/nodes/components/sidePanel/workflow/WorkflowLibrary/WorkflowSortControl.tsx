@@ -1,14 +1,4 @@
-import {
-  Flex,
-  FormControl,
-  FormLabel,
-  IconButton,
-  Popover,
-  PopoverBody,
-  PopoverContent,
-  PopoverTrigger,
-  Select,
-} from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $projectId } from 'app/store/nanostores/projectId';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -21,7 +11,6 @@ import {
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiSortAscendingBold, PiSortDescendingBold } from 'react-icons/pi';
 import { z } from 'zod';
 
 const zOrderBy = z.enum(['opened_at', 'created_at', 'updated_at', 'name']);
@@ -83,38 +72,23 @@ export const WorkflowSortControl = () => {
   const defaultOrderBy = projectId !== undefined ? 'opened_at' : 'created_at';
 
   return (
-    <Popover placement="bottom">
-      <PopoverTrigger>
-        <IconButton
-          tooltip={`Sorting by ${ORDER_BY_LABELS[orderBy ?? defaultOrderBy]} ${DIRECTION_LABELS[direction]}`}
-          aria-label="Sort Workflow Library"
-          icon={direction === 'ASC' ? <PiSortAscendingBold /> : <PiSortDescendingBold />}
-          variant="ghost"
-        />
-      </PopoverTrigger>
-
-      <PopoverContent>
-        <PopoverBody>
-          <Flex flexDir="column" gap={4}>
-            <FormControl orientation="horizontal" gap={1}>
-              <FormLabel>{t('common.orderBy')}</FormLabel>
-              <Select value={orderBy ?? defaultOrderBy} onChange={onChangeOrderBy} size="sm">
-                {projectId !== undefined && <option value="opened_at">{ORDER_BY_LABELS['opened_at']}</option>}
-                <option value="created_at">{ORDER_BY_LABELS['created_at']}</option>
-                <option value="updated_at">{ORDER_BY_LABELS['updated_at']}</option>
-                <option value="name">{ORDER_BY_LABELS['name']}</option>
-              </Select>
-            </FormControl>
-            <FormControl orientation="horizontal" gap={1}>
-              <FormLabel>{t('common.direction')}</FormLabel>
-              <Select value={direction} onChange={onChangeDirection} size="sm">
-                <option value="ASC">{DIRECTION_LABELS['ASC']}</option>
-                <option value="DESC">{DIRECTION_LABELS['DESC']}</option>
-              </Select>
-            </FormControl>
-          </Flex>
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
+    <Flex flexDir="row" gap={6}>
+      <FormControl orientation="horizontal" gap={0} w="auto">
+        <FormLabel>{t('common.orderBy')}</FormLabel>
+        <Select value={orderBy ?? defaultOrderBy} onChange={onChangeOrderBy} size="sm">
+          {projectId !== undefined && <option value="opened_at">{ORDER_BY_LABELS['opened_at']}</option>}
+          <option value="created_at">{ORDER_BY_LABELS['created_at']}</option>
+          <option value="updated_at">{ORDER_BY_LABELS['updated_at']}</option>
+          <option value="name">{ORDER_BY_LABELS['name']}</option>
+        </Select>
+      </FormControl>
+      <FormControl orientation="horizontal" gap={0} w="auto">
+        <FormLabel>{t('common.direction')}</FormLabel>
+        <Select value={direction} onChange={onChangeDirection} size="sm">
+          <option value="ASC">{DIRECTION_LABELS['ASC']}</option>
+          <option value="DESC">{DIRECTION_LABELS['DESC']}</option>
+        </Select>
+      </FormControl>
+    </Flex>
   );
 };

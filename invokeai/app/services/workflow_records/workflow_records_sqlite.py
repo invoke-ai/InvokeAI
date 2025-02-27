@@ -120,7 +120,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self,
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
-        category: WorkflowCategory,
+        categories: Optional[list[WorkflowCategory]],
         page: int = 0,
         per_page: Optional[int] = None,
         query: Optional[str] = None,
@@ -128,28 +128,50 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         # sanitize!
         assert order_by in WorkflowRecordOrderBy
         assert direction in SQLiteDirection
-        assert category in WorkflowCategory
-        count_query = "SELECT COUNT(*) FROM workflow_library WHERE category = ?"
-        main_query = """
-            SELECT
-                workflow_id,
-                category,
-                name,
-                description,
-                created_at,
-                updated_at,
-                opened_at
-            FROM workflow_library
-            WHERE category = ?
-            """
-        main_params: list[int | str] = [category.value]
-        count_params: list[int | str] = [category.value]
+        if categories:
+            assert all(c in WorkflowCategory for c in categories)
+            count_query = "SELECT COUNT(*) FROM workflow_library WHERE category IN ({})".format(
+                ", ".join("?" for _ in categories)
+            )
+            main_query = """
+                SELECT
+                    workflow_id,
+                    category,
+                    name,
+                    description,
+                    created_at,
+                    updated_at,
+                    opened_at
+                FROM workflow_library
+                WHERE category IN ({})
+                """.format(", ".join("?" for _ in categories))
+            main_params: list[int | str] = [category.value for category in categories]
+            count_params: list[int | str] = [category.value for category in categories]
+        else:
+            count_query = "SELECT COUNT(*) FROM workflow_library"
+            main_query = """
+                SELECT
+                    workflow_id,
+                    category,
+                    name,
+                    description,
+                    created_at,
+                    updated_at,
+                    opened_at
+                FROM workflow_library
+                """
+            main_params: list[int | str] = []
+            count_params: list[int | str] = []
 
         stripped_query = query.strip() if query else None
         if stripped_query:
             wildcard_query = "%" + stripped_query + "%"
-            main_query += " AND name LIKE ? OR description LIKE ? "
-            count_query += " AND name LIKE ? OR description LIKE ?;"
+            if categories:
+                main_query += " AND (name LIKE ? OR description LIKE ?) "
+                count_query += " AND (name LIKE ? OR description LIKE ?);"
+            else:
+                main_query += " WHERE name LIKE ? OR description LIKE ? "
+                count_query += " WHERE name LIKE ? OR description LIKE ?;"
             main_params.extend([wildcard_query, wildcard_query])
             count_params.extend([wildcard_query, wildcard_query])
 
@@ -232,7 +254,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             library_workflows_from_db = self.get_many(
                 order_by=WorkflowRecordOrderBy.Name,
                 direction=SQLiteDirection.Ascending,
-                category=WorkflowCategory.Default,
+                categories=[WorkflowCategory.Default],
             ).items
 
             workflows_from_file_ids = [w.id for w in workflows_from_file]
