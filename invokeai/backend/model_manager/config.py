@@ -76,6 +76,7 @@ class ModelType(str, Enum):
     T2IAdapter = "t2i_adapter"
     T5Encoder = "t5_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
+    SigLIP = "siglip"
 
 
 class SubModelType(str, Enum):
@@ -528,6 +529,17 @@ class SpandrelImageToImageConfig(ModelConfigBase):
         return Tag(f"{ModelType.SpandrelImageToImage.value}.{ModelFormat.Checkpoint.value}")
 
 
+class SigLIPConfig(DiffusersConfigBase):
+    """Model config for SigLIP."""
+
+    type: Literal[ModelType.SigLIP] = ModelType.SigLIP
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.SigLIP.value}.{ModelFormat.Diffusers.value}")
+
+
 def get_model_discriminator_value(v: Any) -> str:
     """
     Computes the discriminator value for a model config.
@@ -575,6 +587,7 @@ AnyModelConfig = Annotated[
         Annotated[CLIPEmbedDiffusersConfig, CLIPEmbedDiffusersConfig.get_tag()],
         Annotated[CLIPLEmbedDiffusersConfig, CLIPLEmbedDiffusersConfig.get_tag()],
         Annotated[CLIPGEmbedDiffusersConfig, CLIPGEmbedDiffusersConfig.get_tag()],
+        Annotated[SigLIPConfig, SigLIPConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]
