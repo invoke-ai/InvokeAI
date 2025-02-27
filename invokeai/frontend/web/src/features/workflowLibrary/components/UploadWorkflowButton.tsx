@@ -1,5 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -11,13 +11,13 @@ import { useSaveWorkflowAsDialog } from './SaveWorkflowAsDialog/useSaveWorkflowA
 const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const workflowListMenu = useWorkflowListMenu();
+  const workflowLibraryModal = useWorkflowLibraryModal();
   const saveWorkflowAsDialog = useSaveWorkflowAsDialog();
 
   const loadWorkflowFromFile = useLoadWorkflowFromFile({
     resetRef,
     onSuccess: () => {
-      workflowListMenu.close();
+      workflowLibraryModal.close();
       saveWorkflowAsDialog.onOpen();
     },
   });

@@ -41,7 +41,7 @@ class WorkflowRecordsStorageBase(ABC):
         self,
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
-        category: WorkflowCategory,
+        categories: Optional[list[WorkflowCategory]],
         page: int,
         per_page: Optional[int],
         query: Optional[str],

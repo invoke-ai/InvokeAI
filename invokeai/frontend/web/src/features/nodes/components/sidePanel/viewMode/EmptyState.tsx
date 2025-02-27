@@ -1,6 +1,6 @@
 import { Button, Flex, Image, Link, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectCleanEditor, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback } from 'react';
@@ -40,7 +40,7 @@ export const EmptyState = () => {
 const CleanEditorContent = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const workflowListMenu = useWorkflowListMenu();
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
   const onClickNewWorkflow = useCallback(() => {
     dispatch(workflowModeChanged('edit'));
@@ -52,7 +52,7 @@ const CleanEditorContent = () => {
         <Button size="sm" onClick={onClickNewWorkflow}>
           {t('nodes.newWorkflow')}
         </Button>
-        <Button size="sm" colorScheme="invokeBlue" onClick={workflowListMenu.open}>
+        <Button size="sm" colorScheme="invokeBlue" onClick={workflowLibraryModal.open}>
           {t('nodes.loadWorkflow')}
         </Button>
       </Flex>

@@ -22,10 +22,13 @@ export type NodesState = {
 
 export type WorkflowMode = 'edit' | 'view';
 
+export type WorkflowLibraryCategory = 'account' | 'private' | 'shared' | 'favorites' | `default`;
+
 export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   _version: 1;
   isTouched: boolean;
   mode: WorkflowMode;
+  browsingCategory: WorkflowLibraryCategory;
   searchTerm: string;
   orderBy?: WorkflowRecordOrderBy;
   orderDirection: SQLiteDirection;

@@ -11,7 +11,12 @@ import {
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
-import type { NodesState, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import type {
+  NodesState,
+  WorkflowLibraryCategory,
+  WorkflowMode,
+  WorkflowsState as WorkflowState,
+} from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
@@ -82,6 +87,7 @@ const initialWorkflowState: WorkflowState = {
   orderBy: undefined, // initial value is decided in component
   orderDirection: 'DESC',
   categorySections: {},
+  browsingCategory: 'account',
   ...getBlankWorkflow(),
 };
 
@@ -100,6 +106,10 @@ export const workflowSlice = createSlice({
     },
     workflowOrderDirectionChanged: (state, action: PayloadAction<SQLiteDirection>) => {
       state.orderDirection = action.payload;
+    },
+    workflowBrowsingCategoryChanged: (state, action: PayloadAction<WorkflowLibraryCategory>) => {
+      state.browsingCategory = action.payload;
+      state.searchTerm = '';
     },
     categorySectionsChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
       const { id, isOpen } = action.payload;
@@ -299,6 +309,7 @@ export const {
   workflowSearchTermChanged,
   workflowOrderByChanged,
   workflowOrderDirectionChanged,
+  workflowBrowsingCategoryChanged,
   categorySectionsChanged,
   formReset,
   formElementAdded,
@@ -365,6 +376,7 @@ export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => work
 export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => workflow.searchTerm);
 export const selectWorkflowOrderBy = createWorkflowSelector((workflow) => workflow.orderBy);
 export const selectWorkflowOrderDirection = createWorkflowSelector((workflow) => workflow.orderDirection);
+export const selectWorkflowBrowsingCategory = createWorkflowSelector((workflow) => workflow.browsingCategory);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
 

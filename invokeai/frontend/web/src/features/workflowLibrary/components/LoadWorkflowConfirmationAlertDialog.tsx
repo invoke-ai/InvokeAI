@@ -2,7 +2,7 @@ import { ConfirmationAlertDialog, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { atom } from 'nanostores';
@@ -14,7 +14,7 @@ const cleanup = () => $workflowToLoad.set(null);
 
 export const useLoadWorkflow = () => {
   const dispatch = useAppDispatch();
-  const workflowListMenu = useWorkflowListMenu();
+  const workflowLibraryModal = useWorkflowLibraryModal();
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
 
   const isTouched = useAppSelector(selectWorkflowIsTouched);
@@ -28,8 +28,8 @@ export const useLoadWorkflow = () => {
     await getAndLoadWorkflow(workflowId);
     dispatch(workflowModeChanged(mode));
     cleanup();
-    workflowListMenu.close();
-  }, [dispatch, getAndLoadWorkflow, workflowListMenu]);
+    workflowLibraryModal.close();
+  }, [dispatch, getAndLoadWorkflow, workflowLibraryModal]);
 
   const loadWithDialog = useCallback(
     (workflowId: string, mode: 'view' | 'edit') => {

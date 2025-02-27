@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Path, Query
 
@@ -88,10 +88,10 @@ async def list_workflows(
         default=WorkflowRecordOrderBy.Name, description="The attribute to order by"
     ),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Ascending, description="The direction to order by"),
-    category: WorkflowCategory = Query(default=WorkflowCategory.User, description="The category of workflow to get"),
+    categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
 ) -> PaginatedResults[WorkflowRecordListItemDTO]:
     """Gets a page of workflows"""
     return ApiDependencies.invoker.services.workflow_records.get_many(
-        order_by=order_by, direction=direction, page=page, per_page=per_page, query=query, category=category
+        order_by=order_by, direction=direction, page=page, per_page=per_page, query=query, categories=categories
     )

@@ -11,7 +11,7 @@ import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageVi
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
+import { $isWorkflowLibraryModalOpen } from 'features/nodes/store/workflowLibraryModal';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
@@ -166,7 +166,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         case 'viewAllWorkflows':
           // Go to the workflows tab and open the workflow library modal
           store.dispatch(setActiveTab('workflows'));
-          $isWorkflowListMenuIsOpen.set(true);
+          $isWorkflowLibraryModalOpen.set(true);
           break;
         case 'viewAllStylePresets':
           // Go to the canvas tab and open the style presets menu
