@@ -603,6 +603,16 @@ siglip = StarterModel(
 )
 # endregion
 
+# region FLUX Redux
+flux_redux = StarterModel(
+    name="FLUX Redux",
+    base=BaseModelType.Flux,
+    source="black-forest-labs/FLUX.1-Redux-dev::flux1-redux-dev.safetensors",
+    description="FLUX Redux model (for image variation).",
+    type=ModelType.FluxRedux,
+)
+# endregion
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
@@ -671,6 +681,7 @@ STARTER_MODELS: list[StarterModel] = [
     t5_8b_quantized_encoder,
     clip_l_encoder,
     siglip,
+    flux_redux,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -706,6 +717,7 @@ sdxl_bundle: list[StarterModel] = [
     scribble_sdxl,
     tile_sdxl,
     swinir,
+    flux_redux,
 ]
 
 flux_bundle: list[StarterModel] = [
