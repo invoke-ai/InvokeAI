@@ -40,15 +40,23 @@ class UIType(str, Enum, metaclass=MetaEnum):
 
     # region Model Field Types
     MainModel = "MainModelField"
+    FluxMainModel = "FluxMainModelField"
+    SD3MainModel = "SD3MainModelField"
     SDXLMainModel = "SDXLMainModelField"
     SDXLRefinerModel = "SDXLRefinerModelField"
     ONNXModel = "ONNXModelField"
     VAEModel = "VAEModelField"
+    FluxVAEModel = "FluxVAEModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
     T2IAdapterModel = "T2IAdapterModelField"
+    T5EncoderModel = "T5EncoderModelField"
+    CLIPEmbedModel = "CLIPEmbedModelField"
+    CLIPLEmbedModel = "CLIPLEmbedModelField"
+    CLIPGEmbedModel = "CLIPGEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
+    ControlLoRAModel = "ControlLoRAModelField"
     # endregion
 
     # region Misc Field Types
@@ -125,13 +133,21 @@ class FieldDescriptions:
     negative_cond = "Negative conditioning tensor"
     noise = "Noise tensor"
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
+    t5_encoder = "T5 tokenizer and text encoder"
+    clip_embed_model = "CLIP Embed loader"
+    clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
+    transformer = "Transformer"
+    mmditx = "MMDiTX"
     vae = "VAE"
     cond = "Conditioning tensor"
     controlnet_model = "ControlNet model to load"
     vae_model = "VAE model to load"
     lora_model = "LoRA model to load"
+    control_lora_model = "Control LoRA model to load"
     main_model = "Main model (UNet, VAE, CLIP) to load"
+    flux_model = "Flux model (Transformer) to load"
+    sd3_model = "SD3 model (MMDiTX) to load"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -173,7 +189,7 @@ class FieldDescriptions:
     )
     num_1 = "The first number"
     num_2 = "The second number"
-    mask = "The mask to use for the operation"
+    denoise_mask = "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved."
     board = "The board to save the image to"
     image = "The image to process"
     tile_size = "Tile size"
@@ -184,6 +200,7 @@ class FieldDescriptions:
     freeu_s2 = 'Scaling factor for stage 2 to attenuate the contributions of the skip features. This is done to mitigate the "oversmoothing effect" in the enhanced denoising process.'
     freeu_b1 = "Scaling factor for stage 1 to amplify the contributions of backbone features."
     freeu_b2 = "Scaling factor for stage 2 to amplify the contributions of backbone features."
+    instantx_control_mode = "The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'."
 
 
 class ImageField(BaseModel):
@@ -231,6 +248,23 @@ class ColorField(BaseModel):
         return (self.r, self.g, self.b, self.a)
 
 
+class FluxConditioningField(BaseModel):
+    """A conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
+        "included regions should be set to True.",
+    )
+
+
+class SD3ConditioningField(BaseModel):
+    """A conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
@@ -265,6 +299,13 @@ class BoundingBoxField(BaseModel):
         if self.y_min > self.y_max:
             raise ValueError(f"y_min ({self.y_min}) is greater than y_max ({self.y_max}).")
         return self
+
+    def tuple(self) -> Tuple[int, int, int, int]:
+        """
+        Returns the bounding box as a tuple suitable for use with PIL's `Image.crop()` method.
+        This method returns a tuple of the form (left, upper, right, lower) == (x_min, y_min, x_max, y_max).
+        """
+        return (self.x_min, self.y_min, self.x_max, self.y_max)
 
 
 class MetadataField(RootModel[dict[str, Any]]):

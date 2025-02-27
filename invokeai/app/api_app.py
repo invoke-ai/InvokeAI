@@ -7,13 +7,14 @@ from pathlib import Path
 
 import torch
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from torch.backends.mps import is_available as is_mps_available
 
 # for PyCharm:
@@ -35,6 +36,7 @@ from invokeai.app.api.routers import (
     workflows,
 )
 from invokeai.app.api.sockets import SocketIO
+from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.devices import TorchDevice
@@ -58,11 +60,37 @@ logger.info(f"Using torch device: {torch_device_name}")
 
 loop = asyncio.new_event_loop()
 
+# We may change the port if the default is in use, this global variable is used to store the port so that we can log
+# the correct port when the server starts in the lifespan handler.
+port = app_config.port
+
+# Load custom nodes. This must be done after importing the Graph class, which itself imports all modules from the
+# invocations module. The ordering here is implicit, but important - we want to load custom nodes after all the
+# core nodes have been imported so that we can catch when a custom node clobbers a core node.
+load_custom_nodes(custom_nodes_path=app_config.custom_nodes_path)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Add startup event to load dependencies
     ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, loop=loop, logger=logger)
+
+    # Log the server address when it starts - in case the network log level is not high enough to see the startup log
+    proto = "https" if app_config.ssl_certfile else "http"
+    msg = f"Invoke running on {proto}://{app_config.host}:{port} (Press CTRL+C to quit)"
+
+    # Logging this way ignores the logger's log level and _always_ logs the message
+    record = logger.makeRecord(
+        name=logger.name,
+        level=logging.INFO,
+        fn="",
+        lno=0,
+        msg=msg,
+        args=(),
+        exc_info=None,
+    )
+    logger.handle(record)
+
     yield
     # Shut down threads
     ApiDependencies.shutdown()
@@ -77,6 +105,29 @@ app = FastAPI(
     separate_input_output_schemas=False,
     lifespan=lifespan,
 )
+
+
+class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
+    """When a request is made to the root path with a query string, redirect to the root path without the query string.
+
+    For example, to force a Gradio app to use dark mode, users may append `?__theme=dark` to the URL. Their browser may
+    have this query string saved in history or a bookmark, so when the user navigates to `http://127.0.0.1:9090/`, the
+    browser takes them to `http://127.0.0.1:9090/?__theme=dark`.
+
+    This breaks the static file serving in the UI, so we redirect the user to the root path without the query string.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        if request.url.path == "/" and request.url.query:
+            return RedirectResponse(url="/")
+
+        response = await call_next(request)
+        return response
+
+
+# Add the middleware
+app.add_middleware(RedirectRootWithQueryStringMiddleware)
+
 
 # Add event handler
 event_handler_id: int = id(app)
@@ -182,6 +233,7 @@ def invoke_api() -> None:
         else:
             jurigged.watch(logger=InvokeAILogger.get_logger(name="jurigged").info)
 
+    global port
     port = find_port(app_config.port)
     if port != app_config.port:
         logger.warn(f"Port {app_config.port} in use, using port {port}")
@@ -193,18 +245,17 @@ def invoke_api() -> None:
         host=app_config.host,
         port=port,
         loop="asyncio",
-        log_level=app_config.log_level,
+        log_level=app_config.log_level_network,
         ssl_certfile=app_config.ssl_certfile,
         ssl_keyfile=app_config.ssl_keyfile,
     )
     server = uvicorn.Server(config)
 
     # replace uvicorn's loggers with InvokeAI's for consistent appearance
-    for logname in ["uvicorn.access", "uvicorn"]:
-        log = InvokeAILogger.get_logger(logname)
-        log.handlers.clear()
-        for ch in logger.handlers:
-            log.addHandler(ch)
+    uvicorn_logger = InvokeAILogger.get_logger("uvicorn")
+    uvicorn_logger.handlers.clear()
+    for hdlr in logger.handlers:
+        uvicorn_logger.addHandler(hdlr)
 
     loop.run_until_complete(server.serve())
 

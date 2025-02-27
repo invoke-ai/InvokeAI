@@ -4,7 +4,12 @@ from typing import Optional
 
 import torch
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     BoundingBoxField,
@@ -12,11 +17,13 @@ from invokeai.app.invocations.fields import (
     ConditioningField,
     DenoiseMaskField,
     FieldDescriptions,
+    FluxConditioningField,
     ImageField,
     Input,
     InputField,
     LatentsField,
     OutputField,
+    SD3ConditioningField,
     TensorField,
     UIComponent,
 )
@@ -258,13 +265,9 @@ class ImageInvocation(BaseInvocation):
     image: ImageField = InputField(description="The image to load")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        image_dto = context.images.get_dto(self.image.image_name)
 
-        return ImageOutput(
-            image=ImageField(image_name=self.image.image_name),
-            width=image.width,
-            height=image.height,
-        )
+        return ImageOutput.build(image_dto=image_dto)
 
 
 @invocation(
@@ -409,9 +412,32 @@ class ColorInvocation(BaseInvocation):
 class MaskOutput(BaseInvocationOutput):
     """A torch mask tensor."""
 
+    # shape: [1, H, W], dtype: bool
     mask: TensorField = OutputField(description="The mask.")
     width: int = OutputField(description="The width of the mask in pixels.")
     height: int = OutputField(description="The height of the mask in pixels.")
+
+
+@invocation_output("flux_conditioning_output")
+class FluxConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single conditioning tensor"""
+
+    conditioning: FluxConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "FluxConditioningOutput":
+        return cls(conditioning=FluxConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("sd3_conditioning_output")
+class SD3ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single SD3 conditioning tensor"""
+
+    conditioning: SD3ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "SD3ConditioningOutput":
+        return cls(conditioning=SD3ConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

@@ -1,10 +1,12 @@
 import { Expander, Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativity';
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
-import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { UpscaleScaleSlider } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleScaleSlider';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -14,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { UpscaleInitialImage } from './UpscaleInitialImage';
 import { UpscaleWarning } from './UpscaleWarning';
 
-const selector = createMemoizedSelector([selectUpscalelice], (upscaleSlice) => {
+const selector = createMemoizedSelector([selectUpscaleSlice], (upscaleSlice) => {
   const { upscaleModel, upscaleInitialImage, scale } = upscaleSlice;
 
   const badges: string[] = [];
@@ -24,9 +26,10 @@ const selector = createMemoizedSelector([selectUpscalelice], (upscaleSlice) => {
   }
 
   if (upscaleInitialImage) {
+    const gridSize = upscaleModel ? getGridSize(upscaleModel.base) : getGridSize(null);
     // Output height and width are scaled and rounded down to the nearest multiple of 8
-    const outputWidth = Math.floor((upscaleInitialImage.width * scale) / 8) * 8;
-    const outputHeight = Math.floor((upscaleInitialImage.height * scale) / 8) * 8;
+    const outputWidth = roundDownToMultiple(upscaleInitialImage.width * scale, gridSize);
+    const outputHeight = roundDownToMultiple(upscaleInitialImage.height * scale, gridSize);
 
     badges.push(`${outputWidth}×${outputHeight}`);
   }
@@ -48,7 +51,12 @@ export const UpscaleSettingsAccordion = memo(() => {
   });
 
   return (
-    <StandaloneAccordion label="Upscale" badges={badges} isOpen={isOpenAccordion} onToggle={onToggleAccordion}>
+    <StandaloneAccordion
+      label={t('upscaling.upscale')}
+      badges={badges}
+      isOpen={isOpenAccordion}
+      onToggle={onToggleAccordion}
+    >
       <Flex pt={4} px={4} w="full" h="full" flexDir="column" data-testid="upscale-settings-accordion">
         <Flex flexDir="column" gap={4}>
           <Flex gap={4}>

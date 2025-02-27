@@ -9,6 +9,7 @@ import {
   Spinner,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
 import type { PrefilledFormData } from 'features/stylePresets/store/stylePresetModal';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
@@ -19,6 +20,7 @@ import type { StylePresetFormData } from './StylePresetForm';
 import { StylePresetForm } from './StylePresetForm';
 
 export const StylePresetModal = () => {
+  useAssertSingleton('StylePresetModal');
   const [formData, setFormData] = useState<StylePresetFormData | null>(null);
   const { t } = useTranslation();
   const stylePresetModalState = useStore($stylePresetModalState);
@@ -48,9 +50,13 @@ export const StylePresetModal = () => {
       } else {
         let file = null;
         if (data.imageUrl) {
-          const blob = await convertImageUrlToBlob(data.imageUrl);
-          if (blob) {
-            file = new File([blob], 'style_preset.png', { type: 'image/png' });
+          try {
+            const blob = await convertImageUrlToBlob(data.imageUrl);
+            if (blob) {
+              file = new File([blob], 'style_preset.png', { type: 'image/png' });
+            }
+          } catch (error) {
+            // do nothing
           }
         }
         setFormData({
@@ -63,7 +69,7 @@ export const StylePresetModal = () => {
   }, [stylePresetModalState.prefilledFormData]);
 
   return (
-    <Modal isOpen={stylePresetModalState.isModalOpen} onClose={handleCloseModal} isCentered size="2xl">
+    <Modal isOpen={stylePresetModalState.isModalOpen} onClose={handleCloseModal} isCentered size="2xl" useInert={false}>
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>{modalTitle}</ModalHeader>

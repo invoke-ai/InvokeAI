@@ -83,7 +83,7 @@ async def create_workflow(
 )
 async def list_workflows(
     page: int = Query(default=0, description="The page to get"),
-    per_page: int = Query(default=10, description="The number of workflows per page"),
+    per_page: Optional[int] = Query(default=None, description="The number of workflows per page"),
     order_by: WorkflowRecordOrderBy = Query(
         default=WorkflowRecordOrderBy.Name, description="The attribute to order by"
     ),
@@ -93,5 +93,5 @@ async def list_workflows(
 ) -> PaginatedResults[WorkflowRecordListItemDTO]:
     """Gets a page of workflows"""
     return ApiDependencies.invoker.services.workflow_records.get_many(
-        page=page, per_page=per_page, order_by=order_by, direction=direction, query=query, category=category
+        order_by=order_by, direction=direction, page=page, per_page=per_page, query=query, category=category
     )

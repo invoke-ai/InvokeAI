@@ -1,0 +1,408 @@
+{
+  "name": "FLUX Image to Image",
+  "author": "InvokeAI",
+  "description": "A simple image-to-image workflow using a FLUX dev model. ",
+  "version": "1.1.0",
+  "contact": "",
+  "tags": "image2image, flux, image-to-image",
+  "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend using FLUX dev models for image-to-image workflows. The image-to-image performance with FLUX schnell models is poor.",
+  "exposedFields": [
+    {
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "t5_encoder_model"
+    },
+    {
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "clip_embed_model"
+    },
+    {
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "vae_model"
+    },
+    {
+      "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "fieldName": "image"
+    }
+  ],
+  "meta": {
+    "version": "3.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "type": "invocation",
+      "data": {
+        "id": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+        "type": "flux_denoise",
+        "version": "3.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "nodePack": "invokeai",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "denoise_mask": {
+            "name": "denoise_mask",
+            "label": ""
+          },
+          "denoising_start": {
+            "name": "denoising_start",
+            "label": "",
+            "value": 0.04
+          },
+          "denoising_end": {
+            "name": "denoising_end",
+            "label": "",
+            "value": 1
+          },
+          "transformer": {
+            "name": "transformer",
+            "label": ""
+          },
+          "positive_text_conditioning": {
+            "name": "positive_text_conditioning",
+            "label": ""
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "value": 1024
+          },
+          "num_steps": {
+            "name": "num_steps",
+            "label": "",
+            "value": 30
+          },
+          "guidance": {
+            "name": "guidance",
+            "label": "",
+            "value": 4
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "value": 0
+          }
+        }
+      },
+      "position": {
+        "x": 1176.8139201354052,
+        "y": -244.36724863022368
+      }
+    },
+    {
+      "id": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "type": "invocation",
+      "data": {
+        "id": "2981a67c-480f-4237-9384-26b68dbf912b",
+        "type": "flux_vae_encode",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": 732.7680166609682,
+        "y": -24.37398171806909
+      }
+    },
+    {
+      "id": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
+      "type": "invocation",
+      "data": {
+        "id": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
+        "type": "flux_vae_decode",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true,
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": 1575.5797431839133,
+        "y": -209.00150975507415
+      }
+    },
+    {
+      "id": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "type": "invocation",
+      "data": {
+        "id": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+        "type": "flux_model_loader",
+        "version": "1.0.4",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "Model (dev variant recommended for Image-to-Image)"
+          },
+          "t5_encoder_model": {
+            "name": "t5_encoder_model",
+            "label": "",
+            "value": {
+              "key": "d18d5575-96b6-4da3-b3d8-eb58308d6705",
+              "hash": "random:f2f9ed74acdfb4bf6fec200e780f6c25f8dd8764a35e65d425d606912fdf573a",
+              "name": "t5_bnb_int8_quantized_encoder",
+              "base": "any",
+              "type": "t5_encoder"
+            }
+          },
+          "clip_embed_model": {
+            "name": "clip_embed_model",
+            "label": "",
+            "value": {
+              "key": "5a19d7e5-8d98-43cd-8a81-87515e4b3b4e",
+              "hash": "random:4bd08514c08fb6ff04088db9aeb45def3c488e8b5fd09a35f2cc4f2dc346f99f",
+              "name": "clip-vit-large-patch14",
+              "base": "any",
+              "type": "clip_embed"
+            }
+          },
+          "vae_model": {
+            "name": "vae_model",
+            "label": "",
+            "value": {
+              "key": "9172beab-5c1d-43f0-b2f0-6e0b956710d9",
+              "hash": "random:c54dde288e5fa2e6137f1c92e9d611f598049e6f16e360207b6d96c9f5a67ba0",
+              "name": "FLUX.1-schnell_ae",
+              "base": "flux",
+              "type": "vae"
+            }
+          }
+        }
+      },
+      "position": {
+        "x": 328.1809894659957,
+        "y": -90.2241133566946
+      }
+    },
+    {
+      "id": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "type": "invocation",
+      "data": {
+        "id": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+        "type": "flux_text_encoder",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "t5_encoder": {
+            "name": "t5_encoder",
+            "label": ""
+          },
+          "t5_max_seq_len": {
+            "name": "t5_max_seq_len",
+            "label": "T5 Max Seq Len",
+            "value": 256
+          },
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": "a cat wearing a birthday hat"
+          }
+        }
+      },
+      "position": {
+        "x": 745.8823365057267,
+        "y": -299.60249175851914
+      }
+    },
+    {
+      "id": "4754c534-a5f3-4ad0-9382-7887985e668c",
+      "type": "invocation",
+      "data": {
+        "id": "4754c534-a5f3-4ad0-9382-7887985e668c",
+        "type": "rand_int",
+        "version": "1.0.1",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "inputs": {
+          "low": {
+            "name": "low",
+            "label": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "value": 2147483647
+          }
+        }
+      },
+      "position": {
+        "x": 750.4061458984118,
+        "y": 279.2179215371294
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "reactflow__edge-cd367e62-2b45-4118-b4ba-7c33e2e0b370latents-7e5172eb-48c1-44db-a770-8fd83e1435d1latents",
+      "type": "default",
+      "source": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-cd367e62-2b45-4118-b4ba-7c33e2e0b370seed",
+      "type": "default",
+      "source": "4754c534-a5f3-4ad0-9382-7887985e668c",
+      "target": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
+    },
+    {
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bheight-cd367e62-2b45-4118-b4ba-7c33e2e0b370height",
+      "type": "default",
+      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "target": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "sourceHandle": "height",
+      "targetHandle": "height"
+    },
+    {
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bwidth-cd367e62-2b45-4118-b4ba-7c33e2e0b370width",
+      "type": "default",
+      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "target": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-cd367e62-2b45-4118-b4ba-7c33e2e0b370positive_text_conditioning",
+      "type": "default",
+      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "target": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_text_conditioning"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90transformer-cd367e62-2b45-4118-b4ba-7c33e2e0b370transformer",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912blatents-cd367e62-2b45-4118-b4ba-7c33e2e0b370latents",
+      "type": "default",
+      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "target": "cd367e62-2b45-4118-b4ba-7c33e2e0b370",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90vae-2981a67c-480f-4237-9384-26b68dbf912bvae",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90vae-7e5172eb-48c1-44db-a770-8fd83e1435d1vae",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90max_seq_len-01f674f8-b3d1-4df1-acac-6cb8e0bfb63ct5_max_seq_len",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "sourceHandle": "max_seq_len",
+      "targetHandle": "t5_max_seq_len"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90t5_encoder-01f674f8-b3d1-4df1-acac-6cb8e0bfb63ct5_encoder",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "sourceHandle": "t5_encoder",
+      "targetHandle": "t5_encoder"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90clip-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cclip",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "sourceHandle": "clip",
+      "targetHandle": "clip"
+    }
+  ]
+}

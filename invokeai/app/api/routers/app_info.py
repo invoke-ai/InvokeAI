@@ -40,6 +40,8 @@ class AppVersion(BaseModel):
 
     version: str = Field(description="App version")
 
+    highlights: Optional[list[str]] = Field(default=None, description="Highlights of release")
+
 
 class AppDependencyVersions(BaseModel):
     """App depencency Versions Response"""
@@ -98,7 +100,7 @@ async def get_app_deps() -> AppDependencyVersions:
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
 async def get_config() -> AppConfig:
-    infill_methods = ["tile", "lama", "cv2", "color"]  # TODO: add mosaic back
+    infill_methods = ["lama", "tile", "cv2", "color"]  # TODO: add mosaic back
     if PatchMatch.patchmatch_available():
         infill_methods.append("patchmatch")
 

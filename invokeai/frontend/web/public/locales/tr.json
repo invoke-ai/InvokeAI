@@ -2,7 +2,6 @@
     "accessibility": {
         "invokeProgressBar": "Invoke durum çubuğu",
         "nextImage": "Sonraki Görsel",
-        "showOptionsPanel": "Yan Paneli Göster",
         "reset": "Resetle",
         "uploadImage": "Görsel Yükle",
         "previousImage": "Önceki Görsel",
@@ -10,8 +9,6 @@
         "about": "Hakkında",
         "mode": "Kip",
         "resetUI": "$t(accessibility.reset)Arayüz",
-        "showGalleryPanel": "Galeri Panelini Göster",
-        "loadMore": "Daha Getir",
         "createIssue": "Sorun Bildir"
     },
     "common": {
@@ -26,7 +23,6 @@
         "linear": "Doğrusal",
         "nodes": "İş Akışı Düzenleyici",
         "postprocessing": "Rötuş",
-        "unifiedCanvas": "Tuval",
         "batch": "Toplu İş Yöneticisi",
         "accept": "Onayla",
         "cancel": "Vazgeç",
@@ -52,7 +48,6 @@
         "outpaint": "dışboyama",
         "outputs": "Çıktılar",
         "learnMore": "Bilgi Edin",
-        "nodeEditor": "Çizge Düzenleyici",
         "save": "Kaydet",
         "random": "Rastgele",
         "simple": "Basit",
@@ -132,85 +127,6 @@
         "changeBoard": "Panoyu Değiştir",
         "bottomMessage": "Bu panoyu ve görselleri silmek, bunları kullanan özelliklerin resetlemesine neden olacaktır."
     },
-    "controlnet": {
-        "balanced": "Dengeli",
-        "contentShuffle": "İçerik Karıştırma",
-        "contentShuffleDescription": "Görselin içeriğini karıştırır",
-        "depthZoe": "Derinlik (Zoe)",
-        "depthZoeDescription": "Zoe kullanarak derinlik haritası oluşturma",
-        "resizeMode": "Boyutlandırma Kipi",
-        "addControlNet": "$t(common.controlNet) Ekle",
-        "addIPAdapter": "$t(common.ipAdapter) Ekle",
-        "addT2IAdapter": "$t(common.t2iAdapter) Ekle",
-        "colorMap": "Renk",
-        "crop": "Kırpma",
-        "delete": "Kaldır",
-        "depthMidas": "Derinlik (Midas)",
-        "depthMidasDescription": "Midas kullanarak derinlik haritası oluşturma",
-        "detectResolution": "Çözünürlüğü Bul",
-        "none": "Hiçbiri",
-        "noneDescription": "Hiçbir işlem uygulanmamış",
-        "selectModel": "Model seçin",
-        "showAdvanced": "Gelişmiş Seçenekleri Göster",
-        "canny": "Canny",
-        "colorMapDescription": "Görselden renk haritası oluşturur",
-        "processor": "İşlemci",
-        "prompt": "İstem",
-        "duplicate": "Kopyala",
-        "large": "Büyük",
-        "modelSize": "Model Boyutu",
-        "resize": "Boyutlandır",
-        "resizeSimple": "Boyutlandır (Basit)",
-        "safe": "Güvenli",
-        "small": "Küçük",
-        "weight": "Etki",
-        "cannyDescription": "Canny kenar algılama",
-        "fill": "Doldur",
-        "highThreshold": "Üst Eşik",
-        "imageResolution": "Görsel Çözünürlüğü",
-        "colorMapTileSize": "Döşeme Boyutu",
-        "importImageFromCanvas": "Tuvaldeki Görseli Al",
-        "importMaskFromCanvas": "Tuvalden Maskeyi İçe Aktar",
-        "lowThreshold": "Alt Eşik",
-        "base": "Taban",
-        "depthAnythingDescription": "Depth Anything yöntemi ile derinlik haritası oluşturma",
-        "controlAdapter_one": "Yönetim Aracı",
-        "controlAdapter_other": "Yönetim Aracı",
-        "beginEndStepPercent": "Başlangıç / Bitiş Yüzdesi",
-        "control": "Yönetim",
-        "controlnet": "{{number}}. $t(controlnet.controlAdapter_one) ($t(common.controlNet))",
-        "amult": "a_mult",
-        "hideAdvanced": "Gelişmiş Seçenekleri Gizle",
-        "hed": "HED",
-        "ip_adapter": "{{number}}. $t(controlnet.controlAdapter_one) ($t(common.ipAdapter))",
-        "t2i_adapter": "{{number}}. $t(controlnet.controlAdapter_one) ($t(common.t2iAdapter))",
-        "autoConfigure": "Aracı otomatik yapılandır",
-        "bgth": "bg_th",
-        "coarse": "İri",
-        "controlMode": "Yönetim Kipi",
-        "depthAnything": "Depth Anything",
-        "hedDescription": "Holistically-Nested Edge Detection (Bütünsel Yuvalanmış Kenar Tespiti)",
-        "lineartAnime": "Çizim (Anime)",
-        "lineartAnimeDescription": "Anime stili çizim işleme",
-        "minConfidence": "Özgüven Alt Limiti",
-        "pidiDescription": "PIDI görsel işleme",
-        "mediapipeFace": "Mediapipe Yüz",
-        "megaControl": "Aşırı Yönetim",
-        "mlsd": "M-LSD",
-        "setControlImageDimensions": "Yönetim Görseli Boyutlarını En/Boydan Al",
-        "pidi": "PIDI",
-        "scribble": "çiziktirme",
-        "mediapipeFaceDescription": "Mediapipe kullanarak yüz algılama",
-        "saveControlImage": "Yönetim Görselini Kaydet",
-        "w": "En",
-        "lineartDescription": "Görseli çizime dönüştürür",
-        "maxFaces": "Yüz Üst Limiti",
-        "mlsdDescription": "Minimalist Line Segment Detector (Kolay Çizgi Parçası Algılama)",
-        "normalBae": "Normal BAE",
-        "normalBaeDescription": "Normal BAE işleme",
-        "resetControlImage": "Yönetim Görselini Kaldır",
-        "lineart": "Çizim"
-    },
     "queue": {
         "resumeSucceeded": "İşlem Sürdürüldü",
         "openQueue": "Sırayı Göster",
@@ -279,17 +195,14 @@
     },
     "gallery": {
         "deleteImagePermanent": "Silinen görseller geri getirilemez.",
-        "assets": "Özkaynaklar",
         "autoAssignBoardOnClick": "Tıklanan Panoya Otomatik Atama",
         "loading": "Yükleniyor",
         "starImage": "Yıldız Koy",
         "download": "İndir",
         "deleteSelection": "Seçileni Sil",
-        "problemDeletingImages": "Görsel Silmede Sorun",
         "featuresWillReset": "Bu görseli silerseniz, o özellikler resetlenecektir.",
         "noImageSelected": "Görsel Seçilmedi",
         "unstarImage": "Yıldızı Kaldır",
-        "problemDeletingImagesDesc": "Bir ya da daha çok görsel silinemedi",
         "gallerySettings": "Galeri Düzeni",
         "image": "görsel",
         "galleryImageSize": "Görsel Boyutu",
@@ -299,8 +212,6 @@
         "currentlyInUse": "Bu görsel şurada kullanımda:",
         "deleteImage_one": "Görseli Sil",
         "deleteImage_other": "",
-        "loadMore": "Daha Getir",
-        "setCurrentImage": "Çalışma Görseli Yap",
         "unableToLoad": "Galeri Yüklenemedi",
         "downloadSelection": "Seçileni İndir",
         "dropOrUpload": "$t(gallery.drop) ya da Yükle",
@@ -320,225 +231,7 @@
     "hotkeys": {
         "noHotkeysFound": "Kısayol Tuşu Bulanamadı",
         "searchHotkeys": "Kısayol Tuşlarında Ara",
-        "clearSearch": "Aramayı Sil",
-        "colorPicker": {
-            "title": "Renk Seçici",
-            "desc": "Tuvalde renk seçiciye geçer"
-        },
-        "consoleToggle": {
-            "title": "Konsolu Aç-Kapat",
-            "desc": "Konsolu aç-kapat"
-        },
-        "hideMask": {
-            "desc": "Maskeyi gizle-göster",
-            "title": "Maskeyi Gizle"
-        },
-        "focusPrompt": {
-            "title": "İsteme Odaklan",
-            "desc": "Görsel istemi alanına odaklanır"
-        },
-        "keyboardShortcuts": "Kısayol Tuşları",
-        "nextImage": {
-            "title": "Sonraki Görsel",
-            "desc": "Galerideki sonraki görseli göster"
-        },
-        "maximizeWorkSpace": {
-            "desc": "Panelleri kapatıp çalışma alanını genişlet",
-            "title": "Çalışma Alanını Genişlet"
-        },
-        "pinOptions": {
-            "desc": "Seçenekler panelini iğnele",
-            "title": "Seçenekleri İğnele"
-        },
-        "nodesHotkeys": "Çizgeler",
-        "quickToggleMove": {
-            "desc": "Geçici olarak Kayma Aracına geçer",
-            "title": "Geçici Kayma"
-        },
-        "showHideBoundingBox": {
-            "title": "Sınırlayıcı Kutuyu Gizle/Göster",
-            "desc": "Sınırlayıcı kutunun görünürlüğünü değiştir"
-        },
-        "showInfo": {
-            "desc": "Seçili görselin üstverisini göster",
-            "title": "Bilgileri Göster"
-        },
-        "nextStagingImage": {
-            "desc": "Sonraki Görsel Parçayı Göster",
-            "title": "Sonraki Görsel Parça"
-        },
-        "acceptStagingImage": {
-            "desc": "Geçiçi Görsel Parçasını Onayla",
-            "title": "Geçiçi Görsel Parçasını Onayla"
-        },
-        "changeTabs": {
-            "desc": "Çalışma alanını değiştir",
-            "title": "Sekmeyi değiştir"
-        },
-        "closePanels": {
-            "title": "Panelleri Kapat",
-            "desc": "Açık panelleri kapat"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Fırça Saydamlığını Artır",
-            "desc": "Tuval fırçasının saydamlığını artırır"
-        },
-        "clearMask": {
-            "title": "Maskeyi Sil",
-            "desc": "Tüm maskeyi sil"
-        },
-        "decreaseGalleryThumbSize": {
-            "desc": "Galerideki küçük görsel boyutunu düşürür",
-            "title": "Küçük Görsel Boyutunu Düşür"
-        },
-        "deleteImage": {
-            "desc": "Seçili görseli sil",
-            "title": "Görseli Sil"
-        },
-        "invoke": {
-            "desc": "Görsel Oluştur",
-            "title": "Invoke"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Küçük Görsel Boyutunu Artır",
-            "desc": "Galerideki küçük görsel boyutunu artırır"
-        },
-        "setParameters": {
-            "title": "Değişkenleri Kullan",
-            "desc": "Seçili görselin tüm değişkenlerini kullan"
-        },
-        "setPrompt": {
-            "desc": "Seçili görselin istemini kullan",
-            "title": "İstemi Kullan"
-        },
-        "toggleLayer": {
-            "desc": "Maske/Taban katmanları arasında geçiş yapar",
-            "title": "Katmanı Gizle-Göster"
-        },
-        "setSeed": {
-            "title": "Tohumu Kullan",
-            "desc": "Seçili görselin tohumunu kullan"
-        },
-        "appHotkeys": "Uygulama",
-        "cancel": {
-            "desc": "Geçerli İşi Sil",
-            "title": "Vazgeç"
-        },
-        "sendToImageToImage": {
-            "title": "Görselden Görsel'e Gönder",
-            "desc": "Seçili görseli Görselden Görsel'e gönder"
-        },
-        "fillBoundingBox": {
-            "title": "Sınırlayıcı Kutuyu Doldur",
-            "desc": "Sınırlayıcı kutuyu fırçadaki renkle doldurur"
-        },
-        "moveTool": {
-            "desc": "Tuvalde kaymayı sağlar",
-            "title": "Kayma Aracı"
-        },
-        "redoStroke": {
-            "desc": "Fırça vuruşunu yinele",
-            "title": "Vuruşu Yinele"
-        },
-        "increaseBrushOpacity": {
-            "title": "Fırçanın Saydamlığını Düşür",
-            "desc": "Tuval fırçasının saydamlığını düşürür"
-        },
-        "selectEraser": {
-            "desc": "Tuval silgisini kullan",
-            "title": "Silgiyi Kullan"
-        },
-        "toggleOptions": {
-            "desc": "Seçenekler panelini aç-kapat",
-            "title": "Seçenekleri Aç-Kapat"
-        },
-        "copyToClipboard": {
-            "desc": "Tuval içeriğini kopyala",
-            "title": "Kopyala"
-        },
-        "galleryHotkeys": "Galeri",
-        "generalHotkeys": "Genel",
-        "mergeVisible": {
-            "desc": "Tuvalin görünür tüm katmanlarını birleştir",
-            "title": "Katmanları Birleştir"
-        },
-        "toggleGallery": {
-            "title": "Galeriyi Aç-Kapat",
-            "desc": "Galeri panelini aç-kapat"
-        },
-        "downloadImage": {
-            "title": "Görseli İndir",
-            "desc": "Tuval içeriğini indir"
-        },
-        "previousStagingImage": {
-            "title": "Önceki Görsel Parça",
-            "desc": "Önceki Görsel Parçayı Göster"
-        },
-        "increaseBrushSize": {
-            "title": "Fırça Boyutunu Artır",
-            "desc": "Tuval fırçasının/silgisinin boyutunu artırır"
-        },
-        "previousImage": {
-            "desc": "Galerideki önceki görseli göster",
-            "title": "Önceki Görsel"
-        },
-        "toggleOptionsAndGallery": {
-            "title": "Seçenekleri ve Galeriyi Aç-Kapat",
-            "desc": "Seçenekler ve galeri panellerini aç-kapat"
-        },
-        "toggleSnap": {
-            "desc": "Kılavuza Uydur",
-            "title": "Kılavuza Uydur"
-        },
-        "resetView": {
-            "desc": "Tuval Görüşünü Resetle",
-            "title": "Görüşü Resetle"
-        },
-        "cancelAndClear": {
-            "desc": "Geçerli işi geri çek ve sıradaki tüm işleri sil",
-            "title": "Vazgeç ve Sil"
-        },
-        "decreaseBrushSize": {
-            "title": "Fırça Boyutunu Düşür",
-            "desc": "Tuval fırçasının/silgisinin boyutunu düşürür"
-        },
-        "resetOptionsAndGallery": {
-            "desc": "Seçenekler ve galeri panellerini resetler",
-            "title": "Seçenekleri ve Galeriyi Resetle"
-        },
-        "remixImage": {
-            "desc": "Seçili görselin tohumu hariç tüm değişkenlerini kullan",
-            "title": "Benzerini Türet"
-        },
-        "undoStroke": {
-            "title": "Vuruşu Geri Al",
-            "desc": "Fırça vuruşunu geri al"
-        },
-        "saveToGallery": {
-            "title": "Galeriye Gönder",
-            "desc": "Tuval içeriğini galeriye gönder"
-        },
-        "unifiedCanvasHotkeys": "Tuval",
-        "addNodes": {
-            "desc": "Çizge ekleme menüsünü açar",
-            "title": "Çizge Ekle"
-        },
-        "eraseBoundingBox": {
-            "desc": "Sınırlayıcı kutunun içini boşaltır",
-            "title": "Sınırlayıcı Kutuyu Boşalt"
-        },
-        "selectBrush": {
-            "desc": "Tuval fırçasını kullan",
-            "title": "Fırçayı Kullan"
-        },
-        "restoreFaces": {
-            "title": "Yüzleri Onar",
-            "desc": "Geçerli görseli onar"
-        }
-    },
-    "unifiedCanvas": {
-        "accept": "Onayla",
-        "clearCanvasHistoryMessage": "Tuval geçmişini silmek tuvale dokunmaz, ancak yineleme ve geri alma geçmişini geri dönülemez bir biçimde siler."
+        "clearSearch": "Aramayı Sil"
     },
     "nodes": {
         "unableToValidateWorkflow": "İş Akışı Doğrulanamadı",
@@ -596,15 +289,9 @@
         "workflowSaved": "İş Akışı Kaydedildi"
     },
     "toast": {
-        "problemDownloadingCanvasDesc": "Taban katman indirilemedi",
-        "problemSavingMaskDesc": "Maske kaydedilemedi",
-        "problemSavingCanvasDesc": "Taban katman kaydedilemedi",
         "problemRetrievingWorkflow": "İş Akışını Getirmede Sorun",
         "workflowDeleted": "İş Akışı Silindi",
         "loadedWithWarnings": "İş Akışı Yüklendi Ancak Uyarılar Var",
-        "problemImportingMaskDesc": "Maske aktarılamadı",
-        "problemMergingCanvasDesc": "Taban katman aktarılamadı",
-        "problemCopyingCanvasDesc": "Taban katman aktarılamadı",
         "workflowLoaded": "İş Akışı Yüklendi",
         "problemDeletingWorkflow": "İş Akışını Silmede Sorun"
     },
@@ -612,7 +299,6 @@
         "invoke": {
             "noPrompts": "İstem oluşturulmadı",
             "noModelSelected": "Model seçilmedi",
-            "incompatibleBaseModelForControlAdapter": "{{number}}. yönetim aracı, ana model ile uyumlu değil.",
             "systemDisconnected": "Sistem bağlantısı kesildi",
             "invoke": "Invoke"
         },
@@ -642,8 +328,6 @@
         "noiseThreshold": "Gürültü Eşiği",
         "seed": "Tohum",
         "imageActions": "Görsel İşlemleri",
-        "sendToImg2Img": "Görselden Görsele Aktar",
-        "sendToUnifiedCanvas": "Tuvale Aktar",
         "showOptionsPanel": "Yan Paneli Göster (O ya da T)",
         "shuffle": "Kar",
         "usePrompt": "İstemi Kullan",
@@ -680,9 +364,7 @@
         "vaePrecision": "VAE Kesinliği",
         "convertToDiffusersHelpText6": "Bu modeli dönüştürmek istiyor musunuz?",
         "deleteMsg1": "Bu modeli InvokeAI'dan silmek istediğinize emin misiniz?",
-        "modelSyncFailed": "Modeller Senkronize Edilemedi",
         "settings": "Seçenekler",
-        "v2_768": "v2 (768pks)",
         "vae": "VAE",
         "width": "En",
         "delete": "Sil",
@@ -705,22 +387,15 @@
         "deleteMsg2": "Model InvokeAI ana klasöründeyse bilgisayarınızdan silinir, bu klasör dışındaysa bilgisayarınızdan silinmeyecektir.",
         "load": "Yükle",
         "modelDeleteFailed": "Model kaldırılamadı",
-        "modelsSynced": "Modeller Senkronize Edildi",
         "noModelSelected": "Model Seçilmedi",
         "predictionType": "Saptama Türü",
         "selectModel": "Model Seç",
-        "v2_base": "v2 (512pks)",
         "modelConversionFailed": "Model Dönüşümü Başarısız",
         "modelConverted": "Model Dönüştürüldü",
         "description": "Tanım"
     },
-    "dynamicPrompts": {
-        "promptsWithCount_one": "{{count}} İstem",
-        "promptsWithCount_other": "{{count}} İstem"
-    },
     "models": {
         "addLora": "LoRA Ekle",
-        "esrganModel": "ESRGAN Modeli",
         "defaultVAE": "Varsayılan VAE",
         "lora": "LoRA",
         "noModelsAvailable": "Model yok",

@@ -174,6 +174,7 @@ class ImageProcessorInvocation(BaseInvocation, WithMetadata, WithBoard):
     tags=["controlnet", "canny"],
     category="controlnet",
     version="1.3.3",
+    classification=Classification.Deprecated,
 )
 class CannyImageProcessorInvocation(ImageProcessorInvocation):
     """Canny edge detection for ControlNet"""
@@ -208,6 +209,7 @@ class CannyImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "hed", "softedge"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class HedImageProcessorInvocation(ImageProcessorInvocation):
     """Applies HED edge detection to image"""
@@ -237,6 +239,7 @@ class HedImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "lineart"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class LineartImageProcessorInvocation(ImageProcessorInvocation):
     """Applies line art processing to image"""
@@ -259,6 +262,7 @@ class LineartImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "lineart", "anime"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
     """Applies line art anime processing to image"""
@@ -282,6 +286,7 @@ class LineartAnimeImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "midas"],
     category="controlnet",
     version="1.2.4",
+    classification=Classification.Deprecated,
 )
 class MidasDepthImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Midas depth processing to image"""
@@ -314,6 +319,7 @@ class MidasDepthImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class NormalbaeImageProcessorInvocation(ImageProcessorInvocation):
     """Applies NormalBae processing to image"""
@@ -330,7 +336,12 @@ class NormalbaeImageProcessorInvocation(ImageProcessorInvocation):
 
 
 @invocation(
-    "mlsd_image_processor", title="MLSD Processor", tags=["controlnet", "mlsd"], category="controlnet", version="1.2.3"
+    "mlsd_image_processor",
+    title="MLSD Processor",
+    tags=["controlnet", "mlsd"],
+    category="controlnet",
+    version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class MlsdImageProcessorInvocation(ImageProcessorInvocation):
     """Applies MLSD processing to image"""
@@ -353,7 +364,12 @@ class MlsdImageProcessorInvocation(ImageProcessorInvocation):
 
 
 @invocation(
-    "pidi_image_processor", title="PIDI Processor", tags=["controlnet", "pidi"], category="controlnet", version="1.2.3"
+    "pidi_image_processor",
+    title="PIDI Processor",
+    tags=["controlnet", "pidi"],
+    category="controlnet",
+    version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class PidiImageProcessorInvocation(ImageProcessorInvocation):
     """Applies PIDI processing to image"""
@@ -381,6 +397,7 @@ class PidiImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "contentshuffle"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation):
     """Applies content shuffle processing to image"""
@@ -411,6 +428,7 @@ class ContentShuffleImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "zoe", "depth"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
     """Applies Zoe depth processing to image"""
@@ -427,6 +445,7 @@ class ZoeDepthImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "mediapipe", "face"],
     category="controlnet",
     version="1.2.4",
+    classification=Classification.Deprecated,
 )
 class MediapipeFaceProcessorInvocation(ImageProcessorInvocation):
     """Applies mediapipe face processing to image"""
@@ -454,6 +473,7 @@ class MediapipeFaceProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "leres", "depth"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class LeresImageProcessorInvocation(ImageProcessorInvocation):
     """Applies leres processing to image"""
@@ -483,6 +503,7 @@ class LeresImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "tile"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class TileResamplerProcessorInvocation(ImageProcessorInvocation):
     """Tile resampler processor"""
@@ -523,6 +544,7 @@ class TileResamplerProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "segmentanything"],
     category="controlnet",
     version="1.2.4",
+    classification=Classification.Deprecated,
 )
 class SegmentAnythingProcessorInvocation(ImageProcessorInvocation):
     """Applies segment anything processing to image"""
@@ -570,6 +592,7 @@ class SamDetectorReproducibleColors(SamDetector):
     tags=["controlnet"],
     category="controlnet",
     version="1.2.3",
+    classification=Classification.Deprecated,
 )
 class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a color map from the provided image"""
@@ -609,6 +632,7 @@ DEPTH_ANYTHING_MODELS = {
     tags=["controlnet", "depth", "depth anything"],
     category="controlnet",
     version="1.1.3",
+    classification=Classification.Deprecated,
 )
 class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a depth map based on the Depth Anything algorithm"""
@@ -643,6 +667,7 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     tags=["controlnet", "dwpose", "openpose"],
     category="controlnet",
     version="1.1.1",
+    classification=Classification.Deprecated,
 )
 class DWOpenposeImageProcessorInvocation(ImageProcessorInvocation):
     """Generates an openpose pose from an image using DWPose"""

@@ -1,6 +1,6 @@
 import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { searchTermChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { searchTermChanged, selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { PiXBold } from 'react-icons/pi';
 
 const StylePresetSearch = () => {
   const dispatch = useAppDispatch();
-  const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
+  const searchTerm = useAppSelector(selectStylePresetSearchTerm);
   const { t } = useTranslation();
 
   const handlePresetSearch = useCallback(

@@ -30,51 +30,12 @@ Invoke is available in two editions:
 |----------------------------------------------------------------------------------------------------------------------------|
 |  [Installation and Updates][installation docs] - [Documentation and Tutorials][docs home] - [Bug Reports][github issues] - [Contributing][contributing docs]  | 
 
-</div>
+# Installation
 
-## Quick Start
+To get started with Invoke, [Download the Installer](https://www.invoke.com/downloads).
 
-1. Download and unzip the installer from the bottom of the [latest release][latest release link].
-2. Run the installer script.
+For detailed step by step instructions, or for instructions on manual/docker installations, visit our documentation on [Installation and Updates][installation docs]
 
-   - **Windows**: Double-click on the `install.bat` script.
-   - **macOS**: Open a Terminal window, drag the file `install.sh` from Finder into the Terminal, and press enter.
-   - **Linux**: Run `install.sh`.
-
-3. When prompted, enter a location for the install and select your GPU type.
-4. Once the install finishes, find the directory you selected during install. The default location is `C:\Users\Username\invokeai` for Windows or `~/invokeai` for Linux/macOS.
-5. Run the launcher script (`invoke.bat` for Windows, `invoke.sh` for macOS and Linux) the same way you ran the installer script in step 2.
-6. Select option 1 to start the application. Once it starts up, open your browser and go to <http://localhost:9090>.
-7. Open the model manager tab to install a starter model and then you'll be ready to generate.
-
-More detail, including hardware requirements and manual install instructions, are available in the [installation documentation][installation docs].
-
-## Docker Container
-
-We publish official container images in Github Container Registry: https://github.com/invoke-ai/InvokeAI/pkgs/container/invokeai. Both CUDA and ROCm images are available. Check the above link for relevant tags.
-
-> [!IMPORTANT]
-> Ensure that Docker is set up to use the GPU. Refer to [NVIDIA][nvidia docker docs] or [AMD][amd docker docs] documentation.
-
-### Generate!
-
-Run the container, modifying the command as necessary:
-
-```bash
-docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
-```
-
-Then open `http://localhost:9090` and install some models using the Model Manager tab to begin generating.
-
-For ROCm, add `--device /dev/kfd --device /dev/dri` to the `docker run` command.
-
-### Persist your data
-
-You will likely want to persist your workspace outside of the container. Use the `--volume /home/myuser/invokeai:/invokeai` flag to mount some local directory (using its **absolute** path) to the `/invokeai` path inside the container. Your generated images and models will reside there. You can use this directory with other InvokeAI installations, or switch between runtime directories as needed.
-
-### DIY
-
-Build your own image and customize the environment to match your needs using our `docker-compose` stack. See [README.md](./docker/README.md) in the [docker](./docker) directory.
 
 ## Troubleshooting, FAQ and Support
 
@@ -105,7 +66,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 ### Other features
 
 - Support for both ckpt and diffusers models
-- SD1.5, SD2.0, and SDXL support
+- SD1.5, SD2.0, SDXL, and FLUX support
 - Upscaling Tools
 - Embedding Manager & Support
 - Model Manager & Support
@@ -126,15 +87,15 @@ Invoke is a combined effort of [passionate and talented people from across the w
 
 Original portions of the software are Copyright © 2024 by respective contributors.
 
-[features docs]: https://invoke-ai.github.io/InvokeAI/features/
-[faq]: https://invoke-ai.github.io/InvokeAI/help/FAQ/
-[contributors]: https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/
+[features docs]: https://invoke-ai.github.io/InvokeAI/features/database/
+[faq]: https://invoke-ai.github.io/InvokeAI/faq/
+[contributors]: https://invoke-ai.github.io/InvokeAI/contributing/contributors/
 [invoke.com]: https://www.invoke.com/about
 [github issues]: https://github.com/invoke-ai/InvokeAI/issues
 [docs home]: https://invoke-ai.github.io/InvokeAI
-[installation docs]: https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/
+[installation docs]: https://invoke-ai.github.io/InvokeAI/installation/
 [#dev-chat]: https://discord.com/channels/1020123559063990373/1049495067846524939
-[contributing docs]: https://invoke-ai.github.io/InvokeAI/contributing/CONTRIBUTING/
+[contributing docs]: https://invoke-ai.github.io/InvokeAI/contributing/
 [CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github
 [CI checks on main link]: https://github.com/invoke-ai/InvokeAI/actions?query=branch%3Amain
 [discord badge]: https://flat.badgen.net/discord/members/ZmtBAhwWhy?icon=discord

@@ -11,8 +11,13 @@ import {
   InputGroup,
   InputRightElement,
 } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
+import {
+  selectShouldInstallInPlace,
+  shouldInstallInPlaceChanged,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import type { ChangeEvent, ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,9 +31,10 @@ type ScanModelResultsProps = {
 };
 
 export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
+  const inplace = useAppSelector(selectShouldInstallInPlace);
+  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  const [inplace, setInplace] = useState(true);
   const [installModel] = useInstallModel();
 
   const filteredResults = useMemo(() => {
@@ -42,9 +48,12 @@ export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
     setSearchTerm(e.target.value.trim());
   }, []);
 
-  const onChangeInplace = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setInplace(e.target.checked);
-  }, []);
+  const onChangeInplace = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldInstallInPlaceChanged(e.target.checked));
+    },
+    [dispatch]
+  );
 
   const clearSearch = useCallback(() => {
     setSearchTerm('');

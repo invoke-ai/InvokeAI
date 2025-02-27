@@ -13,7 +13,7 @@ from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import DEFAULT_PRECISION, LATENT_SCALE_FACTOR
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -26,6 +26,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -49,7 +50,7 @@ class ImageToLatentsInvocation(BaseInvocation):
     # NOTE: tile_size = 0 is a special value. We use this rather than `int | None`, because the workflow UI does not
     # offer a way to directly set None values.
     tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
-    fp32: bool = InputField(default=DEFAULT_PRECISION == torch.float32, description=FieldDescriptions.fp32)
+    fp32: bool = InputField(default=False, description=FieldDescriptions.fp32)
 
     @staticmethod
     def vae_encode(
@@ -98,7 +99,7 @@ class ImageToLatentsInvocation(BaseInvocation):
                 )
 
             # non_noised_latents_from_image
-            image_tensor = image_tensor.to(device=vae.device, dtype=vae.dtype)
+            image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
             with torch.inference_mode(), tiling_context:
                 latents = ImageToLatentsInvocation._encode_to_tensor(vae, image_tensor)
 
@@ -117,6 +118,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
+        context.util.signal_progress("Running VAE encoder")
         latents = self.vae_encode(
             vae_info=vae_info, upcast=self.fp32, tiled=self.tiled, image_tensor=image_tensor, tile_size=self.tile_size
         )

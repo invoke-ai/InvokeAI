@@ -10,54 +10,60 @@ import {
   Skeleton,
   Text,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { some } from 'lodash-es';
+import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
 import { useDeleteBoardAndImagesMutation, useDeleteBoardMutation } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
-type Props = {
-  boardToDelete?: BoardDTO;
-  setBoardToDelete: (board?: BoardDTO) => void;
-};
+export const $boardToDelete = atom<BoardDTO | null>(null);
 
-const DeleteBoardModal = (props: Props) => {
-  const { boardToDelete, setBoardToDelete } = props;
+const DeleteBoardModal = () => {
+  useAssertSingleton('DeleteBoardModal');
+  const boardToDelete = useStore($boardToDelete);
   const { t } = useTranslation();
   const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
-    boardToDelete?.board_id ?? skipToken
+    boardToDelete?.board_id
+      ? {
+          board_id: boardToDelete?.board_id,
+          categories: undefined,
+          is_intermediate: undefined,
+        }
+      : skipToken
   );
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createMemoizedSelector(
-        [selectCanvasSlice, selectNodesSlice, selectControlAdaptersSlice, selectControlLayersSlice],
-        (canvas, nodes, controlAdapters, controlLayers) => {
-          const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-            getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, imageName)
-          );
+      createMemoizedSelector([selectNodesSlice, selectCanvasSlice, selectUpscaleSlice], (nodes, canvas, upscale) => {
+        const allImageUsage = (boardImageNames ?? []).map((imageName) =>
+          getImageUsage(nodes, canvas, upscale, imageName)
+        );
 
-          const imageUsageSummary: ImageUsage = {
-            isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
-            isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-            isControlImage: some(allImageUsage, (i) => i.isControlImage),
-            isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
-          };
+        const imageUsageSummary: ImageUsage = {
+          isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
+          isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
+          isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
+          isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
+          isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+          isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+          isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
+        };
 
-          return imageUsageSummary;
-        }
-      ),
+        return imageUsageSummary;
+      }),
     [boardImageNames]
   );
 
@@ -72,20 +78,20 @@ const DeleteBoardModal = (props: Props) => {
       return;
     }
     deleteBoardOnly(boardToDelete.board_id);
-    setBoardToDelete(undefined);
-  }, [boardToDelete, deleteBoardOnly, setBoardToDelete]);
+    $boardToDelete.set(null);
+  }, [boardToDelete, deleteBoardOnly]);
 
   const handleDeleteBoardAndImages = useCallback(() => {
     if (!boardToDelete) {
       return;
     }
     deleteBoardAndImages(boardToDelete.board_id);
-    setBoardToDelete(undefined);
-  }, [boardToDelete, deleteBoardAndImages, setBoardToDelete]);
+    $boardToDelete.set(null);
+  }, [boardToDelete, deleteBoardAndImages]);
 
   const handleClose = useCallback(() => {
-    setBoardToDelete(undefined);
-  }, [setBoardToDelete]);
+    $boardToDelete.set(null);
+  }, []);
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -103,7 +109,7 @@ const DeleteBoardModal = (props: Props) => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('controlnet.delete')} {boardToDelete.board_name}
+            {t('common.delete')} {boardToDelete.board_name}
           </AlertDialogHeader>
 
           <AlertDialogBody>

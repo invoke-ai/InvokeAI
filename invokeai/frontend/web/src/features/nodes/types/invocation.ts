@@ -1,4 +1,4 @@
-import type { Edge, Node } from 'reactflow';
+import type { Edge, Node } from '@xyflow/react';
 import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
@@ -16,7 +16,7 @@ const zInvocationTemplate = z.object({
   outputType: z.string().min(1),
   version: zSemVer,
   useCache: z.boolean(),
-  nodePack: z.string().min(1).nullish(),
+  nodePack: z.string().min(1).default('invokeai'),
   classification: zClassification,
 });
 export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
@@ -26,7 +26,7 @@ export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
   version: zSemVer,
-  nodePack: z.string().min(1).nullish(),
+  nodePack: z.string().min(1).default('invokeai'),
   label: z.string(),
   notes: z.string(),
   type: z.string().trim().min(1),
@@ -49,23 +49,19 @@ const zCurrentImageNodeData = z.object({
   label: z.string(),
   isOpen: z.boolean(),
 });
-const zAnyNodeData = z.union([zInvocationNodeData, zNotesNodeData, zCurrentImageNodeData]);
 
 export type NotesNodeData = z.infer<typeof zNotesNodeData>;
 export type InvocationNodeData = z.infer<typeof zInvocationNodeData>;
 type CurrentImageNodeData = z.infer<typeof zCurrentImageNodeData>;
-type AnyNodeData = z.infer<typeof zAnyNodeData>;
 
 export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
 export type NotesNode = Node<NotesNodeData, 'notes'>;
 export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
-export type AnyNode = Node<AnyNodeData>;
+export type AnyNode = InvocationNode | NotesNode | CurrentImageNode;
 
 export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
 export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
-export const isInvocationNodeData = (node?: AnyNodeData | null): node is InvocationNodeData =>
-  Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
 // #endregion
 
 // #region NodeExecutionState
@@ -87,9 +83,25 @@ export type NodeExecutionState = z.infer<typeof zNodeExecutionState>;
 // #endregion
 
 // #region Edges
-const zInvocationNodeEdgeExtra = z.object({
-  type: z.union([z.literal('default'), z.literal('collapsed')]),
+const zInvocationNodeEdgeCollapsedData = z.object({
+  count: z.number().int().min(1),
 });
-type InvocationNodeEdgeExtra = z.infer<typeof zInvocationNodeEdgeExtra>;
-export type InvocationNodeEdge = Edge<InvocationNodeEdgeExtra>;
+type InvocationNodeEdgeCollapsedData = z.infer<typeof zInvocationNodeEdgeCollapsedData>;
+export type DefaultInvocationNodeEdge = Edge<Record<string, never>, 'default'>;
+export type CollapsedInvocationNodeEdge = Edge<InvocationNodeEdgeCollapsedData, 'collapsed'>;
+export type AnyEdge = DefaultInvocationNodeEdge | CollapsedInvocationNodeEdge;
 // #endregion
+
+export const isBatchNodeType = (type: string) =>
+  ['image_batch', 'string_batch', 'integer_batch', 'float_batch'].includes(type);
+
+export const isGeneratorNodeType = (type: string) =>
+  ['image_generator', 'string_generator', 'integer_generator', 'float_generator'].includes(type);
+
+export const isBatchNode = (node: InvocationNode) => isBatchNodeType(node.data.type);
+
+const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.type);
+
+export const isExecutableNode = (node: InvocationNode) => {
+  return !isBatchNode(node) && !isGeneratorNode(node);
+};

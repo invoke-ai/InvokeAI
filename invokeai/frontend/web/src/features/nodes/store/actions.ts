@@ -4,7 +4,7 @@ import type { Graph, GraphAndWorkflowResponse } from 'services/api/types';
 
 const textToImageGraphBuilt = createAction<Graph>('nodes/textToImageGraphBuilt');
 const imageToImageGraphBuilt = createAction<Graph>('nodes/imageToImageGraphBuilt');
-export const canvasGraphBuilt = createAction<Graph>('nodes/canvasGraphBuilt');
+const canvasGraphBuilt = createAction<Graph>('nodes/canvasGraphBuilt');
 const nodesGraphBuilt = createAction<Graph>('nodes/nodesGraphBuilt');
 
 export const isAnyGraphBuilt = isAnyOf(

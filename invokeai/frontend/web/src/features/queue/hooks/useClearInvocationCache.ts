@@ -1,13 +1,14 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClearInvocationCacheMutation, useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
+import { $isConnected } from 'services/events/stores';
 
 export const useClearInvocationCache = () => {
   const { t } = useTranslation();
   const { data: cacheStatus } = useGetInvocationCacheStatusQuery();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const [trigger, { isLoading }] = useClearInvocationCacheMutation({
     fixedCacheKey: 'clearInvocationCache',
   });

@@ -3,7 +3,7 @@ import { useNodeClassification } from 'features/nodes/hooks/useNodeClassificatio
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFlaskBold, PiHammerBold } from 'react-icons/pi';
+import { PiCircuitryBold, PiFlaskBold, PiHammerBold, PiLightningFill } from 'react-icons/pi';
 
 interface Props {
   nodeId: string;
@@ -22,7 +22,7 @@ const InvocationNodeClassificationIcon = ({ nodeId }: Props) => {
       placement="top"
       shouldWrapChildren
     >
-      <Icon as={getIcon(classification)} display="block" boxSize={4} color="base.400" />
+      <ClassificationIcon classification={classification} />
     </Tooltip>
   );
 };
@@ -40,19 +40,35 @@ const ClassificationTooltipContent = memo(({ classification }: { classification:
     return t('nodes.prototypeDesc');
   }
 
+  if (classification === 'internal') {
+    return t('nodes.internalDesc');
+  }
+
+  if (classification === 'special') {
+    return t('nodes.specialDesc');
+  }
+
   return null;
 });
 
 ClassificationTooltipContent.displayName = 'ClassificationTooltipContent';
 
-const getIcon = (classification: Classification) => {
+const ClassificationIcon = ({ classification }: { classification: Classification }) => {
   if (classification === 'beta') {
-    return PiHammerBold;
+    return <Icon as={PiHammerBold} display="block" boxSize={4} color="invokeYellow.300" />;
   }
 
   if (classification === 'prototype') {
-    return PiFlaskBold;
+    return <Icon as={PiFlaskBold} display="block" boxSize={4} color="invokeRed.300" />;
   }
 
-  return undefined;
+  if (classification === 'internal') {
+    return <Icon as={PiCircuitryBold} display="block" boxSize={4} color="invokePurple.300" />;
+  }
+
+  if (classification === 'special') {
+    return <Icon as={PiLightningFill} display="block" boxSize={4} color="invokeGreen.300" />;
+  }
+
+  return null;
 };

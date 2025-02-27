@@ -1,17 +1,5 @@
-import type { LogLevel } from 'app/logging/logger';
-import type { ProgressImage } from 'services/events/types';
+import type { LogLevel, LogNamespace } from 'app/logging/logger';
 import { z } from 'zod';
-
-type SystemStatus = 'CONNECTED' | 'DISCONNECTED' | 'PROCESSING' | 'ERROR' | 'LOADING_MODEL';
-
-type DenoiseProgress = {
-  session_id: string;
-  batch_id: string;
-  progress_image: ProgressImage | null | undefined;
-  step: number;
-  total_steps: number;
-  percentage: number;
-};
 
 const zLanguage = z.enum([
   'ar',
@@ -34,6 +22,7 @@ const zLanguage = z.enum([
   'sv',
   'tr',
   'ua',
+  'vi',
   'zh_CN',
   'zh_Hant',
 ]);
@@ -42,17 +31,16 @@ export const isLanguage = (v: unknown): v is Language => zLanguage.safeParse(v).
 
 export interface SystemState {
   _version: 1;
-  isConnected: boolean;
   shouldConfirmOnDelete: boolean;
-  enableImageDebugging: boolean;
-  denoiseProgress: DenoiseProgress | null;
-  consoleLogLevel: LogLevel;
-  shouldLogToConsole: boolean;
   shouldAntialiasProgressImage: boolean;
+  shouldConfirmOnNewSession: boolean;
   language: Language;
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
-  status: SystemStatus;
   shouldEnableInformationalPopovers: boolean;
-  cancellations: string[];
+  shouldEnableModelDescriptions: boolean;
+  logIsEnabled: boolean;
+  logLevel: LogLevel;
+  logNamespaces: LogNamespace[];
+  shouldShowInvocationProgressDetail: boolean;
 }

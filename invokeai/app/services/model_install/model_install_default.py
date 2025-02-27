@@ -9,7 +9,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from shutil import copyfile, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import yaml
@@ -20,7 +20,6 @@ from requests import Session
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDownloadJob
-from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_install.model_install_common import (
@@ -56,6 +55,10 @@ from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.util import slugify
+
+if TYPE_CHECKING:
+    from invokeai.app.services.events.events_base import EventServiceBase
+
 
 TMPDIR_PREFIX = "tmpinstall_"
 
@@ -438,9 +441,10 @@ class ModelInstallService(ModelInstallServiceBase):
         variants = "|".join(ModelRepoVariant.__members__.values())
         hf_repoid_re = f"^([^/:]+/[^/:]+)(?::({variants})?(?::/?([^:]+))?)?$"
         source_obj: Optional[StringLikeSource] = None
+        source_stripped = source.strip('"')
 
-        if Path(source).exists():  # A local file or directory
-            source_obj = LocalModelSource(path=Path(source))
+        if Path(source_stripped).exists():  # A local file or directory
+            source_obj = LocalModelSource(path=Path(source_stripped))
         elif match := re.match(hf_repoid_re, source):
             source_obj = HFModelSource(
                 repo_id=match.group(1),
@@ -783,8 +787,9 @@ class ModelInstallService(ModelInstallServiceBase):
         # So what we do is to synthesize a folder named "sdxl-turbo_vae" here.
         if subfolder:
             top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
-            path_to_remove = top / subfolder.parts[-1]  # sdxl-turbo/vae/
-            path_to_add = Path(f"{top}_{subfolder}")
+            path_to_remove = top / subfolder  # sdxl-turbo/vae/
+            subfolder_rename = subfolder.name.replace("/", "_").replace("\\", "_")
+            path_to_add = Path(f"{top}_{subfolder_rename}")
         else:
             path_to_remove = Path(".")
             path_to_add = Path(".")

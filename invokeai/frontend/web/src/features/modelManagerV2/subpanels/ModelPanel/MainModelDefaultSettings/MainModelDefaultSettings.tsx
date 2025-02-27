@@ -1,6 +1,7 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
+import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
 import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultWidth';
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
@@ -16,6 +17,7 @@ import type { MainModelConfig } from 'services/api/types';
 
 import { DefaultCfgRescaleMultiplier } from './DefaultCfgRescaleMultiplier';
 import { DefaultCfgScale } from './DefaultCfgScale';
+import { DefaultGuidance } from './DefaultGuidance';
 import { DefaultScheduler } from './DefaultScheduler';
 import { DefaultSteps } from './DefaultSteps';
 import { DefaultVae } from './DefaultVae';
@@ -35,6 +37,7 @@ export type MainModelDefaultSettingsFormData = {
   cfgRescaleMultiplier: FormField<number>;
   width: FormField<number>;
   height: FormField<number>;
+  guidance: FormField<number>;
 };
 
 type Props = {
@@ -42,11 +45,18 @@ type Props = {
 };
 
 export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+  const selectedModelKey = useAppSelector(selectSelectedModelKey);
   const { t } = useTranslation();
 
+  const isFlux = useMemo(() => {
+    return modelConfig.base === 'flux';
+  }, [modelConfig]);
+
   const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
-  const optimalDimension = useMemo(() => getOptimalDimension(modelConfig), [modelConfig]);
+  const optimalDimension = useMemo(() => {
+    const modelBase = modelConfig?.base;
+    return getOptimalDimension(modelBase ?? null);
+  }, [modelConfig]);
   const [updateModel, { isLoading: isLoadingUpdateModel }] = useUpdateModelMutation();
 
   const { handleSubmit, control, formState, reset } = useForm<MainModelDefaultSettingsFormData>({
@@ -68,6 +78,7 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
         scheduler: data.scheduler.isEnabled ? data.scheduler.value : null,
         width: data.width.isEnabled ? data.width.value : null,
         height: data.height.isEnabled ? data.height.value : null,
+        guidance: data.guidance.isEnabled ? data.guidance.value : null,
       };
 
       updateModel({
@@ -114,11 +125,12 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
 
       <SimpleGrid columns={2} gap={8}>
         <DefaultVae control={control} name="vae" />
-        <DefaultVaePrecision control={control} name="vaePrecision" />
-        <DefaultScheduler control={control} name="scheduler" />
+        {!isFlux && <DefaultVaePrecision control={control} name="vaePrecision" />}
+        {!isFlux && <DefaultScheduler control={control} name="scheduler" />}
         <DefaultSteps control={control} name="steps" />
-        <DefaultCfgScale control={control} name="cfgScale" />
-        <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />
+        {isFlux && <DefaultGuidance control={control} name="guidance" />}
+        {!isFlux && <DefaultCfgScale control={control} name="cfgScale" />}
+        {!isFlux && <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />}
         <DefaultWidth control={control} optimalDimension={optimalDimension} />
         <DefaultHeight control={control} optimalDimension={optimalDimension} />
       </SimpleGrid>

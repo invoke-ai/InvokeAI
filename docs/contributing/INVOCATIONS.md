@@ -144,7 +144,7 @@ As you might have noticed, we added two new arguments to the `InputField`
 definition for `width` and `height`, called `gt` and `le`. They stand for
 _greater than or equal to_ and _less than or equal to_.
 
-These impose contraints on those fields, and will raise an exception if the
+These impose constraints on those fields, and will raise an exception if the
 values do not meet the constraints. Field constraints are provided by
 **pydantic**, so anything you see in the **pydantic docs** will work.
 
@@ -287,8 +287,8 @@ new Invocation ready to be used.
 
 Once you've created a Node, the next step is to share it with the community! The
 best way to do this is to submit a Pull Request to add the Node to the
-[Community Nodes](nodes/communityNodes) list. If you're not sure how to do that,
-take a look a at our [contributing nodes overview](contributingNodes).
+[Community Nodes](../nodes/communityNodes.md) list. If you're not sure how to do that,
+take a look a at our [contributing nodes overview](../nodes/contributingNodes.md).
 
 ## Advanced
 

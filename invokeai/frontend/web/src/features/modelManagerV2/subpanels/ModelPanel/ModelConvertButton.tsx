@@ -67,6 +67,7 @@ export const ModelConvertButton = memo(({ modelConfig }: ModelConvertProps) => {
         acceptButtonText={`${t('modelManager.convert')}`}
         isOpen={isOpen}
         onClose={onClose}
+        useInert={false}
       >
         <Flex flexDirection="column" rowGap={4}>
           <Text fontSize="md">{t('modelManager.convertToDiffusersHelpText1')}</Text>

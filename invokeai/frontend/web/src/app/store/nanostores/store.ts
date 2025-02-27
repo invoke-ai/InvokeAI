@@ -1,4 +1,5 @@
-import type { createStore } from 'app/store/store';
+import { useStore } from '@nanostores/react';
+import type { AppStore } from 'app/store/store';
 import { atom } from 'nanostores';
 
 // Inject socket options and url into window for debugging
@@ -22,10 +23,18 @@ class ReduxStoreNotInitialized extends Error {
   }
 }
 
-export const $store = atom<Readonly<ReturnType<typeof createStore>> | undefined>();
+export const $store = atom<Readonly<AppStore | undefined>>();
 
 export const getStore = () => {
   const store = $store.get();
+  if (!store) {
+    throw new ReduxStoreNotInitialized();
+  }
+  return store;
+};
+
+export const useAppStore = () => {
+  const store = useStore($store);
   if (!store) {
     throw new ReduxStoreNotInitialized();
   }

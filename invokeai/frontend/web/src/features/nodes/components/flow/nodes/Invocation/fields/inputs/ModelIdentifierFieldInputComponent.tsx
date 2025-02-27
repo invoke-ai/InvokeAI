@@ -3,6 +3,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldModelIdentifierValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { ModelIdentifierFieldInputInstance, ModelIdentifierFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
@@ -50,7 +51,7 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
 
   return (
     <Flex w="full" alignItems="center" gap={2}>
-      <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
+      <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isDisabled={!options.length} isInvalid={!value}>
         <Combobox
           value={value}
           placeholder={placeholder}

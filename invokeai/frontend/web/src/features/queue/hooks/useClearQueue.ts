@@ -1,15 +1,17 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClearQueueMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { $isConnected } from 'services/events/stores';
 
 export const useClearQueue = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: queueStatus } = useGetQueueStatusQuery();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const [trigger, { isLoading }] = useClearQueueMutation({
     fixedCacheKey: 'clearQueue',
   });
@@ -39,5 +41,10 @@ export const useClearQueue = () => {
 
   const isDisabled = useMemo(() => !isConnected || !queueStatus?.queue.total, [isConnected, queueStatus?.queue.total]);
 
-  return { clearQueue, isLoading, queueStatus, isDisabled };
+  return {
+    clearQueue,
+    isLoading,
+    queueStatus,
+    isDisabled,
+  };
 };

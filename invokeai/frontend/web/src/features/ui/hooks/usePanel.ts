@@ -5,86 +5,49 @@ import type {
   ImperativePanelHandle,
   PanelOnCollapse,
   PanelOnExpand,
+  PanelProps,
+  PanelResizeHandleProps,
 } from 'react-resizable-panels';
 import { getPanelGroupElement, getResizeHandleElementsForGroup } from 'react-resizable-panels';
 
 type Direction = 'horizontal' | 'vertical';
 
-export type UsePanelOptions =
-  | {
-      /**
-       * The minimum size of the panel as a percentage.
-       */
-      minSize: number;
-      /**
-       * The default size of the panel as a percentage.
-       */
-      defaultSize?: number;
-      /**
-       * The unit of the minSize
-       */
-      unit: 'percentages';
-    }
-  | {
-      /**
-       * The minimum size of the panel in pixels.
-       */
-      minSize: number;
-      /**
-       * The default size of the panel in pixels.
-       */
-      defaultSize?: number;
-      /**
-       * The unit of the minSize.
-       */
-      unit: 'pixels';
-      /**
-       * The direction of the panel group.
-       * This is required to accurately calculate the available space for the panel, minus the space taken by the handles.
-       */
-      panelGroupDirection: Direction;
-      /**
-       * A ref to the panel group.
-       */
-      panelGroupRef: RefObject<ImperativePanelGroupHandle>;
-    };
+const NO_SIZE = Symbol('NO_SIZE');
+
+export type UsePanelOptions = {
+  id: string;
+  /**
+   * The minimum size of the panel in pixels. Must be at least 1.
+   */
+  minSizePx: number;
+  /**
+   * The default size of the panel in pixels. Must be at least 1.
+   */
+  defaultSizePx?: number;
+  /**
+   * The direction of the panel group.
+   * This is required to accurately calculate the available space for the panel, minus the space taken by the handles.
+   */
+  panelGroupDirection: Direction;
+  /**
+   * A ref to the panel group.
+   */
+  imperativePanelGroupRef: RefObject<ImperativePanelGroupHandle>;
+  /**
+   * Called when the board's collapsed state changes.
+   */
+  onCollapse?: (isCollapsed: boolean) => void;
+};
 
 export type UsePanelReturn = {
-  /**
-   * The ref to the panel handle.
-   */
-  ref: RefObject<ImperativePanelHandle>;
-  /**
-   * The dynamically calculated minimum size of the panel.
-   */
-  minSize: number;
-  /**
-   * The dynamically calculated default size of the panel.
-   */
-  defaultSize: number;
   /**
    * Whether the panel is collapsed.
    */
   isCollapsed: boolean;
   /**
-   * The onCollapse callback. This is required to update the isCollapsed state.
-   * This should be passed to the panel as the onCollapse prop. Wrap it if additional logic is required.
-   */
-  onCollapse: PanelOnCollapse;
-  /**
-   * The onExpand callback. This is required to update the isCollapsed state.
-   * This should be passed to the panel as the onExpand prop. Wrap it if additional logic is required.
-   */
-  onExpand: PanelOnExpand;
-  /**
    * Reset the panel to the minSize.
    */
   reset: () => void;
-  /**
-   * Reset the panel to the minSize. If the panel is already at the minSize, collapse it.
-   * This should be passed to the `onDoubleClick` prop of the panel's nearest resize handle.
-   */
-  onDoubleClickHandle: () => void;
   /**
    * Toggle the panel between collapsed and expanded.
    */
@@ -98,133 +61,154 @@ export type UsePanelReturn = {
    */
   collapse: () => void;
   /**
-   * Resize the panel to the given size in the same units as the minSize.
+   * Resize the panel to the given size in pixels. Must be at least 1.
    */
-  resize: (size: number) => void;
+  resize: (sizePx: number) => void;
+  /**
+   * The props to apply to the panel.
+   */
+  panelProps: Partial<PanelProps & { ref: RefObject<ImperativePanelHandle> }>;
+  /**
+   * The props to apply to the resize handle.
+   */
+  resizeHandleProps: Partial<PanelResizeHandleProps>;
 };
 
 export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
-  const panelHandleRef = useRef<ImperativePanelHandle>(null);
-  const [_minSize, _setMinSize] = useState<number>(arg.unit === 'percentages' ? arg.minSize : 0);
-  const [_defaultSize, _setDefaultSize] = useState<number>(arg.defaultSize ?? arg.minSize);
+  const imperativePanelRef = useRef<ImperativePanelHandle>(null);
+  const [_minSize, _setMinSize] = useState(1);
+  const [_defaultSize, _setDefaultSize] = useState(1);
+
+  const observerCallback = useCallback(() => {
+    if (!imperativePanelRef?.current) {
+      return;
+    }
+
+    const minSizePct = getSizeAsPercentage(arg.minSizePx, arg.imperativePanelGroupRef, arg.panelGroupDirection);
+    const defaultSizePct = getSizeAsPercentage(
+      arg.defaultSizePx ?? arg.minSizePx,
+      arg.imperativePanelGroupRef,
+      arg.panelGroupDirection
+    );
+
+    if (minSizePct === NO_SIZE || defaultSizePct === NO_SIZE) {
+      // This can happen when the panel is hidden
+      return;
+    }
+
+    _setMinSize(minSizePct);
+
+    if (defaultSizePct > minSizePct) {
+      _setDefaultSize(defaultSizePct);
+    } else {
+      _setDefaultSize(minSizePct);
+    }
+
+    const currentSize = imperativePanelRef.current.getSize();
+    const isCollapsed = imperativePanelRef.current.isCollapsed();
+
+    if (!isCollapsed && currentSize < minSizePct && minSizePct > 0) {
+      imperativePanelRef.current.resize(minSizePct);
+    }
+  }, [arg.defaultSizePx, arg.imperativePanelGroupRef, arg.minSizePx, arg.panelGroupDirection]);
 
   // If the units are pixels, we need to calculate the min size as a percentage of the available space,
   // then resize the panel if it is too small.
   useLayoutEffect(() => {
-    if (arg.unit === 'percentages' || !arg.panelGroupRef.current) {
+    if (!arg.imperativePanelGroupRef.current) {
       return;
     }
-    const id = arg.panelGroupRef.current.getId();
+    const id = arg.imperativePanelGroupRef.current.getId();
     const panelGroupElement = getPanelGroupElement(id);
     const panelGroupHandleElements = getResizeHandleElementsForGroup(id);
     if (!panelGroupElement) {
       return;
     }
-    const resizeObserver = new ResizeObserver(() => {
-      if (!panelHandleRef?.current) {
-        return;
-      }
-
-      const minSizePct = getSizeAsPercentage(arg.minSize, arg.panelGroupRef, arg.panelGroupDirection);
-      _setMinSize(minSizePct);
-
-      const defaultSizePct = getSizeAsPercentage(
-        arg.defaultSize ?? arg.minSize,
-        arg.panelGroupRef,
-        arg.panelGroupDirection
-      );
-      _setDefaultSize(defaultSizePct);
-
-      if (!panelHandleRef.current.isCollapsed() && panelHandleRef.current.getSize() < minSizePct && minSizePct > 0) {
-        panelHandleRef.current.resize(minSizePct);
-      }
-    });
+    const resizeObserver = new ResizeObserver(observerCallback);
 
     resizeObserver.observe(panelGroupElement);
     panelGroupHandleElements.forEach((el) => resizeObserver.observe(el));
 
-    // Resize the panel to the min size once on startup
-    const defaultSizePct = getSizeAsPercentage(
-      arg.defaultSize ?? arg.minSize,
-      arg.panelGroupRef,
-      arg.panelGroupDirection
-    );
-    panelHandleRef.current?.resize(defaultSizePct);
+    observerCallback();
 
     return () => {
       resizeObserver.disconnect();
     };
-  }, [arg]);
+  }, [arg.imperativePanelGroupRef, observerCallback]);
 
-  const [isCollapsed, setIsCollapsed] = useState(() => Boolean(panelHandleRef.current?.isCollapsed()));
+  const [isCollapsed, setIsCollapsed] = useState(() => Boolean(imperativePanelRef.current?.isCollapsed()));
 
   const onCollapse = useCallback<PanelOnCollapse>(() => {
     setIsCollapsed(true);
-  }, []);
+    arg.onCollapse?.(true);
+  }, [arg]);
 
   const onExpand = useCallback<PanelOnExpand>(() => {
     setIsCollapsed(false);
-  }, []);
+    arg.onCollapse?.(false);
+  }, [arg]);
 
   const toggle = useCallback(() => {
-    if (panelHandleRef.current?.isCollapsed()) {
-      panelHandleRef.current?.expand();
+    if (imperativePanelRef.current?.isCollapsed()) {
+      imperativePanelRef.current?.expand();
     } else {
-      panelHandleRef.current?.collapse();
+      imperativePanelRef.current?.collapse();
     }
   }, []);
 
   const expand = useCallback(() => {
-    panelHandleRef.current?.expand();
+    imperativePanelRef.current?.expand();
   }, []);
 
   const collapse = useCallback(() => {
-    panelHandleRef.current?.collapse();
+    imperativePanelRef.current?.collapse();
   }, []);
 
   const resize = useCallback(
-    (size: number) => {
-      // If we are using percentages, we can just resize to the given size
-      if (arg.unit === 'percentages') {
-        panelHandleRef.current?.resize(size);
+    (sizePx: number) => {
+      // We need to calculate the size as a percentage of the available space
+      const sizeAsPct = getSizeAsPercentage(sizePx, arg.imperativePanelGroupRef, arg.panelGroupDirection);
+      if (sizeAsPct === NO_SIZE) {
         return;
       }
-
-      // If we are using pixels, we need to calculate the size as a percentage of the available space
-      const sizeAsPct = getSizeAsPercentage(size, arg.panelGroupRef, arg.panelGroupDirection);
-      panelHandleRef.current?.resize(sizeAsPct);
+      imperativePanelRef.current?.resize(sizeAsPct);
     },
     [arg]
   );
 
   const reset = useCallback(() => {
-    panelHandleRef.current?.resize(_minSize);
+    imperativePanelRef.current?.resize(_minSize);
   }, [_minSize]);
 
-  const onDoubleClickHandle = useCallback(() => {
+  const cycleState = useCallback(() => {
     // If the panel is really super close to the min size, collapse it
-    if (Math.abs((panelHandleRef.current?.getSize() ?? 0) - _defaultSize) < 0.01) {
+    if (Math.abs((imperativePanelRef.current?.getSize() ?? 0) - _defaultSize) < 0.01) {
       collapse();
       return;
     }
 
     // Otherwise, resize to the min size
-    panelHandleRef.current?.resize(_defaultSize);
+    imperativePanelRef.current?.resize(_defaultSize);
   }, [_defaultSize, collapse]);
 
   return {
-    ref: panelHandleRef,
-    minSize: _minSize,
     isCollapsed,
-    onCollapse,
-    onExpand,
     reset,
     toggle,
     expand,
     collapse,
     resize,
-    onDoubleClickHandle,
-    defaultSize: _defaultSize,
+    panelProps: {
+      id: arg.id,
+      defaultSize: _defaultSize,
+      onCollapse,
+      onExpand,
+      ref: imperativePanelRef,
+      minSize: _minSize,
+    },
+    resizeHandleProps: {
+      onDoubleClick: cycleState,
+    },
   };
 };
 
@@ -242,24 +226,29 @@ const getSizeAsPercentage = (
 ) => {
   if (!panelGroupHandleRef.current) {
     // No panel group handle ref, so we can't calculate the size
-    return 0;
+    return NO_SIZE;
   }
   const id = panelGroupHandleRef.current.getId();
   const panelGroupElement = getPanelGroupElement(id);
   if (!panelGroupElement) {
     // No panel group element, size is 0
-    return 0;
+    return NO_SIZE;
   }
 
   // The available space is the width/height of the panel group...
   let availableSpace =
     panelGroupDirection === 'horizontal' ? panelGroupElement.offsetWidth : panelGroupElement.offsetHeight;
 
+  if (!availableSpace) {
+    // No available space, size is 0
+    return NO_SIZE;
+  }
+
   // ...minus the width/height of the resize handles
   getResizeHandleElementsForGroup(id).forEach((el) => {
     availableSpace -= panelGroupDirection === 'horizontal' ? el.offsetWidth : el.offsetHeight;
   });
 
-  // The final value is a percentage of the available space
-  return (sizeInPixels / availableSpace) * 100;
+  // The final value is a percentage of the available space - must be between 1 and 100, inclusive
+  return Math.max(Math.min((sizeInPixels / availableSpace) * 100, 100), 1);
 };

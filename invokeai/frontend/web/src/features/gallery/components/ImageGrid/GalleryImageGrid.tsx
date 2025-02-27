@@ -4,7 +4,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { GallerySelectionCountTag } from 'features/gallery/components/ImageGrid/GallerySelectionCountTag';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
-import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import {
+  selectGalleryImageMinimumWidth,
+  selectGalleryLimit,
+  selectListImagesQueryArgs,
+} from 'features/gallery/store/gallerySelectors';
 import { limitChanged } from 'features/gallery/store/gallerySlice';
 import { debounce } from 'lodash-es';
 import { memo, useEffect, useMemo, useState } from 'react';
@@ -13,15 +17,15 @@ import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
 import { GALLERY_GRID_CLASS_NAME } from './constants';
-import GalleryImage, { GALLERY_IMAGE_CLASS_NAME } from './GalleryImage';
+import { GALLERY_IMAGE_CONTAINER_CLASS_NAME, GalleryImage } from './GalleryImage';
 
 const GalleryImageGrid = () => {
   useGalleryHotkeys();
   const { t } = useTranslation();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
-  const { imageDTOs, isLoading, isError } = useListImagesQuery(queryArgs, {
+  const { hasImages, isLoading, isError } = useListImagesQuery(queryArgs, {
     selectFromResult: ({ data, isLoading, isSuccess, isError }) => ({
-      imageDTOs: data?.items ?? EMPTY_ARRAY,
+      hasImages: data && data.items.length > 0,
       isLoading,
       isSuccess,
       isError,
@@ -44,7 +48,7 @@ const GalleryImageGrid = () => {
     );
   }
 
-  if (imageDTOs.length === 0) {
+  if (!hasImages) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <IAINoContentFallback label={t('gallery.noImagesInGallery')} icon={PiImageBold} />
@@ -52,19 +56,16 @@ const GalleryImageGrid = () => {
     );
   }
 
-  return <Content />;
+  return <GalleryImageGridContent />;
 };
 
 export default memo(GalleryImageGrid);
 
-const Content = () => {
+const GalleryImageGridContent = memo(() => {
   const dispatch = useAppDispatch();
-  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
+  const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
+  const limit = useAppSelector(selectGalleryLimit);
 
-  const queryArgs = useAppSelector(selectListImagesQueryArgs);
-  const { imageDTOs } = useListImagesQuery(queryArgs, {
-    selectFromResult: ({ data }) => ({ imageDTOs: data?.items ?? EMPTY_ARRAY }),
-  });
   // Use a callback ref to get reactivity on the container element because it is conditionally rendered
   const [container, containerRef] = useState<HTMLDivElement | null>(null);
 
@@ -78,29 +79,65 @@ const Content = () => {
       // Managing refs for dynamically rendered components is a bit tedious:
       // - https://react.dev/learn/manipulating-the-dom-with-refs#how-to-manage-a-list-of-refs-using-a-ref-callback
       // As a easy workaround, we can just grab the first gallery image element directly.
-      const galleryImageEl = document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`);
-      if (!galleryImageEl) {
+      const imageEl = document.querySelector(`.${GALLERY_IMAGE_CONTAINER_CLASS_NAME}`);
+      if (!imageEl) {
         // No images in gallery?
         return;
       }
 
-      const galleryImageRect = galleryImageEl.getBoundingClientRect();
+      const gridEl = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`);
+
+      if (!gridEl) {
+        return;
+      }
+
+      const imageRect = imageEl.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
 
-      if (!galleryImageRect.width || !galleryImageRect.height || !containerRect.width || !containerRect.height) {
+      // We need to account for the gap between images
+      const gridElStyle = window.getComputedStyle(gridEl);
+      const gap = parseFloat(gridElStyle.gap);
+
+      if (!imageRect.width || !imageRect.height || !containerRect.width || !containerRect.height) {
         // Gallery is too small to fit images or not rendered yet
         return;
       }
 
-      // Floating-point precision requires we round to get the correct number of images per row
-      const imagesPerRow = Math.round(containerRect.width / galleryImageRect.width);
-      // However, when calculating the number of images per column, we want to floor the value to not overflow the container
-      const imagesPerColumn = Math.floor(containerRect.height / galleryImageRect.height);
+      let imagesPerColumn = 0;
+      let spaceUsed = 0;
+
+      // Floating point precision can cause imagesPerColumn to be 1 too small. Adding 1px to the container size fixes
+      // this. Because the minimum image size is  without the possibility of overshooting.
+      while (spaceUsed + imageRect.height <= containerRect.height + 1) {
+        imagesPerColumn++; // Increment the number of images
+        spaceUsed += imageRect.height; // Add image size to the used space
+        if (spaceUsed + gap <= containerRect.height) {
+          spaceUsed += gap; // Add gap size to the used space after each image except after the last image
+        }
+      }
+
+      let imagesPerRow = 0;
+      spaceUsed = 0;
+
+      // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
+      // this, without the possibility of accidentally adding an extra column.
+      while (spaceUsed + imageRect.width <= containerRect.width + 1) {
+        imagesPerRow++; // Increment the number of images
+        spaceUsed += imageRect.width; // Add image size to the used space
+        if (spaceUsed + gap <= containerRect.width) {
+          spaceUsed += gap; // Add gap size to the used space after each image except after the last image
+        }
+      }
+
       // Always load at least 1 row of images
-      const limit = Math.max(imagesPerRow, imagesPerRow * imagesPerColumn);
-      dispatch(limitChanged(limit));
+      const newLimit = Math.max(imagesPerRow, imagesPerRow * imagesPerColumn);
+
+      if (limit === 0 || limit === newLimit) {
+        return;
+      }
+      dispatch(limitChanged(newLimit));
     }, 300);
-  }, [container, dispatch]);
+  }, [container, dispatch, limit]);
 
   useEffect(() => {
     // We want to recalculate the limit when image size changes
@@ -139,13 +176,29 @@ const Content = () => {
         <Grid
           className={GALLERY_GRID_CLASS_NAME}
           gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
+          gap={1}
         >
-          {imageDTOs.map((imageDTO, index) => (
-            <GalleryImage key={imageDTO.image_name} imageDTO={imageDTO} index={index} />
-          ))}
+          <GalleryImageGridImages />
         </Grid>
       </Box>
       <GallerySelectionCountTag />
     </Box>
   );
-};
+});
+
+GalleryImageGridContent.displayName = 'GalleryImageGridContent';
+
+const GalleryImageGridImages = memo(() => {
+  const queryArgs = useAppSelector(selectListImagesQueryArgs);
+  const { imageDTOs } = useListImagesQuery(queryArgs, {
+    selectFromResult: ({ data }) => ({ imageDTOs: data?.items ?? EMPTY_ARRAY }),
+  });
+  return (
+    <>
+      {imageDTOs.map((imageDTO) => (
+        <GalleryImage key={imageDTO.image_name} imageDTO={imageDTO} />
+      ))}
+    </>
+  );
+});
+GalleryImageGridImages.displayName = 'GalleryImageGridImages';

@@ -6,7 +6,11 @@ from diffusers import AutoencoderTiny
 
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_manager import ModelManagerServiceBase
-from invokeai.app.services.shared.invocation_context import InvocationContext, build_invocation_context
+from invokeai.app.services.shared.invocation_context import (
+    InvocationContext,
+    InvocationContextData,
+    build_invocation_context,
+)
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 
@@ -19,7 +23,7 @@ def mock_context(
     mock_services.model_manager = mm2_model_manager
     return build_invocation_context(
         services=mock_services,
-        data=None,  # type: ignore
+        data=InvocationContextData(queue_item=None, invocation=None, source_invocation_id=None),  # type: ignore
         is_canceled=None,  # type: ignore
     )
 

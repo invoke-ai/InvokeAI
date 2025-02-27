@@ -33,7 +33,7 @@ class PreviewExt(ExtensionBase):
     def initial_preview(self, ctx: DenoiseContext):
         self.callback(
             PipelineIntermediateState(
-                step=-1,
+                step=0,
                 order=ctx.scheduler.order,
                 total_steps=len(ctx.inputs.timesteps),
                 timestep=int(ctx.scheduler.config.num_train_timesteps),  # TODO: is there any code which uses it?

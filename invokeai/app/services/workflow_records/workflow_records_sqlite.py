@@ -125,11 +125,11 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def get_many(
         self,
-        page: int,
-        per_page: int,
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
         category: WorkflowCategory,
+        page: int = 0,
+        per_page: Optional[int] = None,
         query: Optional[str] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         try:
@@ -153,6 +153,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 """
             main_params: list[int | str] = [category.value]
             count_params: list[int | str] = [category.value]
+
             stripped_query = query.strip() if query else None
             if stripped_query:
                 wildcard_query = "%" + stripped_query + "%"
@@ -161,20 +162,28 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 main_params.extend([wildcard_query, wildcard_query])
                 count_params.extend([wildcard_query, wildcard_query])
 
-            main_query += f" ORDER BY {order_by.value} {direction.value} LIMIT ? OFFSET ?;"
-            main_params.extend([per_page, page * per_page])
+            main_query += f" ORDER BY {order_by.value} {direction.value}"
+
+            if per_page:
+                main_query += " LIMIT ? OFFSET ?"
+                main_params.extend([per_page, page * per_page])
+
             self._cursor.execute(main_query, main_params)
             rows = self._cursor.fetchall()
             workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
 
             self._cursor.execute(count_query, count_params)
             total = self._cursor.fetchone()[0]
-            pages = total // per_page + (total % per_page > 0)
+
+            if per_page:
+                pages = total // per_page + (total % per_page > 0)
+            else:
+                pages = 1  # If no pagination, there is only one page
 
             return PaginatedResults(
                 items=workflows,
                 page=page,
-                per_page=per_page,
+                per_page=per_page if per_page else total,
                 pages=pages,
                 total=total,
             )

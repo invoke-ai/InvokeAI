@@ -1,18 +1,17 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePrompt2Changed } from 'features/controlLayers/store/controlLayersSlice';
+import { negativePrompt2Changed, selectNegativePrompt2 } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLNegativeStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.controlLayers.present.negativePrompt2);
+  const prompt = useAppSelector(selectNegativePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(
@@ -21,13 +20,11 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
   });
-
-  useHotkeys('alt+a', onFocus, []);
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>

@@ -7,7 +7,6 @@ from PIL import Image, ImageFilter
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.constants import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
@@ -28,7 +27,10 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
 class GradientMaskOutput(BaseInvocationOutput):
     """Outputs a denoise mask and an image representing the total gradient of the mask."""
 
-    denoise_mask: DenoiseMaskField = OutputField(description="Mask for denoise model run")
+    denoise_mask: DenoiseMaskField = OutputField(
+        description="Mask for denoise model run. Values of 0.0 represent the regions to be fully denoised, and 1.0 "
+        + "represent the regions to be preserved."
+    )
     expanded_mask_area: ImageField = OutputField(
         description="Image representing the total gradient area of the mask. For paste-back purposes."
     )
@@ -73,11 +75,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
         ui_order=7,
     )
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=8)
-    fp32: bool = InputField(
-        default=DEFAULT_PRECISION == torch.float32,
-        description=FieldDescriptions.fp32,
-        ui_order=9,
-    )
+    fp32: bool = InputField(default=False, description=FieldDescriptions.fp32, ui_order=9)
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> GradientMaskOutput:
@@ -128,6 +126,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
                     image_tensor = image_tensor.unsqueeze(0)
                 img_mask = tv_resize(mask, image_tensor.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
                 masked_image = image_tensor * torch.where(img_mask < 0.5, 0.0, 1.0)
+                context.util.signal_progress("Running VAE encoder")
                 masked_latents = ImageToLatentsInvocation.vae_encode(
                     vae_info, self.fp32, self.tiled, masked_image.clone()
                 )

@@ -1,14 +1,17 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { starredFirstChanged } from 'features/gallery/store/gallerySlice';
+import { selectGallerySlice, starredFirstChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selectStarredFirst = createSelector(selectGallerySlice, (gallery) => gallery.starredFirst);
+
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const starredFirst = useAppSelector((s) => s.gallery.starredFirst);
+  const starredFirst = useAppSelector(selectStarredFirst);
 
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {

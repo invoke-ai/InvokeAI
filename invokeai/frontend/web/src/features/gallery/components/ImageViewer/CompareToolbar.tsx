@@ -10,6 +10,7 @@ import {
   UnorderedList,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectComparisonFit, selectComparisonMode } from 'features/gallery/store/gallerySelectors';
 import {
   comparedImagesSwapped,
   comparisonFitChanged,
@@ -17,16 +18,17 @@ import {
   comparisonModeCycled,
   imageToCompareChanged,
 } from 'features/gallery/store/gallerySlice';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiArrowsOutBold, PiQuestion, PiSwapBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsLeftRightBold, PiArrowsOutBold, PiQuestion } from 'react-icons/pi';
 
 export const CompareToolbar = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const comparisonMode = useAppSelector((s) => s.gallery.comparisonMode);
-  const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
+  const comparisonMode = useAppSelector(selectComparisonMode);
+  const comparisonFit = useAppSelector(selectComparisonFit);
   const setComparisonModeSlider = useCallback(() => {
     dispatch(comparisonModeChanged('slider'));
   }, [dispatch]);
@@ -39,7 +41,12 @@ export const CompareToolbar = memo(() => {
   const swapImages = useCallback(() => {
     dispatch(comparedImagesSwapped());
   }, [dispatch]);
-  useHotkeys('c', swapImages, [swapImages]);
+  useRegisteredHotkeys({
+    id: 'swapImages',
+    category: 'viewer',
+    callback: swapImages,
+    dependencies: [swapImages],
+  });
   const toggleComparisonFit = useCallback(() => {
     dispatch(comparisonFitChanged(comparisonFit === 'contain' ? 'fill' : 'contain'));
   }, [dispatch, comparisonFit]);
@@ -50,17 +57,19 @@ export const CompareToolbar = memo(() => {
   const nextMode = useCallback(() => {
     dispatch(comparisonModeCycled());
   }, [dispatch]);
-  useHotkeys('m', nextMode, [nextMode]);
+  useRegisteredHotkeys({ id: 'nextComparisonMode', category: 'viewer', callback: nextMode, dependencies: [nextMode] });
 
   return (
-    <Flex w="full" gap={2}>
+    <Flex w="full" px={2} gap={2} bg="base.750" borderTopRadius="base" h={12}>
       <Flex flex={1} justifyContent="center">
-        <Flex gap={2} marginInlineEnd="auto">
+        <Flex marginInlineEnd="auto" alignItems="center">
           <IconButton
-            icon={<PiSwapBold />}
+            icon={<PiArrowsLeftRightBold />}
             aria-label={`${t('gallery.swapImages')} (C)`}
             tooltip={`${t('gallery.swapImages')} (C)`}
             onClick={swapImages}
+            variant="link"
+            alignSelf="stretch"
           />
           {comparisonMode !== 'side-by-side' && (
             <IconButton
@@ -68,14 +77,15 @@ export const CompareToolbar = memo(() => {
               tooltip={t('gallery.stretchToFit')}
               onClick={toggleComparisonFit}
               colorScheme={comparisonFit === 'fill' ? 'invokeBlue' : 'base'}
-              variant="outline"
+              variant="link"
+              alignSelf="stretch"
               icon={<PiArrowsOutBold />}
             />
           )}
         </Flex>
       </Flex>
-      <Flex flex={1} gap={4} justifyContent="center">
-        <ButtonGroup variant="outline">
+      <Flex flex={1} justifyContent="center">
+        <ButtonGroup variant="outline" alignItems="center">
           <Button
             flexShrink={0}
             onClick={setComparisonModeSlider}
@@ -103,15 +113,19 @@ export const CompareToolbar = memo(() => {
         <Flex gap={2} marginInlineStart="auto" alignItems="center">
           <Tooltip label={<CompareHelp />}>
             <Flex alignItems="center">
-              <Icon boxSize={8} color="base.500" as={PiQuestion} lineHeight={0} />
+              <Icon boxSize={6} color="base.300" as={PiQuestion} lineHeight={0} />
             </Flex>
           </Tooltip>
-          <IconButton
-            icon={<PiXBold />}
+          <Button
+            variant="link"
+            alignSelf="stretch"
+            px={2}
             aria-label={`${t('gallery.exitCompare')} (Esc)`}
             tooltip={`${t('gallery.exitCompare')} (Esc)`}
             onClick={exitCompare}
-          />
+          >
+            {t('gallery.exitCompare')}
+          </Button>
         </Flex>
       </Flex>
     </Flex>

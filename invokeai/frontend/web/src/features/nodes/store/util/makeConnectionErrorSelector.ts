@@ -1,9 +1,9 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import type { RootState } from 'app/store/store';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import type { HandleType } from '@xyflow/react';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, PendingConnection, Templates } from 'features/nodes/store/types';
-import { buildRejectResult, validateConnection } from 'features/nodes/store/util/validateConnection';
-import type { Edge, HandleType } from 'reactflow';
+import { validateConnection } from 'features/nodes/store/util/validateConnection';
+import type { AnyEdge } from 'features/nodes/types/invocation';
 
 /**
  * Creates a selector that validates a pending connection.
@@ -21,47 +21,43 @@ export const makeConnectionErrorSelector = (
   templates: Templates,
   nodeId: string,
   fieldName: string,
-  handleType: HandleType
+  handleType: HandleType,
+  pendingConnection: PendingConnection | null,
+  edgePendingUpdate: AnyEdge | null
 ) => {
-  return createMemoizedSelector(
-    selectNodesSlice,
-    (state: RootState, pendingConnection: PendingConnection | null) => pendingConnection,
-    (state: RootState, pendingConnection: PendingConnection | null, edgePendingUpdate: Edge | null) =>
-      edgePendingUpdate,
-    (nodesSlice: NodesState, pendingConnection: PendingConnection | null, edgePendingUpdate: Edge | null) => {
-      const { nodes, edges } = nodesSlice;
+  return createSelector(selectNodesSlice, (nodesSlice: NodesState): string | null => {
+    const { nodes, edges } = nodesSlice;
 
-      if (!pendingConnection) {
-        return buildRejectResult('nodes.noConnectionInProgress');
-      }
-
-      if (handleType === pendingConnection.handleType) {
-        if (handleType === 'source') {
-          return buildRejectResult('nodes.cannotConnectOutputToOutput');
-        }
-        return buildRejectResult('nodes.cannotConnectInputToInput');
-      }
-
-      // we have to figure out which is the target and which is the source
-      const source = handleType === 'source' ? nodeId : pendingConnection.nodeId;
-      const sourceHandle = handleType === 'source' ? fieldName : pendingConnection.handleId;
-      const target = handleType === 'target' ? nodeId : pendingConnection.nodeId;
-      const targetHandle = handleType === 'target' ? fieldName : pendingConnection.handleId;
-
-      const validationResult = validateConnection(
-        {
-          source,
-          sourceHandle,
-          target,
-          targetHandle,
-        },
-        nodes,
-        edges,
-        templates,
-        edgePendingUpdate
-      );
-
-      return validationResult;
+    if (!pendingConnection) {
+      return 'nodes.noConnectionInProgress';
     }
-  );
+
+    if (handleType === pendingConnection.handleType) {
+      if (handleType === 'source') {
+        return 'nodes.cannotConnectOutputToOutput';
+      }
+      return 'nodes.cannotConnectInputToInput';
+    }
+
+    // we have to figure out which is the target and which is the source
+    const source = handleType === 'source' ? nodeId : pendingConnection.nodeId;
+    const sourceHandle = handleType === 'source' ? fieldName : pendingConnection.handleId;
+    const target = handleType === 'target' ? nodeId : pendingConnection.nodeId;
+    const targetHandle = handleType === 'target' ? fieldName : pendingConnection.handleId;
+
+    const validationResult = validateConnection(
+      {
+        source,
+        sourceHandle,
+        target,
+        targetHandle,
+      },
+      nodes,
+      edges,
+      templates,
+      edgePendingUpdate
+    );
+
+    return validationResult;
+  });
 };

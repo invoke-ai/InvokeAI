@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.config import (
     DiffusersConfigBase,
     MainCheckpointConfig,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -36,17 +37,21 @@ VARIANT_TO_IN_CHANNEL_MAP = {
 }
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXLRefiner, type=ModelType.Main, format=ModelFormat.Diffusers
+)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion3, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXLRefiner, type=ModelType.Main, format=ModelFormat.Checkpoint
+)
 class StableDiffusionDiffusersModel(GenericDiffusersLoader):
     """Class to load main models."""
-
-    model_base_to_model_type = {
-        BaseModelType.StableDiffusion1: "FrozenCLIPEmbedder",
-        BaseModelType.StableDiffusion2: "FrozenOpenCLIPEmbedder",
-        BaseModelType.StableDiffusionXL: "SDXL",
-        BaseModelType.StableDiffusionXLRefiner: "SDXL-Refiner",
-    }
 
     def _load_model(
         self,
@@ -107,8 +112,6 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:
             raise Exception(f"No diffusers pipeline known for base={config.base}, variant={config.variant}") from e
-        prediction_type = config.prediction_type.value
-        upcast_attention = config.upcast_attention
 
         # Without SilenceWarnings we get log messages like this:
         # site-packages/huggingface_hub/file_download.py:1132: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
@@ -119,13 +122,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         # ['text_model.embeddings.position_ids']
 
         with SilenceWarnings():
-            pipeline = load_class.from_single_file(
-                config.path,
-                torch_dtype=self._torch_dtype,
-                prediction_type=prediction_type,
-                upcast_attention=upcast_attention,
-                load_safety_checker=False,
-            )
+            pipeline = load_class.from_single_file(config.path, torch_dtype=self._torch_dtype)
 
         if not submodel_type:
             return pipeline
@@ -136,5 +133,5 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             if subtype == submodel_type:
                 continue
             if submodel := getattr(pipeline, subtype.value, None):
-                self._ram_cache.put(config.key, submodel_type=subtype, model=submodel)
+                self._ram_cache.put(get_model_cache_key(config.key, subtype), model=submodel)
         return getattr(pipeline, submodel_type.value)

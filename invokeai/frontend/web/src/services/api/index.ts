@@ -1,6 +1,11 @@
 import { createSelectorCreator, lruMemoize } from '@reduxjs/toolkit';
-import type { FetchBaseQueryArgs } from '@reduxjs/toolkit/dist/query/fetchBaseQuery';
-import type { BaseQueryFn, FetchArgs, FetchBaseQueryError, TagDescription } from '@reduxjs/toolkit/query/react';
+import type {
+  BaseQueryFn,
+  FetchArgs,
+  FetchBaseQueryArgs,
+  FetchBaseQueryError,
+  TagDescription,
+} from '@reduxjs/toolkit/query/react';
 import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -42,6 +47,7 @@ const tagTypes = [
   'WorkflowsRecent',
   'StylePreset',
   'Schema',
+  'QueueCountsByDestination',
   // This is invalidated on reconnect. It should be used for queries that have changing data,
   // especially related to the queue and generation.
   'FetchOnReconnect',
@@ -49,11 +55,7 @@ const tagTypes = [
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
 
-const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
-  args,
-  api,
-  extraOptions
-) => {
+const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
   const baseUrl = $baseUrl.get();
   const authToken = $authToken.get();
   const projectId = $projectId.get();

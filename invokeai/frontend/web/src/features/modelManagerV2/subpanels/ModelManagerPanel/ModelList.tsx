@@ -1,10 +1,17 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import {
+  type FilterableModelType,
+  selectFilteredModelType,
+  selectSearchTerm,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  useCLIPEmbedModels,
+  useCLIPVisionModels,
+  useControlLoRAModel,
   useControlNetModels,
   useEmbeddingModels,
   useIPAdapterModels,
@@ -13,6 +20,7 @@ import {
   useRefinerModels,
   useSpandrelImageToImageModels,
   useT2IAdapterModels,
+  useT5EncoderModels,
   useVAEModels,
 } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig } from 'services/api/types';
@@ -21,8 +29,8 @@ import { FetchingModelsLoader } from './FetchingModelsLoader';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const ModelList = () => {
-  const filteredModelType = useAppSelector((s) => s.modelmanagerV2.filteredModelType);
-  const searchTerm = useAppSelector((s) => s.modelmanagerV2.searchTerm);
+  const filteredModelType = useAppSelector(selectFilteredModelType);
+  const searchTerm = useAppSelector(selectSearchTerm);
   const { t } = useTranslation();
 
   const [mainModels, { isLoading: isLoadingMainModels }] = useMainModels();
@@ -67,10 +75,34 @@ const ModelList = () => {
     [ipAdapterModels, searchTerm, filteredModelType]
   );
 
-  const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels();
+  const [clipVisionModels, { isLoading: isLoadingCLIPVisionModels }] = useCLIPVisionModels();
+  const filteredCLIPVisionModels = useMemo(
+    () => modelsFilter(clipVisionModels, searchTerm, filteredModelType),
+    [clipVisionModels, searchTerm, filteredModelType]
+  );
+
+  const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels({ excludeSubmodels: true });
   const filteredVAEModels = useMemo(
     () => modelsFilter(vaeModels, searchTerm, filteredModelType),
     [vaeModels, searchTerm, filteredModelType]
+  );
+
+  const [t5EncoderModels, { isLoading: isLoadingT5EncoderModels }] = useT5EncoderModels({ excludeSubmodels: true });
+  const filteredT5EncoderModels = useMemo(
+    () => modelsFilter(t5EncoderModels, searchTerm, filteredModelType),
+    [t5EncoderModels, searchTerm, filteredModelType]
+  );
+
+  const [controlLoRAModels, { isLoading: isLoadingControlLoRAModels }] = useControlLoRAModel();
+  const filteredControlLoRAModels = useMemo(
+    () => modelsFilter(controlLoRAModels, searchTerm, filteredModelType),
+    [controlLoRAModels, searchTerm, filteredModelType]
+  );
+
+  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useCLIPEmbedModels({ excludeSubmodels: true });
+  const filteredClipEmbedModels = useMemo(
+    () => modelsFilter(clipEmbedModels, searchTerm, filteredModelType),
+    [clipEmbedModels, searchTerm, filteredModelType]
   );
 
   const [spandrelImageToImageModels, { isLoading: isLoadingSpandrelImageToImageModels }] =
@@ -89,19 +121,27 @@ const ModelList = () => {
       filteredControlNetModels.length +
       filteredT2IAdapterModels.length +
       filteredIPAdapterModels.length +
+      filteredCLIPVisionModels.length +
       filteredVAEModels.length +
-      filteredSpandrelImageToImageModels.length
+      filteredSpandrelImageToImageModels.length +
+      t5EncoderModels.length +
+      clipEmbedModels.length +
+      controlLoRAModels.length
     );
   }, [
     filteredControlNetModels.length,
     filteredEmbeddingModels.length,
     filteredIPAdapterModels.length,
+    filteredCLIPVisionModels.length,
     filteredLoRAModels.length,
     filteredMainModels.length,
     filteredRefinerModels.length,
     filteredT2IAdapterModels.length,
     filteredVAEModels.length,
     filteredSpandrelImageToImageModels.length,
+    t5EncoderModels.length,
+    clipEmbedModels.length,
+    controlLoRAModels.length,
   ]);
 
   return (
@@ -149,10 +189,34 @@ const ModelList = () => {
         {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
           <ModelListWrapper title={t('common.ipAdapter')} modelList={filteredIPAdapterModels} key="ip-adapters" />
         )}
+        {/* CLIP Vision List */}
+        {isLoadingCLIPVisionModels && <FetchingModelsLoader loadingMessage="Loading CLIP Vision Models..." />}
+        {!isLoadingCLIPVisionModels && filteredCLIPVisionModels.length > 0 && (
+          <ModelListWrapper title="CLIP Vision" modelList={filteredCLIPVisionModels} key="clip-vision" />
+        )}
         {/* T2I Adapters List */}
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}
         {!isLoadingT2IAdapterModels && filteredT2IAdapterModels.length > 0 && (
           <ModelListWrapper title={t('common.t2iAdapter')} modelList={filteredT2IAdapterModels} key="t2i-adapters" />
+        )}
+        {/* T5 Encoders List */}
+        {isLoadingT5EncoderModels && <FetchingModelsLoader loadingMessage="Loading T5 Encoder Models..." />}
+        {!isLoadingT5EncoderModels && filteredT5EncoderModels.length > 0 && (
+          <ModelListWrapper title={t('modelManager.t5Encoder')} modelList={filteredT5EncoderModels} key="t5-encoder" />
+        )}
+        {/* Control Lora List */}
+        {isLoadingControlLoRAModels && <FetchingModelsLoader loadingMessage="Loading Control Loras..." />}
+        {!isLoadingControlLoRAModels && filteredControlLoRAModels.length > 0 && (
+          <ModelListWrapper
+            title={t('modelManager.controlLora')}
+            modelList={filteredControlLoRAModels}
+            key="control-lora"
+          />
+        )}
+        {/* Clip Embed List */}
+        {isLoadingClipEmbedModels && <FetchingModelsLoader loadingMessage="Loading Clip Embed Models..." />}
+        {!isLoadingClipEmbedModels && filteredClipEmbedModels.length > 0 && (
+          <ModelListWrapper title={t('modelManager.clipEmbed')} modelList={filteredClipEmbedModels} key="clip-embed" />
         )}
         {/* Spandrel Image to Image List */}
         {isLoadingSpandrelImageToImageModels && (
@@ -160,7 +224,7 @@ const ModelList = () => {
         )}
         {!isLoadingSpandrelImageToImageModels && filteredSpandrelImageToImageModels.length > 0 && (
           <ModelListWrapper
-            title="Image-to-Image"
+            title={t('modelManager.spandrelImageToImage')}
             modelList={filteredSpandrelImageToImageModels}
             key="spandrel-image-to-image"
           />

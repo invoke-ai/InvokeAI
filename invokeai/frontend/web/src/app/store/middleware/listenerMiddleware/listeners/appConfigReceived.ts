@@ -1,19 +1,20 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { setInfillMethod } from 'features/parameters/store/generationSlice';
+import { setInfillMethod } from 'features/controlLayers/store/paramsSlice';
 import { shouldUseNSFWCheckerChanged, shouldUseWatermarkerChanged } from 'features/system/store/systemSlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 
 export const addAppConfigReceivedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: appInfoApi.endpoints.getAppConfig.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
+    effect: (action, { getState, dispatch }) => {
       const { infill_methods = [], nsfw_methods = [], watermarking_methods = [] } = action.payload;
-      const infillMethod = getState().generation.infillMethod;
+      const infillMethod = getState().params.infillMethod;
 
       if (!infill_methods.includes(infillMethod)) {
-        // if there is no infill method, set it to the first one
-        // if there is no first one... god help us
-        dispatch(setInfillMethod(infill_methods[0] as string));
+        // If the selected infill method does not exist, prefer 'lama' if it's in the list, otherwise 'tile'.
+        // TODO(psyche): lama _should_ always be in the list, but the API doesn't guarantee it...
+        const infillMethod = infill_methods.includes('lama') ? 'lama' : 'tile';
+        dispatch(setInfillMethod(infillMethod));
       }
 
       if (!nsfw_methods.includes('nsfw_checker')) {

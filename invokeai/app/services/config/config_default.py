@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import filecmp
 import locale
 import os
 import re
@@ -12,7 +13,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-import psutil
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -24,8 +24,6 @@ from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 INIT_FILE = Path("invokeai.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
-DEFAULT_RAM_CACHE = 10.0
-DEFAULT_VRAM_CACHE = 0.25
 DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
@@ -33,24 +31,6 @@ ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 CONFIG_SCHEMA_VERSION = "4.0.2"
-
-
-def get_default_ram_cache_size() -> float:
-    """Run a heuristic for the default RAM cache based on installed RAM."""
-
-    # On some machines, psutil.virtual_memory().total gives a value that is slightly less than the actual RAM, so the
-    # limits are set slightly lower than than what we expect the actual RAM to be.
-
-    GB = 1024**3
-    max_ram = psutil.virtual_memory().total / GB
-
-    if max_ram >= 60:
-        return 15.0
-    if max_ram >= 30:
-        return 7.5
-    if max_ram >= 14:
-        return 4.0
-    return 2.1  # 2.1 is just large enough for sd 1.5 ;-)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -96,15 +76,21 @@ class InvokeAIAppConfig(BaseSettings):
         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
         log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
+        log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
         use_memory_db: Use in-memory database. Useful for development.
         dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.
         profile_graphs: Enable graph profiling using `cProfile`.
         profile_prefix: An optional prefix for profile output files.
         profiles_dir: Path to profiles output directory.
-        ram: Maximum memory amount used by memory model cache for rapid switching (GB).
-        vram: Amount of VRAM reserved for model storage (GB).
-        lazy_offload: Keep models in VRAM until their space is needed.
+        max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+        max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
+        device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
+        enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
+        keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.
+        ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+        vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+        lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
@@ -162,6 +148,7 @@ class InvokeAIAppConfig(BaseSettings):
     log_format:              LOG_FORMAT = Field(default="color",            description='Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.')
     log_level:                LOG_LEVEL = Field(default="info",             description="Emit logging messages at this level or higher.")
     log_sql:                       bool = Field(default=False,              description="Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.")
+    log_level_network:        LOG_LEVEL = Field(default='warning',          description="Log level for network-related messages. 'info' and 'debug' are very verbose.")
 
     # Development
     use_memory_db:                 bool = Field(default=False,              description="Use in-memory database. Useful for development.")
@@ -171,10 +158,16 @@ class InvokeAIAppConfig(BaseSettings):
     profiles_dir:                  Path = Field(default=Path("profiles"),   description="Path to profiles output directory.")
 
     # CACHE
-    ram:                           float = Field(default_factory=get_default_ram_cache_size, gt=0, description="Maximum memory amount used by memory model cache for rapid switching (GB).")
-    vram:                          float = Field(default=DEFAULT_VRAM_CACHE, ge=0, description="Amount of VRAM reserved for model storage (GB).")
-    lazy_offload:                  bool = Field(default=True,               description="Keep models in VRAM until their space is needed.")
+    max_cache_ram_gb:   Optional[float] = Field(default=None, gt=0,         description="The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.")
+    max_cache_vram_gb:  Optional[float] = Field(default=None, ge=0,         description="The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
+    device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
+    enable_partial_loading:        bool = Field(default=False,              description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
+    keep_ram_copy_of_weights:      bool = Field(default=True,              description="Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.")
+    # Deprecated CACHE configs
+    ram:                Optional[float] = Field(default=None, gt=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
+    vram:               Optional[float] = Field(default=None, ge=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
+    lazy_offload:                  bool = Field(default=True,               description="DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.")
 
     # DEVICE
     device:                      DEVICE = Field(default="auto",             description="Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.")
@@ -250,13 +243,13 @@ class InvokeAIAppConfig(BaseSettings):
             )
 
             if as_example:
-                file.write(
-                    "# This is an example file with default and example settings. Use the values here as a baseline.\n\n"
-                )
+                file.write("# This is an example file with default and example settings.\n")
+                file.write("# You should not copy this whole file into your config.\n")
+                file.write("# Only add the settings you need to change to your config file.\n\n")
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
-            file.write("# Put user settings here - see https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/:\n")
+            file.write("# Put user settings here - see https://invoke-ai.github.io/InvokeAI/configuration/:\n")
             if len(config_dict) > 0:
                 file.write(yaml.dump(config_dict, sort_keys=False))
 
@@ -525,9 +518,35 @@ def get_config() -> InvokeAIAppConfig:
     ]
     example_config.write_file(config.config_file_path.with_suffix(".example.yaml"), as_example=True)
 
-    # Copy all legacy configs - We know `__path__[0]` is correct here
+    # Copy all legacy configs only if needed
+    # We know `__path__[0]` is correct here
     configs_src = Path(model_configs.__path__[0])  # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
-    shutil.copytree(configs_src, config.legacy_conf_path, dirs_exist_ok=True)
+    dest_path = config.legacy_conf_path
+
+    # Create destination (we don't need to check for existence)
+    dest_path.mkdir(parents=True, exist_ok=True)
+
+    # Compare directories recursively
+    comparison = filecmp.dircmp(configs_src, dest_path)
+    need_copy = any(
+        [
+            comparison.left_only,  # Files exist only in source
+            comparison.diff_files,  # Files that differ
+            comparison.common_funny,  # Files that couldn't be compared
+        ]
+    )
+
+    if need_copy:
+        # Get permissions from destination directory
+        dest_mode = dest_path.stat().st_mode
+
+        # Copy directory tree
+        shutil.copytree(configs_src, dest_path, dirs_exist_ok=True)
+
+        # Set permissions on copied files to match destination directory
+        dest_path.chmod(dest_mode)
+        for p in dest_path.glob("**/*"):
+            p.chmod(dest_mode)
 
     if config.config_file_path.exists():
         config_from_file = load_and_migrate_config(config.config_file_path)

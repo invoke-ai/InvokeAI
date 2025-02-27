@@ -1,12 +1,17 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
+import {
+  selectBoardSearchText,
+  selectListBoardsQueryArgs,
+  selectSelectedBoardId,
+} from 'features/gallery/store/gallerySelectors';
+import { selectAllowPrivateBoards } from 'features/system/store/configSelectors';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import type { BoardDTO } from 'services/api/types';
 
 import AddBoardButton from './AddBoardButton';
 import GalleryBoard from './GalleryBoard';
@@ -14,16 +19,15 @@ import NoBoardBoard from './NoBoardBoard';
 
 type Props = {
   isPrivate: boolean;
-  setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
+export const BoardsList = ({ isPrivate }: Props) => {
   const { t } = useTranslation();
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const boardSearchText = useAppSelector(selectBoardSearchText);
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
   const { data: boards } = useListAllBoardsQuery(queryArgs);
-  const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
+  const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
   const filteredBoards = useMemo(() => {
@@ -52,17 +56,12 @@ export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
 
     filteredBoards.forEach((board) => {
       elements.push(
-        <GalleryBoard
-          board={board}
-          isSelected={selectedBoardId === board.board_id}
-          setBoardToDelete={setBoardToDelete}
-          key={board.board_id}
-        />
+        <GalleryBoard board={board} isSelected={selectedBoardId === board.board_id} key={board.board_id} />
       );
     });
 
     return elements;
-  }, [allowPrivateBoards, isPrivate, boardSearchText.length, filteredBoards, selectedBoardId, setBoardToDelete]);
+  }, [allowPrivateBoards, isPrivate, boardSearchText.length, filteredBoards, selectedBoardId]);
 
   const boardListTitle = useMemo(() => {
     if (allowPrivateBoards) {
@@ -106,7 +105,7 @@ export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
         )}
         <AddBoardButton isPrivateBoard={isPrivate} />
       </Flex>
-      <Collapse in={isOpen}>
+      <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
         <Flex direction="column" gap={1}>
           {boardElements.length ? (
             boardElements

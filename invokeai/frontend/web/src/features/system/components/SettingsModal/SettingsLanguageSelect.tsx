@@ -2,6 +2,7 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { selectLanguage } from 'features/system/store/systemSelectors';
 import { languageChanged } from 'features/system/store/systemSlice';
 import type { Language } from 'features/system/store/types';
 import { isLanguage } from 'features/system/store/types';
@@ -30,6 +31,7 @@ const optionsObject: Record<Language, string> = {
   sv: 'Svenska',
   tr: 'Türkçe',
   ua: 'Украї́нська',
+  vi: 'Tiếng Việt',
   zh_CN: '简体中文',
   zh_Hant: '漢語',
 };
@@ -39,7 +41,7 @@ const options = map(optionsObject, (label, value) => ({ label, value }));
 export const SettingsLanguageSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const language = useAppSelector((s) => s.system.language);
+  const language = useAppSelector(selectLanguage);
   const isLocalizationEnabled = useFeatureStatus('localization');
 
   const value = useMemo(() => options.find((o) => o.value === language), [language]);

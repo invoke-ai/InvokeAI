@@ -6,7 +6,6 @@ from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.constants import DEFAULT_PRECISION
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField
 from invokeai.app.invocations.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.model import VAEField
@@ -29,11 +28,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
     image: Optional[ImageField] = InputField(default=None, description="Image which will be masked", ui_order=1)
     mask: ImageField = InputField(description="The mask to use when pasting", ui_order=2)
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled, ui_order=3)
-    fp32: bool = InputField(
-        default=DEFAULT_PRECISION == torch.float32,
-        description=FieldDescriptions.fp32,
-        ui_order=4,
-    )
+    fp32: bool = InputField(default=False, description=FieldDescriptions.fp32, ui_order=4)
 
     def prep_mask_tensor(self, mask_image: Image.Image) -> torch.Tensor:
         if mask_image.mode != "L":
@@ -65,6 +60,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
             img_mask = tv_resize(mask, image_tensor.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
             masked_image = image_tensor * torch.where(img_mask < 0.5, 0.0, 1.0)
             # TODO:
+            context.util.signal_progress("Running VAE encoder")
             masked_latents = ImageToLatentsInvocation.vae_encode(vae_info, self.fp32, self.tiled, masked_image.clone())
 
             masked_latents_name = context.tensors.save(tensor=masked_latents)

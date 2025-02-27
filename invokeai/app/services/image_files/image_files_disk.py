@@ -110,15 +110,26 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except Exception as e:
             raise ImageFileDeleteException from e
 
-    # TODO: make this a bit more flexible for e.g. cloud storage
     def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
-        path = self.__output_folder / image_name
+        base_folder = self.__thumbnails_folder if thumbnail else self.__output_folder
+        filename = get_thumbnail_name(image_name) if thumbnail else image_name
 
-        if thumbnail:
-            thumbnail_name = get_thumbnail_name(image_name)
-            path = self.__thumbnails_folder / thumbnail_name
+        # Strip any path information from the filename
+        basename = Path(filename).name
 
-        return path
+        if basename != filename:
+            raise ValueError("Invalid image name, potential directory traversal detected")
+
+        image_path = base_folder / basename
+
+        # Ensure the image path is within the base folder to prevent directory traversal
+        resolved_base = base_folder.resolve()
+        resolved_image_path = image_path.resolve()
+
+        if not resolved_image_path.is_relative_to(resolved_base):
+            raise ValueError("Image path outside outputs folder, potential directory traversal detected")
+
+        return resolved_image_path
 
     def validate_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for an image or thumbnail."""

@@ -9,6 +9,8 @@ import i18n from 'i18n';
 import { pick } from 'lodash-es';
 import { fromZodError } from 'zod-validation-error';
 
+const log = logger('workflows');
+
 export type BuildWorkflowArg = {
   nodes: NodesState['nodes'];
   edges: NodesState['edges'];
@@ -26,6 +28,7 @@ const workflowKeys = [
   'exposedFields',
   'meta',
   'id',
+  'form',
 ] satisfies (keyof WorkflowV3)[];
 
 type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV3;
@@ -93,7 +96,7 @@ export const buildWorkflowWithValidation = ({ nodes, edges, workflow }: BuildWor
       prefix: i18n.t('nodes.unableToValidateWorkflow'),
     });
 
-    logger('nodes').warn({ workflow: parseify(workflowToValidate) }, message);
+    log.warn({ workflow: parseify(workflowToValidate) }, message);
     return null;
   }
 

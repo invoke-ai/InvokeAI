@@ -22,7 +22,7 @@ export const zColorField = z.object({
 });
 export type ColorField = z.infer<typeof zColorField>;
 
-export const zClassification = z.enum(['stable', 'beta', 'prototype']);
+export const zClassification = z.enum(['stable', 'beta', 'prototype', 'deprecated', 'internal', 'special']);
 export type Classification = z.infer<typeof zClassification>;
 
 export const zSchedulerField = z.enum([
@@ -61,11 +61,15 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
 
 // #region Model-related schemas
-const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sd-3', 'sdxl', 'sdxl-refiner', 'flux']);
+export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux']);
+export type MainModelBase = z.infer<typeof zMainModelBase>;
+export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 const zModelType = z.enum([
   'main',
   'vae',
   'lora',
+  'control_lora',
   'controlnet',
   't2i_adapter',
   'ip_adapter',
@@ -73,13 +77,18 @@ const zModelType = z.enum([
   'onnx',
   'clip_vision',
   'spandrel_image_to_image',
+  't5_encoder',
+  'clip_embed',
 ]);
 const zSubModelType = z.enum([
   'unet',
+  'transformer',
   'text_encoder',
   'text_encoder_2',
+  'text_encoder_3',
   'tokenizer',
   'tokenizer_2',
+  'tokenizer_3',
   'vae',
   'vae_decoder',
   'vae_encoder',

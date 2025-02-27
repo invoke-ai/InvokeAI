@@ -1,4 +1,4 @@
-import type { RgbaColor } from 'react-colorful';
+import type { RgbaColor, RgbColor } from 'react-colorful';
 
 export function rgbaToHex(color: RgbaColor, alpha: boolean = false): string {
   const hex = ((1 << 24) + (color.r << 16) + (color.g << 8) + color.b).toString(16).slice(1);
@@ -15,3 +15,13 @@ export function hexToRGBA(hex: string, alpha: number) {
   const b = parseInt(hex.substring(4, 6), 16);
   return { r, g, b, a: alpha };
 }
+
+export const rgbaColorToString = (color: RgbaColor): string => {
+  const { r, g, b, a } = color;
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+};
+
+export const rgbColorToString = (color: RgbColor): string => {
+  const { r, g, b } = color;
+  return `rgba(${r}, ${g}, ${b})`;
+};

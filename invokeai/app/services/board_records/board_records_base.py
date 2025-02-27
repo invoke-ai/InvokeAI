@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 
-from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord, BoardRecordOrderBy
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class BoardRecordStorageBase(ABC):
@@ -39,12 +40,19 @@ class BoardRecordStorageBase(ABC):
 
     @abstractmethod
     def get_many(
-        self, offset: int = 0, limit: int = 10, include_archived: bool = False
+        self,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        offset: int = 0,
+        limit: int = 10,
+        include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
         """Gets many board records."""
         pass
 
     @abstractmethod
-    def get_all(self, include_archived: bool = False) -> list[BoardRecord]:
+    def get_all(
+        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+    ) -> list[BoardRecord]:
         """Gets all board records."""
         pass

@@ -99,7 +99,6 @@ their descriptions.
 | Scale Latents                                                 | Scales latents by a given factor.                                                                                                                    |
 | Segment Anything Processor                                    | Applies segment anything processing to image                                                                                                         |
 | Show Image                                                    | Displays a provided image, and passes it forward in the pipeline.                                                                                    |
-| Step Param Easing                                             | Experimental per-step parameter easing for denoising steps                                                                                           |
 | String Primitive Collection                                   | A collection of string primitive values                                                                                                              |
 | String Primitive                                              | A string primitive value                                                                                                                             |
 | Subtract Integers                                             | Subtracts two numbers                                                                                                                                |

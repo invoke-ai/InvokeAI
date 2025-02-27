@@ -1,6 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
+import { selectWorkflowIsTouched } from 'features/nodes/store/workflowSlice';
 import { useSaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
 import { isWorkflowWithID, useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
 import { memo, useCallback } from 'react';
@@ -11,9 +12,9 @@ const SaveWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const { saveWorkflow } = useSaveLibraryWorkflow();
   const { onOpen } = useSaveWorkflowAsDialog();
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
+  const isTouched = useAppSelector(selectWorkflowIsTouched);
 
-  const handleClickSave = useCallback(async () => {
+  const handleClickSave = useCallback(() => {
     const builtWorkflow = $builtWorkflow.get();
     if (!builtWorkflow) {
       return;

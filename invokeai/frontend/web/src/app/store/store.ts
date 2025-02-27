@@ -3,37 +3,32 @@ import { autoBatchEnhancer, combineReducers, configureStore } from '@reduxjs/too
 import { logger } from 'app/logging/logger';
 import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
-import type { JSONObject } from 'common/types';
-import { canvasPersistConfig, canvasSlice } from 'features/canvas/store/canvasSlice';
+import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
+import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
+import { canvasPersistConfig, canvasSlice, canvasUndoableConfig } from 'features/controlLayers/store/canvasSlice';
 import {
-  controlAdaptersPersistConfig,
-  controlAdaptersSlice,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
-  controlLayersPersistConfig,
-  controlLayersSlice,
-  controlLayersUndoableConfig,
-} from 'features/controlLayers/store/controlLayersSlice';
+  canvasStagingAreaPersistConfig,
+  canvasStagingAreaSlice,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
+import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
-import { loraPersistConfig, loraSlice } from 'features/lora/store/loraSlice';
 import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/nodes/store/nodesSlice';
 import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
-import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
-import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
 import { stylePresetPersistConfig, stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
-import { defaultsDeep, keys, omit, pick } from 'lodash-es';
+import { keys, mergeWith, omit, pick } from 'lodash-es';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
@@ -41,6 +36,7 @@ import undoable from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
+import type { JsonObject } from 'type-fest';
 
 import { STORAGE_PREFIX } from './constants';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
@@ -48,29 +44,30 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 
+const log = logger('system');
+
 const allReducers = {
-  [canvasSlice.name]: canvasSlice.reducer,
+  [api.reducerPath]: api.reducer,
   [gallerySlice.name]: gallerySlice.reducer,
-  [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
   [uiSlice.name]: uiSlice.reducer,
-  [controlAdaptersSlice.name]: controlAdaptersSlice.reducer,
   [dynamicPromptsSlice.name]: dynamicPromptsSlice.reducer,
   [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
-  [loraSlice.name]: loraSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
-  [sdxlSlice.name]: sdxlSlice.reducer,
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
-  [controlLayersSlice.name]: undoable(controlLayersSlice.reducer, controlLayersUndoableConfig),
+  [canvasSlice.name]: undoable(canvasSlice.reducer, canvasUndoableConfig),
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
-  [api.reducerPath]: api.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
   [stylePresetSlice.name]: stylePresetSlice.reducer,
+  [paramsSlice.name]: paramsSlice.reducer,
+  [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
+  [canvasStagingAreaSlice.name]: canvasStagingAreaSlice.reducer,
+  [lorasSlice.name]: lorasSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -100,27 +97,25 @@ export type PersistConfig<T = any> = {
 };
 
 const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
-  [canvasPersistConfig.name]: canvasPersistConfig,
   [galleryPersistConfig.name]: galleryPersistConfig,
-  [generationPersistConfig.name]: generationPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,
   [systemPersistConfig.name]: systemPersistConfig,
   [workflowPersistConfig.name]: workflowPersistConfig,
   [uiPersistConfig.name]: uiPersistConfig,
-  [controlAdaptersPersistConfig.name]: controlAdaptersPersistConfig,
   [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
-  [sdxlPersistConfig.name]: sdxlPersistConfig,
-  [loraPersistConfig.name]: loraPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
-  [controlLayersPersistConfig.name]: controlLayersPersistConfig,
+  [canvasPersistConfig.name]: canvasPersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
   [upscalePersistConfig.name]: upscalePersistConfig,
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,
+  [paramsPersistConfig.name]: paramsPersistConfig,
+  [canvasSettingsPersistConfig.name]: canvasSettingsPersistConfig,
+  [canvasStagingAreaPersistConfig.name]: canvasStagingAreaPersistConfig,
+  [lorasPersistConfig.name]: lorasPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
-  const log = logger('system');
   const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
   if (!persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);
@@ -130,17 +125,21 @@ const unserialize: UnserializeFunction = (data, key) => {
     const parsed = JSON.parse(data);
 
     // strip out old keys
-    const stripped = pick(parsed, keys(initialState));
+    const stripped = pick(deepClone(parsed), keys(initialState));
     // run (additive) migrations
     const migrated = migrate(stripped);
-    // merge in initial state as default values, covering any missing keys
-    const transformed = defaultsDeep(migrated, initialState);
+    /*
+     * Merge in initial state as default values, covering any missing keys. You might be tempted to use _.defaultsDeep,
+     * but that merges arrays by index and partial objects by key. Using an identity function as the customizer results
+     * in behaviour like defaultsDeep, but doesn't overwrite any values that are not undefined in the migrated state.
+     */
+    const transformed = mergeWith(migrated, initialState, (objVal) => objVal);
 
     log.debug(
       {
         persistedData: parsed,
         rehydratedData: transformed,
-        diff: diff(parsed, transformed) as JSONObject, // this is always serializable
+        diff: diff(parsed, transformed) as JsonObject, // this is always serializable
       },
       `Rehydrated slice "${key}"`
     );
@@ -202,7 +201,8 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     },
   });
 
-export type RootState = ReturnType<ReturnType<typeof createStore>['getState']>;
+export type AppStore = ReturnType<typeof createStore>;
+export type RootState = ReturnType<AppStore['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;
 export type AppDispatch = ReturnType<typeof createStore>['dispatch'];

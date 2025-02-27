@@ -5,13 +5,17 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     Batch,
     BatchStatus,
+    CancelAllExceptCurrentResult,
     CancelByBatchIDsResult,
+    CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
     PruneResult,
+    RetryItemsResult,
+    SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueStatus,
@@ -69,6 +73,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def get_counts_by_destination(self, queue_id: str, destination: str) -> SessionQueueCountsByDestination:
+        """Gets the counts of queue items by destination"""
+        pass
+
+    @abstractmethod
     def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:
         """Gets the status of a batch"""
         pass
@@ -96,8 +105,18 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def cancel_by_destination(self, queue_id: str, destination: str) -> CancelByDestinationResult:
+        """Cancels all queue items with the given batch destination"""
+        pass
+
+    @abstractmethod
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
         """Cancels all queue items with matching queue ID"""
+        pass
+
+    @abstractmethod
+    def cancel_all_except_current(self, queue_id: str) -> CancelAllExceptCurrentResult:
+        """Cancels all queue items except in-progress items"""
         pass
 
     @abstractmethod
@@ -120,4 +139,9 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
+        pass
+
+    @abstractmethod
+    def retry_items_by_id(self, queue_id: str, item_ids: list[int]) -> RetryItemsResult:
+        """Retries the given queue items"""
         pass

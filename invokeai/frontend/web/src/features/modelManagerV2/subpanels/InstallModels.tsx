@@ -1,9 +1,10 @@
-import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
 import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiInfoBold } from 'react-icons/pi';
 
 import { HuggingFaceForm } from './AddModelPanel/HuggingFaceFolder/HuggingFaceForm';
 import { InstallModelForm } from './AddModelPanel/InstallModelForm';
@@ -19,9 +20,19 @@ export const InstallModels = memo(() => {
     $installModelsTab.set(index);
   }, []);
 
+  const onClickLearnMore = useCallback(() => {
+    window.open('https://support.invoke.ai/support/solutions/articles/151000170961-supported-models');
+  }, []);
+
   return (
     <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
-      <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
+      <Flex alignItems="center" justifyContent="space-between">
+        <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
+        <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onClick={onClickLearnMore}>
+          <Text variant="subtext">{t('modelManager.learnMoreAboutSupportedModels')}</Text>
+        </Button>
+      </Flex>
+
       <Tabs variant="collapse" height="50%" display="flex" flexDir="column" index={index} onChange={onChange}>
         <TabList>
           <Tab>{t('modelManager.urlOrLocalPath')}</Tab>

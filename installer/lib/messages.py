@@ -206,6 +206,7 @@ def dest_path(dest: Optional[str | Path] = None) -> Path | None:
 
 
 class GpuType(Enum):
+    CUDA_WITH_XFORMERS = "xformers"
     CUDA = "cuda"
     ROCM = "rocm"
     CPU = "cpu"
@@ -221,11 +222,15 @@ def select_gpu() -> GpuType:
         return GpuType.CPU
 
     nvidia = (
-        "an [gold1 b]NVIDIA[/] GPU (using CUDA™)",
+        "an [gold1 b]NVIDIA[/] RTX 3060 or newer GPU using CUDA",
         GpuType.CUDA,
     )
+    vintage_nvidia = (
+        "an [gold1 b]NVIDIA[/] RTX 20xx or older GPU using CUDA+xFormers",
+        GpuType.CUDA_WITH_XFORMERS,
+    )
     amd = (
-        "an [gold1 b]AMD[/] GPU (using ROCm™)",
+        "an [gold1 b]AMD[/] GPU using ROCm",
         GpuType.ROCM,
     )
     cpu = (
@@ -235,14 +240,13 @@ def select_gpu() -> GpuType:
 
     options = []
     if OS == "Windows":
-        options = [nvidia, cpu]
+        options = [nvidia, vintage_nvidia, cpu]
     if OS == "Linux":
-        options = [nvidia, amd, cpu]
+        options = [nvidia, vintage_nvidia, amd, cpu]
     elif OS == "Darwin":
         options = [cpu]
 
     if len(options) == 1:
-        print(f'Your platform [gold1]{OS}-{ARCH}[/] only supports the "{options[0][1]}" driver. Proceeding with that.')
         return options[0][1]
 
     options = {str(i): opt for i, opt in enumerate(options, 1)}
@@ -255,7 +259,7 @@ def select_gpu() -> GpuType:
                     [
                         f"Detected the [gold1]{OS}-{ARCH}[/] platform",
                         "",
-                        "See [deep_sky_blue1]https://invoke-ai.github.io/InvokeAI/#system[/] to ensure your system meets the minimum requirements.",
+                        "See [deep_sky_blue1]https://invoke-ai.github.io/InvokeAI/installation/requirements/[/] to ensure your system meets the minimum requirements.",
                         "",
                         "[red3]🠶[/] [b]Your GPU drivers must be correctly installed before using InvokeAI![/] [red3]🠴[/]",
                     ]

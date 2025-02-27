@@ -407,6 +407,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 FROM images
                 JOIN board_images ON images.image_name = board_images.image_name
                 WHERE board_images.board_id = ?
+                AND images.is_intermediate = FALSE
                 ORDER BY images.starred DESC, images.created_at DESC
                 LIMIT 1;
                 """,

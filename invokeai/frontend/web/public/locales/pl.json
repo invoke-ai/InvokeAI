@@ -1,219 +1,112 @@
 {
     "common": {
         "hotkeysLabel": "Skróty klawiszowe",
-        "languagePickerLabel": "Wybór języka",
+        "languagePickerLabel": "Język",
         "reportBugLabel": "Zgłoś błąd",
         "settingsLabel": "Ustawienia",
         "img2img": "Obraz na obraz",
-        "unifiedCanvas": "Tryb uniwersalny",
         "nodes": "Węzły",
         "upload": "Prześlij",
         "load": "Załaduj",
-        "statusDisconnected": "Odłączono od serwera",
+        "statusDisconnected": "Odłączono",
         "githubLabel": "GitHub",
-        "discordLabel": "Discord"
+        "discordLabel": "Discord",
+        "clipboard": "Schowek",
+        "aboutDesc": "Wykorzystujesz Invoke do pracy? Sprawdź:",
+        "ai": "SI",
+        "areYouSure": "Czy jesteś pewien?",
+        "copyError": "$t(gallery.copy) Błąd",
+        "apply": "Zastosuj",
+        "copy": "Kopiuj",
+        "or": "albo",
+        "add": "Dodaj",
+        "off": "Wyłączony",
+        "accept": "Zaakceptuj",
+        "cancel": "Anuluj",
+        "advanced": "Zawansowane",
+        "back": "Do tyłu",
+        "auto": "Automatyczny",
+        "beta": "Beta",
+        "close": "Wyjdź",
+        "checkpoint": "Punkt kontrolny",
+        "controlNet": "ControlNet",
+        "details": "Detale",
+        "direction": "Kierunek",
+        "ipAdapter": "Adapter IP",
+        "dontAskMeAgain": "Nie pytaj ponownie",
+        "modelManager": "Menedżer modeli",
+        "blue": "Niebieski",
+        "orderBy": "Sortuj według",
+        "openInNewTab": "Otwórz w nowym oknie",
+        "somethingWentWrong": "Coś poszło nie tak",
+        "green": "Zielony",
+        "red": "Czerwony",
+        "imageFailedToLoad": "Nie można załadować obrazu",
+        "saveAs": "Zapisz jako",
+        "outputs": "Wyjścia",
+        "data": "Dane",
+        "localSystem": "System Lokalny",
+        "t2iAdapter": "Adapter T2I",
+        "selected": "Zaznaczone",
+        "warnings": "Ostrzeżenia",
+        "save": "Zapisz",
+        "created": "Stworzono",
+        "alpha": "Alfa",
+        "error": "Bład",
+        "editor": "Edytor",
+        "loading": "Ładuję",
+        "edit": "Edytuj",
+        "enabled": "Aktywny",
+        "communityLabel": "Społeczeństwo",
+        "linear": "Liniowy",
+        "installed": "Zainstalowany",
+        "dontShowMeThese": "Nie pokazuj mi tego",
+        "openInViewer": "Otwórz podgląd",
+        "safetensors": "Bezpieczniki",
+        "ok": "Ok",
+        "goTo": "Idź do",
+        "loadingImage": "wczytywanie zdjęcia",
+        "input": "Wejście",
+        "view": "Podgląd",
+        "learnMore": "Dowiedz się więcej",
+        "notInstalled": "Nie $t(common.installed)",
+        "loadingModel": "Wczytywanie modelu",
+        "postprocessing": "Przetwarzanie końcowe",
+        "random": "Losowo",
+        "disabled": "Wyłączony",
+        "generating": "Generowanie",
+        "simple": "Prosty",
+        "folder": "Katalog",
+        "format": "Format",
+        "updated": "Zaktualizowano",
+        "unknown": "nieznany",
+        "delete": "Usuń",
+        "template": "Szablon",
+        "txt2img": "Tekst na obraz",
+        "prevPage": "Poprzednia strona",
+        "file": "Plik",
+        "toResolve": "Do rozwiązania",
+        "nextPage": "Następna strona",
+        "unknownError": "Nieznany błąd",
+        "placeholderSelectAModel": "Wybierz model",
+        "new": "Nowy",
+        "none": "Żadne",
+        "reset": "Reset",
+        "on": "Włączony",
+        "aboutHeading": "Posiadaj swoją kreatywną moc"
     },
     "gallery": {
         "galleryImageSize": "Rozmiar obrazów",
         "gallerySettings": "Ustawienia galerii",
         "autoSwitchNewImages": "Przełączaj na nowe obrazy",
-        "loadMore": "Wczytaj więcej",
-        "noImagesInGallery": "Brak obrazów w galerii"
-    },
-    "hotkeys": {
-        "keyboardShortcuts": "Skróty klawiszowe",
-        "appHotkeys": "Podstawowe",
-        "generalHotkeys": "Pomocnicze",
-        "galleryHotkeys": "Galeria",
-        "unifiedCanvasHotkeys": "Tryb uniwersalny",
-        "invoke": {
-            "title": "Wywołaj",
-            "desc": "Generuje nowy obraz"
-        },
-        "cancel": {
-            "title": "Anuluj",
-            "desc": "Zatrzymuje generowanie obrazu"
-        },
-        "focusPrompt": {
-            "title": "Aktywuj pole tekstowe",
-            "desc": "Aktywuje pole wprowadzania sugestii"
-        },
-        "toggleOptions": {
-            "title": "Przełącz panel opcji",
-            "desc": "Wysuwa lub chowa panel opcji"
-        },
-        "pinOptions": {
-            "title": "Przypnij opcje",
-            "desc": "Przypina panel opcji"
-        },
-        "toggleGallery": {
-            "title": "Przełącz galerię",
-            "desc": "Wysuwa lub chowa galerię"
-        },
-        "maximizeWorkSpace": {
-            "title": "Powiększ obraz roboczy",
-            "desc": "Chowa wszystkie panele, zostawia tylko podgląd obrazu"
-        },
-        "changeTabs": {
-            "title": "Przełącznie trybu",
-            "desc": "Przełącza na n-ty tryb pracy"
-        },
-        "consoleToggle": {
-            "title": "Przełącz konsolę",
-            "desc": "Otwiera lub chowa widok konsoli"
-        },
-        "setPrompt": {
-            "title": "Skopiuj sugestie",
-            "desc": "Kopiuje sugestie z aktywnego obrazu"
-        },
-        "setSeed": {
-            "title": "Skopiuj inicjator",
-            "desc": "Kopiuje inicjator z aktywnego obrazu"
-        },
-        "setParameters": {
-            "title": "Skopiuj wszystko",
-            "desc": "Kopiuje wszystkie parametry z aktualnie aktywnego obrazu"
-        },
-        "restoreFaces": {
-            "title": "Popraw twarze",
-            "desc": "Uruchamia proces poprawiania twarzy dla aktywnego obrazu"
-        },
-        "showInfo": {
-            "title": "Pokaż informacje",
-            "desc": "Pokazuje metadane zapisane w aktywnym obrazie"
-        },
-        "sendToImageToImage": {
-            "title": "Użyj w trybie \"Obraz na obraz\"",
-            "desc": "Ustawia aktywny obraz jako źródło w trybie \"Obraz na obraz\""
-        },
-        "deleteImage": {
-            "title": "Usuń obraz",
-            "desc": "Usuwa aktywny obraz"
-        },
-        "closePanels": {
-            "title": "Zamknij panele",
-            "desc": "Zamyka wszystkie otwarte panele"
-        },
-        "previousImage": {
-            "title": "Poprzedni obraz",
-            "desc": "Aktywuje poprzedni obraz z galerii"
-        },
-        "nextImage": {
-            "title": "Następny obraz",
-            "desc": "Aktywuje następny obraz z galerii"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Powiększ obrazy",
-            "desc": "Powiększa rozmiar obrazów w galerii"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Pomniejsz obrazy",
-            "desc": "Pomniejsza rozmiar obrazów w galerii"
-        },
-        "selectBrush": {
-            "title": "Aktywuj pędzel",
-            "desc": "Aktywuje narzędzie malowania"
-        },
-        "selectEraser": {
-            "title": "Aktywuj gumkę",
-            "desc": "Aktywuje narzędzie usuwania"
-        },
-        "decreaseBrushSize": {
-            "title": "Zmniejsz rozmiar narzędzia",
-            "desc": "Zmniejsza rozmiar aktywnego narzędzia"
-        },
-        "increaseBrushSize": {
-            "title": "Zwiększ rozmiar narzędzia",
-            "desc": "Zwiększa rozmiar aktywnego narzędzia"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Zmniejsz krycie",
-            "desc": "Zmniejsza poziom krycia pędzla"
-        },
-        "increaseBrushOpacity": {
-            "title": "Zwiększ",
-            "desc": "Zwiększa poziom krycia pędzla"
-        },
-        "moveTool": {
-            "title": "Aktywuj przesunięcie",
-            "desc": "Włącza narzędzie przesuwania"
-        },
-        "fillBoundingBox": {
-            "title": "Wypełnij zaznaczenie",
-            "desc": "Wypełnia zaznaczony obszar aktualnym kolorem pędzla"
-        },
-        "eraseBoundingBox": {
-            "title": "Wyczyść zaznaczenia",
-            "desc": "Usuwa całą zawartość zaznaczonego obszaru"
-        },
-        "colorPicker": {
-            "title": "Aktywuj pipetę",
-            "desc": "Włącza narzędzie kopiowania koloru"
-        },
-        "toggleSnap": {
-            "title": "Przyciąganie do siatki",
-            "desc": "Włącza lub wyłącza opcje przyciągania do siatki"
-        },
-        "quickToggleMove": {
-            "title": "Szybkie przesunięcie",
-            "desc": "Tymczasowo włącza tryb przesuwania obszaru roboczego"
-        },
-        "toggleLayer": {
-            "title": "Przełącz wartwę",
-            "desc": "Przełącza pomiędzy warstwą bazową i maskowania"
-        },
-        "clearMask": {
-            "title": "Wyczyść maskę",
-            "desc": "Usuwa całą zawartość warstwy maskowania"
-        },
-        "hideMask": {
-            "title": "Przełącz maskę",
-            "desc": "Pokazuje lub ukrywa podgląd maski"
-        },
-        "showHideBoundingBox": {
-            "title": "Przełącz zaznaczenie",
-            "desc": "Pokazuje lub ukrywa podgląd zaznaczenia"
-        },
-        "mergeVisible": {
-            "title": "Połącz widoczne",
-            "desc": "Łączy wszystkie widoczne maski w jeden obraz"
-        },
-        "saveToGallery": {
-            "title": "Zapisz w galerii",
-            "desc": "Zapisuje całą zawartość płótna w galerii"
-        },
-        "copyToClipboard": {
-            "title": "Skopiuj do schowka",
-            "desc": "Zapisuje zawartość płótna w schowku systemowym"
-        },
-        "downloadImage": {
-            "title": "Pobierz obraz",
-            "desc": "Zapisuje zawartość płótna do pliku obrazu"
-        },
-        "undoStroke": {
-            "title": "Cofnij",
-            "desc": "Cofa ostatnie pociągnięcie pędzlem"
-        },
-        "redoStroke": {
-            "title": "Ponawia",
-            "desc": "Ponawia cofnięte pociągnięcie pędzlem"
-        },
-        "resetView": {
-            "title": "Resetuj widok",
-            "desc": "Centruje widok płótna"
-        },
-        "previousStagingImage": {
-            "title": "Poprzedni obraz tymczasowy",
-            "desc": "Pokazuje poprzedni obraz tymczasowy"
-        },
-        "nextStagingImage": {
-            "title": "Następny obraz tymczasowy",
-            "desc": "Pokazuje następny obraz tymczasowy"
-        },
-        "acceptStagingImage": {
-            "title": "Akceptuj obraz tymczasowy",
-            "desc": "Akceptuje aktualnie wybrany obraz tymczasowy"
-        }
+        "noImagesInGallery": "Brak obrazów w galerii",
+        "gallery": "Galeria",
+        "alwaysShowImageSizeBadge": "Zawsze pokazuj odznakę wielkości obrazu",
+        "assetsTab": "Pliki, które wrzuciłeś do użytku w twoich projektach.",
+        "currentlyInUse": "Ten obraz jest obecnie w użyciu przez następujące funkcje:",
+        "boardsSettings": "Ustawienia tablic",
+        "autoAssignBoardOnClick": "Automatycznie przypisz tablicę po kliknięciu",
+        "copy": "Kopiuj"
     },
     "parameters": {
         "images": "L. obrazów",
@@ -235,8 +128,6 @@
         "scaledHeight": "Sk. do wys.",
         "infillMethod": "Metoda wypełniania",
         "tileSize": "Rozmiar kafelka",
-        "sendToImg2Img": "Użyj w trybie \"Obraz na obraz\"",
-        "sendToUnifiedCanvas": "Użyj w trybie uniwersalnym",
         "downloadImage": "Pobierz obraz",
         "usePrompt": "Skopiuj sugestie",
         "useSeed": "Skopiuj inicjator",
@@ -248,7 +139,6 @@
         "models": "Modele",
         "displayInProgress": "Podgląd generowanego obrazu",
         "confirmOnDelete": "Potwierdzaj usuwanie",
-        "enableImageDebugging": "Włącz debugowanie obrazu",
         "resetWebUI": "Zresetuj interfejs",
         "resetWebUIDesc1": "Resetowanie interfejsu wyczyści jedynie dane i ustawienia zapisane w pamięci przeglądarki. Nie usunie żadnych obrazów z dysku.",
         "resetWebUIDesc2": "Jeśli obrazy nie są poprawnie wyświetlane w galerii lub doświadczasz innych problemów, przed zgłoszeniem błędu spróbuj zresetować interfejs.",
@@ -257,72 +147,7 @@
     "toast": {
         "uploadFailed": "Błąd przesyłania obrazu",
         "imageCopied": "Skopiowano obraz",
-        "imageNotLoadedDesc": "Nie znaleziono obrazu, który można użyć w Obraz na obraz",
-        "canvasMerged": "Scalono widoczne warstwy",
-        "sentToImageToImage": "Wysłano do Obraz na obraz",
-        "sentToUnifiedCanvas": "Wysłano do trybu uniwersalnego",
-        "parametersNotSet": "Nie ustawiono parametrów",
-        "metadataLoadFailed": "Błąd wczytywania metadanych"
-    },
-    "tooltip": {
-        "feature": {
-            "prompt": "To pole musi zawierać cały tekst sugestii, w tym zarówno opis oczekiwanej zawartości, jak i terminy stylistyczne. Chociaż wagi mogą być zawarte w sugestiach, inne parametry znane z linii poleceń nie będą działać.",
-            "gallery": "W miarę generowania nowych wywołań w tym miejscu będą wyświetlane pliki z katalogu wyjściowego. Obrazy mają dodatkowo opcje konfiguracji nowych wywołań.",
-            "other": "Opcje umożliwią alternatywne tryby przetwarzania. Płynne scalanie będzie pomocne przy generowaniu powtarzających się wzorów. Optymalizacja wysokiej rozdzielczości wykonuje dwuetapowy cykl generowania i powinna być używana przy wyższych rozdzielczościach, gdy potrzebny jest bardziej spójny obraz/kompozycja.",
-            "seed": "Inicjator określa początkowy zestaw szumów, który kieruje procesem odszumiania i może być losowy lub pobrany z poprzedniego wywołania. Funkcja \"Poziom szumu\" może być użyta do złagodzenia saturacji przy wyższych wartościach CFG (spróbuj między 0-10), a Perlin może być użyty w celu dodania wariacji do twoich wyników.",
-            "upscale": "Korzystając z ESRGAN, możesz zwiększyć rozdzielczość obrazu wyjściowego bez konieczności zwiększania szerokości/wysokości w ustawieniach początkowych.",
-            "boundingBox": "Zaznaczony obszar odpowiada ustawieniom wysokości i szerokości w trybach Tekst na obraz i Obraz na obraz. Jedynie piksele znajdujące się w obszarze zaznaczenia zostaną uwzględnione podczas wywoływania nowego obrazu."
-        }
-    },
-    "unifiedCanvas": {
-        "layer": "Warstwa",
-        "base": "Główna",
-        "mask": "Maska",
-        "maskingOptions": "Opcje maski",
-        "enableMask": "Włącz maskę",
-        "preserveMaskedArea": "Zachowaj obszar",
-        "clearMask": "Wyczyść maskę",
-        "brush": "Pędzel",
-        "eraser": "Gumka",
-        "fillBoundingBox": "Wypełnij zaznaczenie",
-        "eraseBoundingBox": "Wyczyść zaznaczenie",
-        "colorPicker": "Pipeta",
-        "brushOptions": "Ustawienia pędzla",
-        "brushSize": "Rozmiar",
-        "move": "Przesunięcie",
-        "resetView": "Resetuj widok",
-        "mergeVisible": "Scal warstwy",
-        "saveToGallery": "Zapisz w galerii",
-        "copyToClipboard": "Skopiuj do schowka",
-        "downloadAsImage": "Zapisz do pliku",
-        "undo": "Cofnij",
-        "redo": "Ponów",
-        "clearCanvas": "Wyczyść obraz",
-        "canvasSettings": "Ustawienia obrazu",
-        "showIntermediates": "Pokazuj stany pośrednie",
-        "showGrid": "Pokazuj siatkę",
-        "snapToGrid": "Przyciągaj do siatki",
-        "darkenOutsideSelection": "Przyciemnij poza zaznaczeniem",
-        "autoSaveToGallery": "Zapisuj automatycznie do galerii",
-        "saveBoxRegionOnly": "Zapisuj tylko zaznaczony obszar",
-        "limitStrokesToBox": "Rysuj tylko wewnątrz zaznaczenia",
-        "showCanvasDebugInfo": "Informacje dla developera",
-        "clearCanvasHistory": "Wyczyść historię operacji",
-        "clearHistory": "Wyczyść historię",
-        "clearCanvasHistoryMessage": "Wyczyszczenie historii nie będzie miało wpływu na sam obraz, ale niemożliwe będzie cofnięcie i otworzenie wszystkich wykonanych do tej pory operacji.",
-        "clearCanvasHistoryConfirm": "Czy na pewno chcesz wyczyścić historię operacji?",
-        "activeLayer": "Warstwa aktywna",
-        "canvasScale": "Poziom powiększenia",
-        "boundingBox": "Rozmiar zaznaczenia",
-        "scaledBoundingBox": "Rozmiar po skalowaniu",
-        "boundingBoxPosition": "Pozycja zaznaczenia",
-        "canvasDimensions": "Rozmiar płótna",
-        "canvasPosition": "Pozycja płótna",
-        "cursorPosition": "Pozycja kursora",
-        "previous": "Poprzedni",
-        "next": "Następny",
-        "accept": "Zaakceptuj",
-        "discardAll": "Odrzuć wszystkie"
+        "parametersNotSet": "Nie ustawiono parametrów"
     },
     "accessibility": {
         "invokeProgressBar": "Pasek postępu",
@@ -330,7 +155,174 @@
         "uploadImage": "Wgrywanie obrazu",
         "previousImage": "Poprzedni obraz",
         "nextImage": "Następny obraz",
-        "showOptionsPanel": "Pokaż panel opcji",
-        "menu": "Menu"
+        "menu": "Menu",
+        "mode": "Tryb",
+        "resetUI": "$t(accessibility.reset) UI",
+        "uploadImages": "Wgrywaj obrazy",
+        "about": "Informacje",
+        "toggleRightPanel": "Przełącz prawy panel (G)",
+        "toggleLeftPanel": "Przełącz lewy panel (G)",
+        "createIssue": "Stwórz problem",
+        "submitSupportTicket": "Wyślij bilet pomocy"
+    },
+    "boards": {
+        "cancel": "Anuluj",
+        "noBoards": "Brak tablic typu {{boardType}}",
+        "imagesWithCount_one": "{{count}} zdjęcie",
+        "imagesWithCount_few": "{{count}} zdjęcia",
+        "imagesWithCount_many": "{{count}} zdjęcia",
+        "private": "Prywatne tablice",
+        "updateBoardError": "Błąd aktualizacji tablicy",
+        "uncategorized": "Nieskategoryzowane",
+        "selectBoard": "Wybierz tablicę",
+        "downloadBoard": "Pobierz tablice",
+        "loading": "Ładowanie...",
+        "move": "Przenieś",
+        "noMatching": "Brak pasujących tablic",
+        "addBoard": "Dodaj tablicę",
+        "autoAddBoard": "Automatycznie dodaj tablicę",
+        "searchBoard": "Szukaj tablic.",
+        "unarchiveBoard": "Odarchiwizuj tablicę",
+        "selectedForAutoAdd": "Wybrany do automatycznego dodania",
+        "deleteBoard": "Usuń tablicę",
+        "clearSearch": "Usuń historię",
+        "hideBoards": "Ukryj tablice",
+        "viewBoards": "Zobacz tablice",
+        "addSharedBoard": "Dodaj udostępnioną tablicę",
+        "boards": "Tablice",
+        "addPrivateBoard": "Dodaj prywatną tablicę",
+        "movingImagesToBoard_one": "Przenoszenie {{count}} zdjęcia do tablicy:",
+        "movingImagesToBoard_few": "Przenoszenie {{count}} zdjęć do tablicy:",
+        "movingImagesToBoard_many": "Przenoszenie {{count}} zdjęć do tablicy:",
+        "shared": "Udostępnione tablice",
+        "topMessage": "Ta tablica zawiera obrazy wykorzystywane w następujących funkcjach:",
+        "deletedPrivateBoardsCannotbeRestored": "Usunięte tablice nie mogą być odzyskane. Wybierając \"Usuń tylko tablicę\" spowoduje że obrazy zostaną przeniesione do prywatnego nieskategoryzowanego stanu autora obrazu.",
+        "changeBoard": "Zmień tablicę",
+        "bottomMessage": "Usuwając tę tablicę oraz jej obrazów zresetują wszystkie funkcje które obecnie ich używają.",
+        "deleteBoardAndImages": "Usuń tablicę i zdjęcia",
+        "deleteBoardOnly": "Usuń tylko tablicę",
+        "deletedBoardsCannotbeRestored": "Usunięte tablice nie mogą być odzyskane. Wybierając \"Usuń tylko tablicę\" spowoduje że obrazy zostaną przeniesione do nieskategoryzowanego stanu.",
+        "archiveBoard": "Zarchiwizuj tablicę",
+        "archived": "Zarchiwizowano",
+        "myBoard": "Moja tablica",
+        "menuItemAutoAdd": "Automatycznie dodaj do tej tablicy"
+    },
+    "accordions": {
+        "compositing": {
+            "title": "Kompozycja",
+            "infillTab": "Inskrypcja",
+            "coherenceTab": "Przebieg Koherencji"
+        },
+        "generation": {
+            "title": "Generowanie"
+        },
+        "image": {
+            "title": "Zdjęcie"
+        },
+        "advanced": {
+            "options": "$t(accordions.advanced.title) Opcje",
+            "title": "Zaawansowane"
+        },
+        "control": {
+            "title": "Kontrola"
+        }
+    },
+    "hrf": {
+        "metadata": {
+            "enabled": "Włączono poprawkę wysokiej rozdzielczości",
+            "strength": "Moc poprawki wysokiej rozdzielczości",
+            "method": "Metoda High Resolution Fix"
+        },
+        "hrf": "Poprawka \"Wysoka rozdzielczość\"",
+        "enableHrf": "Włącz poprawkę wysokiej rozdzielczości"
+    },
+    "queue": {
+        "cancelTooltip": "Anuluj aktualną pozycję",
+        "resumeFailed": "Błąd z kontynuowaniem procesora",
+        "current": "Obecne",
+        "cancelBatchFailed": "Problem z anulacją masy",
+        "queueFront": "Dodaj do przodu kolejki",
+        "cancelBatch": "Anuluj serię",
+        "cancelFailed": "Problem z anulowaniem pozycji",
+        "pruneTooltip": "Wyczyść {{item_count}} skończonych pozycji",
+        "pruneSucceeded": "Wyczyszczono {{item_count}} zakończonych pozycji z kolejki",
+        "cancelBatchSucceeded": "Partia anulowana",
+        "clear": "Wyczyść",
+        "clearTooltip": "Anuluj i usuń wszystkie pozycje",
+        "clearSucceeded": "Kolejka wyczyszczona",
+        "cancelItem": "Anuluj pozycję",
+        "clearQueueAlertDialog2": "Czy na pewno chcesz wyczyścić kolejkę?",
+        "pauseFailed": "Problem z zapauzowaniem processora",
+        "clearFailed": "Problem z czyszczeniem kolejki",
+        "queueBack": "Dodaj do kolejki",
+        "queueEmpty": "Kolejka pusta",
+        "enqueueing": "Kolejkowanie partii",
+        "resumeTooltip": "Kontynuuj processor",
+        "resumeSucceeded": "Processor kontynuowany",
+        "pause": "Zapauzuj",
+        "pauseTooltip": "Zapauzuj processor",
+        "queue": "Kolejka",
+        "resume": "Kontynuuj",
+        "cancel": "Anuluj",
+        "cancelSucceeded": "Pozycja anulowana",
+        "prune": "Wyczyść",
+        "pauseSucceeded": "Processor zapauzowany",
+        "clearQueueAlertDialog": "Czyszczenie kolejki od razu anuluje wszystkie przetwarzane elementy and całkowicie czyści kolejkę. Oczekujące filtry zostaną anulowane.",
+        "pruneFailed": "Problem z wyczyszczeniem kolejki",
+        "batchQueued": "Masa w kolejce",
+        "openQueue": "Otwórz kolejkę",
+        "iterations_one": "Iteracja",
+        "iterations_few": "Iteracje",
+        "iterations_many": "Iteracje",
+        "graphQueued": "Wykres w kolejce",
+        "canvas": "Płótno",
+        "generation": "Generacja",
+        "status": "Status",
+        "total": "Suma",
+        "time": "Czas",
+        "front": "Przód",
+        "back": "tył",
+        "batchFailedToQueue": "Nie można zkolejkować masy",
+        "completedIn": "Ukończony w całości",
+        "other": "Inne",
+        "origin": "Pochodzenie",
+        "destination": "Miejsce docelowe",
+        "notReady": "Nie można zkolejkować",
+        "canceled": "Anulowano",
+        "in_progress": "W trakcie",
+        "gallery": "Galeria",
+        "session": "Sesja",
+        "pending": "W toku",
+        "completed": "Zakończono",
+        "item": "Pozycja",
+        "failed": "Niepowodzenie",
+        "batchFieldValues": "Masowe Wartości pól",
+        "graphFailedToQueue": "NIe udało się dodać tabeli do kolejki",
+        "workflows": "Przepływy pracy",
+        "next": "Następny",
+        "batchQueuedDesc_one": "Dodano {{count}} sesję do {{direction}} kolejki",
+        "batchQueuedDesc_few": "Dodano {{count}} sesje do {{direction}} kolejki",
+        "batchQueuedDesc_many": "Dodano {{count}} sesje do {{direction}} kolejki",
+        "batch": "Masa",
+        "upscaling": "Skalowanie w górę",
+        "generations_one": "Generacja",
+        "generations_few": "Generacje",
+        "generations_many": "Generacje",
+        "prompts_one": "Monit",
+        "prompts_few": "Monity",
+        "prompts_many": "Monity",
+        "batchSize": "Rozmiar masy"
+    },
+    "prompt": {
+        "compatibleEmbeddings": "Kompatybilne osadzenia",
+        "noMatchingTriggers": "Nie dopasowywanie spustów"
+    },
+    "invocationCache": {
+        "hits": "Uderzenia cache",
+        "enable": "Włącz",
+        "clear": "Wyczyść",
+        "disable": "Wyłącz",
+        "maxCacheSize": "Maksymalny rozmiar cache",
+        "cacheSize": "Rozmiar Cache"
     }
 }

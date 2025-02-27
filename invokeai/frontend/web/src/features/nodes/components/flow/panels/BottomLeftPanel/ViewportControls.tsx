@@ -1,6 +1,10 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
+import { useReactFlow } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { shouldShowMinimapPanelChanged } from 'features/nodes/store/workflowSettingsSlice';
+import {
+  selectShouldShowMinimapPanel,
+  shouldShowMinimapPanelChanged,
+} from 'features/nodes/store/workflowSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,13 +13,12 @@ import {
   PiMagnifyingGlassPlusBold,
   PiMapPinBold,
 } from 'react-icons/pi';
-import { useReactFlow } from 'reactflow';
 
 const ViewportControls = () => {
   const { t } = useTranslation();
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const dispatch = useAppDispatch();
-  const shouldShowMinimapPanel = useAppSelector((s) => s.workflowSettings.shouldShowMinimapPanel);
+  const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn({ duration: 300 });

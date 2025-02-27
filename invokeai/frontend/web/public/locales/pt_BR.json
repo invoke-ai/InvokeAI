@@ -5,7 +5,6 @@
         "reportBugLabel": "Relatar Bug",
         "settingsLabel": "Configurações",
         "img2img": "Imagem Para Imagem",
-        "unifiedCanvas": "Tela Unificada",
         "nodes": "Nódulos",
         "upload": "Enviar",
         "load": "Carregar",
@@ -19,203 +18,7 @@
         "galleryImageSize": "Tamanho da Imagem",
         "gallerySettings": "Configurações de Galeria",
         "autoSwitchNewImages": "Trocar para Novas Imagens Automaticamente",
-        "loadMore": "Carregar Mais",
         "noImagesInGallery": "Sem Imagens na Galeria"
-    },
-    "hotkeys": {
-        "keyboardShortcuts": "Atalhos de Teclado",
-        "appHotkeys": "Atalhos do app",
-        "generalHotkeys": "Atalhos Gerais",
-        "galleryHotkeys": "Atalhos da Galeria",
-        "unifiedCanvasHotkeys": "Atalhos da Tela Unificada",
-        "invoke": {
-            "title": "Invoke",
-            "desc": "Gerar uma imagem"
-        },
-        "cancel": {
-            "title": "Cancelar",
-            "desc": "Cancelar geração de imagem"
-        },
-        "focusPrompt": {
-            "title": "Foco do Prompt",
-            "desc": "Foco da área de texto do prompt"
-        },
-        "toggleOptions": {
-            "title": "Ativar Opções",
-            "desc": "Abrir e fechar o painel de opções"
-        },
-        "pinOptions": {
-            "title": "Fixar Opções",
-            "desc": "Fixar o painel de opções"
-        },
-        "toggleGallery": {
-            "title": "Ativar Galeria",
-            "desc": "Abrir e fechar a gaveta da galeria"
-        },
-        "maximizeWorkSpace": {
-            "title": "Maximizar a Área de Trabalho",
-            "desc": "Fechar painéis e maximixar área de trabalho"
-        },
-        "changeTabs": {
-            "title": "Mudar Abas",
-            "desc": "Trocar para outra área de trabalho"
-        },
-        "consoleToggle": {
-            "title": "Ativar Console",
-            "desc": "Abrir e fechar console"
-        },
-        "setPrompt": {
-            "title": "Definir Prompt",
-            "desc": "Usar o prompt da imagem atual"
-        },
-        "setSeed": {
-            "title": "Definir Seed",
-            "desc": "Usar seed da imagem atual"
-        },
-        "setParameters": {
-            "title": "Definir Parâmetros",
-            "desc": "Usar todos os parâmetros da imagem atual"
-        },
-        "restoreFaces": {
-            "title": "Restaurar Rostos",
-            "desc": "Restaurar a imagem atual"
-        },
-        "showInfo": {
-            "title": "Mostrar Informações",
-            "desc": "Mostrar metadados de informações da imagem atual"
-        },
-        "sendToImageToImage": {
-            "title": "Mandar para Imagem Para Imagem",
-            "desc": "Manda a imagem atual para Imagem Para Imagem"
-        },
-        "deleteImage": {
-            "title": "Apagar Imagem",
-            "desc": "Apaga a imagem atual"
-        },
-        "closePanels": {
-            "title": "Fechar Painéis",
-            "desc": "Fecha os painéis abertos"
-        },
-        "previousImage": {
-            "title": "Imagem Anterior",
-            "desc": "Mostra a imagem anterior na galeria"
-        },
-        "nextImage": {
-            "title": "Próxima Imagem",
-            "desc": "Mostra a próxima imagem na galeria"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Aumentar Tamanho da Galeria de Imagem",
-            "desc": "Aumenta o tamanho das thumbs na galeria"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Diminuir Tamanho da Galeria de Imagem",
-            "desc": "Diminui o tamanho das thumbs na galeria"
-        },
-        "selectBrush": {
-            "title": "Selecionar Pincel",
-            "desc": "Seleciona o pincel"
-        },
-        "selectEraser": {
-            "title": "Selecionar Apagador",
-            "desc": "Seleciona o apagador"
-        },
-        "decreaseBrushSize": {
-            "title": "Diminuir Tamanho do Pincel",
-            "desc": "Diminui o tamanho do pincel/apagador"
-        },
-        "increaseBrushSize": {
-            "title": "Aumentar Tamanho do Pincel",
-            "desc": "Aumenta o tamanho do pincel/apagador"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Diminuir Opacidade do Pincel",
-            "desc": "Diminui a opacidade do pincel"
-        },
-        "increaseBrushOpacity": {
-            "title": "Aumentar Opacidade do Pincel",
-            "desc": "Aumenta a opacidade do pincel"
-        },
-        "moveTool": {
-            "title": "Ferramenta Mover",
-            "desc": "Permite navegar pela tela"
-        },
-        "fillBoundingBox": {
-            "title": "Preencher Caixa Delimitadora",
-            "desc": "Preenche a caixa delimitadora com a cor do pincel"
-        },
-        "eraseBoundingBox": {
-            "title": "Apagar Caixa Delimitadora",
-            "desc": "Apaga a área da caixa delimitadora"
-        },
-        "colorPicker": {
-            "title": "Selecionar Seletor de Cor",
-            "desc": "Seleciona o seletor de cores"
-        },
-        "toggleSnap": {
-            "title": "Ativar Encaixe",
-            "desc": "Ativa Encaixar na Grade"
-        },
-        "quickToggleMove": {
-            "title": "Ativar Mover Rapidamente",
-            "desc": "Temporariamente ativa o modo Mover"
-        },
-        "toggleLayer": {
-            "title": "Ativar Camada",
-            "desc": "Ativa a seleção de camada de máscara/base"
-        },
-        "clearMask": {
-            "title": "Limpar Máscara",
-            "desc": "Limpa toda a máscara"
-        },
-        "hideMask": {
-            "title": "Esconder Máscara",
-            "desc": "Esconde e Revela a máscara"
-        },
-        "showHideBoundingBox": {
-            "title": "Mostrar/Esconder Caixa Delimitadora",
-            "desc": "Ativa a visibilidade da caixa delimitadora"
-        },
-        "mergeVisible": {
-            "title": "Fundir Visível",
-            "desc": "Fundir todas as camadas visíveis em tela"
-        },
-        "saveToGallery": {
-            "title": "Salvara Na Galeria",
-            "desc": "Salva a tela atual na galeria"
-        },
-        "copyToClipboard": {
-            "title": "Copiar para a Área de Transferência",
-            "desc": "Copia a tela atual para a área de transferência"
-        },
-        "downloadImage": {
-            "title": "Baixar Imagem",
-            "desc": "Baixa a tela atual"
-        },
-        "undoStroke": {
-            "title": "Desfazer Traço",
-            "desc": "Desfaz um traço de pincel"
-        },
-        "redoStroke": {
-            "title": "Refazer Traço",
-            "desc": "Refaz o traço de pincel"
-        },
-        "resetView": {
-            "title": "Resetar Visualização",
-            "desc": "Reseta Visualização da Tela"
-        },
-        "previousStagingImage": {
-            "title": "Imagem de Preparação Anterior",
-            "desc": "Área de Imagem de Preparação Anterior"
-        },
-        "nextStagingImage": {
-            "title": "Próxima Imagem de Preparação Anterior",
-            "desc": "Próxima Área de Imagem de Preparação Anterior"
-        },
-        "acceptStagingImage": {
-            "title": "Aceitar Imagem de Preparação Anterior",
-            "desc": "Aceitar Área de Imagem de Preparação Anterior"
-        }
     },
     "modelManager": {
         "modelManager": "Gerente de Modelo",
@@ -271,8 +74,6 @@
         "scaledHeight": "A Escalada",
         "infillMethod": "Método de Preenchimento",
         "tileSize": "Tamanho do Ladrilho",
-        "sendToImg2Img": "Mandar para Imagem Para Imagem",
-        "sendToUnifiedCanvas": "Mandar para Tela Unificada",
         "downloadImage": "Baixar Imagem",
         "usePrompt": "Usar Prompt",
         "useSeed": "Usar Seed",
@@ -288,7 +89,6 @@
         "models": "Modelos",
         "displayInProgress": "Mostrar Progresso de Imagens Em Andamento",
         "confirmOnDelete": "Confirmar Antes de Apagar",
-        "enableImageDebugging": "Ativar Depuração de Imagem",
         "resetWebUI": "Reiniciar Interface",
         "resetWebUIDesc1": "Reiniciar a interface apenas reinicia o cache local do broswer para imagens e configurações lembradas. Não apaga nenhuma imagem do disco.",
         "resetWebUIDesc2": "Se as imagens não estão aparecendo na galeria ou algo mais não está funcionando, favor tentar reiniciar antes de postar um problema no GitHub.",
@@ -297,71 +97,6 @@
     "toast": {
         "uploadFailed": "Envio Falhou",
         "imageCopied": "Imagem Copiada",
-        "imageNotLoadedDesc": "Nenhuma imagem encontrar para mandar para o módulo de imagem para imagem",
-        "canvasMerged": "Tela Fundida",
-        "sentToImageToImage": "Mandar Para Imagem Para Imagem",
-        "sentToUnifiedCanvas": "Enviada para a Tela Unificada",
-        "parametersNotSet": "Parâmetros Não Definidos",
-        "metadataLoadFailed": "Falha ao tentar carregar metadados"
-    },
-    "unifiedCanvas": {
-        "layer": "Camada",
-        "base": "Base",
-        "mask": "Máscara",
-        "maskingOptions": "Opções de Mascaramento",
-        "enableMask": "Ativar Máscara",
-        "preserveMaskedArea": "Preservar Área da Máscara",
-        "clearMask": "Limpar Máscara",
-        "brush": "Pincel",
-        "eraser": "Apagador",
-        "fillBoundingBox": "Preencher Caixa Delimitadora",
-        "eraseBoundingBox": "Apagar Caixa Delimitadora",
-        "colorPicker": "Seletor de Cor",
-        "brushOptions": "Opções de Pincel",
-        "brushSize": "Tamanho",
-        "move": "Mover",
-        "resetView": "Resetar Visualização",
-        "mergeVisible": "Fundir Visível",
-        "saveToGallery": "Salvar na Galeria",
-        "copyToClipboard": "Copiar para a Área de Transferência",
-        "downloadAsImage": "Baixar Como Imagem",
-        "undo": "Desfazer",
-        "redo": "Refazer",
-        "clearCanvas": "Limpar Tela",
-        "canvasSettings": "Configurações de Tela",
-        "showIntermediates": "Mostrar Intermediários",
-        "showGrid": "Mostrar Grade",
-        "snapToGrid": "Encaixar na Grade",
-        "darkenOutsideSelection": "Escurecer Seleção Externa",
-        "autoSaveToGallery": "Salvar Automaticamente na Galeria",
-        "saveBoxRegionOnly": "Salvar Apenas a Região da Caixa",
-        "limitStrokesToBox": "Limitar Traços para a Caixa",
-        "showCanvasDebugInfo": "Mostrar Informações de Depuração daTela",
-        "clearCanvasHistory": "Limpar o Histórico da Tela",
-        "clearHistory": "Limpar Históprico",
-        "clearCanvasHistoryMessage": "Limpar o histórico de tela deixa sua tela atual intacta, mas limpa de forma irreversível o histórico de desfazer e refazer.",
-        "clearCanvasHistoryConfirm": "Tem certeza que quer limpar o histórico de tela?",
-        "activeLayer": "Camada Ativa",
-        "canvasScale": "Escala da Tela",
-        "boundingBox": "Caixa Delimitadora",
-        "scaledBoundingBox": "Caixa Delimitadora Escalada",
-        "boundingBoxPosition": "Posição da Caixa Delimitadora",
-        "canvasDimensions": "Dimensões da Tela",
-        "canvasPosition": "Posição da Tela",
-        "cursorPosition": "Posição do cursor",
-        "previous": "Anterior",
-        "next": "Próximo",
-        "accept": "Aceitar",
-        "discardAll": "Descartar Todos"
-    },
-    "tooltip": {
-        "feature": {
-            "seed": "O valor da semente afeta o ruído inicial a partir do qual a imagem é formada. Você pode usar as sementes já existentes de imagens anteriores. 'Limiar de ruído' é usado para mitigar artefatos em valores CFG altos (experimente a faixa de 0-10), e o Perlin para adicionar ruído Perlin durante a geração: ambos servem para adicionar variação às suas saídas.",
-            "gallery": "A galeria exibe as gerações da pasta de saída conforme elas são criadas. As configurações são armazenadas em arquivos e acessadas pelo menu de contexto.",
-            "other": "Essas opções ativam modos alternativos de processamento para o Invoke. 'Seamless tiling' criará padrões repetidos na saída. 'High resolution' é uma geração em duas etapas com img2img: use essa configuração quando desejar uma imagem maior e mais coerente sem artefatos. Levará mais tempo do que o txt2img usual.",
-            "boundingBox": "A caixa delimitadora é a mesma que as configurações de largura e altura para Texto para Imagem ou Imagem para Imagem. Apenas a área na caixa será processada.",
-            "upscale": "Use o ESRGAN para ampliar a imagem imediatamente após a geração.",
-            "prompt": "Este é o campo de prompt. O prompt inclui objetos de geração e termos estilísticos. Você também pode adicionar peso (importância do token) no prompt, mas comandos e parâmetros de CLI não funcionarão."
-        }
+        "parametersNotSet": "Parâmetros Não Definidos"
     }
 }

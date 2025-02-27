@@ -1,4 +1,4 @@
-import { Flex, IconButton, Portal, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Tooltip } from '@invoke-ai/ui-library';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,25 +11,17 @@ type Props = {
 const FloatingGalleryButton = (props: Props) => {
   const { t } = useTranslation();
 
-  if (!props.panelApi.isCollapsed) {
-    return null;
-  }
-
   return (
-    <Portal>
-      <Flex pos="absolute" transform="translate(0, -50%)" minW={8} top="50%" insetInlineEnd="21px" zIndex={11}>
-        <Tooltip label={t('accessibility.showGalleryPanel')} placement="start">
-          <IconButton
-            aria-label={t('accessibility.showGalleryPanel')}
-            onClick={props.panelApi.expand}
-            icon={<PiImagesSquareBold size="20px" />}
-            p={0}
-            h={48}
-            borderEndRadius={0}
-          />
-        </Tooltip>
-      </Flex>
-    </Portal>
+    <Flex pos="absolute" transform="translate(0, -50%)" minW={8} top="50%" insetInlineEnd={2}>
+      <Tooltip label={t('accessibility.toggleRightPanel')} placement="start">
+        <IconButton
+          aria-label={t('accessibility.toggleRightPanel')}
+          onClick={props.panelApi.toggle}
+          icon={<PiImagesSquareBold />}
+          h={48}
+        />
+      </Tooltip>
+    </Flex>
   );
 };
 

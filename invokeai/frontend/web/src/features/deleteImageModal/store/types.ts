@@ -6,8 +6,11 @@ export type DeleteImageState = {
 };
 
 export type ImageUsage = {
-  isCanvasImage: boolean;
+  isUpscaleImage: boolean;
+  isRasterLayerImage: boolean;
+  isInpaintMaskImage: boolean;
+  isRegionalGuidanceImage: boolean;
   isNodesImage: boolean;
-  isControlImage: boolean;
   isControlLayerImage: boolean;
+  isReferenceImage: boolean;
 };

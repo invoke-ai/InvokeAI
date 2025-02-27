@@ -10,9 +10,12 @@ import torchvision.transforms as T
 from diffusers.configuration_utils import ConfigMixin
 from diffusers.models.adapter import T2IAdapter
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
+from diffusers.schedulers.scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
 from diffusers.schedulers.scheduling_dpmsolver_sde import DPMSolverSDEScheduler
+from diffusers.schedulers.scheduling_dpmsolver_singlestep import DPMSolverSinglestepScheduler
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
+from PIL import Image
 from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
@@ -36,9 +39,11 @@ from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, ModelVariantType
+from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
@@ -81,12 +86,14 @@ def get_scheduler(
     scheduler_info: ModelIdentifierField,
     scheduler_name: str,
     seed: int,
+    unet_config: AnyModelConfig,
 ) -> Scheduler:
     """Load a scheduler and apply some scheduler-specific overrides."""
     # TODO(ryand): Silently falling back to ddim seems like a bad idea. Look into why this was added and remove if
     # possible.
     scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
     orig_scheduler_info = context.models.load(scheduler_info)
+
     with orig_scheduler_info as orig_scheduler:
         scheduler_config = orig_scheduler.config
 
@@ -98,9 +105,16 @@ def get_scheduler(
         "_backup": scheduler_config,
     }
 
+    if hasattr(unet_config, "prediction_type"):
+        scheduler_config["prediction_type"] = unet_config.prediction_type
+
     # make dpmpp_sde reproducable(seed can be passed only in initializer)
     if scheduler_class is DPMSolverSDEScheduler:
         scheduler_config["noise_sampler_seed"] = seed
+
+    if scheduler_class is DPMSolverMultistepScheduler or scheduler_class is DPMSolverSinglestepScheduler:
+        if scheduler_config["_class_name"] == "DEISMultistepScheduler" and scheduler_config["algorithm_type"] == "deis":
+            scheduler_config["algorithm_type"] = "dpmsolver++"
 
     scheduler = scheduler_class.from_config(scheduler_config)
 
@@ -185,7 +199,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
         default=None,
-        description=FieldDescriptions.mask,
+        description=FieldDescriptions.denoise_mask,
         input=Input.Connection,
         ui_order=8,
     )
@@ -409,6 +423,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         control_input: ControlField | list[ControlField] | None,
         latents_shape: List[int],
+        device: torch.device,
         exit_stack: ExitStack,
         do_classifier_free_guidance: bool = True,
     ) -> list[ControlNetData] | None:
@@ -450,7 +465,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 height=control_height_resize,
                 # batch_size=batch_size * num_images_per_prompt,
                 # num_images_per_prompt=num_images_per_prompt,
-                device=control_model.device,
+                device=device,
                 dtype=control_model.dtype,
                 control_mode=control_info.control_mode,
                 resize_mode=control_info.resize_mode,
@@ -509,6 +524,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
         ext_manager: ExtensionsManager,
+        bgr_mode: bool = False,
     ) -> None:
         if t2i_adapters is None:
             return
@@ -518,6 +534,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapters = [t2i_adapters]
 
         for t2i_adapter_field in t2i_adapters:
+            image = context.images.get_pil(t2i_adapter_field.image.image_name)
+            if bgr_mode:  # SDXL t2i trained on cv2's BGR outputs, but PIL won't convert straight to BGR
+                r, g, b = image.split()
+                image = Image.merge("RGB", (b, g, r))
             ext_manager.add_extension(
                 T2IAdapterExt(
                     node_context=context,
@@ -540,14 +560,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         for single_ip_adapter in ip_adapters:
             with context.models.load(single_ip_adapter.ip_adapter_model) as ip_adapter_model:
                 assert isinstance(ip_adapter_model, IPAdapter)
-                image_encoder_model_info = context.models.load(single_ip_adapter.image_encoder_model)
                 # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
                 single_ipa_image_fields = single_ip_adapter.image
                 if not isinstance(single_ipa_image_fields, list):
                     single_ipa_image_fields = [single_ipa_image_fields]
 
-                single_ipa_images = [context.images.get_pil(image.image_name) for image in single_ipa_image_fields]
-                with image_encoder_model_info as image_encoder_model:
+                single_ipa_images = [
+                    context.images.get_pil(image.image_name, mode="RGB") for image in single_ipa_image_fields
+                ]
+                with context.models.load(single_ip_adapter.image_encoder_model) as image_encoder_model:
                     assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
                     # Get image embeddings from CLIP and ImageProjModel.
                     image_prompt_embeds, uncond_image_prompt_embeds = ip_adapter_model.get_image_embeds(
@@ -597,6 +618,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         t2i_adapter: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
         latents_shape: list[int],
+        device: torch.device,
         do_classifier_free_guidance: bool,
     ) -> Optional[list[T2IAdapterData]]:
         if t2i_adapter is None:
@@ -612,26 +634,23 @@ class DenoiseLatentsInvocation(BaseInvocation):
         t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
             t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
-            t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model)
-            image = context.images.get_pil(t2i_adapter_field.image.image_name)
+            image = context.images.get_pil(t2i_adapter_field.image.image_name, mode="RGB")
 
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
             if t2i_adapter_model_config.base == BaseModelType.StableDiffusion1:
                 max_unet_downscale = 8
             elif t2i_adapter_model_config.base == BaseModelType.StableDiffusionXL:
                 max_unet_downscale = 4
+
+                # SDXL adapters are trained on cv2's BGR outputs
+                r, g, b = image.split()
+                image = Image.merge("RGB", (b, g, r))
             else:
                 raise ValueError(f"Unexpected T2I-Adapter base model type: '{t2i_adapter_model_config.base}'.")
 
             t2i_adapter_model: T2IAdapter
-            with t2i_adapter_loaded_model as t2i_adapter_model:
+            with context.models.load(t2i_adapter_field.t2i_adapter_model) as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
-
-                # Resize the T2I-Adapter input image.
-                # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
-                # result will match the latent image's dimensions after max_unet_downscale is applied.
-                t2i_input_height = latents_shape[2] // max_unet_downscale * total_downscale_factor
-                t2i_input_width = latents_shape[3] // max_unet_downscale * total_downscale_factor
 
                 # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
                 # a single image. If CFG is enabled, we will duplicate the resultant tensor after applying the
@@ -639,16 +658,32 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 #
                 # Note: We re-use the `prepare_control_image(...)` from ControlNet for T2I-Adapter, because it has many
                 # of the same requirements (e.g. preserving binary masks during resize).
+
+                # Assuming fixed dimensional scaling of LATENT_SCALE_FACTOR.
+                _, _, latent_height, latent_width = latents_shape
+                control_height_resize = latent_height * LATENT_SCALE_FACTOR
+                control_width_resize = latent_width * LATENT_SCALE_FACTOR
                 t2i_image = prepare_control_image(
                     image=image,
                     do_classifier_free_guidance=False,
-                    width=t2i_input_width,
-                    height=t2i_input_height,
+                    width=control_width_resize,
+                    height=control_height_resize,
                     num_channels=t2i_adapter_model.config["in_channels"],  # mypy treats this as a FrozenDict
-                    device=t2i_adapter_model.device,
+                    device=device,
                     dtype=t2i_adapter_model.dtype,
                     resize_mode=t2i_adapter_field.resize_mode,
                 )
+
+                # Resize the T2I-Adapter input image.
+                # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
+                # result will match the latent image's dimensions after max_unet_downscale is applied.
+                # We crop the image to this size so that the positions match the input image on non-standard resolutions
+                t2i_input_height = latents_shape[2] // max_unet_downscale * total_downscale_factor
+                t2i_input_width = latents_shape[3] // max_unet_downscale * total_downscale_factor
+                if t2i_image.shape[2] > t2i_input_height or t2i_image.shape[3] > t2i_input_width:
+                    t2i_image = t2i_image[
+                        :, :, : min(t2i_image.shape[2], t2i_input_height), : min(t2i_image.shape[3], t2i_input_width)
+                    ]
 
                 adapter_state = t2i_adapter_model(t2i_image)
 
@@ -799,6 +834,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
         _, _, latent_height, latent_width = latents.shape
 
+        # get the unet's config so that we can pass the base to sd_step_callback()
+        unet_config = context.models.get_config(self.unet.unet.key)
+
         conditioning_data = self.get_conditioning_data(
             context=context,
             positive_conditioning_field=self.positive_conditioning,
@@ -818,6 +856,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             scheduler_info=self.unet.scheduler,
             scheduler_name=self.scheduler,
             seed=seed,
+            unet_config=unet_config,
         )
 
         timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
@@ -828,9 +867,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             denoising_start=self.denoising_start,
             denoising_end=self.denoising_end,
         )
-
-        # get the unet's config so that we can pass the base to sd_step_callback()
-        unet_config = context.models.get_config(self.unet.unet.key)
 
         ### preview
         def step_callback(state: PipelineIntermediateState) -> None:
@@ -862,7 +898,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         ### inpaint
         mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
-        # NOTE: We used to identify inpainting models by inpecting the shape of the loaded UNet model weights. Now we
+        # NOTE: We used to identify inpainting models by inspecting the shape of the loaded UNet model weights. Now we
         # use the ModelVariantType config. During testing, there was a report of a user with models that had an
         # incorrect ModelVariantType value. Re-installing the model fixed the issue. If this issue turns out to be
         # prevalent, we will have to revisit how we initialize the inpainting extensions.
@@ -897,15 +933,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
             #    ext_manager.add_extension(ext)
             self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
-            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager)
+            bgr_mode = self.unet.unet.base == BaseModelType.StableDiffusionXL
+            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager, bgr_mode)
 
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
-            unet_info = context.models.load(self.unet.unet)
-            assert isinstance(unet_info.model, UNet2DConditionModel)
             with (
-                unet_info.model_on_device() as (cached_weights, unet),
+                context.models.load(self.unet.unet).model_on_device() as (cached_weights, unet),
                 ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
                 # ext: controlnet
                 ext_manager.patch_extensions(denoise_ctx),
@@ -926,6 +961,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def _old_invoke(self, context: InvocationContext) -> LatentsOutput:
+        device = TorchDevice.choose_torch_device()
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
@@ -940,6 +976,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             context,
             self.t2i_adapter,
             latents.shape,
+            device=device,
             do_classifier_free_guidance=True,
         )
 
@@ -963,42 +1000,43 @@ class DenoiseLatentsInvocation(BaseInvocation):
         def step_callback(state: PipelineIntermediateState) -> None:
             context.util.sd_step_callback(state, unet_config.base)
 
-        def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
+        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
             for lora in self.unet.loras:
                 lora_info = context.models.load(lora.lora)
-                assert isinstance(lora_info.model, LoRAModelRaw)
+                assert isinstance(lora_info.model, ModelPatchRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
             return
 
-        unet_info = context.models.load(self.unet.unet)
-        assert isinstance(unet_info.model, UNet2DConditionModel)
         with (
             ExitStack() as exit_stack,
-            unet_info.model_on_device() as (cached_weights, unet),
+            context.models.load(self.unet.unet).model_on_device() as (cached_weights, unet),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
             SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
-            ModelPatcher.apply_lora_unet(
-                unet,
-                loras=_lora_loader(),
+            LayerPatcher.apply_smart_model_patches(
+                model=unet,
+                patches=_lora_loader(),
+                prefix="lora_unet_",
+                dtype=unet.dtype,
                 cached_weights=cached_weights,
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=unet.device, dtype=unet.dtype)
+            latents = latents.to(device=device, dtype=unet.dtype)
             if noise is not None:
-                noise = noise.to(device=unet.device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=unet.dtype)
             if mask is not None:
-                mask = mask.to(device=unet.device, dtype=unet.dtype)
+                mask = mask.to(device=device, dtype=unet.dtype)
             if masked_latents is not None:
-                masked_latents = masked_latents.to(device=unet.device, dtype=unet.dtype)
+                masked_latents = masked_latents.to(device=device, dtype=unet.dtype)
 
             scheduler = get_scheduler(
                 context=context,
                 scheduler_info=self.unet.scheduler,
                 scheduler_name=self.scheduler,
                 seed=seed,
+                unet_config=unet_config,
             )
 
             pipeline = self.create_pipeline(unet, scheduler)
@@ -1008,7 +1046,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 context=context,
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
-                device=unet.device,
+                device=device,
                 dtype=unet.dtype,
                 latent_height=latent_height,
                 latent_width=latent_width,
@@ -1021,6 +1059,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 context=context,
                 control_input=self.control,
                 latents_shape=latents.shape,
+                device=device,
                 # do_classifier_free_guidance=(self.cfg_scale >= 1.0))
                 do_classifier_free_guidance=True,
                 exit_stack=exit_stack,
@@ -1038,7 +1077,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                 scheduler,
-                device=unet.device,
+                device=device,
                 steps=self.steps,
                 denoising_start=self.denoising_start,
                 denoising_end=self.denoising_end,

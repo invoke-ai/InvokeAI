@@ -1,37 +1,38 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { loraAdded, selectLoraSlice } from 'features/lora/store/loraSlice';
+import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
+import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
 import type { LoRAModelConfig } from 'services/api/types';
 
-const selectAddedLoRAs = createMemoizedSelector(selectLoraSlice, (lora) => lora.loras);
+const selectLoRAs = createSelector(selectLoRAsSlice, (loras) => loras.loras);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
-  const addedLoRAs = useAppSelector(selectAddedLoRAs);
-  const currentBaseModel = useAppSelector((s) => s.generation.model?.base);
+  const addedLoRAs = useAppSelector(selectLoRAs);
+  const currentBaseModel = useAppSelector(selectBase);
 
-  const getIsDisabled = (lora: LoRAModelConfig): boolean => {
-    const isCompatible = currentBaseModel === lora.base;
-    const isAdded = Boolean(addedLoRAs[lora.key]);
+  const getIsDisabled = (model: LoRAModelConfig): boolean => {
+    const isCompatible = currentBaseModel === model.base;
+    const isAdded = Boolean(addedLoRAs.find((lora) => lora.model.key === model.key));
     const hasMainModel = Boolean(currentBaseModel);
     return !hasMainModel || !isCompatible || isAdded;
   };
 
   const _onChange = useCallback(
-    (lora: LoRAModelConfig | null) => {
-      if (!lora) {
+    (model: LoRAModelConfig | null) => {
+      if (!model) {
         return;
       }
-      dispatch(loraAdded(lora));
+      dispatch(loraAdded({ model }));
     },
     [dispatch]
   );

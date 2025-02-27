@@ -2,7 +2,12 @@ import { Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
+import {
+  listCursorChanged,
+  listPriorityChanged,
+  selectQueueListCursor,
+  selectQueueListPriority,
+} from 'features/queue/store/queueSlice';
 import { useOverlayScrollbars } from 'overlayscrollbars-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,8 +35,8 @@ const itemContent: ItemContent<SessionQueueItemDTO, ListContext> = (index, item,
 );
 
 const QueueList = () => {
-  const listCursor = useAppSelector((s) => s.queue.listCursor);
-  const listPriority = useAppSelector((s) => s.queue.listPriority);
+  const listCursor = useAppSelector(selectQueueListCursor);
+  const listPriority = useAppSelector(selectQueueListPriority);
   const dispatch = useAppDispatch();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scroller, setScroller] = useState<HTMLElement | null>(null);

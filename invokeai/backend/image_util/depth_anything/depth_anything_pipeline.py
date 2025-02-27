@@ -1,7 +1,9 @@
+import pathlib
 from typing import Optional
 
 import torch
 from PIL import Image
+from transformers import pipeline
 from transformers.pipelines import DepthEstimationPipeline
 
 from invokeai.backend.raw_model import RawModel
@@ -29,3 +31,11 @@ class DepthAnythingPipeline(RawModel):
         from invokeai.backend.model_manager.load.model_util import calc_module_size
 
         return calc_module_size(self._pipeline.model)
+
+    @classmethod
+    def load_model(cls, model_path: pathlib.Path):
+        """Load the model from the given path and return a DepthAnythingPipeline instance."""
+
+        depth_anything_pipeline = pipeline(model=str(model_path), task="depth-estimation", local_files_only=True)
+        assert isinstance(depth_anything_pipeline, DepthEstimationPipeline)
+        return cls(depth_anything_pipeline)

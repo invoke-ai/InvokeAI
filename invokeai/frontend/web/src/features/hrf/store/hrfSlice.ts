@@ -1,6 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
+import { newSessionRequested } from 'features/controlLayers/store/actions';
 import type { ParameterHRFMethod, ParameterStrength } from 'features/parameters/types/parameterSchemas';
 
 interface HRFState {
@@ -31,11 +33,14 @@ export const hrfSlice = createSlice({
       state.hrfMethod = action.payload;
     },
   },
+  extraReducers(builder) {
+    builder.addMatcher(newSessionRequested, () => {
+      return deepClone(initialHRFState);
+    });
+  },
 });
 
 export const { setHrfEnabled, setHrfStrength, setHrfMethod } = hrfSlice.actions;
-
-export const selectHrfSlice = (state: RootState) => state.hrf;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateHRFState = (state: any): any => {
@@ -51,3 +56,8 @@ export const hrfPersistConfig: PersistConfig<HRFState> = {
   migrate: migrateHRFState,
   persistDenylist: [],
 };
+
+export const selectHrfSlice = (state: RootState) => state.hrf;
+export const selectHrfEnabled = createSelector(selectHrfSlice, (hrf) => hrf.hrfEnabled);
+export const selectHrfMethod = createSelector(selectHrfSlice, (hrf) => hrf.hrfMethod);
+export const selectHrfStrength = createSelector(selectHrfSlice, (hrf) => hrf.hrfStrength);

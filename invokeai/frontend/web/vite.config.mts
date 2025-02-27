@@ -24,6 +24,15 @@ export default defineConfig(({ mode }) => {
         cssInjectedByJsPlugin(),
       ],
       build: {
+        /**
+         * zone.js (via faro) requires max ES2015 to prevent spamming unhandled promise rejections.
+         *
+         * See:
+         * - https://github.com/grafana/faro-web-sdk/issues/566
+         * - https://github.com/angular/angular/issues/51328
+         * - https://github.com/open-telemetry/opentelemetry-js/issues/3030
+         */
+        target: 'ES2015',
         cssCodeSplit: true,
         lib: {
           entry: path.resolve(__dirname, './src/index.ts'),
@@ -67,26 +76,23 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1500,
     },
     server: {
-      // Proxy HTTP requests to the flask server
       proxy: {
-        // Proxy socket.io to the nodes socketio server
         '/ws/socket.io': {
           target: 'ws://127.0.0.1:9090',
           ws: true,
         },
-        // Proxy openapi schema definiton
         '/openapi.json': {
           target: 'http://127.0.0.1:9090/openapi.json',
           rewrite: (path) => path.replace(/^\/openapi.json/, ''),
           changeOrigin: true,
         },
-        // proxy nodes api
         '/api/': {
           target: 'http://127.0.0.1:9090/api/',
           rewrite: (path) => path.replace(/^\/api/, ''),
           changeOrigin: true,
         },
       },
+      host: '0.0.0.0',
     },
     test: {
       typecheck: {

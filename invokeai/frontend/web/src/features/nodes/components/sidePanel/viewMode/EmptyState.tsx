@@ -1,36 +1,24 @@
-import { Button, Flex, Image, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { Button, Flex, Image, Link, Text } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
+import { selectCleanEditor, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 export const EmptyState = () => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-
-  const onClick = useCallback(() => {
-    dispatch(workflowModeChanged('edit'));
-  }, [dispatch]);
+  const isCleanEditor = useAppSelector(selectCleanEditor);
 
   return (
-    <Flex
-      sx={{
-        w: 'full',
-        h: 'full',
-        userSelect: 'none',
-      }}
-    >
+    <Flex w="full" h="full" userSelect="none" justifyContent="center">
       <Flex
-        sx={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 'base',
-          flexDir: 'column',
-          gap: 5,
-          maxW: '230px',
-          margin: '0 auto',
-        }}
+        alignItems="center"
+        justifyContent="center"
+        borderRadius="base"
+        flexDir="column"
+        gap={5}
+        maxW="230px"
+        pt={24}
       >
         <Image
           src={InvokeLogoSVG}
@@ -43,13 +31,65 @@ export const EmptyState = () => {
           minH={16}
           userSelect="none"
         />
-        <Text textAlign="center" fontSize="md">
-          {t('nodes.noFieldsViewMode')}
-        </Text>
-        <Button colorScheme="invokeBlue" onClick={onClick}>
-          {t('nodes.edit')}
-        </Button>
+        {isCleanEditor ? <CleanEditorContent /> : <DirtyEditorContent />}
       </Flex>
     </Flex>
   );
+};
+
+const CleanEditorContent = () => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const workflowListMenu = useWorkflowListMenu();
+
+  const onClickNewWorkflow = useCallback(() => {
+    dispatch(workflowModeChanged('edit'));
+  }, [dispatch]);
+
+  return (
+    <>
+      <Flex gap={2}>
+        <Button size="sm" onClick={onClickNewWorkflow}>
+          {t('nodes.newWorkflow')}
+        </Button>
+        <Button size="sm" colorScheme="invokeBlue" onClick={workflowListMenu.open}>
+          {t('nodes.loadWorkflow')}
+        </Button>
+      </Flex>
+      <Text textAlign="center" fontSize="md">
+        <Trans i18nKey="nodes.workflowHelpText" size="sm" components={workflowHelpTextComponents} />
+      </Text>
+    </>
+  );
+};
+
+const DirtyEditorContent = () => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+
+  const onClick = useCallback(() => {
+    dispatch(workflowModeChanged('edit'));
+  }, [dispatch]);
+
+  return (
+    <>
+      <Text textAlign="center" fontSize="md">
+        {t('nodes.noFieldsViewMode')}
+      </Text>
+      <Button size="sm" colorScheme="invokeBlue" onClick={onClick}>
+        {t('nodes.edit')}
+      </Button>
+    </>
+  );
+};
+
+const workflowHelpTextComponents = {
+  LinkComponent: (
+    <Link
+      fontSize="md"
+      fontWeight="semibold"
+      href="https://support.invoke.ai/support/solutions/articles/151000159663-example-workflows"
+      target="_blank"
+    />
+  ),
 };

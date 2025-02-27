@@ -1,6 +1,7 @@
 import { ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { selectWorkflowIsTouched } from 'features/nodes/store/workflowSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +11,7 @@ const ClearFlowButton = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
+  const isTouched = useAppSelector(selectWorkflowIsTouched);
 
   const handleNewWorkflow = useCallback(() => {
     dispatch(nodeEditorReset());
@@ -46,6 +47,7 @@ const ClearFlowButton = () => {
         onClose={onClose}
         title={t('nodes.clearWorkflow')}
         acceptCallback={handleNewWorkflow}
+        useInert={false}
       >
         <Flex flexDir="column" gap={2}>
           <Text>{t('nodes.clearWorkflowDesc')}</Text>

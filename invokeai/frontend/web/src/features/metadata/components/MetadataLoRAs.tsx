@@ -1,4 +1,4 @@
-import type { LoRA } from 'features/lora/store/loraSlice';
+import type { LoRA } from 'features/controlLayers/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
@@ -47,7 +47,9 @@ const MetadataViewLoRA = ({
     if (!handlers.recallItem) {
       return;
     }
-    handlers.recallItem(lora, true);
+    handlers.recallItem(lora, true).catch(() => {
+      // no-op, the toast will show the error
+    });
   }, [handlers, lora]);
 
   const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);

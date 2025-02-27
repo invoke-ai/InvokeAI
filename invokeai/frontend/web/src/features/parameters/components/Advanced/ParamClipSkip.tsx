@@ -1,19 +1,16 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setClipSkip } from 'features/parameters/store/generationSlice';
+import { selectCLIPSKip, selectModel, setClipSkip } from 'features/controlLayers/store/paramsSlice';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
+import { selectCLIPSkipConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamClipSkip = () => {
-  const clipSkip = useAppSelector((s) => s.generation.clipSkip);
-  const initial = useAppSelector((s) => s.config.sd.clipSkip.initial);
-  const sliderMin = useAppSelector((s) => s.config.sd.clipSkip.sliderMin);
-  const numberInputMin = useAppSelector((s) => s.config.sd.clipSkip.numberInputMin);
-  const coarseStep = useAppSelector((s) => s.config.sd.clipSkip.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.clipSkip.fineStep);
-  const { model } = useAppSelector((s) => s.generation);
+  const clipSkip = useAppSelector(selectCLIPSKip);
+  const config = useAppSelector(selectCLIPSkipConfig);
+  const model = useAppSelector(selectModel);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -50,21 +47,21 @@ const ParamClipSkip = () => {
       </InformationalPopover>
       <CompositeSlider
         value={clipSkip}
-        defaultValue={initial}
-        min={sliderMin}
+        defaultValue={config.initial}
+        min={config.sliderMin}
         max={max}
-        step={coarseStep}
-        fineStep={fineStep}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
         onChange={handleClipSkipChange}
         marks={sliderMarks}
       />
       <CompositeNumberInput
         value={clipSkip}
-        defaultValue={initial}
-        min={numberInputMin}
+        defaultValue={config.initial}
+        min={config.numberInputMin}
         max={max}
-        step={coarseStep}
-        fineStep={fineStep}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
         onChange={handleClipSkipChange}
       />
     </FormControl>

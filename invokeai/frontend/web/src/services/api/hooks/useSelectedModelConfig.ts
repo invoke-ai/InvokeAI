@@ -1,10 +1,7 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectModelKey } from 'features/controlLayers/store/paramsSlice';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
-
-const selectModelKey = createSelector(selectGenerationSlice, (generation) => generation.model?.key);
 
 export const useSelectedModelConfig = () => {
   const key = useAppSelector(selectModelKey);

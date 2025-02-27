@@ -1,27 +1,31 @@
-import { ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
+import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { ClearQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
-import QueueFrontButton from 'features/queue/components/QueueFrontButton';
+import { QueueActionsMenuButton } from 'features/queue/components/QueueActionsMenuButton';
+import { SendToToggle } from 'features/queue/components/SendToToggle';
 import ProgressBar from 'features/system/components/ProgressBar';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
-import { InvokeQueueBackButton } from './InvokeQueueBackButton';
-import { QueueActionsMenuButton } from './QueueActionsMenuButton';
+import { InvokeButton } from './InvokeQueueBackButton';
 
 const QueueControls = () => {
-  const isPrependEnabled = useFeatureStatus('prependQueue');
+  const tab = useAppSelector(selectActiveTab);
+
   return (
-    <Flex w="full" position="relative" borderRadius="base" gap={2} pt={2} flexDir="column">
-      <ButtonGroup size="lg" isAttached={false}>
-        {isPrependEnabled && <QueueFrontButton />}
-        <InvokeQueueBackButton />
+    <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
+      <Flex gap={2}>
+        <InvokeButton />
         <Spacer />
+        {tab === 'canvas' && (
+          <CanvasManagerProviderGate>
+            <SendToToggle />
+          </CanvasManagerProviderGate>
+        )}
         <QueueActionsMenuButton />
-        {/* <CancelCurrentQueueItemButton asIconButton />
-        {isResumeEnabled && <ResumeProcessorButton asIconButton />}
-        {isPauseEnabled && <PauseProcessorButton asIconButton />} */}
         <ClearQueueIconButton />
-      </ButtonGroup>
+      </Flex>
       <ProgressBar />
     </Flex>
   );

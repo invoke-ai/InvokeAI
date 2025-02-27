@@ -1,12 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setRefinerPositiveAestheticScore } from 'features/sdxl/store/sdxlSlice';
+import {
+  selectRefinerPositiveAestheticScore,
+  setRefinerPositiveAestheticScore,
+} from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSDXLRefinerPositiveAestheticScore = () => {
-  const refinerPositiveAestheticScore = useAppSelector((s) => s.sdxl.refinerPositiveAestheticScore);
+  const refinerPositiveAestheticScore = useAppSelector(selectRefinerPositiveAestheticScore);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 

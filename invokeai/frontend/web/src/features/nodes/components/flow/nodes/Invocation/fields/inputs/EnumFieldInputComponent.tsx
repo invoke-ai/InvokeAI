@@ -1,6 +1,7 @@
 import { Select } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldEnumModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { EnumFieldInputInstance, EnumFieldInputTemplate } from 'features/nodes/types/field';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -26,7 +27,12 @@ const EnumFieldInputComponent = (props: FieldComponentProps<EnumFieldInputInstan
   );
 
   return (
-    <Select className="nowheel nodrag" onChange={handleValueChanged} value={field.value}>
+    <Select
+      className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
+      onChange={handleValueChanged}
+      value={field.value}
+      size="sm"
+    >
       {fieldTemplate.options.map((option) => (
         <option key={option} value={option}>
           {fieldTemplate.ui_choice_labels ? fieldTemplate.ui_choice_labels[option] : option}

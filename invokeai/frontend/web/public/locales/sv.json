@@ -4,8 +4,7 @@
         "invokeProgressBar": "Invoke förloppsmätare",
         "nextImage": "Nästa bild",
         "reset": "Starta om",
-        "previousImage": "Föregående bild",
-        "showOptionsPanel": "Visa inställningspanelen"
+        "previousImage": "Föregående bild"
     },
     "common": {
         "hotkeysLabel": "Snabbtangenter",
@@ -13,7 +12,6 @@
         "githubLabel": "Github",
         "discordLabel": "Discord",
         "settingsLabel": "Inställningar",
-        "unifiedCanvas": "Förenad kanvas",
         "upload": "Ladda upp",
         "cancel": "Avbryt",
         "accept": "Acceptera",
@@ -29,135 +27,8 @@
     },
     "gallery": {
         "galleryImageSize": "Bildstorlek",
-        "loadMore": "Ladda mer",
         "gallerySettings": "Galleriinställningar",
         "noImagesInGallery": "Inga bilder i galleriet",
         "autoSwitchNewImages": "Ändra automatiskt till nya bilder"
-    },
-    "hotkeys": {
-        "generalHotkeys": "Allmänna snabbtangenter",
-        "galleryHotkeys": "Gallerisnabbtangenter",
-        "unifiedCanvasHotkeys": "Snabbtangenter för sammanslagskanvas",
-        "invoke": {
-            "title": "Anropa",
-            "desc": "Genererar en bild"
-        },
-        "cancel": {
-            "title": "Avbryt",
-            "desc": "Avbryt bildgenerering"
-        },
-        "focusPrompt": {
-            "desc": "Fokusera området för promptinmatning",
-            "title": "Fokusprompt"
-        },
-        "pinOptions": {
-            "desc": "Nåla fast alternativpanelen",
-            "title": "Nåla fast alternativ"
-        },
-        "toggleOptions": {
-            "title": "Växla inställningar",
-            "desc": "Öppna och stäng alternativpanelen"
-        },
-        "toggleGallery": {
-            "title": "Växla galleri",
-            "desc": "Öppna eller stäng galleribyrån"
-        },
-        "maximizeWorkSpace": {
-            "title": "Maximera arbetsyta",
-            "desc": "Stäng paneler och maximera arbetsyta"
-        },
-        "changeTabs": {
-            "title": "Växla flik",
-            "desc": "Byt till en annan arbetsyta"
-        },
-        "consoleToggle": {
-            "title": "Växla konsol",
-            "desc": "Öppna och stäng konsol"
-        },
-        "setSeed": {
-            "desc": "Använd seed för nuvarande bild",
-            "title": "välj seed"
-        },
-        "setParameters": {
-            "title": "Välj parametrar",
-            "desc": "Använd alla parametrar från nuvarande bild"
-        },
-        "setPrompt": {
-            "desc": "Använd prompt för nuvarande bild",
-            "title": "Välj prompt"
-        },
-        "restoreFaces": {
-            "title": "Återskapa ansikten",
-            "desc": "Återskapa nuvarande bild"
-        },
-        "showInfo": {
-            "title": "Visa info",
-            "desc": "Visa metadata för nuvarande bild"
-        },
-        "sendToImageToImage": {
-            "title": "Skicka till Bild till bild",
-            "desc": "Skicka nuvarande bild till Bild till bild"
-        },
-        "deleteImage": {
-            "title": "Radera bild",
-            "desc": "Radera nuvarande bild"
-        },
-        "closePanels": {
-            "title": "Stäng paneler",
-            "desc": "Stäng öppna paneler"
-        },
-        "previousImage": {
-            "title": "Föregående bild",
-            "desc": "Visa föregående bild"
-        },
-        "nextImage": {
-            "title": "Nästa bild",
-            "desc": "Visa nästa bild"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Förstora galleriets bildstorlek",
-            "desc": "Förstora miniatyrbildernas storlek"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Minska gelleriets bildstorlek",
-            "desc": "Minska miniatyrbildernas storlek i galleriet"
-        },
-        "decreaseBrushSize": {
-            "desc": "Förminska storleken på kanvas- pensel eller suddgummi",
-            "title": "Minska penselstorlek"
-        },
-        "increaseBrushSize": {
-            "title": "Öka penselstorlek",
-            "desc": "Öka stoleken på kanvas- pensel eller suddgummi"
-        },
-        "increaseBrushOpacity": {
-            "title": "Öka penselns opacitet",
-            "desc": "Öka opaciteten för kanvaspensel"
-        },
-        "decreaseBrushOpacity": {
-            "desc": "Minska kanvaspenselns opacitet",
-            "title": "Minska penselns opacitet"
-        },
-        "moveTool": {
-            "title": "Flytta",
-            "desc": "Tillåt kanvasnavigation"
-        },
-        "fillBoundingBox": {
-            "title": "Fyll ram",
-            "desc": "Fyller ramen med pensels färg"
-        },
-        "keyboardShortcuts": "Snabbtangenter",
-        "appHotkeys": "Appsnabbtangenter",
-        "selectBrush": {
-            "desc": "Välj kanvaspensel",
-            "title": "Välj pensel"
-        },
-        "selectEraser": {
-            "desc": "Välj kanvassuddgummi",
-            "title": "Välj suddgummi"
-        },
-        "eraseBoundingBox": {
-            "title": "Ta bort ram"
-        }
     }
 }

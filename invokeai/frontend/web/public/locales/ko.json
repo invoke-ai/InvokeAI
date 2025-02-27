@@ -4,7 +4,6 @@
         "reportBugLabel": "버그 리포트",
         "githubLabel": "Github",
         "settingsLabel": "설정",
-        "unifiedCanvas": "통합 캔버스",
         "nodes": "Workflow Editor",
         "upload": "업로드",
         "load": "불러오기",
@@ -27,7 +26,6 @@
         "on": "켜기",
         "save": "저장",
         "created": "생성됨",
-        "nodeEditor": "Node Editor",
         "error": "에러",
         "prevPage": "이전 페이지",
         "ipAdapter": "IP 어댑터",
@@ -70,16 +68,12 @@
         "gallerySettings": "갤러리 설정",
         "deleteSelection": "선택 항목 삭제",
         "featuresWillReset": "이 이미지를 삭제하면 해당 기능이 즉시 재설정됩니다.",
-        "assets": "자산",
-        "problemDeletingImagesDesc": "하나 이상의 이미지를 삭제할 수 없습니다",
         "noImagesInGallery": "보여줄 이미지가 없음",
         "autoSwitchNewImages": "새로운 이미지로 자동 전환",
         "loading": "불러오는 중",
         "unableToLoad": "갤러리를 로드할 수 없음",
         "image": "이미지",
-        "loadMore": "더 불러오기",
         "drop": "드랍",
-        "problemDeletingImages": "이미지 삭제 중 발생한 문제",
         "downloadSelection": "선택 항목 다운로드",
         "deleteImage_other": "이미지 삭제",
         "currentlyInUse": "이 이미지는 현재 다음 기능에서 사용되고 있습니다:",
@@ -89,7 +83,6 @@
         "deleteImagePermanent": "삭제된 이미지는 복원할 수 없습니다.",
         "noImageSelected": "선택된 이미지 없음",
         "autoAssignBoardOnClick": "클릭 시 Board로 자동 할당",
-        "setCurrentImage": "현재 이미지로 설정",
         "dropToUpload": "업로드를 위해 $t(gallery.drop)"
     },
     "accessibility": {
@@ -98,10 +91,7 @@
         "mode": "모드",
         "menu": "메뉴",
         "uploadImage": "이미지 업로드",
-        "showGalleryPanel": "갤러리 패널 표시",
-        "reset": "리셋",
-        "loadMore": "더 불러오기",
-        "showOptionsPanel": "사이드 패널 표시"
+        "reset": "리셋"
     },
     "modelManager": {
         "availableModels": "사용 가능한 모델",
@@ -117,7 +107,6 @@
         "predictionType": "예측 유형(안정 확산 2.x 모델 및 간혹 안정 확산 1.x 모델의 경우)",
         "selectModel": "모델 선택",
         "repo_id": "Repo ID",
-        "modelSyncFailed": "모델 동기화 실패",
         "convertToDiffusersHelpText6": "이 모델을 변환하시겠습니까?",
         "config": "구성",
         "selected": "선택된",
@@ -136,10 +125,8 @@
         "syncModels": "동기화 모델",
         "modelType": "모델 유형",
         "convertingModelBegin": "모델 변환 중입니다. 잠시만 기다려 주십시오.",
-        "v2_base": "v2 (512px)",
         "name": "이름",
         "convertToDiffusersHelpText1": "이 모델은 🧨 Diffusers 형식으로 변환됩니다.",
-        "modelsSynced": "동기화된 모델",
         "vaePrecision": "VAE 정밀도",
         "deleteMsg2": "모델이 InvokeAI root 폴더에 있으면 디스크에서 모델이 삭제됩니다. 사용자 지정 위치를 사용하는 경우 모델이 디스크에서 삭제되지 않습니다.",
         "baseModel": "기본 모델",
@@ -152,278 +139,9 @@
         "allModels": "모든 모델",
         "alpha": "Alpha",
         "noModelSelected": "선택한 모델 없음",
-        "v2_768": "v2 (768px)",
         "convertToDiffusersHelpText4": "이것은 한 번의 과정일 뿐입니다. 컴퓨터 사양에 따라 30-60초 정도 소요될 수 있습니다.",
         "model": "모델",
         "delete": "삭제"
-    },
-    "controlnet": {
-        "amult": "a_mult",
-        "resize": "크기 조정",
-        "showAdvanced": "고급 표시",
-        "contentShuffleDescription": "이미지에서 content 섞기",
-        "bgth": "bg_th",
-        "addT2IAdapter": "$t(common.t2iAdapter) 추가",
-        "pidi": "PIDI",
-        "importImageFromCanvas": "캔버스에서 이미지 가져오기",
-        "lineartDescription": "이미지->lineart 변환",
-        "normalBae": "Normal BAE",
-        "importMaskFromCanvas": "캔버스에서 Mask 가져오기",
-        "hed": "HED",
-        "contentShuffle": "Content Shuffle",
-        "resetControlImage": "Control Image 재설정",
-        "beginEndStepPercent": "Begin / End Step Percentage",
-        "mlsdDescription": "Minimalist Line Segment Detector",
-        "duplicate": "복제",
-        "balanced": "Balanced",
-        "f": "F",
-        "h": "H",
-        "prompt": "프롬프트",
-        "depthMidasDescription": "Midas를 사용하여 Depth map 생성하기",
-        "control": "Control",
-        "resizeMode": "크기 조정 모드",
-        "coarse": "Coarse",
-        "weight": "Weight",
-        "selectModel": "모델 선택",
-        "crop": "Crop",
-        "depthMidas": "Depth (Midas)",
-        "w": "W",
-        "processor": "프로세서",
-        "addControlNet": "$t(common.controlNet) 추가",
-        "none": "해당없음",
-        "detectResolution": "해상도 탐지",
-        "pidiDescription": "PIDI image 처리",
-        "mediapipeFace": "Mediapipe Face",
-        "mlsd": "M-LSD",
-        "controlMode": "Control Mode",
-        "fill": "채우기",
-        "cannyDescription": "Canny 모서리 삭제",
-        "addIPAdapter": "$t(common.ipAdapter) 추가",
-        "lineart": "Lineart",
-        "colorMapDescription": "이미지에서 color map을 생성합니다",
-        "lineartAnimeDescription": "Anime-style lineart 처리",
-        "minConfidence": "Min Confidence",
-        "imageResolution": "이미지 해상도",
-        "megaControl": "Mega Control",
-        "depthZoe": "Depth (Zoe)",
-        "colorMap": "색",
-        "lowThreshold": "Low Threshold",
-        "autoConfigure": "프로세서 자동 구성",
-        "highThreshold": "High Threshold",
-        "normalBaeDescription": "Normal BAE 처리",
-        "noneDescription": "처리되지 않음",
-        "saveControlImage": "Control Image 저장",
-        "toggleControlNet": "해당 ControlNet으로 전환",
-        "delete": "삭제",
-        "controlAdapter_other": "Control Adapter(s)",
-        "safe": "Safe",
-        "colorMapTileSize": "타일 크기",
-        "lineartAnime": "Lineart Anime",
-        "mediapipeFaceDescription": "Mediapipe를 사용하여 Face 탐지",
-        "canny": "Canny",
-        "depthZoeDescription": "Zoe를 사용하여 Depth map 생성하기",
-        "hedDescription": "Holistically-Nested 모서리 탐지",
-        "setControlImageDimensions": "Control Image Dimensions를 W/H로 설정",
-        "scribble": "scribble",
-        "maxFaces": "Max Faces"
-    },
-    "hotkeys": {
-        "toggleSnap": {
-            "desc": "Snap을 Grid로 전환",
-            "title": "Snap 전환"
-        },
-        "setSeed": {
-            "title": "시드 설정",
-            "desc": "현재 이미지의 시드 사용"
-        },
-        "keyboardShortcuts": "키보드 바로 가기",
-        "decreaseGalleryThumbSize": {
-            "desc": "갤러리 미리 보기 크기 축소",
-            "title": "갤러리 이미지 크기 축소"
-        },
-        "previousStagingImage": {
-            "title": "이전 스테이징 이미지",
-            "desc": "이전 스테이징 영역 이미지"
-        },
-        "decreaseBrushSize": {
-            "title": "브러시 크기 줄이기",
-            "desc": "캔버스 브러시/지우개 크기 감소"
-        },
-        "consoleToggle": {
-            "desc": "콘솔 열고 닫기",
-            "title": "콘솔 전환"
-        },
-        "selectBrush": {
-            "desc": "캔버스 브러시를 선택",
-            "title": "브러시 선택"
-        },
-        "previousImage": {
-            "title": "이전 이미지",
-            "desc": "갤러리에 이전 이미지 표시"
-        },
-        "unifiedCanvasHotkeys": "Unified Canvas Hotkeys",
-        "toggleOptions": {
-            "desc": "옵션 패널을 열고 닫기",
-            "title": "옵션 전환"
-        },
-        "selectEraser": {
-            "title": "지우개 선택",
-            "desc": "캔버스 지우개를 선택"
-        },
-        "setPrompt": {
-            "title": "프롬프트 설정",
-            "desc": "현재 이미지의 프롬프트 사용"
-        },
-        "acceptStagingImage": {
-            "desc": "현재 준비 영역 이미지 허용",
-            "title": "준비 이미지 허용"
-        },
-        "resetView": {
-            "desc": "Canvas View 초기화",
-            "title": "View 초기화"
-        },
-        "hideMask": {
-            "title": "Mask 숨김",
-            "desc": "mask 숨김/숨김 해제"
-        },
-        "pinOptions": {
-            "title": "옵션 고정",
-            "desc": "옵션 패널을 고정"
-        },
-        "toggleGallery": {
-            "desc": "gallery drawer 열기 및 닫기",
-            "title": "Gallery 전환"
-        },
-        "quickToggleMove": {
-            "title": "빠른 토글 이동",
-            "desc": "일시적으로 이동 모드 전환"
-        },
-        "generalHotkeys": "General Hotkeys",
-        "showHideBoundingBox": {
-            "desc": "bounding box 표시 전환",
-            "title": "Bounding box 표시/숨김"
-        },
-        "showInfo": {
-            "desc": "현재 이미지의 metadata 정보 표시",
-            "title": "정보 표시"
-        },
-        "copyToClipboard": {
-            "title": "클립보드로 복사",
-            "desc": "현재 캔버스를 클립보드로 복사"
-        },
-        "restoreFaces": {
-            "title": "Faces 복원",
-            "desc": "현재 이미지 복원"
-        },
-        "fillBoundingBox": {
-            "title": "Bounding Box 채우기",
-            "desc": "bounding box를 브러시 색으로 채웁니다"
-        },
-        "closePanels": {
-            "desc": "열린 panels 닫기",
-            "title": "panels 닫기"
-        },
-        "downloadImage": {
-            "desc": "현재 캔버스 다운로드",
-            "title": "이미지 다운로드"
-        },
-        "setParameters": {
-            "title": "매개 변수 설정",
-            "desc": "현재 이미지의 모든 매개 변수 사용"
-        },
-        "maximizeWorkSpace": {
-            "desc": "패널을 닫고 작업 면적을 극대화",
-            "title": "작업 공간 극대화"
-        },
-        "galleryHotkeys": "Gallery Hotkeys",
-        "cancel": {
-            "desc": "이미지 생성 취소",
-            "title": "취소"
-        },
-        "saveToGallery": {
-            "title": "갤러리에 저장",
-            "desc": "현재 캔버스를 갤러리에 저장"
-        },
-        "eraseBoundingBox": {
-            "desc": "bounding box 영역을 지웁니다",
-            "title": "Bounding Box 지우기"
-        },
-        "nextImage": {
-            "title": "다음 이미지",
-            "desc": "갤러리에 다음 이미지 표시"
-        },
-        "colorPicker": {
-            "desc": "canvas color picker 선택",
-            "title": "Color Picker 선택"
-        },
-        "invoke": {
-            "desc": "이미지 생성",
-            "title": "불러오기"
-        },
-        "sendToImageToImage": {
-            "desc": "현재 이미지를 이미지로 보내기"
-        },
-        "toggleLayer": {
-            "desc": "mask/base layer 선택 전환",
-            "title": "Layer 전환"
-        },
-        "increaseBrushSize": {
-            "title": "브러시 크기 증가",
-            "desc": "캔버스 브러시/지우개 크기 증가"
-        },
-        "appHotkeys": "App Hotkeys",
-        "deleteImage": {
-            "title": "이미지 삭제",
-            "desc": "현재 이미지 삭제"
-        },
-        "moveTool": {
-            "desc": "캔버스 탐색 허용",
-            "title": "툴 옮기기"
-        },
-        "clearMask": {
-            "desc": "전체 mask 제거",
-            "title": "Mask 제거"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "갤러리 이미지 크기 증가",
-            "desc": "갤러리 미리 보기 크기를 늘립니다"
-        },
-        "increaseBrushOpacity": {
-            "desc": "캔버스 브러시의 불투명도를 높입니다",
-            "title": "브러시 불투명도 증가"
-        },
-        "focusPrompt": {
-            "desc": "프롬프트 입력 영역에 초점을 맞춥니다",
-            "title": "프롬프트에 초점 맞추기"
-        },
-        "decreaseBrushOpacity": {
-            "desc": "캔버스 브러시의 불투명도를 줄입니다",
-            "title": "브러시 불투명도 감소"
-        },
-        "nextStagingImage": {
-            "desc": "다음 스테이징 영역 이미지",
-            "title": "다음 스테이징 이미지"
-        },
-        "redoStroke": {
-            "title": "Stroke 다시 실행",
-            "desc": "brush stroke 다시 실행"
-        },
-        "nodesHotkeys": "Nodes Hotkeys",
-        "addNodes": {
-            "desc": "노드 추가 메뉴 열기",
-            "title": "노드 추가"
-        },
-        "undoStroke": {
-            "title": "Stroke 실행 취소",
-            "desc": "brush stroke 실행 취소"
-        },
-        "changeTabs": {
-            "desc": "다른 workspace으로 전환",
-            "title": "탭 바꾸기"
-        },
-        "mergeVisible": {
-            "desc": "캔버스의 보이는 모든 레이어 병합"
-        }
     },
     "nodes": {
         "missingTemplate": "잘못된 노드: {{type}} 유형의 {{node}} 템플릿 누락(설치되지 않으셨나요?)",
@@ -451,7 +169,6 @@
         "downloadWorkflow": "Workflow JSON 다운로드",
         "ipAdapter": "IP-Adapter",
         "noConnectionInProgress": "진행중인 연결이 없습니다",
-        "noConnectionData": "연결 데이터 없음",
         "fieldTypesMustMatch": "필드 유형은 일치해야 합니다",
         "edge": "Edge",
         "sourceNodeFieldDoesNotExist": "잘못된 모서리: 소스/출력 필드 {{node}}. {{field}}이(가) 없습니다",
@@ -461,10 +178,8 @@
         "fullyContainNodesHelp": "선택하려면 노드가 선택 상자 안에 완전히 있어야 합니다",
         "nodePack": "Node pack",
         "nodeType": "노드 유형",
-        "noMatchingNodes": "일치하는 노드 없음",
         "fullyContainNodes": "선택할 노드 전체 포함",
         "executionStateInProgress": "진행중",
-        "noFieldType": "필드 유형 없음",
         "executionStateError": "에러",
         "boolean": "Booleans",
         "hideMinimapnodes": "미니맵 숨기기",
@@ -551,7 +266,6 @@
         "model": "모델",
         "noImageDetails": "이미지 세부 정보를 찾을 수 없습니다",
         "cfgScale": "CFG scale",
-        "initImage": "초기이미지",
         "recallParameters": "매개변수 호출",
         "height": "Height",
         "noMetaData": "metadata를 찾을 수 없습니다",
@@ -593,7 +307,6 @@
     },
     "models": {
         "noMatchingModels": "일치하는 모델 없음",
-        "esrganModel": "ESRGAN 모델",
         "loading": "로딩중",
         "noMatchingLoRAs": "일치하는 LoRA 없음",
         "noModelsAvailable": "사용 가능한 모델이 없음",

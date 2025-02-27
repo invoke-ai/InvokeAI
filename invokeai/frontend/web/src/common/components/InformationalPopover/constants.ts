@@ -1,4 +1,6 @@
 import type { PopoverProps } from '@invoke-ai/ui-library';
+import commercialLicenseBg from 'public/assets/images/commercial-license-bg.png';
+import denoisingStrength from 'public/assets/images/denoising-strength.png';
 
 export type Feature =
   | 'clipSkip'
@@ -22,14 +24,17 @@ export type Feature =
   | 'dynamicPrompts'
   | 'dynamicPromptsMaxPrompts'
   | 'dynamicPromptsSeedBehaviour'
+  | 'globalReferenceImage'
   | 'imageFit'
   | 'infillMethod'
+  | 'inpainting'
   | 'ipAdapterMethod'
   | 'lora'
   | 'loraWeight'
   | 'noiseUseCPU'
   | 'paramAspect'
   | 'paramCFGScale'
+  | 'paramGuidance'
   | 'paramCFGRescaleMultiplier'
   | 'paramDenoisingStrength'
   | 'paramHeight'
@@ -44,6 +49,7 @@ export type Feature =
   | 'paramVAEPrecision'
   | 'paramWidth'
   | 'patchmatchDownScaleSize'
+  | 'rasterLayer'
   | 'refinerModel'
   | 'refinerNegativeAestheticScore'
   | 'refinerPositiveAestheticScore'
@@ -51,13 +57,18 @@ export type Feature =
   | 'refinerStart'
   | 'refinerSteps'
   | 'refinerCfgScale'
+  | 'regionalGuidance'
+  | 'regionalGuidanceAndReferenceImage'
+  | 'regionalReferenceImage'
   | 'scaleBeforeProcessing'
   | 'seamlessTilingXAxis'
   | 'seamlessTilingYAxis'
   | 'upscaleModel'
   | 'scale'
   | 'creativity'
-  | 'structure';
+  | 'structure'
+  | 'optimizedDenoising'
+  | 'fluxDevLicense';
 
 export type PopoverData = PopoverProps & {
   image?: string;
@@ -71,6 +82,24 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   clipSkip: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
+  },
+  inpainting: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000096702-inpainting-outpainting-and-bounding-box',
+  },
+  rasterLayer: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000094998-raster-layers-and-initial-images',
+  },
+  regionalGuidance: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000165024-regional-guidance-layers',
+  },
+  regionalGuidanceAndReferenceImage: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000165024-regional-guidance-layers',
+  },
+  globalReferenceImage: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
+  },
+  regionalReferenceImage: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },
   controlNet: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000105880',
@@ -97,10 +126,10 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
     href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   infillMethod: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000158841-infill-and-scaling',
+    href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   scaleBeforeProcessing: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000158841',
+    href: 'https://support.invoke.ai/support/solutions/articles/151000179777-scale-before-processing',
   },
   paramCFGScale: {
     href: 'https://www.youtube.com/watch?v=1OeHEJrsTpI',
@@ -110,6 +139,7 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   paramDenoisingStrength: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000094998-image-to-image',
+    image: denoisingStrength,
   },
   paramHrf: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096700-how-can-i-get-larger-images-what-does-upscaling-do-',
@@ -184,6 +214,10 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   seamlessTilingYAxis: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
+  },
+  fluxDevLicense: {
+    href: 'https://www.invoke.com/get-a-commercial-license-for-flux',
+    image: commercialLicenseBg,
   },
 } as const;
 

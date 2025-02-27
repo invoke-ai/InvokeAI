@@ -1,5 +1,5 @@
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
-import { METADATA } from 'features/nodes/util/graph/constants';
 import { forEach, groupBy, isEqual, unset, values } from 'lodash-es';
 import type {
   AnyInvocation,
@@ -31,10 +31,13 @@ export type GraphType = { id: string; nodes: Record<string, AnyInvocation>; edge
 
 export class Graph {
   _graph: GraphType;
+  _metadataNodeId = getPrefixedId('core_metadata');
+  id: string;
 
   constructor(id?: string) {
+    this.id = id ?? Graph.getId('graph');
     this._graph = {
-      id: id ?? uuidv4(),
+      id: this.id,
       nodes: {},
       edges: [],
     };
@@ -98,6 +101,30 @@ export class Graph {
     } catch {
       return false;
     }
+  }
+
+  updateNode<T extends InvocationType>(node: Invocation<T>, changes: Partial<Invocation<T>>): Invocation<T> {
+    if (changes.id) {
+      assert(!this.hasNode(changes.id), `Node with id ${changes.id} already exists`);
+      const oldId = node.id;
+      const newId = changes.id;
+      this._graph.nodes[newId] = node;
+      delete this._graph.nodes[node.id];
+      node.id = newId;
+
+      this._graph.edges.forEach((edge) => {
+        if (edge.source.node_id === oldId) {
+          edge.source.node_id = newId;
+        }
+        if (edge.destination.node_id === oldId) {
+          edge.destination.node_id = newId;
+        }
+      });
+    }
+
+    Object.assign(node, changes);
+
+    return node;
   }
 
   /**
@@ -332,16 +359,16 @@ export class Graph {
   //#region Metadata
 
   /**
-   * INTERNAL: Get the metadata node. If it does not exist, it is created.
+   * Get the metadata node. If it does not exist, it is created.
    * @returns The metadata node.
    */
-  _getMetadataNode(): S['CoreMetadataInvocation'] {
+  getMetadataNode(): S['CoreMetadataInvocation'] {
     try {
-      const node = this.getNode(METADATA) as AnyInvocationIncMetadata;
+      const node = this.getNode(this._metadataNodeId) as AnyInvocationIncMetadata;
       assert(node.type === 'core_metadata');
       return node;
     } catch {
-      const node: S['CoreMetadataInvocation'] = { id: METADATA, type: 'core_metadata' };
+      const node: S['CoreMetadataInvocation'] = { id: this._metadataNodeId, type: 'core_metadata' };
       // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
       return this.addNode(node);
     }
@@ -354,7 +381,7 @@ export class Graph {
    * @returns The metadata node.
    */
   upsertMetadata(metadata: Partial<S['CoreMetadataInvocation']>): S['CoreMetadataInvocation'] {
-    const node = this._getMetadataNode();
+    const node = this.getMetadataNode();
     Object.assign(node, metadata);
     return node;
   }
@@ -365,7 +392,7 @@ export class Graph {
    * @returns The metadata node
    */
   removeMetadata(keys: string[]): S['CoreMetadataInvocation'] {
-    const metadataNode = this._getMetadataNode();
+    const metadataNode = this.getMetadataNode();
     for (const k of keys) {
       unset(metadataNode, k);
     }
@@ -385,7 +412,7 @@ export class Graph {
     metadataField: string
   ): Edge {
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
-    return this.addEdge(fromNode, fromField, this._getMetadataNode(), metadataField);
+    return this.addEdge(fromNode, fromField, this.getMetadataNode(), metadataField);
   }
   /**
    * Set the node that should receive metadata. All other edges from the metadata node are deleted.
@@ -393,9 +420,9 @@ export class Graph {
    */
   setMetadataReceivingNode(node: AnyInvocation): void {
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
-    this.deleteEdgesFrom(this._getMetadataNode());
+    this.deleteEdgesFrom(this.getMetadataNode());
     // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
-    this.addEdge(this._getMetadataNode(), 'metadata', node, 'metadata');
+    this.addEdge(this.getMetadataNode(), 'metadata', node, 'metadata');
   }
   //#endregion
 
@@ -429,6 +456,17 @@ export class Graph {
     }
     assert(fromField !== undefined && toNodeId !== undefined && toField !== undefined, 'Invalid edge arguments');
     return `${fromNodeId}.${fromField} -> ${toNodeId}.${toField}`;
+  }
+  /**
+   * Gets a unique id.
+   * @param prefix An optional prefix
+   */
+  static getId(prefix?: string): string {
+    if (prefix) {
+      return `${prefix}_${uuidv4()}`;
+    } else {
+      return uuidv4();
+    }
   }
   //#endregion
 }

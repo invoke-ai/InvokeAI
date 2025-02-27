@@ -19,6 +19,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { useClipboard } from 'common/hooks/useClipboard';
 import { discordLink, githubLink, websiteLink } from 'features/system/store/constants';
 import { map } from 'lodash-es';
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
@@ -36,6 +37,7 @@ type AboutModalProps = {
 const AboutModal = ({ children }: AboutModalProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
+  const clipboard = useClipboard();
   const { depsArray, depsObject } = useGetAppDepsQuery(undefined, {
     selectFromResult: ({ data }) => ({
       depsObject: data,
@@ -45,15 +47,15 @@ const AboutModal = ({ children }: AboutModalProps) => {
   const { data: appVersion } = useGetAppVersionQuery();
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(JSON.stringify(depsObject, null, 2));
-  }, [depsObject]);
+    clipboard.writeText(JSON.stringify(depsObject, null, 2));
+  }, [clipboard, depsObject]);
 
   return (
     <>
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
         <ModalOverlay />
         <ModalContent maxH="80vh" h="34rem">
           <ModalHeader>{t('accessibility.about')}</ModalHeader>

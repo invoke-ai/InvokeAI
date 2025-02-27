@@ -378,6 +378,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._poll_now()
 
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
+        # Make sure the cancel event is for the currently processing queue item
+        if self._queue_item and self._queue_item.item_id != event[1].item_id:
+            return
         if self._queue_item and event[1].status in ["completed", "failed", "canceled"]:
             # When the queue item is canceled via HTTP, the queue item status is set to `"canceled"` and this event is
             # emitted. We need to respond to this event and stop graph execution. This is done by setting the cancel
@@ -436,7 +439,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
-                    self._invoker.services.logger.debug(f"Executing queue item {self._queue_item.item_id}")
+                    self._invoker.services.logger.info(
+                        f"Executing queue item {self._queue_item.item_id}, session {self._queue_item.session_id}"
+                    )
                     cancel_event.clear()
 
                     # Run the graph

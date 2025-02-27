@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import sys
 import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -20,7 +21,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 
 import semver
@@ -44,8 +44,6 @@ if TYPE_CHECKING:
 
 logger = InvokeAILogger.get_logger()
 
-CUSTOM_NODE_PACK_SUFFIX = "__invokeai-custom-node"
-
 
 class InvalidVersionError(ValueError):
     pass
@@ -61,11 +59,17 @@ class Classification(str, Enum, metaclass=MetaEnum):
     - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
     - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
     - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
+    - `Deprecated`: The invocation is deprecated and may be removed in a future version.
+    - `Internal`: The invocation is not intended for use by end-users. It may be changed or removed at any time, but is exposed for users to play with.
+    - `Special`: The invocation is a special case and does not fit into any of the other classifications.
     """
 
     Stable = "stable"
     Beta = "beta"
     Prototype = "prototype"
+    Deprecated = "deprecated"
+    Internal = "internal"
+    Special = "special"
 
 
 class UIConfigBase(BaseModel):
@@ -80,7 +84,7 @@ class UIConfigBase(BaseModel):
     version: str = Field(
         description='The node\'s version. Should be a valid semver string e.g. "1.0.0" or "3.8.13".',
     )
-    node_pack: Optional[str] = Field(default=None, description="Whether or not this is a custom node")
+    node_pack: str = Field(description="The node pack that this node belongs to, will be 'invokeai' for built-in nodes")
     classification: Classification = Field(default=Classification.Stable, description="The node's classification")
 
     model_config = ConfigDict(
@@ -189,11 +193,18 @@ class BaseInvocation(ABC, BaseModel):
         """Gets a pydantc TypeAdapter for the union of all invocation types."""
         if not cls._typeadapter or cls._typeadapter_needs_update:
             AnyInvocation = TypeAliasType(
-                "AnyInvocation", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
+                "AnyInvocation", Annotated[Union[tuple(cls.get_invocations())], Field(discriminator="type")]
             )
             cls._typeadapter = TypeAdapter(AnyInvocation)
             cls._typeadapter_needs_update = False
         return cls._typeadapter
+
+    @classmethod
+    def invalidate_typeadapter(cls) -> None:
+        """Invalidates the typeadapter, forcing it to be rebuilt on next access. If the invocation allowlist or
+        denylist is changed, this should be called to ensure the typeadapter is updated and validation respects
+        the updated allowlist and denylist."""
+        cls._typeadapter_needs_update = True
 
     @classmethod
     def get_invocations(cls) -> Iterable[BaseInvocation]:
@@ -227,21 +238,24 @@ class BaseInvocation(ABC, BaseModel):
         """Gets the invocation's output annotation (i.e. the return annotation of its `invoke()` method)."""
         return signature(cls.invoke).return_annotation
 
+    @classmethod
+    def get_invocation_for_type(cls, invocation_type: str) -> BaseInvocation | None:
+        """Gets the invocation class for a given invocation type."""
+        return cls.get_invocations_map().get(invocation_type)
+
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocation]) -> None:
         """Adds various UI-facing attributes to the invocation's OpenAPI schema."""
-        uiconfig = cast(UIConfigBase | None, getattr(model_class, "UIConfig", None))
-        if uiconfig is not None:
-            if uiconfig.title is not None:
-                schema["title"] = uiconfig.title
-            if uiconfig.tags is not None:
-                schema["tags"] = uiconfig.tags
-            if uiconfig.category is not None:
-                schema["category"] = uiconfig.category
-            if uiconfig.node_pack is not None:
-                schema["node_pack"] = uiconfig.node_pack
-            schema["classification"] = uiconfig.classification
-            schema["version"] = uiconfig.version
+        if title := model_class.UIConfig.title:
+            schema["title"] = title
+        if tags := model_class.UIConfig.tags:
+            schema["tags"] = tags
+        if category := model_class.UIConfig.category:
+            schema["category"] = category
+        if node_pack := model_class.UIConfig.node_pack:
+            schema["node_pack"] = node_pack
+        schema["classification"] = model_class.UIConfig.classification
+        schema["version"] = model_class.UIConfig.version
         if "required" not in schema or not isinstance(schema["required"], list):
             schema["required"] = []
         schema["class"] = "invocation"
@@ -312,7 +326,7 @@ class BaseInvocation(ABC, BaseModel):
         json_schema_extra={"field_kind": FieldKind.NodeAttribute},
     )
 
-    UIConfig: ClassVar[Type[UIConfigBase]]
+    UIConfig: ClassVar[UIConfigBase]
 
     model_config = ConfigDict(
         protected_namespaces=(),
@@ -435,36 +449,49 @@ def invocation(
         if re.compile(r"^\S+$").match(invocation_type) is None:
             raise ValueError(f'"invocation_type" must consist of non-whitespace characters, got "{invocation_type}"')
 
+        # The node pack is the module name - will be "invokeai" for built-in nodes
+        node_pack = cls.__module__.split(".")[0]
+
+        # Handle the case where an existing node is being clobbered by the one we are registering
         if invocation_type in BaseInvocation.get_invocation_types():
-            raise ValueError(f'Invocation type "{invocation_type}" already exists')
+            clobbered_invocation = BaseInvocation.get_invocation_for_type(invocation_type)
+            # This should always be true - we just checked if the invocation type was in the set
+            assert clobbered_invocation is not None
+
+            clobbered_node_pack = clobbered_invocation.UIConfig.node_pack
+
+            if clobbered_node_pack == "invokeai":
+                # The node being clobbered is a core node
+                raise ValueError(
+                    f'Cannot load node "{invocation_type}" from node pack "{node_pack}" - a core node with the same type already exists'
+                )
+            else:
+                # The node being clobbered is a custom node
+                raise ValueError(
+                    f'Cannot load node "{invocation_type}" from node pack "{node_pack}" - a node with the same type already exists in node pack "{clobbered_node_pack}"'
+                )
 
         validate_fields(cls.model_fields, invocation_type)
 
         # Add OpenAPI schema extras
-        uiconfig_name = cls.__qualname__ + ".UIConfig"
-        if not hasattr(cls, "UIConfig") or cls.UIConfig.__qualname__ != uiconfig_name:
-            cls.UIConfig = type(uiconfig_name, (UIConfigBase,), {})
-        cls.UIConfig.title = title
-        cls.UIConfig.tags = tags
-        cls.UIConfig.category = category
-        cls.UIConfig.classification = classification
-
-        # Grab the node pack's name from the module name, if it's a custom node
-        is_custom_node = cls.__module__.rsplit(".", 1)[0] == "invokeai.app.invocations"
-        if is_custom_node:
-            cls.UIConfig.node_pack = cls.__module__.split(".")[0]
-        else:
-            cls.UIConfig.node_pack = None
+        uiconfig: dict[str, Any] = {}
+        uiconfig["title"] = title
+        uiconfig["tags"] = tags
+        uiconfig["category"] = category
+        uiconfig["classification"] = classification
+        uiconfig["node_pack"] = node_pack
 
         if version is not None:
             try:
                 semver.Version.parse(version)
             except ValueError as e:
                 raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
-            cls.UIConfig.version = version
+            uiconfig["version"] = version
         else:
             logger.warn(f'No version specified for node "{invocation_type}", using "1.0.0"')
-            cls.UIConfig.version = "1.0.0"
+            uiconfig["version"] = "1.0.0"
+
+        cls.UIConfig = UIConfigBase(**uiconfig)
 
         if use_cache is not None:
             cls.model_fields["use_cache"].default = use_cache
@@ -482,6 +509,26 @@ def invocation(
         invocation_type_field = Field(
             title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
         )
+
+        # Validate the `invoke()` method is implemented
+        if "invoke" in cls.__abstractmethods__:
+            raise ValueError(f'Invocation "{invocation_type}" must implement the "invoke" method')
+
+        # And validate that `invoke()` returns a subclass of `BaseInvocationOutput
+        invoke_return_annotation = signature(cls.invoke).return_annotation
+
+        try:
+            # TODO(psyche): If `invoke()` is not defined, `return_annotation` ends up as the string "BaseInvocationOutput"
+            # instead of the class `BaseInvocationOutput`. This may be a pydantic bug: https://github.com/pydantic/pydantic/issues/7978
+            if isinstance(invoke_return_annotation, str):
+                invoke_return_annotation = getattr(sys.modules[cls.__module__], invoke_return_annotation)
+
+            assert invoke_return_annotation is not BaseInvocationOutput
+            assert issubclass(invoke_return_annotation, BaseInvocationOutput)
+        except Exception:
+            raise ValueError(
+                f'Invocation "{invocation_type}" must have a return annotation of a subclass of BaseInvocationOutput (got "{invoke_return_annotation}")'
+            )
 
         docstring = cls.__doc__
         cls = create_model(

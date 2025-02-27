@@ -16,7 +16,8 @@ from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBas
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
-from invokeai.backend.model_manager.load import ModelCache, ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -81,11 +82,13 @@ class ModelManagerService(ModelManagerServiceBase):
         logger.setLevel(app_config.log_level.upper())
 
         ram_cache = ModelCache(
-            max_cache_size=app_config.ram,
-            max_vram_cache_size=app_config.vram,
-            lazy_offloading=app_config.lazy_offload,
-            logger=logger,
+            execution_device_working_mem_gb=app_config.device_working_mem_gb,
+            enable_partial_loading=app_config.enable_partial_loading,
+            keep_ram_copy_of_weights=app_config.keep_ram_copy_of_weights,
+            max_ram_cache_size_gb=app_config.max_cache_ram_gb,
+            max_vram_cache_size_gb=app_config.max_cache_vram_gb,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
+            logger=logger,
         )
         loader = ModelLoadService(
             app_config=app_config,

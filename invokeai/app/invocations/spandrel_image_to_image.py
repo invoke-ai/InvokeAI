@@ -1,3 +1,4 @@
+import functools
 from typing import Callable
 
 import numpy as np
@@ -21,6 +22,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.tiles.tiles import calc_tiles_min_overlap
 from invokeai.backend.tiles.utils import TBLR, Tile
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation("spandrel_image_to_image", title="Image-to-Image", tags=["upscale"], category="upscale", version="1.3.0")
@@ -61,6 +63,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         tile_size: int,
         spandrel_model: SpandrelImageToImageModel,
         is_canceled: Callable[[], bool],
+        step_callback: Callable[[int, int], None],
     ) -> Image.Image:
         # Compute the image tiles.
         if tile_size > 0:
@@ -100,18 +103,21 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             (height * scale, width * scale, channels), dtype=torch.uint8, device=torch.device("cpu")
         )
 
-        image_tensor = image_tensor.to(device=spandrel_model.device, dtype=spandrel_model.dtype)
+        image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=spandrel_model.dtype)
 
         # Run the model on each tile.
-        for tile, scaled_tile in tqdm(list(zip(tiles, scaled_tiles, strict=True)), desc="Upscaling Tiles"):
+        pbar = tqdm(list(zip(tiles, scaled_tiles, strict=True)), desc="Upscaling Tiles")
+
+        # Update progress, starting with 0.
+        step_callback(0, pbar.total)
+
+        for tile, scaled_tile in pbar:
             # Exit early if the invocation has been canceled.
             if is_canceled():
                 raise CanceledException
 
             # Extract the current tile from the input tensor.
-            input_tile = image_tensor[
-                :, :, tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right
-            ].to(device=spandrel_model.device, dtype=spandrel_model.dtype)
+            input_tile = image_tensor[:, :, tile.coords.top : tile.coords.bottom, tile.coords.left : tile.coords.right]
 
             # Run the model on the tile.
             output_tile = spandrel_model.run(input_tile)
@@ -136,27 +142,34 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 :,
             ] = output_tile[top_overlap:, left_overlap:, :]
 
+            step_callback(pbar.n + 1, pbar.total)
+
         # Convert the output tensor to a PIL image.
         np_image = output_tensor.detach().numpy().astype(np.uint8)
         pil_image = Image.fromarray(np_image)
 
         return pil_image
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Images are converted to RGB, because most models don't support an alpha channel. In the future, we may want to
         # revisit this.
         image = context.images.get_pil(self.image.image_name, mode="RGB")
 
-        # Load the model.
-        spandrel_model_info = context.models.load(self.image_to_image_model)
+        def step_callback(step: int, total_steps: int) -> None:
+            context.util.signal_progress(
+                message=f"Processing tile {step}/{total_steps}",
+                percentage=step / total_steps,
+            )
 
         # Do the upscaling.
-        with spandrel_model_info as spandrel_model:
+        with context.models.load(self.image_to_image_model) as spandrel_model:
             assert isinstance(spandrel_model, SpandrelImageToImageModel)
 
             # Upscale the image
-            pil_image = self.upscale_image(image, self.tile_size, spandrel_model, context.util.is_canceled)
+            pil_image = self.upscale_image(
+                image, self.tile_size, spandrel_model, context.util.is_canceled, step_callback
+            )
 
         image_dto = context.images.save(image=pil_image)
         return ImageOutput.build(image_dto)
@@ -183,26 +196,38 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
         description="If true, the output image will be resized to the nearest multiple of 8 in both dimensions.",
     )
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         # Images are converted to RGB, because most models don't support an alpha channel. In the future, we may want to
         # revisit this.
         image = context.images.get_pil(self.image.image_name, mode="RGB")
-
-        # Load the model.
-        spandrel_model_info = context.models.load(self.image_to_image_model)
 
         # The target size of the image, determined by the provided scale. We'll run the upscaler until we hit this size.
         # Later, we may mutate this value if the model doesn't upscale the image or if the user requested a multiple of 8.
         target_width = int(image.width * self.scale)
         target_height = int(image.height * self.scale)
 
+        def step_callback(iteration: int, step: int, total_steps: int) -> None:
+            context.util.signal_progress(
+                message=self._get_progress_message(iteration, step, total_steps),
+                percentage=step / total_steps,
+            )
+
         # Do the upscaling.
-        with spandrel_model_info as spandrel_model:
+        with context.models.load(self.image_to_image_model) as spandrel_model:
             assert isinstance(spandrel_model, SpandrelImageToImageModel)
 
+            iteration = 1
+            context.util.signal_progress(self._get_progress_message(iteration))
+
             # First pass of upscaling. Note: `pil_image` will be mutated.
-            pil_image = self.upscale_image(image, self.tile_size, spandrel_model, context.util.is_canceled)
+            pil_image = self.upscale_image(
+                image,
+                self.tile_size,
+                spandrel_model,
+                context.util.is_canceled,
+                functools.partial(step_callback, iteration),
+            )
 
             # Some models don't upscale the image, but we have no way to know this in advance. We'll check if the model
             # upscaled the image and run the loop below if it did. We'll require the model to upscale both dimensions
@@ -211,16 +236,22 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
 
             if is_upscale_model:
                 # This is an upscale model, so we should keep upscaling until we reach the target size.
-                iterations = 1
                 while pil_image.width < target_width or pil_image.height < target_height:
-                    pil_image = self.upscale_image(pil_image, self.tile_size, spandrel_model, context.util.is_canceled)
-                    iterations += 1
+                    iteration += 1
+                    context.util.signal_progress(self._get_progress_message(iteration))
+                    pil_image = self.upscale_image(
+                        pil_image,
+                        self.tile_size,
+                        spandrel_model,
+                        context.util.is_canceled,
+                        functools.partial(step_callback, iteration),
+                    )
 
                     # Sanity check to prevent excessive or infinite loops. All known upscaling models are at least 2x.
                     # Our max scale is 16x, so with a 2x model, we should never exceed 16x == 2^4 -> 4 iterations.
                     # We'll allow one extra iteration "just in case" and bail at 5 upscaling iterations. In practice,
                     # we should never reach this limit.
-                    if iterations >= 5:
+                    if iteration >= 5:
                         context.logger.warning(
                             "Upscale loop reached maximum iteration count of 5, stopping upscaling early."
                         )
@@ -251,3 +282,10 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
 
         image_dto = context.images.save(image=pil_image)
         return ImageOutput.build(image_dto)
+
+    @classmethod
+    def _get_progress_message(cls, iteration: int, step: int | None = None, total_steps: int | None = None) -> str:
+        if step is not None and total_steps is not None:
+            return f"Processing iteration {iteration}, tile {step}/{total_steps}"
+
+        return f"Processing iteration {iteration}"

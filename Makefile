@@ -19,6 +19,7 @@ help:
 	@echo "installer-zip            Build the installer .zip file for the current version"
 	@echo "tag-release              Tag the GitHub repository with the current version (use at release time only!)"
 	@echo "openapi                  Generate the OpenAPI schema for the app, outputting to stdout"
+	@echo "docs                     Serve the mkdocs site with live reload"
 
 # Runs ruff, fixing any safely-fixable errors and formatting
 ruff:
@@ -74,3 +75,8 @@ tag-release:
 # Generate the OpenAPI Schema for the app
 openapi:
 	python scripts/generate_openapi_schema.py
+
+# Serve the mkdocs site w/ live reload
+.PHONY: docs
+docs:
+	mkdocs serve

@@ -1,18 +1,30 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { EdgeChange, NodeChange, Viewport, XYPosition } from '@xyflow/react';
+import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from '@xyflow/react';
+import type { PersistConfig } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
   BooleanFieldValue,
+  CLIPEmbedModelFieldValue,
+  CLIPGEmbedModelFieldValue,
+  CLIPLEmbedModelFieldValue,
   ColorFieldValue,
+  ControlLoRAModelFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
   FieldValue,
   FloatFieldValue,
+  FloatGeneratorFieldValue,
+  FluxVAEModelFieldValue,
+  ImageFieldCollectionValue,
   ImageFieldValue,
+  ImageGeneratorFieldValue,
+  IntegerFieldCollectionValue,
   IntegerFieldValue,
+  IntegerGeneratorFieldValue,
   IPAdapterModelFieldValue,
   LoRAModelFieldValue,
   MainModelFieldValue,
@@ -21,19 +33,33 @@ import type {
   SDXLRefinerModelFieldValue,
   SpandrelImageToImageModelFieldValue,
   StatefulFieldValue,
+  StringFieldCollectionValue,
   StringFieldValue,
+  StringGeneratorFieldValue,
   T2IAdapterModelFieldValue,
+  T5EncoderModelFieldValue,
   VAEModelFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
+  zCLIPEmbedModelFieldValue,
+  zCLIPGEmbedModelFieldValue,
+  zCLIPLEmbedModelFieldValue,
   zColorFieldValue,
+  zControlLoRAModelFieldValue,
   zControlNetModelFieldValue,
   zEnumFieldValue,
+  zFloatFieldCollectionValue,
   zFloatFieldValue,
+  zFloatGeneratorFieldValue,
+  zFluxVAEModelFieldValue,
+  zImageFieldCollectionValue,
   zImageFieldValue,
+  zImageGeneratorFieldValue,
+  zIntegerFieldCollectionValue,
   zIntegerFieldValue,
+  zIntegerGeneratorFieldValue,
   zIPAdapterModelFieldValue,
   zLoRAModelFieldValue,
   zMainModelFieldValue,
@@ -42,16 +68,17 @@ import {
   zSDXLRefinerModelFieldValue,
   zSpandrelImageToImageModelFieldValue,
   zStatefulFieldValue,
+  zStringFieldCollectionValue,
   zStringFieldValue,
+  zStringGeneratorFieldValue,
   zT2IAdapterModelFieldValue,
+  zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
-import type { Edge, EdgeChange, NodeChange, Viewport, XYPosition } from 'reactflow';
-import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
 import type { UndoableOptions } from 'redux-undo';
 import type { z } from 'zod';
 
@@ -69,33 +96,41 @@ type FieldValueAction<T extends FieldValue> = PayloadAction<{
   value: T;
 }>;
 
+const getField = (nodeId: string, fieldName: string, state: NodesState) => {
+  const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
+  const node = state.nodes?.[nodeIndex];
+  if (!isInvocationNode(node)) {
+    return;
+  }
+  return node.data?.inputs[fieldName];
+};
+
 const fieldValueReducer = <T extends FieldValue>(
   state: NodesState,
   action: FieldValueAction<T>,
   schema: z.ZodTypeAny
 ) => {
   const { nodeId, fieldName, value } = action.payload;
-  const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
-  const node = state.nodes?.[nodeIndex];
-  if (!isInvocationNode(node)) {
+  const field = getField(nodeId, fieldName, state);
+  if (!field) {
     return;
   }
-  const input = node.data?.inputs[fieldName];
+  // TODO(psyche): Do we need to do this zod validation? We already have type safety from the action payload...
   const result = schema.safeParse(value);
-  if (!input || nodeIndex < 0 || !result.success) {
+  if (!result.success) {
     return;
   }
-  input.value = result.data;
+  field.value = result.data;
 };
 
 export const nodesSlice = createSlice({
   name: 'nodes',
   initialState: initialNodesState,
   reducers: {
-    nodesChanged: (state, action: PayloadAction<NodeChange[]>) => {
-      state.nodes = applyNodeChanges(action.payload, state.nodes);
+    nodesChanged: (state, action: PayloadAction<NodeChange<AnyNode>[]>) => {
+      state.nodes = applyNodeChanges<AnyNode>(action.payload, state.nodes);
       // Remove edges that are no longer valid, due to a removed or otherwise changed node
-      const edgeChanges: EdgeChange[] = [];
+      const edgeChanges: EdgeChange<AnyEdge>[] = [];
       state.edges.forEach((e) => {
         const sourceExists = state.nodes.some((n) => n.id === e.source);
         const targetExists = state.nodes.some((n) => n.id === e.target);
@@ -103,10 +138,10 @@ export const nodesSlice = createSlice({
           edgeChanges.push({ type: 'remove', id: e.id });
         }
       });
-      state.edges = applyEdgeChanges(edgeChanges, state.edges);
+      state.edges = applyEdgeChanges<AnyEdge>(edgeChanges, state.edges);
     },
-    edgesChanged: (state, action: PayloadAction<EdgeChange[]>) => {
-      const changes: EdgeChange[] = [];
+    edgesChanged: (state, action: PayloadAction<EdgeChange<AnyEdge>[]>) => {
+      const changes: EdgeChange<AnyEdge>[] = [];
       // We may need to massage the edge changes or otherwise handle them
       action.payload.forEach((change) => {
         if (change.type === 'remove' || change.type === 'select') {
@@ -218,7 +253,7 @@ export const nodesSlice = createSlice({
           (node) => isInvocationNode(node) && node.data.isOpen === false
         );
 
-        const collapsedEdgesToCreate: Edge<{ count: number }>[] = [];
+        const collapsedEdgesToCreate: AnyEdge[] = [];
 
         // hide all edges
         connectedEdges.forEach((edge) => {
@@ -238,7 +273,7 @@ export const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
-                updatable: false,
+                reconnectable: false,
                 selected: edge.selected,
               });
             }
@@ -259,14 +294,14 @@ export const nodesSlice = createSlice({
                 target: edge.target,
                 type: 'collapsed',
                 data: { count: 1 },
-                updatable: false,
+                reconnectable: false,
                 selected: edge.selected,
               });
             }
           }
         });
         if (collapsedEdgesToCreate.length) {
-          state.edges = applyEdgeChanges(
+          state.edges = applyEdgeChanges<AnyEdge>(
             collapsedEdgesToCreate.map((edge) => ({ type: 'add', item: edge })),
             state.edges
           );
@@ -296,8 +331,20 @@ export const nodesSlice = createSlice({
     fieldStringValueChanged: (state, action: FieldValueAction<StringFieldValue>) => {
       fieldValueReducer(state, action, zStringFieldValue);
     },
-    fieldNumberValueChanged: (state, action: FieldValueAction<IntegerFieldValue | FloatFieldValue>) => {
-      fieldValueReducer(state, action, zIntegerFieldValue.or(zFloatFieldValue));
+    fieldStringCollectionValueChanged: (state, action: FieldValueAction<StringFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zStringFieldCollectionValue);
+    },
+    fieldIntegerValueChanged: (state, action: FieldValueAction<IntegerFieldValue>) => {
+      fieldValueReducer(state, action, zIntegerFieldValue);
+    },
+    fieldFloatValueChanged: (state, action: FieldValueAction<FloatFieldValue>) => {
+      fieldValueReducer(state, action, zFloatFieldValue);
+    },
+    fieldFloatCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zFloatFieldCollectionValue);
+    },
+    fieldIntegerCollectionValueChanged: (state, action: FieldValueAction<IntegerFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zIntegerFieldCollectionValue);
     },
     fieldBooleanValueChanged: (state, action: FieldValueAction<BooleanFieldValue>) => {
       fieldValueReducer(state, action, zBooleanFieldValue);
@@ -307,6 +354,9 @@ export const nodesSlice = createSlice({
     },
     fieldImageValueChanged: (state, action: FieldValueAction<ImageFieldValue>) => {
       fieldValueReducer(state, action, zImageFieldValue);
+    },
+    fieldImageCollectionValueChanged: (state, action: FieldValueAction<ImageFieldCollectionValue>) => {
+      fieldValueReducer(state, action, zImageFieldCollectionValue);
     },
     fieldColorValueChanged: (state, action: FieldValueAction<ColorFieldValue>) => {
       fieldValueReducer(state, action, zColorFieldValue);
@@ -341,11 +391,49 @@ export const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action, zSpandrelImageToImageModelFieldValue);
     },
+    fieldT5EncoderValueChanged: (state, action: FieldValueAction<T5EncoderModelFieldValue>) => {
+      fieldValueReducer(state, action, zT5EncoderModelFieldValue);
+    },
+    fieldCLIPEmbedValueChanged: (state, action: FieldValueAction<CLIPEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPEmbedModelFieldValue);
+    },
+    fieldCLIPLEmbedValueChanged: (state, action: FieldValueAction<CLIPLEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPLEmbedModelFieldValue);
+    },
+    fieldCLIPGEmbedValueChanged: (state, action: FieldValueAction<CLIPGEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPGEmbedModelFieldValue);
+    },
+    fieldControlLoRAModelValueChanged: (state, action: FieldValueAction<ControlLoRAModelFieldValue>) => {
+      fieldValueReducer(state, action, zControlLoRAModelFieldValue);
+    },
+    fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
+      fieldValueReducer(state, action, zFluxVAEModelFieldValue);
+    },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
     fieldSchedulerValueChanged: (state, action: FieldValueAction<SchedulerFieldValue>) => {
       fieldValueReducer(state, action, zSchedulerFieldValue);
+    },
+    fieldFloatGeneratorValueChanged: (state, action: FieldValueAction<FloatGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zFloatGeneratorFieldValue);
+    },
+    fieldIntegerGeneratorValueChanged: (state, action: FieldValueAction<IntegerGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zIntegerGeneratorFieldValue);
+    },
+    fieldStringGeneratorValueChanged: (state, action: FieldValueAction<StringGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zStringGeneratorFieldValue);
+    },
+    fieldImageGeneratorValueChanged: (state, action: FieldValueAction<ImageGeneratorFieldValue>) => {
+      fieldValueReducer(state, action, zImageGeneratorFieldValue);
+    },
+    fieldDescriptionChanged: (state, action: PayloadAction<{ nodeId: string; fieldName: string; val?: string }>) => {
+      const { nodeId, fieldName, val } = action.payload;
+      const field = getField(nodeId, fieldName, state);
+      if (!field) {
+        return;
+      }
+      field.description = val || '';
     },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
@@ -366,13 +454,28 @@ export const nodesSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes, edges } = action.payload;
-      state.nodes = applyNodeChanges(
-        nodes.map((node) => ({
-          type: 'add',
-          item: { ...node, ...SHARED_NODE_PROPERTIES },
-        })),
-        []
-      );
+
+      const changes: NodeChange<AnyNode>[] = [];
+      for (const node of nodes) {
+        if (node.type === 'notes') {
+          changes.push({
+            type: 'add',
+            item: {
+              ...SHARED_NODE_PROPERTIES,
+              ...node,
+            },
+          });
+        } else if (node.type === 'invocation') {
+          changes.push({
+            type: 'add',
+            item: {
+              ...SHARED_NODE_PROPERTIES,
+              ...node,
+            },
+          });
+        }
+      }
+      state.nodes = applyNodeChanges<AnyNode>(changes, []);
       state.edges = applyEdgeChanges(
         edges.map((edge) => ({ type: 'add', item: edge })),
         []
@@ -390,6 +493,7 @@ export const {
   fieldControlNetModelValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
+  fieldImageCollectionValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
   fieldSpandrelImageToImageModelValueChanged,
@@ -397,11 +501,26 @@ export const {
   fieldLoRAModelValueChanged,
   fieldModelIdentifierValueChanged,
   fieldMainModelValueChanged,
-  fieldNumberValueChanged,
+  fieldIntegerValueChanged,
+  fieldFloatValueChanged,
+  fieldFloatCollectionValueChanged,
+  fieldIntegerCollectionValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
+  fieldStringCollectionValueChanged,
   fieldVaeModelValueChanged,
+  fieldT5EncoderValueChanged,
+  fieldCLIPEmbedValueChanged,
+  fieldCLIPLEmbedValueChanged,
+  fieldCLIPGEmbedValueChanged,
+  fieldControlLoRAModelValueChanged,
+  fieldFluxVAEModelValueChanged,
+  fieldFloatGeneratorValueChanged,
+  fieldIntegerGeneratorValueChanged,
+  fieldStringGeneratorValueChanged,
+  fieldImageGeneratorValueChanged,
+  fieldDescriptionChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -416,25 +535,18 @@ export const {
 
 export const $cursorPos = atom<XYPosition | null>(null);
 export const $templates = atom<Templates>({});
+export const $hasTemplates = computed($templates, (templates) => Object.keys(templates).length > 0);
 export const $copiedNodes = atom<AnyNode[]>([]);
-export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
-export const $edgesToCopiedNodes = atom<InvocationNodeEdge[]>([]);
+export const $copiedEdges = atom<AnyEdge[]>([]);
+export const $edgesToCopiedNodes = atom<AnyEdge[]>([]);
 export const $pendingConnection = atom<PendingConnection | null>(null);
-export const $edgePendingUpdate = atom<Edge | null>(null);
+export const $isConnectionInProgress = computed($pendingConnection, (pendingConnection) => pendingConnection !== null);
+export const $edgePendingUpdate = atom<AnyEdge | null>(null);
 export const $didUpdateEdge = atom(false);
 export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);
 
 export const $viewport = atom<Viewport>({ x: 0, y: 0, zoom: 1 });
-export const $isAddNodePopoverOpen = atom(false);
-export const closeAddNodePopover = () => {
-  $isAddNodePopoverOpen.set(false);
-  $pendingConnection.set(null);
-};
-export const openAddNodePopover = () => {
-  $isAddNodePopoverOpen.set(true);
-};
-
-export const selectNodesSlice = (state: RootState) => state.nodes.present;
+export const $addNodeCmdk = atom(false);
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateNodesState = (state: any): any => {
@@ -504,17 +616,28 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldControlNetModelValueChanged,
   fieldEnumModelValueChanged,
   fieldImageValueChanged,
+  fieldImageCollectionValueChanged,
   fieldIPAdapterModelValueChanged,
   fieldT2IAdapterModelValueChanged,
   fieldLabelChanged,
   fieldLoRAModelValueChanged,
   fieldMainModelValueChanged,
-  fieldNumberValueChanged,
+  fieldIntegerValueChanged,
+  fieldIntegerCollectionValueChanged,
+  fieldFloatValueChanged,
+  fieldFloatCollectionValueChanged,
   fieldRefinerModelValueChanged,
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
+  fieldStringCollectionValueChanged,
   fieldVaeModelValueChanged,
-  nodesChanged,
+  fieldT5EncoderValueChanged,
+  fieldCLIPEmbedValueChanged,
+  fieldCLIPLEmbedValueChanged,
+  fieldCLIPGEmbedValueChanged,
+  fieldFluxVAEModelValueChanged,
+  // The `nodesChanged` has extra logic and is handled in its own extra reducer
+  // nodesChanged,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,

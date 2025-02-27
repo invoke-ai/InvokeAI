@@ -1,35 +1,27 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+import type { LogNamespace } from 'app/logging/logger';
+import { zLogNamespace } from 'app/logging/logger';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type { LogLevelName } from 'roarr';
-import {
-  socketConnected,
-  socketDisconnected,
-  socketGeneratorProgress,
-  socketInvocationComplete,
-  socketInvocationStarted,
-  socketModelLoadComplete,
-  socketModelLoadStarted,
-  socketQueueItemStatusChanged,
-} from 'services/events/actions';
+import { uniq } from 'lodash-es';
 
 import type { Language, SystemState } from './types';
 
 const initialSystemState: SystemState = {
   _version: 1,
-  isConnected: false,
   shouldConfirmOnDelete: true,
-  enableImageDebugging: false,
-  denoiseProgress: null,
   shouldAntialiasProgressImage: false,
-  consoleLogLevel: 'debug',
-  shouldLogToConsole: true,
+  shouldConfirmOnNewSession: true,
   language: 'en',
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: true,
-  status: 'DISCONNECTED',
-  cancellations: [],
+  shouldEnableModelDescriptions: true,
+  logIsEnabled: true,
+  logLevel: 'debug',
+  logNamespaces: [...zLogNamespace.options],
+  shouldShowInvocationProgressDetail: false,
 };
 
 export const systemSlice = createSlice({
@@ -39,14 +31,18 @@ export const systemSlice = createSlice({
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
     },
-    setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
-      state.enableImageDebugging = action.payload;
+    logIsEnabledChanged: (state, action: PayloadAction<SystemState['logIsEnabled']>) => {
+      state.logIsEnabled = action.payload;
     },
-    consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
-      state.consoleLogLevel = action.payload;
+    logLevelChanged: (state, action: PayloadAction<SystemState['logLevel']>) => {
+      state.logLevel = action.payload;
     },
-    shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldLogToConsole = action.payload;
+    logNamespaceToggled: (state, action: PayloadAction<LogNamespace>) => {
+      if (state.logNamespaces.includes(action.payload)) {
+        state.logNamespaces = uniq(state.logNamespaces.filter((n) => n !== action.payload)).toSorted();
+      } else {
+        state.logNamespaces = uniq([...state.logNamespaces, action.payload]).toSorted();
+      }
     },
     shouldAntialiasProgressImageChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialiasProgressImage = action.payload;
@@ -63,98 +59,32 @@ export const systemSlice = createSlice({
     setShouldEnableInformationalPopovers(state, action: PayloadAction<boolean>) {
       state.shouldEnableInformationalPopovers = action.payload;
     },
-  },
-  extraReducers(builder) {
-    /**
-     * Socket Connected
-     */
-    builder.addCase(socketConnected, (state) => {
-      state.isConnected = true;
-      state.denoiseProgress = null;
-      state.status = 'CONNECTED';
-    });
-
-    /**
-     * Socket Disconnected
-     */
-    builder.addCase(socketDisconnected, (state) => {
-      state.isConnected = false;
-      state.denoiseProgress = null;
-      state.status = 'DISCONNECTED';
-    });
-
-    /**
-     * Invocation Started
-     */
-    builder.addCase(socketInvocationStarted, (state) => {
-      state.cancellations = [];
-      state.denoiseProgress = null;
-      state.status = 'PROCESSING';
-    });
-
-    /**
-     * Generator Progress
-     */
-    builder.addCase(socketGeneratorProgress, (state, action) => {
-      const { step, total_steps, progress_image, session_id, batch_id, percentage } = action.payload.data;
-
-      if (state.cancellations.includes(session_id)) {
-        // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
-        // progress update after the session has been cancelled.
-        return;
-      }
-
-      state.denoiseProgress = {
-        step,
-        total_steps,
-        percentage,
-        progress_image,
-        session_id,
-        batch_id,
-      };
-
-      state.status = 'PROCESSING';
-    });
-
-    /**
-     * Invocation Complete
-     */
-    builder.addCase(socketInvocationComplete, (state) => {
-      state.denoiseProgress = null;
-      state.status = 'CONNECTED';
-    });
-
-    builder.addCase(socketModelLoadStarted, (state) => {
-      state.status = 'LOADING_MODEL';
-    });
-
-    builder.addCase(socketModelLoadComplete, (state) => {
-      state.status = 'CONNECTED';
-    });
-
-    builder.addCase(socketQueueItemStatusChanged, (state, action) => {
-      if (['completed', 'canceled', 'failed'].includes(action.payload.data.status)) {
-        state.status = 'CONNECTED';
-        state.denoiseProgress = null;
-        state.cancellations.push(action.payload.data.session_id);
-      }
-    });
+    setShouldEnableModelDescriptions(state, action: PayloadAction<boolean>) {
+      state.shouldEnableModelDescriptions = action.payload;
+    },
+    shouldConfirmOnNewSessionToggled(state) {
+      state.shouldConfirmOnNewSession = !state.shouldConfirmOnNewSession;
+    },
+    setShouldShowInvocationProgressDetail(state, action: PayloadAction<boolean>) {
+      state.shouldShowInvocationProgressDetail = action.payload;
+    },
   },
 });
 
 export const {
   setShouldConfirmOnDelete,
-  setEnableImageDebugging,
-  consoleLogLevelChanged,
-  shouldLogToConsoleChanged,
+  logIsEnabledChanged,
+  logLevelChanged,
+  logNamespaceToggled,
   shouldAntialiasProgressImageChanged,
   languageChanged,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
+  setShouldEnableModelDescriptions,
+  shouldConfirmOnNewSessionToggled,
+  setShouldShowInvocationProgressDetail,
 } = systemSlice.actions;
-
-export const selectSystemSlice = (state: RootState) => state.system;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateSystemState = (state: any): any => {
@@ -168,5 +98,30 @@ export const systemPersistConfig: PersistConfig<SystemState> = {
   name: systemSlice.name,
   initialState: initialSystemState,
   migrate: migrateSystemState,
-  persistDenylist: ['isConnected', 'denoiseProgress', 'status', 'cancellations'],
+  persistDenylist: [],
 };
+
+export const selectSystemSlice = (state: RootState) => state.system;
+const createSystemSelector = <T>(selector: Selector<SystemState, T>) => createSelector(selectSystemSlice, selector);
+
+export const selectSystemLogLevel = createSystemSelector((system) => system.logLevel);
+export const selectSystemLogNamespaces = createSystemSelector((system) =>
+  system.logNamespaces.length > 0 ? system.logNamespaces : EMPTY_ARRAY
+);
+export const selectSystemLogIsEnabled = createSystemSelector((system) => system.logIsEnabled);
+export const selectSystemShouldConfirmOnDelete = createSystemSelector((system) => system.shouldConfirmOnDelete);
+export const selectSystemShouldUseNSFWChecker = createSystemSelector((system) => system.shouldUseNSFWChecker);
+export const selectSystemShouldUseWatermarker = createSystemSelector((system) => system.shouldUseWatermarker);
+export const selectSystemShouldAntialiasProgressImage = createSystemSelector(
+  (system) => system.shouldAntialiasProgressImage
+);
+export const selectSystemShouldEnableInformationalPopovers = createSystemSelector(
+  (system) => system.shouldEnableInformationalPopovers
+);
+export const selectSystemShouldEnableModelDescriptions = createSystemSelector(
+  (system) => system.shouldEnableModelDescriptions
+);
+export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);
+export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(
+  (system) => system.shouldShowInvocationProgressDetail
+);

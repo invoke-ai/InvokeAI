@@ -8,17 +8,36 @@ from diffusers import ControlNetModel
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
+)
+from invokeai.backend.model_manager.config import (
     BaseModelType,
+    ControlNetCheckpointConfig,
     ModelFormat,
     ModelType,
+    SubModelType,
 )
-from invokeai.backend.model_manager.config import ControlNetCheckpointConfig, SubModelType
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusion1, type=ModelType.ControlNet, format=ModelFormat.Diffusers
+)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusion1, type=ModelType.ControlNet, format=ModelFormat.Checkpoint
+)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusion2, type=ModelType.ControlNet, format=ModelFormat.Diffusers
+)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusion2, type=ModelType.ControlNet, format=ModelFormat.Checkpoint
+)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXL, type=ModelType.ControlNet, format=ModelFormat.Diffusers
+)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXL, type=ModelType.ControlNet, format=ModelFormat.Checkpoint
+)
 class ControlNetLoader(GenericDiffusersLoader):
     """Class to load ControlNet models."""
 

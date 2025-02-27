@@ -13,6 +13,12 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      push-to-registry:
+        description: Push the built image to the container registry
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -50,16 +56,15 @@ jobs:
           df -h
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: |
             ghcr.io/${{ github.repository }}
-            ${{ env.DOCKERHUB_REPOSITORY }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -72,49 +77,33 @@ jobs:
             suffix=-${{ matrix.gpu-driver }},onlatest=false
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           platforms: ${{ env.PLATFORMS }}
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # - name: Login to Docker Hub
-      #   if: github.event_name != 'pull_request' && vars.DOCKERHUB_REPOSITORY != ''
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Build container
         timeout-minutes: 40
         id: docker_build
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
           platforms: ${{ env.PLATFORMS }}
-          push: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' }}
+          push: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' || github.event.inputs.push-to-registry }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: |
             type=gha,scope=${{ github.ref_name }}-${{ matrix.gpu-driver }}
             type=gha,scope=main-${{ matrix.gpu-driver }}
           cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.gpu-driver }}
-
-      # - name: Docker Hub Description
-      #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/tags/*' && vars.DOCKERHUB_REPOSITORY != ''
-      #   uses: peter-evans/dockerhub-description@v3
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-      #     repository: ${{ vars.DOCKERHUB_REPOSITORY }}
-      #     short-description: ${{ github.event.repository.description }}

@@ -1,6 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   combinatorialToggled,
   isErrorChanged,
@@ -13,8 +13,10 @@ import {
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
-import { socketConnected } from 'services/events/actions';
+
+import { socketConnected } from './socketConnected';
 
 const matcher = isAnyOf(
   positivePromptChanged,
@@ -22,7 +24,8 @@ const matcher = isAnyOf(
   maxPromptsChanged,
   maxPromptsReset,
   socketConnected,
-  activeStylePresetIdChanged
+  activeStylePresetIdChanged,
+  stylePresetsApi.endpoints.listStylePresets.matchFulfilled
 );
 
 export const addDynamicPromptsListener = (startAppListening: AppStartListening) => {

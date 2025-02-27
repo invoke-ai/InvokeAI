@@ -15,6 +15,7 @@ from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
+    ClipVariantType,
     ControlAdapterDefaultSettings,
     MainModelDefaultSettings,
     ModelFormat,
@@ -77,6 +78,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
     type: Optional[ModelType] = Field(description="Type of model", default=None)
     key: Optional[str] = Field(description="Database ID for this model", default=None)
     hash: Optional[str] = Field(description="hash of model file", default=None)
+    format: Optional[str] = Field(description="format of model file", default=None)
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
     default_settings: Optional[MainModelDefaultSettings | ControlAdapterDefaultSettings] = Field(
         description="Default settings for this model", default=None
@@ -84,7 +86,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
 
     # Checkpoint-specific changes
     # TODO(MM2): Should we expose these? Feels footgun-y...
-    variant: Optional[ModelVariantType] = Field(description="The variant of the model.", default=None)
+    variant: Optional[ModelVariantType | ClipVariantType] = Field(description="The variant of the model.", default=None)
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
     )

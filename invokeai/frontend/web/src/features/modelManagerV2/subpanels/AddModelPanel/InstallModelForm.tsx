@@ -1,22 +1,28 @@
 import { Button, Checkbox, Flex, FormControl, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
+import {
+  selectShouldInstallInPlace,
+  shouldInstallInPlaceChanged,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { t } from 'i18next';
+import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
 type SimpleImportModelConfig = {
   location: string;
-  inplace: boolean;
 };
 
 export const InstallModelForm = memo(() => {
+  const inplace = useAppSelector(selectShouldInstallInPlace);
+  const dispatch = useAppDispatch();
   const [installModel, { isLoading }] = useInstallModel();
 
   const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
     defaultValues: {
       location: '',
-      inplace: true,
     },
     mode: 'onChange',
   });
@@ -31,12 +37,19 @@ export const InstallModelForm = memo(() => {
 
       installModel({
         source: values.location,
-        inplace: values.inplace,
+        inplace: inplace,
         onSuccess: resetForm,
         onError: resetForm,
       });
     },
-    [installModel, resetForm]
+    [installModel, resetForm, inplace]
+  );
+
+  const onChangeInplace = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(shouldInstallInPlaceChanged(e.target.checked));
+    },
+    [dispatch]
   );
 
   return (
@@ -63,7 +76,7 @@ export const InstallModelForm = memo(() => {
         <FormControl>
           <Flex flexDir="column" gap={2}>
             <Flex gap={4}>
-              <Checkbox {...register('inplace')} />
+              <Checkbox isChecked={inplace} onChange={onChangeInplace} />
               <FormLabel>
                 {t('modelManager.inplaceInstall')} ({t('modelManager.localOnly')})
               </FormLabel>

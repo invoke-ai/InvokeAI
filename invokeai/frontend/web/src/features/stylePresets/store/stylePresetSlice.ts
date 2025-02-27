@@ -1,6 +1,10 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig } from 'app/store/store';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
+import { newSessionRequested } from 'features/controlLayers/store/actions';
+import { atom } from 'nanostores';
+import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
 import type { StylePresetState } from './types';
 
@@ -24,6 +28,29 @@ export const stylePresetSlice = createSlice({
       state.viewMode = action.payload;
     },
   },
+  extraReducers(builder) {
+    builder.addMatcher(stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled, (state, action) => {
+      if (state.activeStylePresetId === null) {
+        return;
+      }
+      const deletedId = action.meta.arg.originalArgs;
+      if (state.activeStylePresetId === deletedId) {
+        state.activeStylePresetId = null;
+      }
+    });
+    builder.addMatcher(stylePresetsApi.endpoints.listStylePresets.matchFulfilled, (state, action) => {
+      if (state.activeStylePresetId === null) {
+        return;
+      }
+      const ids = action.payload.map((preset) => preset.id);
+      if (!ids.includes(state.activeStylePresetId)) {
+        state.activeStylePresetId = null;
+      }
+    });
+    builder.addMatcher(newSessionRequested, () => {
+      return deepClone(initialState);
+    });
+  },
 });
 
 export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged } = stylePresetSlice.actions;
@@ -42,3 +69,18 @@ export const stylePresetPersistConfig: PersistConfig<StylePresetState> = {
   migrate: migrateStylePresetState,
   persistDenylist: [],
 };
+
+const selectStylePresetSlice = (state: RootState) => state.stylePreset;
+const createStylePresetSelector = <T>(selector: Selector<StylePresetState, T>) =>
+  createSelector(selectStylePresetSlice, selector);
+
+export const selectStylePresetActivePresetId = createStylePresetSelector(
+  (stylePreset) => stylePreset.activeStylePresetId
+);
+export const selectStylePresetViewMode = createStylePresetSelector((stylePreset) => stylePreset.viewMode);
+export const selectStylePresetSearchTerm = createStylePresetSelector((stylePreset) => stylePreset.searchTerm);
+
+/**
+ * Tracks whether or not the style preset menu is open.
+ */
+export const $isStylePresetsMenuOpen = atom<boolean>(false);

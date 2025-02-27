@@ -3,6 +3,7 @@ import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
 import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
@@ -18,7 +19,7 @@ type DefaultVaeType = MainModelDefaultSettingsFormData['vae'];
 export const DefaultVae = memo((props: UseControllerProps<MainModelDefaultSettingsFormData>) => {
   const { t } = useTranslation();
   const { field } = useController(props);
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+  const selectedModelKey = useAppSelector(selectSelectedModelKey);
   const { data: modelData } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
 
   const [vaeModels] = useVAEModels();

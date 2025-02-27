@@ -62,7 +62,7 @@ export const LoadWorkflowFromGraphModal = () => {
     onClose();
   }, [dispatch, onClose, workflowRaw]);
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered>
+    <Modal isOpen={isOpen} onClose={onClose} isCentered useInert={false}>
       <ModalOverlay />
       <ModalContent w="80vw" h="80vh" maxW="unset" maxH="unset">
         <ModalHeader>{t('workflows.loadFromGraph')}</ModalHeader>

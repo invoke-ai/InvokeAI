@@ -4,8 +4,7 @@
         "uploadImage": "Fénykép feltöltése",
         "nextImage": "Következő kép",
         "previousImage": "Előző kép",
-        "menu": "Menü",
-        "loadMore": "Több betöltése"
+        "menu": "Menü"
     },
     "boards": {
         "cancel": "Mégsem",

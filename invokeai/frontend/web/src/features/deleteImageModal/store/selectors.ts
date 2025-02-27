@@ -1,70 +1,66 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import type { CanvasState } from 'features/canvas/store/canvasTypes';
-import {
-  selectControlAdapterAll,
-  selectControlAdaptersSlice,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import type { ControlAdaptersState } from 'features/controlAdapters/store/types';
-import { isControlNetOrT2IAdapter } from 'features/controlAdapters/store/types';
-import {
-  isControlAdapterLayer,
-  isInitialImageLayer,
-  isIPAdapterLayer,
-  isRegionalGuidanceLayer,
-  selectControlLayersSlice,
-} from 'features/controlLayers/store/controlLayersSlice';
-import type { ControlLayersState } from 'features/controlLayers/store/types';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { CanvasState } from 'features/controlLayers/store/types';
 import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
-import { isImageFieldInputInstance } from 'features/nodes/types/field';
+import { isImageFieldCollectionInputInstance, isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { some } from 'lodash-es';
 
 import type { ImageUsage } from './types';
+// TODO(psyche): handle image deletion (canvas staging area?)
+export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: UpscaleState, image_name: string) => {
+  const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) =>
+    some(node.data.inputs, (input) => {
+      if (isImageFieldInputInstance(input)) {
+        if (input.value?.image_name === image_name) {
+          return true;
+        }
+      }
 
-export const getImageUsage = (
-  canvas: CanvasState,
-  nodes: NodesState,
-  controlAdapters: ControlAdaptersState,
-  controlLayers: ControlLayersState,
-  image_name: string
-) => {
-  const isCanvasImage = canvas.layerState.objects.some((obj) => obj.kind === 'image' && obj.imageName === image_name);
+      if (isImageFieldCollectionInputInstance(input)) {
+        if (input.value?.some((value) => value?.image_name === image_name)) {
+          return true;
+        }
+      }
 
-  const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) => {
-    return some(
-      node.data.inputs,
-      (input) => isImageFieldInputInstance(input) && input.value?.image_name === image_name
-    );
-  });
-
-  const isControlImage = selectControlAdapterAll(controlAdapters).some(
-    (ca) => ca.controlImage === image_name || (isControlNetOrT2IAdapter(ca) && ca.processedControlImage === image_name)
+      return false;
+    })
   );
 
-  const isControlLayerImage = controlLayers.layers.some((l) => {
-    if (isRegionalGuidanceLayer(l)) {
-      return l.ipAdapters.some((ipa) => ipa.image?.name === image_name);
-    }
-    if (isControlAdapterLayer(l)) {
-      return l.controlAdapter.image?.name === image_name || l.controlAdapter.processedImage?.name === image_name;
-    }
-    if (isIPAdapterLayer(l)) {
-      return l.ipAdapter.image?.name === image_name;
-    }
-    if (isInitialImageLayer(l)) {
-      return l.image?.name === image_name;
-    }
-    return false;
-  });
+  const isUpscaleImage = upscale.upscaleInitialImage?.image_name === image_name;
+
+  const isReferenceImage = canvas.referenceImages.entities.some(
+    ({ ipAdapter }) => ipAdapter.image?.image_name === image_name
+  );
+
+  const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
+    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
+  );
+
+  const isControlLayerImage = canvas.controlLayers.entities.some(({ objects }) =>
+    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
+  );
+
+  const isInpaintMaskImage = canvas.inpaintMasks.entities.some(({ objects }) =>
+    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
+  );
+
+  const isRegionalGuidanceImage = canvas.regionalGuidance.entities.some(({ referenceImages }) =>
+    referenceImages.some(({ ipAdapter }) => ipAdapter.image?.image_name === image_name)
+  );
 
   const imageUsage: ImageUsage = {
-    isCanvasImage,
+    isUpscaleImage,
+    isRasterLayerImage,
+    isInpaintMaskImage,
+    isRegionalGuidanceImage,
     isNodesImage,
-    isControlImage,
     isControlLayerImage,
+    isReferenceImage,
   };
 
   return imageUsage;
@@ -72,20 +68,17 @@ export const getImageUsage = (
 
 export const selectImageUsage = createMemoizedSelector(
   selectDeleteImageModalSlice,
-  selectCanvasSlice,
   selectNodesSlice,
-  selectControlAdaptersSlice,
-  selectControlLayersSlice,
-  (deleteImageModal, canvas, nodes, controlAdapters, controlLayers) => {
+  selectCanvasSlice,
+  selectUpscaleSlice,
+  (deleteImageModal, nodes, canvas, upscale) => {
     const { imagesToDelete } = deleteImageModal;
 
     if (!imagesToDelete.length) {
       return [];
     }
 
-    const imagesUsage = imagesToDelete.map((i) =>
-      getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, i.image_name)
-    );
+    const imagesUsage = imagesToDelete.map((i) => getImageUsage(nodes, canvas, upscale, i.image_name));
 
     return imagesUsage;
   }

@@ -4,10 +4,13 @@ import { $templates } from 'features/nodes/store/nodesSlice';
 import { NODE_WIDTH } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { getDefaultForm } from 'features/nodes/types/workflow';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { forEach } from 'lodash-es';
 import type { NonNullableGraph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
+
+const log = logger('workflows');
 
 /**
  * Converts a graph to a workflow. This is a best-effort conversion and may not be perfect.
@@ -35,6 +38,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
     exposedFields: [],
     edges: [],
     nodes: [],
+    form: getDefaultForm(),
   };
 
   // Convert nodes
@@ -43,7 +47,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
 
     // Skip missing node templates - this is a best-effort
     if (!template) {
-      logger('nodes').warn(`Node type ${node.type} not found in templates`);
+      log.warn(`Node type ${node.type} not found in templates`);
       return;
     }
 
@@ -60,7 +64,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
 
       // Skip missing input templates
       if (!inputTemplate) {
-        logger('nodes').warn(`Input ${key} not found in template for node type ${node.type}`);
+        log.warn(`Input ${key} not found in template for node type ${node.type}`);
         return;
       }
 
@@ -83,6 +87,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
         isOpen: true,
         isIntermediate: node.is_intermediate ?? false,
         useCache: node.use_cache ?? true,
+        nodePack: template.nodePack,
         inputs,
       },
     });

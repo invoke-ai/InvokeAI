@@ -1,30 +1,27 @@
-// TODO: enable this at some point
 import { useStore } from '@nanostores/react';
+import type { IsValidConnection } from '@xyflow/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { $edgePendingUpdate, $templates } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
+import { selectShouldShouldValidateGraph } from 'features/nodes/store/workflowSettingsSlice';
+import type { AnyEdge } from 'features/nodes/types/invocation';
 import { useCallback } from 'react';
-import type { Connection } from 'reactflow';
 
-/**
- * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
- * TODO: Figure out how to do this without duplicating all the logic
- */
-
-export const useIsValidConnection = () => {
+export const useIsValidConnection = (): IsValidConnection<AnyEdge> => {
   const store = useAppStore();
   const templates = useStore($templates);
-  const shouldValidateGraph = useAppSelector((s) => s.workflowSettings.shouldValidateGraph);
-  const isValidConnection = useCallback(
-    ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
+  const shouldValidateGraph = useAppSelector(selectShouldShouldValidateGraph);
+  const isValidConnection = useCallback<IsValidConnection<AnyEdge>>(
+    ({ source, sourceHandle, target, targetHandle }) => {
       // Connection must have valid targets
       if (!(source && sourceHandle && target && targetHandle)) {
         return false;
       }
       const edgePendingUpdate = $edgePendingUpdate.get();
-      const { nodes, edges } = store.getState().nodes.present;
+      const { nodes, edges } = selectNodesSlice(store.getState());
 
-      const validationResult = validateConnection(
+      const connectionErrorTKey = validateConnection(
         { source, sourceHandle, target, targetHandle },
         nodes,
         edges,
@@ -33,7 +30,7 @@ export const useIsValidConnection = () => {
         shouldValidateGraph
       );
 
-      return validationResult.isValid;
+      return connectionErrorTKey === null;
     },
     [templates, shouldValidateGraph, store]
   );

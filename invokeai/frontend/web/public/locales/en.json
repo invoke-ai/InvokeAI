@@ -10,10 +10,10 @@
         "previousImage": "Previous Image",
         "reset": "Reset",
         "resetUI": "$t(accessibility.reset) UI",
-        "showGalleryPanel": "Show Gallery Panel",
-        "showOptionsPanel": "Show Side Panel",
+        "toggleRightPanel": "Toggle Right Panel (G)",
+        "toggleLeftPanel": "Toggle Left Panel (T)",
         "uploadImage": "Upload Image",
-        "loadMore": "Load More"
+        "uploadImages": "Upload Image(s)"
     },
     "boards": {
         "addBoard": "Add Board",
@@ -54,7 +54,8 @@
         "imagesWithCount_one": "{{count}} image",
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
-        "assetsWithCount_other": "{{count}} assets"
+        "assetsWithCount_other": "{{count}} assets",
+        "updateBoardError": "Error updating board"
     },
     "accordions": {
         "generation": {
@@ -80,6 +81,7 @@
         "aboutDesc": "Using Invoke for work? Check out:",
         "aboutHeading": "Own Your Creative Power",
         "accept": "Accept",
+        "apply": "Apply",
         "add": "Add",
         "advanced": "Advanced",
         "ai": "ai",
@@ -88,11 +90,16 @@
         "back": "Back",
         "batch": "Batch Manager",
         "beta": "Beta",
+        "board": "Board",
         "cancel": "Cancel",
+        "close": "Close",
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
+        "clipboard": "Clipboard",
         "on": "On",
+        "off": "Off",
         "or": "or",
+        "ok": "Ok",
         "checkpoint": "Checkpoint",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
@@ -115,6 +122,8 @@
         "githubLabel": "Github",
         "goTo": "Go to",
         "hotkeysLabel": "Hotkeys",
+        "loadingImage": "Loading Image",
+        "loadingModel": "Loading Model",
         "imageFailedToLoad": "Unable to Load Image",
         "img2img": "Image To Image",
         "inpaint": "inpaint",
@@ -125,13 +134,12 @@
         "load": "Load",
         "loading": "Loading",
         "localSystem": "Local System",
-        "loglevel": "Log Level",
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
-        "nodeEditor": "Node Editor",
         "nodes": "Workflows",
         "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
+        "openInViewer": "Open in Viewer",
         "orderBy": "Order By",
         "outpaint": "outpaint",
         "outputs": "Outputs",
@@ -148,7 +156,6 @@
         "template": "Template",
         "toResolve": "To resolve",
         "txt2img": "Text To Image",
-        "unifiedCanvas": "Unified Canvas",
         "unknown": "Unknown",
         "upload": "Upload",
         "updated": "Updated",
@@ -162,109 +169,29 @@
         "alpha": "Alpha",
         "selected": "Selected",
         "tab": "Tab",
-        "viewing": "Viewing",
-        "viewingDesc": "Review images in a large gallery view",
-        "editing": "Editing",
-        "editingDesc": "Edit on the Control Layers canvas",
-        "comparing": "Comparing",
-        "comparingDesc": "Comparing two images",
+        "view": "View",
+        "edit": "Edit",
         "enabled": "Enabled",
-        "disabled": "Disabled"
-    },
-    "controlnet": {
-        "controlAdapter_one": "Control Adapter",
-        "controlAdapter_other": "Control Adapters",
-        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "addControlNet": "Add $t(common.controlNet)",
-        "addIPAdapter": "Add $t(common.ipAdapter)",
-        "addT2IAdapter": "Add $t(common.t2iAdapter)",
-        "amult": "a_mult",
-        "autoConfigure": "Auto configure processor",
-        "balanced": "Balanced",
-        "base": "Base",
-        "beginEndStepPercent": "Begin / End Step Percentage",
-        "beginEndStepPercentShort": "Begin/End %",
-        "bgth": "bg_th",
-        "canny": "Canny",
-        "cannyDescription": "Canny edge detection",
-        "colorMap": "Color",
-        "colorMapDescription": "Generates a color map from the image",
-        "coarse": "Coarse",
-        "contentShuffle": "Content Shuffle",
-        "contentShuffleDescription": "Shuffles the content in an image",
-        "control": "Control",
-        "controlMode": "Control Mode",
-        "crop": "Crop",
-        "delete": "Delete",
-        "depthAnything": "Depth Anything",
-        "depthAnythingDescription": "Depth map generation using the Depth Anything technique",
-        "depthAnythingSmallV2": "Small V2",
-        "depthMidas": "Depth (Midas)",
-        "depthMidasDescription": "Depth map generation using Midas",
-        "depthZoe": "Depth (Zoe)",
-        "depthZoeDescription": "Depth map generation using Zoe",
-        "detectResolution": "Detect Resolution",
-        "duplicate": "Duplicate",
-        "f": "F",
-        "fill": "Fill",
-        "h": "H",
-        "face": "Face",
-        "body": "Body",
-        "hands": "Hands",
-        "hed": "HED",
-        "hedDescription": "Holistically-Nested Edge Detection",
-        "hideAdvanced": "Hide Advanced",
-        "highThreshold": "High Threshold",
-        "imageResolution": "Image Resolution",
-        "colorMapTileSize": "Tile Size",
-        "importImageFromCanvas": "Import Image From Canvas",
-        "importMaskFromCanvas": "Import Mask From Canvas",
-        "large": "Large",
-        "lineart": "Lineart",
-        "lineartAnime": "Lineart Anime",
-        "lineartAnimeDescription": "Anime-style lineart processing",
-        "lineartDescription": "Converts image to lineart",
-        "lowThreshold": "Low Threshold",
-        "maxFaces": "Max Faces",
-        "mediapipeFace": "Mediapipe Face",
-        "mediapipeFaceDescription": "Face detection using Mediapipe",
-        "megaControl": "Mega Control",
-        "minConfidence": "Min Confidence",
-        "mlsd": "M-LSD",
-        "mlsdDescription": "Minimalist Line Segment Detector",
-        "modelSize": "Model Size",
+        "disabled": "Disabled",
+        "placeholderSelectAModel": "Select a model",
+        "reset": "Reset",
         "none": "None",
-        "noneDescription": "No processing applied",
-        "normalBae": "Normal BAE",
-        "normalBaeDescription": "Normal BAE processing",
-        "dwOpenpose": "DW Openpose",
-        "dwOpenposeDescription": "Human pose estimation using DW Openpose",
-        "pidi": "PIDI",
-        "pidiDescription": "PIDI image processing",
-        "processor": "Processor",
-        "prompt": "Prompt",
-        "resetControlImage": "Reset Control Image",
-        "resize": "Resize",
-        "resizeSimple": "Resize (Simple)",
-        "resizeMode": "Resize Mode",
-        "ipAdapterMethod": "Method",
-        "full": "Full",
-        "style": "Style Only",
-        "composition": "Composition Only",
-        "safe": "Safe",
-        "saveControlImage": "Save Control Image",
-        "scribble": "Scribble",
-        "selectModel": "Select a model",
-        "selectCLIPVisionModel": "Select a CLIP Vision model",
-        "setControlImageDimensions": "Copy size to W/H (optimize for model)",
-        "setControlImageDimensionsForce": "Copy size to W/H (ignore model)",
-        "showAdvanced": "Show Advanced",
-        "small": "Small",
-        "toggleControlNet": "Toggle this ControlNet",
-        "w": "W",
-        "weight": "Weight"
+        "new": "New",
+        "generating": "Generating",
+        "warnings": "Warnings",
+        "start": "Start",
+        "count": "Count",
+        "step": "Step",
+        "end": "End",
+        "min": "Min",
+        "max": "Max",
+        "values": "Values",
+        "resetToDefaults": "Reset to Defaults",
+        "seed": "Seed",
+        "combinatorial": "Combinatorial",
+        "layout": "Layout",
+        "row": "Row",
+        "column": "Column"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -296,9 +223,15 @@
         "pauseSucceeded": "Processor Paused",
         "pauseFailed": "Problem Pausing Processor",
         "cancel": "Cancel",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Canceling all queue items except the current one will stop pending items but allow the in-progress one to finish.",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Are you sure you want to cancel all pending queue items?",
+        "cancelAllExceptCurrentTooltip": "Cancel All Except Current Item",
         "cancelTooltip": "Cancel Current Item",
         "cancelSucceeded": "Item Canceled",
         "cancelFailed": "Problem Canceling Item",
+        "retrySucceeded": "Item Retried",
+        "retryFailed": "Problem Retrying Item",
+        "confirm": "Confirm",
         "prune": "Prune",
         "pruneTooltip": "Prune {{item_count}} Completed Items",
         "pruneSucceeded": "Pruned {{item_count}} Completed Items from Queue",
@@ -309,9 +242,10 @@
         "clearFailed": "Problem Clearing Queue",
         "cancelBatch": "Cancel Batch",
         "cancelItem": "Cancel Item",
+        "retryItem": "Retry Item",
         "cancelBatchSucceeded": "Batch Canceled",
         "cancelBatchFailed": "Problem Canceling Batch",
-        "clearQueueAlertDialog": "Clearing the queue immediately cancels any processing items and clears the queue entirely.",
+        "clearQueueAlertDialog": "Clearing the queue immediately cancels any processing items and clears the queue entirely. Pending filters will be canceled.",
         "clearQueueAlertDialog2": "Are you sure you want to clear the queue?",
         "current": "Current",
         "next": "Next",
@@ -325,6 +259,14 @@
         "canceled": "Canceled",
         "completedIn": "Completed in",
         "batch": "Batch",
+        "origin": "Origin",
+        "destination": "Destination",
+        "upscaling": "Upscaling",
+        "canvas": "Canvas",
+        "generation": "Generation",
+        "workflows": "Workflows",
+        "other": "Other",
+        "gallery": "Gallery",
         "batchFieldValues": "Batch Field Values",
         "item": "Item",
         "session": "Session",
@@ -343,7 +285,8 @@
         "iterations_one": "Iteration",
         "iterations_other": "Iterations",
         "generations_one": "Generation",
-        "generations_other": "Generations"
+        "generations_other": "Generations",
+        "batchSize": "Batch Size"
     },
     "invocationCache": {
         "invocationCache": "Invocation Cache",
@@ -362,11 +305,20 @@
         "disableFailed": "Problem Disabling Invocation Cache",
         "useCache": "Use Cache"
     },
+    "modelCache": {
+        "clear": "Clear Model Cache",
+        "clearSucceeded": "Model Cache Cleared",
+        "clearFailed": "Problem Clearing Model Cache"
+    },
     "gallery": {
-        "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
+        "gallery": "Gallery",
+        "images": "Images",
         "assets": "Assets",
+        "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
+        "assetsTab": "Files you’ve uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
         "autoSwitchNewImages": "Auto-Switch to New Images",
+        "boardsSettings": "Boards Settings",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
         "drop": "Drop",
@@ -375,26 +327,26 @@
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
         "deleteImagePermanent": "Deleted images cannot be restored.",
-        "displayBoardSearch": "Display Board Search",
-        "displaySearch": "Display Search",
+        "displayBoardSearch": "Board Search",
+        "displaySearch": "Image Search",
         "download": "Download",
         "exitBoardSearch": "Exit Board Search",
-        "exitSearch": "Exit Search",
+        "exitSearch": "Exit Image Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
         "go": "Go",
         "image": "image",
+        "imagesTab": "Images you’ve created and saved within Invoke.",
+        "imagesSettings": "Gallery Images Settings",
         "jump": "Jump",
         "loading": "Loading",
-        "loadMore": "Load More",
         "newestFirst": "Newest First",
         "oldestFirst": "Oldest First",
         "sortDirection": "Sort Direction",
         "showStarredImagesFirst": "Show Starred Images First",
         "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
-        "setCurrentImage": "Set as Current Image",
         "starImage": "Star Image",
         "unstarImage": "Unstar Image",
         "unableToLoad": "Unable to load Gallery",
@@ -404,14 +356,11 @@
         "bulkDownloadRequestedDesc": "Your download request is being prepared. This may take a few moments.",
         "bulkDownloadRequestFailed": "Problem Preparing Download",
         "bulkDownloadFailed": "Download Failed",
-        "problemDeletingImages": "Problem Deleting Images",
-        "problemDeletingImagesDesc": "One or more images could not be deleted",
         "viewerImage": "Viewer Image",
         "compareImage": "Compare Image",
         "openInViewer": "Open in Viewer",
         "searchImages": "Search by Metadata",
         "selectAllOnPage": "Select All On Page",
-        "selectAllOnBoard": "Select All On Board",
         "showArchivedBoards": "Show Archived Boards",
         "selectForCompare": "Select for Compare",
         "selectAnImageToCompare": "Select an Image to Compare",
@@ -419,239 +368,327 @@
         "sideBySide": "Side-by-Side",
         "hover": "Hover",
         "swapImages": "Swap Images",
-        "compareOptions": "Comparison Options",
         "stretchToFit": "Stretch to Fit",
         "exitCompare": "Exit Compare",
         "compareHelp1": "Hold <Kbd>Alt</Kbd> while clicking a gallery image or using the arrow keys to change the compare image.",
         "compareHelp2": "Press <Kbd>M</Kbd> to cycle through comparison modes.",
         "compareHelp3": "Press <Kbd>C</Kbd> to swap the compared images.",
-        "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit."
+        "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
+        "openViewer": "Open Viewer",
+        "closeViewer": "Close Viewer",
+        "move": "Move"
     },
     "hotkeys": {
+        "hotkeys": "Hotkeys",
         "searchHotkeys": "Search Hotkeys",
         "clearSearch": "Clear Search",
         "noHotkeysFound": "No Hotkeys Found",
-        "acceptStagingImage": {
-            "desc": "Accept Current Staging Area Image",
-            "title": "Accept Staging Image"
+        "app": {
+            "title": "App",
+            "invoke": {
+                "title": "Invoke",
+                "desc": "Queue a generation, adding it to the end of the queue."
+            },
+            "invokeFront": {
+                "title": "Invoke (Front)",
+                "desc": "Queue a generation, adding it to the front of the queue."
+            },
+            "cancelQueueItem": {
+                "title": "Cancel",
+                "desc": "Cancel the currently processing queue item."
+            },
+            "clearQueue": {
+                "title": "Clear Queue",
+                "desc": "Cancel and clear all queue items."
+            },
+            "selectCanvasTab": {
+                "title": "Select the Canvas Tab",
+                "desc": "Selects the Canvas tab."
+            },
+            "selectUpscalingTab": {
+                "title": "Select the Upscaling Tab",
+                "desc": "Selects the Upscaling tab."
+            },
+            "selectWorkflowsTab": {
+                "title": "Select the Workflows Tab",
+                "desc": "Selects the Workflows tab."
+            },
+            "selectModelsTab": {
+                "title": "Select the Models Tab",
+                "desc": "Selects the Models tab."
+            },
+            "selectQueueTab": {
+                "title": "Select the Queue Tab",
+                "desc": "Selects the Queue tab."
+            },
+            "focusPrompt": {
+                "title": "Focus Prompt",
+                "desc": "Move cursor focus to the positive prompt."
+            },
+            "toggleLeftPanel": {
+                "title": "Toggle Left Panel",
+                "desc": "Show or hide the left panel."
+            },
+            "toggleRightPanel": {
+                "title": "Toggle Right Panel",
+                "desc": "Show or hide the right panel."
+            },
+            "resetPanelLayout": {
+                "title": "Reset Panel Layout",
+                "desc": "Reset the left and right panels to their default size and layout."
+            },
+            "togglePanels": {
+                "title": "Toggle Panels",
+                "desc": "Show or hide both left and right panels at once."
+            }
         },
-        "addNodes": {
-            "desc": "Opens the add node menu",
-            "title": "Add Nodes"
+        "canvas": {
+            "title": "Canvas",
+            "selectBrushTool": {
+                "title": "Brush Tool",
+                "desc": "Select the brush tool."
+            },
+            "selectBboxTool": {
+                "title": "Bbox Tool",
+                "desc": "Select the bounding box tool."
+            },
+            "decrementToolWidth": {
+                "title": "Decrement Tool Width",
+                "desc": "Decrement the brush or eraser tool width, whichever is selected."
+            },
+            "incrementToolWidth": {
+                "title": "Increment Tool Width",
+                "desc": "Increment the brush or eraser tool width, whichever is selected."
+            },
+            "selectColorPickerTool": {
+                "title": "Color Picker Tool",
+                "desc": "Select the color picker tool."
+            },
+            "selectEraserTool": {
+                "title": "Eraser Tool",
+                "desc": "Select the eraser tool."
+            },
+            "selectMoveTool": {
+                "title": "Move Tool",
+                "desc": "Select the move tool."
+            },
+            "selectRectTool": {
+                "title": "Rect Tool",
+                "desc": "Select the rect tool."
+            },
+            "selectViewTool": {
+                "title": "View Tool",
+                "desc": "Select the view tool."
+            },
+            "fitLayersToCanvas": {
+                "title": "Fit Layers to Canvas",
+                "desc": "Scale and position the view to fit all visible layers."
+            },
+            "fitBboxToCanvas": {
+                "title": "Fit Bbox to Canvas",
+                "desc": "Scale and position the view to fit the bbox."
+            },
+            "setZoomTo100Percent": {
+                "title": "Zoom to 100%",
+                "desc": "Set the canvas zoom to 100%."
+            },
+            "setZoomTo200Percent": {
+                "title": "Zoom to 200%",
+                "desc": "Set the canvas zoom to 200%."
+            },
+            "setZoomTo400Percent": {
+                "title": "Zoom to 400%",
+                "desc": "Set the canvas zoom to 400%."
+            },
+            "setZoomTo800Percent": {
+                "title": "Zoom to 800%",
+                "desc": "Set the canvas zoom to 800%."
+            },
+            "quickSwitch": {
+                "title": "Layer Quick Switch",
+                "desc": "Switch between the last two selected layers. If a layer is bookmarked, always switch between it and the last non-bookmarked layer."
+            },
+            "deleteSelected": {
+                "title": "Delete Layer",
+                "desc": "Delete the selected layer."
+            },
+            "resetSelected": {
+                "title": "Reset Layer",
+                "desc": "Reset the selected layer. Only applies to Inpaint Mask and Regional Guidance."
+            },
+            "undo": {
+                "title": "Undo",
+                "desc": "Undo the last canvas action."
+            },
+            "redo": {
+                "title": "Redo",
+                "desc": "Redo the last canvas action."
+            },
+            "nextEntity": {
+                "title": "Next Layer",
+                "desc": "Select the next layer in the list."
+            },
+            "prevEntity": {
+                "title": "Prev Layer",
+                "desc": "Select the previous layer in the list."
+            },
+            "setFillToWhite": {
+                "title": "Set Color to White",
+                "desc": "Set the current tool color to white."
+            },
+            "filterSelected": {
+                "title": "Filter",
+                "desc": "Filter the selected layer. Only applies to Raster and Control layers."
+            },
+            "transformSelected": {
+                "title": "Transform",
+                "desc": "Transform the selected layer."
+            },
+            "applyFilter": {
+                "title": "Apply Filter",
+                "desc": "Apply the pending filter to the selected layer."
+            },
+            "cancelFilter": {
+                "title": "Cancel Filter",
+                "desc": "Cancel the pending filter."
+            },
+            "applyTransform": {
+                "title": "Apply Transform",
+                "desc": "Apply the pending transform to the selected layer."
+            },
+            "cancelTransform": {
+                "title": "Cancel Transform",
+                "desc": "Cancel the pending transform."
+            }
         },
-        "appHotkeys": "App",
-        "cancel": {
-            "desc": "Cancel current queue item",
-            "title": "Cancel"
+        "workflows": {
+            "title": "Workflows",
+            "addNode": {
+                "title": "Add Node",
+                "desc": "Open the add node menu."
+            },
+            "copySelection": {
+                "title": "Copy",
+                "desc": "Copy selected nodes and edges."
+            },
+            "pasteSelection": {
+                "title": "Paste",
+                "desc": "Paste copied nodes and edges."
+            },
+            "pasteSelectionWithEdges": {
+                "title": "Paste with Edges",
+                "desc": "Paste copied nodes, edges, and all edges connected to copied nodes."
+            },
+            "selectAll": {
+                "title": "Select All",
+                "desc": "Select all nodes and edges."
+            },
+            "deleteSelection": {
+                "title": "Delete",
+                "desc": "Delete selected nodes and edges."
+            },
+            "undo": {
+                "title": "Undo",
+                "desc": "Undo the last workflow action."
+            },
+            "redo": {
+                "title": "Redo",
+                "desc": "Redo the last workflow action."
+            }
         },
-        "cancelAndClear": {
-            "desc": "Cancel current queue item and clear all pending items",
-            "title": "Cancel and Clear"
+        "viewer": {
+            "title": "Image Viewer",
+            "toggleViewer": {
+                "title": "Show/Hide Image Viewer",
+                "desc": "Show or hide the image viewer. Only available on the Canvas tab."
+            },
+            "swapImages": {
+                "title": "Swap Comparison Images",
+                "desc": "Swap the images being compared."
+            },
+            "nextComparisonMode": {
+                "title": "Next Comparison Mode",
+                "desc": "Cycle through comparison modes."
+            },
+            "loadWorkflow": {
+                "title": "Load Workflow",
+                "desc": "Load the current image's saved workflow (if it has one)."
+            },
+            "recallAll": {
+                "title": "Recall All Metadata",
+                "desc": "Recall all metadata for the current image."
+            },
+            "recallSeed": {
+                "title": "Recall Seed",
+                "desc": "Recall the seed for the current image."
+            },
+            "recallPrompts": {
+                "title": "Recall Prompts",
+                "desc": "Recall the positive and negative prompts for the current image."
+            },
+            "remix": {
+                "title": "Remix",
+                "desc": "Recall all metadata except for the seed for the current image."
+            },
+            "useSize": {
+                "title": "Use Size",
+                "desc": "Use the current image's size as the bbox size."
+            },
+            "runPostprocessing": {
+                "title": "Run Postprocessing",
+                "desc": "Run the selected postprocessing on the current image."
+            },
+            "toggleMetadata": {
+                "title": "Show/Hide Metadata",
+                "desc": "Show or hide the current image's metadata overlay."
+            }
         },
-        "changeTabs": {
-            "desc": "Switch to another workspace",
-            "title": "Change Tabs"
-        },
-        "clearMask": {
-            "desc": "Clear the entire mask",
-            "title": "Clear Mask"
-        },
-        "closePanels": {
-            "desc": "Closes open panels",
-            "title": "Close Panels"
-        },
-        "colorPicker": {
-            "desc": "Selects the canvas color picker",
-            "title": "Select Color Picker"
-        },
-        "consoleToggle": {
-            "desc": "Open and close console",
-            "title": "Console Toggle"
-        },
-        "copyToClipboard": {
-            "desc": "Copy current canvas to clipboard",
-            "title": "Copy to Clipboard"
-        },
-        "decreaseBrushOpacity": {
-            "desc": "Decreases the opacity of the canvas brush",
-            "title": "Decrease Brush Opacity"
-        },
-        "decreaseBrushSize": {
-            "desc": "Decreases the size of the canvas brush/eraser",
-            "title": "Decrease Brush Size"
-        },
-        "decreaseGalleryThumbSize": {
-            "desc": "Decreases gallery thumbnails size",
-            "title": "Decrease Gallery Image Size"
-        },
-        "deleteImage": {
-            "desc": "Delete the current image",
-            "title": "Delete Image"
-        },
-        "downloadImage": {
-            "desc": "Download current canvas",
-            "title": "Download Image"
-        },
-        "eraseBoundingBox": {
-            "desc": "Erases the bounding box area",
-            "title": "Erase Bounding Box"
-        },
-        "fillBoundingBox": {
-            "desc": "Fills the bounding box with brush color",
-            "title": "Fill Bounding Box"
-        },
-        "focusPrompt": {
-            "desc": "Focus the prompt input area",
-            "title": "Focus Prompt"
-        },
-        "galleryHotkeys": "Gallery",
-        "generalHotkeys": "General",
-        "hideMask": {
-            "desc": "Hide and unhide mask",
-            "title": "Hide Mask"
-        },
-        "increaseBrushOpacity": {
-            "desc": "Increases the opacity of the canvas brush",
-            "title": "Increase Brush Opacity"
-        },
-        "increaseBrushSize": {
-            "desc": "Increases the size of the canvas brush/eraser",
-            "title": "Increase Brush Size"
-        },
-        "increaseGalleryThumbSize": {
-            "desc": "Increases gallery thumbnails size",
-            "title": "Increase Gallery Image Size"
-        },
-        "invoke": {
-            "desc": "Generate an image",
-            "title": "Invoke"
-        },
-        "keyboardShortcuts": "Hotkeys",
-        "maximizeWorkSpace": {
-            "desc": "Close panels and maximize work area",
-            "title": "Maximize Workspace"
-        },
-        "mergeVisible": {
-            "desc": "Merge all visible layers of canvas",
-            "title": "Merge Visible"
-        },
-        "moveTool": {
-            "desc": "Allows canvas navigation",
-            "title": "Move Tool"
-        },
-        "nextImage": {
-            "desc": "Display the next image in gallery",
-            "title": "Next Image"
-        },
-        "nextStagingImage": {
-            "desc": "Next Staging Area Image",
-            "title": "Next Staging Image"
-        },
-        "nodesHotkeys": "Nodes",
-        "pinOptions": {
-            "desc": "Pin the options panel",
-            "title": "Pin Options"
-        },
-        "previousImage": {
-            "desc": "Display the previous image in gallery",
-            "title": "Previous Image"
-        },
-        "previousStagingImage": {
-            "desc": "Previous Staging Area Image",
-            "title": "Previous Staging Image"
-        },
-        "quickToggleMove": {
-            "desc": "Temporarily toggles Move mode",
-            "title": "Quick Toggle Move"
-        },
-        "redoStroke": {
-            "desc": "Redo a brush stroke",
-            "title": "Redo Stroke"
-        },
-        "resetView": {
-            "desc": "Reset Canvas View",
-            "title": "Reset View"
-        },
-        "restoreFaces": {
-            "desc": "Restore the current image",
-            "title": "Restore Faces"
-        },
-        "saveToGallery": {
-            "desc": "Save current canvas to gallery",
-            "title": "Save To Gallery"
-        },
-        "selectBrush": {
-            "desc": "Selects the canvas brush",
-            "title": "Select Brush"
-        },
-        "selectEraser": {
-            "desc": "Selects the canvas eraser",
-            "title": "Select Eraser"
-        },
-        "sendToImageToImage": {
-            "desc": "Send current image to Image to Image",
-            "title": "Send To Image To Image"
-        },
-        "remixImage": {
-            "desc": "Use all parameters except seed from the current image",
-            "title": "Remix image"
-        },
-        "setParameters": {
-            "desc": "Use all parameters of the current image",
-            "title": "Set Parameters"
-        },
-        "setPrompt": {
-            "desc": "Use the prompt of the current image",
-            "title": "Set Prompt"
-        },
-        "setSeed": {
-            "desc": "Use the seed of the current image",
-            "title": "Set Seed"
-        },
-        "showHideBoundingBox": {
-            "desc": "Toggle visibility of bounding box",
-            "title": "Show/Hide Bounding Box"
-        },
-        "showInfo": {
-            "desc": "Show metadata info of the current image",
-            "title": "Show Info"
-        },
-        "toggleGallery": {
-            "desc": "Open and close the gallery drawer",
-            "title": "Toggle Gallery"
-        },
-        "toggleOptions": {
-            "desc": "Open and close the options panel",
-            "title": "Toggle Options"
-        },
-        "toggleOptionsAndGallery": {
-            "desc": "Open and close the options and gallery panels",
-            "title": "Toggle Options and Gallery"
-        },
-        "resetOptionsAndGallery": {
-            "desc": "Resets the options and gallery panels",
-            "title": "Reset Options and Gallery"
-        },
-        "toggleLayer": {
-            "desc": "Toggles mask/base layer selection",
-            "title": "Toggle Layer"
-        },
-        "toggleSnap": {
-            "desc": "Toggles Snap to Grid",
-            "title": "Toggle Snap"
-        },
-        "undoStroke": {
-            "desc": "Undo a brush stroke",
-            "title": "Undo Stroke"
-        },
-        "unifiedCanvasHotkeys": "Unified Canvas",
-        "postProcess": {
-            "desc": "Process the current image using the selected post-processing model",
-            "title": "Process Image"
-        },
-        "toggleViewer": {
-            "desc": "Switches between the Image Viewer and workspace for the current tab.",
-            "title": "Toggle Image Viewer"
+        "gallery": {
+            "title": "Gallery",
+            "selectAllOnPage": {
+                "title": "Select All On Page",
+                "desc": "Select all images on the current page."
+            },
+            "clearSelection": {
+                "title": "Clear Selection",
+                "desc": "Clear the current selection, if any."
+            },
+            "galleryNavUp": {
+                "title": "Navigate Up",
+                "desc": "Navigate up in the gallery grid, selecting that image. If at the top of the page, go to the previous page."
+            },
+            "galleryNavRight": {
+                "title": "Navigate Right",
+                "desc": "Navigate right in the gallery grid, selecting that image. If at the last image of the row, go to the next row. If at the last image of the page, go to the next page."
+            },
+            "galleryNavDown": {
+                "title": "Navigate Down",
+                "desc": "Navigate down in the gallery grid, selecting that image. If at the bottom of the page, go to the next page."
+            },
+            "galleryNavLeft": {
+                "title": "Navigate Left",
+                "desc": "Navigate left in the gallery grid, selecting that image. If at the first image of the row, go to the previous row. If at the first image of the page, go to the previous page."
+            },
+            "galleryNavUpAlt": {
+                "title": "Navigate Up (Compare Image)",
+                "desc": "Same as Navigate Up, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "galleryNavRightAlt": {
+                "title": "Navigate Right (Compare Image)",
+                "desc": "Same as Navigate Right, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "galleryNavDownAlt": {
+                "title": "Navigate Down (Compare Image)",
+                "desc": "Same as Navigate Down, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "galleryNavLeftAlt": {
+                "title": "Navigate Left (Compare Image)",
+                "desc": "Same as Navigate Left, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "deleteSelection": {
+                "title": "Delete",
+                "desc": "Delete all selected images. By default, you will be prompted to confirm deletion. If the images are currently in use in the app, you will be warned."
+            }
         }
     },
     "metadata": {
@@ -659,12 +696,11 @@
         "cfgScale": "CFG scale",
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "createdBy": "Created By",
-        "fit": "Image to image fit",
         "generationMode": "Generation Mode",
+        "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
-        "initImage": "Initial image",
         "metadata": "Metadata",
         "model": "Model",
         "negativePrompt": "Negative Prompt",
@@ -677,14 +713,16 @@
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
-        "seamless": "Seamless",
+        "seamlessXAxis": "Seamless X Axis",
+        "seamlessYAxis": "Seamless Y Axis",
         "seed": "Seed",
         "steps": "Steps",
         "strength": "Image to image strength",
         "Threshold": "Noise Threshold",
         "vae": "VAE",
         "width": "Width",
-        "workflow": "Workflow"
+        "workflow": "Workflow",
+        "canvasV2Metadata": "Canvas"
     },
     "modelManager": {
         "active": "active",
@@ -696,18 +734,25 @@
         "availableModels": "Available Models",
         "baseModel": "Base Model",
         "cancel": "Cancel",
+        "clipEmbed": "CLIP Embed",
+        "clipLEmbed": "CLIP-L Embed",
+        "clipGEmbed": "CLIP-G Embed",
         "config": "Config",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",
         "convertToDiffusers": "Convert To Diffusers",
-        "convertToDiffusersHelpText1": "This model will be converted to the \ud83e\udde8 Diffusers format.",
+        "convertToDiffusersHelpText1": "This model will be converted to the 🧨 Diffusers format.",
         "convertToDiffusersHelpText2": "This process will replace your Model Manager entry with the Diffusers version of the same model.",
         "convertToDiffusersHelpText3": "Your checkpoint file on disk WILL be deleted if it is in InvokeAI root folder. If it is in a custom location, then it WILL NOT be deleted.",
         "convertToDiffusersHelpText4": "This is a one time process only. It might take around 30s-60s depending on the specifications of your computer.",
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
+        "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
         "defaultSettingsSaved": "Default Settings Saved",
+        "defaultSettingsOutOfSync": "Some settings do not match the model's defaults:",
+        "restoreDefaultSettings": "Click to use the model's default settings.",
+        "usingDefaultSettings": "Using model's default settings",
         "delete": "Delete",
         "deleteConfig": "Delete Config",
         "deleteModel": "Delete Model",
@@ -721,15 +766,23 @@
         "huggingFacePlaceholder": "owner/model-name",
         "huggingFaceRepoID": "HuggingFace Repo ID",
         "huggingFaceHelper": "If multiple models are found in this repo, you will be prompted to select one to install.",
-        "hfToken": "HuggingFace Token",
-        "hfTokenHelperText": "A HF token is required to use checkpoint models. Click here to create or get your token.",
+        "hfTokenLabel": "HuggingFace Token (Required for some models)",
+        "hfTokenHelperText": "A HF token is required to use some models. Click here to create or get your token.",
         "hfTokenInvalid": "Invalid or Missing HF Token",
+        "hfForbidden": "You do not have access to this HF model",
+        "hfForbiddenErrorMessage": "We recommend visiting the repo. The owner may require acceptance of terms in order to download.",
+        "urlForbidden": "You do not have access to this model",
+        "urlForbiddenErrorMessage": "You may need to request permission from the site that is distributing the model.",
         "hfTokenInvalidErrorMessage": "Invalid or missing HuggingFace token.",
+        "hfTokenRequired": "You are trying to download a model that requires a valid HuggingFace Token.",
         "hfTokenInvalidErrorMessage2": "Update it in the ",
         "hfTokenUnableToVerify": "Unable to Verify HF Token",
         "hfTokenUnableToVerifyErrorMessage": "Unable to verify HuggingFace token. This is likely due to a network error. Please try again later.",
         "hfTokenSaved": "HF Token Saved",
+        "urlUnauthorizedErrorMessage": "You may need to configure an API token to access this model.",
+        "urlUnauthorizedErrorMessage2": "Learn how here.",
         "imageEncoderModelId": "Image Encoder Model ID",
+        "includesNModels": "Includes {{n}} models and their dependencies",
         "installQueue": "Install Queue",
         "inplaceInstall": "In-place install",
         "inplaceInstallDesc": "Install models without copying the files. When using the model, it will be loaded from its this location. If disabled, the model file(s) will be copied into the Invoke-managed models directory during installation.",
@@ -737,6 +790,7 @@
         "installAll": "Install All",
         "installRepo": "Install Repo",
         "ipAdapters": "IP Adapters",
+        "learnMoreAboutSupportedModels": "Learn more about the models we support",
         "load": "Load",
         "localOnly": "local only",
         "manual": "Manual",
@@ -755,8 +809,6 @@
         "modelManager": "Model Manager",
         "modelName": "Model Name",
         "modelSettings": "Model Settings",
-        "modelsSynced": "Models Synced",
-        "modelSyncFailed": "Model Sync Failed",
         "modelType": "Model Type",
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",
@@ -783,29 +835,37 @@
         "settings": "Settings",
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "source": "Source",
+        "spandrelImageToImage": "Image to Image (Spandrel)",
+        "starterBundles": "Starter Bundles",
+        "starterBundleHelpText": "Easily install all models needed to get started with a base model, including a main model, controlnets, IP adapters, and more. Selecting a bundle will skip any models that you already have installed.",
         "starterModels": "Starter Models",
+        "starterModelsInModelManager": "Starter Models can be found in Model Manager",
+        "controlLora": "Control LoRA",
         "syncModels": "Sync Models",
         "textualInversions": "Textual Inversions",
         "triggerPhrases": "Trigger Phrases",
         "loraTriggerPhrases": "LoRA Trigger Phrases",
         "mainModelTriggerPhrases": "Main Model Trigger Phrases",
         "typePhraseHere": "Type phrase here",
+        "t5Encoder": "T5 Encoder",
         "upcastAttention": "Upcast Attention",
         "uploadImage": "Upload Image",
         "urlOrLocalPath": "URL or Local Path",
         "urlOrLocalPathHelper": "URLs should point to a single file. Local paths can point to a single file or folder for a single diffusers model.",
-        "useDefaultSettings": "Use Default Settings",
-        "v2_768": "v2 (768px)",
-        "v2_base": "v2 (512px)",
         "vae": "VAE",
         "vaePrecision": "VAE Precision",
         "variant": "Variant",
-        "width": "Width"
+        "width": "Width",
+        "installingBundle": "Installing Bundle",
+        "installingModel": "Installing Model",
+        "installingXModels_one": "Installing {{count}} model",
+        "installingXModels_other": "Installing {{count}} models",
+        "skippingXDuplicates_one": ", skipping {{count}} duplicate",
+        "skippingXDuplicates_other": ", skipping {{count}} duplicates"
     },
     "models": {
         "addLora": "Add LoRA",
         "concepts": "Concepts",
-        "esrganModel": "ESRGAN Model",
         "loading": "loading",
         "noMatchingLoRAs": "No matching LoRAs",
         "noMatchingModels": "No matching Models",
@@ -817,6 +877,23 @@
         "defaultVAE": "Default VAE"
     },
     "nodes": {
+        "arithmeticSequence": "Arithmetic Sequence",
+        "linearDistribution": "Linear Distribution",
+        "uniformRandomDistribution": "Uniform Random Distribution",
+        "parseString": "Parse String",
+        "splitOn": "Split On",
+        "noBatchGroup": "no group",
+        "generatorImagesCategory": "Category",
+        "generatorImages_one": "{{count}} image",
+        "generatorImages_other": "{{count}} images",
+        "generatorNRandomValues_one": "{{count}} random value",
+        "generatorNRandomValues_other": "{{count}} random values",
+        "generatorNoValues": "empty",
+        "generatorLoading": "loading",
+        "generatorLoadFromFile": "Load from File",
+        "generatorImagesFromBoard": "Images from Board",
+        "dynamicPromptsRandom": "Dynamic Prompts (Random)",
+        "dynamicPromptsCombinatorial": "Dynamic Prompts (Combinatorial)",
         "addNode": "Add Node",
         "addNodeToolTip": "Add Node (Shift+A, Space)",
         "addLinearView": "Add to Linear View",
@@ -831,6 +908,8 @@
         "missingNode": "Missing invocation node",
         "missingInvocationTemplate": "Missing invocation template",
         "missingFieldTemplate": "Missing field template",
+        "missingSourceOrTargetNode": "Missing source or target node",
+        "missingSourceOrTargetHandle": "Missing source or target handle",
         "nodePack": "Node pack",
         "collection": "Collection",
         "singleFieldType": "{{name}} (Single)",
@@ -863,7 +942,10 @@
         "ipAdapter": "IP-Adapter",
         "loadingNodes": "Loading Nodes...",
         "loadWorkflow": "Load Workflow",
+        "noWorkflows": "No Workflows",
+        "noMatchingWorkflows": "No Matching Workflows",
         "noWorkflow": "No Workflow",
+        "unableToUpdateNode": "Node update failed: node {{node}} of type {{type}} (may require deleting and recreating)",
         "mismatchedVersion": "Invalid node: node {{node}} of type {{type}} has mismatched version (try updating?)",
         "missingTemplate": "Invalid node: node {{node}} of type {{type}} missing template (not installed?)",
         "sourceNodeDoesNotExist": "Invalid edge: source/output node {{node}} does not exist",
@@ -871,22 +953,23 @@
         "sourceNodeFieldDoesNotExist": "Invalid edge: source/output field {{node}}.{{field}} does not exist",
         "targetNodeFieldDoesNotExist": "Invalid edge: target/input field {{node}}.{{field}} does not exist",
         "deletedInvalidEdge": "Deleted invalid edge {{source}} -> {{target}}",
-        "noConnectionData": "No connection data",
+        "deletedMissingNodeFieldFormElement": "Deleted missing form field: node {{nodeId}} field {{fieldName}}",
         "noConnectionInProgress": "No connection in progress",
         "node": "Node",
         "nodeOutputs": "Node Outputs",
         "nodeSearch": "Search for nodes",
         "nodeTemplate": "Node Template",
         "nodeType": "Node Type",
+        "nodeName": "Node Name",
         "noFieldsLinearview": "No fields added to Linear View",
         "noFieldsViewMode": "This workflow has no selected fields to display. View the full workflow to configure values.",
-        "noFieldType": "No field type",
-        "noMatchingNodes": "No matching nodes",
+        "workflowHelpText": "Need Help? Check out our guide to <LinkComponent>Getting Started with Workflows</LinkComponent>.",
         "noNodeSelected": "No node selected",
         "nodeOpacity": "Node Opacity",
         "nodeVersion": "Node Version",
         "noOutputRecorded": "No outputs recorded",
         "notes": "Notes",
+        "description": "Description",
         "notesDescription": "Add notes about your workflow",
         "problemSettingTitle": "Problem Setting Title",
         "resetToDefaultValue": "Reset to default value",
@@ -896,6 +979,8 @@
         "newWorkflow": "New Workflow",
         "newWorkflowDesc": "Create a new workflow?",
         "newWorkflowDesc2": "Your current workflow has unsaved changes.",
+        "loadWorkflowDesc": "Load workflow?",
+        "loadWorkflowDesc2": "Your current workflow has unsaved changes.",
         "clearWorkflow": "Clear Workflow",
         "clearWorkflowDesc": "Clear this workflow and start a new one?",
         "clearWorkflowDesc2": "Your current workflow has unsaved changes.",
@@ -925,6 +1010,7 @@
         "unknownOutput": "Unknown output: {{name}}",
         "updateNode": "Update Node",
         "updateApp": "Update App",
+        "loadingTemplates": "Loading {{name}}",
         "updateAllNodes": "Update Nodes",
         "allNodesUpdated": "All Nodes Updated",
         "unableToUpdateNodes_one": "Unable to update {{count}} node",
@@ -951,9 +1037,16 @@
         "zoomOutNodes": "Zoom Out",
         "betaDesc": "This invocation is in beta. Until it is stable, it may have breaking changes during app updates. We plan to support this invocation long-term.",
         "prototypeDesc": "This invocation is a prototype. It may have breaking changes during app updates and may be removed at any time.",
+        "internalDesc": "This invocation is used internally by Invoke. It may have breaking changes during app updates and may be removed at any time.",
+        "specialDesc": "This invocation some special handling in the app. For example, Batch nodes are used to queue multiple graphs from a single workflow.",
         "imageAccessError": "Unable to find image {{image_name}}, resetting to default",
         "boardAccessError": "Unable to find board {{board_id}}, resetting to default",
-        "modelAccessError": "Unable to find model {{key}}, resetting to default"
+        "modelAccessError": "Unable to find model {{key}}, resetting to default",
+        "saveToGallery": "Save To Gallery",
+        "addItem": "Add Item",
+        "generateValues": "Generate Values",
+        "floatRangeGenerator": "Float Range Generator",
+        "integerRangeGenerator": "Integer Range Generator"
     },
     "parameters": {
         "aspect": "Aspect",
@@ -974,68 +1067,73 @@
         "controlNetControlMode": "Control Mode",
         "copyImage": "Copy Image",
         "denoisingStrength": "Denoising Strength",
+        "disabledNoRasterContent": "Disabled (No Raster Content)",
         "downloadImage": "Download Image",
         "general": "General",
-        "globalSettings": "Global Settings",
+        "guidance": "Guidance",
         "height": "Height",
         "imageFit": "Fit Initial Image To Output Size",
         "images": "Images",
         "infillMethod": "Infill Method",
-        "infillMosaicTileWidth": "Tile Width",
-        "infillMosaicTileHeight": "Tile Height",
-        "infillMosaicMinColor": "Min Color",
-        "infillMosaicMaxColor": "Max Color",
         "infillColorValue": "Fill Color",
         "info": "Info",
         "invoke": {
             "addingImagesTo": "Adding images to",
             "invoke": "Invoke",
             "missingFieldTemplate": "Missing field template",
-            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} missing input",
+            "missingInputForField": "missing input",
             "missingNodeTemplate": "Missing node template",
-            "noControlImageForControlAdapter": "Control Adapter #{{number}} has no control image",
-            "imageNotProcessedForControlAdapter": "Control Adapter #{{number}}'s image is not processed",
-            "noInitialImageSelected": "No initial image selected",
-            "noModelForControlAdapter": "Control Adapter #{{number}} has no model selected.",
-            "incompatibleBaseModelForControlAdapter": "Control Adapter #{{number}} model is incompatible with main model.",
+            "emptyBatches": "empty batches",
+            "batchNodeNotConnected": "Batch node not connected: {{label}}",
+            "batchNodeEmptyCollection": "Some batch nodes have empty collections",
+            "collectionEmpty": "empty collection",
+            "collectionTooFewItems": "too few items, minimum {{minItems}}",
+            "collectionTooManyItems": "too many items, maximum {{maxItems}}",
+            "collectionStringTooLong": "too long, max {{maxLength}}",
+            "collectionStringTooShort": "too short, min {{minLength}}",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (inc max)",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (inc min)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (exc max)",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (exc min)",
+            "collectionNumberNotMultipleOf": "{{value}} not multiple of {{multipleOf}}",
+            "batchNodeCollectionSizeMismatchNoGroupId": "Batch group collection size mismatch",
+            "batchNodeCollectionSizeMismatch": "Collection size mismatch on Batch {{batchGroupId}}",
             "noModelSelected": "No model selected",
+            "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
+            "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
+            "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox height is {{height}}",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), scaled bbox width is {{width}}",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), scaled bbox height is {{height}}",
+            "fluxModelMultipleControlLoRAs": "Can only use 1 Control LoRA at a time",
+            "canvasIsFiltering": "Canvas is busy (filtering)",
+            "canvasIsTransforming": "Canvas is busy (transforming)",
+            "canvasIsRasterizing": "Canvas is busy (rasterizing)",
+            "canvasIsCompositing": "Canvas is busy (compositing)",
+            "canvasIsSelectingObject": "Canvas is busy (selecting object)",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
-            "systemDisconnected": "System disconnected",
-            "layer": {
-                "initialImageNoImageSelected": "no initial image selected",
-                "controlAdapterNoModelSelected": "no Control Adapter model selected",
-                "controlAdapterIncompatibleBaseModel": "incompatible Control Adapter base model",
-                "controlAdapterNoImageSelected": "no Control Adapter image selected",
-                "controlAdapterImageNotProcessed": "Control Adapter image not processed",
-                "t2iAdapterIncompatibleDimensions": "T2I Adapter requires image dimension to be multiples of {{multiple}}",
-                "ipAdapterNoModelSelected": "no IP adapter selected",
-                "ipAdapterIncompatibleBaseModel": "incompatible IP Adapter base model",
-                "ipAdapterNoImageSelected": "no IP Adapter image selected",
-                "rgNoPromptsOrIPAdapters": "no text prompts or IP Adapters",
-                "rgNoRegion": "no region selected"
-            }
+            "systemDisconnected": "System disconnected"
         },
         "maskBlur": "Mask Blur",
         "negativePromptPlaceholder": "Negative Prompt",
-        "globalNegativePromptPlaceholder": "Global Negative Prompt",
         "noiseThreshold": "Noise Threshold",
         "patchmatchDownScaleSize": "Downscale",
         "perlinNoise": "Perlin Noise",
         "positivePromptPlaceholder": "Positive Prompt",
-        "globalPositivePromptPlaceholder": "Global Positive Prompt",
+        "recallMetadata": "Recall Metadata",
         "iterations": "Iterations",
         "scale": "Scale",
         "scaleBeforeProcessing": "Scale Before Processing",
         "scaledHeight": "Scaled H",
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
-        "seamlessXAxis": "Seamless Tiling X Axis",
-        "seamlessYAxis": "Seamless Tiling Y Axis",
+        "seamlessXAxis": "Seamless X Axis",
+        "seamlessYAxis": "Seamless Y Axis",
         "seed": "Seed",
         "imageActions": "Image Actions",
-        "sendToImg2Img": "Send to Image to Image",
-        "sendToUnifiedCanvas": "Send To Unified Canvas",
+        "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
         "showOptionsPanel": "Show Side Panel (O or T)",
         "shuffle": "Shuffle Seed",
@@ -1043,6 +1141,7 @@
         "strength": "Strength",
         "symmetry": "Symmetry",
         "tileSize": "Tile Size",
+        "optimizedImageToImage": "Optimized Image-to-Image",
         "type": "Type",
         "postProcessing": "Post-Processing (Shift + U)",
         "processImage": "Process Image",
@@ -1053,15 +1152,16 @@
         "remixImage": "Remix Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
-        "width": "Width"
+        "width": "Width",
+        "gaussianBlur": "Gaussian Blur",
+        "boxBlur": "Box Blur",
+        "staged": "Staged"
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
         "dynamicPrompts": "Dynamic Prompts",
         "maxPrompts": "Max Prompts",
         "promptsPreview": "Prompts Preview",
-        "promptsWithCount_one": "{{count}} Prompt",
-        "promptsWithCount_other": "{{count}} Prompts",
         "seedBehaviour": {
             "label": "Seed Behaviour",
             "perIterationLabel": "Seed per Iteration",
@@ -1069,7 +1169,8 @@
             "perPromptLabel": "Seed per Image",
             "perPromptDesc": "Use a different seed for each image"
         },
-        "loading": "Generating Dynamic Prompts..."
+        "loading": "Generating Dynamic Prompts...",
+        "promptsToGenerate": "Prompts to Generate"
     },
     "sdxl": {
         "cfgScale": "CFG Scale",
@@ -1093,12 +1194,15 @@
         "antialiasProgressImages": "Antialias Progress Images",
         "beta": "Beta",
         "confirmOnDelete": "Confirm On Delete",
+        "confirmOnNewSession": "Confirm On New Session",
         "developer": "Developer",
         "displayInProgress": "Display Progress Images",
-        "enableImageDebugging": "Enable Image Debugging",
         "enableInformationalPopovers": "Enable Informational Popovers",
         "informationalPopoversDisabled": "Informational Popovers Disabled",
         "informationalPopoversDisabledDesc": "Informational popovers have been disabled. Enable them in Settings.",
+        "enableModelDescriptions": "Enable Model Descriptions in Dropdowns",
+        "modelDescriptionsDisabled": "Model Descriptions in Dropdowns Disabled",
+        "modelDescriptionsDisabledDesc": "Model descriptions in dropdowns have been disabled. Enable them in Settings.",
         "enableInvisibleWatermark": "Enable Invisible Watermark",
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
@@ -1108,7 +1212,7 @@
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",
         "resetWebUIDesc2": "If images aren't showing up in the gallery or something else isn't working, please try resetting before submitting an issue on GitHub.",
-        "shouldLogToConsole": "Console Logging",
+        "showDetailedInvocationProgress": "Show Progress Details",
         "showProgressInViewer": "Show Progress Images in Viewer",
         "ui": "User Interface",
         "clearIntermediatesDisabled": "Queue must be empty to clear intermediates",
@@ -1124,18 +1228,19 @@
         "reloadingIn": "Reloading in"
     },
     "toast": {
-        "addedToBoard": "Added to board",
+        "addedToBoard": "Added to board {{name}}'s assets",
+        "addedToUncategorized": "Added to board $t(boards.uncategorized)'s assets",
         "baseModelChanged": "Base Model Changed",
         "baseModelChangedCleared_one": "Cleared or disabled {{count}} incompatible submodel",
         "baseModelChangedCleared_other": "Cleared or disabled {{count}} incompatible submodels",
         "canceled": "Processing Canceled",
-        "canvasCopiedClipboard": "Canvas Copied to Clipboard",
-        "canvasDownloaded": "Canvas Downloaded",
-        "canvasMerged": "Canvas Merged",
-        "canvasSavedGallery": "Canvas Saved to Gallery",
-        "canvasSentControlnetAssets": "Canvas Sent to ControlNet & Assets",
         "connected": "Connected to Server",
         "imageCopied": "Image Copied",
+        "linkCopied": "Link Copied",
+        "unableToLoadImage": "Unable to Load Image",
+        "unableToLoadImageMetadata": "Unable to Load Image Metadata",
+        "unableToLoadStylePreset": "Unable to Load Style Preset",
+        "stylePresetLoaded": "Style Preset Loaded",
         "imageNotLoadedDesc": "Could not find image",
         "imageSaved": "Image Saved",
         "imageSavingFailed": "Image Saving Failed",
@@ -1144,13 +1249,13 @@
         "importFailed": "Import Failed",
         "importSuccessful": "Import Successful",
         "invalidUpload": "Invalid Upload",
+        "layerCopiedToClipboard": "Layer Copied to Clipboard",
+        "layerSavedToAssets": "Layer Saved to Assets",
         "loadedWithWarnings": "Workflow Loaded with Warnings",
-        "maskSavedAssets": "Mask Saved to Assets",
-        "maskSentControlnetAssets": "Mask Sent to ControlNet & Assets",
-        "metadataLoadFailed": "Failed to load metadata",
         "modelAddedSimple": "Model Added to Queue",
         "modelImportCanceled": "Model Import Canceled",
         "outOfMemoryError": "Out of Memory Error",
+        "outOfMemoryErrorDescLocal": "Follow our <LinkComponent>Low VRAM guide</LinkComponent> to reduce OOMs.",
         "outOfMemoryErrorDesc": "Your current generation settings exceed system capacity. Please adjust your settings and try again.",
         "parameters": "Parameters",
         "parameterSet": "Parameter Recalled",
@@ -1161,49 +1266,32 @@
         "parametersSet": "Parameters Recalled",
         "parametersNotSet": "Parameters Not Recalled",
         "errorCopied": "Error Copied",
-        "problemCopyingCanvas": "Problem Copying Canvas",
-        "problemCopyingCanvasDesc": "Unable to export base layer",
         "problemCopyingImage": "Unable to Copy Image",
+        "problemCopyingLayer": "Unable to Copy Layer",
+        "problemSavingLayer": "Unable to Save Layer",
         "problemDownloadingImage": "Unable to Download Image",
-        "problemDownloadingCanvas": "Problem Downloading Canvas",
-        "problemDownloadingCanvasDesc": "Unable to export base layer",
-        "problemImportingMask": "Problem Importing Mask",
-        "problemImportingMaskDesc": "Unable to export mask",
-        "problemMergingCanvas": "Problem Merging Canvas",
-        "problemMergingCanvasDesc": "Unable to export base layer",
-        "problemSavingCanvas": "Problem Saving Canvas",
-        "problemSavingCanvasDesc": "Unable to export base layer",
-        "problemSavingMask": "Problem Saving Mask",
-        "problemSavingMaskDesc": "Unable to export mask",
+        "pasteSuccess": "Pasted to {{destination}}",
+        "pasteFailed": "Paste Failed",
         "prunedQueue": "Pruned Queue",
-        "resetInitialImage": "Reset Initial Image",
-        "sentToImageToImage": "Sent To Image To Image",
-        "sentToUnifiedCanvas": "Sent to Unified Canvas",
+        "sentToCanvas": "Sent to Canvas",
+        "sentToUpscale": "Sent to Upscale",
         "serverError": "Server Error",
         "sessionRef": "Session: {{sessionId}}",
-        "setAsCanvasInitialImage": "Set as canvas initial image",
-        "setCanvasInitialImage": "Set canvas initial image",
         "setControlImage": "Set as control image",
-        "setInitialImage": "Set as initial image",
         "setNodeField": "Set as node field",
         "somethingWentWrong": "Something Went Wrong",
         "uploadFailed": "Upload failed",
-        "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
-        "uploadInitialImage": "Upload Initial Image",
+        "imagesWillBeAddedTo": "Uploaded images will be added to board {{boardName}}'s assets.",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Must be maximum of 1 PNG or JPEG image.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Must be maximum of {{count}} PNG or JPEG images.",
+        "uploadFailedInvalidUploadDesc": "Must be PNG or JPEG images.",
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
         "workflowDeleted": "Workflow Deleted",
-        "problemDeletingWorkflow": "Problem Deleting Workflow"
-    },
-    "tooltip": {
-        "feature": {
-            "boundingBox": "The bounding box is the same as the Width and Height settings for Text to Image or Image to Image. Only the area in the box will be processed.",
-            "gallery": "Gallery displays generations from the outputs folder as they're created. Settings are stored within files and accesed by context menu.",
-            "other": "These options will enable alternative processing modes for Invoke. 'Seamless tiling' will create repeating patterns in the output. 'High resolution' is generation in two steps with img2img: use this setting when you want a larger and more coherent image without artifacts. It will take longer than usual txt2img.",
-            "prompt": "This is the prompt field. Prompt includes generation objects and stylistic terms. You can add weight (token importance) in the prompt as well, but CLI commands and parameters will not work.",
-            "seed": "Seed value affects the initial noise from which the image is formed. You can use the already existing seeds from previous images. 'Noise Threshold' is used to mitigate artifacts at high CFG values (try the 0-10 range), and Perlin to add Perlin noise during generation: both serve to add variation to your outputs.",
-            "upscale": "Use ESRGAN to enlarge the image immediately after generation."
-        }
+        "problemDeletingWorkflow": "Problem Deleting Workflow",
+        "unableToCopy": "Unable to Copy",
+        "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
+        "unableToCopyDesc_theseSteps": "these steps"
     },
     "popovers": {
         "clipSkip": {
@@ -1265,6 +1353,33 @@
             "heading": "Mask Adjustments",
             "paragraphs": ["Adjust the mask."]
         },
+        "inpainting": {
+            "heading": "Inpainting",
+            "paragraphs": ["Controls which area is modified, guided by Denoising Strength."]
+        },
+        "rasterLayer": {
+            "heading": "Raster Layer",
+            "paragraphs": ["Pixel-based content of your canvas, used during image generation."]
+        },
+        "regionalGuidance": {
+            "heading": "Regional Guidance",
+            "paragraphs": ["Brush to guide where elements from global prompts should appear."]
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "heading": "Regional Guidance and Regional Reference Image",
+            "paragraphs": [
+                "For Regional Guidance, brush to guide where elements from global prompts should appear.",
+                "For Regional Reference Image, brush to apply a reference image to specific areas."
+            ]
+        },
+        "globalReferenceImage": {
+            "heading": "Global Reference Image",
+            "paragraphs": ["Applies a reference image to influence the entire generation."]
+        },
+        "regionalReferenceImage": {
+            "heading": "Regional Reference Image",
+            "paragraphs": ["Brush to apply a reference image to specific areas."]
+        },
         "controlNet": {
             "heading": "ControlNet",
             "paragraphs": [
@@ -1274,8 +1389,9 @@
         "controlNetBeginEnd": {
             "heading": "Begin / End Step Percentage",
             "paragraphs": [
-                "The part of the of the denoising process that will have the Control Adapter applied.",
-                "Generally, Control Adapters applied at the start of the process guide composition, and Control Adapters applied at the end guide details."
+                "This setting determines which portion of the denoising (generation) process incorporates the guidance from this layer.",
+                "• Start Step (%): Specifies when to begin applying the guidance from this layer during the generation process.",
+                "• End Step (%): Specifies when to stop applying this layer's guidance and revert general guidance from the model and other settings."
             ]
         },
         "controlNetControlMode": {
@@ -1285,7 +1401,7 @@
         "controlNetProcessor": {
             "heading": "Processor",
             "paragraphs": [
-                "Method of processing the input image to guide the generation process. Different processors will providedifferent effects or styles in your generated images."
+                "Method of processing the input image to guide the generation process. Different processors will provide different effects or styles in your generated images."
             ]
         },
         "controlNetResizeMode": {
@@ -1293,13 +1409,15 @@
             "paragraphs": ["Method to fit Control Adapter's input image size to the output generation size."]
         },
         "ipAdapterMethod": {
-            "heading": "Method",
-            "paragraphs": ["Method by which to apply the current IP Adapter."]
+            "heading": "Mode",
+            "paragraphs": ["The mode defines how the reference image will guide the generation process."]
         },
         "controlNetWeight": {
             "heading": "Weight",
             "paragraphs": [
-                "Weight of the Control Adapter. Higher weight will lead to larger impacts on the final image."
+                "Adjusts how strongly the layer influences the generation process",
+                "• Higher Weight (.75-2): Creates a more significant impact on the final result.",
+                "• Lower Weight (0-.75): Creates a smaller impact on the final result."
             ]
         },
         "dynamicPrompts": {
@@ -1363,6 +1481,13 @@
                 "High CFG Scale values can result in over-saturation and distorted generation results. "
             ]
         },
+        "paramGuidance": {
+            "heading": "Guidance",
+            "paragraphs": [
+                "Controls how much the prompt influences the generation process.",
+                "High guidance values can result in over-saturation and high or low guidance may result in distorted generation results. Guidance only applies to FLUX DEV models."
+            ]
+        },
         "paramCFGRescaleMultiplier": {
             "heading": "CFG Rescale Multiplier",
             "paragraphs": [
@@ -1373,8 +1498,9 @@
         "paramDenoisingStrength": {
             "heading": "Denoising Strength",
             "paragraphs": [
-                "How much noise is added to the input image.",
-                "0 will result in an identical image, while 1 will result in a completely new image."
+                "Controls how much the generated image varies from the raster layer(s).",
+                "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
+                "When there are no raster layers with visible content, this setting is ignored."
             ]
         },
         "paramHeight": {
@@ -1532,84 +1658,37 @@
             "paragraphs": [
                 "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
             ]
+        },
+        "fluxDevLicense": {
+            "heading": "Non-Commercial License",
+            "paragraphs": [
+                "FLUX.1 [dev] models are licensed under the FLUX [dev] non-commercial license. To use this model type for commercial purposes in Invoke, visit our website to learn more."
+            ]
+        },
+        "optimizedDenoising": {
+            "heading": "Optimized Image-to-Image",
+            "paragraphs": [
+                "Enable 'Optimized Image-to-Image' for a more gradual Denoise Strength scale for image-to-image and inpainting transformations with Flux models. This setting improves the ability to control the amount of change applied to an image, but may be turned off if you prefer to use the standard Denoise Strength scale. This setting is still being tuned and is in beta status."
+            ]
         }
     },
-    "unifiedCanvas": {
-        "accept": "Accept",
-        "activeLayer": "Active Layer",
-        "antialiasing": "Antialiasing",
-        "autoSaveToGallery": "Auto Save to Gallery",
-        "base": "Base",
-        "boundingBox": "Bounding Box",
-        "boundingBoxPosition": "Bounding Box Position",
-        "brush": "Brush",
-        "brushOptions": "Brush Options",
-        "brushSize": "Size",
-        "canvasDimensions": "Canvas Dimensions",
-        "canvasPosition": "Canvas Position",
-        "canvasScale": "Canvas Scale",
-        "canvasSettings": "Canvas Settings",
-        "clearCanvas": "Clear Canvas",
-        "clearCanvasHistory": "Clear Canvas History",
-        "clearCanvasHistoryConfirm": "Are you sure you want to clear the canvas history?",
-        "clearCanvasHistoryMessage": "Clearing the canvas history leaves your current canvas intact, but irreversibly clears the undo and redo history.",
-        "clearHistory": "Clear History",
-        "clearMask": "Clear Mask (Shift+C)",
-        "coherenceModeGaussianBlur": "Gaussian Blur",
-        "coherenceModeBoxBlur": "Box Blur",
-        "coherenceModeStaged": "Staged",
-        "colorPicker": "Color Picker",
-        "copyToClipboard": "Copy to Clipboard",
-        "cursorPosition": "Cursor Position",
-        "darkenOutsideSelection": "Darken Outside Selection",
-        "discardAll": "Discard All",
-        "discardCurrent": "Discard Current",
-        "downloadAsImage": "Download As Image",
-        "enableMask": "Enable Mask",
-        "eraseBoundingBox": "Erase Bounding Box",
-        "eraser": "Eraser",
-        "fillBoundingBox": "Fill Bounding Box",
-        "hideBoundingBox": "Hide Bounding Box",
-        "initialFitImageSize": "Fit Image Size on Drop",
-        "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
-        "layer": "Layer",
-        "limitStrokesToBox": "Limit Strokes to Box",
-        "mask": "Mask",
-        "maskingOptions": "Masking Options",
-        "mergeVisible": "Merge Visible",
-        "move": "Move",
-        "next": "Next",
-        "preserveMaskedArea": "Preserve Masked Area",
-        "previous": "Previous",
-        "redo": "Redo",
-        "resetView": "Reset View",
-        "saveBoxRegionOnly": "Save Box Region Only",
-        "saveMask": "Save $t(unifiedCanvas.mask)",
-        "saveToGallery": "Save To Gallery",
-        "scaledBoundingBox": "Scaled Bounding Box",
-        "showBoundingBox": "Show Bounding Box",
-        "showCanvasDebugInfo": "Show Additional Canvas Info",
-        "showGrid": "Show Grid",
-        "showResultsOn": "Show Results (On)",
-        "showResultsOff": "Show Results (Off)",
-        "showIntermediates": "Show Intermediates",
-        "snapToGrid": "Snap to Grid",
-        "undo": "Undo"
-    },
     "workflows": {
+        "chooseWorkflowFromLibrary": "Choose Workflow from Library",
+        "defaultWorkflows": "Default Workflows",
+        "userWorkflows": "User Workflows",
+        "projectWorkflows": "Project Workflows",
         "ascending": "Ascending",
         "created": "Created",
         "descending": "Descending",
         "workflows": "Workflows",
         "workflowLibrary": "Library",
-        "userWorkflows": "My Workflows",
-        "defaultWorkflows": "Default Workflows",
-        "projectWorkflows": "Project Workflows",
         "opened": "Opened",
         "openWorkflow": "Open Workflow",
         "updated": "Updated",
         "uploadWorkflow": "Load from File",
+        "uploadAndSaveWorkflow": "Upload to Library",
         "deleteWorkflow": "Delete Workflow",
+        "deleteWorkflow2": "Are you sure you want to delete this workflow? This cannot be undone.",
         "unnamedWorkflow": "Unnamed Workflow",
         "downloadWorkflow": "Save to File",
         "saveWorkflow": "Save Workflow",
@@ -1619,8 +1698,6 @@
         "problemSavingWorkflow": "Problem Saving Workflow",
         "workflowSaved": "Workflow Saved",
         "name": "Name",
-        "noRecentWorkflows": "No Recent Workflows",
-        "noUserWorkflows": "No User Workflows",
         "noWorkflows": "No Workflows",
         "problemLoading": "Problem Loading Workflows",
         "loading": "Loading Workflows",
@@ -1634,47 +1711,476 @@
         "loadFromGraph": "Load Workflow from Graph",
         "convertGraph": "Convert Graph",
         "loadWorkflow": "$t(common.load) Workflow",
-        "autoLayout": "Auto Layout"
-    },
-    "app": {
-        "storeNotInitialized": "Store is not initialized"
+        "autoLayout": "Auto Layout",
+        "edit": "Edit",
+        "download": "Download",
+        "copyShareLink": "Copy Share Link",
+        "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
+        "delete": "Delete",
+        "openLibrary": "Open Library",
+        "builder": {
+            "deleteAllElements": "Delete All Form Elements",
+            "resetAllNodeFields": "Reset All Node Fields",
+            "builder": "Form Builder",
+            "layout": "Layout",
+            "row": "Row",
+            "column": "Column",
+            "nodeField": "Node Field",
+            "zoomToNode": "Zoom to Node",
+            "nodeFieldTooltip": "To add a node field, click the small plus sign button on the field in the Workflow Editor, or drag the field by its name into the form.",
+            "addToForm": "Add to Form",
+            "label": "Label",
+            "showDescription": "Show Description",
+            "component": "Component",
+            "numberInput": "Number Input",
+            "singleLine": "Single Line",
+            "multiLine": "Multi Line",
+            "slider": "Slider",
+            "both": "Both",
+            "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
+            "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",
+            "containerPlaceholder": "Empty Container",
+            "headingPlaceholder": "Empty Heading",
+            "textPlaceholder": "Empty Text",
+            "workflowBuilderAlphaWarning": "The workflow builder is currently in alpha. There may be breaking changes before the stable release."
+        }
     },
     "controlLayers": {
-        "deleteAll": "Delete All",
+        "regional": "Regional",
+        "global": "Global",
+        "canvas": "Canvas",
+        "bookmark": "Bookmark for Quick Switch",
+        "fitBboxToLayers": "Fit Bbox To Layers",
+        "removeBookmark": "Remove Bookmark",
+        "saveCanvasToGallery": "Save Canvas to Gallery",
+        "saveBboxToGallery": "Save Bbox to Gallery",
+        "saveLayerToAssets": "Save Layer to Assets",
+        "cropLayerToBbox": "Crop Layer to Bbox",
+        "savedToGalleryOk": "Saved to Gallery",
+        "savedToGalleryError": "Error saving to gallery",
+        "regionCopiedToClipboard": "{{region}} Copied to Clipboard",
+        "copyRegionError": "Error copying {{region}}",
+        "newGlobalReferenceImageOk": "Created Global Reference Image",
+        "newGlobalReferenceImageError": "Problem Creating Global Reference Image",
+        "newRegionalReferenceImageOk": "Created Regional Reference Image",
+        "newRegionalReferenceImageError": "Problem Creating Regional Reference Image",
+        "newControlLayerOk": "Created Control Layer",
+        "newControlLayerError": "Problem Creating Control Layer",
+        "newRasterLayerOk": "Created Raster Layer",
+        "newRasterLayerError": "Problem Creating Raster Layer",
+        "pullBboxIntoLayerOk": "Bbox Pulled Into Layer",
+        "pullBboxIntoLayerError": "Problem Pulling BBox Into Layer",
+        "pullBboxIntoReferenceImageOk": "Bbox Pulled Into ReferenceImage",
+        "pullBboxIntoReferenceImageError": "Problem Pulling BBox Into ReferenceImage",
+        "regionIsEmpty": "Selected region is empty",
+        "mergeVisible": "Merge Visible",
+        "mergeDown": "Merge Down",
+        "mergeVisibleOk": "Merged layers",
+        "mergeVisibleError": "Error merging layers",
+        "mergingLayers": "Merging layers",
+        "clearHistory": "Clear History",
+        "bboxOverlay": "Show Bbox Overlay",
+        "newSession": "New Session",
+        "clearCaches": "Clear Caches",
+        "recalculateRects": "Recalculate Rects",
+        "clipToBbox": "Clip Strokes to Bbox",
+        "outputOnlyMaskedRegions": "Output Only Generated Regions",
         "addLayer": "Add Layer",
+        "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
         "moveToBack": "Move to Back",
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
-        "brushSize": "Brush Size",
-        "controlLayers": "Control Layers",
-        "globalMaskOpacity": "Global Mask Opacity",
+        "width": "Width",
         "autoNegative": "Auto Negative",
+        "enableAutoNegative": "Enable Auto Negative",
+        "disableAutoNegative": "Disable Auto Negative",
         "deletePrompt": "Delete Prompt",
-        "resetRegion": "Reset Region",
-        "debugLayers": "Debug Layers",
+        "deleteReferenceImage": "Delete Reference Image",
+        "showHUD": "Show HUD",
         "rectangle": "Rectangle",
-        "maskPreviewColor": "Mask Preview Color",
-        "addPositivePrompt": "Add $t(common.positivePrompt)",
-        "addNegativePrompt": "Add $t(common.negativePrompt)",
-        "addIPAdapter": "Add $t(common.ipAdapter)",
+        "maskFill": "Mask Fill",
+        "addPositivePrompt": "Add $t(controlLayers.prompt)",
+        "addNegativePrompt": "Add $t(controlLayers.negativePrompt)",
+        "addReferenceImage": "Add $t(controlLayers.referenceImage)",
+        "addRasterLayer": "Add $t(controlLayers.rasterLayer)",
+        "addControlLayer": "Add $t(controlLayers.controlLayer)",
+        "addInpaintMask": "Add $t(controlLayers.inpaintMask)",
+        "addRegionalGuidance": "Add $t(controlLayers.regionalGuidance)",
+        "addGlobalReferenceImage": "Add $t(controlLayers.globalReferenceImage)",
+        "rasterLayer": "Raster Layer",
+        "controlLayer": "Control Layer",
+        "inpaintMask": "Inpaint Mask",
         "regionalGuidance": "Regional Guidance",
-        "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
+        "referenceImageRegional": "Reference Image (Regional)",
+        "referenceImageGlobal": "Reference Image (Global)",
+        "asRasterLayer": "As $t(controlLayers.rasterLayer)",
+        "asRasterLayerResize": "As $t(controlLayers.rasterLayer) (Resize)",
+        "asControlLayer": "As $t(controlLayers.controlLayer)",
+        "asControlLayerResize": "As $t(controlLayers.controlLayer) (Resize)",
+        "referenceImage": "Reference Image",
+        "regionalReferenceImage": "Regional Reference Image",
+        "globalReferenceImage": "Global Reference Image",
+        "sendingToCanvas": "Staging Generations on Canvas",
+        "sendingToGallery": "Sending Generations to Gallery",
+        "sendToGallery": "Send To Gallery",
+        "sendToGalleryDesc": "Pressing Invoke generates and saves a unique image to your gallery.",
+        "sendToCanvas": "Send To Canvas",
+        "newLayerFromImage": "New Layer from Image",
+        "newCanvasFromImage": "New Canvas from Image",
+        "newImg2ImgCanvasFromImage": "New Img2Img from Image",
+        "copyToClipboard": "Copy to Clipboard",
+        "sendToCanvasDesc": "Pressing Invoke stages your work in progress on the canvas.",
+        "viewProgressInViewer": "View progress and outputs in the <Btn>Image Viewer</Btn>.",
+        "viewProgressOnCanvas": "View progress and stage outputs on the <Btn>Canvas</Btn>.",
+        "rasterLayer_withCount_one": "$t(controlLayers.rasterLayer)",
+        "rasterLayer_withCount_other": "Raster Layers",
+        "controlLayer_withCount_one": "$t(controlLayers.controlLayer)",
+        "controlLayer_withCount_other": "Control Layers",
+        "inpaintMask_withCount_one": "$t(controlLayers.inpaintMask)",
+        "inpaintMask_withCount_other": "Inpaint Masks",
+        "regionalGuidance_withCount_one": "$t(controlLayers.regionalGuidance)",
+        "regionalGuidance_withCount_other": "Regional Guidance",
+        "globalReferenceImage_withCount_one": "$t(controlLayers.globalReferenceImage)",
+        "globalReferenceImage_withCount_other": "Global Reference Images",
         "opacity": "Opacity",
-        "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
-        "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
-        "globalIPAdapter": "Global $t(common.ipAdapter)",
-        "globalIPAdapterLayer": "Global $t(common.ipAdapter) $t(unifiedCanvas.layer)",
-        "globalInitialImage": "Global Initial Image",
-        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
-        "opacityFilter": "Opacity Filter",
-        "clearProcessor": "Clear Processor",
-        "resetProcessor": "Reset Processor to Defaults",
-        "noLayersAdded": "No Layers Added",
-        "layers_one": "Layer",
-        "layers_other": "Layers"
+        "regionalGuidance_withCount_hidden": "Regional Guidance ({{count}} hidden)",
+        "controlLayers_withCount_hidden": "Control Layers ({{count}} hidden)",
+        "rasterLayers_withCount_hidden": "Raster Layers ({{count}} hidden)",
+        "globalReferenceImages_withCount_hidden": "Global Reference Images ({{count}} hidden)",
+        "inpaintMasks_withCount_hidden": "Inpaint Masks ({{count}} hidden)",
+        "regionalGuidance_withCount_visible": "Regional Guidance ({{count}})",
+        "controlLayers_withCount_visible": "Control Layers ({{count}})",
+        "rasterLayers_withCount_visible": "Raster Layers ({{count}})",
+        "globalReferenceImages_withCount_visible": "Global Reference Images ({{count}})",
+        "inpaintMasks_withCount_visible": "Inpaint Masks ({{count}})",
+        "layer_one": "Layer",
+        "layer_other": "Layers",
+        "layer_withCount_one": "Layer ({{count}})",
+        "layer_withCount_other": "Layers ({{count}})",
+        "convertRasterLayerTo": "Convert $t(controlLayers.rasterLayer) To",
+        "convertControlLayerTo": "Convert $t(controlLayers.controlLayer) To",
+        "convertInpaintMaskTo": "Convert $t(controlLayers.inpaintMask) To",
+        "convertRegionalGuidanceTo": "Convert $t(controlLayers.regionalGuidance) To",
+        "copyRasterLayerTo": "Copy $t(controlLayers.rasterLayer) To",
+        "copyControlLayerTo": "Copy $t(controlLayers.controlLayer) To",
+        "copyInpaintMaskTo": "Copy $t(controlLayers.inpaintMask) To",
+        "copyRegionalGuidanceTo": "Copy $t(controlLayers.regionalGuidance) To",
+        "newRasterLayer": "New $t(controlLayers.rasterLayer)",
+        "newControlLayer": "New $t(controlLayers.controlLayer)",
+        "newInpaintMask": "New $t(controlLayers.inpaintMask)",
+        "newRegionalGuidance": "New $t(controlLayers.regionalGuidance)",
+        "pasteTo": "Paste To",
+        "pasteToAssets": "Assets",
+        "pasteToAssetsDesc": "Paste to Assets",
+        "pasteToBbox": "Bbox",
+        "pasteToBboxDesc": "New Layer (in Bbox)",
+        "pasteToCanvas": "Canvas",
+        "pasteToCanvasDesc": "New Layer (in Canvas)",
+        "pastedTo": "Pasted to {{destination}}",
+        "transparency": "Transparency",
+        "enableTransparencyEffect": "Enable Transparency Effect",
+        "disableTransparencyEffect": "Disable Transparency Effect",
+        "hidingType": "Hiding {{type}}",
+        "showingType": "Showing {{type}}",
+        "dynamicGrid": "Dynamic Grid",
+        "logDebugInfo": "Log Debug Info",
+        "locked": "Locked",
+        "unlocked": "Unlocked",
+        "deleteSelected": "Delete Selected",
+        "stagingOnCanvas": "Staging images on",
+        "replaceLayer": "Replace Layer",
+        "pullBboxIntoLayer": "Pull Bbox into Layer",
+        "pullBboxIntoReferenceImage": "Pull Bbox into Reference Image",
+        "showProgressOnCanvas": "Show Progress on Canvas",
+        "useImage": "Use Image",
+        "prompt": "Prompt",
+        "negativePrompt": "Negative Prompt",
+        "beginEndStepPercentShort": "Begin/End %",
+        "weight": "Weight",
+        "newGallerySession": "New Gallery Session",
+        "newGallerySessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be sent to the gallery.",
+        "newCanvasSession": "New Canvas Session",
+        "newCanvasSessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be staged on the canvas.",
+        "resetCanvasLayers": "Reset Canvas Layers",
+        "resetGenerationSettings": "Reset Generation Settings",
+        "replaceCurrent": "Replace Current",
+        "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or draw on the canvas to get started.",
+        "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton> or drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer to get started.",
+        "warnings": {
+            "problemsFound": "Problems found",
+            "unsupportedModel": "layer not supported for selected base model",
+            "controlAdapterNoModelSelected": "no Control Layer model selected",
+            "controlAdapterIncompatibleBaseModel": "incompatible Control Layer base model",
+            "controlAdapterNoControl": "no control selected/drawn",
+            "ipAdapterNoModelSelected": "no Reference Image model selected",
+            "ipAdapterIncompatibleBaseModel": "incompatible Reference Image base model",
+            "ipAdapterNoImageSelected": "no Reference Image image selected",
+            "rgNoPromptsOrIPAdapters": "no text prompts or Reference Images",
+            "rgNegativePromptNotSupported": "Negative Prompt not supported for selected base model",
+            "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
+            "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
+            "rgNoRegion": "no region drawn"
+        },
+        "errors": {
+            "unableToFindImage": "Unable to find image",
+            "unableToLoadImage": "Unable to Load Image"
+        },
+        "controlMode": {
+            "controlMode": "Control Mode",
+            "balanced": "Balanced (recommended)",
+            "prompt": "Prompt",
+            "control": "Control",
+            "megaControl": "Mega Control"
+        },
+        "ipAdapterMethod": {
+            "ipAdapterMethod": "Mode",
+            "full": "Style and Composition",
+            "fullDesc": "Applies visual style (colors, textures) & composition (layout, structure).",
+            "style": "Style Only",
+            "styleDesc": "Applies visual style (colors, textures) without considering its layout.",
+            "composition": "Composition Only",
+            "compositionDesc": "Replicates layout & structure while ignoring the reference's style."
+        },
+        "fill": {
+            "fillColor": "Fill Color",
+            "fillStyle": "Fill Style",
+            "solid": "Solid",
+            "grid": "Grid",
+            "crosshatch": "Crosshatch",
+            "vertical": "Vertical",
+            "horizontal": "Horizontal",
+            "diagonal": "Diagonal"
+        },
+        "tool": {
+            "brush": "Brush",
+            "eraser": "Eraser",
+            "rectangle": "Rectangle",
+            "bbox": "Bbox",
+            "move": "Move",
+            "view": "View",
+            "colorPicker": "Color Picker"
+        },
+        "filter": {
+            "filter": "Filter",
+            "filters": "Filters",
+            "filterType": "Filter Type",
+            "autoProcess": "Auto Process",
+            "reset": "Reset",
+            "process": "Process",
+            "apply": "Apply",
+            "cancel": "Cancel",
+            "advanced": "Advanced",
+            "processingLayerWith": "Processing layer with the {{type}} filter.",
+            "forMoreControl": "For more control, click Advanced below.",
+            "spandrel_filter": {
+                "label": "Image-to-Image Model",
+                "description": "Run an image-to-image model on the selected layer.",
+                "model": "Model",
+                "autoScale": "Auto Scale",
+                "autoScaleDesc": "The selected model will be run until the target scale is reached.",
+                "scale": "Target Scale"
+            },
+            "canny_edge_detection": {
+                "label": "Canny Edge Detection",
+                "description": "Generates an edge map from the selected layer using the Canny edge detection algorithm.",
+                "low_threshold": "Low Threshold",
+                "high_threshold": "High Threshold"
+            },
+            "color_map": {
+                "label": "Color Map",
+                "description": "Create a color map from the selected layer.",
+                "tile_size": "Tile Size"
+            },
+            "content_shuffle": {
+                "label": "Content Shuffle",
+                "description": "Shuffles the content of the selected layer, similar to a 'liquify' effect.",
+                "scale_factor": "Scale Factor"
+            },
+            "depth_anything_depth_estimation": {
+                "label": "Depth Anything",
+                "description": "Generates a depth map from the selected layer using a Depth Anything model.",
+                "model_size": "Model Size",
+                "model_size_small": "Small",
+                "model_size_small_v2": "Small v2",
+                "model_size_base": "Base",
+                "model_size_large": "Large"
+            },
+            "dw_openpose_detection": {
+                "label": "DW Openpose Detection",
+                "description": "Detects human poses in the selected layer using the DW Openpose model.",
+                "draw_hands": "Draw Hands",
+                "draw_face": "Draw Face",
+                "draw_body": "Draw Body"
+            },
+            "hed_edge_detection": {
+                "label": "HED Edge Detection",
+                "description": "Generates an edge map from the selected layer using the HED edge detection model.",
+                "scribble": "Scribble"
+            },
+            "lineart_anime_edge_detection": {
+                "label": "Lineart Anime Edge Detection",
+                "description": "Generates an edge map from the selected layer using the Lineart Anime edge detection model."
+            },
+            "lineart_edge_detection": {
+                "label": "Lineart Edge Detection",
+                "description": "Generates an edge map from the selected layer using the Lineart edge detection model.",
+                "coarse": "Coarse"
+            },
+            "mediapipe_face_detection": {
+                "label": "MediaPipe Face Detection",
+                "description": "Detects faces in the selected layer using the MediaPipe face detection model.",
+                "max_faces": "Max Faces",
+                "min_confidence": "Min Confidence"
+            },
+            "mlsd_detection": {
+                "label": "Line Segment Detection",
+                "description": "Generates a line segment map from the selected layer using the MLSD line segment detection model.",
+                "score_threshold": "Score Threshold",
+                "distance_threshold": "Distance Threshold"
+            },
+            "normal_map": {
+                "label": "Normal Map",
+                "description": "Generates a normal map from the selected layer."
+            },
+            "pidi_edge_detection": {
+                "label": "PiDiNet Edge Detection",
+                "description": "Generates an edge map from the selected layer using the PiDiNet edge detection model.",
+                "scribble": "Scribble",
+                "quantize_edges": "Quantize Edges"
+            },
+            "img_blur": {
+                "label": "Blur Image",
+                "description": "Blurs the selected layer.",
+                "blur_type": "Blur Type",
+                "blur_radius": "Radius",
+                "gaussian_type": "Gaussian",
+                "box_type": "Box"
+            },
+            "img_noise": {
+                "label": "Noise Image",
+                "description": "Adds noise to the selected layer.",
+                "noise_type": "Noise Type",
+                "noise_amount": "Amount",
+                "gaussian_type": "Gaussian",
+                "salt_and_pepper_type": "Salt and Pepper",
+                "noise_color": "Colored Noise",
+                "size": "Noise Size"
+            },
+            "adjust_image": {
+                "label": "Adjust Image",
+                "description": "Adjusts the selected channel of an image.",
+                "channel": "Channel",
+                "value_setting": "Value",
+                "scale_values": "Scale Values",
+                "red": "Red (RGBA)",
+                "green": "Green (RGBA)",
+                "blue": "Blue (RGBA)",
+                "alpha": "Alpha (RGBA)",
+                "cyan": "Cyan (CMYK)",
+                "magenta": "Magenta (CMYK)",
+                "yellow": "Yellow (CMYK)",
+                "black": "Black (CMYK)",
+                "hue": "Hue (HSV)",
+                "saturation": "Saturation (HSV)",
+                "value": "Value (HSV)",
+                "luminosity": "Luminosity (LAB)",
+                "a": "A (LAB)",
+                "b": "B (LAB)",
+                "y": "Y (YCbCr)",
+                "cb": "Cb (YCbCr)",
+                "cr": "Cr (YCbCr)"
+            }
+        },
+        "transform": {
+            "transform": "Transform",
+            "fitToBbox": "Fit to Bbox",
+            "fitMode": "Fit Mode",
+            "fitModeContain": "Contain",
+            "fitModeCover": "Cover",
+            "fitModeFill": "Fill",
+            "reset": "Reset",
+            "apply": "Apply",
+            "cancel": "Cancel"
+        },
+        "selectObject": {
+            "selectObject": "Select Object",
+            "pointType": "Point Type",
+            "invertSelection": "Invert Selection",
+            "include": "Include",
+            "exclude": "Exclude",
+            "neutral": "Neutral",
+            "apply": "Apply",
+            "reset": "Reset",
+            "saveAs": "Save As",
+            "cancel": "Cancel",
+            "process": "Process",
+            "help1": "Select a single target object. Add <Bold>Include</Bold> and <Bold>Exclude</Bold> points to indicate which parts of the layer are part of the target object.",
+            "help2": "Start with one <Bold>Include</Bold> point within the target object. Add more points to refine the selection. Fewer points typically produce better results.",
+            "help3": "Invert the selection to select everything except the target object.",
+            "clickToAdd": "Click on the layer to add a point",
+            "dragToMove": "Drag a point to move it",
+            "clickToRemove": "Click on a point to remove it"
+        },
+        "settings": {
+            "snapToGrid": {
+                "label": "Snap to Grid",
+                "on": "On",
+                "off": "Off"
+            },
+            "preserveMask": {
+                "label": "Preserve Masked Region",
+                "alert": "Preserving Masked Region"
+            },
+            "isolatedStagingPreview": "Isolated Staging Preview",
+            "isolatedPreview": "Isolated Preview",
+            "isolatedLayerPreview": "Isolated Layer Preview",
+            "isolatedLayerPreviewDesc": "Whether to show only this layer when performing operations like filtering or transforming.",
+            "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
+            "pressureSensitivity": "Pressure Sensitivity"
+        },
+        "HUD": {
+            "bbox": "Bbox",
+            "scaledBbox": "Scaled Bbox",
+            "entityStatus": {
+                "isFiltering": "{{title}} is filtering",
+                "isTransforming": "{{title}} is transforming",
+                "isLocked": "{{title}} is locked",
+                "isHidden": "{{title}} is hidden",
+                "isDisabled": "{{title}} is disabled",
+                "isEmpty": "{{title}} is empty"
+            }
+        },
+        "canvasContextMenu": {
+            "canvasGroup": "Canvas",
+            "saveToGalleryGroup": "Save To Gallery",
+            "saveCanvasToGallery": "Save Canvas To Gallery",
+            "saveBboxToGallery": "Save Bbox To Gallery",
+            "bboxGroup": "Create From Bbox",
+            "newGlobalReferenceImage": "New Global Reference Image",
+            "newRegionalReferenceImage": "New Regional Reference Image",
+            "newControlLayer": "New Control Layer",
+            "newRasterLayer": "New Raster Layer",
+            "newInpaintMask": "New Inpaint Mask",
+            "newRegionalGuidance": "New Regional Guidance",
+            "cropCanvasToBbox": "Crop Canvas to Bbox",
+            "copyToClipboard": "Copy to Clipboard",
+            "copyCanvasToClipboard": "Copy Canvas to Clipboard",
+            "copyBboxToClipboard": "Copy Bbox to Clipboard"
+        },
+        "stagingArea": {
+            "accept": "Accept",
+            "discardAll": "Discard All",
+            "discard": "Discard",
+            "previous": "Previous",
+            "next": "Next",
+            "saveToGallery": "Save To Gallery",
+            "showResultsOn": "Showing Results",
+            "showResultsOff": "Hiding Results"
+        }
     },
     "upscaling": {
+        "upscale": "Upscale",
         "creativity": "Creativity",
         "exceedsMaxSize": "Upscale settings exceed max size limit",
         "exceedsMaxSizeDetails": "Max upscale limit is {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Please try a smaller image or decrease your scale selection.",
@@ -1689,7 +2195,9 @@
         "upscaleModelDesc": "Upscale (image to image) model",
         "missingUpscaleInitialImage": "Missing initial image for upscaling",
         "missingUpscaleModel": "Missing upscale model",
-        "missingTileControlNetModel": "No valid tile ControlNet models installed"
+        "missingTileControlNetModel": "No valid tile ControlNet models installed",
+        "incompatibleBaseModel": "Unsupported main model architecture for upscaling",
+        "incompatibleBaseModelDesc": "Upscaling is supported for SD1.5 and SDXL architecture models only. Change the main model to enable upscaling."
     },
     "stylePresets": {
         "active": "Active",
@@ -1723,10 +2231,10 @@
         "positivePrompt": "Positive Prompt",
         "preview": "Preview",
         "private": "Private",
+        "promptTemplateCleared": "Prompt Template Cleared",
         "searchByName": "Search by name",
         "shared": "Shared",
         "sharedTemplates": "Shared Templates",
-        "templateActions": "Template Actions",
         "templateDeleted": "Prompt template deleted",
         "toggleViewMode": "Toggle View Mode",
         "type": "Type",
@@ -1740,23 +2248,126 @@
     "upsell": {
         "inviteTeammates": "Invite Teammates",
         "professional": "Professional",
-        "professionalUpsell": "Available in Invoke’s Professional Edition. Click here or visit invoke.com/pricing for more details.",
+        "professionalUpsell": "Available in Invoke's Professional Edition. Click here or visit invoke.com/pricing for more details.",
         "shareAccess": "Share Access"
     },
     "ui": {
         "tabs": {
             "generation": "Generation",
-            "generationTab": "$t(ui.tabs.generation) $t(common.tab)",
             "canvas": "Canvas",
-            "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
             "workflows": "Workflows",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "models": "Models",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "queue": "Queue",
-            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
             "upscaling": "Upscaling",
-            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
+            "gallery": "Gallery"
+        }
+    },
+    "system": {
+        "enableLogging": "Enable Logging",
+        "logLevel": {
+            "logLevel": "Log Level",
+            "trace": "Trace",
+            "debug": "Debug",
+            "info": "Info",
+            "warn": "Warn",
+            "error": "Error",
+            "fatal": "Fatal"
+        },
+        "logNamespaces": {
+            "logNamespaces": "Log Namespaces",
+            "dnd": "Drag and Drop",
+            "gallery": "Gallery",
+            "models": "Models",
+            "config": "Config",
+            "canvas": "Canvas",
+            "generation": "Generation",
+            "workflows": "Workflows",
+            "system": "System",
+            "events": "Events",
+            "queue": "Queue",
+            "metadata": "Metadata"
+        }
+    },
+    "newUserExperience": {
+        "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio.",
+        "lowVRAMMode": "For best performance, follow our <LinkComponent>Low VRAM guide</LinkComponent>.",
+        "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>."
+    },
+    "whatsNew": {
+        "whatsNewInInvoke": "What's New in Invoke",
+        "items": [
+            "Workflow Editor: New drag-and-drop form builder for easier workflow creation.",
+            "Other improvements: Faster batch queuing, better upscaling, improved color picker, and metadata nodes."
+        ],
+        "readReleaseNotes": "Read Release Notes",
+        "watchRecentReleaseVideos": "Watch Recent Release Videos",
+        "watchUiUpdatesOverview": "Watch UI Updates Overview"
+    },
+    "supportVideos": {
+        "supportVideos": "Support Videos",
+        "gettingStarted": "Getting Started",
+        "controlCanvas": "Control Canvas",
+        "watch": "Watch",
+        "studioSessionsDesc1": "Check out the <StudioSessionsPlaylistLink /> for Invoke deep dives.",
+        "studioSessionsDesc2": "Join our <DiscordLink /> to participate in the live sessions and ask questions. Sessions are uploaded to the playlist the following week.",
+        "videos": {
+            "creatingYourFirstImage": {
+                "title": "Creating Your First Image",
+                "description": "Introduction to creating an image from scratch using Invoke's tools."
+            },
+            "usingControlLayersAndReferenceGuides": {
+                "title": "Using Control Layers and Reference Guides",
+                "description": "Learn how to guide your image creation with control layers and reference images."
+            },
+            "understandingImageToImageAndDenoising": {
+                "title": "Understanding Image-to-Image and Denoising",
+                "description": "Overview of image-to-image transformations and denoising in Invoke."
+            },
+            "exploringAIModelsAndConceptAdapters": {
+                "title": "Exploring AI Models and Concept Adapters",
+                "description": "Dive into AI models and how to use concept adapters for creative control."
+            },
+            "creatingAndComposingOnInvokesControlCanvas": {
+                "title": "Creating and Composing on Invoke's Control Canvas",
+                "description": "Learn to compose images using Invoke's control canvas."
+            },
+            "upscaling": {
+                "title": "Upscaling",
+                "description": "How to upscale images with Invoke's tools to enhance resolution."
+            },
+            "howDoIGenerateAndSaveToTheGallery": {
+                "title": "How Do I Generate and Save to the Gallery?",
+                "description": "Steps to generate and save images to the gallery."
+            },
+            "howDoIEditOnTheCanvas": {
+                "title": "How Do I Edit on the Canvas?",
+                "description": "Guide to editing images directly on the canvas."
+            },
+            "howDoIDoImageToImageTransformation": {
+                "title": "How Do I Do Image-to-Image Transformation?",
+                "description": "Tutorial on performing image-to-image transformations in Invoke."
+            },
+            "howDoIUseControlNetsAndControlLayers": {
+                "title": "How Do I Use Control Nets and Control Layers?",
+                "description": "Learn to apply control layers and controlnets to your images."
+            },
+            "howDoIUseGlobalIPAdaptersAndReferenceImages": {
+                "title": "How Do I Use Global IP Adapters and Reference Images?",
+                "description": "Introduction to adding reference images and global IP adapters."
+            },
+            "howDoIUseInpaintMasks": {
+                "title": "How Do I Use Inpaint Masks?",
+                "description": "How to apply inpaint masks for image correction and variation."
+            },
+            "howDoIOutpaint": {
+                "title": "How Do I Outpaint?",
+                "description": "Guide to outpainting beyond the original image borders."
+            }
         }
     }
 }

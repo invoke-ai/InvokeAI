@@ -1,18 +1,19 @@
+import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
-import type { JSONObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
   DeleteBoardResult,
   GraphAndWorkflowResponse,
-  ImageCategory,
   ImageDTO,
   ListImagesArgs,
   ListImagesResponse,
-  PostUploadAction,
+  UploadImageArg,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import type { Param0 } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
@@ -56,11 +57,17 @@ export const imagesApi = api.injectEndpoints({
         // Populate the getImageDTO cache with these images. This makes image selection smoother, because it doesn't
         // need to re-fetch image data when the user selects an image. The getImageDTO cache keeps data for the default
         // of 60s, so this data won't stick around too long.
-        queryFulfilled.then(({ data }) => {
-          for (const imageDTO of data.items) {
-            dispatch(imagesApi.util.upsertQueryData('getImageDTO', imageDTO.image_name, imageDTO));
-          }
-        });
+        const res = await queryFulfilled;
+        const imageDTOs = res.data.items;
+        const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
+        for (const imageDTO of imageDTOs) {
+          updates.push({
+            endpointName: 'getImageDTO',
+            arg: imageDTO.image_name,
+            value: imageDTO,
+          });
+        }
+        dispatch(imagesApi.util.upsertQueryEntries(updates));
       },
     }),
     getIntermediatesCount: build.query<number, void>({
@@ -75,7 +82,7 @@ export const imagesApi = api.injectEndpoints({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
     }),
-    getImageMetadata: build.query<JSONObject | undefined, string>({
+    getImageMetadata: build.query<JsonObject | undefined, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
     }),
@@ -162,7 +169,7 @@ export const imagesApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { imageDTO }) => {
         const categories = getCategories(imageDTO);
-        const boardId = imageDTO.board_id ?? undefined;
+        const boardId = imageDTO.board_id ?? 'none';
 
         return [
           { type: 'Image', id: imageDTO.image_name },
@@ -260,19 +267,7 @@ export const imagesApi = api.injectEndpoints({
         return [];
       },
     }),
-    uploadImage: build.mutation<
-      ImageDTO,
-      {
-        file: File;
-        image_category: ImageCategory;
-        is_intermediate: boolean;
-        postUploadAction?: PostUploadAction;
-        session_id?: string;
-        board_id?: string;
-        crop_visible?: boolean;
-        metadata?: JSONObject;
-      }
-    >({
+    uploadImage: build.mutation<ImageDTO, UploadImageArg>({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -549,6 +544,7 @@ export const imagesApi = api.injectEndpoints({
 export const {
   useGetIntermediatesCountQuery,
   useListImagesQuery,
+  useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
@@ -556,9 +552,6 @@ export const {
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
-  useAddImageToBoardMutation,
-  useRemoveImageFromBoardMutation,
-  useChangeImageIsIntermediateMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
   useStarImagesMutation,
@@ -566,25 +559,95 @@ export const {
   useBulkDownloadImagesMutation,
 } = imagesApi;
 
-export const useGetImageDTOQuery = (...args: Parameters<typeof imagesApi.useGetImageDTOQuery>) => {
-  return imagesApi.useGetImageDTOQuery(...args);
-};
-
 /**
  * Imperative RTKQ helper to fetch an ImageDTO.
  * @param image_name The name of the image to fetch
- * @param forceRefetch Whether to force a refetch of the image
- * @returns
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @returns The ImageDTO if found, otherwise null
  */
-export const getImageDTO = async (image_name: string, forceRefetch?: boolean): Promise<ImageDTO | null> => {
-  const options = {
+export const getImageDTOSafe = async (
+  image_name: string,
+  options?: Parameters<typeof imagesApi.endpoints.getImageDTO.initiate>[1]
+): Promise<ImageDTO | null> => {
+  const _options = {
     subscribe: false,
-    forceRefetch,
+    ...options,
   };
-  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, options));
+  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, _options));
   try {
     return await req.unwrap();
   } catch {
     return null;
   }
+};
+
+/**
+ * Imperative RTKQ helper to fetch an ImageDTO.
+ * @param image_name The name of the image to fetch
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @raises Error if the image is not found or there is an error fetching the image
+ */
+export const getImageDTO = (
+  image_name: string,
+  options?: Parameters<typeof imagesApi.endpoints.getImageDTO.initiate>[1]
+): Promise<ImageDTO> => {
+  const _options = {
+    subscribe: false,
+    ...options,
+  };
+  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, _options));
+  return req.unwrap();
+};
+
+/**
+ * Imperative RTKQ helper to fetch an image's metadata.
+ * @param image_name The name of the image
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @raises Error if the image metadata is not found or there is an error fetching the image metadata. Images without
+ * metadata will return undefined.
+ */
+export const getImageMetadata = (
+  image_name: string,
+  options?: Parameters<typeof imagesApi.endpoints.getImageMetadata.initiate>[1]
+): Promise<JsonObject | undefined> => {
+  const _options = {
+    subscribe: false,
+    ...options,
+  };
+  const req = getStore().dispatch(imagesApi.endpoints.getImageMetadata.initiate(image_name, _options));
+  return req.unwrap();
+};
+
+export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
+  const { dispatch } = getStore();
+  const req = dispatch(imagesApi.endpoints.uploadImage.initiate(arg, { track: false }));
+  return req.unwrap();
+};
+
+export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> => {
+  const { dispatch } = getStore();
+  const results = await Promise.allSettled(
+    args.map((arg) => {
+      const req = dispatch(imagesApi.endpoints.uploadImage.initiate(arg, { track: false }));
+      return req.unwrap();
+    })
+  );
+  return results.filter((r): r is PromiseFulfilledResult<ImageDTO> => r.status === 'fulfilled').map((r) => r.value);
+};
+
+/**
+ * Convert an ImageDTO to a File by downloading the image from the server.
+ * @param imageDTO The image to download and convert to a File
+ */
+export const imageDTOToFile = async (imageDTO: ImageDTO): Promise<File> => {
+  const init: RequestInit = {};
+  const authToken = $authToken.get();
+  if (authToken) {
+    init.headers = { Authorization: `Bearer ${authToken}` };
+  }
+  const res = await fetch(imageDTO.image_url, init);
+  const blob = await res.blob();
+  // Create a new file with the same name, which we will upload
+  const file = new File([blob], `copy_of_${imageDTO.image_name}`, { type: 'image/png' });
+  return file;
 };

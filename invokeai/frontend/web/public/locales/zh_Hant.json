@@ -12,7 +12,6 @@
         "githubLabel": "GitHub",
         "hotkeysLabel": "快捷鍵",
         "languagePickerLabel": "語言",
-        "unifiedCanvas": "統一畫布",
         "cancel": "取消",
         "txt2img": "文字轉圖片",
         "controlNet": "ControlNet",
@@ -40,7 +39,6 @@
         "nextImage": "下一張圖片",
         "previousImage": "上一張圖片",
         "menu": "選單",
-        "loadMore": "載入更多",
         "about": "關於",
         "createIssue": "建立問題",
         "resetUI": "$t(accessibility.reset) 介面",
@@ -60,7 +58,6 @@
         "model": "模型",
         "seed": "種子",
         "vae": "VAE",
-        "seamless": "無縫",
         "metadata": "元數據",
         "width": "寬度",
         "height": "高度"
@@ -76,15 +73,6 @@
             "title": "進階",
             "options": "$t(accordions.advanced.title) 選項"
         }
-    },
-    "hotkeys": {
-        "nodesHotkeys": "節點",
-        "cancel": {
-            "title": "取消"
-        },
-        "generalHotkeys": "一般",
-        "keyboardShortcuts": "快捷鍵",
-        "appHotkeys": "應用程式"
     },
     "modelManager": {
         "advanced": "進階",
@@ -109,23 +97,6 @@
         "search": "搜尋",
         "vae": "VAE",
         "settings": "設定"
-    },
-    "controlnet": {
-        "mlsd": "M-LSD",
-        "canny": "Canny",
-        "duplicate": "重複",
-        "none": "無",
-        "pidi": "PIDI",
-        "h": "H",
-        "balanced": "平衡",
-        "crop": "裁切",
-        "processor": "處理器",
-        "control": "控制",
-        "f": "F",
-        "lineart": "線條藝術",
-        "w": "W",
-        "hed": "HED",
-        "delete": "刪除"
     },
     "queue": {
         "queue": "佇列",
@@ -190,18 +161,6 @@
             "heading": "步數"
         }
     },
-    "unifiedCanvas": {
-        "undo": "復原",
-        "mask": "遮罩",
-        "eraser": "橡皮擦",
-        "antialiasing": "抗鋸齒",
-        "redo": "重做",
-        "layer": "圖層",
-        "accept": "接受",
-        "brush": "刷子",
-        "move": "移動",
-        "brushSize": "大小"
-    },
     "nodes": {
         "workflowName": "名稱",
         "notes": "註釋",
@@ -236,7 +195,6 @@
     "ui": {
         "tabs": {
             "models": "模型",
-            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
             "queue": "佇列"
         }
     },

@@ -1,6 +1,7 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { offsetChanged } from 'features/gallery/store/gallerySlice';
+import { offsetChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { throttle } from 'lodash-es';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
@@ -56,9 +57,13 @@ const getRange = (currentPage: number, totalPages: number, siblingCount: number)
   return fullRange as (number | 'ellipsis')[];
 };
 
+const selectOffset = createSelector(selectGallerySlice, (gallery) => gallery.offset);
+const selectLimit = createSelector(selectGallerySlice, (gallery) => gallery.limit);
+
 export const useGalleryPagination = () => {
   const dispatch = useAppDispatch();
-  const { offset, limit } = useAppSelector((s) => s.gallery);
+  const offset = useAppSelector(selectOffset);
+  const limit = useAppSelector(selectLimit);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
 
   const { count, total } = useListImagesQuery(queryArgs, {
@@ -110,19 +115,13 @@ export const useGalleryPagination = () => {
     },
     [throttledOnOffsetChanged, limit]
   );
-  const goToFirst = useCallback(() => {
-    throttledOnOffsetChanged({ offset: 0 });
-  }, [throttledOnOffsetChanged]);
-  const goToLast = useCallback(() => {
-    throttledOnOffsetChanged({ offset: (pages - 1) * (limit || 0) });
-  }, [throttledOnOffsetChanged, pages, limit]);
 
   // handle when total/pages decrease and user is on high page number (ie bulk removing or deleting)
   useEffect(() => {
     if (pages && currentPage + 1 > pages) {
-      goToLast();
+      throttledOnOffsetChanged({ offset: (pages - 1) * (limit || 0) });
     }
-  }, [currentPage, pages, goToLast]);
+  }, [currentPage, pages, throttledOnOffsetChanged, limit]);
 
   const pageButtons = useMemo(() => {
     if (pages > 7) {
@@ -130,35 +129,16 @@ export const useGalleryPagination = () => {
     }
     return range(1, pages);
   }, [currentPage, pages]);
-  const isFirstEnabled = useMemo(() => currentPage > 0, [currentPage]);
-  const isLastEnabled = useMemo(() => currentPage < pages - 1, [currentPage, pages]);
-
-  const rangeDisplay = useMemo(() => {
-    const startItem = currentPage * (limit || 0) + 1;
-    const endItem = Math.min((currentPage + 1) * (limit || 0), total);
-    return `${startItem}-${endItem} of ${total}`;
-  }, [total, currentPage, limit]);
-
-  const numberOnPage = useMemo(() => {
-    return Math.min((currentPage + 1) * (limit || 0), total);
-  }, [currentPage, limit, total]);
 
   return {
-    count,
-    total,
-    currentPage,
-    pages,
-    isNextEnabled,
-    isPrevEnabled,
-    goNext,
     goPrev,
-    goToPage,
-    goToFirst,
-    goToLast,
+    goNext,
+    isPrevEnabled,
+    isNextEnabled,
     pageButtons,
-    isFirstEnabled,
-    isLastEnabled,
-    rangeDisplay,
-    numberOnPage,
+    goToPage,
+    currentPage,
+    total,
+    pages,
   };
 };

@@ -3,7 +3,11 @@ import threading
 from typing import Optional, cast
 
 from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
-from invokeai.app.services.image_records.image_records_common import ImageRecord, deserialize_image_record
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecord,
+    deserialize_image_record,
+)
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
@@ -97,17 +101,54 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             self._lock.release()
         return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
 
-    def get_all_board_image_names_for_board(self, board_id: str) -> list[str]:
+    def get_all_board_image_names_for_board(
+        self,
+        board_id: str,
+        categories: list[ImageCategory] | None,
+        is_intermediate: bool | None,
+    ) -> list[str]:
         try:
             self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                SELECT image_name
-                FROM board_images
-                WHERE board_id = ?;
-                """,
-                (board_id,),
-            )
+
+            params: list[str | bool] = []
+
+            # Base query is a join between images and board_images
+            stmt = """
+                SELECT images.image_name
+                FROM images
+                LEFT JOIN board_images ON board_images.image_name = images.image_name
+                WHERE 1=1
+                AND board_images.board_id = ?
+                """
+            params.append(board_id)
+
+            # Add the category filter
+            if categories is not None:
+                # Convert the enum values to unique list of strings
+                category_strings = [c.value for c in set(categories)]
+                # Create the correct length of placeholders
+                placeholders = ",".join("?" * len(category_strings))
+                stmt += f"""--sql
+                AND images.image_category IN ( {placeholders} )
+                """
+
+                # Unpack the included categories into the query params
+                for c in category_strings:
+                    params.append(c)
+
+            # Add the is_intermediate filter
+            if is_intermediate is not None:
+                stmt += """--sql
+                AND images.is_intermediate = ?
+                """
+                params.append(is_intermediate)
+
+            # Put a ring on it
+            stmt += ";"
+
+            # Execute the query
+            self._cursor.execute(stmt, params)
+
             result = cast(list[sqlite3.Row], self._cursor.fetchall())
             image_names = [r[0] for r in result]
             return image_names
@@ -146,7 +187,11 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT COUNT(*) FROM board_images WHERE board_id = ?;
+                SELECT COUNT(*)
+                FROM board_images
+                INNER JOIN images ON board_images.image_name = images.image_name
+                WHERE images.is_intermediate = FALSE
+                AND board_images.board_id = ?;
                 """,
                 (board_id,),
             )

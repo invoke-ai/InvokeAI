@@ -27,7 +27,7 @@ export const galleryImageClicked = createAction<{
 export const addGalleryImageClickedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: galleryImageClicked,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const { imageDTO, shiftKey, ctrlKey, metaKey, altKey } = action.payload;
       const state = getState();
       const queryArgs = selectListImagesQueryArgs(state);

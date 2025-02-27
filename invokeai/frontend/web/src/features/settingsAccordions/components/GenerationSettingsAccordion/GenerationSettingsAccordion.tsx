@@ -3,19 +3,22 @@ import { Box, Expander, Flex, FormControlGroup, StandaloneAccordion } from '@inv
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
+import { selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
-import { selectLoraSlice } from 'features/lora/store/loraSlice';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
+import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
+import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { filter } from 'lodash-es';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
@@ -27,11 +30,16 @@ const formLabelProps: FormLabelProps = {
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const activeTabName = useAppSelector(selectActiveTab);
+  const isFLUX = useAppSelector(selectIsFLUX);
+  const isSD3 = useAppSelector(selectIsSD3);
+  const isUpscaling = useMemo(() => {
+    return activeTabName === 'upscaling';
+  }, [activeTabName]);
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector(selectLoraSlice, (lora) => {
-        const enabledLoRAsCount = filter(lora.loras, (l) => !!l.isEnabled).length;
+      createMemoizedSelector(selectLoRAsSlice, (loras) => {
+        const enabledLoRAsCount = loras.loras.filter((l) => l.isEnabled).length;
         const loraTabBadges = enabledLoRAsCount ? [`${enabledLoRAsCount} ${t('models.concepts')}`] : EMPTY_ARRAY;
         const accordionBadges = modelConfig ? [modelConfig.name, modelConfig.base] : EMPTY_ARRAY;
         return { loraTabBadges, accordionBadges };
@@ -72,9 +80,12 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamScheduler />
+              {!isFLUX && !isSD3 && !isUpscaling && <ParamScheduler />}
+              {isUpscaling && <ParamUpscaleScheduler />}
               <ParamSteps />
-              <ParamCFGScale />
+              {isFLUX && <ParamGuidance />}
+              {isUpscaling && <ParamUpscaleCFGScale />}
+              {!isFLUX && !isUpscaling && <ParamCFGScale />}
             </FormControlGroup>
           </Flex>
         </Expander>

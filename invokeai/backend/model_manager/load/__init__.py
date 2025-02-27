@@ -8,7 +8,7 @@ from pathlib import Path
 
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig, ModelLoaderBase
 from invokeai.backend.model_manager.load.load_default import ModelLoader
-from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry, ModelLoaderRegistryBase
 
 # This registers the subclasses that implement loaders of specific model types

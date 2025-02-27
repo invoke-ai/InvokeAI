@@ -9,17 +9,18 @@ from typing import Optional
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
-from transformers import CLIPTokenizer
+from transformers import CLIPTokenizer, T5Tokenizer, T5TokenizerFast
 
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
 def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
@@ -42,7 +43,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         (
             TextualInversionModelRaw,
             IPAdapter,
-            LoRAModelRaw,
+            ModelPatchRaw,
             SpandrelImageToImageModel,
             GroundingDinoPipeline,
             SegmentAnythingPipeline,
@@ -50,6 +51,17 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         ),
     ):
         return model.calc_size()
+    elif isinstance(
+        model,
+        (
+            T5TokenizerFast,
+            T5Tokenizer,
+        ),
+    ):
+        # HACK(ryand): len(model) just returns the vocabulary size, so this is blatantly wrong. It should be small
+        # relative to the text encoder that it's used with, so shouldn't matter too much, but we should fix this at some
+        # point.
+        return len(model)
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
         # supported model types.
@@ -72,10 +84,9 @@ def _calc_pipeline_by_data(pipeline: DiffusionPipeline) -> int:
 
 def calc_module_size(model: torch.nn.Module) -> int:
     """Calculate the size (in bytes) of a torch.nn.Module."""
-    mem_params = sum([param.nelement() * param.element_size() for param in model.parameters()])
-    mem_bufs = sum([buf.nelement() * buf.element_size() for buf in model.buffers()])
-    mem: int = mem_params + mem_bufs  # in bytes
-    return mem
+    mem_params = sum([calc_tensor_size(param) for param in model.parameters()])
+    mem_bufs = sum([calc_tensor_size(buf) for buf in model.buffers()])
+    return mem_params + mem_bufs
 
 
 def _calc_onnx_model_by_data(model: IAIOnnxRuntimeModel) -> int:

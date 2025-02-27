@@ -1,3 +1,4 @@
-import type { RootState } from 'app/store/store';
+import { createSelector } from '@reduxjs/toolkit';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 
-export const configSelector = (state: RootState) => state.config;
+export const selectAllowPrivateBoards = createSelector(selectConfigSlice, (config) => config.allowPrivateBoards);

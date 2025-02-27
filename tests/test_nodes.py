@@ -9,6 +9,8 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.image import ImageField
 from invokeai.app.services.events.events_common import EventBase
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
@@ -131,6 +133,16 @@ class TestEventService(EventServiceBase):
 
     def dispatch(self, event: EventBase) -> None:
         self.events.append(event)
+        pass
+
+    def emit_invocation_progress(
+        self,
+        queue_item: "SessionQueueItem",
+        invocation: "BaseInvocation",
+        message: str,
+        percentage: float | None = None,
+        image: "ProgressImage | None" = None,
+    ) -> None:
         pass
 
 

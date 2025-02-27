@@ -1,8 +1,9 @@
-import { Box } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { hexToRGBA, rgbaToHex } from 'common/util/colorCodeTransformers';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { fieldColorValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { ColorFieldInputInstance, ColorFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import type { RgbaColor } from 'react-colorful';
@@ -49,7 +50,7 @@ const ColorFieldInputComponent = (props: FieldComponentProps<ColorFieldInputInst
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Flex flexDir="column" gap={2} w="full">
       <HexColorInput
         style={{
           background: colorTokenToCssVar('base.700'),
@@ -60,14 +61,19 @@ const ColorFieldInputComponent = (props: FieldComponentProps<ColorFieldInputInst
           paddingBlock: 4,
           outline: 'none',
         }}
-        className="nodrag"
+        className={NO_DRAG_CLASS}
         color={rgbaToHex(color, true)}
         onChange={handleValueChanged}
         prefixed
         alpha
       />
-      <RgbaColorPicker className="nodrag" color={color} onChange={handleValueChanged} style={{ width: '100%' }} />
-    </Box>
+      <RgbaColorPicker
+        className={NO_DRAG_CLASS}
+        color={color}
+        onChange={handleValueChanged}
+        style={{ width: '100%' }}
+      />
+    </Flex>
   );
 };
 

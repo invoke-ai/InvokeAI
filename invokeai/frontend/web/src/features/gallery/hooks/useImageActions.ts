@@ -1,19 +1,39 @@
-import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector } from 'app/store/storeHooks';
-import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'features/metadata/util/handlers';
+import { useStore } from '@nanostores/react';
+import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import {
+  handlers,
+  parseAndRecallAllMetadata,
+  parseAndRecallImageDimensions,
+  parseAndRecallPrompts,
+} from 'features/metadata/util/handlers';
+import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import {
+  activeStylePresetIdChanged,
+  selectStylePresetActivePresetId,
+} from 'features/stylePresets/store/stylePresetSlice';
+import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { useCallback, useEffect, useState } from 'react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import type { ImageDTO } from 'services/api/types';
 
-export const useImageActions = (image_name?: string) => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
-  const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(image_name);
+export const useImageActions = (imageDTO: ImageDTO) => {
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+  const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+  const isStaging = useAppSelector(selectIsStaging);
+  const activeTabName = useAppSelector(selectActiveTab);
+  const { metadata } = useDebouncedMetadata(imageDTO.image_name);
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
   const [hasPrompts, setHasPrompts] = useState(false);
-  const { data: imageDTO } = useGetImageDTOQuery(image_name ?? skipToken);
+  const hasTemplates = useStore($hasTemplates);
 
   useEffect(() => {
     const parseMetadata = async () => {
@@ -26,11 +46,12 @@ export const useImageActions = (image_name?: string) => {
           setHasSeed(false);
         }
 
+        // Need to catch all of these to avoid unhandled promise rejections bubbling up to instrumented error handlers
         const promptParseResults = await Promise.allSettled([
-          handlers.positivePrompt.parse(metadata),
-          handlers.negativePrompt.parse(metadata),
-          handlers.sdxlPositiveStylePrompt.parse(metadata),
-          handlers.sdxlNegativeStylePrompt.parse(metadata),
+          handlers.positivePrompt.parse(metadata).catch(() => {}),
+          handlers.negativePrompt.parse(metadata).catch(() => {}),
+          handlers.sdxlPositiveStylePrompt.parse(metadata).catch(() => {}),
+          handlers.sdxlNegativeStylePrompt.parse(metadata).catch(() => {}),
         ]);
         if (promptParseResults.some((result) => result.status === 'fulfilled')) {
           setHasPrompts(true);
@@ -46,53 +67,123 @@ export const useImageActions = (image_name?: string) => {
     parseMetadata();
   }, [metadata]);
 
+  const clearStylePreset = useCallback(() => {
+    if (activeStylePresetId) {
+      dispatch(activeStylePresetIdChanged(null));
+      toast({
+        status: 'info',
+        title: t('stylePresets.promptTemplateCleared'),
+      });
+    }
+  }, [dispatch, activeStylePresetId, t]);
+
   const recallAll = useCallback(() => {
-    parseAndRecallAllMetadata(metadata, activeTabName === 'generation');
-  }, [activeTabName, metadata]);
+    if (!metadata) {
+      return;
+    }
+    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', isStaging ? ['width', 'height'] : []);
+    clearStylePreset();
+  }, [metadata, activeTabName, isStaging, clearStylePreset]);
 
   const remix = useCallback(() => {
+    if (!metadata) {
+      return;
+    }
     // Recalls all metadata parameters except seed
-    parseAndRecallAllMetadata(metadata, activeTabName === 'generation', ['seed']);
-  }, [activeTabName, metadata]);
+    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', ['seed']);
+    clearStylePreset();
+  }, [activeTabName, metadata, clearStylePreset]);
 
   const recallSeed = useCallback(() => {
-    handlers.seed.parse(metadata).then((seed) => {
-      handlers.seed.recall && handlers.seed.recall(seed, true);
-    });
+    if (!metadata) {
+      return;
+    }
+    handlers.seed
+      .parse(metadata)
+      .then((seed) => {
+        handlers.seed.recall?.(seed, true);
+      })
+      .catch(() => {
+        // no-op, the toast will show the error
+      });
   }, [metadata]);
 
   const recallPrompts = useCallback(() => {
+    if (!metadata) {
+      return;
+    }
     parseAndRecallPrompts(metadata);
-  }, [metadata]);
+    clearStylePreset();
+  }, [metadata, clearStylePreset]);
 
   const createAsPreset = useCallback(async () => {
-    if (image_name && metadata && imageDTO) {
-      const positivePrompt = await handlers.positivePrompt.parse(metadata);
-      const negativePrompt = await handlers.negativePrompt.parse(metadata);
-
-      $stylePresetModalState.set({
-        prefilledFormData: {
-          name: '',
-          positivePrompt,
-          negativePrompt,
-          imageUrl: imageDTO.image_url,
-          type: 'user',
-        },
-        updatingStylePresetId: null,
-        isModalOpen: true,
-      });
+    if (!metadata) {
+      return;
     }
-  }, [image_name, metadata, imageDTO]);
+    let positivePrompt;
+    let negativePrompt;
+
+    try {
+      positivePrompt = await handlers.positivePrompt.parse(metadata);
+    } catch (error) {
+      positivePrompt = '';
+    }
+    try {
+      negativePrompt = await handlers.negativePrompt.parse(metadata);
+    } catch (error) {
+      negativePrompt = '';
+    }
+
+    $stylePresetModalState.set({
+      prefilledFormData: {
+        name: '',
+        positivePrompt,
+        negativePrompt,
+        imageUrl: imageDTO.image_url,
+        type: 'user',
+      },
+      updatingStylePresetId: null,
+      isModalOpen: true,
+    });
+  }, [metadata, imageDTO]);
+
+  const [getAndLoadEmbeddedWorkflow] = useGetAndLoadEmbeddedWorkflow();
+
+  const loadWorkflow = useCallback(() => {
+    if (!imageDTO.has_workflow || !hasTemplates) {
+      return;
+    }
+    getAndLoadEmbeddedWorkflow(imageDTO.image_name);
+  }, [getAndLoadEmbeddedWorkflow, hasTemplates, imageDTO.has_workflow, imageDTO.image_name]);
+
+  const recallSize = useCallback(() => {
+    if (isStaging) {
+      return;
+    }
+    parseAndRecallImageDimensions(imageDTO);
+  }, [imageDTO, isStaging]);
+
+  const upscale = useCallback(() => {
+    dispatch(adHocPostProcessingRequested({ imageDTO }));
+  }, [dispatch, imageDTO]);
+
+  const _delete = useCallback(() => {
+    dispatch(imagesToDeleteSelected([imageDTO]));
+  }, [dispatch, imageDTO]);
 
   return {
+    hasMetadata,
+    hasSeed,
+    hasPrompts,
     recallAll,
     remix,
     recallSeed,
     recallPrompts,
-    hasMetadata,
-    hasSeed,
-    hasPrompts,
-    isLoadingMetadata,
     createAsPreset,
+    loadWorkflow,
+    hasWorkflow: imageDTO.has_workflow,
+    recallSize,
+    upscale,
+    delete: _delete,
   };
 };

@@ -1,10 +1,12 @@
 import { useAltModifier } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { GALLERY_GRID_CLASS_NAME } from 'features/gallery/components/ImageGrid/constants';
-import { GALLERY_IMAGE_CLASS_NAME } from 'features/gallery/components/ImageGrid/GalleryImage';
+import { GALLERY_IMAGE_CONTAINER_CLASS_NAME } from 'features/gallery/components/ImageGrid/GalleryImage';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
+import { selectImageToCompare, selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { getIsVisible } from 'features/gallery/util/getIsVisible';
 import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
@@ -27,12 +29,41 @@ import type { ImageDTO } from 'services/api/types';
  * Gets the number of images per row in the gallery by grabbing their DOM elements.
  */
 const getImagesPerRow = (): number => {
-  const widthOfGalleryImage =
-    document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`)?.getBoundingClientRect().width ?? 1;
+  const imageEl = document.querySelector(`.${GALLERY_IMAGE_CONTAINER_CLASS_NAME}`);
+  const gridEl = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`);
 
-  const widthOfGalleryGrid = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`)?.getBoundingClientRect().width ?? 0;
+  if (!imageEl || !gridEl) {
+    return 0;
+  }
+  const container = gridEl.parentElement;
+  if (!container) {
+    return 0;
+  }
 
-  const imagesPerRow = Math.round(widthOfGalleryGrid / widthOfGalleryImage);
+  const imageRect = imageEl.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  // We need to account for the gap between images
+  const gridElStyle = window.getComputedStyle(gridEl);
+  const gap = parseFloat(gridElStyle.gap);
+
+  if (!imageRect.width || !imageRect.height || !containerRect.width || !containerRect.height) {
+    // Gallery is too small to fit images or not rendered yet
+    return 0;
+  }
+
+  let imagesPerRow = 0;
+  let spaceUsed = 0;
+
+  // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
+  // this, without the possibility of accidentally adding an extra column.
+  while (spaceUsed + imageRect.width <= containerRect.width + 1) {
+    imagesPerRow++; // Increment the number of images
+    spaceUsed += imageRect.width; // Add image size to the used space
+    if (spaceUsed + gap <= containerRect.width) {
+      spaceUsed += gap; // Add gap size to the used space after each image except after the last image
+    }
+  }
 
   return imagesPerRow;
 };
@@ -121,20 +152,24 @@ type UseGalleryNavigationReturn = {
 /**
  * Provides access to the gallery navigation via arrow keys.
  * Also provides information about the current image's position in the gallery,
- * useful for determining whether to load more images or display navigatin
+ * useful for determining whether to load more images or display navigation
  * buttons.
  */
 export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
   const dispatch = useAppDispatch();
   const alt = useAltModifier();
-  const lastSelectedImage = useAppSelector((s) => {
-    const lastSelected = s.gallery.selection.slice(-1)[0] ?? null;
-    if (alt) {
-      return s.gallery.imageToCompare ?? lastSelected;
-    } else {
-      return lastSelected;
-    }
-  });
+  const selectImage = useMemo(
+    () =>
+      createSelector(selectLastSelectedImage, selectImageToCompare, (lastSelectedImage, imageToCompare) => {
+        if (alt) {
+          return imageToCompare ?? lastSelectedImage;
+        } else {
+          return lastSelectedImage;
+        }
+      }),
+    [alt]
+  );
+  const lastSelectedImage = useAppSelector(selectImage);
   const { imageDTOs } = useGalleryImages();
   const loadedImagesCount = useMemo(() => imageDTOs.length, [imageDTOs.length]);
 

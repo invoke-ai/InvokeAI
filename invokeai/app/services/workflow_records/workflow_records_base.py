@@ -39,11 +39,11 @@ class WorkflowRecordsStorageBase(ABC):
     @abstractmethod
     def get_many(
         self,
-        page: int,
-        per_page: int,
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
         category: WorkflowCategory,
+        page: int,
+        per_page: Optional[int],
         query: Optional[str],
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""

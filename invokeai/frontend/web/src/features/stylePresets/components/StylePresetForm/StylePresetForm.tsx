@@ -2,6 +2,7 @@ import { Box, Button, Flex, FormControl, FormLabel, Input, Spacer, Text } from '
 import { useAppSelector } from 'app/store/storeHooks';
 import { PRESET_PLACEHOLDER } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
+import { selectAllowPrivateStylePresets } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import type { PropsWithChildren } from 'react';
 import { useCallback } from 'react';
@@ -30,10 +31,10 @@ export const StylePresetForm = ({
   updatingStylePresetId: string | null;
   formData: StylePresetFormData | null;
 }) => {
-  const [createStylePreset] = useCreateStylePresetMutation();
-  const [updateStylePreset] = useUpdateStylePresetMutation();
+  const [createStylePreset, { isLoading: isCreating }] = useCreateStylePresetMutation();
+  const [updateStylePreset, { isLoading: isUpdating }] = useUpdateStylePresetMutation();
   const { t } = useTranslation();
-  const allowPrivateStylePresets = useAppSelector((s) => s.config.allowPrivateStylePresets);
+  const allowPrivateStylePresets = useAppSelector(selectAllowPrivateStylePresets);
 
   const { handleSubmit, control, register, formState } = useForm<StylePresetFormData>({
     defaultValues: formData || {
@@ -109,7 +110,11 @@ export const StylePresetForm = ({
 
       <Flex justifyContent="space-between" alignItems="flex-end" gap={10}>
         {allowPrivateStylePresets ? <StylePresetTypeField control={control} name="type" /> : <Spacer />}
-        <Button onClick={handleSubmit(handleClickSave)} isDisabled={!formState.isValid}>
+        <Button
+          onClick={handleSubmit(handleClickSave)}
+          isDisabled={!formState.isValid}
+          isLoading={isCreating || isUpdating}
+        >
           {t('common.save')}
         </Button>
       </Flex>

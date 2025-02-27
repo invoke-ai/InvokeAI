@@ -26,13 +26,10 @@ from invokeai.app.services.style_preset_records.style_preset_records_common impo
 )
 
 
-class StylePresetUpdateFormData(BaseModel):
+class StylePresetFormData(BaseModel):
     name: str = Field(description="Preset name")
     positive_prompt: str = Field(description="Positive prompt")
     negative_prompt: str = Field(description="Negative prompt")
-
-
-class StylePresetCreateFormData(StylePresetUpdateFormData):
     type: PresetType = Field(description="Preset type")
 
 
@@ -95,9 +92,10 @@ async def update_style_preset(
 
     try:
         parsed_data = json.loads(data)
-        validated_data = StylePresetUpdateFormData(**parsed_data)
+        validated_data = StylePresetFormData(**parsed_data)
 
         name = validated_data.name
+        type = validated_data.type
         positive_prompt = validated_data.positive_prompt
         negative_prompt = validated_data.negative_prompt
 
@@ -105,7 +103,7 @@ async def update_style_preset(
         raise HTTPException(status_code=400, detail="Invalid preset data")
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
-    changes = StylePresetChanges(name=name, preset_data=preset_data)
+    changes = StylePresetChanges(name=name, preset_data=preset_data, type=type)
 
     style_preset_image = ApiDependencies.invoker.services.style_preset_image_files.get_url(style_preset_id)
     style_preset = ApiDependencies.invoker.services.style_preset_records.update(
@@ -145,7 +143,7 @@ async def create_style_preset(
 
     try:
         parsed_data = json.loads(data)
-        validated_data = StylePresetCreateFormData(**parsed_data)
+        validated_data = StylePresetFormData(**parsed_data)
 
         name = validated_data.name
         type = validated_data.type

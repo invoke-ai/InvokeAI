@@ -6,9 +6,14 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    Classification,
+    invocation,
+)
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
+    BoundingBoxField,
     ColorField,
     FieldDescriptions,
     ImageField,
@@ -19,6 +24,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.misc import SEED_MAX
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
@@ -157,12 +163,12 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     crop: bool = InputField(default=False, description="Crop to base image dimensions")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        base_image = context.images.get_pil(self.base_image.image_name)
-        image = context.images.get_pil(self.image.image_name)
+        base_image = context.images.get_pil(self.base_image.image_name, mode="RGBA")
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
         mask = None
         if self.mask is not None:
-            mask = context.images.get_pil(self.mask.image_name)
-            mask = ImageOps.invert(mask.convert("L"))
+            mask = context.images.get_pil(self.mask.image_name, mode="L")
+            mask = ImageOps.invert(mask)
         # TODO: probably shouldn't invert mask here... should user be required to do it?
 
         min_x = min(0, self.x)
@@ -172,7 +178,11 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         new_image = Image.new(mode="RGBA", size=(max_x - min_x, max_y - min_y), color=(0, 0, 0, 0))
         new_image.paste(base_image, (abs(min_x), abs(min_y)))
-        new_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+
+        # Create a temporary image to paste the image with transparency
+        temp_image = Image.new("RGBA", new_image.size)
+        temp_image.paste(image, (max(0, self.x), max(0, self.y)), mask=mask)
+        new_image = Image.alpha_composite(new_image, temp_image)
 
         if self.crop:
             base_w, base_h = base_image.size
@@ -297,14 +307,44 @@ class ImageBlurInvocation(BaseInvocation, WithMetadata, WithBoard):
     blur_type: Literal["gaussian", "box"] = InputField(default="gaussian", description="The type of blur")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
 
+        # Split the image into RGBA channels
+        r, g, b, a = image.split()
+
+        # Premultiply RGB channels by alpha
+        premultiplied_image = ImageChops.multiply(image, a.convert("RGBA"))
+        premultiplied_image.putalpha(a)
+
+        # Apply the blur
         blur = (
             ImageFilter.GaussianBlur(self.radius) if self.blur_type == "gaussian" else ImageFilter.BoxBlur(self.radius)
         )
-        blur_image = image.filter(blur)
+        blurred_image = premultiplied_image.filter(blur)
 
-        image_dto = context.images.save(image=blur_image)
+        # Split the blurred image into RGBA channels
+        r, g, b, a_orig = blurred_image.split()
+
+        # Convert to float using NumPy. float 32/64 division are much faster than float 16
+        r = numpy.array(r, dtype=numpy.float32)
+        g = numpy.array(g, dtype=numpy.float32)
+        b = numpy.array(b, dtype=numpy.float32)
+        a = numpy.array(a_orig, dtype=numpy.float32) / 255.0  # Normalize alpha to [0, 1]
+
+        # Unpremultiply RGB channels by alpha
+        r /= a + 1e-6  # Add a small epsilon to avoid division by zero
+        g /= a + 1e-6
+        b /= a + 1e-6
+
+        # Convert back to PIL images
+        r = Image.fromarray(numpy.uint8(numpy.clip(r, 0, 255)))
+        g = Image.fromarray(numpy.uint8(numpy.clip(g, 0, 255)))
+        b = Image.fromarray(numpy.uint8(numpy.clip(b, 0, 255)))
+
+        # Merge back into a single image
+        result_image = Image.merge("RGBA", (r, g, b, a_orig))
+
+        image_dto = context.images.save(image=result_image)
 
         return ImageOutput.build(image_dto)
 
@@ -803,7 +843,7 @@ CHANNEL_FORMATS = {
         "value",
     ],
     category="image",
-    version="1.2.2",
+    version="1.2.3",
 )
 class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Add or subtract a value from a specific color channel of an image."""
@@ -813,24 +853,32 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
     offset: int = InputField(default=0, ge=-255, le=255, description="The amount to adjust the channel by")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        pil_image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name, "RGBA")
 
         # extract the channel and mode from the input and reference tuple
         mode = CHANNEL_FORMATS[self.channel][0]
         channel_number = CHANNEL_FORMATS[self.channel][1]
 
         # Convert PIL image to new format
-        converted_image = numpy.array(pil_image.convert(mode)).astype(int)
+        converted_image = numpy.array(image.convert(mode)).astype(int)
         image_channel = converted_image[:, :, channel_number]
 
-        # Adjust the value, clipping to 0..255
-        image_channel = numpy.clip(image_channel + self.offset, 0, 255)
+        if self.channel == "Hue (HSV)":
+            # loop around the values because hue is special
+            image_channel = (image_channel + self.offset) % 256
+        else:
+            # Adjust the value, clipping to 0..255
+            image_channel = numpy.clip(image_channel + self.offset, 0, 255)
 
         # Put the channel back into the image
         converted_image[:, :, channel_number] = image_channel
 
         # Convert back to RGBA format and output
         pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
+
+        # restore the alpha channel
+        if self.channel != "Alpha (RGBA)":
+            pil_image.putalpha(image.getchannel("A"))
 
         image_dto = context.images.save(image=pil_image)
 
@@ -859,7 +907,7 @@ class ImageChannelOffsetInvocation(BaseInvocation, WithMetadata, WithBoard):
         "value",
     ],
     category="image",
-    version="1.2.2",
+    version="1.2.3",
 )
 class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Scale a specific color channel of an image."""
@@ -870,14 +918,14 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     invert_channel: bool = InputField(default=False, description="Invert the channel after scaling")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        pil_image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name, "RGBA")
 
         # extract the channel and mode from the input and reference tuple
         mode = CHANNEL_FORMATS[self.channel][0]
         channel_number = CHANNEL_FORMATS[self.channel][1]
 
         # Convert PIL image to new format
-        converted_image = numpy.array(pil_image.convert(mode)).astype(float)
+        converted_image = numpy.array(image.convert(mode)).astype(float)
         image_channel = converted_image[:, :, channel_number]
 
         # Adjust the value, clipping to 0..255
@@ -892,6 +940,10 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Convert back to RGBA format and output
         pil_image = Image.fromarray(converted_image.astype(numpy.uint8), mode=mode).convert("RGBA")
+
+        # restore the alpha channel
+        if self.channel != "Alpha (RGBA)":
+            pil_image.putalpha(image.getchannel("A"))
 
         image_dto = context.images.save(image=pil_image)
 
@@ -958,10 +1010,10 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 @invocation(
     "mask_from_id",
-    title="Mask from ID",
+    title="Mask from Segmented Image",
     tags=["image", "mask", "id"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
 )
 class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generate a mask for a particular color in an ID Map"""
@@ -971,39 +1023,187 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     threshold: int = InputField(default=100, description="Threshold for color detection")
     invert: bool = InputField(default=False, description="Whether or not to invert the mask")
 
-    def rgba_to_hex(self, rgba_color: tuple[int, int, int, int]):
-        r, g, b, a = rgba_color
-        hex_code = "#{:02X}{:02X}{:02X}{:02X}".format(r, g, b, int(a * 255))
-        return hex_code
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
 
-    def id_to_mask(self, id_mask: Image.Image, color: tuple[int, int, int, int], threshold: int = 100):
-        if id_mask.mode != "RGB":
-            id_mask = id_mask.convert("RGB")
-
-        # Can directly just use the tuple but I'll leave this rgba_to_hex here
-        # incase anyone prefers using hex codes directly instead of the color picker
-        hex_color_str = self.rgba_to_hex(color)
-        rgb_color = numpy.array([int(hex_color_str[i : i + 2], 16) for i in (1, 3, 5)])
+        np_color = numpy.array(self.color.tuple())
 
         # Maybe there's a faster way to calculate this distance but I can't think of any right now.
-        color_distance = numpy.linalg.norm(id_mask - rgb_color, axis=-1)
+        color_distance = numpy.linalg.norm(image - np_color, axis=-1)
 
         # Create a mask based on the threshold and the distance calculated above
-        binary_mask = (color_distance < threshold).astype(numpy.uint8) * 255
+        binary_mask = (color_distance < self.threshold).astype(numpy.uint8) * 255
 
         # Convert the mask back to PIL
         binary_mask_pil = Image.fromarray(binary_mask)
 
-        return binary_mask_pil
+        if self.invert:
+            binary_mask_pil = ImageOps.invert(binary_mask_pil)
+
+        image_dto = context.images.save(image=binary_mask_pil, image_category=ImageCategory.MASK)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "canvas_v2_mask_and_crop",
+    title="Canvas V2 Mask and Crop",
+    tags=["image", "mask", "id"],
+    category="image",
+    version="1.0.0",
+    classification=Classification.Internal,
+)
+class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Handles Canvas V2 image output masking and cropping"""
+
+    source_image: ImageField | None = InputField(
+        default=None,
+        description="The source image onto which the masked generated image is pasted. If omitted, the masked generated image is returned with transparency.",
+    )
+    generated_image: ImageField = InputField(description="The image to apply the mask to")
+    mask: ImageField = InputField(description="The mask to apply")
+    mask_blur: int = InputField(default=0, ge=0, description="The amount to blur the mask by")
+
+    def _prepare_mask(self, mask: Image.Image) -> Image.Image:
+        mask_array = numpy.array(mask)
+        kernel = numpy.ones((self.mask_blur, self.mask_blur), numpy.uint8)
+        dilated_mask_array = cv2.erode(mask_array, kernel, iterations=3)
+        dilated_mask = Image.fromarray(dilated_mask_array)
+        if self.mask_blur > 0:
+            mask = dilated_mask.filter(ImageFilter.GaussianBlur(self.mask_blur))
+        return ImageOps.invert(mask.convert("L"))
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
+
+        if self.source_image:
+            generated_image = context.images.get_pil(self.generated_image.image_name)
+            source_image = context.images.get_pil(self.source_image.image_name)
+            source_image.paste(generated_image, (0, 0), mask)
+            image_dto = context.images.save(image=source_image)
+        else:
+            generated_image = context.images.get_pil(self.generated_image.image_name)
+            generated_image.putalpha(mask)
+            image_dto = context.images.save(image=generated_image)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "img_noise",
+    title="Add Image Noise",
+    tags=["image", "noise"],
+    category="image",
+    version="1.0.1",
+)
+class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Add noise to an image"""
+
+    image: ImageField = InputField(description="The image to add noise to")
+    seed: int = InputField(
+        default=0,
+        ge=0,
+        le=SEED_MAX,
+        description=FieldDescriptions.seed,
+    )
+    noise_type: Literal["gaussian", "salt_and_pepper"] = InputField(
+        default="gaussian",
+        description="The type of noise to add",
+    )
+    amount: float = InputField(default=0.1, ge=0, le=1, description="The amount of noise to add")
+    noise_color: bool = InputField(default=True, description="Whether to add colored noise")
+    size: int = InputField(default=1, ge=1, description="The size of the noise points")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+
+        # Save out the alpha channel
+        alpha = image.getchannel("A")
+
+        # Set the seed for numpy random
+        rs = numpy.random.RandomState(numpy.random.MT19937(numpy.random.SeedSequence(self.seed)))
+
+        if self.noise_type == "gaussian":
+            if self.noise_color:
+                noise = rs.normal(0, 1, (image.height // self.size, image.width // self.size, 3)) * 255
+            else:
+                noise = rs.normal(0, 1, (image.height // self.size, image.width // self.size)) * 255
+                noise = numpy.stack([noise] * 3, axis=-1)
+        elif self.noise_type == "salt_and_pepper":
+            if self.noise_color:
+                noise = rs.choice(
+                    [0, 255], (image.height // self.size, image.width // self.size, 3), p=[1 - self.amount, self.amount]
+                )
+            else:
+                noise = rs.choice(
+                    [0, 255], (image.height // self.size, image.width // self.size), p=[1 - self.amount, self.amount]
+                )
+                noise = numpy.stack([noise] * 3, axis=-1)
+
+        noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB").resize(
+            (image.width, image.height), Image.Resampling.NEAREST
+        )
+        noisy_image = Image.blend(image.convert("RGB"), noise, self.amount).convert("RGBA")
+
+        # Paste back the alpha channel
+        noisy_image.putalpha(alpha)
+
+        image_dto = context.images.save(image=noisy_image)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "crop_image_to_bounding_box",
+    title="Crop Image to Bounding Box",
+    category="image",
+    version="1.0.0",
+    tags=["image", "crop"],
+    classification=Classification.Beta,
+)
+class CropImageToBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Crop an image to the given bounding box. If the bounding box is omitted, the image is cropped to the non-transparent pixels."""
+
+    image: ImageField = InputField(description="The image to crop")
+    bounding_box: BoundingBoxField | None = InputField(
+        default=None, description="The bounding box to crop the image to"
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
 
-        mask = self.id_to_mask(image, self.color.tuple(), self.threshold)
+        bounding_box = self.bounding_box.tuple() if self.bounding_box is not None else image.getbbox()
 
-        if self.invert:
-            mask = ImageOps.invert(mask)
+        cropped_image = image.crop(bounding_box)
 
-        image_dto = context.images.save(image=mask, image_category=ImageCategory.MASK)
+        image_dto = context.images.save(image=cropped_image)
+        return ImageOutput.build(image_dto)
 
+
+@invocation(
+    "paste_image_into_bounding_box",
+    title="Paste Image into Bounding Box",
+    category="image",
+    version="1.0.0",
+    tags=["image", "crop"],
+    classification=Classification.Beta,
+)
+class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Paste the source image into the target image at the given bounding box.
+
+    The source image must be the same size as the bounding box, and the bounding box must fit within the target image."""
+
+    source_image: ImageField = InputField(description="The image to paste")
+    target_image: ImageField = InputField(description="The image to paste into")
+    bounding_box: BoundingBoxField = InputField(description="The bounding box to paste the image into")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        source_image = context.images.get_pil(self.source_image.image_name, mode="RGBA")
+        target_image = context.images.get_pil(self.target_image.image_name, mode="RGBA")
+
+        bounding_box = self.bounding_box.tuple()
+
+        target_image.paste(source_image, bounding_box, source_image)
+
+        image_dto = context.images.save(image=target_image)
         return ImageOutput.build(image_dto)

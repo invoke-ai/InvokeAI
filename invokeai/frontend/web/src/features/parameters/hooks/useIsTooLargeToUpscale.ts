@@ -1,12 +1,12 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO) =>
-  createMemoizedSelector(selectUpscalelice, selectConfigSlice, (upscale, config) => {
+const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO | null) =>
+  createMemoizedSelector(selectUpscaleSlice, selectConfigSlice, (upscale, config) => {
     const { upscaleModel, scale } = upscale;
     const { maxUpscaleDimension } = config;
 
@@ -23,7 +23,7 @@ const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO) =>
     return upscaledPixels > maxPixels;
   });
 
-export const useIsTooLargeToUpscale = (imageDTO?: ImageDTO) => {
+export const useIsTooLargeToUpscale = (imageDTO?: ImageDTO | null) => {
   const selectIsTooLargeToUpscale = useMemo(() => createIsTooLargeToUpscaleSelector(imageDTO), [imageDTO]);
   return useAppSelector(selectIsTooLargeToUpscale);
 };

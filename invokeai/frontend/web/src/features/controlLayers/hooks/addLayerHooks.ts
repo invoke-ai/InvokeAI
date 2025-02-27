@@ -1,111 +1,196 @@
+import { createSelector } from '@reduxjs/toolkit';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
-  caLayerAdded,
-  iiLayerAdded,
-  ipaLayerAdded,
-  isInitialImageLayer,
-  rgLayerIPAdapterAdded,
-} from 'features/controlLayers/store/controlLayersSlice';
-import {
-  buildControlNet,
-  buildIPAdapter,
-  buildT2IAdapter,
-  CA_PROCESSOR_DATA,
-  isProcessorTypeV2,
-} from 'features/controlLayers/util/controlAdapters';
+  controlLayerAdded,
+  inpaintMaskAdded,
+  rasterLayerAdded,
+  referenceImageAdded,
+  rgAdded,
+  rgIPAdapterAdded,
+  rgNegativePromptChanged,
+  rgPositivePromptChanged,
+} from 'features/controlLayers/store/canvasSlice';
+import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import type {
+  CanvasEntityIdentifier,
+  CanvasRegionalGuidanceState,
+  ControlLoRAConfig,
+  ControlNetConfig,
+  IPAdapterConfig,
+  T2IAdapterConfig,
+} from 'features/controlLayers/store/types';
+import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { useCallback, useMemo } from 'react';
-import { useControlNetAndT2IAdapterModels, useIPAdapterModels } from 'services/api/hooks/modelsByType';
-import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
-import { v4 as uuidv4 } from 'uuid';
+import { useCallback } from 'react';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import type {
+  ControlLoRAModelConfig,
+  ControlNetModelConfig,
+  IPAdapterModelConfig,
+  T2IAdapterModelConfig,
+} from 'services/api/types';
+import { isControlLayerModelConfig, isIPAdapterModelConfig } from 'services/api/types';
 
-export const useAddCALayer = () => {
-  const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
-  const [modelConfigs] = useControlNetAndT2IAdapterModels();
-  const model: ControlNetModelConfig | T2IAdapterModelConfig | null = useMemo(() => {
-    // prefer to use a model that matches the base model
-    const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
-    return compatibleModels[0] ?? modelConfigs[0] ?? null;
-  }, [baseModel, modelConfigs]);
-  const isDisabled = useMemo(() => !model, [model]);
-  const addCALayer = useCallback(() => {
-    if (!model) {
-      return;
+/**
+ * Selects the default control adapter configuration based on the model configurations and the base.
+ *
+ * Be sure to clone the output of this selector before modifying it!
+ *
+ * @knipignore
+ */
+export const selectDefaultControlAdapter = createSelector(
+  selectModelConfigsQuery,
+  selectBase,
+  (query, base): ControlNetConfig | T2IAdapterConfig | ControlLoRAConfig => {
+    const { data } = query;
+    let model: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig | null = null;
+    if (data) {
+      const modelConfigs = modelConfigsAdapterSelectors
+        .selectAll(data)
+        .filter(isControlLayerModelConfig)
+        .sort((a) => (a.type === 'controlnet' ? -1 : 1)); // Prefer ControlNet models
+      const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
+      model = compatibleModels[0] ?? modelConfigs[0] ?? null;
     }
-
-    const id = uuidv4();
-    const defaultPreprocessor = model.default_settings?.preprocessor;
-    const processorConfig = isProcessorTypeV2(defaultPreprocessor)
-      ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(baseModel)
-      : null;
-
-    const builder = model.type === 'controlnet' ? buildControlNet : buildT2IAdapter;
-    const controlAdapter = builder(id, {
-      model: zModelIdentifierField.parse(model),
-      processorConfig,
-    });
-
-    dispatch(caLayerAdded(controlAdapter));
-  }, [dispatch, model, baseModel]);
-
-  return [addCALayer, isDisabled] as const;
-};
-
-export const useAddIPALayer = () => {
-  const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
-  const [modelConfigs] = useIPAdapterModels();
-  const model: IPAdapterModelConfig | null = useMemo(() => {
-    // prefer to use a model that matches the base model
-    const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
-    return compatibleModels[0] ?? modelConfigs[0] ?? null;
-  }, [baseModel, modelConfigs]);
-  const isDisabled = useMemo(() => !model, [model]);
-  const addIPALayer = useCallback(() => {
-    if (!model) {
-      return;
+    const controlAdapter = model?.type === 't2i_adapter' ? deepClone(initialT2IAdapter) : deepClone(initialControlNet);
+    if (model) {
+      controlAdapter.model = zModelIdentifierField.parse(model);
     }
-    const id = uuidv4();
-    const ipAdapter = buildIPAdapter(id, {
-      model: zModelIdentifierField.parse(model),
-    });
-    dispatch(ipaLayerAdded(ipAdapter));
-  }, [dispatch, model]);
+    return controlAdapter;
+  }
+);
 
-  return [addIPALayer, isDisabled] as const;
-};
-
-export const useAddIPAdapterToIPALayer = (layerId: string) => {
-  const dispatch = useAppDispatch();
-  const baseModel = useAppSelector((s) => s.generation.model?.base);
-  const [modelConfigs] = useIPAdapterModels();
-  const model: IPAdapterModelConfig | null = useMemo(() => {
-    // prefer to use a model that matches the base model
-    const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
-    return compatibleModels[0] ?? modelConfigs[0] ?? null;
-  }, [baseModel, modelConfigs]);
-  const isDisabled = useMemo(() => !model, [model]);
-  const addIPAdapter = useCallback(() => {
-    if (!model) {
-      return;
+/**
+ * Selects the default IP adapter configuration based on the model configurations and the base.
+ *
+ * Be sure to clone the output of this selector before modifying it!
+ */
+export const selectDefaultIPAdapter = createSelector(
+  selectModelConfigsQuery,
+  selectBase,
+  (query, base): IPAdapterConfig => {
+    const { data } = query;
+    let model: IPAdapterModelConfig | null = null;
+    if (data) {
+      const modelConfigs = modelConfigsAdapterSelectors.selectAll(data).filter(isIPAdapterModelConfig);
+      const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
+      model = compatibleModels[0] ?? modelConfigs[0] ?? null;
     }
-    const id = uuidv4();
-    const ipAdapter = buildIPAdapter(id, {
-      model: zModelIdentifierField.parse(model),
-    });
-    dispatch(rgLayerIPAdapterAdded({ layerId, ipAdapter }));
-  }, [dispatch, model, layerId]);
+    const ipAdapter = deepClone(initialIPAdapter);
+    if (model) {
+      ipAdapter.model = zModelIdentifierField.parse(model);
+      if (model.base === 'flux') {
+        ipAdapter.clipVisionModel = 'ViT-L';
+      }
+    }
+    return ipAdapter;
+  }
+);
 
-  return [addIPAdapter, isDisabled] as const;
-};
-
-export const useAddIILayer = () => {
+export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => Boolean(s.controlLayers.present.layers.find(isInitialImageLayer)));
-  const addIILayer = useCallback(() => {
-    dispatch(iiLayerAdded(null));
+  const func = useCallback(() => {
+    const overrides = { controlAdapter: deepClone(initialControlNet) };
+    dispatch(controlLayerAdded({ isSelected: true, overrides }));
   }, [dispatch]);
 
-  return [addIILayer, isDisabled] as const;
+  return func;
+};
+
+export const useAddRasterLayer = () => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(rasterLayerAdded({ isSelected: true }));
+  }, [dispatch]);
+
+  return func;
+};
+
+export const useAddInpaintMask = () => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(inpaintMaskAdded({ isSelected: true }));
+  }, [dispatch]);
+
+  return func;
+};
+
+export const useAddRegionalGuidance = () => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(rgAdded({ isSelected: true }));
+  }, [dispatch]);
+
+  return func;
+};
+
+export const useAddRegionalReferenceImage = () => {
+  const dispatch = useAppDispatch();
+  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+
+  const func = useCallback(() => {
+    const overrides: Partial<CanvasRegionalGuidanceState> = {
+      referenceImages: [
+        { id: getPrefixedId('regional_guidance_reference_image'), ipAdapter: deepClone(defaultIPAdapter) },
+      ],
+    };
+    dispatch(rgAdded({ isSelected: true, overrides }));
+  }, [defaultIPAdapter, dispatch]);
+
+  return func;
+};
+
+export const useAddGlobalReferenceImage = () => {
+  const dispatch = useAppDispatch();
+  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+  const func = useCallback(() => {
+    const overrides = { ipAdapter: deepClone(defaultIPAdapter) };
+    dispatch(referenceImageAdded({ isSelected: true, overrides }));
+  }, [defaultIPAdapter, dispatch]);
+
+  return func;
+};
+
+export const useAddRegionalGuidanceIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
+  const dispatch = useAppDispatch();
+  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+  const func = useCallback(() => {
+    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: { ipAdapter: deepClone(defaultIPAdapter) } }));
+  }, [defaultIPAdapter, dispatch, entityIdentifier]);
+
+  return func;
+};
+
+export const useAddRegionalGuidancePositivePrompt = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
+
+  return func;
+};
+
+export const useAddRegionalGuidanceNegativePrompt = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
+  const dispatch = useAppDispatch();
+  const runc = useCallback(() => {
+    dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
+
+  return runc;
+};
+
+export const buildSelectValidRegionalGuidanceActions = (
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>
+) => {
+  return createMemoizedSelector(selectCanvasSlice, (canvas) => {
+    const entity = selectEntity(canvas, entityIdentifier);
+    return {
+      canAddPositivePrompt: entity?.positivePrompt === null,
+      canAddNegativePrompt: entity?.negativePrompt === null,
+    };
+  });
 };

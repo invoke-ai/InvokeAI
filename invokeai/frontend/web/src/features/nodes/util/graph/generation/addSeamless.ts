@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import { SEAMLESS } from 'features/nodes/util/graph/constants';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
 
@@ -21,22 +21,23 @@ export const addSeamless = (
   modelLoader: Invocation<'main_model_loader'> | Invocation<'sdxl_model_loader'>,
   vaeLoader: Invocation<'vae_loader'> | null
 ): Invocation<'seamless'> | null => {
-  const { seamlessXAxis: seamless_x, seamlessYAxis: seamless_y } = state.generation;
+  const { seamlessXAxis: seamless_x, seamlessYAxis: seamless_y } = state.params;
+
+  // Always write seamless metadata to ensure recalling all parameters will reset the seamless settings
+  g.upsertMetadata({
+    seamless_x,
+    seamless_y,
+  });
 
   if (!seamless_x && !seamless_y) {
     return null;
   }
 
   const seamless = g.addNode({
-    id: SEAMLESS,
     type: 'seamless',
+    id: getPrefixedId('seamless'),
     seamless_x,
     seamless_y,
-  });
-
-  g.upsertMetadata({
-    seamless_x: seamless_x || undefined,
-    seamless_y: seamless_y || undefined,
   });
 
   // Seamless slots into the graph between the model loader and the denoise node

@@ -171,8 +171,19 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
+
+        # On 30xx and 40xx series GPUs, `torch-sdp` is faster than `xformers`. This corresponds to a CUDA major
+        # version of 8 or higher. So, for major version 7 or below, we prefer `xformers`.
+        # See:
+        # - https://developer.nvidia.com/cuda-gpus
+        # - https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capabilities
+        try:
+            prefer_xformers = torch.cuda.is_available() and torch.cuda.get_device_properties("cuda").major <= 7  # type: ignore # Type of "get_device_properties" is partially unknown
+        except Exception:
+            prefer_xformers = False
+
         config = get_config()
-        if config.attention_type == "xformers":
+        if config.attention_type == "xformers" and is_xformers_available() and prefer_xformers:
             self.enable_xformers_memory_efficient_attention()
             return
         elif config.attention_type == "sliced":
@@ -187,20 +198,24 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             self.disable_attention_slicing()
             return
         elif config.attention_type == "torch-sdp":
-            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enables sdp automatically
-                return
-            else:
-                raise Exception("torch-sdp attention slicing not available")
+            # torch-sdp is the default in diffusers.
+            return
 
-        # the remainder if this code is called when attention_type=='auto'
+        # See https://github.com/invoke-ai/InvokeAI/issues/7049 for context.
+        # Bumping torch from 2.2.2 to 2.4.1 caused the sliced attention implementation to produce incorrect results.
+        # For now, if a user is on an MPS device and has not explicitly set the attention_type, then we select the
+        # non-sliced torch-sdp implementation. This keeps things working on MPS at the cost of increased peak memory
+        # utilization.
+        if torch.backends.mps.is_available():
+            return
+
+        # The remainder if this code is called when attention_type=='auto'.
         if self.unet.device.type == "cuda":
-            if is_xformers_available():
+            if is_xformers_available() and prefer_xformers:
                 self.enable_xformers_memory_efficient_attention()
                 return
-            elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
-                # diffusers enables sdp automatically
-                return
+            # torch-sdp is the default in diffusers.
+            return
 
         if self.unet.device.type == "cpu" or self.unet.device.type == "mps":
             mem_free = psutil.virtual_memory().free
@@ -366,7 +381,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         with attn_ctx:
             callback(
                 PipelineIntermediateState(
-                    step=-1,
+                    step=0,  # initial latents
                     order=self.scheduler.order,
                     total_steps=len(timesteps),
                     timestep=self.scheduler.config.num_train_timesteps,
@@ -395,7 +410,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
                 callback(
                     PipelineIntermediateState(
-                        step=i,
+                        step=i + 1,  # final latents
                         order=self.scheduler.order,
                         total_steps=len(timesteps),
                         timestep=int(t),
@@ -483,6 +498,22 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                     # Add to the previous adapter states.
                     for idx, value in enumerate(single_t2i_adapter_data.adapter_state):
                         accum_adapter_state[idx] += value * t2i_adapter_weight
+
+            # Hack: force compatibility with irregular resolutions by padding the feature map with zeros
+            for idx, tensor in enumerate(accum_adapter_state):
+                # The tensor size is supposed to be some integer downscale factor of the latents size.
+                # Internally, the unet will pad the latents before downscaling between levels when it is no longer divisible by its downscale factor.
+                # If the latent size does not scale down evenly, we need to pad the tensor so that it matches the the downscaled padded latents later on.
+                scale_factor = latents.size()[-1] // tensor.size()[-1]
+                required_padding_width = math.ceil(latents.size()[-1] / scale_factor) - tensor.size()[-1]
+                required_padding_height = math.ceil(latents.size()[-2] / scale_factor) - tensor.size()[-2]
+                tensor = torch.nn.functional.pad(
+                    tensor,
+                    (0, required_padding_width, 0, required_padding_height, 0, 0, 0, 0),
+                    mode="constant",
+                    value=0,
+                )
+                accum_adapter_state[idx] = tensor
 
             down_intrablock_additional_residuals = accum_adapter_state
 

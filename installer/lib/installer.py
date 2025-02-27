@@ -245,6 +245,9 @@ class InvokeAiInstance:
 
         pip = local[self.pip]
 
+        # Uninstall xformers if it is present; the correct version of it will be reinstalled if needed
+        _ = pip["uninstall", "-yqq", "xformers"] & FG
+
         pipeline = pip[
             "install",
             "--require-virtualenv",
@@ -281,12 +284,6 @@ class InvokeAiInstance:
             dest = self.runtime / f"{script}.{ext}"
             shutil.copy(src, dest)
             os.chmod(dest, 0o0755)
-
-    def update(self):
-        pass
-
-    def remove(self):
-        pass
 
 
 ### Utility functions ###
@@ -402,7 +399,7 @@ def get_torch_source() -> Tuple[str | None, str | None]:
     :rtype: list
     """
 
-    from messages import select_gpu
+    from messages import GpuType, select_gpu
 
     # device can be one of: "cuda", "rocm", "cpu", "cuda_and_dml, autodetect"
     device = select_gpu()
@@ -412,16 +409,22 @@ def get_torch_source() -> Tuple[str | None, str | None]:
     url = None
     optional_modules: str | None = None
     if OS == "Linux":
-        if device.value == "rocm":
-            url = "https://download.pytorch.org/whl/rocm5.6"
-        elif device.value == "cpu":
+        if device == GpuType.ROCM:
+            url = "https://download.pytorch.org/whl/rocm6.1"
+        elif device == GpuType.CPU:
             url = "https://download.pytorch.org/whl/cpu"
-        elif device.value == "cuda":
-            # CUDA uses the default PyPi index
+        elif device == GpuType.CUDA:
+            url = "https://download.pytorch.org/whl/cu124"
+            optional_modules = "[onnx-cuda]"
+        elif device == GpuType.CUDA_WITH_XFORMERS:
+            url = "https://download.pytorch.org/whl/cu124"
             optional_modules = "[xformers,onnx-cuda]"
     elif OS == "Windows":
-        if device.value == "cuda":
-            url = "https://download.pytorch.org/whl/cu121"
+        if device == GpuType.CUDA:
+            url = "https://download.pytorch.org/whl/cu124"
+            optional_modules = "[onnx-cuda]"
+        elif device == GpuType.CUDA_WITH_XFORMERS:
+            url = "https://download.pytorch.org/whl/cu124"
             optional_modules = "[xformers,onnx-cuda]"
         elif device.value == "cpu":
             # CPU  uses the default PyPi index, no optional modules

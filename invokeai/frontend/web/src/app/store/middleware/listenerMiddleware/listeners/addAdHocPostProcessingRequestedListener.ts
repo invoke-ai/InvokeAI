@@ -1,12 +1,14 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { parseify } from 'common/util/serialize';
 import { buildAdHocPostProcessingGraph } from 'features/nodes/util/graph/buildAdHocPostProcessingGraph';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { queueApi } from 'services/api/endpoints/queue';
+import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
+import type { JsonObject } from 'type-fest';
+
+const log = logger('queue');
 
 export const adHocPostProcessingRequested = createAction<{ imageDTO: ImageDTO }>(`upscaling/postProcessingRequested`);
 
@@ -14,8 +16,6 @@ export const addAdHocPostProcessingRequestedListener = (startAppListening: AppSt
   startAppListening({
     actionCreator: adHocPostProcessingRequested,
     effect: async (action, { dispatch, getState }) => {
-      const log = logger('session');
-
       const { imageDTO } = action.payload;
       const state = getState();
 
@@ -32,16 +32,14 @@ export const addAdHocPostProcessingRequestedListener = (startAppListening: AppSt
 
       try {
         const req = dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
-            fixedCacheKey: 'enqueueBatch',
-          })
+          queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, enqueueMutationFixedCacheKeyOptions)
         );
 
         const enqueueResult = await req.unwrap();
         req.reset();
-        log.debug({ enqueueResult: parseify(enqueueResult) }, t('queue.graphQueued'));
+        log.debug({ enqueueResult } as JsonObject, t('queue.graphQueued'));
       } catch (error) {
-        log.error({ enqueueBatchArg: parseify(enqueueBatchArg) }, t('queue.graphFailedToQueue'));
+        log.error({ enqueueBatchArg } as JsonObject, t('queue.graphFailedToQueue'));
 
         if (error instanceof Object && 'status' in error && error.status === 403) {
           return;

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
 # General
-site_name: InvokeAI Documentation
+site_name: Invoke
 site_url: https://invoke-ai.github.io/InvokeAI
 site_author: mauwii
 dev_addr: '127.0.0.1:8080'
@@ -12,20 +12,22 @@ repo_url: 'https://github.com/invoke-ai/InvokeAI'
 edit_uri: edit/main/docs/
 
 # Copyright
-copyright: Copyright &copy; 2023 InvokeAI Team
-
-extra_css:
-  - stylesheets/extra.css
+copyright: Copyright &copy; 2022-2024 InvokeAI Team
 
 # Configuration
 theme:
   name: material
+  font:
+    text: 'Inter'
+    code: 'JetBrains Mono'
+  logo: img/invoke-symbol-wht-lrg.svg
   icon:
     repo: fontawesome/brands/github
     edit: material/file-document-edit-outline
   favicon: img/favicon.ico
   palette:
     scheme: slate
+    primary: black
   features:
     - navigation.instant
     - navigation.tabs
@@ -85,12 +87,15 @@ plugins:
       enable_creation_date: true
   - redirects:
       redirect_maps:
-        'installation/INSTALL_AUTOMATED.md': 'installation/010_INSTALL_AUTOMATED.md'
-        'installation/INSTALL_MANUAL.md': 'installation/020_INSTALL_MANUAL.md'
-        'installation/INSTALL_SOURCE.md': 'installation/020_INSTALL_MANUAL.md'
-        'installation/INSTALL_DOCKER.md': 'installation/040_INSTALL_DOCKER.md'
-        'installation/INSTALLING_MODELS.md': 'installation/050_INSTALLING_MODELS.md'
-        'installation/INSTALL_PATCHMATCH.md': 'installation/060_INSTALL_PATCHMATCH.md'
+        'installation/index.md': 'installation/quick_start.md'
+        'installation/INSTALL_AUTOMATED.md': 'installation/quick_start.md'
+        'installation/installer.md': 'installation/quick_start.md'
+        'installation/INSTALL_MANUAL.md': 'installation/manual.md'
+        'installation/INSTALL_SOURCE.md': 'installation/manual.md'
+        'installation/INSTALL_DOCKER.md': 'installation/docker.md'
+        'installation/INSTALLING_MODELS.md': 'installation/models.md'
+        'installation/INSTALL_PATCHMATCH.md': 'installation/patchmatch.md'
+        'installation/060_INSTALL_PATCHMATCH.md': 'installation/patchmatch.md'
   - mkdocstrings:
       handlers:
         python:
@@ -105,11 +110,6 @@ plugins:
             show_root_full_path: false
             show_bases: false
 
-extra_javascript:
-  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
-  - javascripts/tablesort.js
-  - javascript/init_kapa_widget.js
-
 extra:
   analytics:
     provider: google
@@ -118,61 +118,42 @@ extra:
 nav:
   - Home: 'index.md'
   - Installation:
-      - Overview: 'installation/INSTALLATION.md'
-      - Requirements: 'installation/INSTALL_REQUIREMENTS.md'
-      - Automatic Install: 'installation/010_INSTALL_AUTOMATED.md'
-      - Manual Install: 'installation/020_INSTALL_MANUAL.md'
-      - Developer Install: 'installation/INSTALL_DEVELOPMENT.md'
-      - Docker: 'installation/040_INSTALL_DOCKER.md'
-      - Installing Models: 'installation/050_INSTALLING_MODELS.md'
-      - Installing PyPatchMatch: 'installation/060_INSTALL_PATCHMATCH.md'
+      - Quick Start: 'installation/quick_start.md'
+      - Detailed Requirements: 'installation/requirements.md'
+      - Manual Install: 'installation/manual.md'
+      - Docker: 'installation/docker.md'
+      - PatchMatch: 'installation/patchmatch.md'
+      - Models: 'installation/models.md'
+      - Legacy Scripts: 'installation/legacy_scripts.md'
   - Workflows & Nodes:
       - Nodes Overview: 'nodes/overview.md'
       - Workflow Editor Basics: 'nodes/NODES.md'
       - List of Default Nodes: 'nodes/defaultNodes.md'
-      - Example Workflows: 'nodes/exampleWorkflows.md'
+      - Community Nodes: 'nodes/communityNodes.md'
       - ComfyUI to InvokeAI: 'nodes/comfyToInvoke.md'
       - Facetool Node: 'nodes/detailedNodes/faceTools.md'
       - Contributing Nodes: 'nodes/contributingNodes.md'
       - Migrating from v3 to v4: 'nodes/NODES_MIGRATION_V3_V4.md'
-      - Invocation API: 'nodes/INVOCATION_API.md'
-  - Community Nodes: 'nodes/communityNodes.md'
+      - Invocation API: 'nodes/invocation-api.md'
+  - Configuration: 'configuration.md'
   - Features:
-      - Overview: 'features/index.md'
+      - Low VRAM mode: 'features/low-vram.md'
+      - Database: 'features/database.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
-      - Configuration: 'features/CONFIGURATION.md'
-      - Database: 'features/DATABASE.md'
-      - Control Adapters: 'features/CONTROLNET.md'
-      - Image-to-Image: 'features/IMG2IMG.md'
-      - Controlling Logging: 'features/LOGGING.md'
-      - LoRAs & LCM-LoRAs: 'features/LORAS.md'
-      - Model Merging: 'features/MODEL_MERGING.md'
-      - Workflows &  Nodes: 'nodes/overview'
-      - NSFW Checker: 'features/WATERMARK+NSFW.md'
-      - Postprocessing: 'features/POSTPROCESS.md'
-      - Prompting Features: 'features/PROMPTS.md'
-      - Textual Inversions:
-          - Textual Inversions: 'features/TEXTUAL_INVERSIONS.md'
-          - Textual Inversion Training: 'features/TRAINING.md'
-      - Unified Canvas: 'features/UNIFIED_CANVAS.md'
-      - InvokeAI Web Server: 'features/WEB.md'
-      - WebUI Hotkeys: 'features/WEBUIHOTKEYS.md'
-      - Maintenance Utilities: 'features/UTILITIES.md'
-      - Other: 'features/OTHER.md'
   - Contributing:
-      - How to Contribute: 'contributing/CONTRIBUTING.md'
-      - InvokeAI Code of Conduct: 'CODE_OF_CONDUCT.md'
+      - Overview: 'contributing/index.md'
+      - Code of Conduct: 'CODE_OF_CONDUCT.md'
+      - Dev Environment: 'contributing/dev-environment.md'
       - Development:
           - Overview: 'contributing/contribution_guides/development.md'
           - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
           - Model Manager v2: 'contributing/MODEL_MANAGER.md'
-          - Frontend Documentation: 'contributing/contribution_guides/contributingToFrontend.md'
           - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
           - Testing: 'contributing/TESTS.md'
-          - Frontend:
-              - Overview: 'contributing/frontend/OVERVIEW.md'
-              - State Management: 'contributing/frontend/STATE_MGMT.md'
-              - Workflows: 'contributing/frontend/WORKFLOWS.md'
+      - Frontend:
+          - Overview: 'contributing/frontend/index.md'
+          - State Management: 'contributing/frontend/state-management.md'
+          - Workflows - Design and Implementation: 'contributing/frontend/workflows.md'
       - Documentation: 'contributing/contribution_guides/documentation.md'
       - Nodes: 'contributing/INVOCATIONS.md'
       - Model Manager: 'contributing/MODEL_MANAGER.md'
@@ -181,9 +162,6 @@ nav:
       - Tutorials: 'contributing/contribution_guides/tutorials.md'
   - Help:
       - Getting Started: 'help/gettingStartedWithAI.md'
-      - FAQ: 'help/FAQ.md'
       - Diffusion Overview: 'help/diffusion.md'
       - Sampler Convergence: 'help/SAMPLER_CONVERGENCE.md'
-  - Other:
-      - Contributors: 'other/CONTRIBUTORS.md'
-      - CompViz-README: 'other/README-CompViz.md'
+  - FAQ: 'faq.md'

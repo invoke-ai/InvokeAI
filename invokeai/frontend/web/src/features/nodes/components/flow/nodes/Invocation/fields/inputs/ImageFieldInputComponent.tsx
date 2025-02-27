@@ -1,25 +1,30 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { UploadImageButton } from 'common/hooks/useImageUploadButton';
+import type { SetNodeImageFieldImageDndTargetData } from 'features/dnd/dnd';
+import { setNodeImageFieldImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { DndImage } from 'features/dnd/DndImage';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import type { PostUploadAction } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
+import { $isConnected } from 'services/events/stores';
 
 import type { FieldComponentProps } from './types';
 
 const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInstance, ImageFieldInputTemplate>) => {
-  const { nodeId, field } = props;
+  const { t } = useTranslation();
+  const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
-  const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
+  const isConnected = useStore($isConnected);
 
+  const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
   const handleReset = useCallback(() => {
     dispatch(
       fieldImageValueChanged({
@@ -30,32 +35,13 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
     );
   }, [dispatch, field.name, nodeId]);
 
-  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (imageDTO) {
-      return {
-        id: `node-${nodeId}-${field.name}`,
-        payloadType: 'IMAGE_DTO',
-        payload: { imageDTO },
-      };
-    }
-  }, [field.name, imageDTO, nodeId]);
-
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
-    () => ({
-      id: `node-${nodeId}-${field.name}`,
-      actionType: 'SET_NODES_IMAGE',
-      context: { nodeId, fieldName: field.name },
-    }),
-    [field.name, nodeId]
-  );
-
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({
-      type: 'SET_NODES_IMAGE',
-      nodeId,
-      fieldName: field.name,
-    }),
-    [nodeId, field.name]
+  const dndTargetData = useMemo<SetNodeImageFieldImageDndTargetData>(
+    () =>
+      setNodeImageFieldImageDndTarget.getData(
+        { fieldIdentifier: { nodeId, fieldName: field.name } },
+        field.value?.image_name
+      ),
+    [field, nodeId]
   );
 
   useEffect(() => {
@@ -64,24 +50,55 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
     }
   }, [handleReset, isConnected, isError]);
 
+  const onUpload = useCallback(
+    (imageDTO: ImageDTO) => {
+      dispatch(
+        fieldImageValueChanged({
+          nodeId,
+          fieldName: field.name,
+          value: imageDTO,
+        })
+      );
+    },
+    [dispatch, field.name, nodeId]
+  );
+
   return (
-    <Flex className="nodrag" w="full" h="full" alignItems="center" justifyContent="center">
-      <IAIDndImage
-        imageDTO={imageDTO}
-        droppableData={droppableData}
-        draggableData={draggableData}
-        postUploadAction={postUploadAction}
-        useThumbailFallback
-        uploadElement={<UploadElement />}
-        dropLabel={<DropLabel />}
-        minSize={8}
-      >
-        <IAIDndImageIcon
-          onClick={handleReset}
-          icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
-          tooltip="Reset Image"
+    <Flex position="relative" className={NO_DRAG_CLASS} w="full" h={32} alignItems="stretch">
+      {!imageDTO && (
+        <UploadImageButton
+          w="full"
+          h="auto"
+          isError={fieldTemplate.required && !field.value}
+          onUpload={onUpload}
+          fontSize={24}
         />
-      </IAIDndImage>
+      )}
+      {imageDTO && (
+        <>
+          <Flex borderRadius="base" borderWidth={1} borderStyle="solid">
+            <DndImage imageDTO={imageDTO} asThumbnail />
+          </Flex>
+          <Text
+            position="absolute"
+            background="base.900"
+            color="base.50"
+            fontSize="sm"
+            fontWeight="semibold"
+            insetInlineEnd={1}
+            insetBlockEnd={1}
+            opacity={0.7}
+            px={2}
+            borderRadius="base"
+            pointerEvents="none"
+          >{`${imageDTO.width}x${imageDTO.height}`}</Text>
+        </>
+      )}
+      <DndDropTarget
+        dndTarget={setNodeImageFieldImageDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.drop')}
+      />
     </Flex>
   );
 };
@@ -91,21 +108,12 @@ export default memo(ImageFieldInputComponent);
 const UploadElement = memo(() => {
   const { t } = useTranslation();
   return (
-    <Text fontSize={16} fontWeight="semibold">
-      {t('gallery.dropOrUpload')}
-    </Text>
+    <Flex h={16} w="full" alignItems="center" justifyContent="center">
+      <Text fontSize={16} fontWeight="semibold">
+        {t('gallery.dropOrUpload')}
+      </Text>
+    </Flex>
   );
 });
 
 UploadElement.displayName = 'UploadElement';
-
-const DropLabel = memo(() => {
-  const { t } = useTranslation();
-  return (
-    <Text fontSize={16} fontWeight="semibold">
-      {t('gallery.drop')}
-    </Text>
-  );
-});
-
-DropLabel.displayName = 'DropLabel';

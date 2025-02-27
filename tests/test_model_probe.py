@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import torch
 from torch import tensor
 
 from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
@@ -9,7 +10,7 @@ from invokeai.backend.model_manager.probe import (
     CkptType,
     ModelProbe,
     VaeFolderProbe,
-    get_default_settings_controlnet_t2i_adapter,
+    get_default_settings_control_adapters,
     get_default_settings_main,
 )
 
@@ -39,12 +40,10 @@ def test_repo_variant(datadir: Path):
 
 
 def test_controlnet_t2i_default_settings():
-    assert get_default_settings_controlnet_t2i_adapter("some_canny_model").preprocessor == "canny_image_processor"
-    assert (
-        get_default_settings_controlnet_t2i_adapter("some_depth_model").preprocessor == "depth_anything_image_processor"
-    )
-    assert get_default_settings_controlnet_t2i_adapter("some_pose_model").preprocessor == "dw_openpose_image_processor"
-    assert get_default_settings_controlnet_t2i_adapter("i like turtles") is None
+    assert get_default_settings_control_adapters("some_canny_model").preprocessor == "canny_image_processor"
+    assert get_default_settings_control_adapters("some_depth_model").preprocessor == "depth_anything_image_processor"
+    assert get_default_settings_control_adapters("some_pose_model").preprocessor == "dw_openpose_image_processor"
+    assert get_default_settings_control_adapters("i like turtles") is None
 
 
 def test_default_settings_main():
@@ -58,8 +57,9 @@ def test_default_settings_main():
     assert get_default_settings_main(BaseModelType.Any) is None
 
 
-def test_probe_handles_state_dict_with_integer_keys():
-    # This structure isn't supported by invoke, but we still need to handle it gracefully. See #6044
+def test_probe_handles_state_dict_with_integer_keys(tmp_path: Path):
+    # This structure isn't supported by invoke, but we still need to handle it gracefully.
+    # See https://github.com/invoke-ai/InvokeAI/issues/6044
     state_dict_with_integer_keys: CkptType = {
         320: (
             {
@@ -76,8 +76,10 @@ def test_probe_handles_state_dict_with_integer_keys():
             },
         ),
     }
+    sd_path = tmp_path / "sd.pt"
+    torch.save(state_dict_with_integer_keys, sd_path)
     with pytest.raises(InvalidModelConfigException):
-        ModelProbe.get_model_type_from_checkpoint(Path("embedding.pt"), state_dict_with_integer_keys)
+        ModelProbe.get_model_type_from_checkpoint(sd_path, state_dict_with_integer_keys)
 
 
 def test_probe_sd1_diffusers_inpainting(datadir: Path):

@@ -8,6 +8,9 @@ import safetensors
 import torch
 from picklescan.scanner import scan_file_path
 
+from invokeai.backend.model_manager.config import ClipVariantType
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+
 
 def _fast_safetensors_reader(path: str) -> Dict[str, torch.Tensor]:
     checkpoint = {}
@@ -41,7 +44,7 @@ def _fast_safetensors_reader(path: str) -> Dict[str, torch.Tensor]:
     return checkpoint
 
 
-def read_checkpoint_meta(path: Union[str, Path], scan: bool = False) -> Dict[str, torch.Tensor]:
+def read_checkpoint_meta(path: Union[str, Path], scan: bool = True) -> Dict[str, torch.Tensor]:
     if str(path).endswith(".safetensors"):
         try:
             path_str = path.as_posix() if isinstance(path, Path) else path
@@ -49,10 +52,13 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False) -> Dict[str
         except Exception:
             # TODO: create issue for support "meta"?
             checkpoint = safetensors.torch.load_file(path, device="cpu")
+    elif str(path).endswith(".gguf"):
+        # The GGUF reader used here uses numpy memmap, so these tensors are not loaded into memory during this function
+        checkpoint = gguf_sd_loader(Path(path), compute_dtype=torch.float32)
     else:
         if scan:
             scan_result = scan_file_path(path)
-            if scan_result.infected_files != 0:
+            if scan_result.infected_files != 0 or scan_result.scan_err:
                 raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
         checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
@@ -133,3 +139,51 @@ def lora_token_vector_length(checkpoint: Dict[str, torch.Tensor]) -> Optional[in
             break
 
     return lora_token_vector_length
+
+
+def convert_bundle_to_flux_transformer_checkpoint(
+    transformer_state_dict: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    original_state_dict: dict[str, torch.Tensor] = {}
+    keys_to_remove: list[str] = []
+
+    for k, v in transformer_state_dict.items():
+        if not k.startswith("model.diffusion_model"):
+            keys_to_remove.append(k)  # This can be removed in the future if we only want to delete transformer keys
+            continue
+        if k.endswith("scale"):
+            # Scale math must be done at bfloat16 due to our current flux model
+            # support limitations at inference time
+            v = v.to(dtype=torch.bfloat16)
+        new_key = k.replace("model.diffusion_model.", "")
+        original_state_dict[new_key] = v
+        keys_to_remove.append(k)
+
+    # Remove processed keys from the original dictionary, leaving others in case
+    # other model state dicts need to be pulled
+    for k in keys_to_remove:
+        del transformer_state_dict[k]
+
+    return original_state_dict
+
+
+def get_clip_variant_type(location: str) -> Optional[ClipVariantType]:
+    try:
+        path = Path(location)
+        config_path = path / "config.json"
+        if not config_path.exists():
+            config_path = path / "text_encoder" / "config.json"
+        if not config_path.exists():
+            return ClipVariantType.L
+        with open(config_path) as file:
+            clip_conf = json.load(file)
+            hidden_size = clip_conf.get("hidden_size", -1)
+            match hidden_size:
+                case 1280:
+                    return ClipVariantType.G
+                case 768:
+                    return ClipVariantType.L
+                case _:
+                    return ClipVariantType.L
+    except Exception:
+        return ClipVariantType.L

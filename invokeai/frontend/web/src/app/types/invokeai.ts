@@ -1,7 +1,7 @@
-import type { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { FilterType } from 'features/controlLayers/store/filters';
 import type { ParameterPrecision, ParameterScheduler } from 'features/parameters/types/parameterSchemas';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
-import type { O } from 'ts-toolbelt';
+import type { TabName } from 'features/ui/store/uiTypes';
+import type { PartialDeep } from 'type-fest';
 
 /**
  * A disable-able application feature
@@ -22,12 +22,12 @@ export type AppFeature =
   | 'multiselect'
   | 'pauseQueue'
   | 'resumeQueue'
-  | 'prependQueue'
   | 'invocationCache'
+  | 'modelCache'
   | 'bulkDownload'
   | 'starterModels'
-  | 'hfToken';
-
+  | 'hfToken'
+  | 'retryQueueItem';
 /**
  * A disable-able Stable Diffusion feature
  */
@@ -72,7 +72,7 @@ export type AppConfig = {
   maxUpscaleDimension?: number;
   allowPrivateBoards: boolean;
   allowPrivateStylePresets: boolean;
-  disabledTabs: InvokeTabName[];
+  disabledTabs: TabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
   nodesAllowlist: string[] | undefined;
@@ -80,10 +80,11 @@ export type AppConfig = {
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
   isLocal?: boolean;
+  maxImageUploadCount?: number;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
-    disabledControlNetProcessors: (keyof typeof CONTROLNET_PROCESSORS)[];
+    disabledControlNetProcessors: FilterType[];
     // Core parameters
     iterations: NumericalParameterConfig;
     width: NumericalParameterConfig; // initial value comes from model
@@ -114,6 +115,9 @@ export type AppConfig = {
       weight: NumericalParameterConfig;
     };
   };
+  flux: {
+    guidance: NumericalParameterConfig;
+  };
 };
 
-export type PartialAppConfig = O.Partial<AppConfig, 'deep'>;
+export type PartialAppConfig = PartialDeep<AppConfig>;

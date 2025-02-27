@@ -1,9 +1,9 @@
+import type { Connection } from '@xyflow/react';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
-import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { map } from 'lodash-es';
-import type { Connection, Edge } from 'reactflow';
 
 /**
  *
@@ -23,9 +23,9 @@ export const getFirstValidConnection = (
   target: string,
   targetHandle: string | null,
   nodes: AnyNode[],
-  edges: InvocationNodeEdge[],
+  edges: AnyEdge[],
   templates: Templates,
-  edgePendingUpdate: Edge | null
+  edgePendingUpdate: AnyEdge | null
 ): Connection | null => {
   if (source === target) {
     return null;
@@ -81,9 +81,9 @@ export const getTargetCandidateFields = (
   sourceHandle: string,
   target: string,
   nodes: AnyNode[],
-  edges: Edge[],
+  edges: AnyEdge[],
   templates: Templates,
-  edgePendingUpdate: Edge | null
+  edgePendingUpdate: AnyEdge | null
 ): FieldInputTemplate[] => {
   const sourceNode = nodes.find((n) => n.id === source);
   const targetNode = nodes.find((n) => n.id === target);
@@ -105,8 +105,8 @@ export const getTargetCandidateFields = (
 
   const targetCandidateFields = map(targetTemplate.inputs).filter((field) => {
     const c = { source, sourceHandle, target, targetHandle: field.name };
-    const r = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
-    return r.isValid;
+    const connectionErrorTKey = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
+    return connectionErrorTKey === null;
   });
 
   return targetCandidateFields;
@@ -117,9 +117,9 @@ export const getSourceCandidateFields = (
   targetHandle: string,
   source: string,
   nodes: AnyNode[],
-  edges: Edge[],
+  edges: AnyEdge[],
   templates: Templates,
-  edgePendingUpdate: Edge | null
+  edgePendingUpdate: AnyEdge | null
 ): FieldOutputTemplate[] => {
   const targetNode = nodes.find((n) => n.id === target);
   const sourceNode = nodes.find((n) => n.id === source);
@@ -141,8 +141,8 @@ export const getSourceCandidateFields = (
 
   const sourceCandidateFields = map(sourceTemplate.outputs).filter((field) => {
     const c = { source, sourceHandle: field.name, target, targetHandle };
-    const r = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
-    return r.isValid;
+    const connectionErrorTKey = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
+    return connectionErrorTKey === null;
   });
 
   return sourceCandidateFields;

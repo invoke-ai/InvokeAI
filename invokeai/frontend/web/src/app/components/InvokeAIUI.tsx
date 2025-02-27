@@ -1,7 +1,10 @@
 import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
-import { $socketOptions } from 'app/hooks/useSocketIO';
+import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
+import { $didStudioInit } from 'app/hooks/useStudioInitAction';
+import type { LoggingOverrides } from 'app/logging/logger';
+import { $loggingOverrides, configureLogging } from 'app/logging/logger';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -17,13 +20,12 @@ import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
-import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
 import type { PropsWithChildren, ReactNode } from 'react';
-import React, { lazy, memo, useEffect, useMemo } from 'react';
+import React, { lazy, memo, useEffect, useLayoutEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
+import { $socketOptions } from 'services/events/stores';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 
 const App = lazy(() => import('./App'));
@@ -40,17 +42,13 @@ interface Props extends PropsWithChildren {
   projectName?: string;
   projectUrl?: string;
   queueId?: string;
-  selectedImage?: {
-    imageName: string;
-    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-  };
-  selectedWorkflowId?: string;
-  destination?: InvokeTabName;
+  studioInitAction?: StudioInitAction;
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
   logo?: ReactNode;
   workflowCategories?: WorkflowCategory[];
+  loggingOverrides?: LoggingOverrides;
 }
 
 const InvokeAIUI = ({
@@ -64,15 +62,38 @@ const InvokeAIUI = ({
   projectName,
   projectUrl,
   queueId,
-  selectedImage,
-  selectedWorkflowId,
-  destination,
+  studioInitAction,
   customStarUi,
   socketOptions,
   isDebugging = false,
   logo,
   workflowCategories,
+  loggingOverrides,
 }: Props) => {
+  useLayoutEffect(() => {
+    /*
+     * We need to configure logging before anything else happens - useLayoutEffect ensures we set this at the first
+     * possible opportunity.
+     *
+     * Once redux initializes, we will check the user's settings and update the logging config accordingly. See
+     * `useSyncLoggingConfig`.
+     */
+    $loggingOverrides.set(loggingOverrides);
+
+    // Until we get the user's settings, we will use the overrides OR default values.
+    configureLogging(
+      loggingOverrides?.logIsEnabled ?? true,
+      loggingOverrides?.logLevel ?? 'debug',
+      loggingOverrides?.logNamespaces ?? '*'
+    );
+  }, [loggingOverrides]);
+
+  useLayoutEffect(() => {
+    if (studioInitAction) {
+      $didStudioInit.set(false);
+    }
+  }, [studioInitAction]);
+
   useEffect(() => {
     // configure API client token
     if (token) {
@@ -222,14 +243,7 @@ const InvokeAIUI = ({
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <AppDndContext>
-              <App
-                config={config}
-                selectedImage={selectedImage}
-                selectedWorkflowId={selectedWorkflowId}
-                destination={destination}
-              />
-            </AppDndContext>
+            <App config={config} studioInitAction={studioInitAction} />
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>

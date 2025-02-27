@@ -10,7 +10,7 @@ The suggested method is to use `git clone` to clone the repository the node is f
 
 If you'd prefer, you can also just download the whole node folder from the linked repository and add it to the `nodes` folder. 
 
-To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
+To use a community workflow, download the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
     + [Adapters-Linked](#adapters-linked-nodes)
@@ -21,6 +21,7 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Clothing Mask](#clothing-mask)
     + [Contrast Limited Adaptive Histogram Equalization](#contrast-limited-adaptive-histogram-equalization)
     + [Depth Map from Wavefront OBJ](#depth-map-from-wavefront-obj)
+    + [Enhance Detail](#enhance-detail)
     + [Film Grain](#film-grain)
     + [Generative Grammar-Based Prompt Nodes](#generative-grammar-based-prompt-nodes)
     + [GPT2RandomPromptMaker](#gpt2randompromptmaker)
@@ -39,13 +40,16 @@ To use a community workflow, download the the `.json` node graph file and load i
     + [Match Histogram](#match-histogram)
     + [Metadata-Linked](#metadata-linked-nodes)
     + [Negative Image](#negative-image)
-    + [Nightmare Promptgen](#nightmare-promptgen)    
+    + [Nightmare Promptgen](#nightmare-promptgen)
+    + [Ollama](#ollama-node)
+    + [One Button Prompt](#one-button-prompt)
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
     + [BriaAI Background Remove](#briaai-remove-background)
     + [Remove Background](#remove-background)    
     + [Retroize](#retroize)
+    + [Stereogram](#stereogram-nodes)
     + [Size Stepper Nodes](#size-stepper-nodes)
     + [Simple Skin Detection](#simple-skin-detection)
     + [Text font to Image](#text-font-to-image)
@@ -79,7 +83,7 @@ Note: These are inherited from the core nodes so any update to the core nodes sh
 
 **Example Usage:**
 </br>
-<img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider-depth.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-dots.png" width="200" /> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-pattern.png" width="200" />
+<img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider.png" width="200" /> -> <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-depth.png" width="200" /> -> <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-dots.png" width="200" /> <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-pattern.png" width="200" />
 
 --------------------------------
 ### Average Images
@@ -139,6 +143,17 @@ To be imported, an .obj must use triangulated meshes, so make sure to enable tha
 
 **Example Usage:**
 </br><img src="https://raw.githubusercontent.com/dwringer/depth-from-obj-node/main/depth_from_obj_usage.jpg" width="500" />
+
+--------------------------------
+### Enhance Detail
+
+**Description:** A single node that can enhance the detail in an image. Increase or decrease details in an image using a guided filter (as opposed to the typical Gaussian blur used by most sharpening filters.) Based on the `Enhance Detail` ComfyUI node from  https://github.com/spacepxl/ComfyUI-Image-Filters
+
+**Node Link:** https://github.com/skunkworxdark/enhance-detail-node
+
+**Example Usage:**
+</br>
+<img src="https://raw.githubusercontent.com/skunkworxdark/enhance-detail-node/refs/heads/main/images/Comparison.png" />
 
 --------------------------------
 ### Film Grain
@@ -306,7 +321,7 @@ View:
 **Node Link:** https://github.com/helix4u/load_video_frame
 
 **Output Example:** 
-<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/_git_assets/testmp4_embed_converted.gif" width="500" />
+<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/refs/heads/main/_git_assets/dance1736978273.gif" width="500" />
 
 --------------------------------
 ### Make 3D
@@ -347,7 +362,7 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 **Output Examples** 
 
-<img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" width="300" />
+<img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" />
 
 --------------------------------
 ### Metadata Linked Nodes
@@ -390,6 +405,34 @@ View:
 **Node Link:** [https://github.com/gogurtenjoyer/nightmare-promptgen](https://github.com/gogurtenjoyer/nightmare-promptgen)
 
 --------------------------------
+### Ollama Node
+
+**Description:** Uses Ollama API to expand text prompts for text-to-image generation using local LLMs. Works great for expanding basic prompts into detailed natural language prompts for Flux. Also provides a toggle to unload the LLM model immediately after expanding, to free up VRAM for Invoke to continue the image generation workflow.
+
+**Node Link:** https://github.com/Jonseed/Ollama-Node
+
+**Example Node Graph:**  https://github.com/Jonseed/Ollama-Node/blob/main/Ollama-Node-Flux-example.json
+
+**View:** 
+
+![ollama node](https://raw.githubusercontent.com/Jonseed/Ollama-Node/a3e7cdc55e394cb89c1ea7ed54e106c212c85e8c/ollama-node-screenshot.png)
+
+--------------------------------
+### One Button Prompt
+
+<img src="https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/background.png" width="800" />
+
+**Description:** an extensive suite of auto prompt generation and prompt helper nodes based on extensive logic. Get creative with the best prompt generator in the world. 
+
+The main node generates interesting prompts based on a set of parameters. There are also some additional nodes such as Auto Negative Prompt, One Button Artify, Create Prompt Variant and other cool prompt toys to play around with.
+
+**Node Link:** [https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI](https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI)
+
+**Nodes:**
+
+<img src="https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/OBP_nodes_invokeai.png" width="800" />
+
+--------------------------------
 ### Oobabooga
 
 **Description:** asks a local LLM running in Oobabooga's Text-Generation-Webui to write a prompt based on the user input.
@@ -427,7 +470,7 @@ This node works best with SDXL models, especially as the style can be described 
 5. `Prompt Strength Combine` - Combines weighted prompts for .and()/.blend()
 6. `CSV To Index String` - Gets a string from a CSV by index. Includes a Random index option
 
-The following Nodes are now included in v3.2 of Invoke and are nolonger in this set of tools.<br>
+The following Nodes are now included in v3.2 of Invoke and are no longer in this set of tools.<br>
 - `Prompt Join` -> `String Join`
 - `Prompt Join Three` -> `String Join Three`
 - `Prompt Replace` -> `String Replace`
@@ -440,7 +483,7 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 **Workflow Examples** 
 
-<img src="https://github.com/skunkworxdark/prompt-tools/blob/main/images/CSVToIndexStringNode.png" width="300" />
+<img src="https://raw.githubusercontent.com/skunkworxdark/prompt-tools/refs/heads/main/images/CSVToIndexStringNode.png"/>
 
 --------------------------------
 ### Remote Image
@@ -456,7 +499,7 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 ### BriaAI Remove Background
 
-**Description**: Implements one click background removal with BriaAI's new version 1.4 model which seems to be be producing better results than any other previous background removal tool.
+**Description**: Implements one click background removal with BriaAI's new version 1.4 model which seems to be producing better results than any other previous background removal tool.
 
 **Node Link:** https://github.com/blessedcoolant/invoke_bria_rmbg
 
@@ -483,6 +526,16 @@ View:
 **Retroize Output Examples**
 
 <img src="https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974" width="500" />
+
+--------------------------------
+### Stereogram Nodes
+
+**Description:** A set of custom nodes for InvokeAI to create cross-view or parallel-view stereograms. Stereograms are 2D images that, when viewed properly, reveal a 3D scene. Check out [r/crossview](https://www.reddit.com/r/CrossView/) for tutorials.
+
+**Node Link:** https://github.com/simonfuhrmann/invokeai-stereo
+
+**Example Workflow and Output**
+</br><img src="https://raw.githubusercontent.com/simonfuhrmann/invokeai-stereo/refs/heads/main/docs/example_promo_03.jpg" width="600" />
 
 --------------------------------
 ### Simple Skin Detection
@@ -578,7 +631,7 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 
 **Output Examples** 
 
-<img src="https://github.com/skunkworxdark/XYGrid_nodes/blob/main/images/collage.png" width="300" />
+<img src="https://raw.githubusercontent.com/skunkworxdark/XYGrid_nodes/refs/heads/main/images/collage.png" />
 
 
 --------------------------------

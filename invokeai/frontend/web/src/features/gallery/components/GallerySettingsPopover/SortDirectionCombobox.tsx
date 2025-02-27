@@ -1,16 +1,19 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SingleValue } from 'chakra-react-select';
-import { orderDirChanged } from 'features/gallery/store/gallerySlice';
+import { orderDirChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
+const selectOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.orderDir);
+
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const orderDir = useAppSelector((s) => s.gallery.orderDir);
+  const orderDir = useAppSelector(selectOrderDir);
 
   const options = useMemo<ComboboxOption[]>(
     () => [

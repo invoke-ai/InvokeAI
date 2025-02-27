@@ -2,7 +2,13 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    Classification,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -12,6 +18,7 @@ from invokeai.app.invocations.fields import (
     UIType,
 )
 from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 from invokeai.version.invokeai_version import __version__
@@ -34,7 +41,7 @@ class IPAdapterMetadataField(BaseModel):
 
     image: ImageField = Field(description="The IP-Adapter image prompt.")
     ip_adapter_model: ModelIdentifierField = Field(description="The IP-Adapter model.")
-    clip_vision_model: Literal["ViT-H", "ViT-G"] = Field(description="The CLIP Vision model")
+    clip_vision_model: Literal["ViT-L", "ViT-H", "ViT-G"] = Field(description="The CLIP Vision model")
     method: Literal["full", "style", "composition"] = Field(description="Method to apply IP Weights with")
     weight: Union[float, list[float]] = Field(description="The weight given to the IP-Adapter")
     begin_step_percent: float = Field(description="When the IP-Adapter is first applied (% of total steps)")
@@ -129,13 +136,35 @@ class MergeMetadataInvocation(BaseInvocation):
 
 
 GENERATION_MODES = Literal[
-    "txt2img", "img2img", "inpaint", "outpaint", "sdxl_txt2img", "sdxl_img2img", "sdxl_inpaint", "sdxl_outpaint"
+    "txt2img",
+    "img2img",
+    "inpaint",
+    "outpaint",
+    "sdxl_txt2img",
+    "sdxl_img2img",
+    "sdxl_inpaint",
+    "sdxl_outpaint",
+    "flux_txt2img",
+    "flux_img2img",
+    "flux_inpaint",
+    "flux_outpaint",
+    "sd3_txt2img",
+    "sd3_img2img",
+    "sd3_inpaint",
+    "sd3_outpaint",
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="2.0.0")
+@invocation(
+    "core_metadata",
+    title="Core Metadata",
+    tags=["metadata"],
+    category="metadata",
+    version="2.0.0",
+    classification=Classification.Internal,
+)
 class CoreMetadataInvocation(BaseInvocation):
-    """Collects core generation metadata into a MetadataField"""
+    """Used internally by Invoke to collect metadata for generations."""
 
     generation_mode: Optional[GENERATION_MODES] = InputField(
         default=None,
@@ -247,3 +276,34 @@ class CoreMetadataInvocation(BaseInvocation):
         return MetadataOutput(metadata=MetadataField.model_validate(as_dict))
 
     model_config = ConfigDict(extra="allow")
+
+
+@invocation(
+    "metadata_field_extractor",
+    title="Metadata Field Extractor",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Deprecated,
+)
+class MetadataFieldExtractorInvocation(BaseInvocation):
+    """Extracts the text value from an image's metadata given a key.
+    Raises an error if the image has no metadata or if the value is not a string (nesting not permitted)."""
+
+    image: ImageField = InputField(description="The image to extract metadata from")
+    key: str = InputField(description="The key in the image's metadata to extract the value from")
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        image_name = self.image.image_name
+
+        metadata = context.images.get_metadata(image_name=image_name)
+        if not metadata:
+            raise ValueError(f"No metadata found on image {image_name}")
+
+        try:
+            val = metadata.root[self.key]
+            if not isinstance(val, str):
+                raise ValueError(f"Metadata at key '{self.key}' must be a string")
+            return StringOutput(value=val)
+        except KeyError as e:
+            raise ValueError(f"No key '{self.key}' found in the metadata for {image_name}") from e
