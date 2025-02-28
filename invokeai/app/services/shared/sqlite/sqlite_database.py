@@ -1,5 +1,4 @@
 import sqlite3
-import threading
 from logging import Logger
 from pathlib import Path
 
@@ -38,13 +37,19 @@ class SqliteDatabase:
             self.logger.info(f"Initializing database at {self.db_path}")
 
         self.conn = sqlite3.connect(database=self.db_path or sqlite_memory, check_same_thread=False)
-        self.lock = threading.RLock()
         self.conn.row_factory = sqlite3.Row
 
         if self.verbose:
             self.conn.set_trace_callback(self.logger.debug)
 
+        # Enable foreign key constraints
         self.conn.execute("PRAGMA foreign_keys = ON;")
+
+        # Enable Write-Ahead Logging (WAL) mode for better concurrency
+        self.conn.execute("PRAGMA journal_mode = WAL;")
+
+        # Set a busy timeout to prevent database lockups during writes
+        self.conn.execute("PRAGMA busy_timeout = 5000;")  # 5 seconds
 
     def clean(self) -> None:
         """
@@ -53,15 +58,14 @@ class SqliteDatabase:
         # No need to clean in-memory database
         if not self.db_path:
             return
-        with self.lock:
-            try:
-                initial_db_size = Path(self.db_path).stat().st_size
-                self.conn.execute("VACUUM;")
-                self.conn.commit()
-                final_db_size = Path(self.db_path).stat().st_size
-                freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
-                if freed_space_in_mb > 0:
-                    self.logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
-            except Exception as e:
-                self.logger.error(f"Error cleaning database: {e}")
-                raise
+        try:
+            initial_db_size = Path(self.db_path).stat().st_size
+            self.conn.execute("VACUUM;")
+            self.conn.commit()
+            final_db_size = Path(self.db_path).stat().st_size
+            freed_space_in_mb = round((initial_db_size - final_db_size) / 1024 / 1024, 2)
+            if freed_space_in_mb > 0:
+                self.logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
+        except Exception as e:
+            self.logger.error(f"Error cleaning database: {e}")
+            raise
