@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 from PIL import Image
 
@@ -13,6 +15,7 @@ from invokeai.app.invocations.fields import (
     FluxReduxConditioningField,
     InputField,
     OutputField,
+    TensorField,
 )
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
@@ -51,8 +54,11 @@ class FluxReduxInvocation(BaseInvocation):
     """Runs a FLUX Redux model to generate a conditioning tensor."""
 
     image: ImageField = InputField(description="The FLUX Redux image prompt.")
-
-    # TODO(ryand): Add support for a mask.
+    mask: Optional[TensorField] = InputField(
+        default=None,
+        description="The bool mask associated with this FLUX Redux image prompt. Excluded regions should be set to "
+        "False, included regions should be set to True.",
+    )
 
     def invoke(self, context: InvocationContext) -> FluxReduxOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
@@ -61,7 +67,9 @@ class FluxReduxInvocation(BaseInvocation):
         redux_conditioning = self._flux_redux_encode(context, encoded_x)
 
         tensor_name = context.tensors.save(redux_conditioning)
-        return FluxReduxOutput(redux_cond=FluxReduxConditioningField(tensor_name=tensor_name))
+        return FluxReduxOutput(
+            redux_cond=FluxReduxConditioningField(conditioning=TensorField(tensor_name=tensor_name), mask=self.mask)
+        )
 
     @torch.no_grad()
     def _siglip_encode(self, context: InvocationContext, image: Image.Image) -> torch.Tensor:

@@ -16,6 +16,8 @@ class FluxTextConditioning:
 @dataclass
 class FluxReduxConditioning:
     redux_embeddings: torch.Tensor
+    # If mask is None, the prompt is a global prompt.
+    mask: torch.Tensor | None
 
 
 @dataclass
