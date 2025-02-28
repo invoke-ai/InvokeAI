@@ -18,6 +18,7 @@ type Props = {
   data: paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'];
 };
 
+// kent and devon want to make this infinite scroll
 export const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
   const { t } = useTranslation();
 
