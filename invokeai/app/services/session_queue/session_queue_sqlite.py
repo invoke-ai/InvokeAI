@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sqlite3
 import threading
@@ -108,7 +109,11 @@ class SqliteSessionQueue(SessionQueueBase):
         )
         return cast(Union[int, None], self.__cursor.fetchone()[0]) or 0
 
-    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
+    async def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._enqueue_batch, queue_id, batch, prepend)
+
+    def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
         try:
             self.__lock.acquire()
 
