@@ -24254,8 +24254,8 @@ export interface operations {
                 direction?: components["schemas"]["SQLiteDirection"];
                 /** @description The categories of workflow to get */
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
-                /** @description The categories of marketplace workflow to get */
-                marketplace_categories?: string[] | null;
+                /** @description The tags of workflow to get */
+                tags?: string[] | null;
                 /** @description The text to query by (matches name and description) */
                 query?: string | null;
             };

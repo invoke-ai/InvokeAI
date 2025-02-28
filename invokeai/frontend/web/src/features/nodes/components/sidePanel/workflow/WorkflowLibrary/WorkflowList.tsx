@@ -1,14 +1,12 @@
 import { Flex, Grid, GridItem, Spinner } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type { WorkflowLibraryCategory } from 'features/nodes/store/types';
 import {
-  selectWorkflowBrowsingCategory,
+  selectWorkflowCategories,
   selectWorkflowOrderBy,
   selectWorkflowOrderDirection,
   selectWorkflowSearchTerm,
 } from 'features/nodes/store/workflowSlice';
-import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
@@ -19,27 +17,12 @@ import { WorkflowListItem } from './WorkflowListItem';
 
 const PER_PAGE = 6;
 
-const mapUiCategoryToApiCategory = (sideNav: WorkflowLibraryCategory): WorkflowCategory[] => {
-  switch (sideNav) {
-    case 'account':
-      return ['user', 'project'];
-    case 'private':
-      return ['user'];
-    case 'shared':
-      return ['project'];
-    case 'default':
-      return ['default'];
-    default:
-      return [];
-  }
-};
-
 export const WorkflowList = () => {
   const searchTerm = useAppSelector(selectWorkflowSearchTerm);
   const { t } = useTranslation();
 
   const [page, setPage] = useState(0);
-  const browsingCategory = useAppSelector(selectWorkflowBrowsingCategory);
+  const categories = useAppSelector(selectWorkflowCategories);
   const orderBy = useAppSelector(selectWorkflowOrderBy);
   const direction = useAppSelector(selectWorkflowOrderDirection);
   const query = useAppSelector(selectWorkflowSearchTerm);
@@ -47,10 +30,9 @@ export const WorkflowList = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [browsingCategory, query]);
+  }, [categories, query]);
 
   const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
-    const categories = mapUiCategoryToApiCategory(browsingCategory);
     return {
       page,
       per_page: PER_PAGE,
@@ -59,7 +41,7 @@ export const WorkflowList = () => {
       categories,
       query: debouncedQuery,
     };
-  }, [direction, orderBy, page, browsingCategory, debouncedQuery]);
+  }, [direction, orderBy, page, categories, debouncedQuery]);
 
   const { data, isLoading } = useListWorkflowsQuery(queryArg);
 
