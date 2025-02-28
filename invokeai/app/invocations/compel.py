@@ -340,11 +340,11 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
         description=FieldDescriptions.compel_prompt,
         ui_component=UIComponent.Textarea,
     )  # TODO: ?
-    original_width: int = InputField(default=1024, description="")
-    original_height: int = InputField(default=1024, description="")
-    crop_top: int = InputField(default=0, description="")
-    crop_left: int = InputField(default=0, description="")
-    aesthetic_score: float = InputField(default=6.0, description=FieldDescriptions.sdxl_aesthetic)
+    original_width: int = InputField(ge=8, default=1024, description="")
+    original_height: int = InputField(ge=8, default=1024, description="")
+    crop_top: int = InputField(ge=0, default=0, description="")
+    crop_left: int = InputField(ge=0, default=0, description="")
+    aesthetic_score: float = InputField(ge=1.0, le=10.0, default=6.0, description=FieldDescriptions.sdxl_aesthetic)
     clip2: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection)
 
     @torch.no_grad()
