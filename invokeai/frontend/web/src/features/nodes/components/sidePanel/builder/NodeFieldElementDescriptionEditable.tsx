@@ -1,10 +1,12 @@
 import { FormHelperText, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { linkifyOptions, linkifySx } from 'common/components/linkify';
 import { useEditable } from 'common/hooks/useEditable';
 import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
 import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
 import { fieldDescriptionChanged } from 'features/nodes/store/nodesSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
+import Linkify from 'linkify-react';
 import { memo, useCallback, useRef } from 'react';
 
 export const NodeFieldElementDescriptionEditable = memo(({ el }: { el: NodeFieldElement }) => {
@@ -36,7 +38,11 @@ export const NodeFieldElementDescriptionEditable = memo(({ el }: { el: NodeField
   });
 
   if (!editable.isEditing) {
-    return <FormHelperText onDoubleClick={editable.startEditing}>{editable.value}</FormHelperText>;
+    return (
+      <FormHelperText onDoubleClick={editable.startEditing} sx={linkifySx}>
+        <Linkify options={linkifyOptions}>{editable.value}</Linkify>
+      </FormHelperText>
+    );
   }
 
   return (

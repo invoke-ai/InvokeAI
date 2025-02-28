@@ -2277,11 +2277,7 @@
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
             "Impostazioni predefinite VRAM migliorate",
-            "Cancellazione della cache del modello su richiesta",
-            "Compatibilità estesa FLUX LoRA",
-            "Filtro Regola Immagine su Tela",
-            "Annulla tutto tranne l'elemento della coda corrente",
-            "Copia da e incolla sulla Tela"
+            "Cancellazione della cache del modello su richiesta"
         ]
     },
     "system": {

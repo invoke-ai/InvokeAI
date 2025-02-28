@@ -15,6 +15,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowName } from 'features/nodes/store/workflowSlice';
+import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import UploadWorkflowButton from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +64,7 @@ export const WorkflowListMenuTrigger = () => {
                 <WorkflowSearch searchInputRef={searchInputRef} />
                 <WorkflowSortControl />
                 <UploadWorkflowButton />
+                <NewWorkflowButton />
               </Flex>
               <Box position="relative" w="full" h="full">
                 <ScrollableContent>

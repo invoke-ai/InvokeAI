@@ -1,5 +1,7 @@
+import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { parseify } from 'common/util/serialize';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
@@ -7,8 +9,11 @@ import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { groupBy } from 'lodash-es';
+import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, BatchConfig } from 'services/api/types';
+
+const log = logger('generation');
 
 export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -101,6 +106,9 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
       const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));
       try {
         await req.unwrap();
+        log.debug(parseify({ batchConfig }), 'Enqueued batch');
+      } catch (error) {
+        log.error({ error: serializeError(error) }, 'Failed to enqueue batch');
       } finally {
         req.reset();
       }

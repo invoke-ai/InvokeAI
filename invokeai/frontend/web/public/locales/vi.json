@@ -2311,11 +2311,7 @@
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
             "Cải thiện các thiết lập mặc định của VRAM",
-            "Xoá bộ nhớ đệm của model theo yêu cầu",
-            "Mở rộng khả năng tương thích LoRA trên FLUX",
-            "Bộ lọc điều chỉnh ảnh trên Canvas",
-            "Huỷ tất cả trừ mục đang xếp hàng hiện tại",
-            "Sao chép và dán trên Canvas"
+            "Xoá bộ nhớ đệm của model theo yêu cầu"
         ]
     },
     "upsell": {

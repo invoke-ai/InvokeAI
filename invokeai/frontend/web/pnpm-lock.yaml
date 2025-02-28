@@ -74,6 +74,12 @@ dependencies:
   konva:
     specifier: ^9.3.15
     version: 9.3.15
+  linkify-react:
+    specifier: ^4.2.0
+    version: 4.2.0(linkifyjs@4.2.0)(react@18.3.1)
+  linkifyjs:
+    specifier: ^4.2.0
+    version: 4.2.0
   lodash-es:
     specifier: ^4.17.21
     version: 4.17.21
@@ -6712,6 +6718,20 @@ packages:
 
   /lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
+    dev: false
+
+  /linkify-react@4.2.0(linkifyjs@4.2.0)(react@18.3.1):
+    resolution: {integrity: sha512-dIcDGo+n4FP2FPIHDcqB7cUE+omkcEgQJpc7sNNP4+XZ9FUhFAkKjGnHMzsZM+B4yF93sK166z9K5cKTe/JpzA==}
+    peerDependencies:
+      linkifyjs: ^4.0.0
+      react: '>= 15.0.0'
+    dependencies:
+      linkifyjs: 4.2.0
+      react: 18.3.1
+    dev: false
+
+  /linkifyjs@4.2.0:
+    resolution: {integrity: sha512-pCj3PrQyATaoTYKHrgWRF3SJwsm61udVh+vuls/Rl6SptiDhgE7ziUIudAedRY9QEfynmM7/RmLEfPUyw1HPCw==}
     dev: false
 
   /liqe@3.8.0:

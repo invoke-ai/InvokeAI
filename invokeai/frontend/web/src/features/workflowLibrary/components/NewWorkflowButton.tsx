@@ -23,7 +23,6 @@ export const NewWorkflowButton = memo(() => {
     <IconButton
       onClick={onClickNewWorkflow}
       variant="ghost"
-      size="sm"
       aria-label={t('nodes.newWorkflow')}
       tooltip={t('nodes.newWorkflow')}
       icon={<PiFilePlusBold />}

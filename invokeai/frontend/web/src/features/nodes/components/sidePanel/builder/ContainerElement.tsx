@@ -50,7 +50,7 @@ const ContainerElement = memo(({ id }: { id: string }) => {
 ContainerElement.displayName = 'ContainerElementComponent';
 
 const containerViewModeSx: SystemStyleObject = {
-  gap: 4,
+  gap: 2,
   '&[data-self-layout="column"]': {
     flexDir: 'column',
     alignItems: 'stretch',
@@ -197,7 +197,7 @@ const rootViewModeSx: SystemStyleObject = {
   borderRadius: 'base',
   w: 'full',
   h: 'full',
-  gap: 4,
+  gap: 2,
   display: 'flex',
   flex: 1,
   maxW: '768px',
@@ -232,6 +232,7 @@ RootContainerElementViewMode.displayName = 'RootContainerElementViewMode';
 
 const rootEditModeSx: SystemStyleObject = {
   ...rootViewModeSx,
+  gap: 4,
   '&[data-is-dragging-over="true"]': {
     opacity: 1,
     bg: 'base.850',
