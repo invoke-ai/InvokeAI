@@ -331,14 +331,25 @@ const buildInstanceTypeGuard = <T extends z.ZodTypeAny>(schema: T) => {
   return (val: unknown): val is z.infer<T> => schema.safeParse(val).success;
 };
 
+/**
+ * Builds a type guard for a specific field input template type.
+ *
+ * The output type guards are primarily used for determining which input component to render for fields in the
+ * <InputFieldRenderer/> component.
+ *
+ * @param name The name of the field type.
+ * @param cardinalities The allowed cardinalities for the field type. If omitted, all cardinalities are allowed.
+ *
+ *  @returns A type guard for the specified field type.
+ */
 const buildTemplateTypeGuard =
-  <T extends FieldInputTemplate>(name: string, cardinality?: 'SINGLE' | 'COLLECTION' | 'SINGLE_OR_COLLECTION') =>
+  <T extends FieldInputTemplate>(name: string, cardinalities?: FieldType['cardinality'][]) =>
   (template: FieldInputTemplate): template is T => {
     if (template.type.name !== name) {
       return false;
     }
-    if (cardinality) {
-      return template.type.cardinality === cardinality;
+    if (cardinalities) {
+      return cardinalities.includes(template.type.cardinality);
     }
     return true;
   };
@@ -366,7 +377,10 @@ export type IntegerFieldValue = z.infer<typeof zIntegerFieldValue>;
 export type IntegerFieldInputInstance = z.infer<typeof zIntegerFieldInputInstance>;
 export type IntegerFieldInputTemplate = z.infer<typeof zIntegerFieldInputTemplate>;
 export const isIntegerFieldInputInstance = buildInstanceTypeGuard(zIntegerFieldInputInstance);
-export const isIntegerFieldInputTemplate = buildTemplateTypeGuard<IntegerFieldInputTemplate>('IntegerField', 'SINGLE');
+export const isIntegerFieldInputTemplate = buildTemplateTypeGuard<IntegerFieldInputTemplate>('IntegerField', [
+  'SINGLE',
+  'SINGLE_OR_COLLECTION',
+]);
 // #endregion
 
 // #region IntegerField Collection
@@ -406,7 +420,7 @@ export type IntegerFieldCollectionInputTemplate = z.infer<typeof zIntegerFieldCo
 export const isIntegerFieldCollectionInputInstance = buildInstanceTypeGuard(zIntegerFieldCollectionInputInstance);
 export const isIntegerFieldCollectionInputTemplate = buildTemplateTypeGuard<IntegerFieldCollectionInputTemplate>(
   'IntegerField',
-  'COLLECTION'
+  ['COLLECTION']
 );
 // #endregion
 
@@ -432,7 +446,10 @@ export type FloatFieldValue = z.infer<typeof zFloatFieldValue>;
 export type FloatFieldInputInstance = z.infer<typeof zFloatFieldInputInstance>;
 export type FloatFieldInputTemplate = z.infer<typeof zFloatFieldInputTemplate>;
 export const isFloatFieldInputInstance = buildInstanceTypeGuard(zFloatFieldInputInstance);
-export const isFloatFieldInputTemplate = buildTemplateTypeGuard<FloatFieldInputTemplate>('FloatField', 'SINGLE');
+export const isFloatFieldInputTemplate = buildTemplateTypeGuard<FloatFieldInputTemplate>('FloatField', [
+  'SINGLE',
+  'SINGLE_OR_COLLECTION',
+]);
 // #endregion
 
 // #region FloatField Collection
@@ -471,7 +488,7 @@ export type FloatFieldCollectionInputTemplate = z.infer<typeof zFloatFieldCollec
 export const isFloatFieldCollectionInputInstance = buildInstanceTypeGuard(zFloatFieldCollectionInputInstance);
 export const isFloatFieldCollectionInputTemplate = buildTemplateTypeGuard<FloatFieldCollectionInputTemplate>(
   'FloatField',
-  'COLLECTION'
+  ['COLLECTION']
 );
 // #endregion
 
@@ -504,7 +521,10 @@ export type StringFieldValue = z.infer<typeof zStringFieldValue>;
 export type StringFieldInputInstance = z.infer<typeof zStringFieldInputInstance>;
 export type StringFieldInputTemplate = z.infer<typeof zStringFieldInputTemplate>;
 export const isStringFieldInputInstance = buildInstanceTypeGuard(zStringFieldInputInstance);
-export const isStringFieldInputTemplate = buildTemplateTypeGuard<StringFieldInputTemplate>('StringField', 'SINGLE');
+export const isStringFieldInputTemplate = buildTemplateTypeGuard<StringFieldInputTemplate>('StringField', [
+  'SINGLE',
+  'SINGLE_OR_COLLECTION',
+]);
 // #endregion
 
 // #region StringField Collection
@@ -550,7 +570,7 @@ export type StringFieldCollectionInputTemplate = z.infer<typeof zStringFieldColl
 export const isStringFieldCollectionInputInstance = buildInstanceTypeGuard(zStringFieldCollectionInputInstance);
 export const isStringFieldCollectionInputTemplate = buildTemplateTypeGuard<StringFieldCollectionInputTemplate>(
   'StringField',
-  'COLLECTION'
+  ['COLLECTION']
 );
 // #endregion
 
@@ -613,7 +633,10 @@ export type ImageFieldValue = z.infer<typeof zImageFieldValue>;
 export type ImageFieldInputInstance = z.infer<typeof zImageFieldInputInstance>;
 export type ImageFieldInputTemplate = z.infer<typeof zImageFieldInputTemplate>;
 export const isImageFieldInputInstance = buildInstanceTypeGuard(zImageFieldInputInstance);
-export const isImageFieldInputTemplate = buildTemplateTypeGuard<ImageFieldInputTemplate>('ImageField', 'SINGLE');
+export const isImageFieldInputTemplate = buildTemplateTypeGuard<ImageFieldInputTemplate>('ImageField', [
+  'SINGLE',
+  'SINGLE_OR_COLLECTION',
+]);
 // #endregion
 
 // #region ImageField Collection
@@ -648,7 +671,7 @@ export type ImageFieldCollectionInputTemplate = z.infer<typeof zImageFieldCollec
 export const isImageFieldCollectionInputInstance = buildInstanceTypeGuard(zImageFieldCollectionInputInstance);
 export const isImageFieldCollectionInputTemplate = buildTemplateTypeGuard<ImageFieldCollectionInputTemplate>(
   'ImageField',
-  'COLLECTION'
+  ['COLLECTION']
 );
 // #endregion
 
