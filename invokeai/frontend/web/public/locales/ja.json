@@ -329,7 +329,13 @@
             "redo": {
                 "title": "やり直し"
             },
-            "title": "ワークフロー"
+            "title": "ワークフロー",
+            "pasteSelection": {
+                "title": "ペースト"
+            },
+            "copySelection": {
+                "title": "コピー"
+            }
         },
         "app": {
             "toggleLeftPanel": {
@@ -390,7 +396,10 @@
                 "desc": "カーソルをポジティブプロンプト欄に移動します。"
             }
         },
-        "hotkeys": "ホットキー"
+        "hotkeys": "ホットキー",
+        "gallery": {
+            "title": "ギャラリー"
+        }
     },
     "modelManager": {
         "modelManager": "モデルマネージャ",
@@ -452,7 +461,8 @@
         "loraModels": "LoRA",
         "edit": "編集",
         "install": "インストール",
-        "huggingFacePlaceholder": "owner/model-name"
+        "huggingFacePlaceholder": "owner/model-name",
+        "variant": "Variant"
     },
     "parameters": {
         "images": "画像",
@@ -507,7 +517,8 @@
         "resetWebUIDesc2": "もしギャラリーに画像が表示されないなど、何か問題が発生した場合はGitHubにissueを提出する前にリセットを試してください。",
         "resetComplete": "WebUIはリセットされました。",
         "ui": "ユーザーインターフェイス",
-        "beta": "ベータ"
+        "beta": "ベータ",
+        "developer": "開発者"
     },
     "toast": {
         "uploadFailed": "アップロード失敗",
@@ -556,7 +567,8 @@
         "negativePrompt": "ネガティブプロンプト",
         "generationMode": "生成モード",
         "vae": "VAE",
-        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)"
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "canvasV2Metadata": "キャンバス"
     },
     "queue": {
         "queueEmpty": "キューが空です",
@@ -690,7 +702,8 @@
         "notes": "ノート",
         "workflow": "ワークフロー",
         "workflowName": "名前",
-        "workflowNotes": "ノート"
+        "workflowNotes": "ノート",
+        "enum": "Enum"
     },
     "boards": {
         "autoAddBoard": "自動追加するボード",
@@ -823,6 +836,15 @@
         },
         "lora": {
             "heading": "LoRA"
+        },
+        "loraWeight": {
+            "heading": "重み"
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Downscale"
+        },
+        "controlNetWeight": {
+            "heading": "重み"
         }
     },
     "accordions": {
@@ -865,7 +887,8 @@
             "queue": "キュー",
             "canvas": "キャンバス",
             "workflows": "ワークフロー",
-            "models": "モデル"
+            "models": "モデル",
+            "gallery": "ギャラリー"
         }
     },
     "controlLayers": {
@@ -880,7 +903,8 @@
             "bboxGroup": "バウンディングボックスから作成",
             "cropCanvasToBbox": "キャンバスをバウンディングボックスでクロップ",
             "newGlobalReferenceImage": "新規全域参照画像",
-            "newRegionalReferenceImage": "新規領域参照画像"
+            "newRegionalReferenceImage": "新規領域参照画像",
+            "canvasGroup": "キャンバス"
         },
         "regionalGuidance": "領域ガイダンス",
         "globalReferenceImage": "全域参照画像",
@@ -901,7 +925,8 @@
             "brush": "ブラシ",
             "rectangle": "矩形",
             "move": "移動",
-            "eraser": "消しゴム"
+            "eraser": "消しゴム",
+            "bbox": "Bbox"
         },
         "saveCanvasToGallery": "キャンバスをギャラリーに保存",
         "saveBboxToGallery": "バウンディングボックスをギャラリーへ保存",
@@ -919,7 +944,27 @@
         "canvas": "キャンバス",
         "fitBboxToLayers": "バウンディングボックスをレイヤーにフィット",
         "removeBookmark": "ブックマークを外す",
-        "savedToGalleryOk": "ギャラリーに保存しました"
+        "savedToGalleryOk": "ギャラリーに保存しました",
+        "controlMode": {
+            "prompt": "プロンプト"
+        },
+        "prompt": "プロンプト",
+        "settings": {
+            "snapToGrid": {
+                "off": "オフ",
+                "on": "オン"
+            }
+        },
+        "filter": {
+            "filter": "フィルター",
+            "spandrel_filter": {
+                "model": "モデル"
+            },
+            "apply": "適用",
+            "reset": "リセット",
+            "cancel": "キャンセル"
+        },
+        "weight": "重み"
     },
     "stylePresets": {
         "clearTemplateSelection": "選択したテンプレートをクリア",
@@ -934,7 +979,10 @@
         "toggleViewMode": "表示モードを切り替え",
         "negativePromptColumn": "'negative_prompt'",
         "preview": "プレビュー",
-        "nameColumn": "'name'"
+        "nameColumn": "'name'",
+        "type": "タイプ",
+        "private": "プライベート",
+        "name": "名称"
     },
     "upscaling": {
         "upscaleModel": "アップスケールモデル",
@@ -946,7 +994,8 @@
         "denoisingStrength": "ノイズ除去強度",
         "scheduler": "スケジューラー",
         "loading": "ロード中...",
-        "steps": "ステップ"
+        "steps": "ステップ",
+        "refiner": "Refiner"
     },
     "modelCache": {
         "clear": "モデルキャッシュを消去",
@@ -958,5 +1007,23 @@
         "ascending": "昇順",
         "name": "名前",
         "descending": "降順"
+    },
+    "system": {
+        "logNamespaces": {
+            "system": "システム",
+            "gallery": "ギャラリー",
+            "workflows": "ワークフロー",
+            "models": "モデル",
+            "canvas": "キャンバス",
+            "metadata": "メタデータ",
+            "queue": "キュー"
+        },
+        "logLevel": {
+            "debug": "Debug",
+            "info": "Info",
+            "error": "Error",
+            "fatal": "Fatal",
+            "warn": "Warn"
+        }
     }
 }
