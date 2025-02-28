@@ -1,32 +1,24 @@
-import { Badge, Button, Flex, Icon, IconButton, Image, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $projectUrl } from 'app/store/nanostores/projectId';
+import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
-import { useDeleteWorkflow } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
-import { useDownloadWorkflowById } from 'features/workflowLibrary/hooks/useDownloadWorkflowById';
-import type { MouseEvent } from 'react';
+import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiDownloadSimpleBold,
-  PiImageBold,
-  PiPencilBold,
-  PiShareFatBold,
-  PiTrashBold,
-  PiUsersBold,
-} from 'react-icons/pi';
+import { PiImageBold, PiUsersBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
-import { useShareWorkflow } from './ShareWorkflowModal';
+import { DeleteWorkflow } from './WorkflowLibraryListItemActions/DeleteWorkflow';
+import { DownloadWorkflow } from './WorkflowLibraryListItemActions/DownloadWorkflow';
+import { EditWorkflow } from './WorkflowLibraryListItemActions/EditWorkflow';
+import { SaveWorkflow } from './WorkflowLibraryListItemActions/SaveWorkflow';
+import { ViewWorkflow } from './WorkflowLibraryListItemActions/ViewWorkflow';
 
 const IMAGE_THUMBNAIL_SIZE = '80px';
 const FALLBACK_ICON_SIZE = '24px';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
   const { t } = useTranslation();
-  const projectUrl = useStore($projectUrl);
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseOver = useCallback(() => {
@@ -38,9 +30,6 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   }, []);
 
   const workflowId = useAppSelector(selectWorkflowId);
-  const downloadWorkflowById = useDownloadWorkflowById();
-  const shareWorkflow = useShareWorkflow();
-  const deleteWorkflow = useDeleteWorkflow();
   const loadWorkflow = useLoadWorkflow();
 
   const isActive = useMemo(() => {
@@ -51,38 +40,6 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
     setIsHovered(false);
     loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
   }, [loadWorkflow, workflow.workflow_id]);
-
-  const handleClickEdit = useCallback(() => {
-    setIsHovered(false);
-    loadWorkflow.loadWithDialog(workflow.workflow_id, 'edit');
-  }, [loadWorkflow, workflow.workflow_id]);
-
-  const handleClickDelete = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      setIsHovered(false);
-      deleteWorkflow(workflow);
-    },
-    [deleteWorkflow, workflow]
-  );
-
-  const handleClickShare = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      setIsHovered(false);
-      shareWorkflow(workflow);
-    },
-    [shareWorkflow, workflow]
-  );
-
-  const handleClickDownload = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      setIsHovered(false);
-      downloadWorkflowById.downloadWorkflow(workflow.workflow_id);
-    },
-    [downloadWorkflowById, workflow.workflow_id]
-  );
 
   return (
     <Flex
@@ -141,78 +98,26 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       <Flex flexDir="column" gap={1} justifyContent="space-between">
         <Flex gap={1} justifyContent="flex-end" w="full" p={2}>
           {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
-          {workflow.category === 'default' && <Icon as={PiUsersBold} color="base.200" />}
+          {workflow.category === 'default' && (
+            <Image src={InvokeLogo} alt="invoke-logo" w="14px" h="14px" minW="14px" minH="14px" userSelect="none" />
+          )}
         </Flex>
 
-        {workflow.category !== 'default' ? (
-          <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
-            <Tooltip
-              label={t('workflows.edit')}
-              // This prevents an issue where the tooltip isn't closed after the modal is opened
-              isOpen={!isHovered ? false : undefined}
-              closeOnScroll
-            >
-              <IconButton
-                size="sm"
-                variant="ghost"
-                aria-label={t('workflows.edit')}
-                onClick={handleClickEdit}
-                icon={<PiPencilBold />}
-              />
-            </Tooltip>
-            <Tooltip
-              label={t('workflows.download')}
-              // This prevents an issue where the tooltip isn't closed after the modal is opened
-              isOpen={!isHovered ? false : undefined}
-              closeOnScroll
-            >
-              <IconButton
-                size="sm"
-                variant="ghost"
-                aria-label={t('workflows.download')}
-                onClick={handleClickDownload}
-                icon={<PiDownloadSimpleBold />}
-                isLoading={downloadWorkflowById.isLoading}
-              />
-            </Tooltip>
-            {!!projectUrl && workflow.workflow_id && workflow.category !== 'user' && (
-              <Tooltip
-                label={t('workflows.copyShareLink')}
-                // This prevents an issue where the tooltip isn't closed after the modal is opened
-                isOpen={!isHovered ? false : undefined}
-                closeOnScroll
-              >
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t('workflows.copyShareLink')}
-                  onClick={handleClickShare}
-                  icon={<PiShareFatBold />}
-                />
-              </Tooltip>
-            )}
-            <Tooltip
-              label={t('workflows.delete')}
-              // This prevents an issue where the tooltip isn't closed after the modal is opened
-              isOpen={!isHovered ? false : undefined}
-              closeOnScroll
-            >
-              <IconButton
-                size="sm"
-                variant="ghost"
-                aria-label={t('workflows.delete')}
-                onClick={handleClickDelete}
-                colorScheme="error"
-                icon={<PiTrashBold />}
-              />
-            </Tooltip>
-          </Flex>
-        ) : (
-          <Flex flexDir="column" alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
-            <Button size="xs">Try it out</Button>
-            <Button size="xs">Copy to account</Button>
-          </Flex>
-        )}
+        <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
+          {workflow.category === 'default' && (
+            <>
+              <ViewWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
+              <SaveWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
+            </>
+          )}
+          {workflow.category !== 'default' && (
+            <>
+              <EditWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
+              <DownloadWorkflow isHovered={isHovered} setIsHovered={setIsHovered} />
+              <DeleteWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
+            </>
+          )}
+        </Flex>
       </Flex>
     </Flex>
   );

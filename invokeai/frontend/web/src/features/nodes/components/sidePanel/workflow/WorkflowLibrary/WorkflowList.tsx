@@ -84,7 +84,7 @@ export const WorkflowList = () => {
 
   return (
     <Flex flexDir="column" gap={6}>
-      <Grid templateColumns="repeat(2, minmax(200px, 3fr))" gap={4}>
+      <Grid templateColumns="repeat(2, minmax(200px, 3fr))" templateRows="1fr 1fr 1fr" gap={4}>
         {data?.items.map((workflow) => (
           <GridItem key={workflow.workflow_id}>
             <WorkflowListItem workflow={workflow} key={workflow.workflow_id} />
