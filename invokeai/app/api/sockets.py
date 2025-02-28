@@ -90,7 +90,7 @@ class SocketIO:
     _unsub_bulk_download = "unsubscribe_bulk_download"
 
     def __init__(self, app: FastAPI):
-        self._sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*", ping_interval=1)
+        self._sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
         self._app = ASGIApp(socketio_server=self._sio, socketio_path="/ws/socket.io")
         app.mount("/ws", self._app)
 
