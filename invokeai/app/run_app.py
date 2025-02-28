@@ -1,5 +1,6 @@
 import uvicorn
 
+from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.startup_utils import (
     apply_monkeypatches,
@@ -46,6 +47,11 @@ def run_app() -> None:
 
     # Initialize the app and event loop.
     app, loop = get_app()
+
+    # Load custom nodes. This must be done after importing the Graph class, which itself imports all modules from the
+    # invocations module. The ordering here is implicit, but important - we want to load custom nodes after all the
+    # core nodes have been imported so that we can catch when a custom node clobbers a core node.
+    load_custom_nodes(custom_nodes_path=app_config.custom_nodes_path)
 
     # Start the server.
     config = uvicorn.Config(
