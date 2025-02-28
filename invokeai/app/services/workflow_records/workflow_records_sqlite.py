@@ -23,7 +23,6 @@ from invokeai.app.util.misc import uuid_string
 class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
-        self._lock = db.lock
         self._conn = db.conn
         self._cursor = self._conn.cursor()
 
@@ -33,41 +32,33 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def get(self, workflow_id: str) -> WorkflowRecordDTO:
         """Gets a workflow by ID. Updates the opened_at column."""
-        try:
-            self._lock.acquire()
-            self._cursor.execute(
-                """--sql
-                UPDATE workflow_library
-                SET opened_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-                WHERE workflow_id = ?;
-                """,
-                (workflow_id,),
-            )
-            self._conn.commit()
-            self._cursor.execute(
-                """--sql
-                SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
-                FROM workflow_library
-                WHERE workflow_id = ?;
-                """,
-                (workflow_id,),
-            )
-            row = self._cursor.fetchone()
-            if row is None:
-                raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
-            return WorkflowRecordDTO.from_dict(dict(row))
-        except Exception:
-            self._conn.rollback()
-            raise
-        finally:
-            self._lock.release()
+        self._cursor.execute(
+            """--sql
+            UPDATE workflow_library
+            SET opened_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+            WHERE workflow_id = ?;
+            """,
+            (workflow_id,),
+        )
+        self._conn.commit()
+        self._cursor.execute(
+            """--sql
+            SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
+            FROM workflow_library
+            WHERE workflow_id = ?;
+            """,
+            (workflow_id,),
+        )
+        row = self._cursor.fetchone()
+        if row is None:
+            raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
+        return WorkflowRecordDTO.from_dict(dict(row))
 
     def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
         try:
             # Only user workflows may be created by this method
             assert workflow.meta.category is WorkflowCategory.User
             workflow_with_id = Workflow(**workflow.model_dump(), id=uuid_string())
-            self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO workflow_library (
@@ -82,13 +73,10 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         except Exception:
             self._conn.rollback()
             raise
-        finally:
-            self._lock.release()
         return self.get(workflow_with_id.id)
 
     def update(self, workflow: Workflow) -> WorkflowRecordDTO:
         try:
-            self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 UPDATE workflow_library
@@ -101,13 +89,10 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         except Exception:
             self._conn.rollback()
             raise
-        finally:
-            self._lock.release()
         return self.get(workflow.id)
 
     def delete(self, workflow_id: str) -> None:
         try:
-            self._lock.acquire()
             self._cursor.execute(
                 """--sql
                 DELETE from workflow_library
@@ -119,8 +104,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         except Exception:
             self._conn.rollback()
             raise
-        finally:
-            self._lock.release()
         return None
 
     def get_many(
@@ -132,66 +115,59 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         per_page: Optional[int] = None,
         query: Optional[str] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
-        try:
-            self._lock.acquire()
-            # sanitize!
-            assert order_by in WorkflowRecordOrderBy
-            assert direction in SQLiteDirection
-            assert category in WorkflowCategory
-            count_query = "SELECT COUNT(*) FROM workflow_library WHERE category = ?"
-            main_query = """
-                SELECT
-                    workflow_id,
-                    category,
-                    name,
-                    description,
-                    created_at,
-                    updated_at,
-                    opened_at
-                FROM workflow_library
-                WHERE category = ?
-                """
-            main_params: list[int | str] = [category.value]
-            count_params: list[int | str] = [category.value]
+        # sanitize!
+        assert order_by in WorkflowRecordOrderBy
+        assert direction in SQLiteDirection
+        assert category in WorkflowCategory
+        count_query = "SELECT COUNT(*) FROM workflow_library WHERE category = ?"
+        main_query = """
+            SELECT
+                workflow_id,
+                category,
+                name,
+                description,
+                created_at,
+                updated_at,
+                opened_at
+            FROM workflow_library
+            WHERE category = ?
+            """
+        main_params: list[int | str] = [category.value]
+        count_params: list[int | str] = [category.value]
 
-            stripped_query = query.strip() if query else None
-            if stripped_query:
-                wildcard_query = "%" + stripped_query + "%"
-                main_query += " AND name LIKE ? OR description LIKE ? "
-                count_query += " AND name LIKE ? OR description LIKE ?;"
-                main_params.extend([wildcard_query, wildcard_query])
-                count_params.extend([wildcard_query, wildcard_query])
+        stripped_query = query.strip() if query else None
+        if stripped_query:
+            wildcard_query = "%" + stripped_query + "%"
+            main_query += " AND name LIKE ? OR description LIKE ? "
+            count_query += " AND name LIKE ? OR description LIKE ?;"
+            main_params.extend([wildcard_query, wildcard_query])
+            count_params.extend([wildcard_query, wildcard_query])
 
-            main_query += f" ORDER BY {order_by.value} {direction.value}"
+        main_query += f" ORDER BY {order_by.value} {direction.value}"
 
-            if per_page:
-                main_query += " LIMIT ? OFFSET ?"
-                main_params.extend([per_page, page * per_page])
+        if per_page:
+            main_query += " LIMIT ? OFFSET ?"
+            main_params.extend([per_page, page * per_page])
 
-            self._cursor.execute(main_query, main_params)
-            rows = self._cursor.fetchall()
-            workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
+        self._cursor.execute(main_query, main_params)
+        rows = self._cursor.fetchall()
+        workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
 
-            self._cursor.execute(count_query, count_params)
-            total = self._cursor.fetchone()[0]
+        self._cursor.execute(count_query, count_params)
+        total = self._cursor.fetchone()[0]
 
-            if per_page:
-                pages = total // per_page + (total % per_page > 0)
-            else:
-                pages = 1  # If no pagination, there is only one page
+        if per_page:
+            pages = total // per_page + (total % per_page > 0)
+        else:
+            pages = 1  # If no pagination, there is only one page
 
-            return PaginatedResults(
-                items=workflows,
-                page=page,
-                per_page=per_page if per_page else total,
-                pages=pages,
-                total=total,
-            )
-        except Exception:
-            self._conn.rollback()
-            raise
-        finally:
-            self._lock.release()
+        return PaginatedResults(
+            items=workflows,
+            page=page,
+            per_page=per_page if per_page else total,
+            pages=pages,
+            total=total,
+        )
 
     def _sync_default_workflows(self) -> None:
         """Syncs default workflows to the database. Internal use only."""
@@ -207,7 +183,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         """
 
         try:
-            self._lock.acquire()
             workflows: list[Workflow] = []
             workflows_dir = Path(__file__).parent / Path("default_workflows")
             workflow_paths = workflows_dir.glob("*.json")
@@ -239,5 +214,3 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         except Exception:
             self._conn.rollback()
             raise
-        finally:
-            self._lock.release()
