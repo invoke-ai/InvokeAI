@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import threading
+from time import sleep
 from typing import Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
@@ -115,6 +116,8 @@ class SqliteSessionQueue(SessionQueueBase):
             current_queue_size = self._get_current_queue_size(queue_id)
             max_queue_size = self.__invoker.services.configuration.max_queue_size
             max_new_queue_items = max_queue_size - current_queue_size
+
+            sleep(15)  # Simulate a slow operation
 
             priority = 0
             if prepend:
