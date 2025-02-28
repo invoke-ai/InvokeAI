@@ -3,23 +3,39 @@ import { Button, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { WorkflowLibraryCategory } from 'features/nodes/store/types';
-import { selectWorkflowBrowsingCategory, workflowBrowsingCategoryChanged } from 'features/nodes/store/workflowSlice';
-import { useCallback } from 'react';
+import { selectWorkflowCategories, workflowCategoriesChanged } from 'features/nodes/store/workflowSlice';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import { useCallback, useMemo } from 'react';
 import { PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
 
 export const WorkflowLibrarySideNav = () => {
   const dispatch = useDispatch();
-  const browsingCategory = useAppSelector(selectWorkflowBrowsingCategory);
-  const workflowCategories = useStore($workflowCategories);
+  const categories = useAppSelector(selectWorkflowCategories);
+  const categoryOptions = useStore($workflowCategories);
 
   const handleCategoryChange = useCallback(
-    (category: WorkflowLibraryCategory) => {
-      dispatch(workflowBrowsingCategoryChanged(category));
+    (categories: WorkflowCategory[]) => {
+      dispatch(workflowCategoriesChanged(categories));
     },
     [dispatch]
   );
+
+  const handleSelectYourWorkflows = useCallback(() => {
+    if (categoryOptions.includes('project')) {
+      handleCategoryChange(['user', 'project']);
+    } else {
+      handleCategoryChange(['user']);
+    }
+  }, [categoryOptions, handleCategoryChange]);
+
+  const isYourWorkflowsActive = useMemo(() => {
+    if (categoryOptions.includes('project')) {
+      return categories.includes('user') && categories.includes('project');
+    } else {
+      return categories.includes('user');
+    }
+  }, [categoryOptions, categories]);
 
   return (
     <Flex flexDir="column" gap={2} borderRight="1px solid" borderColor="base.400" h="full" pr={4}>
@@ -28,8 +44,8 @@ export const WorkflowLibrarySideNav = () => {
         fontWeight="bold"
         justifyContent="flex-start"
         size="md"
-        isActive={browsingCategory === 'account'}
-        onClick={handleCategoryChange.bind(null, 'account')}
+        isActive={isYourWorkflowsActive}
+        onClick={handleSelectYourWorkflows}
         _active={{
           bg: 'base.700',
           color: 'base.100',
@@ -37,15 +53,15 @@ export const WorkflowLibrarySideNav = () => {
       >
         Your Workflows
       </Button>
-      {workflowCategories.includes('project') && (
+      {categoryOptions.includes('project') && (
         <Flex flexDir="column" gap={2} pl={4}>
           <Button
             variant="ghost"
             fontWeight="bold"
             justifyContent="flex-start"
             size="sm"
-            isActive={browsingCategory === 'private'}
-            onClick={handleCategoryChange.bind(null, 'private')}
+            isActive={categories.length === 1 && categories.includes('user')}
+            onClick={handleCategoryChange.bind(null, ['user'])}
             _active={{
               bg: 'base.700',
               color: 'base.100',
@@ -59,8 +75,8 @@ export const WorkflowLibrarySideNav = () => {
             justifyContent="flex-start"
             size="sm"
             rightIcon={<PiUsersBold />}
-            isActive={browsingCategory === 'shared'}
-            onClick={handleCategoryChange.bind(null, 'shared')}
+            isActive={categories.length === 1 && categories.includes('project')}
+            onClick={handleCategoryChange.bind(null, ['project'])}
             _active={{
               bg: 'base.700',
               color: 'base.100',
@@ -75,8 +91,8 @@ export const WorkflowLibrarySideNav = () => {
         fontWeight="bold"
         justifyContent="flex-start"
         size="md"
-        isActive={browsingCategory === 'default'}
-        onClick={handleCategoryChange.bind(null, 'default')}
+        isActive={categories.includes('default')}
+        onClick={handleCategoryChange.bind(null, ['default'])}
         _active={{
           bg: 'base.700',
           color: 'base.100',
@@ -85,14 +101,13 @@ export const WorkflowLibrarySideNav = () => {
         Browse Workflows
       </Button>
 
+      {/* these are obviously placeholders - we need to figure out the best way to do this. leaning towards "tags" so that we can filter and/or have multiple selected eventually */}
       <Flex flexDir="column" gap={2} pl={4}>
         <Button
           variant="ghost"
           fontWeight="bold"
           justifyContent="flex-start"
           size="sm"
-          isActive={browsingCategory === 'private'}
-          onClick={handleCategoryChange.bind(null, 'private')}
           _active={{
             bg: 'base.700',
             color: 'base.100',
@@ -105,8 +120,6 @@ export const WorkflowLibrarySideNav = () => {
           fontWeight="bold"
           justifyContent="flex-start"
           size="sm"
-          isActive={browsingCategory === 'shared'}
-          onClick={handleCategoryChange.bind(null, 'shared')}
           _active={{
             bg: 'base.700',
             color: 'base.100',

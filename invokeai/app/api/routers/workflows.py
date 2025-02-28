@@ -103,9 +103,7 @@ async def list_workflows(
     ),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Ascending, description="The direction to order by"),
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories of workflow to get"),
-    marketplace_categories: Optional[list[str]] = Query(
-        default=None, description="The categories of marketplace workflow to get"
-    ),
+    tags: Optional[list[str]] = Query(default=None, description="The tags of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""

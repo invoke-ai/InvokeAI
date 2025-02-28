@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold } from 'react-icons/pi';
 
+// needs to be updated to work for a workflow other than the one loaded in editor
 export const DownloadWorkflow = ({
   isHovered,
   setIsHovered,

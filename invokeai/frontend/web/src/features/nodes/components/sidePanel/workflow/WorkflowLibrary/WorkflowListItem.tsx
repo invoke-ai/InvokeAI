@@ -106,6 +106,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
           {workflow.category === 'default' && (
             <>
+              {/* need to consider what is useful here and which icons show that. idea is to "try it out"/"view" or "clone for your own changes" */}
               <ViewWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
               <SaveWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
             </>
