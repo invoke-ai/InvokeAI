@@ -20,6 +20,9 @@ const sx: SystemStyleObject = {
     flex: '1 1 0',
     minW: 32,
   },
+  '&[data-with-description="false"]': {
+    pb: 2,
+  },
 };
 
 export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) => {
@@ -35,7 +38,13 @@ export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) 
   );
 
   return (
-    <Flex id={id} className={NODE_FIELD_CLASS_NAME} sx={sx} data-parent-layout={containerCtx.layout}>
+    <Flex
+      id={id}
+      className={NODE_FIELD_CLASS_NAME}
+      sx={sx}
+      data-parent-layout={containerCtx.layout}
+      data-with-description={showDescription && !!_description}
+    >
       <FormControl flex="1 1 0" orientation="vertical">
         <NodeFieldElementLabel el={el} />
         <Flex w="full" gap={4}>
