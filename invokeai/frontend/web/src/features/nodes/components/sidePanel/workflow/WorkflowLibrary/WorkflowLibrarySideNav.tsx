@@ -84,6 +84,37 @@ export const WorkflowLibrarySideNav = () => {
       >
         Browse Workflows
       </Button>
+
+      <Flex flexDir="column" gap={2} pl={4}>
+        <Button
+          variant="ghost"
+          fontWeight="bold"
+          justifyContent="flex-start"
+          size="sm"
+          isActive={browsingCategory === 'private'}
+          onClick={handleCategoryChange.bind(null, 'private')}
+          _active={{
+            bg: 'base.700',
+            color: 'base.100',
+          }}
+        >
+          Architecture
+        </Button>
+        <Button
+          variant="ghost"
+          fontWeight="bold"
+          justifyContent="flex-start"
+          size="sm"
+          isActive={browsingCategory === 'shared'}
+          onClick={handleCategoryChange.bind(null, 'shared')}
+          _active={{
+            bg: 'base.700',
+            color: 'base.100',
+          }}
+        >
+          Fashion
+        </Button>
+      </Flex>
     </Flex>
   );
 };
