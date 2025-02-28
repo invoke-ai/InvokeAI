@@ -101,8 +101,7 @@ dependencies = [
 "xformers" = [
   # Core generation dependencies, pinned for reproducible builds.
   "xformers>=0.0.28.post1; sys_platform!='darwin'",
-  # Auxiliary dependencies, pinned only if necessary.
-  "triton; sys_platform=='linux'",
+  # torch 2.4+cu carries its own triton dependency
 ]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
