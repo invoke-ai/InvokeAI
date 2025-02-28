@@ -20,7 +20,7 @@ export const WorkflowThumbnailField = ({
       try {
         const blob = await convertImageUrlToBlob(imageUrl);
         if (blob) {
-          file = new File([blob], 'style_preset.png', { type: 'image/png' });
+          file = new File([blob], 'workflow.png', { type: 'image/png' });
         }
       } catch (error) {
         // do nothing

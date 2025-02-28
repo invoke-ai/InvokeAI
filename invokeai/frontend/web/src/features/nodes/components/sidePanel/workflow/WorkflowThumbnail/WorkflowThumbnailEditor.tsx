@@ -55,7 +55,12 @@ export const WorkflowThumbnailEditor = ({
     <Flex alignItems="center" gap={4}>
       <WorkflowThumbnailField imageUrl={thumbnailUrl} onChange={handleLocalThumbnailUrlChange} />
 
-      <Button size="sm" isLoading={isLoading || isDeleting} onClick={handleSaveChanges} isDisabled={!canSaveChanges}>
+      <Button
+        size="sm"
+        isLoading={isLoading || isDeleting}
+        onClick={handleSaveChanges}
+        isDisabled={!canSaveChanges || !workflowId}
+      >
         {t('common.saveChanges')}
       </Button>
     </Flex>
