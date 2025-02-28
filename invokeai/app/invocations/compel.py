@@ -379,13 +379,13 @@ class CLIPSkipInvocationOutput(BaseInvocationOutput):
     title="CLIP Skip",
     tags=["clipskip", "clip", "skip"],
     category="conditioning",
-    version="1.1.0",
+    version="1.1.1",
 )
 class CLIPSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""
 
     clip: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP")
-    skipped_layers: int = InputField(default=0, ge=0, description=FieldDescriptions.skipped_layers)
+    skipped_layers: int = InputField(default=0, ge=0, le=24, description=FieldDescriptions.skipped_layers)
 
     def invoke(self, context: InvocationContext) -> CLIPSkipInvocationOutput:
         self.clip.skipped_layers += self.skipped_layers
