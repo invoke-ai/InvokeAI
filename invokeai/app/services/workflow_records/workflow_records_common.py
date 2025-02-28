@@ -121,3 +121,11 @@ class WorkflowRecordListItemDTO(WorkflowRecordDTOBase):
 
 
 WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
+
+
+class WorkflowRecordWithThumbnailDTO(WorkflowRecordDTO):
+    thumbnail_url: str | None = Field(default=None, description="The URL of the workflow thumbnail.")
+
+
+class WorkflowRecordListItemWithThumbnailDTO(WorkflowRecordListItemDTO):
+    thumbnail_url: str | None = Field(default=None, description="The URL of the workflow thumbnail.")
