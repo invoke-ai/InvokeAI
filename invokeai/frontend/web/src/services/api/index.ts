@@ -103,6 +103,7 @@ export const api = customCreateApi({
   reducerPath: 'api',
   tagTypes,
   endpoints: () => ({}),
+  invalidationBehavior: 'immediately',
 });
 
 function getCircularReplacer() {
