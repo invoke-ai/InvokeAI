@@ -1,5 +1,4 @@
 import sqlite3
-import threading
 from datetime import datetime
 from typing import Optional, Union, cast
 
@@ -24,7 +23,6 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 class SqliteImageRecordStorage(ImageRecordStorageBase):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
-    _lock: threading.RLock
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
