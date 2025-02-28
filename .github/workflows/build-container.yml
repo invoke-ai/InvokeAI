@@ -76,9 +76,6 @@ jobs:
             latest=${{ matrix.gpu-driver == 'cuda' && github.ref == 'refs/heads/main' }}
             suffix=-${{ matrix.gpu-driver }},onlatest=false
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -103,7 +100,7 @@ jobs:
           push: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' || github.event.inputs.push-to-registry }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: |
-            type=gha,scope=${{ github.ref_name }}-${{ matrix.gpu-driver }}
-            type=gha,scope=main-${{ matrix.gpu-driver }}
-          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.gpu-driver }}
+          # cache-from: |
+          #   type=gha,scope=${{ github.ref_name }}-${{ matrix.gpu-driver }}
+          #   type=gha,scope=main-${{ matrix.gpu-driver }}
+          # cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.gpu-driver }}
