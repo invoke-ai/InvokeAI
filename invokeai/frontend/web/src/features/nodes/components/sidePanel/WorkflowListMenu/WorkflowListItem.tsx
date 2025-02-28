@@ -6,7 +6,7 @@ import dateFormat, { masks } from 'dateformat';
 import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
 import { useDeleteWorkflow } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
-import { useDownloadWorkflow } from 'features/workflowLibrary/hooks/useDownloadWorkflow';
+import { useDownloadWorkflowById } from 'features/workflowLibrary/hooks/useDownloadWorkflowById';
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +30,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   }, []);
 
   const workflowId = useAppSelector(selectWorkflowId);
-  const downloadWorkflow = useDownloadWorkflow();
+  const { downloadWorkflow, isLoading: isLoadingDownloadWorkflow } = useDownloadWorkflowById();
   const shareWorkflow = useShareWorkflow();
   const deleteWorkflow = useDeleteWorkflow();
   const loadWorkflow = useLoadWorkflow();
@@ -71,9 +71,9 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       setIsHovered(false);
-      downloadWorkflow();
+      downloadWorkflow(workflow.workflow_id);
     },
-    [downloadWorkflow]
+    [downloadWorkflow, workflow.workflow_id]
   );
 
   return (
@@ -144,6 +144,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
             aria-label={t('workflows.download')}
             onClick={handleClickDownload}
             icon={<PiDownloadSimpleBold />}
+            isLoading={isLoadingDownloadWorkflow}
           />
         </Tooltip>
         {!!projectUrl && workflow.workflow_id && workflow.category !== 'user' && (

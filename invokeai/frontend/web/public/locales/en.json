@@ -921,6 +921,7 @@
         "currentImage": "Current Image",
         "currentImageDescription": "Displays the current image in the Node Editor",
         "downloadWorkflow": "Download Workflow JSON",
+        "downloadWorkflowError": "Error downloading workflow",
         "edge": "Edge",
         "edit": "Edit",
         "editMode": "Edit in Workflow Editor",
