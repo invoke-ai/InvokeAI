@@ -1,9 +1,9 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { NewWorkflowButton } from 'features/nodes/components/sidePanel/NewWorkflowButton';
 import { WorkflowListMenuTrigger } from 'features/nodes/components/sidePanel/WorkflowListMenu/WorkflowListMenuTrigger';
 import { WorkflowViewEditToggleButton } from 'features/nodes/components/sidePanel/WorkflowViewEditToggleButton';
 import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
+import { WorkflowLibraryMenu } from 'features/workflowLibrary/components/WorkflowLibraryMenu/WorkflowLibraryMenu';
 import { memo } from 'react';
 
 import SaveWorkflowButton from './SaveWorkflowButton';
@@ -17,7 +17,7 @@ export const ActiveWorkflowNameAndActions = memo(() => {
       <Spacer />
       {mode === 'edit' && <SaveWorkflowButton />}
       <WorkflowViewEditToggleButton />
-      <NewWorkflowButton />
+      <WorkflowLibraryMenu />
     </Flex>
   );
 });
