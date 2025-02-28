@@ -264,7 +264,12 @@ class FluxConditioningField(BaseModel):
 class FluxReduxConditioningField(BaseModel):
     """A FLUX Redux conditioning tensor primitive value"""
 
-    tensor_name: str = Field(description="The name of the conditioning tensor")
+    conditioning: TensorField = Field(description="The Redux image conditioning tensor.")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
+        "included regions should be set to True.",
+    )
 
 
 class SD3ConditioningField(BaseModel):
