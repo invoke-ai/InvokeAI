@@ -236,7 +236,7 @@ class SDXLPromptInvocationBase:
     title="SDXL Prompt",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.2.0",
+    version="1.2.1",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -251,12 +251,12 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
         description=FieldDescriptions.compel_prompt,
         ui_component=UIComponent.Textarea,
     )
-    original_width: int = InputField(default=1024, description="")
-    original_height: int = InputField(default=1024, description="")
-    crop_top: int = InputField(default=0, description="")
-    crop_left: int = InputField(default=0, description="")
-    target_width: int = InputField(default=1024, description="")
-    target_height: int = InputField(default=1024, description="")
+    original_width: int = InputField(ge=8, default=1024, description="")
+    original_height: int = InputField(ge=8, default=1024, description="")
+    crop_top: int = InputField(default=0, ge=0, description="")
+    crop_left: int = InputField(default=0, ge=0, description="")
+    target_width: int = InputField(ge=8, default=1024, description="")
+    target_height: int = InputField(ge=8, default=1024, description="")
     clip: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 1")
     clip2: CLIPField = InputField(description=FieldDescriptions.clip, input=Input.Connection, title="CLIP 2")
     mask: Optional[TensorField] = InputField(
