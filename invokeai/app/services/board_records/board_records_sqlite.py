@@ -1,5 +1,4 @@
 import sqlite3
-import threading
 from typing import Union, cast
 
 from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
@@ -21,7 +20,6 @@ from invokeai.app.util.misc import uuid_string
 class SqliteBoardRecordStorage(BoardRecordStorageBase):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
-    _lock: threading.RLock
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()

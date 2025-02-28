@@ -1,7 +1,6 @@
 import asyncio
 import json
 import sqlite3
-import threading
 from typing import Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
@@ -40,7 +39,6 @@ class SqliteSessionQueue(SessionQueueBase):
     __invoker: Invoker
     __conn: sqlite3.Connection
     __cursor: sqlite3.Cursor
-    __lock: threading.RLock
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
