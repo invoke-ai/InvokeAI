@@ -63,7 +63,7 @@ def slerp(
     title="Blend Latents",
     tags=["latents", "blend", "mask"],
     category="latents",
-    version="1.1.0",
+    version="1.1.1",
 )
 class BlendLatentsInvocation(BaseInvocation):
     """Blend two latents using a given alpha. If a mask is provided, the second latents will be masked before blending.
@@ -72,7 +72,7 @@ class BlendLatentsInvocation(BaseInvocation):
     latents_a: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     latents_b: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     mask: Optional[ImageField] = InputField(default=None, description="Mask for blending in latents B")
-    alpha: float = InputField(ge=0, default=0.5, description=FieldDescriptions.blend_alpha)
+    alpha: float = InputField(ge=0.0, default=0.5, le=1.0, description=FieldDescriptions.blend_alpha)
 
     def prep_mask_tensor(self, mask_image: Image.Image) -> torch.Tensor:
         if mask_image.mode != "L":
