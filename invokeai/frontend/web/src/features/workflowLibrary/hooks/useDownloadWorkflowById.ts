@@ -38,5 +38,5 @@ export const useDownloadWorkflowById = () => {
     [dispatch, toastError, trigger]
   );
 
-  return { downloadWorkflow, isLoading: query.isLoading }
+  return { downloadWorkflow, isLoading: query.isLoading };
 };
