@@ -1,41 +1,50 @@
 # Release Process
 
-The app is published in twice, in different build formats.
+The Invoke application is published as a python package on [PyPI]. This includes both a source distribution and built distribution (a wheel).
 
-- A [PyPI] distribution. This includes both a source distribution and built distribution (a wheel). Users install with `pip install invokeai`. The updater uses this build.
-- An installer on the [InvokeAI Releases Page]. This is a zip file with install scripts and a wheel. This is only used for new installs.
+Most users install it with the [Launcher](https://github.com/invoke-ai/launcher/), others with `pip`.
+
+The launcher uses GitHub as the source of truth for available releases.
+
+## Broad Strokes
+
+- Merge all changes and bump the version in the codebase.
+- Tag the release commit.
+- Wait for the release workflow to complete.
+- Approve the PyPI publish jobs.
+- Write GH release notes.
 
 ## General Prep
 
-Make a developer call-out for PRs to merge. Merge and test things out.
-
-While the release workflow does not include end-to-end tests, it does pause before publishing so you can download and test the final build.
+Make a developer call-out for PRs to merge. Merge and test things out. Bump the version by editing `invokeai/version/invokeai_version.py`.
 
 ## Release Workflow
 
 The `release.yml` workflow runs a number of jobs to handle code checks, tests, build and publish on PyPI.
 
-It is triggered on **tag push**, when the tag matches `v*`. It doesn't matter if you've prepped a release branch like `release/v3.5.0` or are releasing from `main` - it works the same.
-
-> Because commits are reference-counted, it is safe to create a release branch, tag it, let the workflow run, then delete the branch. So long as the tag exists, that commit will exist.
+It is triggered on **tag push**, when the tag matches `v*`.
 
 ### Triggering the Workflow
 
-Run `make tag-release` to tag the current commit and kick off the workflow.
+Ensure all commits that should be in the release are merged, and you have pulled them locally.
 
-The release may also be dispatched [manually].
+Double-check that you have checked out the commit that will represent the release (typically the latest commit on `main`).
+
+Run `make tag-release` to tag the current commit and kick off the workflow. You will be prompted to provide a message - use the version specifier.
+
+If this version's tag already exists for some reason (maybe you had to make a last minute change), the script will overwrite it.
+
+> In case you cannot use the Make target, the release may also be dispatched [manually] via GH.
 
 ### Workflow Jobs and Process
 
-The workflow consists of a number of concurrently-run jobs, and two final publish jobs.
+The workflow consists of a number of concurrently-run checks and tests, then two final publish jobs.
 
 The publish jobs require manual approval and are only run if the other jobs succeed.
 
 #### `check-version` Job
 
-This job checks that the git ref matches the app version. It matches the ref against the `__version__` variable in `invokeai/version/invokeai_version.py`.
-
-When the workflow is triggered by tag push, the ref is the tag. If the workflow is run manually, the ref is the target selected from the **Use workflow from** dropdown.
+This job ensures that the `invokeai` python package version specifier matches the tag for the release. The version specifier is pulled from the `__version__` variable in `invokeai/version/invokeai_version.py`.
 
 This job uses [samuelcolvin/check-python-version].
 
@@ -43,62 +52,52 @@ This job uses [samuelcolvin/check-python-version].
 
 #### Check and Test Jobs
 
+Next, these jobs run and must pass. They are the same jobs that are run for every PR.
+
 - **`python-tests`**: runs `pytest` on matrix of platforms
 - **`python-checks`**: runs `ruff` (format and lint)
 - **`frontend-tests`**: runs `vitest`
 - **`frontend-checks`**: runs `prettier` (format), `eslint` (lint), `dpdm` (circular refs), `tsc` (static type check) and `knip` (unused imports)
-
-> **TODO** We should add `mypy` or `pyright` to the **`check-python`** job.
-
-> **TODO** We should add an end-to-end test job that generates an image.
+- **`typegen-checks`**: ensures the frontend and backend types are synced
 
 #### `build-installer` Job
 
 This sets up both python and frontend dependencies and builds the python package. Internally, this runs `installer/create_installer.sh` and uploads two artifacts:
 
 - **`dist`**: the python distribution, to be published on PyPI
-- **`InvokeAI-installer-${VERSION}.zip`**: the installer to be included in the GitHub release
+- **`InvokeAI-installer-${VERSION}.zip`**: the legacy install scripts
+
+You don't need to download either of these files.
+
+> The legacy install scripts are no longer used, but we haven't updated the workflow to skip building them.
 
 #### Sanity Check & Smoke Test
 
-At this point, the release workflow pauses as the remaining publish jobs require approval. Time to test the installer.
+At this point, the release workflow pauses as the remaining publish jobs require approval.
 
-Because the installer pulls from PyPI, and we haven't published to PyPI yet, you will need to install from the wheel:
+It's possible to test the python package before it gets published to PyPI. We've never had problems with it, so it's not necessary to do this.
 
-- Download and unzip `dist.zip` and the installer from the **Summary** tab of the workflow
-- Run the installer script using the `--wheel` CLI arg, pointing at the wheel:
+But, if you want to be extra-super careful, here's how to test it:
 
-  ```sh
-  ./install.sh --wheel ../InvokeAI-4.0.0rc6-py3-none-any.whl
-  ```
-
-- Install to a temporary directory so you get the new user experience
-- Download a model and generate
-
-> The same wheel file is bundled in the installer and in the `dist` artifact, which is uploaded to PyPI. You should end up with the exactly the same installation as if the installer got the wheel from PyPI.
+- Download the `dist.zip` build artifact from the `build-installer` job
+- Unzip it and find the wheel file
+- Create a fresh Invoke install by following the [manual install guide](https://invoke-ai.github.io/InvokeAI/installation/manual/) - but instead of installing from PyPI, install from the wheel
+- Test the app
 
 ##### Something isn't right
 
-If testing reveals any issues, no worries. Cancel the workflow, which will cancel the pending publish jobs (you didn't approve them prematurely, right?).
-
-Now you can start from the top:
-
-- Fix the issues and PR the fixes per usual
-- Get the PR approved and merged per usual
-- Switch to `main` and pull in the fixes
-- Run `make tag-release` to move the tag to `HEAD` (which has the fixes) and kick off the release workflow again
-- Re-do the sanity check
+If testing reveals any issues, no worries. Cancel the workflow, which will cancel the pending publish jobs (you didn't approve them prematurely, right?) and start over.
 
 #### PyPI Publish Jobs
 
-The publish jobs will run if any of the previous jobs fail.
+The publish jobs will not run if any of the previous jobs fail.
 
 They use [GitHub environments], which are configured as [trusted publishers] on PyPI.
 
-Both jobs require a maintainer to approve them from the workflow's **Summary** tab.
+Both jobs require a @hipsterusername or @psychedelicious to approve them from the workflow's **Summary** tab.
 
 - Click the **Review deployments** button
-- Select the environment (either `testpypi` or `pypi`)
+- Select the environment (either `testpypi` or `pypi` - typically you select both)
 - Click **Approve and deploy**
 
 > **If the version already exists on PyPI, the publish jobs will fail.** PyPI only allows a given version to be published once - you cannot change it. If version published on PyPI has a problem, you'll need to "fail forward" by bumping the app version and publishing a followup release.
@@ -113,46 +112,33 @@ If there are no incidents, contact @hipsterusername or @lstein, who have owner a
 
 Publishes the distribution on the [Test PyPI] index, using the `testpypi` GitHub environment.
 
-This job is not required for the production PyPI publish, but included just in case you want to test the PyPI release.
+This job is not required for the production PyPI publish, but included just in case you want to test the PyPI release for some reason:
 
-If approved and successful, you could try out the test release like this:
-
-```sh
-# Create a new virtual environment
-python -m venv ~/.test-invokeai-dist --prompt test-invokeai-dist
-# Install the distribution from Test PyPI
-pip install --index-url https://test.pypi.org/simple/ invokeai
-# Run and test the app
-invokeai-web
-# Cleanup
-deactivate
-rm -rf ~/.test-invokeai-dist
-```
+- Approve this publish job without approving the prod publish
+- Let it finish
+- Create a fresh Invoke install by following the [manual install guide](https://invoke-ai.github.io/InvokeAI/installation/manual/), making sure to use the Test PyPI index URL: `https://test.pypi.org/simple/`
+- Test the app
 
 #### `publish-pypi` Job
 
 Publishes the distribution on the production PyPI index, using the `pypi` GitHub environment.
 
-## Publish the GitHub Release with installer
+It's a good idea to wait to approve and run this job until you have the release notes ready!
 
-Once the release is published to PyPI, it's time to publish the GitHub release.
+## Prep and publish the GitHub Release
 
 1. [Draft a new release] on GitHub, choosing the tag that triggered the release.
-1. Write the release notes, describing important changes. The **Generate release notes** button automatically inserts the changelog and new contributors, and you can copy/paste the intro from previous releases.
-1. Use `scripts/get_external_contributions.py` to get a list of external contributions to shout out in the release notes.
-1. Upload the zip file created in **`build`** job into the Assets section of the release notes.
-1. Check **Set as a pre-release** if it's a pre-release.
-1. Check **Create a discussion for this release**.
-1. Publish the release.
-1. Announce the release in Discord.
-
-> **TODO** Workflows can create a GitHub release from a template and upload release assets. One popular action to handle this is [ncipollo/release-action]. A future enhancement to the release process could set this up.
-
-## Manual Build
-
-The `build installer` workflow can be dispatched manually. This is useful to test the installer for a given branch or tag.
-
-No checks are run, it just builds.
+2. The **Generate release notes** button automatically inserts the changelog and new contributors. Make sure to select the correct tags for this release and the last stable release. GH often selects the wrong tags - do this manually.
+3. Write the release notes, describing important changes. Contributions from community members should be shouted out. Use the GH-generated changelog to see all contributors. If there are Weblate translation updates, open that PR and shout out every person who contributed a translation.
+4. Check **Set as a pre-release** if it's a pre-release.
+5. Approve and wait for the `publish-pypi` job to finish if you haven't already.
+6. Publish the GH release.
+7. Post the release in Discord in the [releases](https://discord.com/channels/1020123559063990373/1149260708098359327) channel with abbreviated notes. For example:
+   > Invoke v5.7.0 (stable): <https://github.com/invoke-ai/InvokeAI/releases/tag/v5.7.0>
+   >
+   > It's a pretty big one - Form Builder, Metadata Nodes (thanks @SkunkWorxDark!), and much more.
+8. Right click the message in releases and copy the link to it. Then, post that link in the [new-release-discussion](https://discord.com/channels/1020123559063990373/1149506274971631688) channel. For example:
+   > Invoke v5.7.0 (stable): <https://discord.com/channels/1020123559063990373/1149260708098359327/1344521744916021248>
 
 ## Manual Release
 
@@ -160,12 +146,10 @@ The `release` workflow can be dispatched manually. You must dispatch the workflo
 
 This functionality is available as a fallback in case something goes wonky. Typically, releases should be triggered via tag push as described above.
 
-[InvokeAI Releases Page]: https://github.com/invoke-ai/InvokeAI/releases
 [PyPI]: https://pypi.org/
 [Draft a new release]: https://github.com/invoke-ai/InvokeAI/releases/new
 [Test PyPI]: https://test.pypi.org/
 [version specifier]: https://packaging.python.org/en/latest/specifications/version-specifiers/
-[ncipollo/release-action]: https://github.com/ncipollo/release-action
 [GitHub environments]: https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment
 [trusted publishers]: https://docs.pypi.org/trusted-publishers/
 [samuelcolvin/check-python-version]: https://github.com/samuelcolvin/check-python-version
