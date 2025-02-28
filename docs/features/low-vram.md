@@ -31,6 +31,7 @@ It is possible to fine-tune the settings for best performance or if you still ge
 Low-VRAM mode involves 4 features, each of which can be configured or fine-tuned:
 
 - Partial model loading (`enable_partial_loading`)
+- PyTorch CUDA allocator config (`pytorch_cuda_alloc_conf`)
 - Dynamic RAM and VRAM cache sizes (`max_cache_ram_gb`, `max_cache_vram_gb`)
 - Working memory (`device_working_mem_gb`)
 - Keeping a RAM weight copy (`keep_ram_copy_of_weights`)
@@ -50,6 +51,16 @@ As described above, you can enable partial model loading by adding this line to 
 ```yaml
 enable_partial_loading: true
 ```
+
+### PyTorch CUDA allocator config
+
+The PyTorch CUDA allocator's behavior can be configured using the `pytorch_cuda_alloc_conf` config. Tuning the allocator configuration can help to reduce the peak reserved VRAM. The optimal configuration is dependent on many factors (e.g. device type, VRAM, CUDA driver version, etc.), but switching from PyTorch's native allocator to using CUDA's built-in allocator works well on many systems. To try this, add the following line to your `invokeai.yaml` file:
+
+```yaml
+pytorch_cuda_alloc_conf: "backend:cudaMallocAsync"
+```
+
+A more complete explanation of the available configuration options is [here](https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf).
 
 ### Dynamic RAM and VRAM cache sizes
 
