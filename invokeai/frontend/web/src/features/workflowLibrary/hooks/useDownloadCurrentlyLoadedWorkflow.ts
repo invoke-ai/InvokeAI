@@ -3,7 +3,7 @@ import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
 import { workflowDownloaded } from 'features/workflowLibrary/store/actions';
 import { useCallback } from 'react';
 
-export const useDownloadWorkflow = () => {
+export const useDownloadCurrentlyLoadedWorkflow = () => {
   const dispatch = useAppDispatch();
 
   const downloadWorkflow = useCallback(() => {
