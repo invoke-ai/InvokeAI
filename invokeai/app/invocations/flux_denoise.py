@@ -199,6 +199,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         redux_conditionings: list[FluxReduxConditioning] = self._load_redux_conditioning(
             context=context,
             redux_cond_field=self.redux_conditioning,
+            packed_height=packed_h,
+            packed_width=packed_w,
             device=TorchDevice.choose_torch_device(),
             dtype=inference_dtype,
         )
@@ -420,6 +422,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self,
         context: InvocationContext,
         redux_cond_field: FluxReduxConditioningField | list[FluxReduxConditioningField] | None,
+        packed_height: int,
+        packed_width: int,
         device: torch.device,
         dtype: torch.dtype,
     ) -> list[FluxReduxConditioning]:
@@ -433,9 +437,20 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         redux_conditionings: list[FluxReduxConditioning] = []
         for redux_cond_field in redux_cond_list:
-            redux_cond_data = context.tensors.load(redux_cond_field.tensor_name)
+            # Load the Redux conditioning tensor.
+            redux_cond_data = context.tensors.load(redux_cond_field.conditioning.tensor_name)
             redux_cond_data.to(device=device, dtype=dtype)
-            redux_conditionings.append(FluxReduxConditioning(redux_embeddings=redux_cond_data))
+
+            # Load the mask, if provided.
+            mask: Optional[torch.Tensor] = None
+            if redux_cond_field.mask is not None:
+                mask = context.tensors.load(redux_cond_field.mask.tensor_name)
+                mask = mask.to(device=device)
+                mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(
+                    mask, packed_height, packed_width, dtype, device
+                )
+
+            redux_conditionings.append(FluxReduxConditioning(redux_embeddings=redux_cond_data, mask=mask))
 
         return redux_conditionings
 

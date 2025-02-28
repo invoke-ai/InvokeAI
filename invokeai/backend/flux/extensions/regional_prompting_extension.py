@@ -245,7 +245,7 @@ class RegionalPromptingExtension:
                     start=cur_t5_embedding_len, end=cur_t5_embedding_len + redux_conditioning.redux_embeddings.shape[1]
                 )
             )
-            image_masks.append(None)
+            image_masks.append(redux_conditioning.mask)
             cur_t5_embedding_len += redux_conditioning.redux_embeddings.shape[1]
 
         t5_embeddings = torch.cat(concat_t5_embeddings, dim=1)
