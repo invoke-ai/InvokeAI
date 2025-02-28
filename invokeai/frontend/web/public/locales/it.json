@@ -699,7 +699,6 @@
             "batchNodeEmptyCollection": "Alcuni nodi lotto hanno raccolte vuote",
             "emptyBatches": "lotti vuoti",
             "batchNodeCollectionSizeMismatch": "Le dimensioni della raccolta nel Lotto {{batchGroupId}} non corrispondono",
-            "invalidBatchConfigurationCannotCalculate": "Configurazione lotto non valida; impossibile calcolare",
             "collectionStringTooShort": "troppo corto, minimo {{minLength}}",
             "collectionNumberNotMultipleOf": "{{value}} non è multiplo di {{multipleOf}}",
             "collectionNumberLTMin": "{{value}} < {{minimum}} (incr min)",
@@ -2174,7 +2173,11 @@
         "pasteToCanvas": "Tela",
         "pasteToCanvasDesc": "Nuovo livello (nella Tela)",
         "pastedTo": "Incollato su {{destination}}",
-        "regionCopiedToClipboard": "{{region}} Copiato negli appunti"
+        "regionCopiedToClipboard": "{{region}} Copiato negli appunti",
+        "errors": {
+            "unableToFindImage": "Impossibile trovare l'immagine",
+            "unableToLoadImage": "Impossibile caricare l'immagine"
+        }
     },
     "ui": {
         "tabs": {
@@ -2274,11 +2277,7 @@
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
             "Impostazioni predefinite VRAM migliorate",
-            "Cancellazione della cache del modello su richiesta",
-            "Compatibilità estesa FLUX LoRA",
-            "Filtro Regola Immagine su Tela",
-            "Annulla tutto tranne l'elemento della coda corrente",
-            "Copia da e incolla sulla Tela"
+            "Cancellazione della cache del modello su richiesta"
         ]
     },
     "system": {

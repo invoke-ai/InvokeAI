@@ -1,8 +1,14 @@
-import { isNil, trim } from 'lodash-es';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import type { AppDispatch } from 'app/store/store';
+import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { isNil, random, trim } from 'lodash-es';
 import MersenneTwister from 'mtwist';
+import { boardsApi } from 'services/api/endpoints/boards';
+import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
+import type { ImageField } from './common';
 import { zBoardField, zColorField, zImageField, zModelIdentifierField, zSchedulerField } from './common';
 
 /**
@@ -239,6 +245,10 @@ const zStringGeneratorFieldType = zFieldTypeBase.extend({
   name: z.literal('StringGeneratorField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zImageGeneratorFieldType = zFieldTypeBase.extend({
+  name: z.literal('ImageGeneratorField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zStatefulFieldType = z.union([
   zIntegerFieldType,
   zFloatFieldType,
@@ -270,6 +280,7 @@ const zStatefulFieldType = z.union([
   zFloatGeneratorFieldType,
   zIntegerGeneratorFieldType,
   zStringGeneratorFieldType,
+  zImageGeneratorFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -642,7 +653,7 @@ export const isImageFieldCollectionInputTemplate = buildTemplateTypeGuard<ImageF
 // #endregion
 
 // #region BoardField
-export const zBoardFieldValue = zBoardField.optional();
+export const zBoardFieldValue = z.union([zBoardField, z.enum(['none', 'auto'])]).optional();
 const zBoardFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zBoardFieldValue,
 });
@@ -1225,7 +1236,6 @@ const zIntegerGeneratorArithmeticSequence = z.object({
   start: z.number().int().default(0),
   step: z.number().int().default(1),
   count: z.number().int().default(10),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorArithmeticSequence = z.infer<typeof zIntegerGeneratorArithmeticSequence>;
 export const getIntegerGeneratorArithmeticSequenceDefaults = () => zIntegerGeneratorArithmeticSequence.parse({});
@@ -1244,7 +1254,6 @@ const zIntegerGeneratorLinearDistribution = z.object({
   start: z.number().int().default(0),
   end: z.number().int().default(10),
   count: z.number().int().default(10),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorLinearDistribution = z.infer<typeof zIntegerGeneratorLinearDistribution>;
 const getIntegerGeneratorLinearDistributionDefaults = () => zIntegerGeneratorLinearDistribution.parse({});
@@ -1264,7 +1273,6 @@ const zIntegerGeneratorUniformRandomDistribution = z.object({
   max: z.number().int().default(10),
   count: z.number().int().default(10),
   seed: z.number().int().nullish(),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorUniformRandomDistribution = z.infer<typeof zIntegerGeneratorUniformRandomDistribution>;
 const getIntegerGeneratorUniformRandomDistributionDefaults = () => zIntegerGeneratorUniformRandomDistribution.parse({});
@@ -1280,7 +1288,6 @@ const zIntegerGeneratorParseString = z.object({
   type: z.literal(IntegerGeneratorParseStringType).default(IntegerGeneratorParseStringType),
   input: z.string().default('1,2,3,4,5,6,7,8,9,10'),
   splitOn: z.string().default(','),
-  values: z.array(z.number().int()).nullish(),
 });
 export type IntegerGeneratorParseString = z.infer<typeof zIntegerGeneratorParseString>;
 const getIntegerGeneratorParseStringDefaults = () => zIntegerGeneratorParseString.parse({});
@@ -1334,9 +1341,6 @@ export const isIntegerGeneratorFieldInputInstance = buildInstanceTypeGuard(zInte
 export const isIntegerGeneratorFieldInputTemplate =
   buildTemplateTypeGuard<IntegerGeneratorFieldInputTemplate>('IntegerGeneratorField');
 export const resolveIntegerGeneratorField = ({ value }: IntegerGeneratorFieldInputInstance) => {
-  if (value.values) {
-    return value.values;
-  }
   if (value.type === IntegerGeneratorArithmeticSequenceType) {
     return getIntegerGeneratorArithmeticSequenceValues(value);
   }
@@ -1374,7 +1378,6 @@ const zStringGeneratorParseString = z.object({
   type: z.literal(StringGeneratorParseStringType).default(StringGeneratorParseStringType),
   input: z.string().default('foo,bar,baz,qux'),
   splitOn: z.string().default(','),
-  values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorParseString = z.infer<typeof zStringGeneratorParseString>;
 export const getStringGeneratorParseStringDefaults = () => zStringGeneratorParseString.parse({});
@@ -1404,14 +1407,36 @@ const zStringGeneratorDynamicPromptsCombinatorial = z.object({
     .default(StringGeneratorDynamicPromptsCombinatorialType),
   input: z.string().default('a super {cute|ferocious} {dog|cat}'),
   maxPrompts: z.number().int().gte(1).default(10),
-  values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorDynamicPromptsCombinatorial = z.infer<typeof zStringGeneratorDynamicPromptsCombinatorial>;
 const getStringGeneratorDynamicPromptsCombinatorialDefaults = () =>
   zStringGeneratorDynamicPromptsCombinatorial.parse({});
-const getStringGeneratorDynamicPromptsCombinatorialValues = (generator: StringGeneratorDynamicPromptsCombinatorial) => {
-  const { values } = generator;
-  return values ?? [];
+const getStringGeneratorDynamicPromptsCombinatorialValues = async (
+  generator: StringGeneratorDynamicPromptsCombinatorial,
+  dispatch: AppDispatch
+): Promise<string[]> => {
+  const { input, maxPrompts } = generator;
+  const req = dispatch(
+    utilitiesApi.endpoints.dynamicPrompts.initiate(
+      {
+        prompt: input,
+        max_prompts: maxPrompts,
+        combinatorial: true,
+      },
+      {
+        subscribe: false,
+      }
+    )
+  );
+  try {
+    const { prompts, error } = await req.unwrap();
+    if (error) {
+      return EMPTY_ARRAY;
+    }
+    return prompts;
+  } catch {
+    return EMPTY_ARRAY;
+  }
 };
 
 export const StringGeneratorDynamicPromptsRandomType = 'string_generator_dynamic_prompts_random';
@@ -1420,13 +1445,36 @@ const zStringGeneratorDynamicPromptsRandom = z.object({
   input: z.string().default('a super {cute|ferocious} {dog|cat}'),
   count: z.number().int().gte(1).default(10),
   seed: z.number().int().nullish(),
-  values: z.array(z.string()).nullish(),
 });
 export type StringGeneratorDynamicPromptsRandom = z.infer<typeof zStringGeneratorDynamicPromptsRandom>;
 const getStringGeneratorDynamicPromptsRandomDefaults = () => zStringGeneratorDynamicPromptsRandom.parse({});
-const getStringGeneratorDynamicPromptsRandomValues = (generator: StringGeneratorDynamicPromptsRandom) => {
-  const { values } = generator;
-  return values ?? [];
+const getStringGeneratorDynamicPromptsRandomValues = async (
+  generator: StringGeneratorDynamicPromptsRandom,
+  dispatch: AppDispatch
+): Promise<string[]> => {
+  const { input, seed, count } = generator;
+  const req = dispatch(
+    utilitiesApi.endpoints.dynamicPrompts.initiate(
+      {
+        prompt: input,
+        max_prompts: count,
+        combinatorial: false,
+        seed: seed ?? random(),
+      },
+      {
+        subscribe: false,
+      }
+    )
+  );
+  try {
+    const { prompts, error } = await req.unwrap();
+    if (error) {
+      return EMPTY_ARRAY;
+    }
+    return prompts;
+  } catch {
+    return EMPTY_ARRAY;
+  }
 };
 
 export const zStringGeneratorFieldValue = z.union([
@@ -1453,18 +1501,18 @@ export const isStringGeneratorFieldInputTemplate = buildTemplateTypeGuard<String
   zStringGeneratorFieldType.shape.name.value
 );
 
-export const resolveStringGeneratorField = ({ value }: StringGeneratorFieldInputInstance) => {
-  if (value.values) {
-    return value.values;
-  }
+export const resolveStringGeneratorField = async (
+  { value }: StringGeneratorFieldInputInstance,
+  dispatch: AppDispatch
+) => {
   if (value.type === StringGeneratorParseStringType) {
     return getStringGeneratorParseStringValues(value);
   }
   if (value.type === StringGeneratorDynamicPromptsRandomType) {
-    return getStringGeneratorDynamicPromptsRandomValues(value);
+    return await getStringGeneratorDynamicPromptsRandomValues(value, dispatch);
   }
   if (value.type === StringGeneratorDynamicPromptsCombinatorialType) {
-    return getStringGeneratorDynamicPromptsCombinatorialValues(value);
+    return await getStringGeneratorDynamicPromptsCombinatorialValues(value, dispatch);
   }
   assert(false, 'Invalid string generator type');
 };
@@ -1477,6 +1525,78 @@ export const getStringGeneratorDefaults = (type: StringGeneratorFieldValue['type
   }
   if (type === StringGeneratorDynamicPromptsCombinatorialType) {
     return getStringGeneratorDynamicPromptsCombinatorialDefaults();
+  }
+  assert(false, 'Invalid string generator type');
+};
+// #endregion
+
+// #region ImageGeneratorField
+export const ImageGeneratorImagesFromBoardType = 'image_generator_images_from_board';
+const zImageGeneratorImagesFromBoard = z.object({
+  type: z.literal(ImageGeneratorImagesFromBoardType).default(ImageGeneratorImagesFromBoardType),
+  board_id: z.string().trim().min(1).optional(),
+  category: z.union([z.literal('images'), z.literal('assets')]).default('images'),
+});
+export type ImageGeneratorImagesFromBoard = z.infer<typeof zImageGeneratorImagesFromBoard>;
+export const getImageGeneratorImagesFromBoardDefaults = () => zImageGeneratorImagesFromBoard.parse({});
+const getImageGeneratorImagesFromBoardValues = async (
+  generator: ImageGeneratorImagesFromBoard,
+  dispatch: AppDispatch
+) => {
+  const { board_id, category } = generator;
+  if (!board_id) {
+    return EMPTY_ARRAY;
+  }
+  const req = dispatch(
+    boardsApi.endpoints.listAllImageNamesForBoard.initiate(
+      {
+        board_id,
+        categories: category === 'images' ? IMAGE_CATEGORIES : ASSETS_CATEGORIES,
+        is_intermediate: false,
+      },
+      { subscribe: false }
+    )
+  );
+  try {
+    const imageNames = await req.unwrap();
+    return imageNames.map((image_name) => ({ image_name }));
+  } catch {
+    return EMPTY_ARRAY;
+  }
+};
+
+export const zImageGeneratorFieldValue = zImageGeneratorImagesFromBoard;
+const zImageGeneratorFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zImageGeneratorFieldValue,
+});
+const zImageGeneratorFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zImageGeneratorFieldType,
+  originalType: zFieldType.optional(),
+  default: zImageGeneratorFieldValue,
+});
+const zImageGeneratorFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zImageGeneratorFieldType,
+});
+export type ImageGeneratorFieldValue = z.infer<typeof zImageGeneratorFieldValue>;
+export type ImageGeneratorFieldInputInstance = z.infer<typeof zImageGeneratorFieldInputInstance>;
+export type ImageGeneratorFieldInputTemplate = z.infer<typeof zImageGeneratorFieldInputTemplate>;
+export const isImageGeneratorFieldInputInstance = buildInstanceTypeGuard(zImageGeneratorFieldInputInstance);
+export const isImageGeneratorFieldInputTemplate = buildTemplateTypeGuard<ImageGeneratorFieldInputTemplate>(
+  zImageGeneratorFieldType.shape.name.value
+);
+
+export const resolveImageGeneratorField = async (
+  { value }: ImageGeneratorFieldInputInstance,
+  dispatch: AppDispatch
+): Promise<ImageField[]> => {
+  if (value.type === ImageGeneratorImagesFromBoardType) {
+    return await getImageGeneratorImagesFromBoardValues(value, dispatch);
+  }
+  assert(false, 'Invalid image generator type');
+};
+export const getImageGeneratorDefaults = (type: ImageGeneratorFieldValue['type']) => {
+  if (type === ImageGeneratorImagesFromBoardType) {
+    return getImageGeneratorImagesFromBoardDefaults();
   }
   assert(false, 'Invalid string generator type');
 };
@@ -1563,6 +1683,7 @@ export const zStatefulFieldValue = z.union([
   zFloatGeneratorFieldValue,
   zIntegerGeneratorFieldValue,
   zStringGeneratorFieldValue,
+  zImageGeneratorFieldValue,
 ]);
 export type StatefulFieldValue = z.infer<typeof zStatefulFieldValue>;
 
@@ -1603,6 +1724,7 @@ const zStatefulFieldInputInstance = z.union([
   zFloatGeneratorFieldInputInstance,
   zIntegerGeneratorFieldInputInstance,
   zStringGeneratorFieldInputInstance,
+  zImageGeneratorFieldInputInstance,
 ]);
 
 export const zFieldInputInstance = z.union([zStatefulFieldInputInstance, zStatelessFieldInputInstance]);
@@ -1646,6 +1768,7 @@ const zStatefulFieldInputTemplate = z.union([
   zFloatGeneratorFieldInputTemplate,
   zIntegerGeneratorFieldInputTemplate,
   zStringGeneratorFieldInputTemplate,
+  zImageGeneratorFieldInputTemplate,
 ]);
 
 export const zFieldInputTemplate = z.union([zStatefulFieldInputTemplate, zStatelessFieldInputTemplate]);
@@ -1682,6 +1805,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zFloatGeneratorFieldOutputTemplate,
   zIntegerGeneratorFieldOutputTemplate,
   zStringGeneratorFieldOutputTemplate,
+  zImageGeneratorFieldOutputTemplate,
 ]);
 
 export const zFieldOutputTemplate = z.union([zStatefulFieldOutputTemplate, zStatelessFieldOutputTemplate]);

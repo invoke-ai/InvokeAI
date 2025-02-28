@@ -44,8 +44,6 @@ if TYPE_CHECKING:
 
 logger = InvokeAILogger.get_logger()
 
-CUSTOM_NODE_PACK_SUFFIX = "__invokeai-custom-node"
-
 
 class InvalidVersionError(ValueError):
     pass
@@ -239,6 +237,11 @@ class BaseInvocation(ABC, BaseModel):
     def get_output_annotation(cls) -> BaseInvocationOutput:
         """Gets the invocation's output annotation (i.e. the return annotation of its `invoke()` method)."""
         return signature(cls.invoke).return_annotation
+
+    @classmethod
+    def get_invocation_for_type(cls, invocation_type: str) -> BaseInvocation | None:
+        """Gets the invocation class for a given invocation type."""
+        return cls.get_invocations_map().get(invocation_type)
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocation]) -> None:
@@ -446,8 +449,27 @@ def invocation(
         if re.compile(r"^\S+$").match(invocation_type) is None:
             raise ValueError(f'"invocation_type" must consist of non-whitespace characters, got "{invocation_type}"')
 
+        # The node pack is the module name - will be "invokeai" for built-in nodes
+        node_pack = cls.__module__.split(".")[0]
+
+        # Handle the case where an existing node is being clobbered by the one we are registering
         if invocation_type in BaseInvocation.get_invocation_types():
-            raise ValueError(f'Invocation type "{invocation_type}" already exists')
+            clobbered_invocation = BaseInvocation.get_invocation_for_type(invocation_type)
+            # This should always be true - we just checked if the invocation type was in the set
+            assert clobbered_invocation is not None
+
+            clobbered_node_pack = clobbered_invocation.UIConfig.node_pack
+
+            if clobbered_node_pack == "invokeai":
+                # The node being clobbered is a core node
+                raise ValueError(
+                    f'Cannot load node "{invocation_type}" from node pack "{node_pack}" - a core node with the same type already exists'
+                )
+            else:
+                # The node being clobbered is a custom node
+                raise ValueError(
+                    f'Cannot load node "{invocation_type}" from node pack "{node_pack}" - a node with the same type already exists in node pack "{clobbered_node_pack}"'
+                )
 
         validate_fields(cls.model_fields, invocation_type)
 
@@ -457,8 +479,7 @@ def invocation(
         uiconfig["tags"] = tags
         uiconfig["category"] = category
         uiconfig["classification"] = classification
-        # The node pack is the module name - will be "invokeai" for built-in nodes
-        uiconfig["node_pack"] = cls.__module__.split(".")[0]
+        uiconfig["node_pack"] = node_pack
 
         if version is not None:
             try:

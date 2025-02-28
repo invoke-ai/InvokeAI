@@ -9,6 +9,7 @@ from torch import Tensor
 
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import MetadataField, WithBoard, WithMetadata
+from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
@@ -16,6 +17,7 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.step_callback import flux_step_callback, stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModel,
@@ -102,7 +104,9 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all boards.
         """
-        return self._services.boards.get_all()
+        return self._services.boards.get_all(
+            order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
+        )
 
     def add_image_to_board(self, board_id: str, image_name: str) -> None:
         """Adds an image to a board.
@@ -122,7 +126,11 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             A list of all image names for the board.
         """
-        return self._services.board_images.get_all_board_image_names_for_board(board_id)
+        return self._services.board_images.get_all_board_image_names_for_board(
+            board_id,
+            categories=None,
+            is_intermediate=None,
+        )
 
 
 class LoggerInterface(InvocationContextInterface):
@@ -283,7 +291,7 @@ class ImagesInterface(InvocationContextInterface):
         Returns:
             The local path of the image or thumbnail.
         """
-        return self._services.images.get_path(image_name, thumbnail)
+        return Path(self._services.images.get_path(image_name, thumbnail))
 
 
 class TensorsInterface(InvocationContextInterface):

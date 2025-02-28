@@ -63,7 +63,11 @@ class BulkDownloadService(BulkDownloadBase):
         return [self._invoker.services.images.get_dto(image_name) for image_name in image_names]
 
     def _board_handler(self, board_id: str) -> list[ImageDTO]:
-        image_names = self._invoker.services.board_image_records.get_all_board_image_names_for_board(board_id)
+        image_names = self._invoker.services.board_image_records.get_all_board_image_names_for_board(
+            board_id,
+            categories=None,
+            is_intermediate=None,
+        )
         return self._image_handler(image_names)
 
     def generate_item_id(self, board_id: Optional[str]) -> str:

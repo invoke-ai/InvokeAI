@@ -25,7 +25,6 @@ import {
   getElement,
   getInitialValue,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
-import { getEditModeWrapperId } from 'features/nodes/components/sidePanel/builder/shared';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import {
   formElementAdded,
@@ -41,6 +40,7 @@ import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { Param0 } from 'tsafe';
+import { assert } from 'tsafe';
 
 const log = logger('dnd');
 
@@ -63,7 +63,7 @@ const isFormElementDndData = (data: Record<string | symbol, unknown>): data is F
  * @param elementId The id of the element to flash
  */
 const flashElement = (elementId: ElementId) => {
-  const element = document.querySelector(`#${getEditModeWrapperId(elementId)}`);
+  const element = document.querySelector(`#${elementId}`);
   if (element instanceof HTMLElement) {
     triggerPostMoveFlash(element, colorTokenToCssVar('base.800'));
   }
@@ -329,6 +329,9 @@ export const useFormElementDnd = (
   const getAllowedDropRegions = useGetAllowedDropRegions();
 
   useEffect(() => {
+    if (isRootElement) {
+      assert(false, 'Root element should not be draggable');
+    }
     const draggableElement = draggableRef.current;
     const dragHandleElement = dragHandleRef.current;
 
@@ -339,8 +342,6 @@ export const useFormElementDnd = (
     return combine(
       firefoxDndFix(draggableElement),
       draggable({
-        // Don't allow dragging the root element
-        canDrag: () => !isRootElement,
         element: draggableElement,
         dragHandle: dragHandleElement,
         getInitialData: () => {
@@ -356,7 +357,8 @@ export const useFormElementDnd = (
       }),
       dropTargetForElements({
         element: draggableElement,
-        getIsSticky: () => !isRootElement,
+        // TODO(psyche): This causes a kinda jittery behaviour - need a better heuristic to determine stickiness
+        getIsSticky: () => false,
         canDrop: ({ source }) =>
           isFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId,
         getData: ({ input }) => {
@@ -402,6 +404,52 @@ export const useFormElementDnd = (
   }, [dragHandleRef, draggableRef, elementId, getAllowedDropRegions, getElement, isRootElement]);
 
   return [activeDropRegion, isDragging] as const;
+};
+
+export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement>) => {
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const getElement = useGetElement();
+  const getAllowedDropRegions = useGetAllowedDropRegions();
+  const rootElementId = useAppSelector(selectFormRootElementId);
+
+  useEffect(() => {
+    const droppableElement = droppableRef.current;
+
+    if (!droppableElement) {
+      return;
+    }
+
+    return combine(
+      dropTargetForElements({
+        element: droppableElement,
+        getIsSticky: () => false,
+        canDrop: ({ source }) =>
+          getElement(rootElementId, isContainerElement).data.children.length === 0 && isFormElementDndData(source.data),
+        getData: ({ input }) => {
+          const element = getElement(rootElementId, isContainerElement);
+
+          const targetData = buildFormElementDndData(element);
+
+          return attachClosestCenterOrEdge(targetData, {
+            element: droppableElement,
+            input,
+            allowedCenterOrEdge: ['center'],
+          });
+        },
+        onDrag: () => {
+          setIsDraggingOver(true);
+        },
+        onDragLeave: () => {
+          setIsDraggingOver(false);
+        },
+        onDrop: () => {
+          setIsDraggingOver(false);
+        },
+      })
+    );
+  }, [droppableRef, getAllowedDropRegions, getElement, rootElementId]);
+
+  return isDraggingOver;
 };
 
 /**
@@ -457,7 +505,7 @@ export const useNodeFieldDnd = (
  * @param elementId The id of the element
  * @returns Whether the element is the root element
  */
-export const useIsRootElement = (elementId: string) => {
+const useIsRootElement = (elementId: string) => {
   const rootElementId = useAppSelector(selectFormRootElementId);
   const isRootElement = useMemo(() => rootElementId === elementId, [rootElementId, elementId]);
   return isRootElement;

@@ -31,6 +31,9 @@ const sx: SystemStyleObject = {
   '&[data-with-footer="true"]': {
     borderBottomRadius: 0,
   },
+  '&[data-with-footer="false"]': {
+    pb: 4,
+  },
 };
 
 const InvocationNode = ({ nodeId, isOpen }: Props) => {

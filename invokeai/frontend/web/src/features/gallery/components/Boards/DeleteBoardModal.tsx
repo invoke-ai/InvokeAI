@@ -36,7 +36,13 @@ const DeleteBoardModal = () => {
   const boardToDelete = useStore($boardToDelete);
   const { t } = useTranslation();
   const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
-    boardToDelete?.board_id ?? skipToken
+    boardToDelete?.board_id
+      ? {
+          board_id: boardToDelete?.board_id,
+          categories: undefined,
+          is_intermediate: undefined,
+        }
+      : skipToken
   );
 
   const selectImageUsageSummary = useMemo(

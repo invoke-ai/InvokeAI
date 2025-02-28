@@ -1,21 +1,21 @@
 import type { TooltipProps } from '@invoke-ai/ui-library';
 import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
+import type { NodesState } from 'features/nodes/store/types';
+import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue';
+import { getBatchSize } from 'features/nodes/util/node/resolveBatchValue';
 import type { Reason } from 'features/queue/store/readiness';
-import {
-  $isReadyToEnqueue,
-  $reasonsWhyCannotEnqueue,
-  selectPromptsCount,
-  selectWorkflowsBatchSize,
-} from 'features/queue/store/readiness';
+import { $isReadyToEnqueue, $reasonsWhyCannotEnqueue, selectPromptsCount } from 'features/queue/store/readiness';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { debounce } from 'lodash-es';
 import type { PropsWithChildren } from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
@@ -129,10 +129,27 @@ QueueCountPredictionCanvasOrUpscaleTab.displayName = 'QueueCountPredictionCanvas
 
 const QueueCountPredictionWorkflowsTab = memo(() => {
   const { t } = useTranslation();
-  const batchSize = useAppSelector(selectWorkflowsBatchSize);
+  const dispatch = useAppDispatch();
+  const nodesState = useAppSelector(selectNodesSlice);
+  const [batchSize, setBatchSize] = useState<BatchSizeResult | 'LOADING'>('LOADING');
+  const debouncedUpdateBatchSize = useMemo(
+    () =>
+      debounce(async (nodesState: NodesState) => {
+        setBatchSize('LOADING');
+        const batchSize = await getBatchSize(nodesState, dispatch);
+        setBatchSize(batchSize);
+      }, 300),
+    [dispatch]
+  );
+  useEffect(() => {
+    debouncedUpdateBatchSize(nodesState);
+  }, [debouncedUpdateBatchSize, nodesState]);
   const iterationsCount = useAppSelector(selectIterations);
 
   const text = useMemo(() => {
+    if (batchSize === 'LOADING') {
+      return `${t('common.loading')}...`;
+    }
     const iterations = t('queue.iterations', { count: iterationsCount });
     if (batchSize === 'NO_BATCHES') {
       const generationCount = Math.min(10000, iterationsCount);
@@ -140,7 +157,10 @@ const QueueCountPredictionWorkflowsTab = memo(() => {
       return `${iterationsCount} ${iterations} -> ${generationCount} ${generations}`.toLowerCase();
     }
     if (batchSize === 'EMPTY_BATCHES') {
-      return t('parameters.invoke.invalidBatchConfigurationCannotCalculate');
+      return t('parameters.invoke.batchNodeEmptyCollection');
+    }
+    if (batchSize === 'MISMATCHED_BATCH_GROUP') {
+      return t('parameters.invoke.batchNodeCollectionSizeMismatchNoGroupId');
     }
     const generationCount = Math.min(batchSize * iterationsCount, 10000);
     const generations = t('queue.generations', { count: generationCount });

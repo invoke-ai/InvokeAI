@@ -4,6 +4,7 @@ import { FloatFieldSlider } from 'features/nodes/components/flow/nodes/Invocatio
 import { FloatFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldCollectionInputComponent';
 import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
+import { ImageGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageGeneratorFieldComponent';
 import { IntegerFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerFieldCollectionInputComponent';
 import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorFieldComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
@@ -49,6 +50,8 @@ import {
   isImageFieldCollectionInputTemplate,
   isImageFieldInputInstance,
   isImageFieldInputTemplate,
+  isImageGeneratorFieldInputInstance,
+  isImageGeneratorFieldInputTemplate,
   isIntegerFieldCollectionInputInstance,
   isIntegerFieldCollectionInputTemplate,
   isIntegerFieldInputInstance,
@@ -390,6 +393,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <StringGeneratorFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isImageGeneratorFieldInputTemplate(template)) {
+    if (!isImageGeneratorFieldInputInstance(field)) {
+      return null;
+    }
+    return <ImageGeneratorFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   return null;

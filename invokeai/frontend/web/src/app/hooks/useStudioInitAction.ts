@@ -16,7 +16,8 @@ import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/st
 import { toast } from 'features/toast/toast';
 import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
-import { useCallback, useEffect, useRef } from 'react';
+import { atom } from 'nanostores';
+import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getImageDTO, getImageMetadata } from 'services/api/endpoints/images';
 import { getStylePreset } from 'services/api/endpoints/stylePresets';
@@ -31,6 +32,9 @@ type StudioDestinationAction = _StudioInitAction<
   'goToDestination',
   { destination: 'generation' | 'canvas' | 'workflows' | 'upscaling' | 'viewAllWorkflows' | 'viewAllStylePresets' }
 >;
+
+// Use global state to show loader until we are ready to render the studio.
+export const $didStudioInit = atom(false);
 
 export type StudioInitAction =
   | LoadWorkflowAction
@@ -51,8 +55,6 @@ export type StudioInitAction =
 export const useStudioInitAction = (action?: StudioInitAction) => {
   useAssertSingleton('useStudioInitAction');
   const { t } = useTranslation();
-  // Use a ref to ensure that we only perform the action once
-  const didInit = useRef(false);
   const didParseOpenAPISchema = useStore($hasTemplates);
   const store = useAppStore();
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
@@ -102,16 +104,16 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       }
       const metadata = getImageMetadataResult.value;
       // This shows a toast
-      parseAndRecallAllMetadata(metadata, true);
+      await parseAndRecallAllMetadata(metadata, true);
       store.dispatch(setActiveTab('canvas'));
     },
     [store, t]
   );
 
   const handleLoadWorkflow = useCallback(
-    (workflowId: string) => {
+    async (workflowId: string) => {
       // This shows a toast
-      getAndLoadWorkflow(workflowId);
+      await getAndLoadWorkflow(workflowId);
       store.dispatch(setActiveTab('workflows'));
     },
     [getAndLoadWorkflow, store]
@@ -176,36 +178,48 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
     [store]
   );
 
+  const handleStudioInitAction = useCallback(
+    async (action: StudioInitAction) => {
+      // This cannot be in the useEffect below because we need to await some of the actions before setting didStudioInit.
+      switch (action.type) {
+        case 'loadWorkflow':
+          await handleLoadWorkflow(action.data.workflowId);
+          break;
+        case 'selectStylePreset':
+          await handleSelectStylePreset(action.data.stylePresetId);
+          break;
+
+        case 'sendToCanvas':
+          await handleSendToCanvas(action.data.imageName);
+          break;
+
+        case 'useAllParameters':
+          await handleUseAllMetadata(action.data.imageName);
+          break;
+
+        case 'goToDestination':
+          handleGoToDestination(action.data.destination);
+          break;
+
+        default:
+          break;
+      }
+      $didStudioInit.set(true);
+    },
+    [handleGoToDestination, handleLoadWorkflow, handleSelectStylePreset, handleSendToCanvas, handleUseAllMetadata]
+  );
+
   useEffect(() => {
-    if (didInit.current || !action || !didParseOpenAPISchema) {
+    if ($didStudioInit.get() || !didParseOpenAPISchema) {
       return;
     }
 
-    didInit.current = true;
-
-    switch (action.type) {
-      case 'loadWorkflow':
-        handleLoadWorkflow(action.data.workflowId);
-        break;
-      case 'selectStylePreset':
-        handleSelectStylePreset(action.data.stylePresetId);
-        break;
-
-      case 'sendToCanvas':
-        handleSendToCanvas(action.data.imageName);
-        break;
-
-      case 'useAllParameters':
-        handleUseAllMetadata(action.data.imageName);
-        break;
-
-      case 'goToDestination':
-        handleGoToDestination(action.data.destination);
-        break;
-
-      default:
-        break;
+    if (!action) {
+      $didStudioInit.set(true);
+      return;
     }
+
+    handleStudioInitAction(action);
   }, [
     handleSendToCanvas,
     handleUseAllMetadata,
@@ -214,5 +228,6 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
     handleGoToDestination,
     handleLoadWorkflow,
     didParseOpenAPISchema,
+    handleStudioInitAction,
   ]);
 };

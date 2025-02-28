@@ -36,14 +36,14 @@ const validateImageFieldCollectionValue = (
   // Image collections may have min or max items to validate
   if (minItems !== undefined && minItems > 0 && count === 0) {
     reasons.push(t('parameters.invoke.collectionEmpty'));
-  }
+  } else {
+    if (minItems !== undefined && count < minItems) {
+      reasons.push(t('parameters.invoke.collectionTooFewItems', { count, minItems }));
+    }
 
-  if (minItems !== undefined && count < minItems) {
-    reasons.push(t('parameters.invoke.collectionTooFewItems', { count, minItems }));
-  }
-
-  if (maxItems !== undefined && count > maxItems) {
-    reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
+    if (maxItems !== undefined && count > maxItems) {
+      reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
+    }
   }
 
   return reasons;
@@ -60,14 +60,14 @@ const validateStringFieldCollectionValue = (
   // Image collections may have min or max items to validate
   if (minItems !== undefined && minItems > 0 && count === 0) {
     reasons.push(t('parameters.invoke.collectionEmpty'));
-  }
+  } else {
+    if (minItems !== undefined && count < minItems) {
+      reasons.push(t('parameters.invoke.collectionTooFewItems', { count, minItems }));
+    }
 
-  if (minItems !== undefined && count < minItems) {
-    reasons.push(t('parameters.invoke.collectionTooFewItems', { count, minItems }));
-  }
-
-  if (maxItems !== undefined && count > maxItems) {
-    reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
+    if (maxItems !== undefined && count > maxItems) {
+      reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
+    }
   }
 
   for (const str of value) {
@@ -93,14 +93,14 @@ const validateNumberFieldCollectionValue = (
   // Image collections may have min or max items to validate
   if (minItems !== undefined && minItems > 0 && count === 0) {
     reasons.push(t('parameters.invoke.collectionEmpty'));
-  }
+  } else {
+    if (minItems !== undefined && count < minItems) {
+      reasons.push(t('parameters.invoke.collectionTooFewItems', { count, minItems }));
+    }
 
-  if (minItems !== undefined && count < minItems) {
-    reasons.push(t('parameters.invoke.collectionTooFewItems', { count, minItems }));
-  }
-
-  if (maxItems !== undefined && count > maxItems) {
-    reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
+    if (maxItems !== undefined && count > maxItems) {
+      reasons.push(t('parameters.invoke.collectionTooManyItems', { count, maxItems }));
+    }
   }
 
   for (const num of value) {
@@ -174,6 +174,8 @@ export const getFieldErrors = (
       prefix,
       issue: t('parameters.invoke.missingInputForField'),
     });
+  } else if (isConnected) {
+    // Connected fields have no value to validate - they are OK
   } else if (
     field.value &&
     isImageFieldCollectionInputTemplate(fieldTemplate) &&

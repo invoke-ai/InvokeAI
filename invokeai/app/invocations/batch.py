@@ -64,10 +64,47 @@ class ImageBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each image in the batch."""
 
     images: list[ImageField] = InputField(
-        default=[], min_length=1, description="The images to batch over", input=Input.Direct
+        default=[],
+        min_length=1,
+        description="The images to batch over",
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
+        raise NotExecutableNodeError()
+
+
+@invocation_output("image_generator_output")
+class ImageGeneratorOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of boards"""
+
+    images: list[ImageField] = OutputField(description="The generated images")
+
+
+class ImageGeneratorField(BaseModel):
+    pass
+
+
+@invocation(
+    "image_generator",
+    title="Image Generator",
+    tags=["primitives", "board", "image", "batch", "special"],
+    category="primitives",
+    version="1.0.0",
+    classification=Classification.Special,
+)
+class ImageGenerator(BaseInvocation):
+    """Generated a collection of images for use in a batched generation"""
+
+    generator: ImageGeneratorField = InputField(
+        description="The image generator.",
+        input=Input.Direct,
+        title="Generator Type",
+    )
+
+    def __init__(self):
+        raise NotExecutableNodeError()
+
+    def invoke(self, context: InvocationContext) -> ImageGeneratorOutput:
         raise NotExecutableNodeError()
 
 

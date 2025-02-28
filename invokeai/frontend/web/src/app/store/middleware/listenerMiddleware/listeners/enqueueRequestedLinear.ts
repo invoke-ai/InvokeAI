@@ -3,6 +3,7 @@ import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
+import { parseify } from 'common/util/serialize';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
@@ -13,7 +14,6 @@ import { toast } from 'features/toast/toast';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import { assert, AssertionError } from 'tsafe';
-import type { JsonObject } from 'type-fest';
 
 const log = logger('generation');
 
@@ -80,16 +80,15 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const req = dispatch(
         queueApi.endpoints.enqueueBatch.initiate(prepareBatchResult.value, enqueueMutationFixedCacheKeyOptions)
       );
-      req.reset();
 
-      const enqueueResult = await withResultAsync(() => req.unwrap());
-
-      if (enqueueResult.isErr()) {
-        log.error({ error: serializeError(enqueueResult.error) }, 'Failed to enqueue batch');
-        return;
+      try {
+        await req.unwrap();
+        log.debug(parseify({ batchConfig: prepareBatchResult.value }), 'Enqueued batch');
+      } catch (error) {
+        log.error({ error: serializeError(error) }, 'Failed to enqueue batch');
+      } finally {
+        req.reset();
       }
-
-      log.debug({ batchConfig: prepareBatchResult.value } as JsonObject, 'Enqueued batch');
     },
   });
 };
