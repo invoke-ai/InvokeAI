@@ -75,6 +75,8 @@
     "idb-keyval": "^6.2.1",
     "jsondiffpatch": "^0.6.0",
     "konva": "^9.3.15",
+    "linkify-react": "^4.2.0",
+    "linkifyjs": "^4.2.0",
     "lodash-es": "^4.17.21",
     "lru-cache": "^11.0.1",
     "mtwist": "^1.0.2",
