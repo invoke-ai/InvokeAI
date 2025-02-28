@@ -96,10 +96,13 @@ const WorkflowGeneralTab = () => {
             <FormLabel>{t('nodes.workflowName')}</FormLabel>
             <Input variant="darkFilled" value={name} onChange={handleChangeName} />
           </FormControl>
+          {/* we should not show this field if default workflow or not saved to DB yet */}
+          {/* {data?.meta.category !== 'default' || !data.workflow_id && ( */}
           <FormControl>
             <FormLabel>{t('workflows.workflowThumbnail')}</FormLabel>
             <WorkflowThumbnailEditor thumbnailUrl={data?.thumbnail_url || null} workflowId={id} />
           </FormControl>
+          {/* )} */}
           <FormControl>
             <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
             <Input variant="darkFilled" value={version} onChange={handleChangeVersion} />
