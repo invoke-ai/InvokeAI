@@ -48,7 +48,9 @@ async def enqueue_batch(
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution."""
 
-    return ApiDependencies.invoker.services.session_queue.enqueue_batch(queue_id=queue_id, batch=batch, prepend=prepend)
+    return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
+        queue_id=queue_id, batch=batch, prepend=prepend
+    )
 
 
 @session_queue_router.get(
