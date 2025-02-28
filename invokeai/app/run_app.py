@@ -31,7 +31,7 @@ def run_app() -> None:
     if app_config.pytorch_cuda_alloc_conf:
         configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
 
-    # Import from startup_utils here to avoid importing torch before enable_torch_cuda_malloc() is called.
+    # Import from startup_utils here to avoid importing torch before configure_torch_cuda_allocator() is called.
     from invokeai.app.util.startup_utils import (
         apply_monkeypatches,
         check_cudnn,
