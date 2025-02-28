@@ -1,5 +1,4 @@
 import sqlite3
-import threading
 from typing import Optional, cast
 
 from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
@@ -15,7 +14,6 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
     _conn: sqlite3.Connection
     _cursor: sqlite3.Cursor
-    _lock: threading.RLock
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
