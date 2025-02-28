@@ -141,8 +141,8 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     add_lora_layer_if_present("time_text_embed.text_embedder.linear_2", "vector_in.out_layer")
 
     # time_text_embed.guidance_embedder -> guidance_in.
-    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_1", "guidance_in")
-    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_2", "guidance_in")
+    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_1", "guidance_in.in_layer")
+    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_2", "guidance_in.out_layer")
 
     # context_embedder -> txt_in.
     add_lora_layer_if_present("context_embedder", "txt_in")
