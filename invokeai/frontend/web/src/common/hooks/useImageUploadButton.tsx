@@ -128,7 +128,11 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
     getInputProps: getUploadInputProps,
     open: openUploader,
   } = useDropzone({
-    accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
+    accept: {
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg', '.png'],
+      'image/webp': ['.webp'],
+    },
     onDropAccepted,
     onDropRejected,
     disabled: isDisabled,
