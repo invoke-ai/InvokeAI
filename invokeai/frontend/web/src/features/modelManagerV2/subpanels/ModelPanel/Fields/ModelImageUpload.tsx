@@ -72,7 +72,11 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
   }, [model_key, t, deleteModelImage]);
 
   const { getInputProps, getRootProps } = useDropzone({
-    accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
+    accept: {
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg', '.png'],
+      'image/webp': ['.webp'],
+    },
     onDropAccepted,
     noDrag: true,
     multiple: false,
