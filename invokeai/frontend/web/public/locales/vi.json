@@ -118,7 +118,8 @@
         "compareHelp2": "Nhấn <Kbd>M</Kbd> để tuần hoàn trong chế độ so sánh.",
         "boardsSettings": "Thiết Lập Bảng",
         "imagesSettings": "Cài Đặt Ảnh Trong Thư Viện Ảnh",
-        "assets": "Tài Nguyên"
+        "assets": "Tài Nguyên",
+        "images": "Hình Ảnh"
     },
     "common": {
         "ipAdapter": "IP Adapter",
@@ -233,7 +234,8 @@
         "combinatorial": "Tổ Hợp",
         "column": "Cột",
         "layout": "Bố Cục",
-        "row": "Hàng"
+        "row": "Hàng",
+        "board": "Bảng"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -873,7 +875,7 @@
         "removeLinearView": "Xoá Khỏi Chế Độ Xem Tuyến Tính",
         "unknownErrorValidatingWorkflow": "Lỗi không rõ khi xác thực workflow",
         "unableToLoadWorkflow": "Không Thể Tải Workflow",
-        "workflowSettings": "Cài Đặt Trình Biên Tập Viên Workflow",
+        "workflowSettings": "Cài Đặt Biên Tập Workflow",
         "workflowVersion": "Phiên Bản",
         "unableToGetWorkflowVersion": "Không thể tìm phiên bản của lược đồ workflow",
         "collection": "Đa tài nguyên",
@@ -1010,7 +1012,11 @@
         "loadWorkflowDesc2": "Workflow hiện tại của bạn có những điều chỉnh chưa được lưu.",
         "loadingTemplates": "Đang Tải {{name}}",
         "nodeName": "Tên Node",
-        "unableToUpdateNode": "Cập nhật node thất bại: node {{node}} thuộc dạng {{type}} (có thể cần xóa và tạo lại)"
+        "unableToUpdateNode": "Cập nhật node thất bại: node {{node}} thuộc dạng {{type}} (có thể cần xóa và tạo lại)",
+        "downloadWorkflowError": "Lỗi tải xuống workflow",
+        "generatorImagesFromBoard": "Ảnh Từ Bảng",
+        "generatorImagesCategory": "Phân Loại",
+        "generatorImages_other": "{{count}} ảnh"
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -1494,7 +1500,9 @@
             "batchNodeCollectionSizeMismatch": "Kích cỡ tài nguyên không phù hợp với Lô {{batchGroupId}}",
             "emptyBatches": "lô trống",
             "batchNodeNotConnected": "Node Hàng Loạt chưa được kết nối: {{label}}",
-            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng"
+            "batchNodeEmptyCollection": "Một vài node hàng loạt có tài nguyên rỗng",
+            "collectionEmpty": "tài nguyên trống",
+            "batchNodeCollectionSizeMismatchNoGroupId": "tài nguyên theo nhóm có kích thước sai lệch"
         },
         "cfgScale": "Thang CFG",
         "useSeed": "Dùng Hạt Giống",
@@ -2247,11 +2255,11 @@
         "workflowLibrary": "Thư Viện",
         "opened": "Ngày Mở",
         "deleteWorkflow": "Xoá Workflow",
-        "workflowEditorMenu": "Menu Biên Tập Viên Workflow",
+        "workflowEditorMenu": "Menu Biên Tập Workflow",
         "uploadAndSaveWorkflow": "Tải Lên Thư Viện",
         "openLibrary": "Mở Thư Viện",
         "builder": {
-            "resetAllNodeFields": "Khởi Động Lại Tất Cả Vùng Cho Node",
+            "resetAllNodeFields": "Tải Lại Các Vùng Cho Node",
             "builder": "Trình Tạo Vùng Nhập",
             "layout": "Bố Cục",
             "row": "Hàng",
@@ -2271,10 +2279,10 @@
             "headingPlaceholder": "Đầu Dòng Trống",
             "textPlaceholder": "Mô Tả Trống",
             "column": "Cột",
-            "deleteAllElements": "Xóa Tất Cả Thành Phần Vùng Nhập",
+            "deleteAllElements": "Xóa Tất Cả Thành Phần",
             "nodeField": "Vùng Cho Node",
-            "nodeFieldTooltip": "Để thêm vùng cho node, bấm vào dấu cộng nhỏ trên vùng trong Vùng Biên Tập Workflow, hoặc kéo vùng theo tên của nó vào vùng nhập.",
-            "workflowBuilderAlphaWarning": "Trình tạo workflow đang trong giai đoạn alpha. Nó có thể xuất hiện những thay đổi đột ngột trước khi chính thức được phát hành."
+            "nodeFieldTooltip": "Để thêm vùng cho node, bấm vào dấu cộng nhỏ trên vùng trong Trình Biên Tập Workflow, hoặc kéo vùng theo tên của nó vào vùng nhập.",
+            "workflowBuilderAlphaWarning": "Trình tạo vùng nhập đang trong giai đoạn alpha. Nó có thể xuất hiện những thay đổi đột ngột trước khi chính thức được phát hành."
         }
     },
     "upscaling": {
@@ -2310,8 +2318,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Cải thiện các thiết lập mặc định của VRAM",
-            "Xoá bộ nhớ đệm của model theo yêu cầu"
+            "Trình Biên Tập Workflow: trình tạo vùng nhập dưới dạng kéo thả nhằm tạo dựng workflow dễ dàng hơn.",
+            "Các nâng cấp khác: Xếp hàng tạo sinh theo nhóm nhanh hơn, upscale tốt hơn, trình chọn màu được cải thiện, và node chứa metadata."
         ]
     },
     "upsell": {
