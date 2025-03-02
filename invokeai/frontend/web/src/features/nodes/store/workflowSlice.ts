@@ -309,7 +309,6 @@ export const {
   formElementNodeFieldDataChanged,
   formElementContainerDataChanged,
   formFieldInitialValuesChanged,
-  workflowThumbnailChanged,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -368,7 +367,6 @@ export const selectWorkflowOrderBy = createWorkflowSelector((workflow) => workfl
 export const selectWorkflowOrderDirection = createWorkflowSelector((workflow) => workflow.orderDirection);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
-export const selectWorkflowThumbnail = createWorkflowSelector((workflow) => workflow.thumbnail);
 
 export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
   const noNodes = !nodes.nodes.length;
