@@ -105,7 +105,11 @@
         "resetToDefaults": "Ripristina le impostazioni predefinite",
         "seed": "Seme",
         "combinatorial": "Combinatorio",
-        "count": "Quantità"
+        "count": "Quantità",
+        "board": "Bacheca",
+        "layout": "Schema",
+        "row": "Riga",
+        "column": "Colonna"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -173,7 +177,8 @@
         "assetsTab": "File che hai caricato per usarli nei tuoi progetti.",
         "boardsSettings": "Impostazioni Bacheche",
         "imagesSettings": "Impostazioni Immagini Galleria",
-        "assets": "Risorse"
+        "assets": "Risorse",
+        "images": "Immagini"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -703,7 +708,8 @@
             "collectionNumberNotMultipleOf": "{{value}} non è multiplo di {{multipleOf}}",
             "collectionNumberLTMin": "{{value}} < {{minimum}} (incr min)",
             "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (excl max)",
-            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (excl min)"
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (excl min)",
+            "collectionEmpty": "raccolta vuota"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -920,8 +926,8 @@
         "boolean": "Booleani",
         "node": "Nodo",
         "collection": "Raccolta",
-        "cannotConnectInputToInput": "Impossibile collegare Input a Input",
-        "cannotConnectOutputToOutput": "Impossibile collegare Output ad Output",
+        "cannotConnectInputToInput": "Impossibile collegare ingresso a ingresso",
+        "cannotConnectOutputToOutput": "Impossibile collegare uscita ad uscita",
         "cannotConnectToSelf": "Impossibile connettersi a se stesso",
         "mismatchedVersion": "Nodo non valido: il nodo {{node}} di tipo {{type}} ha una versione non corrispondente (provare ad aggiornare?)",
         "loadingNodes": "Caricamento nodi...",
@@ -1014,7 +1020,21 @@
         "generatorNRandomValues_one": "{{count}} valore casuale",
         "generatorNRandomValues_many": "{{count}} valori casuali",
         "generatorNRandomValues_other": "{{count}} valori casuali",
-        "arithmeticSequence": "Sequenza aritmetica"
+        "arithmeticSequence": "Sequenza aritmetica",
+        "nodeName": "Nome del nodo",
+        "loadWorkflowDesc": "Caricare il flusso di lavoro?",
+        "loadWorkflowDesc2": "Il flusso di lavoro corrente presenta modifiche non salvate.",
+        "downloadWorkflowError": "Errore durante lo scaricamento del flusso di lavoro",
+        "deletedMissingNodeFieldFormElement": "Campo modulo mancante eliminato: nodo {{nodeId}} campo {{fieldName}}",
+        "loadingTemplates": "Caricamento {{name}}",
+        "unableToUpdateNode": "Aggiornamento del nodo non riuscito: nodo {{node}} di tipo {{type}} (potrebbe essere necessario eliminarlo e ricrearlo)",
+        "description": "Descrizione",
+        "generatorImagesCategory": "Categoria",
+        "generatorImages_one": "{{count}} immagine",
+        "generatorImages_many": "{{count}} immagini",
+        "generatorImages_other": "{{count}} immagini",
+        "generatorImagesFromBoard": "Immagini dalla Bacheca",
+        "missingSourceOrTargetNode": "Nodo sorgente o di destinazione mancante"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1140,7 +1160,10 @@
         "cancelAllExceptCurrentQueueItemAlertDialog2": "Vuoi davvero annullare tutti gli elementi in coda in sospeso?",
         "confirm": "Conferma",
         "cancelAllExceptCurrentQueueItemAlertDialog": "L'annullamento di tutti gli elementi della coda, eccetto quello corrente, interromperà gli elementi in sospeso ma consentirà il completamento di quello in corso.",
-        "cancelAllExceptCurrentTooltip": "Annulla tutto tranne l'elemento corrente"
+        "cancelAllExceptCurrentTooltip": "Annulla tutto tranne l'elemento corrente",
+        "retrySucceeded": "Elemento rieseguito",
+        "retryItem": "Riesegui elemento",
+        "retryFailed": "Problema riesecuzione elemento"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1718,7 +1741,33 @@
         "download": "Scarica",
         "copyShareLink": "Copia Condividi Link",
         "copyShareLinkForWorkflow": "Copia Condividi Link del Flusso di lavoro",
-        "delete": "Elimina"
+        "delete": "Elimina",
+        "openLibrary": "Apri la libreria",
+        "builder": {
+            "resetAllNodeFields": "Reimposta tutti i campi del nodo",
+            "row": "Riga",
+            "nodeField": "Campo del nodo",
+            "slider": "Cursore",
+            "emptyRootPlaceholderEditMode": "Per iniziare, trascina qui un elemento del modulo o un campo nodo.",
+            "containerPlaceholder": "Contenitore vuoto",
+            "headingPlaceholder": "Titolo vuoto",
+            "column": "Colonna",
+            "nodeFieldTooltip": "Per aggiungere un campo nodo, fare clic sul piccolo pulsante con il segno più sul campo nell'editor del flusso di lavoro, oppure trascinare il campo in base al suo nome nel modulo.",
+            "label": "Etichetta",
+            "deleteAllElements": "Elimina tutti gli elementi del modulo",
+            "addToForm": "Aggiungi al Modulo",
+            "layout": "Schema",
+            "builder": "Generatore Modulo",
+            "zoomToNode": "Zoom sul nodo",
+            "component": "Componente",
+            "showDescription": "Mostra Descrizione",
+            "singleLine": "Linea singola",
+            "multiLine": "Linea Multipla",
+            "both": "Entrambi",
+            "emptyRootPlaceholderViewMode": "Fare clic su Modifica per iniziare a creare un modulo per questo flusso di lavoro.",
+            "textPlaceholder": "Testo vuoto",
+            "workflowBuilderAlphaWarning": "Il generatore di flussi di lavoro è attualmente in versione alpha. Potrebbero esserci cambiamenti radicali prima della versione stabile."
+        }
     },
     "accordions": {
         "compositing": {
@@ -2276,8 +2325,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Impostazioni predefinite VRAM migliorate",
-            "Cancellazione della cache del modello su richiesta"
+            "Editor del flusso di lavoro: nuovo generatore di moduli trascina-e-rilascia per una creazione più facile del flusso di lavoro.",
+            "Altri miglioramenti: messa in coda dei lotti più rapida, migliore ampliamento, selettore colore migliorato e nodi metadati."
         ]
     },
     "system": {
