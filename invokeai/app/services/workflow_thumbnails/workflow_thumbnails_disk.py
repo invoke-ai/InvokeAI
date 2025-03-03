@@ -4,6 +4,7 @@ from PIL import Image
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_common import (
     WorkflowThumbnailFileDeleteException,
@@ -41,7 +42,12 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
             raise WorkflowThumbnailFileSaveException from e
 
     def get_path(self, workflow_id: str) -> Path:
-        path = self._workflow_thumbnail_folder / (workflow_id + ".webp")
+        workflow = self._invoker.services.workflow_records.get(workflow_id).workflow
+        if workflow.meta.category is WorkflowCategory.Default:
+            default_thumbnails_dir = Path(__file__).parent / Path("default_workflow_thumbnails")
+            path = default_thumbnails_dir / (workflow_id + ".png")
+        else:
+            path = self._workflow_thumbnail_folder / (workflow_id + ".webp")
 
         return path
 
