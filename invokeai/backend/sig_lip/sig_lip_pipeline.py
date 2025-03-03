@@ -34,3 +34,10 @@ class SigLipPipeline(RawModel):
         imgs = self._siglip_processor.preprocess(images=[x], do_resize=True, return_tensors="pt", do_convert_rgb=True)
         encoded_x = self._siglip_model(**imgs.to(device=device, dtype=dtype)).last_hidden_state
         return encoded_x
+
+    def calc_size(self) -> int:
+        """Get size of the model in memory in bytes."""
+        # HACK(ryand): Fix this issue with circular imports.
+        from invokeai.backend.model_manager.load.model_util import calc_module_size
+
+        return calc_module_size(self._siglip_model)
