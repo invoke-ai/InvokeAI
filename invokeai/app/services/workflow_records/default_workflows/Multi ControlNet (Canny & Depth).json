@@ -1,4 +1,5 @@
 {
+  "id": "default_2d05e719-a6b9-4e64-9310-b875d3b2f9d2",
   "name": "Multi ControlNet (Canny & Depth)",
   "author": "InvokeAI",
   "description": "A sample workflow using canny & depth ControlNets to guide the generation process. ",

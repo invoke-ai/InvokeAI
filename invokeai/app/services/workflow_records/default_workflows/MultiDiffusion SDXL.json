@@ -1,4 +1,5 @@
 {
+  "id": "default_35658541-6d41-4a20-8ec5-4bf2561faed0",
   "name": "MultiDiffusion SDXL",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling, using SDXL based models.",
@@ -56,7 +57,6 @@
     "version": "3.0.0",
     "category": "default"
   },
-  "id": "dd607062-9e1b-48b9-89ad-9762cdfbb8f4",
   "nodes": [
     {
       "id": "71a116e1-c631-48b3-923d-acea4753b887",

@@ -1,4 +1,5 @@
 {
+  "id": "default_686bb1d0-d086-4c70-9fa3-2f600b922023",
   "name": "ESRGAN Upscaling with Canny ControlNet",
   "author": "InvokeAI",
   "description": "Sample workflow for using Upscaling with ControlNet with SD1.5",

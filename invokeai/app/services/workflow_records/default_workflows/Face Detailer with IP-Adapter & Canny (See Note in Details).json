@@ -1,4 +1,5 @@
 {
+  "id": "default_dec5a2e9-f59c-40d9-8869-a056751d79b8",
   "name": "Face Detailer with IP-Adapter & Canny (See Note in Details)",
   "author": "kosmoskatten",
   "description": "A workflow to add detail to and improve faces. This workflow is most effective when used with a model that creates realistic outputs. ",

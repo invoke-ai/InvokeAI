@@ -1,4 +1,5 @@
 {
+  "id": "default_d7a1c60f-ca2f-4f90-9e33-75a826ca6d8f",
   "name": "Prompt from File",
   "author": "InvokeAI",
   "description": "Sample workflow using Prompt from File node",

@@ -1,4 +1,5 @@
 {
+  "id": "default_43b0d7f7-6a12-4dcf-a5a4-50c940cbee29",
   "name": "Tiled Upscaling (Beta)",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling. ",
