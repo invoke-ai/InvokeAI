@@ -21,17 +21,14 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
-    _conn: sqlite3.Connection
-    _cursor: sqlite3.Cursor
-
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._conn = db.conn
-        self._cursor = self._conn.cursor()
 
     def get(self, image_name: str) -> ImageRecord:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 f"""--sql
                 SELECT {IMAGE_DTO_COLS} FROM images
                 WHERE image_name = ?;
@@ -39,7 +36,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 (image_name,),
             )
 
-            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
         except sqlite3.Error as e:
             raise ImageRecordNotFoundException from e
 
@@ -50,7 +47,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 SELECT metadata FROM images
                 WHERE image_name = ?;
@@ -58,7 +56,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 (image_name,),
             )
 
-            result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
             if not result:
                 raise ImageRecordNotFoundException
@@ -75,9 +73,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         changes: ImageRecordChanges,
     ) -> None:
         try:
+            cursor = self._conn.cursor()
             # Change the category of the image
             if changes.image_category is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE images
                     SET image_category = ?
@@ -88,7 +87,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             # Change the session associated with the image
             if changes.session_id is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE images
                     SET session_id = ?
@@ -99,7 +98,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             # Change the image's `is_intermediate`` flag
             if changes.is_intermediate is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE images
                     SET is_intermediate = ?
@@ -110,7 +109,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             # Change the image's `starred`` state
             if changes.starred is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE images
                     SET starred = ?
@@ -136,6 +135,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
+        cursor = self._conn.cursor()
+
         # Manually build two queries - one for the count, one for the records
         count_query = """--sql
         SELECT COUNT(*)
@@ -216,21 +217,22 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         images_params.extend([limit, offset])
 
         # Build the list of images, deserializing each row
-        self._cursor.execute(images_query, images_params)
-        result = cast(list[sqlite3.Row], self._cursor.fetchall())
+        cursor.execute(images_query, images_params)
+        result = cast(list[sqlite3.Row], cursor.fetchall())
         images = [deserialize_image_record(dict(r)) for r in result]
 
         # Set up and execute the count query, without pagination
         count_query += query_conditions + ";"
         count_params = query_params.copy()
-        self._cursor.execute(count_query, count_params)
-        count = cast(int, self._cursor.fetchone()[0])
+        cursor.execute(count_query, count_params)
+        count = cast(int, cursor.fetchone()[0])
 
         return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
 
     def delete(self, image_name: str) -> None:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 DELETE FROM images
                 WHERE image_name = ?;
@@ -244,13 +246,15 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
     def delete_many(self, image_names: list[str]) -> None:
         try:
+            cursor = self._conn.cursor()
+
             placeholders = ",".join("?" for _ in image_names)
 
             # Construct the SQLite query with the placeholders
             query = f"DELETE FROM images WHERE image_name IN ({placeholders})"
 
             # Execute the query with the list of IDs as parameters
-            self._cursor.execute(query, image_names)
+            cursor.execute(query, image_names)
 
             self._conn.commit()
         except sqlite3.Error as e:
@@ -258,27 +262,29 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordDeleteException from e
 
     def get_intermediates_count(self) -> int:
-        self._cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """--sql
             SELECT COUNT(*) FROM images
             WHERE is_intermediate = TRUE;
             """
         )
-        count = cast(int, self._cursor.fetchone()[0])
+        count = cast(int, cursor.fetchone()[0])
         self._conn.commit()
         return count
 
     def delete_intermediates(self) -> list[str]:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 SELECT image_name FROM images
                 WHERE is_intermediate = TRUE;
                 """
             )
-            result = cast(list[sqlite3.Row], self._cursor.fetchall())
+            result = cast(list[sqlite3.Row], cursor.fetchall())
             image_names = [r[0] for r in result]
-            self._cursor.execute(
+            cursor.execute(
                 """--sql
                 DELETE FROM images
                 WHERE is_intermediate = TRUE;
@@ -305,7 +311,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         metadata: Optional[str] = None,
     ) -> datetime:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO images (
                     image_name,
@@ -338,7 +345,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             )
             self._conn.commit()
 
-            self._cursor.execute(
+            cursor.execute(
                 """--sql
                 SELECT created_at
                 FROM images
@@ -347,7 +354,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 (image_name,),
             )
 
-            created_at = datetime.fromisoformat(self._cursor.fetchone()[0])
+            created_at = datetime.fromisoformat(cursor.fetchone()[0])
 
             return created_at
         except sqlite3.Error as e:
@@ -355,7 +362,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             raise ImageRecordSaveException from e
 
     def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
-        self._cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """--sql
             SELECT images.*
             FROM images
@@ -368,7 +376,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             (board_id,),
         )
 
-        result = cast(Optional[sqlite3.Row], self._cursor.fetchone())
+        result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
         if result is None:
             return None
