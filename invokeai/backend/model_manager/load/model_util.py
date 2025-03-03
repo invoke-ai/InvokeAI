@@ -18,6 +18,7 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.sig_lip.sig_lip_pipeline import SigLipPipeline
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
@@ -48,6 +49,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
             GroundingDinoPipeline,
             SegmentAnythingPipeline,
             DepthAnythingPipeline,
+            SigLipPipeline,
         ),
     ):
         return model.calc_size()
