@@ -15,6 +15,7 @@ import {
   isControlLoRAModelConfig,
   isControlNetModelConfig,
   isFluxMainModelModelConfig,
+  isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
@@ -23,6 +24,7 @@ import {
   isRefinerMainModelModelConfig,
   isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
+  isSigLipModelConfig,
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
@@ -74,6 +76,8 @@ export const useVAEModels = (args?: ModelHookArgs) => buildModelsHook(isVAEModel
 export const useFluxVAEModels = (args?: ModelHookArgs) =>
   buildModelsHook(isFluxVAEModelConfig, args?.excludeSubmodels)();
 export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
+export const useSigLipModels = buildModelsHook(isSigLipModelConfig);
+export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);
 
 // const buildModelsSelector =
 //   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>

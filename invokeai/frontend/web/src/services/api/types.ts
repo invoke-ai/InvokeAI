@@ -62,6 +62,8 @@ type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualI
 type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
+export type SigLipModelConfig = S['SigLIPConfig'];
+export type FluxReduxModelConfig = S['FluxReduxConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
@@ -76,7 +78,9 @@ export type AnyModelConfig =
   | SpandrelImageToImageModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
-  | CLIPVisionDiffusersConfig;
+  | CLIPVisionDiffusersConfig
+  | SigLipModelConfig
+  | FluxReduxModelConfig;
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
@@ -207,6 +211,14 @@ export const isSpandrelImageToImageModelConfig = (
   config: AnyModelConfig
 ): config is SpandrelImageToImageModelConfig => {
   return config.type === 'spandrel_image_to_image';
+};
+
+export const isSigLipModelConfig = (config: AnyModelConfig): config is SigLipModelConfig => {
+  return config.type === 'siglip';
+};
+
+export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FluxReduxModelConfig => {
+  return config.type === 'flux_redux';
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
