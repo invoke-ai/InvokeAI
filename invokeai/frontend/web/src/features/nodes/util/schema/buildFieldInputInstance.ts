@@ -29,6 +29,8 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   CLIPLEmbedModelField: undefined,
   CLIPGEmbedModelField: undefined,
   ControlLoRAModelField: undefined,
+  SigLipModelField: undefined,
+  FluxReduxModelField: undefined,
   FloatGeneratorField: undefined,
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,

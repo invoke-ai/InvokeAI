@@ -229,6 +229,14 @@ const zFluxVAEModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxVAEModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zSigLipModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('SigLipModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zFluxReduxModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('FluxReduxModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
@@ -275,6 +283,8 @@ const zStatefulFieldType = z.union([
   zCLIPGEmbedModelFieldType,
   zControlLoRAModelFieldType,
   zFluxVAEModelFieldType,
+  zSigLipModelFieldType,
+  zFluxReduxModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
   zFloatGeneratorFieldType,
@@ -309,6 +319,8 @@ const modelFieldTypeNames = [
   zCLIPGEmbedModelFieldType.shape.name.value,
   zControlLoRAModelFieldType.shape.name.value,
   zFluxVAEModelFieldType.shape.name.value,
+  zSigLipModelFieldType.shape.name.value,
+  zFluxReduxModelFieldType.shape.name.value,
   // Stateless model fields
   'UNetField',
   'VAEField',
@@ -1074,6 +1086,42 @@ export const isControlLoRAModelFieldInputTemplate =
   buildTemplateTypeGuard<ControlLoRAModelFieldInputTemplate>('ControlLoRAModelField');
 // #endregion
 
+// #region SigLipModelField
+export const zSigLipModelFieldValue = zModelIdentifierField.optional();
+const zSigLipModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zSigLipModelFieldValue,
+});
+const zSigLipModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zSigLipModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zSigLipModelFieldValue,
+});
+export type SigLipModelFieldValue = z.infer<typeof zSigLipModelFieldValue>;
+export type SigLipModelFieldInputInstance = z.infer<typeof zSigLipModelFieldInputInstance>;
+export type SigLipModelFieldInputTemplate = z.infer<typeof zSigLipModelFieldInputTemplate>;
+export const isSigLipModelFieldInputInstance = buildInstanceTypeGuard(zSigLipModelFieldInputInstance);
+export const isSigLipModelFieldInputTemplate =
+  buildTemplateTypeGuard<SigLipModelFieldInputTemplate>('SigLipModelField');
+// #endregion
+
+// #region FluxReduxModelField
+export const zFluxReduxModelFieldValue = zModelIdentifierField.optional();
+const zFluxReduxModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFluxReduxModelFieldValue,
+});
+const zFluxReduxModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFluxReduxModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zFluxReduxModelFieldValue,
+});
+export type FluxReduxModelFieldValue = z.infer<typeof zFluxReduxModelFieldValue>;
+export type FluxReduxModelFieldInputInstance = z.infer<typeof zFluxReduxModelFieldInputInstance>;
+export type FluxReduxModelFieldInputTemplate = z.infer<typeof zFluxReduxModelFieldInputTemplate>;
+export const isFluxReduxModelFieldInputInstance = buildInstanceTypeGuard(zFluxReduxModelFieldInputInstance);
+export const isFluxReduxModelFieldInputTemplate =
+  buildTemplateTypeGuard<FluxReduxModelFieldInputTemplate>('FluxReduxModelField');
+// #endregion
+
 // #region SchedulerField
 export const zSchedulerFieldValue = zSchedulerField.optional();
 const zSchedulerFieldInputInstance = zFieldInputInstanceBase.extend({
@@ -1701,6 +1749,8 @@ export const zStatefulFieldValue = z.union([
   zCLIPLEmbedModelFieldValue,
   zCLIPGEmbedModelFieldValue,
   zControlLoRAModelFieldValue,
+  zSigLipModelFieldValue,
+  zFluxReduxModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
   zFloatGeneratorFieldValue,
@@ -1785,6 +1835,8 @@ const zStatefulFieldInputTemplate = z.union([
   zCLIPLEmbedModelFieldInputTemplate,
   zCLIPGEmbedModelFieldInputTemplate,
   zControlLoRAModelFieldInputTemplate,
+  zSigLipModelFieldInputTemplate,
+  zFluxReduxModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

@@ -14,10 +14,12 @@ import {
   useControlLoRAModel,
   useControlNetModels,
   useEmbeddingModels,
+  useFluxReduxModels,
   useIPAdapterModels,
   useLoRAModels,
   useMainModels,
   useRefinerModels,
+  useSigLipModels,
   useSpandrelImageToImageModels,
   useT2IAdapterModels,
   useT5EncoderModels,
@@ -112,6 +114,18 @@ const ModelList = () => {
     [spandrelImageToImageModels, searchTerm, filteredModelType]
   );
 
+  const [sigLipModels, { isLoading: isLoadingSigLipModels }] = useSigLipModels();
+  const filteredSigLipModels = useMemo(
+    () => modelsFilter(sigLipModels, searchTerm, filteredModelType),
+    [sigLipModels, searchTerm, filteredModelType]
+  );
+
+  const [fluxReduxModels, { isLoading: isLoadingFluxReduxModels }] = useFluxReduxModels();
+  const filteredFluxReduxModels = useMemo(
+    () => modelsFilter(fluxReduxModels, searchTerm, filteredModelType),
+    [fluxReduxModels, searchTerm, filteredModelType]
+  );
+
   const totalFilteredModels = useMemo(() => {
     return (
       filteredMainModels.length +
@@ -124,6 +138,8 @@ const ModelList = () => {
       filteredCLIPVisionModels.length +
       filteredVAEModels.length +
       filteredSpandrelImageToImageModels.length +
+      filteredSigLipModels.length +
+      filteredFluxReduxModels.length +
       t5EncoderModels.length +
       clipEmbedModels.length +
       controlLoRAModels.length
@@ -139,6 +155,8 @@ const ModelList = () => {
     filteredT2IAdapterModels.length,
     filteredVAEModels.length,
     filteredSpandrelImageToImageModels.length,
+    filteredSigLipModels.length,
+    filteredFluxReduxModels.length,
     t5EncoderModels.length,
     clipEmbedModels.length,
     controlLoRAModels.length,
@@ -228,6 +246,16 @@ const ModelList = () => {
             modelList={filteredSpandrelImageToImageModels}
             key="spandrel-image-to-image"
           />
+        )}
+        {/* SigLIP List */}
+        {isLoadingSigLipModels && <FetchingModelsLoader loadingMessage="Loading SigLIP Models..." />}
+        {!isLoadingSigLipModels && filteredSigLipModels.length > 0 && (
+          <ModelListWrapper title={t('modelManager.sigLip')} modelList={filteredSigLipModels} key="sig-lip" />
+        )}
+        {/* Flux Redux List */}
+        {isLoadingFluxReduxModels && <FetchingModelsLoader loadingMessage="Loading Flux Redux Models..." />}
+        {!isLoadingFluxReduxModels && filteredFluxReduxModels.length > 0 && (
+          <ModelListWrapper title={t('modelManager.fluxRedux')} modelList={filteredFluxReduxModels} key="flux-redux" />
         )}
         {totalFilteredModels === 0 && (
           <Flex w="full" h="full" alignItems="center" justifyContent="center">

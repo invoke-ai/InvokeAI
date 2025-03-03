@@ -18,6 +18,7 @@ import type {
   FieldValue,
   FloatFieldValue,
   FloatGeneratorFieldValue,
+  FluxReduxModelFieldValue,
   FluxVAEModelFieldValue,
   ImageFieldCollectionValue,
   ImageFieldValue,
@@ -31,6 +32,7 @@ import type {
   ModelIdentifierFieldValue,
   SchedulerFieldValue,
   SDXLRefinerModelFieldValue,
+  SigLipModelFieldValue,
   SpandrelImageToImageModelFieldValue,
   StatefulFieldValue,
   StringFieldCollectionValue,
@@ -53,6 +55,7 @@ import {
   zFloatFieldCollectionValue,
   zFloatFieldValue,
   zFloatGeneratorFieldValue,
+  zFluxReduxModelFieldValue,
   zFluxVAEModelFieldValue,
   zImageFieldCollectionValue,
   zImageFieldValue,
@@ -66,6 +69,7 @@ import {
   zModelIdentifierFieldValue,
   zSchedulerFieldValue,
   zSDXLRefinerModelFieldValue,
+  zSigLipModelFieldValue,
   zSpandrelImageToImageModelFieldValue,
   zStatefulFieldValue,
   zStringFieldCollectionValue,
@@ -409,6 +413,12 @@ export const nodesSlice = createSlice({
     fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
       fieldValueReducer(state, action, zFluxVAEModelFieldValue);
     },
+    fieldSigLipModelValueChanged: (state, action: FieldValueAction<SigLipModelFieldValue>) => {
+      fieldValueReducer(state, action, zSigLipModelFieldValue);
+    },
+    fieldFluxReduxModelValueChanged: (state, action: FieldValueAction<FluxReduxModelFieldValue>) => {
+      fieldValueReducer(state, action, zFluxReduxModelFieldValue);
+    },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
@@ -516,6 +526,8 @@ export const {
   fieldCLIPGEmbedValueChanged,
   fieldControlLoRAModelValueChanged,
   fieldFluxVAEModelValueChanged,
+  fieldSigLipModelValueChanged,
+  fieldFluxReduxModelValueChanged,
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,
