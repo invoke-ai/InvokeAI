@@ -12,13 +12,9 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
-    _conn: sqlite3.Connection
-    _cursor: sqlite3.Cursor
-
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._conn = db.conn
-        self._cursor = self._conn.cursor()
 
     def add_image_to_board(
         self,
@@ -26,7 +22,8 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         image_name: str,
     ) -> None:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 INSERT INTO board_images (board_id, image_name)
                 VALUES (?, ?)
@@ -44,7 +41,8 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         image_name: str,
     ) -> None:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 DELETE FROM board_images
                 WHERE image_name = ?;
@@ -63,7 +61,8 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         limit: int = 10,
     ) -> OffsetPaginatedResults[ImageRecord]:
         # TODO: this isn't paginated yet?
-        self._cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """--sql
             SELECT images.*
             FROM board_images
@@ -73,15 +72,15 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             """,
             (board_id,),
         )
-        result = cast(list[sqlite3.Row], self._cursor.fetchall())
+        result = cast(list[sqlite3.Row], cursor.fetchall())
         images = [deserialize_image_record(dict(r)) for r in result]
 
-        self._cursor.execute(
+        cursor.execute(
             """--sql
             SELECT COUNT(*) FROM images WHERE 1=1;
             """
         )
-        count = cast(int, self._cursor.fetchone()[0])
+        count = cast(int, cursor.fetchone()[0])
 
         return OffsetPaginatedResults(items=images, offset=offset, limit=limit, total=count)
 
@@ -128,9 +127,10 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         stmt += ";"
 
         # Execute the query
-        self._cursor.execute(stmt, params)
+        cursor = self._conn.cursor()
+        cursor.execute(stmt, params)
 
-        result = cast(list[sqlite3.Row], self._cursor.fetchall())
+        result = cast(list[sqlite3.Row], cursor.fetchall())
         image_names = [r[0] for r in result]
         return image_names
 
@@ -138,7 +138,8 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         self,
         image_name: str,
     ) -> Optional[str]:
-        self._cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """--sql
                 SELECT board_id
                 FROM board_images
@@ -146,13 +147,14 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 """,
             (image_name,),
         )
-        result = self._cursor.fetchone()
+        result = cursor.fetchone()
         if result is None:
             return None
         return cast(str, result[0])
 
     def get_image_count_for_board(self, board_id: str) -> int:
-        self._cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """--sql
                 SELECT COUNT(*)
                 FROM board_images
@@ -162,5 +164,5 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 """,
             (board_id,),
         )
-        count = cast(int, self._cursor.fetchone()[0])
+        count = cast(int, cursor.fetchone()[0])
         return count
