@@ -57,6 +57,8 @@ class UIType(str, Enum, metaclass=MetaEnum):
     CLIPGEmbedModel = "CLIPGEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     ControlLoRAModel = "ControlLoRAModelField"
+    SigLipModel = "SigLipModelField"
+    FluxReduxModel = "FluxReduxModelField"
     # endregion
 
     # region Misc Field Types
