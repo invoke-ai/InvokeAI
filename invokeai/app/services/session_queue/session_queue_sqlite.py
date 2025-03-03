@@ -103,8 +103,7 @@ class SqliteSessionQueue(SessionQueueBase):
         return cast(Union[int, None], self.__cursor.fetchone()[0]) or 0
 
     async def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._enqueue_batch, queue_id, batch, prepend)
+        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend)
 
     def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
         try:
