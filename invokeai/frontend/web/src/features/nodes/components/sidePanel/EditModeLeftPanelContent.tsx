@@ -1,7 +1,6 @@
 import { Box } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { ViewContextProvider } from 'features/nodes/contexts/ViewContext';
-import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
+import { HorizontalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
@@ -23,27 +22,25 @@ export const EditModeLeftPanelContent = memo(() => {
   }, []);
 
   return (
-    <ViewContextProvider view="edit-mode-linear">
-      <Box position="relative" w="full" h="full">
-        <ScrollableContent>
-          <PanelGroup
-            ref={panelGroupRef}
-            id="workflow-panel-group"
-            autoSaveId="workflow-panel-group"
-            direction="vertical"
-            style={panelGroupStyles}
-          >
-            <Panel id="workflow" collapsible minSize={25}>
-              <WorkflowFieldsLinearViewPanel />
-            </Panel>
-            <ResizeHandle onDoubleClick={handleDoubleClickHandle} />
-            <Panel id="inspector" collapsible minSize={25}>
-              <WorkflowNodeInspectorPanel />
-            </Panel>
-          </PanelGroup>
-        </ScrollableContent>
-      </Box>
-    </ViewContextProvider>
+    <Box position="relative" w="full" h="full">
+      <ScrollableContent>
+        <PanelGroup
+          ref={panelGroupRef}
+          id="workflow-panel-group"
+          autoSaveId="workflow-panel-group"
+          direction="vertical"
+          style={panelGroupStyles}
+        >
+          <Panel id="workflow" collapsible minSize={25}>
+            <WorkflowFieldsLinearViewPanel />
+          </Panel>
+          <HorizontalResizeHandle onDoubleClick={handleDoubleClickHandle} />
+          <Panel id="inspector" collapsible minSize={25}>
+            <WorkflowNodeInspectorPanel />
+          </Panel>
+        </PanelGroup>
+      </ScrollableContent>
+    </Box>
   );
 });
 

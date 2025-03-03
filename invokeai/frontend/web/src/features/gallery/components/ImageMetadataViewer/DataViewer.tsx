@@ -1,3 +1,4 @@
+import type { FlexProps } from '@invoke-ai/ui-library';
 import { Box, Flex, IconButton, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { useClipboard } from 'common/hooks/useClipboard';
@@ -18,12 +19,12 @@ type Props = {
   withDownload?: boolean;
   withCopy?: boolean;
   extraCopyActions?: { label: string; getData: (data: unknown) => unknown }[];
-};
+} & FlexProps;
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams('scroll', 'scroll').options;
 
 const DataViewer = (props: Props) => {
-  const { label, data, fileName, withDownload = true, withCopy = true, extraCopyActions } = props;
+  const { label, data, fileName, withDownload = true, withCopy = true, extraCopyActions, ...rest } = props;
   const dataString = useMemo(() => (isString(data) ? data : formatter.Serialize(data)) ?? '', [data]);
   const shift = useShiftModifier();
   const clipboard = useClipboard();
@@ -44,8 +45,8 @@ const DataViewer = (props: Props) => {
   const { t } = useTranslation();
 
   return (
-    <Flex layerStyle="second" borderRadius="base" flexGrow={1} w="full" h="full" position="relative">
-      <Box position="absolute" top={0} left={0} right={0} bottom={0} overflow="auto" p={4} fontSize="sm">
+    <Flex bg="base.800" borderRadius="base" flexGrow={1} w="full" h="full" position="relative" {...rest}>
+      <Box position="absolute" top={0} left={0} right={0} bottom={0} overflow="auto" p={2} fontSize="sm">
         <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayscrollbarsOptions}>
           <pre>{dataString}</pre>
         </OverlayScrollbarsComponent>

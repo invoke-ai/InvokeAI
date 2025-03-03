@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Any, Coroutine, Optional
 
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
@@ -14,6 +14,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     PruneResult,
+    RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemDTO,
@@ -32,7 +33,7 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
+    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> Coroutine[Any, Any, EnqueueBatchResult]:
         """Enqueues all permutations of a batch for execution."""
         pass
 
@@ -138,4 +139,9 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
+        pass
+
+    @abstractmethod
+    def retry_items_by_id(self, queue_id: str, item_ids: list[int]) -> RetryItemsResult:
+        """Retries the given queue items"""
         pass

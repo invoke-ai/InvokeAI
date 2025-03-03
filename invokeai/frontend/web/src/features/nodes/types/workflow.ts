@@ -57,34 +57,6 @@ const zWorkflowEdgeCollapsed = zWorkflowEdgeBase.extend({
 const zWorkflowEdge = z.union([zWorkflowEdgeDefault, zWorkflowEdgeCollapsed]);
 // #endregion
 
-// #region Workflow
-export const zWorkflowV3 = z.object({
-  id: z.string().min(1).optional(),
-  name: z.string(),
-  author: z.string(),
-  description: z.string(),
-  version: z.string(),
-  contact: z.string(),
-  tags: z.string(),
-  notes: z.string(),
-  nodes: z.array(zWorkflowNode),
-  edges: z.array(zWorkflowEdge),
-  exposedFields: z.array(zFieldIdentifier),
-  meta: z.object({
-    category: zWorkflowCategory.default('user'),
-    version: z.literal('3.0.0'),
-  }),
-  form: z
-    .object({
-      elements: z.record(z.lazy(() => zFormElement)),
-      layout: z.array(z.lazy(() => zElementId)),
-    })
-    // Catch must be a function else changes to the workflows parsed with this schema will mutate the catch value D:
-    .catch(() => ({ elements: {}, layout: [] })),
-});
-export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
-// #endregion
-
 // #region Workflow Builder
 const zElementId = z.string().trim().min(1);
 export type ElementId = z.infer<typeof zElementId>;
@@ -98,7 +70,7 @@ const zElementBase = z.object({
 export const zNumberComponent = z.enum(['number-input', 'slider', 'number-input-and-slider']);
 
 const NODE_FIELD_TYPE = 'node-field';
-export const NODE_FIELD_CLASS_NAME = getPrefixedId(NODE_FIELD_TYPE, '-');
+export const NODE_FIELD_CLASS_NAME = `form-builder-${NODE_FIELD_TYPE}`;
 const FLOAT_FIELD_SETTINGS_TYPE = 'float-field-config';
 const zNodeFieldFloatSettings = z.object({
   type: z.literal(FLOAT_FIELD_SETTINGS_TYPE).default(FLOAT_FIELD_SETTINGS_TYPE),
@@ -169,7 +141,7 @@ export const buildNodeFieldElement = (
 };
 
 const HEADING_TYPE = 'heading';
-export const HEADING_CLASS_NAME = getPrefixedId(HEADING_TYPE, '-');
+export const HEADING_CLASS_NAME = `form-builder-${HEADING_TYPE}`;
 const zHeadingElement = zElementBase.extend({
   type: z.literal(HEADING_TYPE),
   data: z.object({ content: z.string() }),
@@ -190,7 +162,7 @@ export const buildHeading = (
 };
 
 const TEXT_TYPE = 'text';
-export const TEXT_CLASS_NAME = getPrefixedId(TEXT_TYPE, '-');
+export const TEXT_CLASS_NAME = `form-builder-${TEXT_TYPE}`;
 const zTextElement = zElementBase.extend({
   type: z.literal(TEXT_TYPE),
   data: z.object({ content: z.string() }),
@@ -211,7 +183,7 @@ export const buildText = (
 };
 
 const DIVIDER_TYPE = 'divider';
-export const DIVIDER_CLASS_NAME = getPrefixedId(DIVIDER_TYPE, '-');
+export const DIVIDER_CLASS_NAME = `form-builder-${DIVIDER_TYPE}`;
 const zDividerElement = zElementBase.extend({
   type: z.literal(DIVIDER_TYPE),
 });
@@ -227,7 +199,8 @@ export const buildDivider = (parentId?: NodeFieldElement['parentId']): DividerEl
 };
 
 const CONTAINER_TYPE = 'container';
-export const CONTAINER_CLASS_NAME = getPrefixedId(CONTAINER_TYPE, '-');
+export const CONTAINER_CLASS_NAME = `form-builder-${CONTAINER_TYPE}`;
+export const ROOT_CONTAINER_CLASS_NAME = `form-builder-root-${CONTAINER_TYPE}`;
 const zContainerElement = zElementBase.extend({
   type: z.literal(CONTAINER_TYPE),
   data: z.object({
@@ -257,3 +230,126 @@ export const buildContainer = (
 const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElement, zTextElement, zDividerElement]);
 
 export type FormElement = z.infer<typeof zFormElement>;
+
+export const getDefaultForm = (): BuilderForm => {
+  const rootElement = buildContainer('column', []);
+  return {
+    elements: {
+      [rootElement.id]: rootElement,
+    },
+    rootElementId: rootElement.id,
+  };
+};
+
+const zBuilderForm = z.object({
+  elements: z.record(zFormElement),
+  rootElementId: zElementId,
+});
+
+export type BuilderForm = z.infer<typeof zBuilderForm>;
+
+// This validation function needs to be here to avoid circular dependencies. It was intended to be in
+// `form-manipulation.ts` and is tested in taht file's tests.
+
+/**
+ * Validates the structure of a form.
+ *
+ * The form structure is valid if:
+ * - The root element is a container
+ * - Starting from the root element, all children referenced are reachable
+ * - There are no extra elements in the form that are not reachable from the root element
+ * - The root element has no parentId and is a container
+ * - Non-root elements have a parentId
+ * - All parent elements are containers
+ * - All elements with a parentId are children of their parent
+ *
+ * @param form The form to validate
+ *
+ * @returns True if the form structure is valid, false otherwise
+ */
+export const validateFormStructure = (form: BuilderForm): boolean => {
+  const { elements, rootElementId } = form;
+
+  const rootElement = elements[rootElementId];
+  const isRootElementAContainer = rootElement !== undefined && isContainerElement(rootElement);
+
+  const childrenFoundInTree = new Set<string>();
+
+  const findChildren = (elementId: string): boolean => {
+    const element = elements[elementId];
+    if (!element) {
+      // Element not found
+      return false;
+    }
+    childrenFoundInTree.add(elementId);
+    if (element.id === rootElementId) {
+      // Special handling for root
+      if (element.parentId !== undefined) {
+        // Root element must not have a parent
+        return false;
+      }
+    } else {
+      // Handling for all other elements
+      if (element.parentId === undefined) {
+        // Element must have a parent
+        return false;
+      }
+      const parent = elements[element.parentId];
+      if (!parent) {
+        // Parent must exist
+        return false;
+      }
+      if (!isContainerElement(parent)) {
+        // Parent must be a container
+        return false;
+      }
+      if (!parent.data.children.includes(elementId)) {
+        // Element must be a child of its parent
+        return false;
+      }
+    }
+    if (isContainerElement(element) && element.data.children.length > 0) {
+      return element.data.children.every(findChildren);
+    }
+    return true;
+  };
+
+  const noMissingChildren = findChildren(rootElementId);
+  const noExtraElements = Object.keys(elements).length === childrenFoundInTree.size;
+
+  return isRootElementAContainer && noMissingChildren && noExtraElements;
+};
+
+// Need to separate the form vaidation from the schema due to circular dependencies
+const zValidatedBuilderForm = zBuilderForm
+  .catch(getDefaultForm)
+  .refine((val) => val.rootElementId in val.elements, {
+    message: 'rootElementId must be a valid element id',
+  })
+  .refine((val) => validateFormStructure(val), {
+    message: 'Form structure is invalid',
+  });
+//# endregion
+
+// #region Workflow
+export const zWorkflowV3 = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string(),
+  author: z.string(),
+  description: z.string(),
+  version: z.string(),
+  contact: z.string(),
+  tags: z.string(),
+  notes: z.string(),
+  nodes: z.array(zWorkflowNode),
+  edges: z.array(zWorkflowEdge),
+  exposedFields: z.array(zFieldIdentifier),
+  meta: z.object({
+    category: zWorkflowCategory.default('user'),
+    version: z.literal('3.0.0'),
+  }),
+  // Use the validated form schema!
+  form: zValidatedBuilderForm,
+});
+export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
+// #endregion

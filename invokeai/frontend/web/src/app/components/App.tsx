@@ -1,13 +1,15 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
-import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
+import { $didStudioInit, useStudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { useSyncLoggingConfig } from 'app/logging/useSyncLoggingConfig';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
+import Loading from 'common/components/Loading/Loading';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
@@ -27,6 +29,7 @@ import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterM
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useReadinessWatcher } from 'features/queue/store/readiness';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
@@ -35,6 +38,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
 import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
+import { LoadWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { NewWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -53,17 +57,8 @@ interface Props {
 }
 
 const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
-  const language = useAppSelector(selectLanguage);
-  const logger = useLogger('system');
-  const dispatch = useAppDispatch();
+  const didStudioInit = useStore($didStudioInit);
   const clearStorage = useClearStorage();
-
-  // singleton!
-  useSocketIO();
-  useGlobalModifiersInit();
-  useGlobalHotkeys();
-  useGetOpenAPISchemaQuery();
-  useSyncLoggingConfig();
 
   const handleReset = useCallback(() => {
     clearStorage();
@@ -71,31 +66,13 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
     return false;
   }, [clearStorage]);
 
-  useEffect(() => {
-    i18n.changeLanguage(language);
-  }, [language]);
-
-  useEffect(() => {
-    if (size(config)) {
-      logger.info({ config }, 'Received config');
-      dispatch(configChanged(config));
-    }
-  }, [dispatch, config, logger]);
-
-  useEffect(() => {
-    dispatch(appStarted());
-  }, [dispatch]);
-
-  useStudioInitAction(studioInitAction);
-  useStarterModelsToast();
-  useSyncQueueStatus();
-  useFocusRegionWatcher();
-
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
       <Box id="invoke-app-wrapper" w="100dvw" h="100dvh" position="relative" overflow="hidden">
         <AppContent />
+        {!didStudioInit && <Loading />}
       </Box>
+      <HookIsolator config={config} studioInitAction={studioInitAction} />
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
@@ -103,6 +80,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <CancelAllExceptCurrentQueueItemConfirmationAlertDialog />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
+      <LoadWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
       <DeleteWorkflowDialog />
       <ShareWorkflowModal />
@@ -122,3 +100,43 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
 };
 
 export default memo(App);
+
+// Running these hooks in a separate component ensures we do not inadvertently rerender the entire app when they change.
+const HookIsolator = memo(
+  ({ config, studioInitAction }: { config: PartialAppConfig; studioInitAction?: StudioInitAction }) => {
+    const language = useAppSelector(selectLanguage);
+    const logger = useLogger('system');
+    const dispatch = useAppDispatch();
+
+    // singleton!
+    useReadinessWatcher();
+    useSocketIO();
+    useGlobalModifiersInit();
+    useGlobalHotkeys();
+    useGetOpenAPISchemaQuery();
+    useSyncLoggingConfig();
+
+    useEffect(() => {
+      i18n.changeLanguage(language);
+    }, [language]);
+
+    useEffect(() => {
+      if (size(config)) {
+        logger.info({ config }, 'Received config');
+        dispatch(configChanged(config));
+      }
+    }, [dispatch, config, logger]);
+
+    useEffect(() => {
+      dispatch(appStarted());
+    }, [dispatch]);
+
+    useStudioInitAction(studioInitAction);
+    useStarterModelsToast();
+    useSyncQueueStatus();
+    useFocusRegionWatcher();
+
+    return null;
+  }
+);
+HookIsolator.displayName = 'HookIsolator';

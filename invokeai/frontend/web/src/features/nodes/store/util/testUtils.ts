@@ -319,6 +319,7 @@ export const img_resize: InvocationTemplate = {
       fieldKind: 'input',
       input: 'direct',
       ui_hidden: false,
+      default: 'auto',
       type: {
         name: 'BoardField',
         cardinality: 'SINGLE',

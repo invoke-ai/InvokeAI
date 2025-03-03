@@ -4,11 +4,13 @@ import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge'
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import type { SessionQueueItemDTO } from 'services/api/types';
 
 import { COLUMN_WIDTHS } from './constants';
@@ -30,16 +32,25 @@ const sx: ChakraProps['sx'] = {
 
 const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
   const { t } = useTranslation();
+  const isRetryEnabled = useFeatureStatus('retryQueueItem');
   const handleToggle = useCallback(() => {
     context.toggleQueueItem(item.item_id);
   }, [context, item.item_id]);
-  const { cancelQueueItem, isLoading } = useCancelQueueItem(item.item_id);
+  const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } = useCancelQueueItem(item.item_id);
   const handleCancelQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       cancelQueueItem();
     },
     [cancelQueueItem]
+  );
+  const { retryQueueItem, isLoading: isLoadingRetryQueueItem } = useRetryQueueItem(item.item_id);
+  const handleRetryQueueItem = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      retryQueueItem();
+    },
+    [retryQueueItem]
   );
   const isOpen = useMemo(() => context.openQueueItems.includes(item.item_id), [context.openQueueItems, item.item_id]);
 
@@ -52,10 +63,10 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
   }, [item]);
 
   const isCanceled = useMemo(() => ['canceled', 'completed', 'failed'].includes(item.status), [item.status]);
+  const isFailed = useMemo(() => ['canceled', 'failed'].includes(item.status), [item.status]);
   const originText = useOriginText(item.origin);
   const destinationText = useDestinationText(item.destination);
 
-  const icon = useMemo(() => <PiXBold />, []);
   return (
     <Flex
       flexDir="column"
@@ -109,13 +120,23 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
-            <IconButton
-              onClick={handleCancelQueueItem}
-              isDisabled={isCanceled}
-              isLoading={isLoading}
-              aria-label={t('queue.cancelItem')}
-              icon={icon}
-            />
+            {(!isFailed || !isRetryEnabled) && (
+              <IconButton
+                onClick={handleCancelQueueItem}
+                isDisabled={isCanceled}
+                isLoading={isLoadingCancelQueueItem}
+                aria-label={t('queue.cancelItem')}
+                icon={<PiXBold />}
+              />
+            )}
+            {isFailed && isRetryEnabled && (
+              <IconButton
+                onClick={handleRetryQueueItem}
+                isLoading={isLoadingRetryQueueItem}
+                aria-label={t('queue.retryItem')}
+                icon={<PiArrowCounterClockwiseBold />}
+              />
+            )}
           </ButtonGroup>
         </Flex>
       </Flex>

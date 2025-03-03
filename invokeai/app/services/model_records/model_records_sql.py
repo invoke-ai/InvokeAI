@@ -96,38 +96,37 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise DuplicateModelException and InvalidModelConfigException exceptions.
         """
-        with self._db.lock:
-            try:
-                self._cursor.execute(
-                    """--sql
-                    INSERT INTO models (
-                       id,
-                       config
-                      )
-                    VALUES (?,?);
-                    """,
-                    (
-                        config.key,
-                        config.model_dump_json(),
-                    ),
-                )
-                self._db.conn.commit()
+        try:
+            self._cursor.execute(
+                """--sql
+                INSERT INTO models (
+                    id,
+                    config
+                    )
+                VALUES (?,?);
+                """,
+                (
+                    config.key,
+                    config.model_dump_json(),
+                ),
+            )
+            self._db.conn.commit()
 
-            except sqlite3.IntegrityError as e:
-                self._db.conn.rollback()
-                if "UNIQUE constraint failed" in str(e):
-                    if "models.path" in str(e):
-                        msg = f"A model with path '{config.path}' is already installed"
-                    elif "models.name" in str(e):
-                        msg = f"A model with name='{config.name}', type='{config.type}', base='{config.base}' is already installed"
-                    else:
-                        msg = f"A model with key '{config.key}' is already installed"
-                    raise DuplicateModelException(msg) from e
+        except sqlite3.IntegrityError as e:
+            self._db.conn.rollback()
+            if "UNIQUE constraint failed" in str(e):
+                if "models.path" in str(e):
+                    msg = f"A model with path '{config.path}' is already installed"
+                elif "models.name" in str(e):
+                    msg = f"A model with name='{config.name}', type='{config.type}', base='{config.base}' is already installed"
                 else:
-                    raise e
-            except sqlite3.Error as e:
-                self._db.conn.rollback()
+                    msg = f"A model with key '{config.key}' is already installed"
+                raise DuplicateModelException(msg) from e
+            else:
                 raise e
+        except sqlite3.Error as e:
+            self._db.conn.rollback()
+            raise e
 
         return self.get_model(config.key)
 
@@ -139,21 +138,20 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise an UnknownModelException
         """
-        with self._db.lock:
-            try:
-                self._cursor.execute(
-                    """--sql
-                    DELETE FROM models
-                    WHERE id=?;
-                    """,
-                    (key,),
-                )
-                if self._cursor.rowcount == 0:
-                    raise UnknownModelException("model not found")
-                self._db.conn.commit()
-            except sqlite3.Error as e:
-                self._db.conn.rollback()
-                raise e
+        try:
+            self._cursor.execute(
+                """--sql
+                DELETE FROM models
+                WHERE id=?;
+                """,
+                (key,),
+            )
+            if self._cursor.rowcount == 0:
+                raise UnknownModelException("model not found")
+            self._db.conn.commit()
+        except sqlite3.Error as e:
+            self._db.conn.rollback()
+            raise e
 
     def update_model(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
         record = self.get_model(key)
@@ -164,23 +162,22 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         json_serialized = record.model_dump_json()
 
-        with self._db.lock:
-            try:
-                self._cursor.execute(
-                    """--sql
-                    UPDATE models
-                    SET
-                        config=?
-                    WHERE id=?;
-                    """,
-                    (json_serialized, key),
-                )
-                if self._cursor.rowcount == 0:
-                    raise UnknownModelException("model not found")
-                self._db.conn.commit()
-            except sqlite3.Error as e:
-                self._db.conn.rollback()
-                raise e
+        try:
+            self._cursor.execute(
+                """--sql
+                UPDATE models
+                SET
+                    config=?
+                WHERE id=?;
+                """,
+                (json_serialized, key),
+            )
+            if self._cursor.rowcount == 0:
+                raise UnknownModelException("model not found")
+            self._db.conn.commit()
+        except sqlite3.Error as e:
+            self._db.conn.rollback()
+            raise e
 
         return self.get_model(key)
 
@@ -192,33 +189,31 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Exceptions: UnknownModelException
         """
-        with self._db.lock:
-            self._cursor.execute(
-                """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
-                WHERE id=?;
-                """,
-                (key,),
-            )
-            rows = self._cursor.fetchone()
-            if not rows:
-                raise UnknownModelException("model not found")
-            model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
+        self._cursor.execute(
+            """--sql
+            SELECT config, strftime('%s',updated_at) FROM models
+            WHERE id=?;
+            """,
+            (key,),
+        )
+        rows = self._cursor.fetchone()
+        if not rows:
+            raise UnknownModelException("model not found")
+        model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
         return model
 
     def get_model_by_hash(self, hash: str) -> AnyModelConfig:
-        with self._db.lock:
-            self._cursor.execute(
-                """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
-                WHERE hash=?;
-                """,
-                (hash,),
-            )
-            rows = self._cursor.fetchone()
-            if not rows:
-                raise UnknownModelException("model not found")
-            model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
+        self._cursor.execute(
+            """--sql
+            SELECT config, strftime('%s',updated_at) FROM models
+            WHERE hash=?;
+            """,
+            (hash,),
+        )
+        rows = self._cursor.fetchone()
+        if not rows:
+            raise UnknownModelException("model not found")
+        model = ModelConfigFactory.make_config(json.loads(rows[0]), timestamp=rows[1])
         return model
 
     def exists(self, key: str) -> bool:
@@ -227,16 +222,14 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         :param key: Unique key for the model to be deleted
         """
-        count = 0
-        with self._db.lock:
-            self._cursor.execute(
-                """--sql
-                select count(*) FROM models
-                WHERE id=?;
-                """,
-                (key,),
-            )
-            count = self._cursor.fetchone()[0]
+        self._cursor.execute(
+            """--sql
+            select count(*) FROM models
+            WHERE id=?;
+            """,
+            (key,),
+        )
+        count = self._cursor.fetchone()[0]
         return count > 0
 
     def search_by_attr(
@@ -284,17 +277,16 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             where_clause.append("format=?")
             bindings.append(model_format)
         where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
-        with self._db.lock:
-            self._cursor.execute(
-                f"""--sql
-                SELECT config, strftime('%s',updated_at)
-                FROM models
-                {where}
-                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
-                """,
-                tuple(bindings),
-            )
-            result = self._cursor.fetchall()
+        self._cursor.execute(
+            f"""--sql
+            SELECT config, strftime('%s',updated_at)
+            FROM models
+            {where}
+            ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
+            """,
+            tuple(bindings),
+        )
+        result = self._cursor.fetchall()
 
         # Parse the model configs.
         results: list[AnyModelConfig] = []
@@ -313,34 +305,26 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
         """Return models with the indicated path."""
-        results = []
-        with self._db.lock:
-            self._cursor.execute(
-                """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
-                WHERE path=?;
-                """,
-                (str(path),),
-            )
-            results = [
-                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
-            ]
+        self._cursor.execute(
+            """--sql
+            SELECT config, strftime('%s',updated_at) FROM models
+            WHERE path=?;
+            """,
+            (str(path),),
+        )
+        results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
         return results
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
         """Return models with the indicated hash."""
-        results = []
-        with self._db.lock:
-            self._cursor.execute(
-                """--sql
-                SELECT config, strftime('%s',updated_at) FROM models
-                WHERE hash=?;
-                """,
-                (hash,),
-            )
-            results = [
-                ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()
-            ]
+        self._cursor.execute(
+            """--sql
+            SELECT config, strftime('%s',updated_at) FROM models
+            WHERE hash=?;
+            """,
+            (hash,),
+        )
+        results = [ModelConfigFactory.make_config(json.loads(x[0]), timestamp=x[1]) for x in self._cursor.fetchall()]
         return results
 
     def list_models(
@@ -357,32 +341,29 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         }
 
         # Lock so that the database isn't updated while we're doing the two queries.
-        with self._db.lock:
-            # query1: get the total number of model configs
-            self._cursor.execute(
-                """--sql
-                select count(*) from models;
-                """,
-                (),
-            )
-            total = int(self._cursor.fetchone()[0])
+        # query1: get the total number of model configs
+        self._cursor.execute(
+            """--sql
+            select count(*) from models;
+            """,
+            (),
+        )
+        total = int(self._cursor.fetchone()[0])
 
-            # query2: fetch key fields
-            self._cursor.execute(
-                f"""--sql
-                SELECT config
-                FROM models
-                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
-                LIMIT ?
-                OFFSET ?;
-                """,
-                (
-                    per_page,
-                    page * per_page,
-                ),
-            )
-            rows = self._cursor.fetchall()
-            items = [ModelSummary.model_validate(dict(x)) for x in rows]
-            return PaginatedResults(
-                page=page, pages=ceil(total / per_page), per_page=per_page, total=total, items=items
-            )
+        # query2: fetch key fields
+        self._cursor.execute(
+            f"""--sql
+            SELECT config
+            FROM models
+            ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
+            LIMIT ?
+            OFFSET ?;
+            """,
+            (
+                per_page,
+                page * per_page,
+            ),
+        )
+        rows = self._cursor.fetchall()
+        items = [ModelSummary.model_validate(dict(x)) for x in rows]
+        return PaginatedResults(page=page, pages=ceil(total / per_page), per_page=per_page, total=total, items=items)

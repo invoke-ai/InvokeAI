@@ -62,9 +62,13 @@ class WorkflowWithoutID(BaseModel):
     notes: str = Field(description="The notes of the workflow.")
     exposedFields: list[ExposedField] = Field(description="The exposed fields of the workflow.")
     meta: WorkflowMeta = Field(description="The meta of the workflow.")
-    # TODO: nodes and edges are very loosely typed
+    # TODO(psyche): nodes, edges and form are very loosely typed - they are strictly modeled and checked on the frontend.
     nodes: list[dict[str, JsonValue]] = Field(description="The nodes of the workflow.")
     edges: list[dict[str, JsonValue]] = Field(description="The edges of the workflow.")
+    # TODO(psyche): We have a crapload of workflows that have no form, bc it was added after we introduced workflows.
+    # This is typed as optional to prevent errors when pulling workflows from the DB. The frontend adds a default form if
+    # it is None.
+    form: dict[str, JsonValue] | None = Field(default=None, description="The form of the workflow.")
 
     model_config = ConfigDict(extra="ignore")
 

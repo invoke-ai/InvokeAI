@@ -277,8 +277,11 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
 
       let points: number[];
 
+      let isShiftDraw = false;
+
       if (e.evt.shiftKey && lastLinePoint) {
         // Create a straight line from the last line point
+        isShiftDraw = true;
         points = [
           lastLinePoint.x,
           lastLinePoint.y,
@@ -298,15 +301,18 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         points,
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
-        clip: this.parent.getClip(selectedEntity.state),
+        // When shift is held, the line may extend beyond the clip region. No clip for these lines.
+        clip: isShiftDraw ? null : this.parent.getClip(selectedEntity.state),
       });
     } else {
       const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
 
       let points: number[];
+      let isShiftDraw = false;
 
       if (e.evt.shiftKey && lastLinePoint) {
         // Create a straight line from the last line point
+        isShiftDraw = true;
         points = [lastLinePoint.x, lastLinePoint.y, alignedPoint.x, alignedPoint.y];
       } else {
         // Create a new line with the current point
@@ -319,7 +325,8 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         points,
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
-        clip: this.parent.getClip(selectedEntity.state),
+        // When shift is held, the line may extend beyond the clip region. No clip for these lines.
+        clip: isShiftDraw ? null : this.parent.getClip(selectedEntity.state),
       });
     }
   };

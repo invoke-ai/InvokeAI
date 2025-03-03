@@ -21,7 +21,7 @@ export const useIsValidConnection = (): IsValidConnection<AnyEdge> => {
       const edgePendingUpdate = $edgePendingUpdate.get();
       const { nodes, edges } = selectNodesSlice(store.getState());
 
-      const validationResult = validateConnection(
+      const connectionErrorTKey = validateConnection(
         { source, sourceHandle, target, targetHandle },
         nodes,
         edges,
@@ -30,7 +30,7 @@ export const useIsValidConnection = (): IsValidConnection<AnyEdge> => {
         shouldValidateGraph
       );
 
-      return validationResult.isValid;
+      return connectionErrorTKey === null;
     },
     [templates, shouldValidateGraph, store]
   );

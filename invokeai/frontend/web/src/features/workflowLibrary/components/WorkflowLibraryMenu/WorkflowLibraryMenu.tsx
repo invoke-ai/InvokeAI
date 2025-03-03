@@ -13,13 +13,12 @@ import LoadWorkflowFromGraphMenuItem from 'features/workflowLibrary/components/W
 import { NewWorkflowMenuItem } from 'features/workflowLibrary/components/WorkflowLibraryMenu/NewWorkflowMenuItem';
 import SaveWorkflowAsMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/SaveWorkflowAsMenuItem';
 import SaveWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/SaveWorkflowMenuItem';
-import SettingsMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/SettingsMenuItem';
 import UploadWorkflowMenuItem from 'features/workflowLibrary/components/WorkflowLibraryMenu/UploadWorkflowMenuItem';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDotsThreeOutlineFill } from 'react-icons/pi';
 
-const WorkflowLibraryMenu = () => {
+export const WorkflowLibraryMenu = memo(() => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const shift = useShiftModifier();
@@ -31,6 +30,8 @@ const WorkflowLibraryMenu = () => {
         aria-label={t('workflows.workflowEditorMenu')}
         icon={<PiDotsThreeOutlineFill />}
         pointerEvents="auto"
+        size="sm"
+        variant="ghost"
       />
       <MenuList pointerEvents="auto">
         <NewWorkflowMenuItem />
@@ -39,13 +40,10 @@ const WorkflowLibraryMenu = () => {
         <SaveWorkflowMenuItem />
         <SaveWorkflowAsMenuItem />
         <DownloadWorkflowMenuItem />
-        <MenuDivider />
-        <SettingsMenuItem />
         {shift && <MenuDivider />}
         {shift && <LoadWorkflowFromGraphMenuItem />}
       </MenuList>
     </Menu>
   );
-};
-
-export default memo(WorkflowLibraryMenu);
+});
+WorkflowLibraryMenu.displayName = 'WorkflowLibraryMenu';

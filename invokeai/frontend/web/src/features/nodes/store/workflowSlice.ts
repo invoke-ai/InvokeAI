@@ -3,12 +3,19 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
+import {
+  addElement,
+  getElement,
+  removeElement,
+  reparentElement,
+} from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
-import type { WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
+import type { NodesState, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
+  BuilderForm,
   ContainerElement,
   ElementId,
   FormElement,
@@ -18,7 +25,14 @@ import type {
   WorkflowCategory,
   WorkflowV3,
 } from 'features/nodes/types/workflow';
-import { isContainerElement, isHeadingElement, isNodeFieldElement, isTextElement } from 'features/nodes/types/workflow';
+import {
+  buildContainer,
+  getDefaultForm,
+  isContainerElement,
+  isHeadingElement,
+  isNodeFieldElement,
+  isTextElement,
+} from 'features/nodes/types/workflow';
 import { isEqual } from 'lodash-es';
 import { useMemo } from 'react';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
@@ -55,10 +69,7 @@ const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
     exposedFields: [],
     meta: { version: '3.0.0', category: 'user' },
     id: undefined,
-    form: {
-      elements: {},
-      layout: [],
-    },
+    form: getDefaultForm(),
   };
 };
 
@@ -134,56 +145,35 @@ export const workflowSlice = createSlice({
       state.isTouched = false;
     },
     formReset: (state) => {
+      const rootElement = buildContainer('column', []);
       state.form = {
-        elements: {},
-        layout: [],
+        elements: { [rootElement.id]: rootElement },
+        rootElementId: rootElement.id,
       };
-    },
-    formElementNodeFieldInitialValueChanged: (
-      state,
-      action: PayloadAction<{ id: ElementId; value: StatefulFieldValue }>
-    ) => {
-      const { id, value } = action.payload;
-      const element = state.form?.elements[id];
-      if (!element || !isNodeFieldElement(element)) {
-        return;
-      }
-      state.formFieldInitialValues[id] = value;
     },
     formElementAdded: (
       state,
       action: PayloadAction<{
         element: FormElement;
+        parentId: ElementId;
         index?: number;
         initialValue?: StatefulFieldValue;
       }>
     ) => {
       const { form } = state;
-      const { element, index } = action.payload;
-      addElement({ form, element, index });
+      const { element, parentId, index, initialValue } = action.payload;
+      addElement({ form, element, parentId, index });
       if (isNodeFieldElement(element)) {
-        state.formFieldInitialValues[element.id] = action.payload.initialValue;
+        state.formFieldInitialValues[element.id] = initialValue;
       }
     },
     formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
       const { form } = state;
       const { id } = action.payload;
-      removeElement({ id, form });
+      removeElement({ form, id });
       delete state.formFieldInitialValues[id];
     },
-    formRootReordered: (state, action: PayloadAction<{ layout: string[] }>) => {
-      const { layout } = action.payload;
-      state.form.layout = layout;
-    },
-    formContainerChildrenReordered: (state, action: PayloadAction<{ id: string; children: string[] }>) => {
-      const { id, children } = action.payload;
-      const container = state.form.elements[id];
-      if (!container || !isContainerElement(container)) {
-        return;
-      }
-      container.data.children = children;
-    },
-    formElementReparented: (state, action: PayloadAction<{ id: string; newParentId?: string; index?: number }>) => {
+    formElementReparented: (state, action: PayloadAction<{ id: string; newParentId: string; index: number }>) => {
       const { form } = state;
       const { id, newParentId, index } = action.payload;
       reparentElement({ form, id, newParentId, index });
@@ -200,33 +190,19 @@ export const workflowSlice = createSlice({
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
     },
+    formFieldInitialValuesChanged: (
+      state,
+      action: PayloadAction<{ formFieldInitialValues: WorkflowState['formFieldInitialValues'] }>
+    ) => {
+      const { formFieldInitialValues } = action.payload;
+      state.formFieldInitialValues = formFieldInitialValues;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action): WorkflowState => {
       const { nodes, edges: _edges, ...workflowExtra } = action.payload;
 
-      const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
-
-      for (const el of Object.values(workflowExtra.form.elements)) {
-        if (!isNodeFieldElement(el)) {
-          continue;
-        }
-        const { nodeId, fieldName } = el.data.fieldIdentifier;
-
-        const node = nodes.find((n) => n.id === nodeId);
-
-        if (!isInvocationNode(node)) {
-          continue;
-        }
-
-        const field = node.data.inputs[fieldName];
-
-        if (!field) {
-          continue;
-        }
-
-        formFieldInitialValues[el.id] = field.value;
-      }
+      const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
 
       return {
         ...deepClone(initialWorkflowState),
@@ -264,15 +240,19 @@ export const workflowSlice = createSlice({
       });
       state.exposedFields = state.exposedFields.filter((field) => !fieldsToRemove.some((f) => isEqual(f, field)));
 
-      for (const el of Object.values(state.form?.elements || {})) {
-        if (!isNodeFieldElement(el)) {
-          continue;
-        }
-        const { nodeId } = el.data.fieldIdentifier;
-        const removeIndex = action.payload.findLastIndex((change) => change.type === 'remove' && change.id === nodeId);
-        const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
-        if (removeIndex > addIndex) {
-          removeElement({ form: state.form, id: el.id });
+      if (state.form) {
+        for (const el of Object.values(state.form?.elements || {})) {
+          if (!isNodeFieldElement(el)) {
+            continue;
+          }
+          const { nodeId } = el.data.fieldIdentifier;
+          const removeIndex = action.payload.findLastIndex(
+            (change) => change.type === 'remove' && change.id === nodeId
+          );
+          const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
+          if (removeIndex > addIndex) {
+            removeElement({ form: state.form, id: el.id });
+          }
         }
       }
 
@@ -324,12 +304,11 @@ export const {
   formElementAdded,
   formElementRemoved,
   formElementReparented,
-  formRootReordered,
-  formContainerChildrenReordered,
   formElementHeadingDataChanged,
   formElementTextDataChanged,
   formElementNodeFieldDataChanged,
   formElementContainerDataChanged,
+  formFieldInitialValuesChanged,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -351,6 +330,34 @@ export const selectWorkflowSlice = (state: RootState) => state.workflow;
 const createWorkflowSelector = <T>(selector: Selector<WorkflowState, T>) =>
   createSelector(selectWorkflowSlice, selector);
 
+// The form builder's initial values are based on the current values of the node fields in the workflow.
+export const getFormFieldInitialValues = (form: BuilderForm, nodes: NodesState['nodes']) => {
+  const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
+
+  for (const el of Object.values(form.elements)) {
+    if (!isNodeFieldElement(el)) {
+      continue;
+    }
+    const { nodeId, fieldName } = el.data.fieldIdentifier;
+
+    const node = nodes.find((n) => n.id === nodeId);
+
+    if (!isInvocationNode(node)) {
+      continue;
+    }
+
+    const field = node.data.inputs[fieldName];
+
+    if (!field) {
+      continue;
+    }
+
+    formFieldInitialValues[el.id] = field.value;
+  }
+
+  return formFieldInitialValues;
+};
+
 export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.name);
 export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
@@ -359,6 +366,7 @@ export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => wor
 export const selectWorkflowOrderBy = createWorkflowSelector((workflow) => workflow.orderBy);
 export const selectWorkflowOrderDirection = createWorkflowSelector((workflow) => workflow.orderDirection);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
+export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
 
 export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
   const noNodes = !nodes.nodes.length;
@@ -367,119 +375,26 @@ export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflo
   return noNodes && !isTouched && !savedWorkflow;
 });
 
-export const selectFormLayout = createWorkflowSelector((workflow) => workflow.form.layout);
-export const selectFormIsEmpty = createWorkflowSelector((workflow) => workflow.form.layout.length === 0);
+export const selectFormRootElementId = createWorkflowSelector((workflow) => {
+  return workflow.form.rootElementId;
+});
+export const selectFormRootElement = createWorkflowSelector((workflow) => {
+  return getElement(workflow.form, workflow.form.rootElementId, isContainerElement);
+});
+export const selectIsFormEmpty = createWorkflowSelector((workflow) => {
+  const rootElement = workflow.form.elements[workflow.form.rootElementId];
+  if (!rootElement || !isContainerElement(rootElement)) {
+    return true;
+  }
+  return rootElement.data.children.length === 0;
+});
+export const selectFormInitialValues = createWorkflowSelector((workflow) => workflow.formFieldInitialValues);
+export const selectNodeFieldElements = createWorkflowSelector((workflow) =>
+  Object.values(workflow.form.elements).filter(isNodeFieldElement)
+);
 const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
 export const useElement = (id: string): FormElement | undefined => {
   const selector = useMemo(() => buildSelectElement(id), [id]);
   const element = useAppSelector(selector);
   return element;
-};
-
-const removeElement = (args: { form: NonNullable<WorkflowV3['form']>; id: string }) => {
-  const { id, form } = args;
-
-  const element = form.elements[id];
-
-  // Bail if the element doesn't exist
-  if (!element) {
-    return;
-  }
-
-  delete form.elements[id];
-
-  if (!element.parentId) {
-    form.layout = form.layout.filter((elId) => elId !== id);
-    return;
-  }
-
-  const parent = form.elements[element.parentId];
-  if (!parent || !isContainerElement(parent)) {
-    return;
-  }
-  parent.data.children = parent.data.children.filter((childId) => childId !== id);
-};
-
-const reparentElement = (args: {
-  form: NonNullable<WorkflowV3['form']>;
-  id: string;
-  newParentId?: string;
-  index?: number;
-}) => {
-  const { form, id, newParentId, index } = args;
-  const { elements } = form;
-
-  const element = elements[id];
-
-  // Bail if the element doesn't exist
-  if (!element) {
-    return;
-  }
-
-  if (newParentId === element.parentId) {
-    // Nothing to do
-    return;
-  }
-
-  // Reparenting from container to root
-  if (newParentId === undefined && element.parentId !== undefined) {
-    const oldParent = elements[element.parentId];
-    if (!oldParent || !isContainerElement(oldParent)) {
-      // This should never happen
-      return;
-    }
-
-    form.layout.splice(index ?? form.layout.length, 0, id);
-    oldParent.data.children = oldParent.data.children.filter((elementId) => elementId !== id);
-    element.parentId = newParentId;
-  }
-
-  // Reparenting from one container to another container
-  if (newParentId !== undefined && element.parentId !== undefined) {
-    const oldParent = elements[element.parentId];
-    if (!oldParent || !isContainerElement(oldParent)) {
-      return;
-    }
-    const newParent = elements[newParentId];
-    if (!newParent || !isContainerElement(newParent)) {
-      return;
-    }
-    newParent.data.children.splice(index ?? newParent.data.children.length, 0, id);
-    oldParent.data.children = oldParent.data.children.filter((elementId) => elementId !== id);
-    element.parentId = newParentId;
-  }
-
-  // Reparenting from root to container
-  if (newParentId !== undefined && element.parentId === undefined) {
-    const newParent = elements[newParentId];
-    if (!newParent || !isContainerElement(newParent)) {
-      return;
-    }
-    newParent.data.children.splice(index ?? newParent.data.children.length, 0, id);
-    form.layout = form.layout.filter((elementId) => elementId !== id);
-    element.parentId = newParentId;
-  }
-
-  // We should never get here!
-};
-
-const addElement = (args: { form: NonNullable<WorkflowV3['form']>; element: FormElement; index?: number }): boolean => {
-  const { form, element, index } = args;
-  const { elements } = form;
-
-  // Adding to the root
-  if (!element.parentId) {
-    form.elements[element.id] = element;
-    form.layout.splice(index ?? form.layout.length, 0, element.id);
-    return true;
-  }
-
-  const container = elements[element.parentId];
-  if (!container || !isContainerElement(container)) {
-    return false;
-  }
-
-  elements[element.id] = element;
-  container.data.children.splice(index ?? container.data.children.length, 0, element.id);
-  return true;
 };

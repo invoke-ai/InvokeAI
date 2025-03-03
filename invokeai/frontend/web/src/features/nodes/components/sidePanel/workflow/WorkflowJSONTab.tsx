@@ -11,7 +11,7 @@ const WorkflowJSONTab = () => {
 
   return (
     <Flex flexDir="column" alignItems="flex-start" gap={2} h="full">
-      <DataViewer data={workflow ?? {}} label={t('nodes.workflow')} />
+      <DataViewer data={workflow ?? {}} label={t('nodes.workflow')} bg="base.850" color="base.200" />
     </Flex>
   );
 };

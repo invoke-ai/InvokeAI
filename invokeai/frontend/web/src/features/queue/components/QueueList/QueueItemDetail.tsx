@@ -4,12 +4,14 @@ import { useDestinationText } from 'features/queue/components/QueueList/useDesti
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { get } from 'lodash-es';
 import type { ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
 import type { SessionQueueItemDTO } from 'services/api/types';
 
@@ -20,9 +22,11 @@ type Props = {
 const QueueItemComponent = ({ queueItemDTO }: Props) => {
   const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
   const { t } = useTranslation();
-  const { cancelBatch, isLoading: isLoadingCancelBatch, isCanceled } = useCancelBatch(batch_id);
+  const isRetryEnabled = useFeatureStatus('retryQueueItem');
+  const { cancelBatch, isLoading: isLoadingCancelBatch, isCanceled: isBatchCanceled } = useCancelBatch(batch_id);
 
   const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } = useCancelQueueItem(item_id);
+  const { retryQueueItem, isLoading: isLoadingRetryQueueItem } = useRetryQueueItem(item_id);
 
   const { data: queueItem } = useGetQueueItemQuery(item_id);
 
@@ -43,6 +47,13 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
     return `${seconds}s`;
   }, [queueItem, t]);
 
+  const isCanceled = useMemo(
+    () => !!queueItem && ['canceled', 'completed', 'failed'].includes(queueItem.status),
+    [queueItem]
+  );
+
+  const isFailed = useMemo(() => !!queueItem && ['canceled', 'failed'].includes(queueItem.status), [queueItem]);
+
   return (
     <Flex layerStyle="third" flexDir="column" p={2} pt={0} borderRadius="base" gap={2}>
       <Flex
@@ -61,20 +72,34 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         <QueueItemData label={t('queue.batch')} data={batch_id} />
         <QueueItemData label={t('queue.session')} data={session_id} />
         <ButtonGroup size="xs" orientation="vertical">
-          <Button
-            onClick={cancelQueueItem}
-            isLoading={isLoadingCancelQueueItem}
-            isDisabled={queueItem ? ['canceled', 'completed', 'failed'].includes(queueItem.status) : true}
-            aria-label={t('queue.cancelItem')}
-            leftIcon={<PiXBold />}
-            colorScheme="error"
-          >
-            {t('queue.cancelItem')}
-          </Button>
+          {(!isFailed || !isRetryEnabled) && (
+            <Button
+              onClick={cancelQueueItem}
+              isLoading={isLoadingCancelQueueItem}
+              isDisabled={queueItem ? isCanceled : true}
+              aria-label={t('queue.cancelItem')}
+              leftIcon={<PiXBold />}
+              colorScheme="error"
+            >
+              {t('queue.cancelItem')}
+            </Button>
+          )}
+          {isFailed && isRetryEnabled && (
+            <Button
+              onClick={retryQueueItem}
+              isLoading={isLoadingRetryQueueItem}
+              isDisabled={!queueItem}
+              aria-label={t('queue.retryItem')}
+              leftIcon={<PiArrowCounterClockwiseBold />}
+              colorScheme="invokeBlue"
+            >
+              {t('queue.retryItem')}
+            </Button>
+          )}
           <Button
             onClick={cancelBatch}
             isLoading={isLoadingCancelBatch}
-            isDisabled={isCanceled}
+            isDisabled={isBatchCanceled}
             aria-label={t('queue.cancelBatch')}
             leftIcon={<PiXBold />}
             colorScheme="error"

@@ -1,13 +1,20 @@
 import { parseify } from 'common/util/serialize';
+import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { Templates } from 'features/nodes/store/types';
 import {
   isBoardFieldInputInstance,
   isImageFieldCollectionInputInstance,
   isImageFieldInputInstance,
+  isModelFieldType,
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { buildNodeFieldElement, isNodeFieldElement, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
+import {
+  buildNodeFieldElement,
+  getDefaultForm,
+  isNodeFieldElement,
+  isWorkflowInvocationNode,
+} from 'features/nodes/types/workflow';
 import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
 import { t } from 'i18next';
 import type { JsonObject } from 'type-fest';
@@ -20,25 +27,18 @@ type WorkflowWarning = {
   data: JsonObject;
 };
 
+type ValidateWorkflowArgs = {
+  workflow: unknown;
+  templates: Templates;
+  checkImageAccess: (name: string) => Promise<boolean>;
+  checkBoardAccess: (id: string) => Promise<boolean>;
+  checkModelAccess: (key: string) => Promise<boolean>;
+};
+
 type ValidateWorkflowResult = {
   workflow: WorkflowV3;
   warnings: WorkflowWarning[];
 };
-
-const MODEL_FIELD_TYPES = [
-  'ModelIdentifier',
-  'MainModelField',
-  'SDXLMainModelField',
-  'FluxMainModelField',
-  'SD3MainModelField',
-  'SDXLRefinerModelField',
-  'VAEModelField',
-  'LoRAModelField',
-  'ControlNetModelField',
-  'IPAdapterModelField',
-  'T2IAdapterModelField',
-  'SpandrelImageToImageModelField',
-];
 
 /**
  * Parses and validates a workflow:
@@ -46,18 +46,11 @@ const MODEL_FIELD_TYPES = [
  * - Validates the workflow against the node templates, warning if the template is not known.
  * - Attempts to update nodes which have a mismatched version.
  * - Removes edges which are invalid.
- * @param workflow The raw workflow object (e.g. JSON.parse(stringifiedWorkflow))
- * @param templates The node templates to validate against.
- * @throws {WorkflowVersionError} If the workflow version is not recognized.
+ * - Reset image, board and model fields which are not accessible
  * @throws {z.ZodError} If there is a validation error.
  */
-export const validateWorkflow = async (
-  workflow: unknown,
-  templates: Templates,
-  checkImageAccess: (name: string) => Promise<boolean>,
-  checkBoardAccess: (id: string) => Promise<boolean>,
-  checkModelAccess: (key: string) => Promise<boolean>
-): Promise<ValidateWorkflowResult> => {
+export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<ValidateWorkflowResult> => {
+  const { workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess } = args;
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 
@@ -123,7 +116,7 @@ export const validateWorkflow = async (
 
       // We need to confirm that all images, boards and models are accessible before loading,
       // else the workflow could end up with stale data an an error state.
-      if (fieldTemplate.type.name === 'ImageField' && isImageFieldInputInstance(input) && input.value) {
+      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldInputInstance(input)) {
         const hasAccess = await checkImageAccess(input.value.image_name);
         if (!hasAccess) {
           const message = t('nodes.imageAccessError', { image_name: input.value.image_name });
@@ -131,7 +124,7 @@ export const validateWorkflow = async (
           input.value = undefined;
         }
       }
-      if (fieldTemplate.type.name === 'ImageField' && isImageFieldCollectionInputInstance(input) && input.value) {
+      if (fieldTemplate.type.name === 'ImageField' && input.value && isImageFieldCollectionInputInstance(input)) {
         for (const { image_name } of [...input.value]) {
           const hasAccess = await checkImageAccess(image_name);
           if (!hasAccess) {
@@ -141,7 +134,10 @@ export const validateWorkflow = async (
           }
         }
       }
-      if (fieldTemplate.type.name === 'BoardField' && isBoardFieldInputInstance(input) && input.value) {
+      if (fieldTemplate.type.name === 'BoardField' && input.value && isBoardFieldInputInstance(input)) {
+        if (input.value === 'none' || input.value === 'auto') {
+          continue;
+        }
         const hasAccess = await checkBoardAccess(input.value.board_id);
         if (!hasAccess) {
           const message = t('nodes.boardAccessError', { board_id: input.value.board_id });
@@ -149,11 +145,7 @@ export const validateWorkflow = async (
           input.value = undefined;
         }
       }
-      if (
-        MODEL_FIELD_TYPES.includes(fieldTemplate.type.name) &&
-        isModelIdentifierFieldInputInstance(input) &&
-        input.value
-      ) {
+      if (isModelFieldType(fieldTemplate.type) && input.value && isModelIdentifierFieldInputInstance(input)) {
         const hasAccess = await checkModelAccess(input.value.key);
         if (!hasAccess) {
           const message = t('nodes.modelAccessError', { key: input.value.key });
@@ -242,9 +234,15 @@ export const validateWorkflow = async (
     }
   });
 
-  if (_workflow.exposedFields.length > 0 && Object.values(_workflow.form.elements).length === 0) {
-    // Migrated exposed fields to form elements
-    for (const { nodeId, fieldName } of _workflow.exposedFields) {
+  // Migrated exposed fields to form elements if they exist and the form does not
+  // Note: If the form is invalid per its zod schema, it will be reset to a default, empty form!
+  if (_workflow.exposedFields.length > 0 && getIsFormEmpty(_workflow.form)) {
+    _workflow.form = getDefaultForm();
+
+    // Reverse the fields so that we can insert each at index 0 without needing to shift the index
+    const reverseExposedFields = [..._workflow.exposedFields].reverse();
+
+    for (const { nodeId, fieldName } of reverseExposedFields) {
       const node = nodes.find(({ id }) => id === nodeId);
       if (!node) {
         continue;
@@ -258,11 +256,17 @@ export const validateWorkflow = async (
         continue;
       }
       const element = buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
-      _workflow.form.elements[element.id] = element;
-      _workflow.form.layout.push(element.id);
+      element.data.showDescription = false;
+      addElement({
+        form: _workflow.form,
+        element,
+        parentId: _workflow.form.rootElementId,
+        index: 0,
+      });
     }
   }
 
+  // If the form exists, remove any form elements that no longer have a corresponding node field
   for (const element of Object.values(_workflow.form.elements)) {
     if (!isNodeFieldElement(element)) {
       continue;

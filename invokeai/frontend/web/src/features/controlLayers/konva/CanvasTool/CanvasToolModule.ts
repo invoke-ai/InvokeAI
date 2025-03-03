@@ -22,6 +22,7 @@ import type {
   Coordinate,
   Tool,
 } from 'features/controlLayers/store/types';
+import { isRenderableEntityType } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
@@ -177,24 +178,26 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor('not-allowed');
     } else if (tool === 'bbox') {
       this.tools.bbox.syncCursorStyle();
-    } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
-      stage.setCursor('not-allowed');
-    } else if (selectedEntityAdapter?.$isDisabled.get()) {
-      stage.setCursor('not-allowed');
-    } else if (selectedEntityAdapter?.$isEntityTypeHidden.get()) {
-      stage.setCursor('not-allowed');
-    } else if (selectedEntityAdapter?.$isLocked.get()) {
-      stage.setCursor('not-allowed');
-    } else if (tool === 'brush') {
-      this.tools.brush.syncCursorStyle();
-    } else if (tool === 'eraser') {
-      this.tools.eraser.syncCursorStyle();
     } else if (tool === 'colorPicker') {
       this.tools.colorPicker.syncCursorStyle();
-    } else if (tool === 'move') {
-      this.tools.move.syncCursorStyle();
-    } else if (tool === 'rect') {
-      this.tools.rect.syncCursorStyle();
+    } else if (selectedEntityAdapter && isRenderableEntityType(selectedEntityAdapter.entityIdentifier.type)) {
+      if (selectedEntityAdapter.$isDisabled.get()) {
+        stage.setCursor('not-allowed');
+      } else if (selectedEntityAdapter.$isEntityTypeHidden.get()) {
+        stage.setCursor('not-allowed');
+      } else if (selectedEntityAdapter.$isLocked.get()) {
+        stage.setCursor('not-allowed');
+      } else if (tool === 'brush') {
+        this.tools.brush.syncCursorStyle();
+      } else if (tool === 'eraser') {
+        this.tools.eraser.syncCursorStyle();
+      } else if (tool === 'move') {
+        this.tools.move.syncCursorStyle();
+      } else if (tool === 'rect') {
+        this.tools.rect.syncCursorStyle();
+      }
+    } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
+      stage.setCursor('not-allowed');
     } else {
       stage.setCursor('not-allowed');
     }
@@ -387,15 +390,17 @@ export class CanvasToolModule extends CanvasModuleBase {
     try {
       this.$lastPointerType.set(e.evt.pointerType);
 
-      if (!this.getCanDraw()) {
-        return;
-      }
-
       const tool = this.$tool.get();
 
       if (tool === 'colorPicker') {
         this.tools.colorPicker.onStagePointerUp(e);
-      } else if (tool === 'brush') {
+      }
+
+      if (!this.getCanDraw()) {
+        return;
+      }
+
+      if (tool === 'brush') {
         this.tools.brush.onStagePointerUp(e);
       } else if (tool === 'eraser') {
         this.tools.eraser.onStagePointerUp(e);
@@ -416,15 +421,17 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.$lastPointerType.set(e.evt.pointerType);
       this.syncCursorPositions();
 
-      if (!this.getCanDraw()) {
-        return;
-      }
-
       const tool = this.$tool.get();
 
       if (tool === 'colorPicker') {
         this.tools.colorPicker.onStagePointerMove(e);
-      } else if (tool === 'brush') {
+      }
+
+      if (!this.getCanDraw()) {
+        return;
+      }
+
+      if (tool === 'brush') {
         await this.tools.brush.onStagePointerMove(e);
       } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerMove(e);

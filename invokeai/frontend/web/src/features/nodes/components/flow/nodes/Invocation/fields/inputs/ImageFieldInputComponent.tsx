@@ -7,12 +7,11 @@ import type { SetNodeImageFieldImageDndTargetData } from 'features/dnd/dnd';
 import { setNodeImageFieldImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
-import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
@@ -24,6 +23,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
+
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
   const handleReset = useCallback(() => {
     dispatch(
@@ -64,15 +64,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   );
 
   return (
-    <Flex
-      position="relative"
-      className="nodrag"
-      w="full"
-      h="full"
-      minH={16}
-      alignItems="stretch"
-      justifyContent="center"
-    >
+    <Flex position="relative" className={NO_DRAG_CLASS} w="full" h={32} alignItems="stretch">
       {!imageDTO && (
         <UploadImageButton
           w="full"
@@ -84,17 +76,22 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
       )}
       {imageDTO && (
         <>
-          <DndImage imageDTO={imageDTO} minW={8} minH={8} />
-          <DndImageIcon
-            onClick={handleReset}
-            icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
-            tooltip="Reset Image"
+          <Flex borderRadius="base" borderWidth={1} borderStyle="solid">
+            <DndImage imageDTO={imageDTO} asThumbnail />
+          </Flex>
+          <Text
             position="absolute"
-            flexDir="column"
-            top={1}
+            background="base.900"
+            color="base.50"
+            fontSize="sm"
+            fontWeight="semibold"
             insetInlineEnd={1}
-            gap={1}
-          />
+            insetBlockEnd={1}
+            opacity={0.7}
+            px={2}
+            borderRadius="base"
+            pointerEvents="none"
+          >{`${imageDTO.width}x${imageDTO.height}`}</Text>
         </>
       )}
       <DndDropTarget

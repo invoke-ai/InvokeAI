@@ -8,8 +8,6 @@ const sx = {
   minH: 8,
   py: 0.5,
   alignItems: 'center',
-  transitionProperty: 'opacity',
-  transitionDuration: '0.1s',
   justifyContent: 'flex-end',
 } satisfies SystemStyleObject;
 

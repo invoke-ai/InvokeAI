@@ -19,13 +19,13 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
+  $addNodeCmdk,
   $cursorPos,
   $edgePendingUpdate,
   $pendingConnection,
   $templates,
   edgesChanged,
   nodesChanged,
-  useAddNodeCmdk,
 } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
@@ -40,34 +40,12 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memoize } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCircuitryBold, PiFlaskBold, PiHammerBold, PiLightningFill } from 'react-icons/pi';
 import type { S } from 'services/api/types';
 import { objectEntries } from 'tsafe';
-
-const useThrottle = <T,>(value: T, limit: number) => {
-  const [throttledValue, setThrottledValue] = useState(value);
-  const lastRan = useRef(Date.now());
-
-  useEffect(() => {
-    const handler = setTimeout(
-      function () {
-        if (Date.now() - lastRan.current >= limit) {
-          setThrottledValue(value);
-          lastRan.current = Date.now();
-        }
-      },
-      limit - (Date.now() - lastRan.current)
-    );
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, limit]);
-
-  return throttledValue;
-};
+import { useDebounce } from 'use-debounce';
 
 const useAddNode = () => {
   const { t } = useTranslation();
@@ -164,19 +142,26 @@ const cmdkRootSx: SystemStyleObject = {
 
 export const AddNodeCmdk = memo(() => {
   const { t } = useTranslation();
-  const addNodeCmdk = useAddNodeCmdk();
   const inputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const addNode = useAddNode();
   const tab = useAppSelector(selectActiveTab);
-  const throttledSearchTerm = useThrottle(searchTerm, 100);
+  // Filtering the list is expensive - debounce the search term to avoid stutters
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const isOpen = useStore($addNodeCmdk);
+  const open = useCallback(() => {
+    $addNodeCmdk.set(true);
+  }, []);
+  const close = useCallback(() => {
+    $addNodeCmdk.set(false);
+  }, []);
 
   useRegisteredHotkeys({
     id: 'addNode',
     category: 'workflows',
-    callback: addNodeCmdk.setTrue,
+    callback: open,
     options: { enabled: tab === 'workflows', preventDefault: true },
-    dependencies: [addNodeCmdk.setTrue, tab],
+    dependencies: [open, tab],
   });
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -184,10 +169,10 @@ export const AddNodeCmdk = memo(() => {
   }, []);
 
   const onClose = useCallback(() => {
-    addNodeCmdk.setFalse();
+    close();
     setSearchTerm('');
     $pendingConnection.set(null);
-  }, [addNodeCmdk]);
+  }, [close]);
 
   const onSelect = useCallback(
     (value: string) => {
@@ -198,14 +183,7 @@ export const AddNodeCmdk = memo(() => {
   );
 
   return (
-    <Modal
-      isOpen={addNodeCmdk.isTrue}
-      onClose={onClose}
-      useInert={false}
-      initialFocusRef={inputRef}
-      size="xl"
-      isCentered
-    >
+    <Modal isOpen={isOpen} onClose={onClose} useInert={false} initialFocusRef={inputRef} size="xl" isCentered>
       <ModalOverlay />
       <ModalContent h="512" maxH="70%">
         <ModalBody p={2} h="full" sx={cmdkRootSx}>
@@ -226,7 +204,7 @@ export const AddNodeCmdk = memo(() => {
                     />
                   </CommandEmpty>
                   <CommandList>
-                    <NodeCommandList searchTerm={throttledSearchTerm} onSelect={onSelect} />
+                    <NodeCommandList searchTerm={debouncedSearchTerm} onSelect={onSelect} />
                   </CommandList>
                 </ScrollableContent>
               </Box>

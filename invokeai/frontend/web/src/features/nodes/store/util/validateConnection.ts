@@ -9,16 +9,6 @@ import type { SetNonNullable } from 'type-fest';
 
 type Connection = SetNonNullable<NullableConnection>;
 
-export type ValidationResult =
-  | {
-      isValid: true;
-      messageTKey?: string;
-    }
-  | {
-      isValid: false;
-      messageTKey: string;
-    };
-
 type ValidateConnectionFunc = (
   connection: Connection,
   nodes: AnyNode[],
@@ -26,7 +16,7 @@ type ValidateConnectionFunc = (
   templates: Templates,
   ignoreEdge: AnyEdge | null,
   strict?: boolean
-) => ValidationResult;
+) => string | null;
 
 const getEqualityPredicate =
   (c: Connection) =>
@@ -45,12 +35,20 @@ const getTargetEqualityPredicate =
     return e.target === c.target && e.targetHandle === c.targetHandle;
   };
 
-export const buildAcceptResult = (): ValidationResult => ({ isValid: true });
-export const buildRejectResult = (messageTKey: string): ValidationResult => ({ isValid: false, messageTKey });
-
-export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, templates, ignoreEdge, strict = true) => {
+/**
+ * Validates a connection between two fields
+ * @returns A translation key for an error if the connection is invalid, otherwise null
+ */
+export const validateConnection: ValidateConnectionFunc = (
+  c,
+  nodes,
+  edges,
+  templates,
+  ignoreEdge,
+  strict = true
+): string | null => {
   if (c.source === c.target) {
-    return buildRejectResult('nodes.cannotConnectToSelf');
+    return 'nodes.cannotConnectToSelf';
   }
 
   if (strict) {
@@ -65,66 +63,66 @@ export const validateConnection: ValidateConnectionFunc = (c, nodes, edges, temp
 
     if (filteredEdges.some(getEqualityPredicate(c))) {
       // We already have a connection from this source to this target
-      return buildRejectResult('nodes.cannotDuplicateConnection');
+      return 'nodes.cannotDuplicateConnection';
     }
 
     const sourceNode = nodes.find((n) => n.id === c.source);
     if (!sourceNode) {
-      return buildRejectResult('nodes.missingNode');
+      return 'nodes.missingNode';
     }
 
     const targetNode = nodes.find((n) => n.id === c.target);
     if (!targetNode) {
-      return buildRejectResult('nodes.missingNode');
+      return 'nodes.missingNode';
     }
 
     const sourceTemplate = templates[sourceNode.data.type];
     if (!sourceTemplate) {
-      return buildRejectResult('nodes.missingInvocationTemplate');
+      return 'nodes.missingInvocationTemplate';
     }
 
     const targetTemplate = templates[targetNode.data.type];
     if (!targetTemplate) {
-      return buildRejectResult('nodes.missingInvocationTemplate');
+      return 'nodes.missingInvocationTemplate';
     }
 
     const sourceFieldTemplate = sourceTemplate.outputs[c.sourceHandle];
     if (!sourceFieldTemplate) {
-      return buildRejectResult('nodes.missingFieldTemplate');
+      return 'nodes.missingFieldTemplate';
     }
 
     const targetFieldTemplate = targetTemplate.inputs[c.targetHandle];
     if (!targetFieldTemplate) {
-      return buildRejectResult('nodes.missingFieldTemplate');
+      return 'nodes.missingFieldTemplate';
     }
 
     if (targetFieldTemplate.input === 'direct') {
-      return buildRejectResult('nodes.cannotConnectToDirectInput');
+      return 'nodes.cannotConnectToDirectInput';
     }
 
     if (targetNode.data.type === 'collect' && c.targetHandle === 'item') {
       // Collect nodes shouldn't mix and match field types.
       const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
       if (collectItemType && !areTypesEqual(sourceFieldTemplate.type, collectItemType)) {
-        return buildRejectResult('nodes.cannotMixAndMatchCollectionItemTypes');
+        return 'nodes.cannotMixAndMatchCollectionItemTypes';
       }
     }
 
     if (filteredEdges.find(getTargetEqualityPredicate(c))) {
       // CollectionItemField inputs can have multiple input connections
       if (targetFieldTemplate.type.name !== 'CollectionItemField') {
-        return buildRejectResult('nodes.inputMayOnlyHaveOneConnection');
+        return 'nodes.inputMayOnlyHaveOneConnection';
       }
     }
 
     if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
-      return buildRejectResult('nodes.fieldTypesMustMatch');
+      return 'nodes.fieldTypesMustMatch';
     }
   }
 
   if (getHasCycles(c.source, c.target, nodes, edges)) {
-    return buildRejectResult('nodes.connectionWouldCreateCycle');
+    return 'nodes.connectionWouldCreateCycle';
   }
 
-  return buildAcceptResult();
+  return null;
 };

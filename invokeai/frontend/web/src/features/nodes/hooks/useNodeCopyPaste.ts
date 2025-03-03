@@ -16,8 +16,7 @@ import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupied
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { t } from 'i18next';
-import { isEqual, isNil, uniqWith } from 'lodash-es';
-import { assert } from 'tsafe';
+import { isEqual, uniqWith } from 'lodash-es';
 import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('workflows');
@@ -120,26 +119,54 @@ const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
 
   // Add new edges
   copiedEdges.forEach((e) => {
-    const { source, sourceHandle, target, targetHandle } = e;
-    // We need a type guard here to work around reactflow types
-    assert(!isNil(sourceHandle));
-    assert(!isNil(targetHandle));
+    if (e.type === 'collapsed') {
+      const { type, source, target } = e;
+      // Our "collapsed" edges are between nodes and do not have handles, so we only need to validate that the source
+      // and target nodes exist.
+      if (
+        validationNodes.find((n) => n.id === e.source) === undefined ||
+        validationNodes.find((n) => n.id === e.target) === undefined
+      ) {
+        log.warn(
+          { edge: { type, source, target } },
+          `Invalid collapsed edge, cannot paste: ${t('nodes.missingSourceOrTargetNode')}`
+        );
+        return;
+      }
+    } else if (e.type === 'default') {
+      const { type, source, sourceHandle, target, targetHandle } = e;
 
-    // Validate the edge before adding it
-    const validationResult = validateConnection(
-      { source, sourceHandle, target, targetHandle },
-      validationNodes,
-      validationEdges,
-      templates,
-      null,
-      true
-    );
-    // If the edge is invalid, log a warning and skip it
-    if (!validationResult.isValid) {
-      log.warn(
-        { edge: { source, sourceHandle, target, targetHandle } },
-        `Invalid edge, cannot paste: ${t(validationResult.messageTKey)}`
+      // Our "default" type edges always have handles, but the reactflow types don't seem to inherit this typing, so we
+      // need a type guard here. But these _should_ always be present.
+      if (!sourceHandle || !targetHandle) {
+        log.warn(
+          { edge: { type, source, sourceHandle, target, targetHandle } },
+          `Invalid edge, cannot paste: ${t('nodes.missingSourceOrTargetHandle')}`
+        );
+        return;
+      }
+
+      // Validate the edge before adding it
+      const connectionErrorTKey = validateConnection(
+        { source, sourceHandle, target, targetHandle },
+        validationNodes,
+        validationEdges,
+        templates,
+        null,
+        true
       );
+      // If the edge is invalid, log a warning and skip it
+      if (connectionErrorTKey !== null) {
+        log.warn(
+          { edge: { source, sourceHandle, target, targetHandle } },
+          `Invalid edge, cannot paste: ${t(connectionErrorTKey)}`
+        );
+        return;
+      }
+    } else {
+      // All our edges should be either "collapsed" or "default" type, so if we get here, something is wrong
+      const { type } = e;
+      log.warn({ edge: { type } }, `Invalid edge type, cannot paste`);
       return;
     }
     edgeChanges.push({

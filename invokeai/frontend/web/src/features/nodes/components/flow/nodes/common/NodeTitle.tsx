@@ -6,6 +6,7 @@ import { useBatchGroupId } from 'features/nodes/hooks/useBatchGroupId';
 import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
+import { NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -48,9 +49,14 @@ const NodeTitle = ({ nodeId, title }: Props) => {
   }, [batchGroupId, editable.value, t]);
 
   return (
-    <Flex overflow="hidden" w="full" h="full" alignItems="center" justifyContent="center" cursor="text">
+    <Flex overflow="hidden" w="full" h="full" alignItems="center" justifyContent="center">
       {!editable.isEditing && (
-        <Text fontWeight="semibold" color={batchGroupColorToken} onDoubleClick={editable.startEditing}>
+        <Text
+          className={NO_FIT_ON_DOUBLE_CLICK_CLASS}
+          fontWeight="semibold"
+          color={batchGroupColorToken}
+          onDoubleClick={editable.startEditing}
+        >
           {titleWithBatchGroupId}
         </Text>
       )}

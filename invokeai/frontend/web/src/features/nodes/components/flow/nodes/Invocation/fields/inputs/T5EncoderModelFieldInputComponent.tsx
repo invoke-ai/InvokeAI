@@ -2,6 +2,7 @@ import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldT5EncoderValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { T5EncoderModelFieldInputInstance, T5EncoderModelFieldInputTemplate } from 'features/nodes/types/field';
 import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
@@ -44,7 +45,11 @@ const T5EncoderModelFieldInputComponent = (props: Props) => {
   return (
     <Flex w="full" alignItems="center" gap={2}>
       <Tooltip label={!isModelsTabDisabled && t('modelManager.starterModelsInModelManager')}>
-        <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value && required}>
+        <FormControl
+          className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
+          isDisabled={!options.length}
+          isInvalid={!value && required}
+        >
           <Combobox
             value={value}
             placeholder={required ? placeholder : `(Optional) ${placeholder}`}

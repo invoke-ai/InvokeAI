@@ -2,6 +2,7 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldSchedulerValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_FIT_ON_DOUBLE_CLICK_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { SchedulerFieldInputInstance, SchedulerFieldInputTemplate } from 'features/nodes/types/field';
 import { SCHEDULER_OPTIONS } from 'features/parameters/types/constants';
 import { isParameterScheduler } from 'features/parameters/types/parameterSchemas';
@@ -34,7 +35,7 @@ const SchedulerFieldInputComponent = (props: Props) => {
   const value = useMemo(() => SCHEDULER_OPTIONS.find((o) => o.value === field?.value), [field?.value]);
 
   return (
-    <FormControl className="nowheel nodrag">
+    <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS} ${NO_FIT_ON_DOUBLE_CLICK_CLASS}`}>
       <Combobox value={value} options={SCHEDULER_OPTIONS} onChange={onChange} />
     </FormControl>
   );

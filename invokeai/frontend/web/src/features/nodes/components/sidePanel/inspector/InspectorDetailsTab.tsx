@@ -1,82 +1,67 @@
 import { Box, Flex, FormControl, FormLabel, HStack, Text } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { InvocationNodeNotesTextarea } from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeNotesTextarea';
-import { useNodeIsInvocationNode } from 'features/nodes/hooks/useNodeIsInvocationNode';
+import { TemplateGate } from 'features/nodes/components/sidePanel/inspector/NodeTemplateGate';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
-import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectLastSelectedNode, selectNodesSlice } from 'features/nodes/store/selectors';
-import { isInvocationNode } from 'features/nodes/types/invocation';
-import { memo, useMemo } from 'react';
+import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
+import { selectLastSelectedNodeId } from 'features/nodes/store/selectors';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import EditableNodeTitle from './details/EditableNodeTitle';
+import InspectorTabEditableNodeTitle from './InspectorTabEditableNodeTitle';
 
 const InspectorDetailsTab = () => {
-  const templates = useStore($templates);
-  const selector = useMemo(
-    () =>
-      createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const lastSelectedNode = selectLastSelectedNode(nodes);
-        const lastSelectedNodeTemplate = lastSelectedNode ? templates[lastSelectedNode.data.type] : undefined;
-
-        if (!isInvocationNode(lastSelectedNode) || !lastSelectedNodeTemplate) {
-          return;
-        }
-
-        return {
-          nodeId: lastSelectedNode.data.id,
-          nodeVersion: lastSelectedNode.data.version,
-          templateTitle: lastSelectedNodeTemplate.title,
-        };
-      }),
-    [templates]
-  );
-  const data = useAppSelector(selector);
   const { t } = useTranslation();
+  const lastSelectedNodeId = useAppSelector(selectLastSelectedNodeId);
 
-  if (!data) {
+  if (!lastSelectedNodeId) {
     return <IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />;
   }
 
-  return <Content nodeId={data.nodeId} nodeVersion={data.nodeVersion} templateTitle={data.templateTitle} />;
+  return (
+    <TemplateGate
+      nodeId={lastSelectedNodeId}
+      fallback={<IAINoContentFallback label={t('nodes.noNodeSelected')} icon={null} />}
+    >
+      <Content nodeId={lastSelectedNodeId} />
+    </TemplateGate>
+  );
 };
 
 export default memo(InspectorDetailsTab);
 
-type ContentProps = {
-  nodeId: string;
-  nodeVersion: string;
-  templateTitle: string;
-};
-
-const Content = memo((props: ContentProps) => {
+const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const needsUpdate = useNodeNeedsUpdate(props.nodeId);
-  const isInvocationNode = useNodeIsInvocationNode(props.nodeId);
+  const version = useNodeVersion(nodeId);
+  const template = useNodeTemplate(nodeId);
+  const needsUpdate = useNodeNeedsUpdate(nodeId);
+
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
-        <Flex flexDir="column" position="relative" w="full" h="full" p={1} gap={2}>
-          <EditableNodeTitle nodeId={props.nodeId} />
+        <Flex flexDir="column" position="relative" w="full" h="full" gap={1}>
+          <FormControl>
+            <FormLabel m={0}>{t('nodes.nodeName')}</FormLabel>
+            <InspectorTabEditableNodeTitle nodeId={nodeId} />
+          </FormControl>
           <HStack>
             <FormControl>
-              <FormLabel>{t('nodes.nodeType')}</FormLabel>
+              <FormLabel m={0}>{t('nodes.nodeType')}</FormLabel>
               <Text fontSize="sm" fontWeight="semibold">
-                {props.templateTitle}
+                {template.title}
               </Text>
             </FormControl>
             <FormControl isInvalid={needsUpdate}>
-              <FormLabel>{t('nodes.nodeVersion')}</FormLabel>
+              <FormLabel m={0}>{t('nodes.nodeVersion')}</FormLabel>
               <Text fontSize="sm" fontWeight="semibold">
-                {props.nodeVersion}
+                {version}
               </Text>
             </FormControl>
           </HStack>
-          {isInvocationNode && <InvocationNodeNotesTextarea nodeId={props.nodeId} />}
+          <InvocationNodeNotesTextarea nodeId={nodeId} />
         </Flex>
       </ScrollableContent>
     </Box>

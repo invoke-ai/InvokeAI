@@ -1,13 +1,16 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import type { Node, NodeProps } from '@xyflow/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import NodeCollapseButton from 'features/nodes/components/flow/nodes/common/NodeCollapseButton';
 import NodeTitle from 'features/nodes/components/flow/nodes/common/NodeTitle';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { notesNodeValueChanged } from 'features/nodes/store/nodesSlice';
+import { selectNodes } from 'features/nodes/store/selectors';
+import { NO_DRAG_CLASS, NO_PAN_CLASS } from 'features/nodes/types/constants';
 import type { NotesNodeData } from 'features/nodes/types/invocation';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 
 const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
   const { id: nodeId, data, selected } = props;
@@ -19,6 +22,16 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
     },
     [dispatch, nodeId]
   );
+
+  const selectNodeExists = useMemo(
+    () => createSelector(selectNodes, (nodes) => Boolean(nodes.find((n) => n.id === nodeId))),
+    [nodeId]
+  );
+  const nodeExists = useAppSelector(selectNodeExists);
+
+  if (!nodeExists) {
+    return null;
+  }
 
   return (
     <NodeWrapper nodeId={nodeId} selected={selected}>
@@ -38,7 +51,7 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
         <>
           <Flex
             layerStyle="nodeBody"
-            className="nopan"
+            className={NO_PAN_CLASS}
             cursor="auto"
             flexDirection="column"
             borderBottomRadius="base"
@@ -47,8 +60,15 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
             p={2}
             gap={1}
           >
-            <Flex className="nopan" w="full" h="full" flexDir="column">
-              <Textarea className="nodrag" value={notes} onChange={handleChange} rows={8} resize="none" fontSize="sm" />
+            <Flex className={NO_PAN_CLASS} w="full" h="full" flexDir="column">
+              <Textarea
+                className={NO_DRAG_CLASS}
+                value={notes}
+                onChange={handleChange}
+                rows={8}
+                resize="none"
+                fontSize="sm"
+              />
             </Flex>
           </Flex>
         </>

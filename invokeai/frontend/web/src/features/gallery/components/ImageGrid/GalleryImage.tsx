@@ -6,7 +6,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useBoolean } from 'common/hooks/useBoolean';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
 import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
@@ -178,7 +177,15 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     );
   }, [imageDTO, element, store, dndId]);
 
-  const isHovered = useBoolean(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const onMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const onMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
 
   const onClick = useCallback<MouseEventHandler<HTMLDivElement>>(
     (e) => {
@@ -217,8 +224,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         <Flex
           role="button"
           className="gallery-image"
-          onMouseOver={isHovered.setTrue}
-          onMouseOut={isHovered.setFalse}
+          onMouseOver={onMouseOver}
+          onMouseOut={onMouseOut}
           onClick={onClick}
           onDoubleClick={onDoubleClick}
           data-selected={isSelected}
@@ -234,7 +241,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
             maxH="full"
             borderRadius="base"
           />
-          <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered.isTrue} />
+          <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
         </Flex>
       </Box>
       {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}

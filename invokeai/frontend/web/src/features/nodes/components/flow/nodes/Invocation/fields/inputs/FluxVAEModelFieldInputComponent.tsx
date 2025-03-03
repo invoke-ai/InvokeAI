@@ -2,6 +2,7 @@ import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldFluxVAEModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { FluxVAEModelFieldInputInstance, FluxVAEModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,7 +44,7 @@ const FluxVAEModelFieldInputComponent = (props: Props) => {
   return (
     <Flex w="full" alignItems="center" gap={2}>
       <Tooltip label={!disabledTabs.includes('models') && t('modelManager.starterModelsInModelManager')}>
-        <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
+        <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isDisabled={!options.length} isInvalid={!value}>
           <Combobox
             value={value}
             placeholder={placeholder}

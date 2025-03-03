@@ -2,6 +2,7 @@ import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
+import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
 import { $authToken } from 'app/store/nanostores/authToken';
@@ -86,6 +87,12 @@ const InvokeAIUI = ({
       loggingOverrides?.logNamespaces ?? '*'
     );
   }, [loggingOverrides]);
+
+  useLayoutEffect(() => {
+    if (studioInitAction) {
+      $didStudioInit.set(false);
+    }
+  }, [studioInitAction]);
 
   useEffect(() => {
     // configure API client token

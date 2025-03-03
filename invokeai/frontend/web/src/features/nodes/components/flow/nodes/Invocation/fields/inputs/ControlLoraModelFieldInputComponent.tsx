@@ -2,6 +2,7 @@ import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldControlLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type {
   ControlLoRAModelFieldInputInstance,
   ControlLoRAModelFieldInputTemplate,
@@ -48,7 +49,11 @@ const ControlLoRAModelFieldInputComponent = (props: Props) => {
   return (
     <Flex w="full" alignItems="center" gap={2}>
       <Tooltip label={!disabledTabs.includes('models') && t('modelManager.starterModelsInModelManager')}>
-        <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value && required}>
+        <FormControl
+          className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
+          isDisabled={!options.length}
+          isInvalid={!value && required}
+        >
           <Combobox
             value={value}
             placeholder={required ? placeholder : `(Optional) ${placeholder}`}

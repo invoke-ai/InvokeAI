@@ -1,8 +1,9 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useInputFieldValue } from 'features/nodes/hooks/useInputFieldValue';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { isEqual } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 
@@ -21,11 +22,22 @@ export const useInputFieldInitialFormValue = (elementId: string, nodeId: string,
     [elementId]
   );
   const initialValue = useAppSelector(selectInitialValue);
-  const value = useInputFieldValue(nodeId, fieldName);
-  const isValueChanged = useMemo(
-    () => initialValue !== uniqueNonexistentValue && !isEqual(value, initialValue),
-    [value, initialValue]
+  const selectIsChanged = useMemo(
+    () =>
+      createSelector(selectNodesSlice, (nodes) => {
+        if (initialValue === uniqueNonexistentValue) {
+          return false;
+        }
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (!isInvocationNode(node)) {
+          return;
+        }
+        const value = node.data.inputs[fieldName]?.value;
+        return !isEqual(value, initialValue);
+      }),
+    [fieldName, initialValue, nodeId]
   );
+  const isValueChanged = useAppSelector(selectIsChanged);
   const resetToInitialValue = useCallback(() => {
     if (initialValue === uniqueNonexistentValue) {
       return;

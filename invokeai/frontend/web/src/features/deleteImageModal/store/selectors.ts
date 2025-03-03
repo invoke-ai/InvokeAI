@@ -4,7 +4,7 @@ import type { CanvasState } from 'features/controlLayers/store/types';
 import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
-import { isImageFieldInputInstance } from 'features/nodes/types/field';
+import { isImageFieldCollectionInputInstance, isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
@@ -13,11 +13,23 @@ import { some } from 'lodash-es';
 import type { ImageUsage } from './types';
 // TODO(psyche): handle image deletion (canvas staging area?)
 export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: UpscaleState, image_name: string) => {
-  const isNodesImage = nodes.nodes
-    .filter(isInvocationNode)
-    .some((node) =>
-      some(node.data.inputs, (input) => isImageFieldInputInstance(input) && input.value?.image_name === image_name)
-    );
+  const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) =>
+    some(node.data.inputs, (input) => {
+      if (isImageFieldInputInstance(input)) {
+        if (input.value?.image_name === image_name) {
+          return true;
+        }
+      }
+
+      if (isImageFieldCollectionInputInstance(input)) {
+        if (input.value?.some((value) => value?.image_name === image_name)) {
+          return true;
+        }
+      }
+
+      return false;
+    })
+  );
 
   const isUpscaleImage = upscale.upscaleInitialImage?.image_name === image_name;
 

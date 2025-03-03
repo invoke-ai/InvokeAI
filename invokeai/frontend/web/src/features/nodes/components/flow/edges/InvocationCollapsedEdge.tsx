@@ -5,6 +5,7 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { buildSelectAreConnectedNodesSelected } from 'features/nodes/components/flow/edges/util/buildEdgeSelectors';
 import { selectShouldAnimateEdges } from 'features/nodes/store/workflowSettingsSlice';
+import { NO_DRAG_CLASS, NO_PAN_CLASS } from 'features/nodes/types/constants';
 import type { CollapsedInvocationNodeEdge } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 
@@ -80,7 +81,7 @@ const InvocationCollapsedEdge = ({
           <Box
             position="absolute"
             transform={`translate(-50%, -50%) translate(${labelX}px,${labelY}px)`}
-            className="edge-label-renderer__custom-edge nodrag nopan" // Unfortunately edge labels do not get the same zIndex treatment as edges do, so we need to manage this ourselves
+            className={`edge-label-renderer__custom-edge ${NO_DRAG_CLASS} ${NO_PAN_CLASS}`} // Unfortunately edge labels do not get the same zIndex treatment as edges do, so we need to manage this ourselves
             // See: https://github.com/xyflow/xyflow/issues/3658
             zIndex={1001}
           >

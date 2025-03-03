@@ -1,13 +1,12 @@
 import { Badge, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $projectUrl } from 'app/store/nanostores/projectId';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import dateFormat, { masks } from 'dateformat';
-import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
-import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
 import { useDeleteWorkflow } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
-import { useDownloadWorkflow } from 'features/workflowLibrary/hooks/useDownloadWorkflow';
-import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
+import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import { useDownloadWorkflowById } from 'features/workflowLibrary/hooks/useDownloadWorkflowById';
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,9 +18,7 @@ import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const projectUrl = useStore($projectUrl);
-  const workflowListMenu = useWorkflowListMenu();
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseOver = useCallback(() => {
@@ -33,36 +30,24 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   }, []);
 
   const workflowId = useAppSelector(selectWorkflowId);
-  const downloadWorkflow = useDownloadWorkflow();
+  const { downloadWorkflow, isLoading: isLoadingDownloadWorkflow } = useDownloadWorkflowById();
   const shareWorkflow = useShareWorkflow();
   const deleteWorkflow = useDeleteWorkflow();
-  const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow({
-    onSuccess: workflowListMenu.close,
-  });
+  const loadWorkflow = useLoadWorkflow();
 
   const isActive = useMemo(() => {
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
 
-  const handleClickLoad = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      e.stopPropagation();
-      getAndLoadWorkflow(workflow.workflow_id);
-      workflowListMenu.close();
-    },
-    [getAndLoadWorkflow, workflow.workflow_id, workflowListMenu]
-  );
+  const handleClickLoad = useCallback(() => {
+    setIsHovered(false);
+    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
+  }, [loadWorkflow, workflow.workflow_id]);
 
-  const handleClickEdit = useCallback(
-    async (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      setIsHovered(false);
-      await getAndLoadWorkflow(workflow.workflow_id);
-      dispatch(workflowModeChanged('edit'));
-      workflowListMenu.close();
-    },
-    [getAndLoadWorkflow, workflow.workflow_id, dispatch, workflowListMenu]
-  );
+  const handleClickEdit = useCallback(() => {
+    setIsHovered(false);
+    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
+  }, [loadWorkflow, workflow.workflow_id]);
 
   const handleClickDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -86,9 +71,9 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       setIsHovered(false);
-      downloadWorkflow();
+      downloadWorkflow(workflow.workflow_id);
     },
-    [downloadWorkflow]
+    [downloadWorkflow, workflow.workflow_id]
   );
 
   return (
@@ -159,6 +144,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
             aria-label={t('workflows.download')}
             onClick={handleClickDownload}
             icon={<PiDownloadSimpleBold />}
+            isLoading={isLoadingDownloadWorkflow}
           />
         </Tooltip>
         {!!projectUrl && workflow.workflow_id && workflow.category !== 'user' && (
