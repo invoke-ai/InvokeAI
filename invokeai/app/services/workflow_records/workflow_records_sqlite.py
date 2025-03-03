@@ -24,7 +24,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._conn = db.conn
-        self._cursor = self._conn.cursor()
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
@@ -32,7 +31,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def get(self, workflow_id: str) -> WorkflowRecordDTO:
         """Gets a workflow by ID. Updates the opened_at column."""
-        self._cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """--sql
             UPDATE workflow_library
             SET opened_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
@@ -41,7 +41,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             (workflow_id,),
         )
         self._conn.commit()
-        self._cursor.execute(
+        cursor.execute(
             """--sql
             SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
             FROM workflow_library
@@ -49,7 +49,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             """,
             (workflow_id,),
         )
-        row = self._cursor.fetchone()
+        row = cursor.fetchone()
         if row is None:
             raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
         return WorkflowRecordDTO.from_dict(dict(row))
@@ -59,7 +59,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             # Only user workflows may be created by this method
             assert workflow.meta.category is WorkflowCategory.User
             workflow_with_id = Workflow(**workflow.model_dump(), id=uuid_string())
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO workflow_library (
                     workflow_id,
@@ -77,7 +78,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def update(self, workflow: Workflow) -> WorkflowRecordDTO:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 UPDATE workflow_library
                 SET workflow = ?
@@ -93,7 +95,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     def delete(self, workflow_id: str) -> None:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 DELETE from workflow_library
                 WHERE workflow_id = ? AND category = 'user';
@@ -149,12 +152,13 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             main_query += " LIMIT ? OFFSET ?"
             main_params.extend([per_page, page * per_page])
 
-        self._cursor.execute(main_query, main_params)
-        rows = self._cursor.fetchall()
+        cursor = self._conn.cursor()
+        cursor.execute(main_query, main_params)
+        rows = cursor.fetchall()
         workflows = [WorkflowRecordListItemDTOValidator.validate_python(dict(row)) for row in rows]
 
-        self._cursor.execute(count_query, count_params)
-        total = self._cursor.fetchone()[0]
+        cursor.execute(count_query, count_params)
+        total = cursor.fetchone()[0]
 
         if per_page:
             pages = total // per_page + (total % per_page > 0)
@@ -193,14 +197,15 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 workflows.append(workflow)
             # Only default workflows may be managed by this method
             assert all(w.meta.category is WorkflowCategory.Default for w in workflows)
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 DELETE FROM workflow_library
                 WHERE category = 'default';
                 """
             )
             for w in workflows:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     INSERT OR REPLACE INTO workflow_library (
                         workflow_id,
