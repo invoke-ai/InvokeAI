@@ -18,7 +18,6 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._conn = db.conn
-        self._cursor = self._conn.cursor()
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
@@ -26,7 +25,8 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def get(self, style_preset_id: str) -> StylePresetRecordDTO:
         """Gets a style preset by ID."""
-        self._cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """--sql
             SELECT *
             FROM style_presets
@@ -34,7 +34,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             """,
             (style_preset_id,),
         )
-        row = self._cursor.fetchone()
+        row = cursor.fetchone()
         if row is None:
             raise StylePresetNotFoundError(f"Style preset with id {style_preset_id} not found")
         return StylePresetRecordDTO.from_dict(dict(row))
@@ -42,7 +42,8 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
     def create(self, style_preset: StylePresetWithoutId) -> StylePresetRecordDTO:
         style_preset_id = uuid_string()
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO style_presets (
                     id,
@@ -68,10 +69,11 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
     def create_many(self, style_presets: list[StylePresetWithoutId]) -> None:
         style_preset_ids = []
         try:
+            cursor = self._conn.cursor()
             for style_preset in style_presets:
                 style_preset_id = uuid_string()
                 style_preset_ids.append(style_preset_id)
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     INSERT OR IGNORE INTO style_presets (
                         id,
@@ -97,9 +99,10 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def update(self, style_preset_id: str, changes: StylePresetChanges) -> StylePresetRecordDTO:
         try:
+            cursor = self._conn.cursor()
             # Change the name of a style preset
             if changes.name is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE style_presets
                     SET name = ?
@@ -110,7 +113,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
             # Change the preset data for a style preset
             if changes.preset_data is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE style_presets
                     SET preset_data = ?
@@ -127,7 +130,8 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def delete(self, style_preset_id: str) -> None:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 DELETE from style_presets
                 WHERE id = ?;
@@ -152,12 +156,13 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
         main_query += "ORDER BY LOWER(name) ASC"
 
+        cursor = self._conn.cursor()
         if type is not None:
-            self._cursor.execute(main_query, (type,))
+            cursor.execute(main_query, (type,))
         else:
-            self._cursor.execute(main_query)
+            cursor.execute(main_query)
 
-        rows = self._cursor.fetchall()
+        rows = cursor.fetchall()
         style_presets = [StylePresetRecordDTO.from_dict(dict(row)) for row in rows]
 
         return style_presets
@@ -167,7 +172,8 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
         # First delete all existing default style presets
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 DELETE FROM style_presets
                 WHERE type = "default";
