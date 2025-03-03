@@ -14,24 +14,25 @@ export const WorkflowThumbnailField = ({
 }) => {
   const [thumbnail, setThumbnail] = useState<File | null>(null);
 
-  const createThumbnailFromURL = useCallback(async () => {
-    let file = null;
-    if (imageUrl) {
-      try {
-        const blob = await convertImageUrlToBlob(imageUrl);
-        if (blob) {
-          file = new File([blob], 'workflow.png', { type: 'image/png' });
-        }
-      } catch (error) {
-        // do nothing
-      }
+  const syncThumbnail = useCallback(async (imageUrl: string | null) => {
+    if (!imageUrl) {
+      setThumbnail(null);
+      return;
     }
-    return file;
-  }, [imageUrl]);
+    try {
+      const blob = await convertImageUrlToBlob(imageUrl);
+      if (blob) {
+        const file = new File([blob], 'workflow.png', { type: 'image/png' });
+        setThumbnail(file);
+      }
+    } catch (error) {
+      setThumbnail(null);
+    }
+  }, []);
 
   useEffect(() => {
-    createThumbnailFromURL().then(setThumbnail);
-  }, [createThumbnailFromURL]);
+    syncThumbnail(imageUrl);
+  }, [imageUrl, syncThumbnail]);
 
   const { t } = useTranslation();
 
