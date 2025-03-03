@@ -18,17 +18,14 @@ from invokeai.app.util.misc import uuid_string
 
 
 class SqliteBoardRecordStorage(BoardRecordStorageBase):
-    _conn: sqlite3.Connection
-    _cursor: sqlite3.Cursor
-
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._conn = db.conn
-        self._cursor = self._conn.cursor()
 
     def delete(self, board_id: str) -> None:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 DELETE FROM boards
                 WHERE board_id = ?;
@@ -46,7 +43,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     ) -> BoardRecord:
         try:
             board_id = uuid_string()
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 INSERT OR IGNORE INTO boards (board_id, board_name)
                 VALUES (?, ?);
@@ -64,7 +62,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         board_id: str,
     ) -> BoardRecord:
         try:
-            self._cursor.execute(
+            cursor = self._conn.cursor()
+            cursor.execute(
                 """--sql
                 SELECT *
                 FROM boards
@@ -73,7 +72,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 (board_id,),
             )
 
-            result = cast(Union[sqlite3.Row, None], self._cursor.fetchone())
+            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
         except sqlite3.Error as e:
             raise BoardRecordNotFoundException from e
         if result is None:
@@ -86,9 +85,10 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         changes: BoardChanges,
     ) -> BoardRecord:
         try:
+            cursor = self._conn.cursor()
             # Change the name of a board
             if changes.board_name is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE boards
                     SET board_name = ?
@@ -99,7 +99,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
             # Change the cover image of a board
             if changes.cover_image_name is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE boards
                     SET cover_image_name = ?
@@ -110,7 +110,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
             # Change the archived status of a board
             if changes.archived is not None:
-                self._cursor.execute(
+                cursor.execute(
                     """--sql
                     UPDATE boards
                     SET archived = ?
@@ -133,6 +133,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         limit: int = 10,
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
+        cursor = self._conn.cursor()
+
         # Build base query
         base_query = """
                 SELECT *
@@ -150,9 +152,9 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         )
 
         # Execute query to fetch boards
-        self._cursor.execute(final_query, (limit, offset))
+        cursor.execute(final_query, (limit, offset))
 
-        result = cast(list[sqlite3.Row], self._cursor.fetchall())
+        result = cast(list[sqlite3.Row], cursor.fetchall())
         boards = [deserialize_board_record(dict(r)) for r in result]
 
         # Determine count query
@@ -169,15 +171,16 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 """
 
         # Execute count query
-        self._cursor.execute(count_query)
+        cursor.execute(count_query)
 
-        count = cast(int, self._cursor.fetchone()[0])
+        count = cast(int, cursor.fetchone()[0])
 
         return OffsetPaginatedResults[BoardRecord](items=boards, offset=offset, limit=limit, total=count)
 
     def get_all(
         self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
     ) -> list[BoardRecord]:
+        cursor = self._conn.cursor()
         if order_by == BoardRecordOrderBy.Name:
             base_query = """
                     SELECT *
@@ -199,9 +202,9 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
         )
 
-        self._cursor.execute(final_query)
+        cursor.execute(final_query)
 
-        result = cast(list[sqlite3.Row], self._cursor.fetchall())
+        result = cast(list[sqlite3.Row], cursor.fetchall())
         boards = [deserialize_board_record(dict(r)) for r in result]
 
         return boards
