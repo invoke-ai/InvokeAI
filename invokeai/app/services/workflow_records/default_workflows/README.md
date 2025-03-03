@@ -3,6 +3,7 @@
 Workflows placed in this directory will be synced to the `workflow_library` as
 _default workflows_ on app startup.
 
+- Default workflows must have an id that starts with "default\_". The ID must be retained when the workflow is updated. You may need to do this manually.
 - Default workflows are not editable by users. If they are loaded and saved,
   they will save as a copy of the default workflow.
 - Default workflows must have the `meta.category` property set to `"default"`.

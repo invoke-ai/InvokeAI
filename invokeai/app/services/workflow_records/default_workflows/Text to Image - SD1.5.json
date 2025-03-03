@@ -1,4 +1,5 @@
 {
+  "id": "default_7dde3e36-d78f-4152-9eea-00ef9c8124ed",
   "name": "Text to Image - SD1.5",
   "author": "InvokeAI",
   "description": "Sample text to image workflow for Stable Diffusion 1.5/2",

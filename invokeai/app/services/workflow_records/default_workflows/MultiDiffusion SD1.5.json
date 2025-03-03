@@ -1,4 +1,5 @@
 {
+  "id": "default_f96e794f-eb3e-4d01-a960-9b4e43402bcf",
   "name": "MultiDiffusion SD1.5",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling, using SD1.5 based models.",
@@ -52,7 +53,6 @@
     "version": "3.0.0",
     "category": "default"
   },
-  "id": "e5b5fb01-8906-463a-963a-402dbc42f79b",
   "nodes": [
     {
       "id": "33fe76a0-5efd-4482-a7f0-e2abf1223dc2",
