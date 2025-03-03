@@ -4,11 +4,11 @@ from PIL import Image
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_common import (
     WorkflowThumbnailFileDeleteException,
     WorkflowThumbnailFileNotFoundException,
     WorkflowThumbnailFileSaveException,
-    WorkflowThumbnailServiceBase,
 )
 from invokeai.app.util.misc import uuid_string
 from invokeai.app.util.thumbnails import make_thumbnail
