@@ -44,6 +44,8 @@ import {
   isFloatGeneratorFieldInputTemplate,
   isFluxMainModelFieldInputInstance,
   isFluxMainModelFieldInputTemplate,
+  isFluxReduxModelFieldInputInstance,
+  isFluxReduxModelFieldInputTemplate,
   isFluxVAEModelFieldInputInstance,
   isFluxVAEModelFieldInputTemplate,
   isImageFieldCollectionInputInstance,
@@ -74,6 +76,8 @@ import {
   isSDXLMainModelFieldInputTemplate,
   isSDXLRefinerModelFieldInputInstance,
   isSDXLRefinerModelFieldInputTemplate,
+  isSigLipModelFieldInputInstance,
+  isSigLipModelFieldInputTemplate,
   isSpandrelImageToImageModelFieldInputInstance,
   isSpandrelImageToImageModelFieldInputTemplate,
   isStringFieldCollectionInputInstance,
@@ -102,6 +106,7 @@ import ControlLoRAModelFieldInputComponent from './inputs/ControlLoraModelFieldI
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import FluxMainModelFieldInputComponent from './inputs/FluxMainModelFieldInputComponent';
+import FluxReduxModelFieldInputComponent from './inputs/FluxReduxModelFieldInputComponent';
 import FluxVAEModelFieldInputComponent from './inputs/FluxVAEModelFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
@@ -111,6 +116,7 @@ import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComp
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComponent';
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
+import SigLipModelFieldInputComponent from './inputs/SigLipModelFieldInputComponent';
 import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
@@ -337,6 +343,20 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <SpandrelImageToImageModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isSigLipModelFieldInputTemplate(template)) {
+    if (!isSigLipModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <SigLipModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isFluxReduxModelFieldInputTemplate(template)) {
+    if (!isFluxReduxModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <FluxReduxModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isColorFieldInputTemplate(template)) {
