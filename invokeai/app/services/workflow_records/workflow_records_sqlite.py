@@ -55,9 +55,10 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         return WorkflowRecordDTO.from_dict(dict(row))
 
     def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
+        if workflow.meta.category is WorkflowCategory.Default:
+            raise ValueError("Default workflows cannot be created via this method")
+
         try:
-            # Only user workflows may be created by this method
-            assert workflow.meta.category is WorkflowCategory.User
             workflow_with_id = Workflow(**workflow.model_dump(), id=uuid_string())
             cursor = self._conn.cursor()
             cursor.execute(
@@ -77,6 +78,9 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         return self.get(workflow_with_id.id)
 
     def update(self, workflow: Workflow) -> WorkflowRecordDTO:
+        if workflow.meta.category is WorkflowCategory.Default:
+            raise ValueError("Default workflows cannot be updated")
+
         try:
             cursor = self._conn.cursor()
             cursor.execute(
@@ -94,6 +98,9 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         return self.get(workflow.id)
 
     def delete(self, workflow_id: str) -> None:
+        if self.get(workflow_id).workflow.meta.category is WorkflowCategory.Default:
+            raise ValueError("Default workflows cannot be deleted")
+
         try:
             cursor = self._conn.cursor()
             cursor.execute(
