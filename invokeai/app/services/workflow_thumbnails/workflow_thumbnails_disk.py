@@ -22,9 +22,9 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
 
-    def get(self, style_preset_id: str) -> PILImageType:
+    def get(self, workflow_id: str) -> PILImageType:
         try:
-            path = self.get_path(style_preset_id)
+            path = self.get_path(workflow_id)
 
             return Image.open(path)
         except FileNotFoundError as e:
