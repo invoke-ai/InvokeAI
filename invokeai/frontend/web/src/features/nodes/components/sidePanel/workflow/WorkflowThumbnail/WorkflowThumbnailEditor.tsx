@@ -11,8 +11,8 @@ export const WorkflowThumbnailEditor = ({
   workflowId,
   thumbnailUrl,
 }: {
-  workflowId?: string;
-  thumbnailUrl: string | null;
+  workflowId: string;
+  thumbnailUrl?: string | null;
 }) => {
   const { t } = useTranslation();
 
@@ -28,10 +28,6 @@ export const WorkflowThumbnailEditor = ({
   }, []);
 
   const handleSaveChanges = useCallback(async () => {
-    if (!workflowId) {
-      return;
-    }
-
     try {
       if (localThumbnailUrl) {
         const blob = await convertImageUrlToBlob(localThumbnailUrl);

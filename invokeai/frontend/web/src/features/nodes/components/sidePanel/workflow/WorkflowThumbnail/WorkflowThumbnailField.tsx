@@ -9,12 +9,12 @@ export const WorkflowThumbnailField = ({
   imageUrl,
   onChange,
 }: {
-  imageUrl: string | null;
+  imageUrl?: string | null;
   onChange: (localThumbnailUrl: string | null) => void;
 }) => {
   const [thumbnail, setThumbnail] = useState<File | null>(null);
 
-  const syncThumbnail = useCallback(async (imageUrl: string | null) => {
+  const syncThumbnail = useCallback(async (imageUrl?: string | null) => {
     if (!imageUrl) {
       setThumbnail(null);
       return;
