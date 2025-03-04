@@ -14,9 +14,8 @@ import {
   Textarea,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
+import { useLoadWorkflow } from 'features/workflowLibrary/hooks/useLoadWorkflow';
 import { atom } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { useCallback, useState } from 'react';
@@ -38,7 +37,7 @@ export const useLoadWorkflowFromGraphModal = () => {
 
 export const LoadWorkflowFromGraphModal = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const _loadWorkflow = useLoadWorkflow();
   const { isOpen, onClose } = useLoadWorkflowFromGraphModal();
   const [graphRaw, setGraphRaw] = useState<string>('');
   const [workflowRaw, setWorkflowRaw] = useState<string>('');
@@ -58,9 +57,9 @@ export const LoadWorkflowFromGraphModal = () => {
     setWorkflowRaw(JSON.stringify(workflow, null, 2));
   }, [graphRaw, shouldAutoLayout]);
   const loadWorkflow = useCallback(() => {
-    dispatch(workflowLoadRequested({ data: { workflow: workflowRaw, graph: null }, asCopy: true }));
+    _loadWorkflow({ workflow: workflowRaw, graph: null });
     onClose();
-  }, [dispatch, onClose, workflowRaw]);
+  }, [_loadWorkflow, onClose, workflowRaw]);
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered useInert={false}>
       <ModalOverlay />

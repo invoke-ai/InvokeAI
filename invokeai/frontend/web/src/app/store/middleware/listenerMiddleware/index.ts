@@ -27,7 +27,6 @@ import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddlewa
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { addUpdateAllNodesRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/updateAllNodesRequested';
-import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
@@ -89,7 +88,6 @@ addArchivedOrDeletedBoardListener(startAppListening);
 addGetOpenAPISchemaListener(startAppListening);
 
 // Workflows
-addWorkflowLoadRequestedListener(startAppListening);
 addUpdateAllNodesRequestedListener(startAppListening);
 
 // Models

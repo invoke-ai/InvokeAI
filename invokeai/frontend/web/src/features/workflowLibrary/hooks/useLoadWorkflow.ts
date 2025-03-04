@@ -1,15 +1,17 @@
 import { logger } from 'app/logging/logger';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState';
-import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
+import { workflowLoaded } from 'features/nodes/store/actions';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';
 import type { Templates } from 'features/nodes/store/types';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { toast } from 'features/toast/toast';
-import { t } from 'i18next';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
 import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
 import type { GraphAndWorkflowResponse, NonNullableGraph } from 'services/api/types';
@@ -18,7 +20,7 @@ import { fromZodError } from 'zod-validation-error';
 
 const log = logger('workflows');
 
-const getWorkflow = async (data: GraphAndWorkflowResponse, templates: Templates) => {
+const getWorkflowFromStringifiedWorkflowOrGraph = async (data: GraphAndWorkflowResponse, templates: Templates) => {
   if (data.workflow) {
     // Prefer to load the workflow if it's available - it has more information
     const parsed = JSON.parse(data.workflow);
@@ -39,20 +41,14 @@ const getWorkflow = async (data: GraphAndWorkflowResponse, templates: Templates)
   }
 };
 
-export const addWorkflowLoadRequestedListener = (startAppListening: AppStartListening) => {
-  startAppListening({
-    actionCreator: workflowLoadRequested,
-    effect: async (action, { dispatch }) => {
-      const { data, asCopy } = action.payload;
-      const nodeTemplates = $templates.get();
-
+export const useLoadWorkflow = () => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const loadWorkflow = useCallback(
+    async (data: GraphAndWorkflowResponse): Promise<WorkflowV3 | null> => {
       try {
-        const { workflow, warnings } = await getWorkflow(data, nodeTemplates);
-
-        if (asCopy) {
-          // If we're loading a copy, we need to remove the ID so that the backend will create a new workflow
-          delete workflow.id;
-        }
+        const templates = $templates.get();
+        const { workflow, warnings } = await getWorkflowFromStringifiedWorkflowOrGraph(data, templates);
 
         $nodeExecutionStates.set({});
         dispatch(workflowLoaded(workflow));
@@ -75,6 +71,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
         }
 
         $needsFit.set(true);
+        return workflow;
       } catch (e) {
         if (e instanceof WorkflowVersionError) {
           // The workflow version was not recognized in the valid list of versions
@@ -116,7 +113,11 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
             description: t('nodes.unknownErrorValidatingWorkflow'),
           });
         }
+        return null;
       }
     },
-  });
+    [dispatch, t]
+  );
+
+  return loadWorkflow;
 };
