@@ -21091,11 +21091,8 @@ export type components = {
              * @description The version of the workflow schema.
              */
             version: string;
-            /**
-             * @description The category of the workflow (user or default).
-             * @default user
-             */
-            category?: components["schemas"]["WorkflowCategory"];
+            /** @description The category of the workflow (user or default). */
+            category: components["schemas"]["WorkflowCategory"];
         };
         /** WorkflowRecordDTO */
         WorkflowRecordDTO: {
