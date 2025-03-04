@@ -99,7 +99,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
             values = get_lora_layer_values(src_layer_dict)
             layers[dst_key] = any_lora_layer_from_state_dict(values)
 
-    def add_lora_adaLN_layer_if_present(src_key: str, dst_key: str) -> None:
+    def add_adaLN_lora_layer_if_present(src_key: str, dst_key: str) -> None:
         if src_key in grouped_state_dict:
             src_layer_dict = grouped_state_dict.pop(src_key)
             values = get_lora_layer_values(src_layer_dict)
@@ -253,7 +253,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
 
     # Final layer.
     add_lora_layer_if_present("proj_out", "final_layer.linear")
-    add_lora_adaLN_layer_if_present(
+    add_adaLN_lora_layer_if_present(
         'norm_out.linear',
         'final_layer.adaLN_modulation.1',
     )
