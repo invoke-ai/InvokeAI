@@ -168,10 +168,10 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             wildcard_query = "%" + stripped_query + "%"
             if categories:
                 main_query += " AND (name LIKE ? OR description LIKE ?) "
-                count_query += " AND (name LIKE ? OR description LIKE ?);"
+                count_query += " AND (name LIKE ? OR description LIKE ?)"
             else:
                 main_query += " WHERE name LIKE ? OR description LIKE ? "
-                count_query += " WHERE name LIKE ? OR description LIKE ?;"
+                count_query += " WHERE name LIKE ? OR description LIKE ?"
             main_params.extend([wildcard_query, wildcard_query])
             count_params.extend([wildcard_query, wildcard_query])
 
@@ -180,6 +180,9 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         if per_page:
             main_query += " LIMIT ? OFFSET ?"
             main_params.extend([per_page, page * per_page])
+
+        main_query += ";"
+        count_query += ";"
 
         cursor = self._conn.cursor()
         cursor.execute(main_query, main_params)
