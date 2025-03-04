@@ -57,7 +57,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       alignItems="stretch"
     >
       <Image
-        src=""
+        src={workflow.thumbnail_url ?? undefined}
         fallbackStrategy="beforeLoadOrError"
         fallback={
           <Flex
