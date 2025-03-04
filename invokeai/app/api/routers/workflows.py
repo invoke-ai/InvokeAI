@@ -19,6 +19,7 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowRecordWithThumbnailDTO,
     WorkflowWithoutID,
 )
+from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_common import WorkflowThumbnailFileNotFoundException
 
 IMAGE_MAX_AGE = 31536000
 workflows_router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
@@ -65,7 +66,11 @@ async def delete_workflow(
     workflow_id: str = Path(description="The workflow to delete"),
 ) -> None:
     """Deletes a workflow"""
-    ApiDependencies.invoker.services.workflow_thumbnails.delete(workflow_id)
+    try:
+        ApiDependencies.invoker.services.workflow_thumbnails.delete(workflow_id)
+    except WorkflowThumbnailFileNotFoundException:
+        # It's OK if the workflow has no thumbnail file. We can still delete the workflow.
+        pass
     ApiDependencies.invoker.services.workflow_records.delete(workflow_id)
 
 
