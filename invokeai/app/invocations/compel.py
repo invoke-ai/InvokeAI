@@ -513,7 +513,7 @@ def log_tokenization_for_text(
             usedTokens += 1
 
     if usedTokens > 0:
-        print(f'\n>> [TOKENLOG] Tokens {display_label or ""} ({usedTokens}):')
+        print(f"\n>> [TOKENLOG] Tokens {display_label or ''} ({usedTokens}):")
         print(f"{tokenized}\x1b[0m")
 
     if discarded != "":
