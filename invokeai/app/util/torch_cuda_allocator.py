@@ -8,13 +8,14 @@ def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging
     configurations.
     """
 
-    # Raise if the PYTORCH_CUDA_ALLOC_CONF environment variable is already set.
+    # Log a warning if the PYTORCH_CUDA_ALLOC_CONF environment variable is already set.
     prev_cuda_alloc_conf = os.environ.get("PYTORCH_CUDA_ALLOC_CONF", None)
     if prev_cuda_alloc_conf is not None:
-        raise RuntimeError(
-            f"Attempted to configure the PyTorch CUDA memory allocator, but PYTORCH_CUDA_ALLOC_CONF is already set to "
-            f"'{prev_cuda_alloc_conf}'."
+        logger.warning(
+            f"Attempted to configure the PyTorch CUDA memory allocator with '{pytorch_cuda_alloc_conf}', but PYTORCH_CUDA_ALLOC_CONF is already set to "
+            f"'{prev_cuda_alloc_conf}'. Skipping configuration."
         )
+        return
 
     # Configure the PyTorch CUDA memory allocator.
     # NOTE: It is important that this happens before torch is imported.
@@ -38,4 +39,4 @@ def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging
             "not imported before calling configure_torch_cuda_allocator()."
         )
 
-        logger.info(f"PyTorch CUDA memory allocator: {torch.cuda.get_allocator_backend()}")
+    logger.info(f"PyTorch CUDA memory allocator: {torch.cuda.get_allocator_backend()}")
