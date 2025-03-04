@@ -207,6 +207,7 @@ class FieldDescriptions:
     instantx_control_mode = "The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'."
     flux_redux_conditioning = "FLUX Redux conditioning tensor"
     vllm_model = "The VLLM model to use"
+    flux_fill_conditioning = "FLUX Fill conditioning tensor"
 
 
 class ImageField(BaseModel):
@@ -274,6 +275,13 @@ class FluxReduxConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
         "included regions should be set to True.",
     )
+
+
+class FluxFillConditioningField(BaseModel):
+    """A FLUX Fill conditioning field."""
+
+    image: ImageField = Field(description="The FLUX Fill reference image.")
+    mask: TensorField = Field(description="The FLUX Fill inpaint mask.")
 
 
 class SD3ConditioningField(BaseModel):
