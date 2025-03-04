@@ -20,7 +20,6 @@ import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useNodeCopyPaste } from 'features/nodes/hooks/useNodeCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
   $addNodeCmdk,
   $cursorPos,
@@ -95,7 +94,6 @@ export const Flow = memo(() => {
   const isWorkflowsFocused = useIsRegionFocused('workflows');
   useFocusRegion('workflows', flowWrapper);
 
-  useWorkflowWatcher();
   useSyncExecutionState();
   const [borderRadius] = useToken('radii', ['base']);
   const flowStyles = useMemo<CSSProperties>(() => ({ borderRadius }), [borderRadius]);

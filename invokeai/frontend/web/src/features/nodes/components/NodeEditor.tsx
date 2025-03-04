@@ -4,8 +4,6 @@ import { useFocusRegion } from 'common/hooks/focus';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
 import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
-import { LoadWorkflowFromGraphModal } from 'features/workflowLibrary/components/LoadWorkflowFromGraphModal/LoadWorkflowFromGraphModal';
-import { SaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/SaveWorkflowAsDialog';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFlowArrowBold } from 'react-icons/pi';
@@ -40,8 +38,6 @@ const NodeEditor = () => {
           <TopPanel />
           <BottomLeftPanel />
           <MinimapPanel />
-          <SaveWorkflowAsDialog />
-          <LoadWorkflowFromGraphModal />
         </>
       )}
       <WorkflowEditorSettings />

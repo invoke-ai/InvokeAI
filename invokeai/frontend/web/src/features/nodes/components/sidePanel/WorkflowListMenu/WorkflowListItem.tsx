@@ -39,15 +39,23 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
 
-  const handleClickLoad = useCallback(() => {
-    setIsHovered(false);
-    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
-  }, [loadWorkflow, workflow.workflow_id]);
+  const handleClickLoad = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      setIsHovered(false);
+      loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
+    },
+    [loadWorkflow, workflow.workflow_id]
+  );
 
-  const handleClickEdit = useCallback(() => {
-    setIsHovered(false);
-    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
-  }, [loadWorkflow, workflow.workflow_id]);
+  const handleClickEdit = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      setIsHovered(false);
+      loadWorkflow.loadWithDialog(workflow.workflow_id, 'edit');
+    },
+    [loadWorkflow, workflow.workflow_id]
+  );
 
   const handleClickDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
