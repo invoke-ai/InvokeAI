@@ -6,7 +6,7 @@ import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiShareFatBold } from 'react-icons/pi';
-import type { WorkflowRecordListItemDTO } from 'services/api/types';
+import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const ViewWorkflow = ({
   isHovered,
@@ -15,7 +15,7 @@ export const ViewWorkflow = ({
 }: {
   isHovered: boolean;
   setIsHovered: (isHovered: boolean) => void;
-  workflow: WorkflowRecordListItemDTO;
+  workflow: WorkflowRecordListItemWithThumbnailDTO;
 }) => {
   const projectUrl = useStore($projectUrl);
   const shareWorkflow = useShareWorkflow();
