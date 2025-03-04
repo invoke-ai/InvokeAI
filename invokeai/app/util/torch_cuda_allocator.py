@@ -2,7 +2,7 @@ import logging
 import os
 
 
-def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging.Logger | None = None):
+def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging.Logger):
     """Configure the PyTorch CUDA memory allocator. See
     https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf for supported
     configurations.
@@ -38,5 +38,4 @@ def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging
             "not imported before calling configure_torch_cuda_allocator()."
         )
 
-    if logger is not None:
         logger.info(f"PyTorch CUDA memory allocator: {torch.cuda.get_allocator_backend()}")
