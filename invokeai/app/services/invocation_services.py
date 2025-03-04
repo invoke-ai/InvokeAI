@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
-    from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_common import WorkflowThumbnailServiceBase
+    from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 
