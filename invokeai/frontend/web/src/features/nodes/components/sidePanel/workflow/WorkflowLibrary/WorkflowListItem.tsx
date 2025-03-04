@@ -114,7 +114,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
           {workflow.category !== 'default' && (
             <>
               <EditWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
-              <DownloadWorkflow isHovered={isHovered} setIsHovered={setIsHovered} />
+              <DownloadWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
               <DeleteWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
             </>
           )}

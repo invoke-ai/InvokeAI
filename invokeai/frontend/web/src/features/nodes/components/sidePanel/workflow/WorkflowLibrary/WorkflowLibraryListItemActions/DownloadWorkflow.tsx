@@ -1,5 +1,5 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { useDownloadWorkflow } from 'features/workflowLibrary/hooks/useDownloadWorkflow';
+import { useDownloadWorkflowById } from 'features/workflowLibrary/hooks/useDownloadWorkflowById';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,18 +9,20 @@ import { PiDownloadSimpleBold } from 'react-icons/pi';
 export const DownloadWorkflow = ({
   isHovered,
   setIsHovered,
+  workflowId,
 }: {
   isHovered: boolean;
   setIsHovered: (isHovered: boolean) => void;
+  workflowId: string;
 }) => {
-  const downloadWorkflow = useDownloadWorkflow();
+  const downloadWorkflowById = useDownloadWorkflowById();
   const handleClickDownload = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       setIsHovered(false);
-      downloadWorkflow();
+      downloadWorkflowById.downloadWorkflow(workflowId);
     },
-    [downloadWorkflow, setIsHovered]
+    [downloadWorkflowById, setIsHovered, workflowId]
   );
 
   const { t } = useTranslation();
@@ -37,6 +39,7 @@ export const DownloadWorkflow = ({
         aria-label={t('workflows.download')}
         onClick={handleClickDownload}
         icon={<PiDownloadSimpleBold />}
+        isLoading={downloadWorkflowById.isLoading}
       />
     </Tooltip>
   );
