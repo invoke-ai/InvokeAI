@@ -1,7 +1,7 @@
+import queryString from 'query-string';
 import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url, LIST_TAG } from '..';
-import queryString from 'query-string';
 
 /**
  * Builds an endpoint URL for the workflows router
