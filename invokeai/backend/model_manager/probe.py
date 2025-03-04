@@ -552,9 +552,21 @@ class CheckpointProbeBase(ProbeBase):
     def get_variant_type(self) -> ModelVariantType:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.model_path, self.checkpoint)
         base_type = self.get_base_type()
-        if model_type != ModelType.Main or base_type == BaseModelType.Flux:
+        if model_type != ModelType.Main:
             return ModelVariantType.Normal
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
+
+        if base_type == BaseModelType.Flux:
+            in_channels = state_dict["img_in.weight"].shape[1]
+            if in_channels == 64:
+                return ModelVariantType.Normal
+            elif in_channels == 384:
+                return ModelVariantType.Inpaint
+            else:
+                raise InvalidModelConfigException(
+                    f"Unexpected in_channels (in_channels={in_channels}) for FLUX model at {self.model_path}."
+                )
+
         in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
         if in_channels == 9:
             return ModelVariantType.Inpaint
