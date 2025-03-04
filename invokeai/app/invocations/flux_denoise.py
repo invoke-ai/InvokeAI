@@ -15,6 +15,7 @@ from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
     FluxConditioningField,
+    FluxFillConditioningField,
     FluxReduxConditioningField,
     ImageField,
     Input,
@@ -107,6 +108,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     redux_conditioning: FluxReduxConditioningField | list[FluxReduxConditioningField] | None = InputField(
         default=None,
         description="FLUX Redux conditioning tensor.",
+        input=Input.Connection,
+    )
+    fill_conditioning: FluxFillConditioningField | None = InputField(
+        default=None,
+        description="FLUX Fill conditioning.",
         input=Input.Connection,
     )
     cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
