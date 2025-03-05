@@ -85,7 +85,7 @@ jobs:
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: make frontend-typegen
+        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py | pnpm typegen
         shell: bash
 
       - name: compare files
