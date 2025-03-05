@@ -2306,8 +2306,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Workflow Editor: New drag-and-drop form builder for easier workflow creation.",
-            "Other improvements: Faster batch queuing, better upscaling, improved color picker, and metadata nodes."
+            "Memory Management: New setting for users with Nvidia GPUs to reduce VRAM usage.",
+            "Performance: Continued improvements to overall application performance and responsivenes."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
