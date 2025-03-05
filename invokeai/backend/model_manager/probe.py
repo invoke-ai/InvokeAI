@@ -141,6 +141,7 @@ class ModelProbe(object):
         "SD3Transformer2DModel": ModelType.Main,
         "CLIPTextModelWithProjection": ModelType.CLIPEmbed,
         "SiglipModel": ModelType.SigLIP,
+        "CogView4Pipeline": ModelType.Main,
     }
 
     TYPE2VARIANT: Dict[ModelType, Callable[[str], Optional[AnyVariant]]] = {ModelType.CLIPEmbed: get_clip_variant_type}
@@ -818,6 +819,8 @@ class PipelineFolderProbe(FolderProbeBase):
                 transformer_conf = json.load(file)
             if transformer_conf["_class_name"] == "SD3Transformer2DModel":
                 return BaseModelType.StableDiffusion3
+            elif transformer_conf["_class_name"] == "CogView4Transformer2DModel":
+                return BaseModelType.CogView4
             else:
                 raise InvalidModelConfigException(f"Unknown base model for {self.model_path}")
 
