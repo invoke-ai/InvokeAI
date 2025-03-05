@@ -36,7 +36,7 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel==2.0.2",
-  "diffusers[torch]",
+  "diffusers[torch]==0.33.0",
   "gguf",
   "invisible-watermark==0.2.0",           # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
