@@ -61,7 +61,7 @@ jobs:
     timeout-minutes: 15 # expected run time: 2-6 min, depending on platform
     env:
       PIP_USE_PEP517: '1'
-      UV_PYTHON_PREFERENCE: only-managed
+      UV_SYSTEM_PYTHON: 1
 
     steps:
       - name: checkout
@@ -94,7 +94,7 @@ jobs:
 
       - name: install python
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv python install ${{ matrix.python-version }} -v --system
+        run: uv python install ${{ matrix.python-version }} -v --preview
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
