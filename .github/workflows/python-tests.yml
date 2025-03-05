@@ -61,8 +61,6 @@ jobs:
     timeout-minutes: 15 # expected run time: 2-6 min, depending on platform
     env:
       PIP_USE_PEP517: '1'
-      # uv requires a venv by default - but for this, we can simply use the system python
-      UV_SYSTEM_PYTHON: 1
       UV_PYTHON_PREFERENCE: only-managed
 
     steps:
@@ -97,6 +95,10 @@ jobs:
       - name: install python
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         run: uv python install ${{ matrix.python-version }} -v
+
+      - name: create venv
+        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
+        run: uv venv
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
