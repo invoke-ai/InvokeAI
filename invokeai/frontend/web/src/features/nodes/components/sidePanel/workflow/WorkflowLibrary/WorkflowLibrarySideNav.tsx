@@ -38,7 +38,7 @@ export const WorkflowLibrarySideNav = () => {
   }, [categoryOptions, categories]);
 
   return (
-    <Flex flexDir="column" gap={2} borderRight="1px solid" borderColor="base.400" h="full" pr={4}>
+    <Flex flexDir="column" gap={2} h="full">
       <Button
         variant="ghost"
         fontWeight="bold"
