@@ -73,10 +73,10 @@ jobs:
 
       - name: ruff check
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv tool run ruff check --output-format=github .
+        run: uv tool run ruff@0.11.2 check --output-format=github .
         shell: bash
 
       - name: ruff format
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv tool run ruff format --check .
+        run: uv tool run ruff@0.11.2 format --check .
         shell: bash
