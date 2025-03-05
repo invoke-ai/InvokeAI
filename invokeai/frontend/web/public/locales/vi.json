@@ -2167,7 +2167,7 @@
         "parameterSetDesc": "Gợi lại {{parameter}}",
         "loadedWithWarnings": "Đã Tải Workflow Với Cảnh Báo",
         "outOfMemoryErrorDesc": "Thiết lập tạo sinh hiện tại đã vượt mức cho phép của thiết bị. Hãy điều chỉnh thiết lập và thử lại.",
-        "setNodeField": "Đặt làm vùng cho node",
+        "setNodeField": "Đặt làm vùng node",
         "problemRetrievingWorkflow": "Có Vấn Đề Khi Lấy Lại Workflow",
         "somethingWentWrong": "Có Vấn Đề Phát Sinh",
         "problemDeletingWorkflow": "Có Vấn Đề Khi Xoá Workflow",
@@ -2259,7 +2259,7 @@
         "uploadAndSaveWorkflow": "Tải Lên Thư Viện",
         "openLibrary": "Mở Thư Viện",
         "builder": {
-            "resetAllNodeFields": "Tải Lại Các Vùng Cho Node",
+            "resetAllNodeFields": "Tải Lại Các Vùng Node",
             "builder": "Trình Tạo Vùng Nhập",
             "layout": "Bố Cục",
             "row": "Hàng",
@@ -2274,15 +2274,19 @@
             "slider": "Thanh Trượt",
             "both": "Cả Hai",
             "emptyRootPlaceholderViewMode": "Chọn Chỉnh Sửa để bắt đầu tạo nên một vùng nhập cho workflow này.",
-            "emptyRootPlaceholderEditMode": "Kéo thành phần vùng nhập hoặc vùng cho node vào đây để bắt đầu.",
+            "emptyRootPlaceholderEditMode": "Kéo thành phần vùng nhập hoặc vùng node vào đây để bắt đầu.",
             "containerPlaceholder": "Hộp Chứa Trống",
             "headingPlaceholder": "Đầu Dòng Trống",
-            "textPlaceholder": "Mô Tả Trống",
+            "textPlaceholder": "Văn Bản Trống",
             "column": "Cột",
             "deleteAllElements": "Xóa Tất Cả Thành Phần",
-            "nodeField": "Vùng Cho Node",
-            "nodeFieldTooltip": "Để thêm vùng cho node, bấm vào dấu cộng nhỏ trên vùng trong Trình Biên Tập Workflow, hoặc kéo vùng theo tên của nó vào vùng nhập.",
-            "workflowBuilderAlphaWarning": "Trình tạo vùng nhập đang trong giai đoạn alpha. Nó có thể xuất hiện những thay đổi đột ngột trước khi chính thức được phát hành."
+            "nodeField": "Vùng Node",
+            "nodeFieldTooltip": "Để thêm vùng node, bấm vào dấu cộng nhỏ trên vùng trong Trình Biên Tập Workflow, hoặc kéo vùng theo tên của nó vào vùng nhập.",
+            "workflowBuilderAlphaWarning": "Trình tạo vùng nhập đang trong giai đoạn alpha. Nó có thể xuất hiện những thay đổi đột ngột trước khi chính thức được phát hành.",
+            "container": "Hộp Chứa",
+            "heading": "Đầu Dòng",
+            "text": "Văn Bản",
+            "divider": "Gạch Chia"
         }
     },
     "upscaling": {

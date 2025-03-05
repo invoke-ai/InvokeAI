@@ -62,7 +62,7 @@ jobs:
 
       - name: install ruff
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: pip install ruff==0.6.0
+        run: pip install ruff==0.9.9
         shell: bash
 
       - name: ruff check

@@ -1,20 +1,31 @@
 import logging
 import os
+import sys
 
 
-def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging.Logger | None = None):
+def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging.Logger):
     """Configure the PyTorch CUDA memory allocator. See
     https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf for supported
     configurations.
     """
 
-    # Raise if the PYTORCH_CUDA_ALLOC_CONF environment variable is already set.
+    if "torch" in sys.modules:
+        raise RuntimeError("configure_torch_cuda_allocator() must be called before importing torch.")
+
+    # Log a warning if the PYTORCH_CUDA_ALLOC_CONF environment variable is already set.
     prev_cuda_alloc_conf = os.environ.get("PYTORCH_CUDA_ALLOC_CONF", None)
     if prev_cuda_alloc_conf is not None:
-        raise RuntimeError(
-            f"Attempted to configure the PyTorch CUDA memory allocator, but PYTORCH_CUDA_ALLOC_CONF is already set to "
-            f"'{prev_cuda_alloc_conf}'."
-        )
+        if prev_cuda_alloc_conf == pytorch_cuda_alloc_conf:
+            logger.info(
+                f"PYTORCH_CUDA_ALLOC_CONF is already set to '{pytorch_cuda_alloc_conf}'. Skipping configuration."
+            )
+            return
+        else:
+            logger.warning(
+                f"Attempted to configure the PyTorch CUDA memory allocator with '{pytorch_cuda_alloc_conf}', but PYTORCH_CUDA_ALLOC_CONF is already set to "
+                f"'{prev_cuda_alloc_conf}'. Skipping configuration."
+            )
+            return
 
     # Configure the PyTorch CUDA memory allocator.
     # NOTE: It is important that this happens before torch is imported.
@@ -38,5 +49,4 @@ def configure_torch_cuda_allocator(pytorch_cuda_alloc_conf: str, logger: logging
             "not imported before calling configure_torch_cuda_allocator()."
         )
 
-    if logger is not None:
-        logger.info(f"PyTorch CUDA memory allocator: {torch.cuda.get_allocator_backend()}")
+    logger.info(f"PyTorch CUDA memory allocator: {torch.cuda.get_allocator_backend()}")
