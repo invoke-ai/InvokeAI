@@ -67,10 +67,6 @@ jobs:
           version: '0.6.4'
           enable-cache: true
 
-      - name: install python
-        if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv python install
-
       - name: ruff check
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         run: uv tool run ruff@0.11.2 check --output-format=github .
