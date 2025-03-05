@@ -417,7 +417,7 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
 
         ui_type = field.json_schema_extra.get("ui_type", None)
         if isinstance(ui_type, str) and ui_type.startswith("DEPRECATED_"):
-            logger.warn(f"\"UIType.{ui_type.split('_')[-1]}\" is deprecated, ignoring")
+            logger.warn(f'"UIType.{ui_type.split("_")[-1]}" is deprecated, ignoring')
             field.json_schema_extra.pop("ui_type")
     return None
 

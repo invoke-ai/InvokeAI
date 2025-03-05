@@ -115,19 +115,19 @@ class ModelMerger(object):
         base_models: Set[BaseModelType] = set()
         variant = None if self._installer.app_config.precision == "float32" else "fp16"
 
-        assert (
-            len(model_keys) <= 2 or interp == MergeInterpolationMethod.AddDifference
-        ), "When merging three models, only the 'add_difference' merge method is supported"
+        assert len(model_keys) <= 2 or interp == MergeInterpolationMethod.AddDifference, (
+            "When merging three models, only the 'add_difference' merge method is supported"
+        )
 
         for key in model_keys:
             info = store.get_model(key)
             model_names.append(info.name)
-            assert isinstance(
-                info, MainDiffusersConfig
-            ), f"{info.name} ({info.key}) is not a diffusers model. It must be optimized before merging"
-            assert info.variant == ModelVariantType(
-                "normal"
-            ), f"{info.name} ({info.key}) is a {info.variant} model, which cannot currently be merged"
+            assert isinstance(info, MainDiffusersConfig), (
+                f"{info.name} ({info.key}) is not a diffusers model. It must be optimized before merging"
+            )
+            assert info.variant == ModelVariantType("normal"), (
+                f"{info.name} ({info.key}) is a {info.variant} model, which cannot currently be merged"
+            )
 
             # tally base models used
             base_models.add(info.base)
