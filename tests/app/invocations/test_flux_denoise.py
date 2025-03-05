@@ -31,6 +31,7 @@ def test_prep_cfg_scale(
     cfg_scale_end_step: int,
     expected: list[float],
 ):
+    raise Exception('simulate test failure')
     result = FluxDenoiseInvocation.prep_cfg_scale(cfg_scale, timesteps, cfg_scale_start_step, cfg_scale_end_step)
     assert result == expected
 
