@@ -95,7 +95,7 @@ jobs:
 
       - name: install python
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv python install
+        run: uv python install --version ${{ matrix.python-version }}
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
