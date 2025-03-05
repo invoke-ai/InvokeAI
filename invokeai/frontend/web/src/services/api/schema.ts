@@ -16521,7 +16521,7 @@ export type components = {
              * @constant
              * @enum {string}
              */
-            type: "pair_tile_image";
+            type: "pair_tile_imageaaa";
         };
         /** PairTileImageOutput */
         PairTileImageOutput: {
