@@ -68,6 +68,15 @@ class SD3ConditioningInfo:
 
 
 @dataclass
+class CogView4ConditioningInfo:
+    glm_embeds: torch.Tensor
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.glm_embeds = self.glm_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -77,6 +86,7 @@ class ConditioningFieldData:
         | List[SDXLConditioningInfo]
         | List[FLUXConditioningInfo]
         | List[SD3ConditioningInfo]
+        | List[CogView4ConditioningInfo]
     )
 
 
