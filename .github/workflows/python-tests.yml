@@ -106,4 +106,4 @@ jobs:
 
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: pytest -v
+        run: pytest -v -r
