@@ -78,6 +78,29 @@ export const workflowsApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
     }),
+    listWorkflowsInfinite: build.infiniteQuery<
+      paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
+      NonNullable<paths['/api/v1/workflows/']['get']['parameters']['query']>,
+      number
+    >({
+      query: ({ queryArg, pageParam }) => ({
+        url: `${buildWorkflowsUrl()}?${queryString.stringify({ ...queryArg, page: pageParam }, { arrayFormat: 'none' })}`,
+      }),
+      infiniteQueryOptions: {
+        initialPageParam: 0,
+        getNextPageParam: (_lastPage, _allPages, lastPageParam, _allPageParams) => {
+          const finalPage = _lastPage.pages - 1;
+          const remainingPages = finalPage - lastPageParam;
+          if (remainingPages > 0) {
+            return lastPageParam + 1;
+          }
+          return undefined;
+        },
+        getPreviousPageParam: (_firstPage, _allPages, firstPageParam, _allPageParams) => {
+          return firstPageParam > -1 ? firstPageParam - 1 : undefined;
+        },
+      },
+    }),
     setWorkflowThumbnail: build.mutation<void, { workflow_id: string; image: File }>({
       query: ({ workflow_id, image }) => {
         const formData = new FormData();
@@ -113,6 +136,7 @@ export const {
   useDeleteWorkflowMutation,
   useUpdateWorkflowMutation,
   useListWorkflowsQuery,
+  useListWorkflowsInfiniteInfiniteQuery,
   useSetWorkflowThumbnailMutation,
   useDeleteWorkflowThumbnailMutation,
 } = workflowsApi;
