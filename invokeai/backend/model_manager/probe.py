@@ -139,6 +139,7 @@ class ModelProbe(object):
         "FluxControlNetModel": ModelType.ControlNet,
         "SD3Transformer2DModel": ModelType.Main,
         "CLIPTextModelWithProjection": ModelType.CLIPEmbed,
+        "LlavaOnevisionForConditionalGeneration": ModelType.LlavaOnevision,
     }
 
     TYPE2VARIANT: Dict[ModelType, Callable[[str], Optional[AnyVariant]]] = {ModelType.CLIPEmbed: get_clip_variant_type}
@@ -752,6 +753,11 @@ class SpandrelImageToImageCheckpointProbe(CheckpointProbeBase):
         return BaseModelType.Any
 
 
+class LlavaOnevisionCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 ########################################################
 # classes for probing folders
 #######################################################
@@ -1022,6 +1028,11 @@ class SpandrelImageToImageFolderProbe(FolderProbeBase):
         raise NotImplementedError()
 
 
+class LlaveOnevisionFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
 class T2IAdapterFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         config_file = self.model_path / "config.json"
@@ -1055,6 +1066,7 @@ ModelProbe.register_probe("diffusers", ModelType.CLIPEmbed, CLIPEmbedFolderProbe
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelImageToImageFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.LlavaOnevision, LlaveOnevisionFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
@@ -1066,5 +1078,6 @@ ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpoint
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.SpandrelImageToImage, SpandrelImageToImageCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.LlavaOnevision, LlavaOnevisionCheckpointProbe)
 
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)

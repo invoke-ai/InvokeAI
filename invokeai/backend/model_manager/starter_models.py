@@ -592,7 +592,15 @@ swinir = StarterModel(
 )
 
 # endregion
-
+# region LlavaOnevisionModel
+llava_onevision = StarterModel(
+    name="LLaVA Onevision Qwen2 0.5B",
+    base=BaseModelType.Any,
+    source="llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
+    description="LLaVA Onevision VLLM model",
+    type=ModelType.LlavaOnevision,
+)
+# endregion
 
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
@@ -661,6 +669,7 @@ STARTER_MODELS: list[StarterModel] = [
     t5_base_encoder,
     t5_8b_quantized_encoder,
     clip_l_encoder,
+    llava_onevision,
 ]
 
 sd1_bundle: list[StarterModel] = [
