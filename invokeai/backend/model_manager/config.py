@@ -309,6 +309,7 @@ class ModelConfigBase(ABC, BaseModel):
         format = cls.model_fields["format"].default.value
         return Tag(f"{type}.{format}")
 
+
     @classmethod
     @abstractmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -664,8 +665,9 @@ def concrete_subclasses(base):
     return {sc for sc in subclasses if not isabstract(sc)}
 
 
+config_classes = sorted(concrete_subclasses(ModelConfigBase), key=lambda c: c.__name__) # sorted for consistency
 AnyModelConfig = Annotated[
-    Union[tuple(Annotated[cls, cls.get_tag()] for cls in concrete_subclasses(ModelConfigBase))],
+    Union[tuple(Annotated[cls, cls.get_tag()] for cls in config_classes)],
     Discriminator(get_model_discriminator_value),
 ]
 
