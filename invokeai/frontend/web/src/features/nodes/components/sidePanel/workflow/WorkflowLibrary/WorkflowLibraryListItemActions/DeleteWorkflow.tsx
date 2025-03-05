@@ -5,33 +5,19 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashBold } from 'react-icons/pi';
 
-export const DeleteWorkflow = ({
-  isHovered,
-  setIsHovered,
-  workflowId,
-}: {
-  isHovered: boolean;
-  setIsHovered: (isHovered: boolean) => void;
-  workflowId: string;
-}) => {
+export const DeleteWorkflow = ({ workflowId }: { workflowId: string }) => {
   const { t } = useTranslation();
   const deleteWorkflow = useDeleteWorkflow();
 
   const handleClickDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      setIsHovered(false);
       deleteWorkflow(workflowId);
     },
-    [deleteWorkflow, workflowId, setIsHovered]
+    [deleteWorkflow, workflowId]
   );
   return (
-    <Tooltip
-      label={t('workflows.delete')}
-      // This prevents an issue where the tooltip isn't closed after the modal is opened
-      isOpen={!isHovered ? false : undefined}
-      closeOnScroll
-    >
+    <Tooltip label={t('workflows.delete')} closeOnScroll>
       <IconButton
         size="sm"
         variant="ghost"
