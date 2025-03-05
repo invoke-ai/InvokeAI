@@ -42,19 +42,10 @@ jobs:
           - '3.10'
           - '3.11'
         platform:
-          - linux-cuda-11_7
-          - linux-rocm-5_2
           - linux-cpu
           - macos-default
           - windows-cpu
         include:
-          - platform: linux-cuda-11_7
-            os: ubuntu-22.04
-            github-env: $GITHUB_ENV
-          - platform: linux-rocm-5_2
-            os: ubuntu-22.04
-            extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
-            github-env: $GITHUB_ENV
           - platform: linux-cpu
             os: ubuntu-22.04
             extra-index-url: 'https://download.pytorch.org/whl/cpu'
