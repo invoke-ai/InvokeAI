@@ -2307,7 +2307,7 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "Memory Management: New setting for users with Nvidia GPUs to reduce VRAM usage.",
-            "Performance: Continued improvements to overall application performance and responsivenes."
+            "Performance: Continued improvements to overall application performance and responsiveness."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
