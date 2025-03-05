@@ -69,7 +69,7 @@ jobs:
 
       - name: install python
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv python install
+        run: uv python install 3.11
 
       - name: ruff check
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
