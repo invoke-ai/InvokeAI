@@ -124,64 +124,95 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         page: int = 0,
         per_page: Optional[int] = None,
         query: Optional[str] = None,
+        tags: Optional[list[str]] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         # sanitize!
         assert order_by in WorkflowRecordOrderBy
         assert direction in SQLiteDirection
 
-        main_params: list[int | str] = []
-        count_params: list[int | str] = []
+        # We will construct the query dynamically based on the query params
+
+        # The main query to get the workflows / counts
+        main_query = """
+                SELECT
+                    workflow_id,
+                    category,
+                    name,
+                    description,
+                    created_at,
+                    updated_at,
+                    opened_at,
+                    tags
+                FROM workflow_library
+                """
+        count_query = "SELECT COUNT(*) FROM workflow_library"
+
+        # Start with an empty list of conditions and params
+        conditions: list[str] = []
+        params: list[str | int] = []
 
         if categories:
-            assert all(c in WorkflowCategory for c in categories)
-            question_marks = ", ".join("?" for _ in categories)
-            count_query = f"SELECT COUNT(*) FROM workflow_library WHERE category IN ({question_marks})"
-            main_query = f"""
-                SELECT
-                    workflow_id,
-                    category,
-                    name,
-                    description,
-                    created_at,
-                    updated_at,
-                    opened_at
-                FROM workflow_library
-                WHERE category IN ({question_marks})
-                """
-            main_params.extend([category.value for category in categories])
-            count_params.extend([category.value for category in categories])
-        else:
-            count_query = "SELECT COUNT(*) FROM workflow_library"
-            main_query = """
-                SELECT
-                    workflow_id,
-                    category,
-                    name,
-                    description,
-                    created_at,
-                    updated_at,
-                    opened_at
-                FROM workflow_library
-                """
+            # Categories is a list of WorkflowCategory enum values, and a single string in the DB
 
+            # Ensure all categories are valid (is this necessary?)
+            assert all(c in WorkflowCategory for c in categories)
+
+            # Construct a placeholder string for the number of categories
+            placeholders = ", ".join("?" for _ in categories)
+
+            # Construct the condition string & params
+            category_condition = f"category IN ({placeholders})"
+            category_params = [category.value for category in categories]
+
+            conditions.append(category_condition)
+            params.extend(category_params)
+
+        if tags:
+            # Tags is a list of strings, and a single string in the DB
+            # The string in the DB has no guaranteed format
+
+            # Construct a list of conditions for each tag
+            tags_conditions = ["tags LIKE ?" for _ in tags]
+            tags_conditions_joined = " OR ".join(tags_conditions)
+            tags_condition = f"({tags_conditions_joined})"
+
+            # And the params for the tags, case-insensitive
+            tags_params = [f"%{t.strip()}%" for t in tags]
+
+            conditions.append(tags_condition)
+            params.extend(tags_params)
+
+        # Ignore whitespace in the query
         stripped_query = query.strip() if query else None
         if stripped_query:
+            # Construct a wildcard query for the name, description, and tags
             wildcard_query = "%" + stripped_query + "%"
-            if categories:
-                main_query += " AND (name LIKE ? OR description LIKE ?) "
-                count_query += " AND (name LIKE ? OR description LIKE ?)"
-            else:
-                main_query += " WHERE name LIKE ? OR description LIKE ? "
-                count_query += " WHERE name LIKE ? OR description LIKE ?"
-            main_params.extend([wildcard_query, wildcard_query])
-            count_params.extend([wildcard_query, wildcard_query])
+            query_condition = "(name LIKE ? OR description LIKE ? OR tags LIKE ?)"
 
+            conditions.append(query_condition)
+            params.extend([wildcard_query])
+
+        if conditions:
+            # If there are conditions, add a WHERE clause and then join the conditions
+            main_query += " WHERE "
+            count_query += " WHERE "
+
+            all_conditions = " AND ".join(conditions)
+            main_query += all_conditions
+            count_query += all_conditions
+
+        # After this point, the query and params differ for the main query and the count query
+        main_params = params.copy()
+        count_params = params.copy()
+
+        # Main query also gets ORDER BY and LIMIT/OFFSET
         main_query += f" ORDER BY {order_by.value} {direction.value}"
 
         if per_page:
             main_query += " LIMIT ? OFFSET ?"
             main_params.extend([per_page, page * per_page])
 
+        # Put a ring on it
         main_query += ";"
         count_query += ";"
 

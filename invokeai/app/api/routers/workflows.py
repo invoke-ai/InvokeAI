@@ -109,7 +109,13 @@ async def list_workflows(
     """Gets a page of workflows"""
     workflows_with_thumbnails: list[WorkflowRecordListItemWithThumbnailDTO] = []
     workflows = ApiDependencies.invoker.services.workflow_records.get_many(
-        order_by=order_by, direction=direction, page=page, per_page=per_page, query=query, categories=categories
+        order_by=order_by,
+        direction=direction,
+        page=page,
+        per_page=per_page,
+        query=query,
+        categories=categories,
+        tags=tags,
     )
     for workflow in workflows.items:
         workflows_with_thumbnails.append(
