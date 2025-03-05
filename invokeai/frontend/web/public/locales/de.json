@@ -107,7 +107,13 @@
         "min": "Min",
         "max": "Max",
         "resetToDefaults": "Auf Standard zurücksetzen",
-        "seed": "Seed"
+        "seed": "Seed",
+        "row": "Reihe",
+        "column": "Spalte",
+        "end": "Ende",
+        "layout": "Layout",
+        "board": "Ordner",
+        "combinatorial": "Kombinatorisch"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -616,7 +622,9 @@
         "hfTokenUnableToVerify": "HF-Token kann nicht überprüft werden",
         "hfTokenUnableToVerifyErrorMessage": "HuggingFace-Token kann nicht überprüft werden. Dies ist wahrscheinlich auf einen Netzwerkfehler zurückzuführen. Bitte versuchen Sie es später erneut.",
         "hfTokenSaved": "HF-Token gespeichert",
-        "hfTokenRequired": "Sie versuchen, ein Modell herunterzuladen, für das ein gültiges HuggingFace-Token erforderlich ist."
+        "hfTokenRequired": "Sie versuchen, ein Modell herunterzuladen, für das ein gültiges HuggingFace-Token erforderlich ist.",
+        "urlUnauthorizedErrorMessage2": "Hier erfahren wie.",
+        "urlForbidden": "Sie haben keinen Zugriff auf dieses Modell"
     },
     "parameters": {
         "images": "Bilder",
@@ -683,7 +691,8 @@
         "iterations": "Iterationen",
         "guidance": "Führung",
         "coherenceMode": "Modus",
-        "recallMetadata": "Metadaten abrufen"
+        "recallMetadata": "Metadaten abrufen",
+        "gaussianBlur": "Gaußsche Unschärfe"
     },
     "settings": {
         "displayInProgress": "Zwischenbilder anzeigen",
@@ -883,7 +892,8 @@
         "canvas": "Leinwand",
         "prompts_one": "Prompt",
         "prompts_other": "Prompts",
-        "batchSize": "Stapelgröße"
+        "batchSize": "Stapelgröße",
+        "confirm": "Bestätigen"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -1298,7 +1308,13 @@
         "noBatchGroup": "keine Gruppe",
         "generatorNoValues": "leer",
         "generatorLoading": "wird geladen",
-        "generatorLoadFromFile": "Aus Datei laden"
+        "generatorLoadFromFile": "Aus Datei laden",
+        "showEdgeLabels": "Kantenbeschriftungen anzeigen",
+        "downloadWorkflowError": "Fehler beim Herunterladen des Arbeitsablaufs",
+        "nodeName": "Knotenname",
+        "description": "Beschreibung",
+        "loadWorkflowDesc": "Arbeitsablauf laden?",
+        "loadWorkflowDesc2": "Ihr aktueller Arbeitsablauf enthält nicht gespeicherte Änderungen."
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
