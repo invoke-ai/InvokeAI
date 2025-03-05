@@ -1,9 +1,10 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold, PiUsersBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
@@ -17,17 +18,19 @@ import { ViewWorkflow } from './WorkflowLibraryListItemActions/ViewWorkflow';
 const IMAGE_THUMBNAIL_SIZE = '80px';
 const FALLBACK_ICON_SIZE = '24px';
 
+const WORKFLOW_ACTION_BUTTONS_CN = 'workflow-action-buttons';
+
+const sx: SystemStyleObject = {
+  _hover: {
+    bg: 'base.700',
+    [`& .${WORKFLOW_ACTION_BUTTONS_CN}`]: {
+      display: 'flex',
+    },
+  },
+};
+
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
   const { t } = useTranslation();
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseOver = useCallback(() => {
-    setIsHovered(true);
-  }, []);
-
-  const handleMouseOut = useCallback(() => {
-    setIsHovered(false);
-  }, []);
 
   const workflowId = useAppSelector(selectWorkflowId);
   const loadWorkflow = useLoadWorkflow();
@@ -37,24 +40,22 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   }, [workflowId, workflow.workflow_id]);
 
   const handleClickLoad = useCallback(() => {
-    setIsHovered(false);
     loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
   }, [loadWorkflow, workflow.workflow_id]);
 
   return (
     <Flex
+      role="button"
       gap={4}
       onClick={handleClickLoad}
       cursor="pointer"
       bg="base.750"
-      _hover={{ backgroundColor: 'base.700' }}
       p={2}
       ps={3}
       borderRadius="base"
       w="full"
-      onMouseOver={handleMouseOver}
-      onMouseOut={handleMouseOut}
       alignItems="stretch"
+      sx={sx}
     >
       <Image
         src={workflow.thumbnail_url ?? undefined}
@@ -95,7 +96,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       </Flex>
 
       <Spacer />
-      <Flex flexDir="column" gap={1} justifyContent="space-between">
+      <Flex flexDir="column" gap={1} justifyContent="space-between" position="relative">
         <Flex gap={1} justifyContent="flex-end" w="full" p={2}>
           {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
           {workflow.category === 'default' && (
@@ -103,7 +104,15 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
           )}
         </Flex>
 
-        <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
+        <Flex
+          alignItems="center"
+          gap={1}
+          display="none"
+          className={WORKFLOW_ACTION_BUTTONS_CN}
+          position="absolute"
+          right={0}
+          bottom={0}
+        >
           {workflow.category === 'default' && (
             <>
               {/* need to consider what is useful here and which icons show that. idea is to "try it out"/"view" or "clone for your own changes" */}
