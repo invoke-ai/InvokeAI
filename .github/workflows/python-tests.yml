@@ -92,11 +92,9 @@ jobs:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
 
-      - name: setup python
+      - name: install python
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
