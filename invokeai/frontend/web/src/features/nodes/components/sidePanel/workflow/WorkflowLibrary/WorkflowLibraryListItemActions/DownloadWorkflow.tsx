@@ -5,34 +5,20 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold } from 'react-icons/pi';
 
-// needs to be updated to work for a workflow other than the one loaded in editor
-export const DownloadWorkflow = ({
-  isHovered,
-  setIsHovered,
-  workflowId,
-}: {
-  isHovered: boolean;
-  setIsHovered: (isHovered: boolean) => void;
-  workflowId: string;
-}) => {
+export const DownloadWorkflow = ({ workflowId }: { workflowId: string }) => {
   const downloadWorkflowById = useDownloadWorkflowById();
+
   const handleClickDownload = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      setIsHovered(false);
       downloadWorkflowById.downloadWorkflow(workflowId);
     },
-    [downloadWorkflowById, setIsHovered, workflowId]
+    [downloadWorkflowById, workflowId]
   );
 
   const { t } = useTranslation();
   return (
-    <Tooltip
-      label={t('workflows.download')}
-      // This prevents an issue where the tooltip isn't closed after the modal is opened
-      isOpen={!isHovered ? false : undefined}
-      closeOnScroll
-    >
+    <Tooltip label={t('workflows.download')} closeOnScroll>
       <IconButton
         size="sm"
         variant="ghost"

@@ -107,15 +107,15 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
           {workflow.category === 'default' && (
             <>
               {/* need to consider what is useful here and which icons show that. idea is to "try it out"/"view" or "clone for your own changes" */}
-              <ViewWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
-              <SaveWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
+              <ViewWorkflow workflowId={workflow.workflow_id} />
+              <SaveWorkflow workflowId={workflow.workflow_id} />
             </>
           )}
           {workflow.category !== 'default' && (
             <>
-              <EditWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
-              <DownloadWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
-              <DeleteWorkflow isHovered={isHovered} setIsHovered={setIsHovered} workflowId={workflow.workflow_id} />
+              <EditWorkflow workflowId={workflow.workflow_id} />
+              <DownloadWorkflow workflowId={workflow.workflow_id} />
+              <DeleteWorkflow workflowId={workflow.workflow_id} />
             </>
           )}
         </Flex>

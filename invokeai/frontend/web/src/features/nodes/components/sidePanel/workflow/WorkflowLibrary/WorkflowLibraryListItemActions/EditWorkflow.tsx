@@ -1,33 +1,24 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import type { MouseEvent} from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPencilBold } from 'react-icons/pi';
 
-export const EditWorkflow = ({
-  isHovered,
-  setIsHovered,
-  workflowId,
-}: {
-  isHovered: boolean;
-  setIsHovered: (isHovered: boolean) => void;
-  workflowId: string;
-}) => {
+export const EditWorkflow = ({ workflowId }: { workflowId: string }) => {
   const loadWorkflow = useLoadWorkflow();
   const { t } = useTranslation();
 
-  const handleClickEdit = useCallback(() => {
-    setIsHovered(false);
-    loadWorkflow.loadWithDialog(workflowId, 'edit');
-  }, [loadWorkflow, workflowId, setIsHovered]);
+  const handleClickEdit = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      loadWorkflow.loadWithDialog(workflowId, 'edit');
+    },
+    [loadWorkflow, workflowId]
+  );
 
   return (
-    <Tooltip
-      label={t('workflows.edit')}
-      // This prevents an issue where the tooltip isn't closed after the modal is opened
-      isOpen={!isHovered ? false : undefined}
-      closeOnScroll
-    >
+    <Tooltip label={t('workflows.edit')} closeOnScroll>
       <IconButton
         size="sm"
         variant="ghost"
