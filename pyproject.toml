@@ -115,8 +115,8 @@ dependencies = [
 ]
 "dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
-  "ruff>=0.3.3",
-  "ruff-lsp>=0.0.53",
+  "ruff~=0.9.9",
+  "ruff-lsp~=0.0.62",
   "mypy",
   "pre-commit",
   "pytest>6.0.0",
