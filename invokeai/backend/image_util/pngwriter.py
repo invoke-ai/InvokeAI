@@ -91,10 +91,10 @@ class PromptFormatter:
 
         switches = []
         switches.append(f'"{opt.prompt}"')
-        switches.append(f"-s{opt.steps        or t2i.steps}")
-        switches.append(f"-W{opt.width        or t2i.width}")
-        switches.append(f"-H{opt.height       or t2i.height}")
-        switches.append(f"-C{opt.cfg_scale    or t2i.cfg_scale}")
+        switches.append(f"-s{opt.steps or t2i.steps}")
+        switches.append(f"-W{opt.width or t2i.width}")
+        switches.append(f"-H{opt.height or t2i.height}")
+        switches.append(f"-C{opt.cfg_scale or t2i.cfg_scale}")
         switches.append(f"-A{opt.sampler_name or t2i.sampler_name}")
         # to do: put model name into the t2i object
         #        switches.append(f'--model{t2i.model_name}')
@@ -109,7 +109,7 @@ class PromptFormatter:
         if opt.gfpgan_strength:
             switches.append(f"-G{opt.gfpgan_strength}")
         if opt.upscale:
-            switches.append(f'-U {" ".join([str(u) for u in opt.upscale])}')
+            switches.append(f"-U {' '.join([str(u) for u in opt.upscale])}")
         if opt.variation_amount > 0:
             switches.append(f"-v{opt.variation_amount}")
         if opt.with_variations:
