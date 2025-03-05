@@ -7,6 +7,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Switch,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -61,22 +62,24 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
   }, [data.settings, fieldTemplate]);
 
   return (
-    <Popover placement="top">
+    <Popover placement="top" isLazy lazyBehavior="unmount">
       <PopoverTrigger>
         <IconButton aria-label="settings" icon={<PiWrenchFill />} variant="link" size="sm" alignSelf="stretch" />
       </PopoverTrigger>
-      <PopoverContent>
-        <PopoverArrow />
-        <PopoverBody minW={48}>
-          <FormControl>
-            <FormLabel flex={1}>{t('workflows.builder.description')}</FormLabel>
-            <Switch size="sm" isChecked={showDescription} onChange={toggleShowDescription} />
-          </FormControl>
-          {settings?.type === 'integer-field-config' && <NodeFieldElementIntegerConfig id={id} config={settings} />}
-          {settings?.type === 'float-field-config' && <NodeFieldElementFloatSettings id={id} config={settings} />}
-          {settings?.type === 'string-field-config' && <NodeFieldElementStringSettings id={id} config={settings} />}
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent>
+          <PopoverArrow />
+          <PopoverBody minW={48}>
+            <FormControl>
+              <FormLabel flex={1}>{t('workflows.builder.showDescription')}</FormLabel>
+              <Switch size="sm" isChecked={showDescription} onChange={toggleShowDescription} />
+            </FormControl>
+            {settings?.type === 'integer-field-config' && <NodeFieldElementIntegerConfig id={id} config={settings} />}
+            {settings?.type === 'float-field-config' && <NodeFieldElementFloatSettings id={id} config={settings} />}
+            {settings?.type === 'string-field-config' && <NodeFieldElementStringSettings id={id} config={settings} />}
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });

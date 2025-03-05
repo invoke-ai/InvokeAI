@@ -11,7 +11,9 @@ import {
   PopoverTrigger,
   Text,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { shouldShowNotificationChanged } from 'features/ui/store/uiSlice';
@@ -27,6 +29,7 @@ const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLoc
 
 export const Notifications = () => {
   const { t } = useTranslation();
+  const didStudioInit = useStore($didStudioInit);
   const dispatch = useAppDispatch();
   const shouldShowNotification = useAppSelector((s) => s.ui.shouldShowNotificationV2);
   const resetIndicator = useCallback(() => {
@@ -35,7 +38,7 @@ export const Notifications = () => {
   const { data } = useGetAppVersionQuery();
   const isLocal = useAppSelector(selectIsLocal);
 
-  if (!data) {
+  if (!data || !didStudioInit) {
     return null;
   }
 

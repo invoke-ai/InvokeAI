@@ -10,7 +10,7 @@ export const EmptyState = () => {
   const isCleanEditor = useAppSelector(selectCleanEditor);
 
   return (
-    <Flex w="full" userSelect="none" justifyContent="center">
+    <Flex w="full" h="full" userSelect="none" justifyContent="center">
       <Flex
         alignItems="center"
         justifyContent="center"

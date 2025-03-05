@@ -15,6 +15,10 @@ export const NodeFieldElementResetToInitialValueIconButton = memo(({ element }: 
   const { nodeId, fieldName } = data.fieldIdentifier;
   const { isValueChanged, resetToInitialValue } = useInputFieldInitialFormValue(id, nodeId, fieldName);
 
+  if (!isValueChanged) {
+    return null;
+  }
+
   return (
     <IconButton
       variant="link"

@@ -22,12 +22,18 @@ const getWorkflow = async (data: GraphAndWorkflowResponse, templates: Templates)
   if (data.workflow) {
     // Prefer to load the workflow if it's available - it has more information
     const parsed = JSON.parse(data.workflow);
-    return await validateWorkflow(parsed, templates, checkImageAccess, checkBoardAccess, checkModelAccess);
+    return await validateWorkflow({
+      workflow: parsed,
+      templates,
+      checkImageAccess,
+      checkBoardAccess,
+      checkModelAccess,
+    });
   } else if (data.graph) {
     // Else we fall back on the graph, using the graphToWorkflow function to convert and do layout
     const parsed = JSON.parse(data.graph);
     const workflow = graphToWorkflow(parsed as NonNullableGraph, true);
-    return await validateWorkflow(workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess);
+    return await validateWorkflow({ workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess });
   } else {
     throw new Error('No workflow or graph provided');
   }

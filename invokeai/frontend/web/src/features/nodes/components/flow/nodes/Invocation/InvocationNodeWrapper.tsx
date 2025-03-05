@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import type { Node, NodeProps } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
+import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import InvocationNode from 'features/nodes/components/flow/nodes/Invocation/InvocationNode';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodes } from 'features/nodes/store/selectors';
@@ -27,11 +28,17 @@ const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
 
   if (!hasTemplate) {
     return (
-      <InvocationNodeUnknownFallback nodeId={nodeId} isOpen={isOpen} label={label} type={type} selected={selected} />
+      <NodeWrapper nodeId={nodeId} selected={selected}>
+        <InvocationNodeUnknownFallback nodeId={nodeId} isOpen={isOpen} label={label} type={type} />
+      </NodeWrapper>
     );
   }
 
-  return <InvocationNode nodeId={nodeId} isOpen={isOpen} label={label} type={type} selected={selected} />;
+  return (
+    <NodeWrapper nodeId={nodeId} selected={selected}>
+      <InvocationNode nodeId={nodeId} isOpen={isOpen} />
+    </NodeWrapper>
+  );
 };
 
 export default memo(InvocationNodeWrapper);

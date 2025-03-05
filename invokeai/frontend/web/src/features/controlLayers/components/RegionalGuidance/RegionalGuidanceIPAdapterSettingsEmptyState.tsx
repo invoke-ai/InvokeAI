@@ -2,6 +2,7 @@ import { Button, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { rgIPAdapterDeleted } from 'features/controlLayers/store/canvasSlice';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
@@ -36,6 +37,7 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
   }, [dispatch, entityIdentifier, referenceImageId]);
+  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
 
   const dndTargetData = useMemo<SetRegionalGuidanceReferenceImageDndTargetData>(
     () =>
@@ -44,6 +46,21 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
         referenceImageId,
       }),
     [entityIdentifier, referenceImageId]
+  );
+
+  const components = useMemo(
+    () => ({
+      UploadButton: (
+        <Button isDisabled={isBusy} size="sm" variant="link" color="base.300" {...uploadApi.getUploadButtonProps()} />
+      ),
+      GalleryButton: (
+        <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
+      ),
+      PullBboxButton: (
+        <Button onClick={pullBboxIntoIPAdapter} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
+      ),
+    }),
+    [isBusy, onClickGalleryButton, pullBboxIntoIPAdapter, uploadApi]
   );
 
   return (
@@ -66,23 +83,7 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
       </Flex>
       <Flex alignItems="center" gap={2} p={4}>
         <Text textAlign="center" color="base.300">
-          <Trans
-            i18nKey="controlLayers.referenceImageEmptyState"
-            components={{
-              UploadButton: (
-                <Button
-                  isDisabled={isBusy}
-                  size="sm"
-                  variant="link"
-                  color="base.300"
-                  {...uploadApi.getUploadButtonProps()}
-                />
-              ),
-              GalleryButton: (
-                <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
-              ),
-            }}
-          />
+          <Trans i18nKey="controlLayers.referenceImageEmptyState" components={components} />
         </Text>
       </Flex>
       <input {...uploadApi.getUploadInputProps()} />

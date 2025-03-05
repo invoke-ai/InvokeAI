@@ -7,6 +7,7 @@ import { IntegerGeneratorParseStringSettings } from 'features/nodes/components/f
 import { IntegerGeneratorUniformRandomDistributionSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorUniformRandomDistributionSettings';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { fieldIntegerGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type {
   IntegerGeneratorFieldInputInstance,
   IntegerGeneratorFieldInputTemplate,
@@ -82,7 +83,12 @@ export const IntegerGeneratorFieldInputComponent = memo(
 
     return (
       <Flex flexDir="column" gap={2}>
-        <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
+        <Select
+          className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
+          onChange={onChangeGeneratorType}
+          value={field.value.type}
+          size="sm"
+        >
           <option value={IntegerGeneratorArithmeticSequenceType}>{t('nodes.arithmeticSequence')}</option>
           <option value={IntegerGeneratorLinearDistributionType}>{t('nodes.linearDistribution')}</option>
           <option value={IntegerGeneratorUniformRandomDistributionType}>{t('nodes.uniformRandomDistribution')}</option>
@@ -103,12 +109,17 @@ export const IntegerGeneratorFieldInputComponent = memo(
         <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
           <Flex w="full" h="auto">
             <OverlayScrollbarsComponent
-              className="nodrag nowheel"
+              className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
               defer
               style={overlayScrollbarsStyles}
               options={overlayscrollbarsOptions}
             >
-              <Text className="nodrag nowheel" fontFamily="monospace" userSelect="text" cursor="text">
+              <Text
+                className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
+                fontFamily="monospace"
+                userSelect="text"
+                cursor="text"
+              >
                 {resolvedValuesAsString}
               </Text>
             </OverlayScrollbarsComponent>

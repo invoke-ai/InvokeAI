@@ -1,6 +1,4 @@
-import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import {
-  Combobox,
   Flex,
   FormControl,
   FormLabel,
@@ -9,6 +7,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Select,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $projectId } from 'app/store/nanostores/projectId';
@@ -19,6 +18,7 @@ import {
   workflowOrderByChanged,
   workflowOrderDirectionChanged,
 } from 'features/nodes/store/workflowSlice';
+import type { ChangeEvent } from 'react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSortAscendingBold, PiSortDescendingBold } from 'react-icons/pi';
@@ -39,62 +39,54 @@ export const WorkflowSortControl = () => {
   const orderBy = useAppSelector(selectWorkflowOrderBy);
   const direction = useAppSelector(selectWorkflowOrderDirection);
 
-  const ORDER_BY_OPTIONS: ComboboxOption[] = useMemo(
-    () => [
-      { value: 'opened_at', label: t('workflows.opened') },
-      { value: 'created_at', label: t('workflows.created') },
-      { value: 'updated_at', label: t('workflows.updated') },
-      { value: 'name', label: t('workflows.name') },
-    ],
+  const ORDER_BY_LABELS = useMemo(
+    () => ({
+      opened_at: t('workflows.opened'),
+      created_at: t('workflows.created'),
+      updated_at: t('workflows.updated'),
+      name: t('workflows.name'),
+    }),
     [t]
   );
 
-  const DIRECTION_OPTIONS: ComboboxOption[] = useMemo(
-    () => [
-      { value: 'ASC', label: t('workflows.ascending') },
-      { value: 'DESC', label: t('workflows.descending') },
-    ],
+  const DIRECTION_LABELS = useMemo(
+    () => ({
+      ASC: t('workflows.ascending'),
+      DESC: t('workflows.descending'),
+    }),
     [t]
   );
 
   const dispatch = useAppDispatch();
 
-  const orderByOptions = useMemo(() => {
-    return projectId ? ORDER_BY_OPTIONS.filter((option) => option.value !== 'opened_at') : ORDER_BY_OPTIONS;
-  }, [projectId, ORDER_BY_OPTIONS]);
-
-  const onChangeOrderBy = useCallback<ComboboxOnChange>(
-    (v) => {
-      if (!isOrderBy(v?.value) || v.value === orderBy) {
+  const onChangeOrderBy = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      if (!isOrderBy(e.target.value)) {
         return;
       }
-      dispatch(workflowOrderByChanged(v.value));
+      dispatch(workflowOrderByChanged(e.target.value));
     },
-    [orderBy, dispatch]
+    [dispatch]
   );
-  const valueOrderBy = useMemo(() => {
-    return orderByOptions.find((o) => o.value === orderBy) || orderByOptions[0];
-  }, [orderBy, orderByOptions]);
 
-  const onChangeDirection = useCallback<ComboboxOnChange>(
-    (v) => {
-      if (!isDirection(v?.value) || v.value === direction) {
+  const onChangeDirection = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      if (!isDirection(e.target.value)) {
         return;
       }
-      dispatch(workflowOrderDirectionChanged(v.value));
+      dispatch(workflowOrderDirectionChanged(e.target.value));
     },
-    [direction, dispatch]
+    [dispatch]
   );
-  const valueDirection = useMemo(
-    () => DIRECTION_OPTIONS.find((o) => o.value === direction),
-    [direction, DIRECTION_OPTIONS]
-  );
+
+  // In OSS, we don't have the concept of "opened_at" for workflows. This is only available in the Enterprise version.
+  const defaultOrderBy = projectId !== undefined ? 'opened_at' : 'created_at';
 
   return (
     <Popover placement="bottom">
       <PopoverTrigger>
         <IconButton
-          tooltip={`Sorting by ${valueOrderBy?.label} ${valueDirection?.label}`}
+          tooltip={`Sorting by ${ORDER_BY_LABELS[orderBy ?? defaultOrderBy]} ${DIRECTION_LABELS[direction]}`}
           aria-label="Sort Workflow Library"
           icon={direction === 'ASC' ? <PiSortAscendingBold /> : <PiSortDescendingBold />}
           variant="ghost"
@@ -106,11 +98,19 @@ export const WorkflowSortControl = () => {
           <Flex flexDir="column" gap={4}>
             <FormControl orientation="horizontal" gap={1}>
               <FormLabel>{t('common.orderBy')}</FormLabel>
-              <Combobox value={valueOrderBy} options={orderByOptions} onChange={onChangeOrderBy} />
+              <Select value={orderBy ?? defaultOrderBy} onChange={onChangeOrderBy} size="sm">
+                {projectId !== undefined && <option value="opened_at">{ORDER_BY_LABELS['opened_at']}</option>}
+                <option value="created_at">{ORDER_BY_LABELS['created_at']}</option>
+                <option value="updated_at">{ORDER_BY_LABELS['updated_at']}</option>
+                <option value="name">{ORDER_BY_LABELS['name']}</option>
+              </Select>
             </FormControl>
             <FormControl orientation="horizontal" gap={1}>
               <FormLabel>{t('common.direction')}</FormLabel>
-              <Combobox value={valueDirection} options={DIRECTION_OPTIONS} onChange={onChangeDirection} />
+              <Select value={direction} onChange={onChangeDirection} size="sm">
+                <option value="ASC">{DIRECTION_LABELS['ASC']}</option>
+                <option value="DESC">{DIRECTION_LABELS['DESC']}</option>
+              </Select>
             </FormControl>
           </Flex>
         </PopoverBody>

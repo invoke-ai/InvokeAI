@@ -1,7 +1,13 @@
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
-import { getConnectedEdges } from '@xyflow/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { EMPTY_ARRAY } from 'app/store/constants';
+import { useAppStore } from 'app/store/nanostores/store';
+import { $true } from 'app/store/nanostores/util';
+import type { AppDispatch, AppStore } from 'app/store/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import type { AppConfig } from 'app/types/invokeai';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -16,39 +22,24 @@ import {
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
+import { getInvocationNodeErrors } from 'features/nodes/store/util/fieldValidators';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
-import {
-  isFloatFieldCollectionInputInstance,
-  isFloatFieldCollectionInputTemplate,
-  isFloatGeneratorFieldInputInstance,
-  isImageFieldCollectionInputInstance,
-  isImageFieldCollectionInputTemplate,
-  isIntegerFieldCollectionInputInstance,
-  isIntegerFieldCollectionInputTemplate,
-  isIntegerGeneratorFieldInputInstance,
-  isStringFieldCollectionInputInstance,
-  isStringFieldCollectionInputTemplate,
-  isStringGeneratorFieldInputInstance,
-  resolveFloatGeneratorField,
-  resolveIntegerGeneratorField,
-  resolveStringGeneratorField,
-} from 'features/nodes/types/field';
-import {
-  validateImageFieldCollectionValue,
-  validateNumberFieldCollectionValue,
-  validateStringFieldCollectionValue,
-} from 'features/nodes/types/fieldValidators';
-import type { AnyEdge, InvocationNode } from 'features/nodes/types/invocation';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
+import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
-import { forEach, groupBy, upperFirst } from 'lodash-es';
-import { assert } from 'tsafe';
+import { debounce, groupBy, upperFirst } from 'lodash-es';
+import { atom, computed } from 'nanostores';
+import { useEffect } from 'react';
+import { $isConnected } from 'services/events/stores';
 
 /**
  * This file contains selectors and utilities for determining the app is ready to enqueue generations. The handling
@@ -56,6 +47,9 @@ import { assert } from 'tsafe';
  *
  * For example, the canvas tab needs to check the status of the canvas manager before enqueuing, while the workflows
  * tab needs to check the status of the nodes and their connections.
+ *
+ * A global store that contains the reasons why the app is not ready to enqueue generations. State changes are debounced
+ * to reduce the number of times we run the fairly involved readiness checks.
  */
 
 const LAYER_TYPE_TO_TKEY = {
@@ -68,84 +62,143 @@ const LAYER_TYPE_TO_TKEY = {
 
 export type Reason = { prefix?: string; content: string };
 
-const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
+export const $reasonsWhyCannotEnqueue = atom<Reason[]>([]);
+export const $isReadyToEnqueue = computed($reasonsWhyCannotEnqueue, (reasons) => reasons.length === 0);
 
-export const resolveBatchValue = (batchNode: InvocationNode, nodes: InvocationNode[], edges: AnyEdge[]) => {
-  if (batchNode.data.type === 'image_batch') {
-    assert(isImageFieldCollectionInputInstance(batchNode.data.inputs.images));
-    const ownValue = batchNode.data.inputs.images.value ?? [];
-    // no generators for images yet
-    return ownValue;
-  } else if (batchNode.data.type === 'string_batch') {
-    assert(isStringFieldCollectionInputInstance(batchNode.data.inputs.strings));
-    const ownValue = batchNode.data.inputs.strings.value;
-    const edgeToStrings = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'strings');
-
-    if (!edgeToStrings) {
-      return ownValue ?? [];
+const debouncedUpdateReasons = debounce(
+  async (
+    tab: TabName,
+    isConnected: boolean,
+    canvas: CanvasState,
+    params: ParamsState,
+    dynamicPrompts: DynamicPromptsState,
+    canvasIsFiltering: boolean,
+    canvasIsTransforming: boolean,
+    canvasIsRasterizing: boolean,
+    canvasIsCompositing: boolean,
+    canvasIsSelectingObject: boolean,
+    nodes: NodesState,
+    workflowSettings: WorkflowSettingsState,
+    templates: Templates,
+    upscale: UpscaleState,
+    config: AppConfig,
+    store: AppStore
+  ) => {
+    if (tab === 'canvas') {
+      const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
+        isConnected,
+        canvas,
+        params,
+        dynamicPrompts,
+        canvasIsFiltering,
+        canvasIsTransforming,
+        canvasIsRasterizing,
+        canvasIsCompositing,
+        canvasIsSelectingObject,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
+    } else if (tab === 'workflows') {
+      const reasons = await getReasonsWhyCannotEnqueueWorkflowsTab({
+        dispatch: store.dispatch,
+        nodesState: nodes,
+        workflowSettingsState: workflowSettings,
+        isConnected,
+        templates,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
+    } else if (tab === 'upscaling') {
+      const reasons = getReasonsWhyCannotEnqueueUpscaleTab({
+        isConnected,
+        upscale,
+        config,
+        params,
+      });
+      $reasonsWhyCannotEnqueue.set(reasons);
+    } else {
+      $reasonsWhyCannotEnqueue.set(EMPTY_ARRAY);
     }
+  },
+  300
+);
 
-    const generatorNode = nodes.find((node) => node.id === edgeToStrings.source);
-    assert(generatorNode, 'Missing edge from string generator to string batch');
+export const useReadinessWatcher = () => {
+  useAssertSingleton('useReadinessWatcher');
+  const store = useAppStore();
+  const canvasManager = useCanvasManagerSafe();
+  const tab = useAppSelector(selectActiveTab);
+  const canvas = useAppSelector(selectCanvasSlice);
+  const params = useAppSelector(selectParamsSlice);
+  const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);
+  const nodes = useAppSelector(selectNodesSlice);
+  const workflowSettings = useAppSelector(selectWorkflowSettingsSlice);
+  const upscale = useAppSelector(selectUpscaleSlice);
+  const config = useAppSelector(selectConfigSlice);
+  const templates = useStore($templates);
+  const isConnected = useStore($isConnected);
+  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
+  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
+  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
+  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
+  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
 
-    const generatorField = generatorNode.data.inputs['generator'];
-    assert(isStringGeneratorFieldInputInstance(generatorField), 'Invalid string generator');
-
-    const generatorValue = resolveStringGeneratorField(generatorField);
-    return generatorValue;
-  } else if (batchNode.data.type === 'float_batch') {
-    assert(isFloatFieldCollectionInputInstance(batchNode.data.inputs.floats));
-    const ownValue = batchNode.data.inputs.floats.value;
-    const edgeToFloats = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'floats');
-
-    if (!edgeToFloats) {
-      return ownValue ?? [];
-    }
-
-    const generatorNode = nodes.find((node) => node.id === edgeToFloats.source);
-    assert(generatorNode, 'Missing edge from float generator to float batch');
-
-    const generatorField = generatorNode.data.inputs['generator'];
-    assert(isFloatGeneratorFieldInputInstance(generatorField), 'Invalid float generator');
-
-    const generatorValue = resolveFloatGeneratorField(generatorField);
-    return generatorValue;
-  } else if (batchNode.data.type === 'integer_batch') {
-    assert(isIntegerFieldCollectionInputInstance(batchNode.data.inputs.integers));
-    const ownValue = batchNode.data.inputs.integers.value;
-    const incomers = edges.find((edge) => edge.target === batchNode.id && edge.targetHandle === 'integers');
-
-    if (!incomers) {
-      return ownValue ?? [];
-    }
-
-    const generatorNode = nodes.find((node) => node.id === incomers.source);
-    assert(generatorNode, 'Missing edge from integer generator to integer batch');
-
-    const generatorField = generatorNode.data.inputs['generator'];
-    assert(isIntegerGeneratorFieldInputInstance(generatorField), 'Invalid integer generator field');
-
-    const generatorValue = resolveIntegerGeneratorField(generatorField);
-    return generatorValue;
-  }
-  assert(false, 'Invalid batch node type');
+  useEffect(() => {
+    debouncedUpdateReasons(
+      tab,
+      isConnected,
+      canvas,
+      params,
+      dynamicPrompts,
+      canvasIsFiltering,
+      canvasIsTransforming,
+      canvasIsRasterizing,
+      canvasIsCompositing,
+      canvasIsSelectingObject,
+      nodes,
+      workflowSettings,
+      templates,
+      upscale,
+      config,
+      store
+    );
+  }, [
+    store,
+    canvas,
+    canvasIsCompositing,
+    canvasIsFiltering,
+    canvasIsRasterizing,
+    canvasIsSelectingObject,
+    canvasIsTransforming,
+    config,
+    dynamicPrompts,
+    isConnected,
+    nodes,
+    params,
+    tab,
+    templates,
+    upscale,
+    workflowSettings,
+  ]);
 };
 
-const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
+const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
+
+const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {
+  dispatch: AppDispatch;
+  nodesState: NodesState;
+  workflowSettingsState: WorkflowSettingsState;
   isConnected: boolean;
-  nodes: NodesState;
-  workflowSettings: WorkflowSettingsState;
   templates: Templates;
-}): Reason[] => {
-  const { isConnected, nodes, workflowSettings, templates } = arg;
+}): Promise<Reason[]> => {
+  const { dispatch, nodesState, workflowSettingsState, isConnected, templates } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
     reasons.push(disconnectedReason(i18n.t));
   }
 
-  if (workflowSettings.shouldValidateGraph) {
-    const invocationNodes = nodes.nodes.filter(isInvocationNode);
+  if (workflowSettingsState.shouldValidateGraph) {
+    const { nodes, edges } = nodesState;
+    const invocationNodes = nodes.filter(isInvocationNode);
     const batchNodes = invocationNodes.filter(isBatchNode);
     const executableNodes = invocationNodes.filter(isExecutableNode);
 
@@ -154,12 +207,12 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
     }
 
     for (const node of batchNodes) {
-      if (nodes.edges.find((e) => e.source === node.id) === undefined) {
+      if (edges.find((e) => e.source === node.id) === undefined) {
         reasons.push({ content: i18n.t('parameters.invoke.batchNodeNotConnected', { label: node.data.label }) });
       }
     }
 
-    if (batchNodes.length > 1) {
+    if (batchNodes.length > 0) {
       const batchSizes: number[] = [];
       const groupedBatchNodes = groupBy(batchNodes, (node) => node.data.inputs['batch_group_id']?.value);
       for (const [batchGroupId, batchNodes] of Object.entries(groupedBatchNodes)) {
@@ -167,7 +220,7 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
         const groupBatchSizes: number[] = [];
 
         for (const node of batchNodes) {
-          const size = resolveBatchValue(node, invocationNodes, nodes.edges).length;
+          const size = (await resolveBatchValue({ dispatch, nodesState, node })).length;
           if (batchGroupId === 'None') {
             // Ungrouped batch nodes may have differing collection sizes
             batchSizes.push(size);
@@ -192,66 +245,21 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = (arg: {
       }
     }
 
-    executableNodes.forEach((node) => {
+    invocationNodes.forEach((node) => {
       if (!isInvocationNode(node)) {
         return;
       }
 
-      const nodeTemplate = templates[node.data.type];
+      const errors = getInvocationNodeErrors(node.data.id, templates, nodesState);
 
-      if (!nodeTemplate) {
-        // Node type not found
-        reasons.push({ content: i18n.t('parameters.invoke.missingNodeTemplate') });
-        return;
+      for (const error of errors) {
+        if (error.type === 'node-error') {
+          reasons.push({ content: error.issue });
+        } else {
+          // error.type === 'field-error'
+          reasons.push({ prefix: error.prefix, content: error.issue });
+        }
       }
-
-      const connectedEdges = getConnectedEdges([node], nodes.edges);
-
-      forEach(node.data.inputs, (field) => {
-        const fieldTemplate = nodeTemplate.inputs[field.name];
-        const hasConnection = connectedEdges.some(
-          (edge) => edge.target === node.id && edge.targetHandle === field.name
-        );
-
-        if (!fieldTemplate) {
-          reasons.push({ content: i18n.t('parameters.invoke.missingFieldTemplate') });
-          return;
-        }
-
-        const prefix = `${node.data.label || nodeTemplate.title} -> ${field.label || fieldTemplate.title}`;
-
-        if (fieldTemplate.required && field.value === undefined && !hasConnection) {
-          reasons.push({ prefix, content: i18n.t('parameters.invoke.missingInputForField') });
-        } else if (
-          field.value &&
-          isImageFieldCollectionInputInstance(field) &&
-          isImageFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateImageFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        } else if (
-          field.value &&
-          isStringFieldCollectionInputInstance(field) &&
-          isStringFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateStringFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        } else if (
-          field.value &&
-          isIntegerFieldCollectionInputInstance(field) &&
-          isIntegerFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        } else if (
-          field.value &&
-          isFloatFieldCollectionInputInstance(field) &&
-          isFloatFieldCollectionInputTemplate(fieldTemplate)
-        ) {
-          const errors = validateNumberFieldCollectionValue(field.value, fieldTemplate);
-          reasons.push(...errors.map((error) => ({ prefix, content: error })));
-        }
-      });
     });
   }
 
@@ -485,206 +493,8 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   return reasons;
 };
 
-export const buildSelectReasonsWhyCannotEnqueueCanvasTab = (arg: {
-  isConnected: boolean;
-  canvasIsFiltering: boolean;
-  canvasIsTransforming: boolean;
-  canvasIsRasterizing: boolean;
-  canvasIsCompositing: boolean;
-  canvasIsSelectingObject: boolean;
-}) => {
-  const {
-    isConnected,
-    canvasIsFiltering,
-    canvasIsTransforming,
-    canvasIsRasterizing,
-    canvasIsCompositing,
-    canvasIsSelectingObject,
-  } = arg;
-
-  return createSelector(
-    selectCanvasSlice,
-    selectParamsSlice,
-    selectDynamicPromptsSlice,
-    (canvas, params, dynamicPrompts) =>
-      getReasonsWhyCannotEnqueueCanvasTab({
-        isConnected,
-        canvas,
-        params,
-        dynamicPrompts,
-        canvasIsFiltering,
-        canvasIsTransforming,
-        canvasIsRasterizing,
-        canvasIsCompositing,
-        canvasIsSelectingObject,
-      })
-  );
-};
-
-export const buildSelectIsReadyToEnqueueCanvasTab = (arg: {
-  isConnected: boolean;
-  canvasIsFiltering: boolean;
-  canvasIsTransforming: boolean;
-  canvasIsRasterizing: boolean;
-  canvasIsCompositing: boolean;
-  canvasIsSelectingObject: boolean;
-}) => {
-  const {
-    isConnected,
-    canvasIsFiltering,
-    canvasIsTransforming,
-    canvasIsRasterizing,
-    canvasIsCompositing,
-    canvasIsSelectingObject,
-  } = arg;
-
-  return createSelector(
-    selectCanvasSlice,
-    selectParamsSlice,
-    selectDynamicPromptsSlice,
-    (canvas, params, dynamicPrompts) =>
-      getReasonsWhyCannotEnqueueCanvasTab({
-        isConnected,
-        canvas,
-        params,
-        dynamicPrompts,
-        canvasIsFiltering,
-        canvasIsTransforming,
-        canvasIsRasterizing,
-        canvasIsCompositing,
-        canvasIsSelectingObject,
-      }).length === 0
-  );
-};
-
-export const buildSelectReasonsWhyCannotEnqueueUpscaleTab = (arg: { isConnected: boolean }) => {
-  const { isConnected } = arg;
-  return createSelector(selectUpscaleSlice, selectConfigSlice, selectParamsSlice, (upscale, config, params) =>
-    getReasonsWhyCannotEnqueueUpscaleTab({ isConnected, upscale, config, params })
-  );
-};
-
-export const buildSelectIsReadyToEnqueueUpscaleTab = (arg: { isConnected: boolean }) => {
-  const { isConnected } = arg;
-
-  return createSelector(
-    selectUpscaleSlice,
-    selectConfigSlice,
-    selectParamsSlice,
-    (upscale, config, params) =>
-      getReasonsWhyCannotEnqueueUpscaleTab({ isConnected, upscale, config, params }).length === 0
-  );
-};
-
-export const buildSelectReasonsWhyCannotEnqueueWorkflowsTab = (arg: { isConnected: boolean; templates: Templates }) => {
-  const { isConnected, templates } = arg;
-
-  return createSelector(selectNodesSlice, selectWorkflowSettingsSlice, (nodes, workflowSettings) =>
-    getReasonsWhyCannotEnqueueWorkflowsTab({
-      isConnected,
-      nodes,
-      workflowSettings,
-      templates,
-    })
-  );
-};
-
-export const buildSelectIsReadyToEnqueueWorkflowsTab = (arg: { isConnected: boolean; templates: Templates }) => {
-  const { isConnected, templates } = arg;
-
-  return createSelector(
-    selectNodesSlice,
-    selectWorkflowSettingsSlice,
-    (nodes, workflowSettings) =>
-      getReasonsWhyCannotEnqueueWorkflowsTab({
-        isConnected,
-        nodes,
-        workflowSettings,
-        templates,
-      }).length === 0
-  );
-};
-
 export const selectPromptsCount = createSelector(
   selectParamsSlice,
   selectDynamicPromptsSlice,
   (params, dynamicPrompts) => (getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1)
-);
-
-const buildSelectGroupBatchSizes = (batchGroupId: string) =>
-  createMemoizedSelector(selectNodesSlice, ({ nodes, edges }) => {
-    const invocationNodes = nodes.filter(isInvocationNode);
-    return invocationNodes
-      .filter(isBatchNode)
-      .filter((node) => node.data.inputs['batch_group_id']?.value === batchGroupId)
-      .map((batchNodes) => resolveBatchValue(batchNodes, invocationNodes, edges).length);
-  });
-
-const selectUngroupedBatchSizes = buildSelectGroupBatchSizes('None');
-const selectGroup1BatchSizes = buildSelectGroupBatchSizes('Group 1');
-const selectGroup2BatchSizes = buildSelectGroupBatchSizes('Group 2');
-const selectGroup3BatchSizes = buildSelectGroupBatchSizes('Group 3');
-const selectGroup4BatchSizes = buildSelectGroupBatchSizes('Group 4');
-const selectGroup5BatchSizes = buildSelectGroupBatchSizes('Group 5');
-
-export const selectWorkflowsBatchSize = createSelector(
-  selectUngroupedBatchSizes,
-  selectGroup1BatchSizes,
-  selectGroup2BatchSizes,
-  selectGroup3BatchSizes,
-  selectGroup4BatchSizes,
-  selectGroup5BatchSizes,
-  (
-    ungroupedBatchSizes,
-    group1BatchSizes,
-    group2BatchSizes,
-    group3BatchSizes,
-    group4BatchSizes,
-    group5BatchSizes
-  ): number | 'EMPTY_BATCHES' | 'NO_BATCHES' => {
-    // All batch nodes _must_ have a populated collection
-
-    const allBatchSizes = [
-      ...ungroupedBatchSizes,
-      ...group1BatchSizes,
-      ...group2BatchSizes,
-      ...group3BatchSizes,
-      ...group4BatchSizes,
-      ...group5BatchSizes,
-    ];
-
-    // There are no batch nodes
-    if (allBatchSizes.length === 0) {
-      return 'NO_BATCHES';
-    }
-
-    // All batch nodes must have a populated collection
-    if (allBatchSizes.some((size) => size === 0)) {
-      return 'EMPTY_BATCHES';
-    }
-
-    for (const group of [group1BatchSizes, group2BatchSizes, group3BatchSizes, group4BatchSizes, group5BatchSizes]) {
-      // Ignore groups with no batch nodes
-      if (group.length === 0) {
-        continue;
-      }
-      // Grouped batch nodes must have the same collection size
-      if (group.some((size) => size !== group[0])) {
-        return 'EMPTY_BATCHES';
-      }
-    }
-
-    // Total batch size = product of all ungrouped batches and each grouped batch
-    const totalBatchSize = [
-      ...ungroupedBatchSizes,
-      // In case of no batch nodes in a group, fall back to 1 for the product calculation
-      group1BatchSizes[0] ?? 1,
-      group2BatchSizes[0] ?? 1,
-      group3BatchSizes[0] ?? 1,
-      group4BatchSizes[0] ?? 1,
-      group5BatchSizes[0] ?? 1,
-    ].reduce((acc, size) => acc * size, 1);
-
-    return totalBatchSize;
-  }
 );

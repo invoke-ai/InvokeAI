@@ -32,7 +32,7 @@ import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
-import ResizeHandle from './tabs/ResizeHandle';
+import { VerticalResizeHandle } from './tabs/ResizeHandle';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
 
@@ -136,7 +136,7 @@ export const AppContent = memo(() => {
                 </Box>
               </Flex>
             </Panel>
-            <ResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
+            <VerticalResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
           </>
         )}
         <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
@@ -146,7 +146,7 @@ export const AppContent = memo(() => {
         </Panel>
         {withRightPanel && (
           <>
-            <ResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
+            <VerticalResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
             <Panel order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
               <RightPanelContent />
             </Panel>

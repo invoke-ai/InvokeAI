@@ -1,6 +1,6 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
@@ -8,8 +8,8 @@ import { assert } from 'tsafe';
 export const useInputFieldInstance = (nodeId: string, fieldName: string): FieldInputInstance => {
   const selector = useMemo(
     () =>
-      createMemoizedSelector(selectNodesSlice, (nodes) => {
-        const instance = selectFieldInputInstance(nodes, nodeId, fieldName);
+      createSelector(selectNodesSlice, (nodes) => {
+        const instance = selectFieldInputInstanceSafe(nodes, nodeId, fieldName);
         assert(instance, `Instance for input field ${fieldName} not found`);
         return instance;
       }),

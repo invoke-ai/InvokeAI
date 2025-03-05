@@ -6,6 +6,7 @@ import { StringGeneratorDynamicPromptsRandomSettings } from 'features/nodes/comp
 import { StringGeneratorParseStringSettings } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/StringGeneratorParseStringSettings';
 import type { FieldComponentProps } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/types';
 import { fieldStringGeneratorValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { StringGeneratorFieldInputInstance, StringGeneratorFieldInputTemplate } from 'features/nodes/types/field';
 import {
   getStringGeneratorDefaults,
@@ -14,12 +15,11 @@ import {
   StringGeneratorDynamicPromptsRandomType,
   StringGeneratorParseStringType,
 } from 'features/nodes/types/field';
-import { isNil } from 'lodash-es';
+import { debounce } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDebounce } from 'use-debounce';
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
 
@@ -56,29 +56,36 @@ export const StringGeneratorFieldInputComponent = memo(
       [dispatch, field.name, nodeId]
     );
 
-    const [debouncedField] = useDebounce(field, 300);
-    const resolvedValuesAsString = useMemo(() => {
-      if (debouncedField.value.type === StringGeneratorDynamicPromptsRandomType && isNil(debouncedField.value.seed)) {
-        const { count } = debouncedField.value;
-        return `<${t('nodes.generatorNRandomValues', { count })}>`;
-      }
-
-      const resolvedValues = resolveStringGeneratorField(debouncedField);
-      if (resolvedValues.length === 0) {
-        return `<${t('nodes.generatorNoValues')}>`;
-      } else {
-        return resolvedValues.join(', ');
-      }
-    }, [debouncedField, t]);
+    const [resolvedValuesAsString, setResolvedValuesAsString] = useState<string | null>(null);
+    const resolveAndSetValuesAsString = useMemo(
+      () =>
+        debounce(async (field: StringGeneratorFieldInputInstance) => {
+          const resolvedValues = await resolveStringGeneratorField(field, dispatch);
+          if (resolvedValues.length === 0) {
+            setResolvedValuesAsString(`<${t('nodes.generatorNoValues')}>`);
+          } else {
+            setResolvedValuesAsString(resolvedValues.join(', '));
+          }
+        }, 300),
+      [dispatch, t]
+    );
+    useEffect(() => {
+      resolveAndSetValuesAsString(field);
+    }, [field, resolveAndSetValuesAsString]);
 
     return (
       <Flex flexDir="column" gap={2}>
-        <Select className="nowheel nodrag" onChange={onChangeGeneratorType} value={field.value.type} size="sm">
+        <Select
+          className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
+          onChange={onChangeGeneratorType}
+          value={field.value.type}
+          size="sm"
+        >
           <option value={StringGeneratorParseStringType}>{t('nodes.parseString')}</option>
-          {/* <option value={StringGeneratorDynamicPromptsRandomType}>{t('nodes.dynamicPromptsRandom')}</option>
+          <option value={StringGeneratorDynamicPromptsRandomType}>{t('nodes.dynamicPromptsRandom')}</option>
           <option value={StringGeneratorDynamicPromptsCombinatorialType}>
             {t('nodes.dynamicPromptsCombinatorial')}
-          </option> */}
+          </option>
         </Select>
         {field.value.type === StringGeneratorParseStringType && (
           <StringGeneratorParseStringSettings state={field.value} onChange={onChange} />
@@ -92,12 +99,17 @@ export const StringGeneratorFieldInputComponent = memo(
         <Flex w="full" h="full" p={2} borderWidth={1} borderRadius="base" maxH={128}>
           <Flex w="full" h="auto">
             <OverlayScrollbarsComponent
-              className="nodrag nowheel"
+              className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
               defer
               style={overlayScrollbarsStyles}
               options={overlayscrollbarsOptions}
             >
-              <Text className="nodrag nowheel" fontFamily="monospace" userSelect="text" cursor="text">
+              <Text
+                className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
+                fontFamily="monospace"
+                userSelect="text"
+                cursor="text"
+              >
                 {resolvedValuesAsString}
               </Text>
             </OverlayScrollbarsComponent>

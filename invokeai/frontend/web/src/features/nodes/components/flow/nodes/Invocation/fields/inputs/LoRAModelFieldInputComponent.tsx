@@ -2,6 +2,7 @@ import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldLoRAModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { LoRAModelFieldInputInstance, LoRAModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
@@ -39,7 +40,7 @@ const LoRAModelFieldInputComponent = (props: Props) => {
   });
 
   return (
-    <FormControl className="nowheel nodrag" isInvalid={!value} isDisabled={!options.length}>
+    <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isInvalid={!value} isDisabled={!options.length}>
       <Combobox
         value={value}
         placeholder={placeholder}

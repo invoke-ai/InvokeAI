@@ -2,6 +2,7 @@ import { Button, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { usePullBboxIntoGlobalReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
@@ -27,6 +28,7 @@ export const IPAdapterSettingsEmptyState = memo(() => {
   const onClickGalleryButton = useCallback(() => {
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
+  const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
 
   const dndTargetData = useMemo<SetGlobalReferenceImageDndTargetData>(
     () => setGlobalReferenceImageDndTarget.getData({ entityIdentifier }),
@@ -41,8 +43,11 @@ export const IPAdapterSettingsEmptyState = memo(() => {
       GalleryButton: (
         <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
       ),
+      PullBboxButton: (
+        <Button onClick={pullBboxIntoIPAdapter} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
+      ),
     }),
-    [isBusy, onClickGalleryButton, uploadApi]
+    [isBusy, onClickGalleryButton, pullBboxIntoIPAdapter, uploadApi]
   );
 
   return (

@@ -9,6 +9,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { formElementContainerDataChanged } from 'features/nodes/store/workflowSlice';
@@ -32,26 +33,28 @@ export const ContainerElementSettings = memo(({ element }: { element: ContainerE
   }, [dispatch, id]);
 
   return (
-    <Popover>
+    <Popover placement="top" isLazy lazyBehavior="unmount">
       <PopoverTrigger>
         <IconButton aria-label="settings" icon={<PiWrenchFill />} variant="link" size="sm" alignSelf="stretch" />
       </PopoverTrigger>
-      <PopoverContent>
-        <PopoverArrow />
-        <PopoverBody>
-          <FormControl>
-            <FormLabel m={0}>{t('workflows.builder.layout')}</FormLabel>
-            <ButtonGroup variant="outline" size="sm">
-              <Button onClick={setLayoutToRow} colorScheme={layout === 'row' ? 'invokeBlue' : 'base'}>
-                {t('workflows.builder.row')}
-              </Button>
-              <Button onClick={setLayoutToColumn} colorScheme={layout === 'column' ? 'invokeBlue' : 'base'}>
-                {t('workflows.builder.column')}
-              </Button>
-            </ButtonGroup>
-          </FormControl>
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent>
+          <PopoverArrow />
+          <PopoverBody>
+            <FormControl>
+              <FormLabel m={0}>{t('workflows.builder.layout')}</FormLabel>
+              <ButtonGroup variant="outline" size="sm">
+                <Button onClick={setLayoutToRow} colorScheme={layout === 'row' ? 'invokeBlue' : 'base'}>
+                  {t('workflows.builder.row')}
+                </Button>
+                <Button onClick={setLayoutToColumn} colorScheme={layout === 'column' ? 'invokeBlue' : 'base'}>
+                  {t('workflows.builder.column')}
+                </Button>
+              </ButtonGroup>
+            </FormControl>
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });

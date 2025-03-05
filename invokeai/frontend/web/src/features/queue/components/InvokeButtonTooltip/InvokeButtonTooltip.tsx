@@ -1,32 +1,24 @@
 import type { TooltipProps } from '@invoke-ai/ui-library';
 import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $true } from 'app/store/nanostores/util';
-import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { $templates } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
+import type { NodesState } from 'features/nodes/store/types';
+import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue';
+import { getBatchSize } from 'features/nodes/util/node/resolveBatchValue';
 import type { Reason } from 'features/queue/store/readiness';
-import {
-  buildSelectIsReadyToEnqueueCanvasTab,
-  buildSelectIsReadyToEnqueueUpscaleTab,
-  buildSelectIsReadyToEnqueueWorkflowsTab,
-  buildSelectReasonsWhyCannotEnqueueCanvasTab,
-  buildSelectReasonsWhyCannotEnqueueUpscaleTab,
-  buildSelectReasonsWhyCannotEnqueueWorkflowsTab,
-  selectPromptsCount,
-  selectWorkflowsBatchSize,
-} from 'features/queue/store/readiness';
+import { $isReadyToEnqueue, $reasonsWhyCannotEnqueue, selectPromptsCount } from 'features/queue/store/readiness';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { debounce } from 'lodash-es';
 import type { PropsWithChildren } from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import { $isConnected } from 'services/events/stores';
 
 type Props = TooltipProps & {
   prepend?: boolean;
@@ -60,56 +52,8 @@ const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
 TooltipContent.displayName = 'TooltipContent';
 
 const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isConnected = useStore($isConnected);
-  const canvasManager = useCanvasManagerSafe();
-  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
-  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
-  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
-  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
-  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
-
-  const selectIsReady = useMemo(
-    () =>
-      buildSelectIsReadyToEnqueueCanvasTab({
-        isConnected,
-        canvasIsFiltering,
-        canvasIsTransforming,
-        canvasIsRasterizing,
-        canvasIsSelectingObject,
-        canvasIsCompositing,
-      }),
-    [
-      isConnected,
-      canvasIsCompositing,
-      canvasIsFiltering,
-      canvasIsRasterizing,
-      canvasIsSelectingObject,
-      canvasIsTransforming,
-    ]
-  );
-
-  const selectReasons = useMemo(
-    () =>
-      buildSelectReasonsWhyCannotEnqueueCanvasTab({
-        isConnected,
-        canvasIsFiltering,
-        canvasIsTransforming,
-        canvasIsRasterizing,
-        canvasIsSelectingObject,
-        canvasIsCompositing,
-      }),
-    [
-      isConnected,
-      canvasIsCompositing,
-      canvasIsFiltering,
-      canvasIsRasterizing,
-      canvasIsSelectingObject,
-      canvasIsTransforming,
-    ]
-  );
-
-  const isReady = useAppSelector(selectIsReady);
-  const reasons = useAppSelector(selectReasons);
+  const isReady = useStore($isReadyToEnqueue);
+  const reasons = useStore($reasonsWhyCannotEnqueue);
 
   return (
     <Flex flexDir="column" gap={1}>
@@ -129,13 +73,8 @@ const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }
 CanvasTabTooltipContent.displayName = 'CanvasTabTooltipContent';
 
 const UpscaleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isConnected = useStore($isConnected);
-
-  const selectIsReady = useMemo(() => buildSelectIsReadyToEnqueueUpscaleTab({ isConnected }), [isConnected]);
-  const selectReasons = useMemo(() => buildSelectReasonsWhyCannotEnqueueUpscaleTab({ isConnected }), [isConnected]);
-
-  const isReady = useAppSelector(selectIsReady);
-  const reasons = useAppSelector(selectReasons);
+  const isReady = useStore($isReadyToEnqueue);
+  const reasons = useStore($reasonsWhyCannotEnqueue);
 
   return (
     <Flex flexDir="column" gap={1}>
@@ -153,20 +92,8 @@ const UpscaleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean 
 UpscaleTabTooltipContent.displayName = 'UpscaleTabTooltipContent';
 
 const WorkflowsTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
-  const isConnected = useStore($isConnected);
-  const templates = useStore($templates);
-
-  const selectIsReady = useMemo(
-    () => buildSelectIsReadyToEnqueueWorkflowsTab({ isConnected, templates }),
-    [isConnected, templates]
-  );
-  const selectReasons = useMemo(
-    () => buildSelectReasonsWhyCannotEnqueueWorkflowsTab({ isConnected, templates }),
-    [isConnected, templates]
-  );
-
-  const isReady = useAppSelector(selectIsReady);
-  const reasons = useAppSelector(selectReasons);
+  const isReady = useStore($isReadyToEnqueue);
+  const reasons = useStore($reasonsWhyCannotEnqueue);
 
   return (
     <Flex flexDir="column" gap={1}>
@@ -202,10 +129,27 @@ QueueCountPredictionCanvasOrUpscaleTab.displayName = 'QueueCountPredictionCanvas
 
 const QueueCountPredictionWorkflowsTab = memo(() => {
   const { t } = useTranslation();
-  const batchSize = useAppSelector(selectWorkflowsBatchSize);
+  const dispatch = useAppDispatch();
+  const nodesState = useAppSelector(selectNodesSlice);
+  const [batchSize, setBatchSize] = useState<BatchSizeResult | 'LOADING'>('LOADING');
+  const debouncedUpdateBatchSize = useMemo(
+    () =>
+      debounce(async (nodesState: NodesState) => {
+        setBatchSize('LOADING');
+        const batchSize = await getBatchSize(nodesState, dispatch);
+        setBatchSize(batchSize);
+      }, 300),
+    [dispatch]
+  );
+  useEffect(() => {
+    debouncedUpdateBatchSize(nodesState);
+  }, [debouncedUpdateBatchSize, nodesState]);
   const iterationsCount = useAppSelector(selectIterations);
 
   const text = useMemo(() => {
+    if (batchSize === 'LOADING') {
+      return `${t('common.loading')}...`;
+    }
     const iterations = t('queue.iterations', { count: iterationsCount });
     if (batchSize === 'NO_BATCHES') {
       const generationCount = Math.min(10000, iterationsCount);
@@ -213,7 +157,10 @@ const QueueCountPredictionWorkflowsTab = memo(() => {
       return `${iterationsCount} ${iterations} -> ${generationCount} ${generations}`.toLowerCase();
     }
     if (batchSize === 'EMPTY_BATCHES') {
-      return t('parameters.invoke.invalidBatchConfigurationCannotCalculate');
+      return t('parameters.invoke.batchNodeEmptyCollection');
+    }
+    if (batchSize === 'MISMATCHED_BATCH_GROUP') {
+      return t('parameters.invoke.batchNodeCollectionSizeMismatchNoGroupId');
     }
     const generationCount = Math.min(batchSize * iterationsCount, 10000);
     const generations = t('queue.generations', { count: generationCount });

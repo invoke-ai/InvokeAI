@@ -92,28 +92,15 @@ export type CollapsedInvocationNodeEdge = Edge<InvocationNodeEdgeCollapsedData, 
 export type AnyEdge = DefaultInvocationNodeEdge | CollapsedInvocationNodeEdge;
 // #endregion
 
-export const isBatchNode = (node: InvocationNode) => {
-  switch (node.data.type) {
-    case 'image_batch':
-    case 'string_batch':
-    case 'integer_batch':
-    case 'float_batch':
-      return true;
-    default:
-      return false;
-  }
-};
+export const isBatchNodeType = (type: string) =>
+  ['image_batch', 'string_batch', 'integer_batch', 'float_batch'].includes(type);
 
-const isGeneratorNode = (node: InvocationNode) => {
-  switch (node.data.type) {
-    case 'float_generator':
-    case 'integer_generator':
-    case 'string_generator':
-      return true;
-    default:
-      return false;
-  }
-};
+export const isGeneratorNodeType = (type: string) =>
+  ['image_generator', 'string_generator', 'integer_generator', 'float_generator'].includes(type);
+
+export const isBatchNode = (node: InvocationNode) => isBatchNodeType(node.data.type);
+
+const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.type);
 
 export const isExecutableNode = (node: InvocationNode) => {
   return !isBatchNode(node) && !isGeneratorNode(node);

@@ -1,7 +1,7 @@
 import { Flex, Image } from '@invoke-ai/ui-library';
 import type { ComparisonProps } from 'features/gallery/components/ImageViewer/common';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
-import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
+import { VerticalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
 import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
@@ -42,7 +42,7 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Comp
               </Flex>
             </Flex>
           </Panel>
-          <ResizeHandle id="image-comparison-side-by-side-handle" onDoubleClick={onDoubleClickHandle} />
+          <VerticalResizeHandle id="image-comparison-side-by-side-handle" onDoubleClick={onDoubleClickHandle} />
 
           <Panel minSize={20}>
             <Flex position="relative" w="full" h="full" alignItems="center" justifyContent="center">

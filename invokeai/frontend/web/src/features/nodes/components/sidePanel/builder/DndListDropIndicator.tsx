@@ -9,7 +9,7 @@ import type { CenterOrEdge } from 'features/nodes/components/sidePanel/builder/c
  */
 const line = {
   thickness: 2,
-  backgroundColor: 'base.500',
+  backgroundColor: 'base.600',
 };
 
 type DropIndicatorProps = {

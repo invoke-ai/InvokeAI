@@ -2,6 +2,7 @@ import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldIPAdapterModelValueChanged } from 'features/nodes/store/nodesSlice';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { IPAdapterModelFieldInputInstance, IPAdapterModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useIPAdapterModels } from 'services/api/hooks/modelsByType';
@@ -41,7 +42,7 @@ const IPAdapterModelFieldInputComponent = (
 
   return (
     <Tooltip label={value?.description}>
-      <FormControl className="nowheel nodrag" isInvalid={!value}>
+      <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isInvalid={!value}>
         <Combobox value={value} placeholder="Pick one" options={options} onChange={onChange} />
       </FormControl>
     </Tooltip>

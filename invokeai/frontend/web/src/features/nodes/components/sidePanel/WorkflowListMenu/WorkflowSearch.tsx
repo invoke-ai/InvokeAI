@@ -1,12 +1,12 @@
 import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowSearchTerm, workflowSearchTermChanged } from 'features/nodes/store/workflowSlice';
-import type { ChangeEvent, KeyboardEvent } from 'react';
-import { memo, useCallback } from 'react';
+import type { ChangeEvent, KeyboardEvent, RefObject } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-const WorkflowSearch = () => {
+export const WorkflowSearch = memo(({ searchInputRef }: { searchInputRef: RefObject<HTMLInputElement> }) => {
   const dispatch = useAppDispatch();
   const searchTerm = useAppSelector(selectWorkflowSearchTerm);
   const { t } = useTranslation();
@@ -39,9 +39,16 @@ const WorkflowSearch = () => {
     [handleWorkflowSearch]
   );
 
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchInputRef]);
+
   return (
     <InputGroup>
       <Input
+        ref={searchInputRef}
         placeholder={t('stylePresets.searchByName')}
         value={searchTerm}
         onKeyDown={handleKeydown}
@@ -60,6 +67,6 @@ const WorkflowSearch = () => {
       )}
     </InputGroup>
   );
-};
+});
 
-export default memo(WorkflowSearch);
+WorkflowSearch.displayName = 'WorkflowSearch';

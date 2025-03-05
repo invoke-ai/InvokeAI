@@ -23,26 +23,11 @@ export const SHARED_NODE_PROPERTIES: Partial<AnyNode> = {
   dragHandle: `.${DRAG_HANDLE_CLASSNAME}`,
 };
 
-/**
- * Model types' handles are rendered as squares in the UI.
- */
-export const MODEL_TYPES = [
-  'IPAdapterModelField',
-  'ControlNetModelField',
-  'LoRAModelField',
-  'MainModelField',
-  'FluxMainModelField',
-  'SD3MainModelField',
-  'SDXLMainModelField',
-  'SDXLRefinerModelField',
-  'VaeModelField',
-  'UNetField',
-  'VAEField',
-  'CLIPField',
-  'T2IAdapterModelField',
-  'T5EncoderField',
-  'SpandrelImageToImageModelField',
-];
+export const NO_FIT_ON_DOUBLE_CLICK_CLASS = 'no-fit-on-double-click';
+// These are the reactflow classes that are used to disable dragging, panning, and zooming.
+export const NO_DRAG_CLASS = 'nodrag';
+export const NO_WHEEL_CLASS = 'nowheel';
+export const NO_PAN_CLASS = 'nopan';
 
 /**
  * Colors for each field type - applies to their handles and edges.

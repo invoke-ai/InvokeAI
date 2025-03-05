@@ -98,7 +98,22 @@
         "close": "Fermer",
         "clipboard": "Presse-papier",
         "loadingModel": "Chargement du modèle",
-        "generating": "En Génération"
+        "generating": "En Génération",
+        "warnings": "Alertes",
+        "layout": "Disposition",
+        "row": "Ligne",
+        "column": "Colonne",
+        "start": "Commencer",
+        "board": "Planche",
+        "count": "Quantité",
+        "step": "Étape",
+        "end": "Fin",
+        "min": "Min",
+        "max": "Max",
+        "values": "Valeurs",
+        "resetToDefaults": "Réinitialiser par défaut",
+        "seed": "Graine",
+        "combinatorial": "Combinatoire"
     },
     "gallery": {
         "galleryImageSize": "Taille de l'image",
@@ -165,7 +180,9 @@
         "imagesSettings": "Paramètres des images de la galerie",
         "assetsTab": "Fichiers que vous avez importés pour vos projets.",
         "imagesTab": "Images que vous avez créées et enregistrées dans Invoke.",
-        "boardsSettings": "Paramètres des planches"
+        "boardsSettings": "Paramètres des planches",
+        "assets": "Ressources",
+        "images": "Images"
     },
     "modelManager": {
         "modelManager": "Gestionnaire de modèle",
@@ -289,7 +306,7 @@
         "usingDefaultSettings": "Utilisation des paramètres par défaut du modèle",
         "defaultSettingsOutOfSync": "Certain paramètres ne correspondent pas aux valeurs par défaut du modèle :",
         "restoreDefaultSettings": "Cliquez pour utiliser les paramètres par défaut du modèle.",
-        "hfForbiddenErrorMessage": "Nous vous recommandons de visiter la page du modèle sur HuggingFace.com. Le propriétaire peut exiger l'acceptation des conditions pour pouvoir télécharger.",
+        "hfForbiddenErrorMessage": "Nous vous recommandons de visiter la page du modèle. Le propriétaire peut exiger l'acceptation des conditions pour pouvoir télécharger.",
         "hfTokenRequired": "Vous essayez de télécharger un modèle qui nécessite un token HuggingFace valide.",
         "clipLEmbed": "CLIP-L Embed",
         "hfTokenSaved": "Token HF enregistré",
@@ -303,7 +320,10 @@
         "hfForbidden": "Vous n'avez pas accès à ce modèle HF.",
         "hfTokenInvalidErrorMessage2": "Mettre à jour dans le ",
         "controlLora": "Controle LoRA",
-        "urlUnauthorizedErrorMessage2": "Découvrir comment ici."
+        "urlUnauthorizedErrorMessage2": "Découvrir comment ici.",
+        "urlUnauthorizedErrorMessage": "Vous devrez peut-être configurer un jeton API pour accéder à ce modèle.",
+        "urlForbidden": "Vous n'avez pas accès à ce modèle",
+        "urlForbiddenErrorMessage": "Vous devrez peut-être demander l'autorisation du site qui distribue le modèle."
     },
     "parameters": {
         "images": "Images",
@@ -345,19 +365,31 @@
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la hauteur de la bounding box est {{height}}",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la hauteur de la bounding box est {{height}}",
             "noFLUXVAEModelSelected": "Aucun modèle VAE sélectionné pour la génération FLUX",
-            "canvasIsTransforming": "La Toile se transforme",
-            "canvasIsRasterizing": "La Toile se rastérise",
+            "canvasIsTransforming": "La Toile est occupée (en transformation)",
+            "canvasIsRasterizing": "La Toile est occupée (en rastérisation)",
             "noCLIPEmbedModelSelected": "Aucun modèle CLIP Embed sélectionné pour la génération FLUX",
-            "canvasIsFiltering": "La Toile est en train de filtrer",
+            "canvasIsFiltering": "La Toile est occupée (en filtration)",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la largeur de la bounding box est {{width}}",
             "noT5EncoderModelSelected": "Aucun modèle T5 Encoder sélectionné pour la génération FLUX",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la largeur de la bounding box mise à l'échelle est {{width}}",
-            "canvasIsCompositing": "La toile est en train de composer",
-            "collectionTooFewItems": "{{nodeLabel}} -> {{fieldLabel}} : trop peu d'éléments, minimum {{minItems}}",
-            "collectionTooManyItems": "{{nodeLabel}} -> {{fieldLabel}} : trop d'éléments, maximum {{maxItems}}",
+            "canvasIsCompositing": "La Toile est occupée (en composition)",
+            "collectionTooFewItems": "trop peu d'éléments, minimum {{minItems}}",
+            "collectionTooManyItems": "trop d'éléments, maximum {{maxItems}}",
             "canvasIsSelectingObject": "La toile est occupée (sélection d'objet)",
             "emptyBatches": "lots vides",
-            "batchNodeNotConnected": "Noeud de lots non connecté : {{label}}"
+            "batchNodeNotConnected": "Noeud de lots non connecté : {{label}}",
+            "fluxModelMultipleControlLoRAs": "Vous ne pouvez utiliser qu'un seul Control LoRA à la fois",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (incl. min)",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (incl. max)",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (max exc)",
+            "batchNodeEmptyCollection": "Certains nœuds de lot ont des collections vides",
+            "batchNodeCollectionSizeMismatch": "Non-concordance de taille de collection sur le lot {{batchGroupId}}",
+            "collectionStringTooLong": "trop long, max {{maxLength}}",
+            "collectionNumberNotMultipleOf": "{{value}} n'est pas un multiple de {{multipleOf}}",
+            "collectionEmpty": "collection vide",
+            "collectionStringTooShort": "trop court, min {{minLength}}",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (min exc)",
+            "batchNodeCollectionSizeMismatchNoGroupId": "Taille de collection de groupe par lot non conforme"
         },
         "negativePromptPlaceholder": "Prompt Négatif",
         "positivePromptPlaceholder": "Prompt Positif",
@@ -501,7 +533,13 @@
         "uploadFailedInvalidUploadDesc_withCount_one": "Doit être au maximum une image PNG ou JPEG.",
         "uploadFailedInvalidUploadDesc_withCount_many": "Doit être au maximum {{count}} images PNG ou JPEG.",
         "uploadFailedInvalidUploadDesc_withCount_other": "Doit être au maximum {{count}} images PNG ou JPEG.",
-        "addedToUncategorized": "Ajouté aux ressources de la planche $t(boards.uncategorized)"
+        "addedToUncategorized": "Ajouté aux ressources de la planche $t(boards.uncategorized)",
+        "pasteSuccess": "Collé à {{destination}}",
+        "pasteFailed": "Échec du collage",
+        "outOfMemoryErrorDescLocal": "Suivez notre <LinkComponent>guide Low VRAM</LinkComponent> pour réduire les OOMs.",
+        "unableToCopy": "Incapable de Copier",
+        "unableToCopyDesc": "Votre navigateur ne prend pas en charge l'accès au presse-papiers. Les utilisateurs de Firefox peuvent peut-être résoudre ce problème en suivant ",
+        "unableToCopyDesc_theseSteps": "ces étapes"
     },
     "accessibility": {
         "uploadImage": "Importer une image",
@@ -659,7 +697,14 @@
         "iterations_many": "Itérations",
         "iterations_other": "Itérations",
         "back": "fin",
-        "batchSize": "Taille de lot"
+        "batchSize": "Taille de lot",
+        "retryFailed": "Problème de nouvelle tentative de l'élément",
+        "retrySucceeded": "Élément Retenté",
+        "retryItem": "Réessayer l'élement",
+        "cancelAllExceptCurrentQueueItemAlertDialog": "Annuler tous les éléments de la file d'attente, sauf celui en cours, arrêtera les éléments en attente mais permettra à celui en cours de se terminer.",
+        "cancelAllExceptCurrentQueueItemAlertDialog2": "Êtes-vous sûr de vouloir annuler tous les éléments en attente dans la file d'attente ?",
+        "cancelAllExceptCurrentTooltip": "Annuler tout sauf l'élément actuel",
+        "confirm": "Confirmer"
     },
     "prompt": {
         "noMatchingTriggers": "Pas de déclancheurs correspondants",
@@ -1031,7 +1076,9 @@
         "controlNetWeight": {
             "heading": "Poids",
             "paragraphs": [
-                "Poids du Control Adapter. Un poids plus élevé aura un impact plus important sur l'image finale."
+                "Poids du Control Adapter. Un poids plus élevé aura un impact plus important sur l'image finale.",
+                "• Poids plus élevé (.75-2) : Crée un impact plus significatif sur le résultat final.",
+                "• Poids inférieur (0-.75) : Crée un impact plus faible sur le résultat final."
             ]
         },
         "compositingMaskAdjustments": {
@@ -1076,8 +1123,9 @@
         "controlNetBeginEnd": {
             "heading": "Pourcentage de début / de fin d'étape",
             "paragraphs": [
-                "La partie du processus de débruitage à laquelle le Control Adapter sera appliqué.",
-                "En général, les Control Adapter appliqués au début du processus guident la composition, tandis que les Control Adapter appliqués à la fin guident les détails."
+                "Ce paramètre détérmine quelle portion du processus de débruitage (génération) utilisera cette couche comme guide.",
+                "En général, les Control Adapter appliqués au début du processus guident la composition, tandis que les Control Adapter appliqués à la fin guident les détails.",
+                "• Étape de fin (%): Spécifie quand arrêter d'appliquer le guide de cette couche et revenir aux guides généraux du modèle et aux autres paramètres."
             ]
         },
         "controlNetControlMode": {
@@ -1442,7 +1490,8 @@
         "showDynamicPrompts": "Afficher les Prompts dynamiques",
         "dynamicPrompts": "Prompts Dynamiques",
         "promptsPreview": "Prévisualisation des Prompts",
-        "loading": "Génération des Pompts Dynamiques..."
+        "loading": "Génération des Pompts Dynamiques...",
+        "promptsToGenerate": "Prompts à générer"
     },
     "metadata": {
         "positivePrompt": "Prompt Positif",
@@ -1653,7 +1702,22 @@
         "internalDesc": "Cette invocation est utilisée internalement par Invoke. En fonction des mises à jours il est possible que des changements y soit effectués ou qu'elle soit supprimé sans prévention.",
         "splitOn": "Diviser sur",
         "generatorNoValues": "vide",
-        "addItem": "Ajouter un élément"
+        "addItem": "Ajouter un élément",
+        "specialDesc": "Cette invocation nécessite un traitement spécial dans l'application. Par exemple, les nœuds Batch sont utilisés pour mettre en file d'attente plusieurs graphes à partir d'un seul workflow.",
+        "unableToUpdateNode": "La mise à jour du nœud a échoué : nœud {{node}} de type {{type}} (peut nécessiter la suppression et la recréation).",
+        "deletedMissingNodeFieldFormElement": "Champ de formulaire manquant supprimé : nœud {{nodeId}} champ {{fieldName}}",
+        "nodeName": "Nom du nœud",
+        "description": "Description",
+        "loadWorkflowDesc": "Charger le workflow ?",
+        "missingSourceOrTargetNode": "Nœud source ou cible manquant",
+        "generatorImagesCategory": "Catégorie",
+        "generatorImagesFromBoard": "Images de la Planche",
+        "missingSourceOrTargetHandle": "Manque de gestionnaire source ou cible",
+        "loadingTemplates": "Chargement de {{name}}",
+        "loadWorkflowDesc2": "Votre workflow actuel contient des modifications non enregistrées.",
+        "generatorImages_one": "{{count}} image",
+        "generatorImages_many": "{{count}} images",
+        "generatorImages_other": "{{count}} images"
     },
     "models": {
         "noMatchingModels": "Aucun modèle correspondant",
@@ -1712,13 +1776,41 @@
         "deleteWorkflow2": "Êtes-vous sûr de vouloir supprimer ce Workflow ? Cette action ne peut pas être annulé.",
         "download": "Télécharger",
         "copyShareLinkForWorkflow": "Copier le lien de partage pour le Workflow",
-        "delete": "Supprimer"
+        "delete": "Supprimer",
+        "builder": {
+            "component": "Composant",
+            "numberInput": "Entrée de nombre",
+            "slider": "Curseur",
+            "both": "Les deux",
+            "singleLine": "Ligne unique",
+            "multiLine": "Multi Ligne",
+            "headingPlaceholder": "En-tête vide",
+            "emptyRootPlaceholderEditMode": "Faites glisser un élément de formulaire ou un champ de nœud ici pour commencer.",
+            "emptyRootPlaceholderViewMode": "Cliquez sur Modifier pour commencer à créer un formulaire pour ce workflow.",
+            "containerPlaceholder": "Conteneur Vide",
+            "row": "Ligne",
+            "column": "Colonne",
+            "layout": "Mise en page",
+            "nodeField": "Champ de nœud",
+            "zoomToNode": "Zoomer sur le nœud",
+            "nodeFieldTooltip": "Pour ajouter un champ de nœud, cliquez sur le petit bouton plus sur le champ dans l'Éditeur de Workflow, ou faites glisser le champ par son nom dans le formulaire.",
+            "addToForm": "Ajouter au formulaire",
+            "label": "Étiquette",
+            "textPlaceholder": "Texte vide",
+            "builder": "Constructeur de Formulaire",
+            "resetAllNodeFields": "Réinitialiser tous les champs de nœud",
+            "deleteAllElements": "Supprimer tous les éléments de formulaire",
+            "workflowBuilderAlphaWarning": "Le constructeur de workflow est actuellement en version alpha. Il peut y avoir des changements majeurs avant la version stable.",
+            "showDescription": "Afficher la description"
+        },
+        "openLibrary": "Ouvrir la Bibliothèque"
     },
     "whatsNew": {
         "whatsNewInInvoke": "Quoi de neuf dans Invoke",
         "watchRecentReleaseVideos": "Regarder les vidéos des dernières versions",
         "items": [
-            "<StrongComponent>FLUX Guidage Régional (bêta)</StrongComponent> : Notre version bêta de FLUX Guidage Régional est en ligne pour le contrôle des prompt régionaux."
+            "<StrongComponent>FLUX Guidage Régional (bêta)</StrongComponent> : Notre version bêta de FLUX Guidage Régional est en ligne pour le contrôle des prompt régionaux.",
+            "Autres améliorations : mise en file d'attente par lots plus rapide, meilleur redimensionnement, sélecteur de couleurs amélioré et nœuds de métadonnées."
         ],
         "readReleaseNotes": "Notes de version",
         "watchUiUpdatesOverview": "Aperçu des mises à jour de l'interface utilisateur"
@@ -1832,7 +1924,49 @@
             "cancel": "Annuler",
             "advanced": "Avancé",
             "processingLayerWith": "Calque de traitement avec le filtre {{type}}.",
-            "forMoreControl": "Pour plus de contrôle, cliquez sur Avancé ci-dessous."
+            "forMoreControl": "Pour plus de contrôle, cliquez sur Avancé ci-dessous.",
+            "adjust_image": {
+                "b": "B (LAB)",
+                "blue": "Bleu (RGBA)",
+                "alpha": "Alpha (RGBA)",
+                "magenta": "Magenta (CMJN)",
+                "yellow": "Jaune (CMJN)",
+                "cb": "Cb (YCbCr)",
+                "cr": "Cr (YCbCr)",
+                "cyan": "Cyan (CMJN)",
+                "label": "Ajuster l'image",
+                "description": "Ajuste le canal sélectionné d'une image.",
+                "channel": "Canal",
+                "value_setting": "Valeur",
+                "scale_values": "Valeurs d'échelle",
+                "red": "Rouge (RGBA)",
+                "green": "Vert (RGBA)",
+                "black": "Noir (CMJN)",
+                "hue": "Teinte (HSV)",
+                "saturation": "Saturation (HSV)",
+                "value": "Valeur (HSV)",
+                "luminosity": "Luminosité (LAB)",
+                "a": "A (LAB)",
+                "y": "Y (YCbCr)"
+            },
+            "img_blur": {
+                "label": "Flou de l'image",
+                "blur_type": "Type de flou",
+                "box_type": "Boîte",
+                "description": "Floute la couche sélectionnée.",
+                "blur_radius": "Rayon",
+                "gaussian_type": "Gaussien"
+            },
+            "img_noise": {
+                "label": "Image de bruit",
+                "description": "Ajoute du bruit à la couche sélectionnée.",
+                "gaussian_type": "Gaussien",
+                "size": "Taille du bruit",
+                "noise_amount": "Quantité",
+                "noise_type": "Type de bruit",
+                "salt_and_pepper_type": "Sel et Poivre",
+                "noise_color": "Bruit coloré"
+            }
         },
         "canvasContextMenu": {
             "saveToGalleryGroup": "Enregistrer dans la galerie",
@@ -1846,7 +1980,10 @@
             "newGlobalReferenceImage": "Nouvelle image de référence globale",
             "newControlLayer": "Nouveau couche de contrôle",
             "newInpaintMask": "Nouveau Masque Inpaint",
-            "newRegionalGuidance": "Nouveau Guide Régional"
+            "newRegionalGuidance": "Nouveau Guide Régional",
+            "copyToClipboard": "Copier dans le presse-papiers",
+            "copyBboxToClipboard": "Copier Bbox dans le presse-papiers",
+            "copyCanvasToClipboard": "Copier la Toile dans le presse-papiers"
         },
         "bookmark": "Marque-page pour Changement Rapide",
         "saveLayerToAssets": "Enregistrer la couche dans les ressources",
@@ -2012,7 +2149,10 @@
             "ipAdapterMethod": "Méthode d'IP Adapter",
             "full": "Complet",
             "style": "Style uniquement",
-            "composition": "Composition uniquement"
+            "composition": "Composition uniquement",
+            "fullDesc": "Applique le style visuel (couleurs, textures) et la composition (mise en page, structure).",
+            "styleDesc": "Applique un style visuel (couleurs, textures) sans tenir compte de sa mise en page.",
+            "compositionDesc": "Réplique la mise en page et la structure tout en ignorant le style de la référence."
         },
         "fitBboxToLayers": "Ajuster la bounding box aux calques",
         "regionIsEmpty": "La zone sélectionnée est vide",
@@ -2095,7 +2235,40 @@
         "asRasterLayerResize": "En tant que $t(controlLayers.rasterLayer) (Redimensionner)",
         "asControlLayer": "En tant que $t(controlLayers.controlLayer)",
         "asControlLayerResize": "En $t(controlLayers.controlLayer) (Redimensionner)",
-        "newSession": "Nouvelle session"
+        "newSession": "Nouvelle session",
+        "warnings": {
+            "controlAdapterIncompatibleBaseModel": "modèle de base de la couche de contrôle incompatible",
+            "controlAdapterNoControl": "aucun contrôle sélectionné/dessiné",
+            "rgNoPromptsOrIPAdapters": "pas de textes d'instructions ni d'images de référence",
+            "rgAutoNegativeNotSupported": "Auto-négatif non pris en charge pour le modèle de base sélectionné",
+            "rgNoRegion": "aucune région dessinée",
+            "ipAdapterNoModelSelected": "aucun modèle d'image de référence sélectionné",
+            "rgReferenceImagesNotSupported": "Les images de référence régionales ne sont pas prises en charge pour le modèle de base sélectionné",
+            "problemsFound": "Problèmes trouvés",
+            "unsupportedModel": "couche non prise en charge pour le modèle de base sélectionné",
+            "rgNegativePromptNotSupported": "Prompt négatif non pris en charge pour le modèle de base sélectionné",
+            "ipAdapterIncompatibleBaseModel": "modèle de base d'image de référence incompatible",
+            "controlAdapterNoModelSelected": "aucun modèle de couche de contrôle sélectionné",
+            "ipAdapterNoImageSelected": "Aucune image de référence sélectionnée."
+        },
+        "pasteTo": "Coller vers",
+        "pasteToAssets": "Ressources",
+        "pasteToAssetsDesc": "Coller dans les ressources",
+        "pasteToBbox": "Bbox",
+        "regionCopiedToClipboard": "{{region}} Copié dans le presse-papiers",
+        "copyRegionError": "Erreur de copie {{region}}",
+        "pasteToCanvas": "Toile",
+        "errors": {
+            "unableToFindImage": "Impossible de trouver l'image",
+            "unableToLoadImage": "Impossible de charger l'image"
+        },
+        "referenceImageRegional": "Image de référence (régionale)",
+        "pasteToBboxDesc": "Nouvelle couche (dans Bbox)",
+        "pasteToCanvasDesc": "Nouvelle couche (dans la Toile)",
+        "useImage": "Utiliser l'image",
+        "pastedTo": "Collé à {{destination}}",
+        "referenceImageEmptyState": "<UploadButton>Séléctionner une image</UploadButton> ou faites glisser une image depuis la <GalleryButton>galerie</GalleryButton> sur cette couche pour commencer.",
+        "referenceImageGlobal": "Image de référence (Globale)"
     },
     "upscaling": {
         "exceedsMaxSizeDetails": "La limite maximale d'agrandissement est de {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Veuillez essayer une image plus petite ou réduire votre sélection d'échelle.",
@@ -2175,7 +2348,8 @@
             "queue": "File d'attente",
             "events": "Événements",
             "metadata": "Métadonnées",
-            "gallery": "Galerie"
+            "gallery": "Galerie",
+            "dnd": "Glisser et déposer"
         },
         "logLevel": {
             "trace": "Trace",
@@ -2192,7 +2366,8 @@
         "toGetStarted": "Pour commencer, saisissez un prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement dans la <StrongComponent>Galerie</StrongComponent> ou de les modifier sur la <StrongComponent>Toile</StrongComponent>.",
         "gettingStartedSeries": "Vous souhaitez plus de conseils ? Consultez notre <LinkComponent>Série de démarrage</LinkComponent> pour des astuces sur l'exploitation du plein potentiel de l'Invoke Studio.",
         "noModelsInstalled": "Il semble qu'aucun modèle ne soit installé",
-        "toGetStartedLocal": "Pour commencer, assurez-vous de télécharger ou d'importer des modèles nécessaires pour exécuter Invoke. Ensuite, saisissez le prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement sur <StrongComponent>Galerie</StrongComponent> ou les modifier sur la <StrongComponent>Toile</StrongComponent>."
+        "toGetStartedLocal": "Pour commencer, assurez-vous de télécharger ou d'importer des modèles nécessaires pour exécuter Invoke. Ensuite, saisissez le prompt dans la boîte et cliquez sur <StrongComponent>Invoke</StrongComponent> pour générer votre première image. Sélectionnez un template de prompt pour améliorer les résultats. Vous pouvez choisir de sauvegarder vos images directement sur <StrongComponent>Galerie</StrongComponent> ou les modifier sur la <StrongComponent>Toile</StrongComponent>.",
+        "lowVRAMMode": "Pour de meilleures performances, suivez notre <LinkComponent>guide Low VRAM</LinkComponent>."
     },
     "upsell": {
         "shareAccess": "Partager l'accès",
@@ -2240,7 +2415,8 @@
                 "description": "Introduction à l'ajout d'images de référence et IP Adapters globaux."
             },
             "howDoIUseInpaintMasks": {
-                "title": "Comment utiliser les masques d'inpainting ?"
+                "title": "Comment utiliser les masques d'inpainting ?",
+                "description": "Comment appliquer des masques de retourche pour la correction et la variation d'image."
             },
             "creatingYourFirstImage": {
                 "title": "Créer votre première image",
@@ -2260,5 +2436,10 @@
         "studioSessionsDesc2": "Rejoignez notre <DiscordLink /> pour participer aux sessions en direct et poser vos questions. Les sessions sont ajoutée dans la playlist la semaine suivante.",
         "supportVideos": "Vidéos d'assistance",
         "controlCanvas": "Contrôler la toile"
+    },
+    "modelCache": {
+        "clear": "Effacer le cache du modèle",
+        "clearSucceeded": "Cache du modèle effacée",
+        "clearFailed": "Problème de nettoyage du cache du modèle"
     }
 }

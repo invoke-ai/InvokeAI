@@ -1,19 +1,22 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAddNodeCmdk } from 'features/nodes/store/nodesSlice';
-import { memo } from 'react';
+import { $addNodeCmdk } from 'features/nodes/store/nodesSlice';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
 const AddNodeButton = () => {
-  const addNodeCmdk = useAddNodeCmdk();
   const { t } = useTranslation();
+
+  const onClick = useCallback(() => {
+    $addNodeCmdk.set(true);
+  }, []);
 
   return (
     <IconButton
       tooltip={t('nodes.addNodeToolTip')}
       aria-label={t('nodes.addNode')}
       icon={<PiPlusBold />}
-      onClick={addNodeCmdk.setTrue}
+      onClick={onClick}
       pointerEvents="auto"
     />
   );

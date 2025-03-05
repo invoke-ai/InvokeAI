@@ -367,6 +367,26 @@ export const queueApi = api.injectEndpoints({
       },
       invalidatesTags: ['SessionQueueStatus', 'BatchStatus', 'QueueCountsByDestination'],
     }),
+    retryItemsById: build.mutation<
+      paths['/api/v1/queue/{queue_id}/retry_items_by_id']['put']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/retry_items_by_id']['put']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildQueueUrl('retry_items_by_id'),
+        method: 'PUT',
+        body,
+      }),
+      onQueryStarted: async (arg, api) => {
+        const { dispatch, queryFulfilled } = api;
+        try {
+          await queryFulfilled;
+          resetListQueryData(dispatch);
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: ['CurrentSessionQueueItem', 'NextSessionQueueItem', 'QueueCountsByDestination'],
+    }),
     listQueueItems: build.query<
       EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
         has_more: boolean;
@@ -423,6 +443,7 @@ export const {
   useGetBatchStatusQuery,
   useGetCurrentQueueItemQuery,
   useGetQueueCountsByDestinationQuery,
+  useRetryItemsByIdMutation,
 } = queueApi;
 
 export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();

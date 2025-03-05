@@ -41,16 +41,11 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _estimate_working_memory(self, latents: torch.Tensor, vae: AutoEncoder) -> int:
         """Estimate the working memory required by the invocation in bytes."""
-        # It was found experimentally that the peak working memory scales linearly with the number of pixels and the
-        # element size (precision).
         out_h = LATENT_SCALE_FACTOR * latents.shape[-2]
         out_w = LATENT_SCALE_FACTOR * latents.shape[-1]
         element_size = next(vae.parameters()).element_size()
-        scaling_constant = 1090  # Determined experimentally.
+        scaling_constant = 2200  # Determined experimentally.
         working_memory = out_h * out_w * element_size * scaling_constant
-
-        # We add a 20% buffer to the working memory estimate to be safe.
-        working_memory = working_memory * 1.2
         return int(working_memory)
 
     def _vae_decode(self, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:

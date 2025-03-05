@@ -105,8 +105,8 @@ export const getTargetCandidateFields = (
 
   const targetCandidateFields = map(targetTemplate.inputs).filter((field) => {
     const c = { source, sourceHandle, target, targetHandle: field.name };
-    const r = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
-    return r.isValid;
+    const connectionErrorTKey = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
+    return connectionErrorTKey === null;
   });
 
   return targetCandidateFields;
@@ -141,8 +141,8 @@ export const getSourceCandidateFields = (
 
   const sourceCandidateFields = map(sourceTemplate.outputs).filter((field) => {
     const c = { source, sourceHandle: field.name, target, targetHandle };
-    const r = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
-    return r.isValid;
+    const connectionErrorTKey = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
+    return connectionErrorTKey === null;
   });
 
   return sourceCandidateFields;

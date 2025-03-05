@@ -56,7 +56,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
         >
           {editable.value}
         </Text>
-        {isHovering && (
+        {isHovering.isTrue && (
           <IconButton
             aria-label="edit name"
             icon={<PiPencilBold />}

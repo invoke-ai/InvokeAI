@@ -13,6 +13,7 @@ import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageField } from 'features/nodes/types/common';
+import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { ImageFieldCollectionInputInstance, ImageFieldCollectionInputTemplate } from 'features/nodes/types/field';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
@@ -71,7 +72,7 @@ export const ImageFieldCollectionInputComponent = memo(
 
     return (
       <Flex
-        className="nodrag"
+        className={NO_DRAG_CLASS}
         position="relative"
         w="full"
         h="full"
@@ -93,14 +94,14 @@ export const ImageFieldCollectionInputComponent = memo(
         {field.value && field.value.length > 0 && (
           <Box w="full" h="auto" p={1} sx={sx} data-error={isInvalid} borderRadius="base">
             <OverlayScrollbarsComponent
-              className="nowheel"
+              className={NO_WHEEL_CLASS}
               defer
               style={overlayScrollbarsStyles}
               options={overlayscrollbarsOptions}
             >
               <Grid w="full" h="full" templateColumns="repeat(4, 1fr)" gap={1}>
                 {field.value.map((value, index) => (
-                  <GridItem key={index} position="relative" className="nodrag">
+                  <GridItem key={index} position="relative" className={NO_DRAG_CLASS}>
                     <ImageGridItemContent value={value} index={index} onRemoveImage={onRemoveImage} />
                   </GridItem>
                 ))}

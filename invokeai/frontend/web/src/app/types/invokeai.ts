@@ -26,7 +26,8 @@ export type AppFeature =
   | 'modelCache'
   | 'bulkDownload'
   | 'starterModels'
-  | 'hfToken';
+  | 'hfToken'
+  | 'retryQueueItem';
 /**
  * A disable-able Stable Diffusion feature
  */

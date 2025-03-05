@@ -20,7 +20,7 @@ import {
   setUpscaleInitialImage,
 } from 'features/imageActions/actions';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
-import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { type FieldIdentifier, isImageFieldCollectionInputInstance } from 'features/nodes/types/field';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
@@ -261,7 +261,7 @@ export const addImagesToNodeImageFieldCollectionDndTarget: DndTarget<
 
     const { fieldIdentifier } = targetData.payload;
 
-    const fieldInputInstance = selectFieldInputInstance(
+    const fieldInputInstance = selectFieldInputInstanceSafe(
       selectNodesSlice(getState()),
       fieldIdentifier.nodeId,
       fieldIdentifier.fieldName

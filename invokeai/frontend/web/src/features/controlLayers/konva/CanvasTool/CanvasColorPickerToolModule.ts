@@ -3,7 +3,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { getColorAtCoordinate, getPrefixedId } from 'features/controlLayers/konva/util';
-import type { RgbColor } from 'features/controlLayers/store/types';
+import type { RgbaColor } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -52,6 +52,39 @@ type CanvasColorPickerToolModuleConfig = {
    * The color of the crosshair line borders.
    */
   CROSSHAIR_BORDER_COLOR: string;
+  /**
+   * The color of the RGBA value text.
+   */
+  TEXT_COLOR: string;
+  /**
+   * The padding of the RGBA value text within the background rect.
+   */
+
+  TEXT_PADDING: number;
+  /**
+   * The font size of the RGBA value text.
+   */
+  TEXT_FONT_SIZE: number;
+  /**
+   * The color of the RGBA value text background rect.
+   */
+  TEXT_BG_COLOR: string;
+  /**
+   * The width of the RGBA value text background rect.
+   */
+  TEXT_BG_WIDTH: number;
+  /**
+   * The height of the RGBA value text background rect.
+   */
+  TEXT_BG_HEIGHT: number;
+  /**
+   * The corner radius of the RGBA value text background rect.
+   */
+  TEXT_BG_CORNER_RADIUS: number;
+  /**
+   * The x offset of the RGBA value text background rect from the color picker ring.
+   */
+  TEXT_BG_X_OFFSET: number;
 };
 
 const DEFAULT_CONFIG: CanvasColorPickerToolModuleConfig = {
@@ -65,6 +98,14 @@ const DEFAULT_CONFIG: CanvasColorPickerToolModuleConfig = {
   CROSSHAIR_LINE_LENGTH: 10,
   CROSSHAIR_LINE_COLOR: 'rgba(0,0,0,1)',
   CROSSHAIR_BORDER_COLOR: 'rgba(255,255,255,0.8)',
+  TEXT_COLOR: 'rgba(255,255,255,1)',
+  TEXT_BG_COLOR: 'rgba(0,0,0,0.8)',
+  TEXT_BG_HEIGHT: 62,
+  TEXT_BG_WIDTH: 62,
+  TEXT_BG_CORNER_RADIUS: 7,
+  TEXT_PADDING: 8,
+  TEXT_FONT_SIZE: 12,
+  TEXT_BG_X_OFFSET: 7,
 };
 
 /**
@@ -83,7 +124,7 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
   /**
    * The color currently under the cursor. Only has a value when the color picker tool is active.
    */
-  $colorUnderCursor = atom<RgbColor>(RGBA_BLACK);
+  $colorUnderCursor = atom<RgbaColor>(RGBA_BLACK);
 
   /**
    * The Konva objects that make up the color picker tool preview:
@@ -105,6 +146,9 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
     crosshairSouthOuter: Konva.Line;
     crosshairWestInner: Konva.Line;
     crosshairWestOuter: Konva.Line;
+    rgbaTextGroup: Konva.Group;
+    rgbaText: Konva.Text;
+    rgbaTextBackground: Konva.Rect;
   };
 
   constructor(parent: CanvasToolModule) {
@@ -202,7 +246,27 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
       }),
+      rgbaTextGroup: new Konva.Group({
+        listening: false,
+        name: `${this.type}:color_picker_text_group`,
+      }),
+      rgbaText: new Konva.Text({
+        listening: false,
+        name: `${this.type}:color_picker_text`,
+        fill: this.config.TEXT_COLOR,
+        fontFamily: 'monospace',
+        align: 'left',
+        fontStyle: 'bold',
+        verticalAlign: 'middle',
+      }),
+      rgbaTextBackground: new Konva.Rect({
+        listening: false,
+        name: `${this.type}:color_picker_text_background`,
+        fill: this.config.TEXT_BG_COLOR,
+      }),
     };
+
+    this.konva.rgbaTextGroup.add(this.konva.rgbaTextBackground, this.konva.rgbaText);
 
     this.konva.group.add(
       this.konva.ringCandidateColor,
@@ -216,7 +280,8 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
       this.konva.crosshairSouthOuter,
       this.konva.crosshairSouthInner,
       this.konva.crosshairWestOuter,
-      this.konva.crosshairWestInner
+      this.konva.crosshairWestInner,
+      this.konva.rgbaTextGroup
     );
   }
 
@@ -229,11 +294,6 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
    */
   render = () => {
     if (this.parent.$tool.get() !== 'colorPicker') {
-      this.setVisibility(false);
-      return;
-    }
-
-    if (!this.parent.getCanDraw()) {
       this.setVisibility(false);
       return;
     }
@@ -283,6 +343,24 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
       outerRadius: colorPickerOuterRadius + twoPixels,
     });
 
+    const textBgWidth = this.manager.stage.unscale(this.config.TEXT_BG_WIDTH);
+    const textBgHeight = this.manager.stage.unscale(this.config.TEXT_BG_HEIGHT);
+
+    this.konva.rgbaTextBackground.setAttrs({
+      width: textBgWidth,
+      height: textBgHeight,
+      cornerRadius: this.manager.stage.unscale(this.config.TEXT_BG_CORNER_RADIUS),
+    });
+    this.konva.rgbaText.setAttrs({
+      padding: this.manager.stage.unscale(this.config.TEXT_PADDING),
+      fontSize: this.manager.stage.unscale(this.config.TEXT_FONT_SIZE),
+      text: `R: ${colorUnderCursor.r}\nG: ${colorUnderCursor.g}\nB: ${colorUnderCursor.b}\nA: ${colorUnderCursor.a}`,
+    });
+    this.konva.rgbaTextGroup.setAttrs({
+      x: x + this.manager.stage.unscale(this.config.RING_OUTER_RADIUS + this.config.TEXT_BG_X_OFFSET),
+      y: y - textBgHeight / 2,
+    });
+
     const size = this.manager.stage.unscale(this.config.CROSSHAIR_LINE_LENGTH);
     const space = this.manager.stage.unscale(this.config.CROSSHAIR_INNER_RADIUS);
     const innerThickness = this.manager.stage.unscale(this.config.CROSSHAIR_LINE_THICKNESS);
@@ -329,11 +407,8 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
 
   onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
     const color = this.$colorUnderCursor.get();
-    if (color) {
-      const settings = this.manager.stateApi.getSettings();
-      // This will update the color but not the alpha value
-      this.manager.stateApi.setColor({ ...settings.color, ...color });
-    }
+    const settings = this.manager.stateApi.getSettings();
+    this.manager.stateApi.setColor({ ...settings.color, ...color });
   };
 
   onStagePointerMove = (_e: KonvaEventObject<PointerEvent>) => {
@@ -346,7 +421,11 @@ export class CanvasColorPickerToolModule extends CanvasModuleBase {
       return;
     }
 
+    // Hide the background layer so we can get the color under the cursor without the grid interfering
+    this.manager.background.konva.layer.visible(false);
     const color = getColorAtCoordinate(this.manager.stage.konva.stage, cursorPos.absolute);
+    this.manager.background.konva.layer.visible(true);
+
     if (color) {
       this.$colorUnderCursor.set(color);
     }

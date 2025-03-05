@@ -1,9 +1,14 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Text, Tooltip } from '@invoke-ai/ui-library';
 import { OutputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldTooltipContent';
+import {
+  useConnectionErrorTKey,
+  useIsConnectionInProgress,
+  useIsConnectionStartField,
+} from 'features/nodes/hooks/useFieldConnectionState';
+import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
 const sx = {
@@ -16,14 +21,17 @@ const sx = {
   },
 } satisfies SystemStyleObject;
 
-type Props = PropsWithChildren<{
+type Props = {
   nodeId: string;
   fieldName: string;
-  isDisabled?: boolean;
-}>;
+};
 
-export const OutputFieldTitle = memo(({ nodeId, fieldName, isDisabled }: Props) => {
+export const OutputFieldTitle = memo(({ nodeId, fieldName }: Props) => {
   const fieldTemplate = useOutputFieldTemplate(nodeId, fieldName);
+  const isConnected = useInputFieldIsConnected(nodeId, fieldName);
+  const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'source');
+  const isConnectionInProgress = useIsConnectionInProgress();
+  const connectionErrorTKey = useConnectionErrorTKey(nodeId, fieldName, 'source');
 
   return (
     <Tooltip
@@ -31,7 +39,12 @@ export const OutputFieldTitle = memo(({ nodeId, fieldName, isDisabled }: Props) 
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
       placement="top"
     >
-      <Text data-is-disabled={isDisabled} sx={sx}>
+      <Text
+        data-is-disabled={
+          (isConnectionInProgress && connectionErrorTKey !== null && !isConnectionStartField) || isConnected
+        }
+        sx={sx}
+      >
         {fieldTemplate.title}
       </Text>
     </Tooltip>
