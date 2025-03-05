@@ -1,4 +1,5 @@
 import {
+  Divider,
   Flex,
   Modal,
   ModalBody,
@@ -16,16 +17,20 @@ import { WorkflowList } from './WorkflowList';
 export const WorkflowLibraryModal = () => {
   const workflowLibraryModal = useWorkflowLibraryModal();
   return (
-    <Modal isOpen={workflowLibraryModal.isOpen} onClose={workflowLibraryModal.close} size="5xl">
+    <Modal isOpen={workflowLibraryModal.isOpen} onClose={workflowLibraryModal.close} isCentered>
       <ModalOverlay />
-      <ModalContent>
+      <ModalContent
+        w="calc(100% - var(--invoke-sizes-40))"
+        maxW="calc(100% - var(--invoke-sizes-40))"
+        h="calc(100% - var(--invoke-sizes-40))"
+        maxH="calc(100% - var(--invoke-sizes-40))"
+      >
         <ModalHeader>Workflow Library</ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={6}>
-          <Flex gap={4}>
-            <Flex flexDir="column" gap={4}>
-              <WorkflowLibrarySideNav />
-            </Flex>
+          <Flex gap={4} h="100%">
+            <WorkflowLibrarySideNav />
+            <Divider orientation="vertical" />
             <Flex flexDir="column" flex={1} gap={6}>
               <WorkflowLibraryTopNav />
               <WorkflowList />
