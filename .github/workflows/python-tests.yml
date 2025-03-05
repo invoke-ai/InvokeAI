@@ -63,6 +63,7 @@ jobs:
       PIP_USE_PEP517: '1'
       # uv requires a venv by default - but for this, we can simply use the system python
       UV_SYSTEM_PYTHON: 1
+      UV_PYTHON_PREFERENCE: system
 
     steps:
       - name: checkout
