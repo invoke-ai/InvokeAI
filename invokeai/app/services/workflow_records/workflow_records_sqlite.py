@@ -190,7 +190,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             query_condition = "(name LIKE ? OR description LIKE ? OR tags LIKE ?)"
 
             conditions.append(query_condition)
-            params.extend([wildcard_query])
+            params.extend([wildcard_query, wildcard_query, wildcard_query])
 
         if conditions:
             # If there are conditions, add a WHERE clause and then join the conditions
