@@ -1766,7 +1766,12 @@
             "both": "Entrambi",
             "emptyRootPlaceholderViewMode": "Fare clic su Modifica per iniziare a creare un modulo per questo flusso di lavoro.",
             "textPlaceholder": "Testo vuoto",
-            "workflowBuilderAlphaWarning": "Il generatore di flussi di lavoro è attualmente in versione alpha. Potrebbero esserci cambiamenti radicali prima della versione stabile."
+            "workflowBuilderAlphaWarning": "Il generatore di flussi di lavoro è attualmente in versione alpha. Potrebbero esserci cambiamenti radicali prima della versione stabile.",
+            "heading": "Intestazione",
+            "divider": "Divisore",
+            "container": "Contenitore",
+            "text": "Testo",
+            "numberInput": "Ingresso numerico"
         }
     },
     "accordions": {
@@ -2189,7 +2194,7 @@
         "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello oppure disegna sulla tela per iniziare.",
         "useImage": "Usa immagine",
         "resetGenerationSettings": "Ripristina impostazioni di generazione",
-        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton> oppure trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello.",
+        "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton>, oppure <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> su questo livello.",
         "asRasterLayer": "Come $t(controlLayers.rasterLayer)",
         "asRasterLayerResize": "Come $t(controlLayers.rasterLayer) (Ridimensiona)",
         "asControlLayer": "Come $t(controlLayers.controlLayer)",
