@@ -92,15 +92,17 @@ jobs:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
 
-      - name: install python
+      - name: setup python
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv python install ${{ matrix.python-version }} -v --preview
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         env:
           UV_INDEX: ${{ matrix.extra-index-url }}
-        run: uv pip install --editable ".[test]"  --system
+        run: uv pip install --editable ".[test]"
 
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
