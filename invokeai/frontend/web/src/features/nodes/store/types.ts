@@ -24,8 +24,8 @@ export type WorkflowMode = 'edit' | 'view';
 
 export const WORKFLOW_TAGS = [
   { category: 'Industry', tags: ['Architecture', 'Fashion', 'Game Dev', 'Food'] },
-  { category: 'Task', tags: ['Upscaling', 'Text to Image', 'Image to Image'] },
-  { category: 'Base Model', tags: ['SD1.5', 'SDXL', 'Bria', 'FLUX'] },
+  { category: 'Common Tasks', tags: ['Upscaling', 'Text to Image', 'Image to Image'] },
+  { category: 'Model Architecture', tags: ['SD1.5', 'SDXL', 'Bria', 'FLUX'] },
   { category: 'Tech Showcase', tags: ['Control', 'Reference Image'] },
 ] as const;
 export type WorkflowTag = (typeof WORKFLOW_TAGS)[number]['tags'][number];
