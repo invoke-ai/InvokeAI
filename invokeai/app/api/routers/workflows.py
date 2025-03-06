@@ -229,3 +229,14 @@ async def get_counts(
     """Gets a the count of workflows that include the specified tags and categories"""
 
     return ApiDependencies.invoker.services.workflow_records.get_counts(tags=tags, categories=categories)
+
+
+@workflows_router.put(
+    "/i/{workflow_id}/opened_at",
+    operation_id="update_opened_at",
+)
+async def update_opened_at(
+    workflow_id: str = Path(description="The workflow to update"),
+) -> None:
+    """Updates the opened_at field of a workflow"""
+    ApiDependencies.invoker.services.workflow_records.update_opened_at(workflow_id)
