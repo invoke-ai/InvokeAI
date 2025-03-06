@@ -1,5 +1,5 @@
 import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
-import { Box, Button, Checkbox, Collapse, Flex, Spacer, Text } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Collapse, Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -66,7 +66,7 @@ export const WorkflowLibrarySideNav = () => {
 
   return (
     <Flex flexDir="column" h="full">
-      <Box w="full" pb={2}>
+      <Flex w="full" pb={2}>
         <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
           {t('workflows.yourWorkflows')}
         </CategoryButton>
@@ -96,13 +96,13 @@ export const WorkflowLibrarySideNav = () => {
             </Flex>
           </Collapse>
         )}
-      </Box>
-      <Box w="full">
+      </Flex>
+      <Flex w="full" h="full" minH={0} overflow="hidden" flexDir="column">
         <CategoryButton isSelected={isDefaultWorkflowsExclusivelySelected} onClick={selectDefaultWorkflows}>
           {t('workflows.browseWorkflows')}
         </CategoryButton>
         <Collapse in={isDefaultWorkflowsExclusivelySelected}>
-          <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden">
+          <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden" h="100%" minH={0}>
             <Button
               isDisabled={!isDefaultWorkflowsExclusivelySelected || selectedTags.length === 0}
               onClick={resetTags}
@@ -128,7 +128,7 @@ export const WorkflowLibrarySideNav = () => {
             </Flex>
           </Flex>
         </Collapse>
-      </Box>
+      </Flex>
     </Flex>
   );
 };
