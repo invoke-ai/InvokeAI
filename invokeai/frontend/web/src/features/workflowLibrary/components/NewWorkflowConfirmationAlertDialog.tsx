@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
@@ -15,10 +16,12 @@ export const useNewWorkflow = () => {
   const dispatch = useAppDispatch();
   const dialog = useDialogState();
   const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
   const createImmediate = useCallback(() => {
     dispatch(nodeEditorReset());
     dispatch(workflowModeChanged('edit'));
+    workflowLibraryModal.close();
 
     toast({
       id: 'NEW_WORKFLOW_CREATED',
@@ -27,7 +30,7 @@ export const useNewWorkflow = () => {
     });
 
     dialog.close();
-  }, [dialog, dispatch, t]);
+  }, [dialog, dispatch, t, workflowLibraryModal]);
 
   const createWithDialog = useCallback(() => {
     if (!isTouched) {

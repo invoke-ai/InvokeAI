@@ -12,6 +12,7 @@ import {
   workflowSelectedTagToggled,
 } from 'features/nodes/store/workflowSlice';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -141,6 +142,7 @@ export const WorkflowLibrarySideNav = () => {
         </Collapse>
       </Flex>
       <Spacer />
+      <NewWorkflowButton />
       <UploadWorkflowButton />
     </Flex>
   );
