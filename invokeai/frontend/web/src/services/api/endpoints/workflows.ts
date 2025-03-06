@@ -109,6 +109,13 @@ export const workflowsApi = api.injectEndpoints({
         },
       },
     }),
+    updateOpenedAt: build.mutation<void, { workflow_id: string }>({
+      query: ({ workflow_id }) => ({
+        url: buildWorkflowsUrl(`i/${workflow_id}/opened_at`),
+        method: 'PUT',
+      }),
+      invalidatesTags: (result, error, { workflow_id }) => [{ type: 'Workflow', id: workflow_id }],
+    }),
     setWorkflowThumbnail: build.mutation<void, { workflow_id: string; image: File }>({
       query: ({ workflow_id, image }) => {
         const formData = new FormData();
@@ -138,6 +145,7 @@ export const workflowsApi = api.injectEndpoints({
 });
 
 export const {
+  useUpdateOpenedAtMutation,
   useGetCountsQuery,
   useLazyGetWorkflowQuery,
   useGetWorkflowQuery,

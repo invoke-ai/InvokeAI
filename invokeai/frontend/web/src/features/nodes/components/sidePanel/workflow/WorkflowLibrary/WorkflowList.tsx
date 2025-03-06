@@ -32,7 +32,7 @@ const useInfiniteQueryAry = () => {
     return {
       page: 0,
       per_page: PER_PAGE,
-      order_by: orderBy,
+      order_by: orderBy ?? 'opened_at',
       direction,
       categories,
       query: debouncedQuery,
