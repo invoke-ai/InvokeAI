@@ -11,17 +11,7 @@ from sympy.testing.pytest import slow
 from torch import tensor
 
 from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
-from invokeai.backend.model_manager.config import (
-    InvalidModelConfigException,
-    MainDiffusersConfig,
-    ModelConfigBase,
-    ModelConfigFactory,
-    ModelFormat,
-    ModelOnDisk,
-    ModelType,
-    ModelVariantType,
-    concrete_subclasses,
-)
+from invokeai.backend.model_manager.config import *
 from invokeai.backend.model_manager.legacy_probe import (
     CkptType,
     ModelProbe,
@@ -223,3 +213,17 @@ def test_inheritance_order():
         inheritance_list = [cls for cls in config_cls.mro() if cls not in excluded]
         assert inheritance_list[-1] is ModelConfigBase
 
+
+def test_concrete_subclasses():
+    excluded = { MinimalConfigExample }
+    config_classes = concrete_subclasses(ModelConfigBase) - excluded
+    expected = {
+        CLIPGEmbedDiffusersConfig, MainGGUFCheckpointConfig, T2IAdapterConfig, TextualInversionFolderConfig,
+        IPAdapterInvokeAIConfig, ControlNetDiffusersConfig, ControlLoRALyCORISConfig, MainDiffusersConfig,
+        LoRALyCORISConfig, CLIPVisionDiffusersConfig, MainCheckpointConfig, T5EncoderConfig, IPAdapterCheckpointConfig,
+        VAEDiffusersConfig, LoRADiffusersConfig, ControlNetCheckpointConfig, FluxReduxConfig,
+        T5EncoderBnbQuantizedLlmInt8bConfig, SpandrelImageToImageConfig, MainBnbQuantized4bCheckpointConfig,
+        TextualInversionFileConfig, CLIPLEmbedDiffusersConfig, VAECheckpointConfig, ControlLoRADiffusersConfig,
+        SigLIPConfig,
+    }
+    assert config_classes == expected
