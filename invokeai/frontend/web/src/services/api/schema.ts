@@ -2455,8 +2455,11 @@ export type components = {
              * Format: binary
              */
             file: Blob;
-            /** @description The metadata to associate with the image */
-            metadata?: components["schemas"]["JsonValue"] | null;
+            /**
+             * Metadata
+             * @description The metadata to associate with the image
+             */
+            metadata?: string | null;
         };
         /**
          * Boolean Collection Primitive
