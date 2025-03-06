@@ -14,9 +14,9 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import CogView4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -33,6 +33,9 @@ from invokeai.backend.util.devices import TorchDevice
 class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run the denoising process with a CogView4 model."""
 
+    transformer: TransformerField = InputField(
+        description=FieldDescriptions.cogview4_model, input=Input.Connection, title="Transformer"
+    )
     positive_conditioning: CogView4ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
@@ -142,15 +145,10 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self,
         context: InvocationContext,
     ):
-        inference_dtype = TorchDevice.choose_torch_dtype()
+        inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
 
-        transformer_info = context.models.load_by_attrs(
-            name="CogView4",
-            base=BaseModelType.CogView4,
-            type=ModelType.Main,
-            submodel_type=SubModelType.Transformer,
-        )
+        transformer_info = context.models.load(self.transformer.transformer)
         assert isinstance(transformer_info.model, CogView4Transformer2DModel)
 
         # Load/process the conditioning data.
@@ -262,6 +260,8 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, BaseModelType.CogView4)
+            # TODO(ryand): Implement this.
+            # context.util.sd_step_callback(state, BaseModelType.CogView4)
+            pass
 
         return step_callback

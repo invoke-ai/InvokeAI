@@ -1,11 +1,11 @@
 import torch
-from transformers import AutoTokenizer, GlmModel
+from transformers import GlmModel, PreTrainedTokenizerFast
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import InputField, UIComponent
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, UIComponent
+from invokeai.app.invocations.model import GlmEncoderField
 from invokeai.app.invocations.primitives import CogView4ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     CogView4ConditioningInfo,
     ConditioningFieldData,
@@ -18,7 +18,7 @@ COGVIEW4_GLM_MAX_SEQ_LEN = 1024
 
 @invocation(
     "cogview4_text_encoder",
-    title="FLUX Text Encoding",
+    title="CogView4 Text Encoding",
     tags=["prompt", "conditioning", "cogview4"],
     category="conditioning",
     version="1.0.0",
@@ -28,6 +28,11 @@ class CogView4TextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a cogview4 image."""
 
     prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
+    glm_encoder: GlmEncoderField = InputField(
+        title="GLM Encoder",
+        description=FieldDescriptions.glm_encoder,
+        input=Input.Connection,
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> CogView4ConditioningOutput:
@@ -41,28 +46,17 @@ class CogView4TextEncoderInvocation(BaseInvocation):
 
         # TODO(ryand): Add model inputs to the invocation rather than hard-coding.
         with (
-            context.models.load_by_attrs(
-                name="CogView4",
-                base=BaseModelType.CogView4,
-                type=ModelType.Main,
-                submodel_type=SubModelType.TextEncoder,
-            ).model_on_device() as (_, glm_text_encoder),
-            context.models.load_by_attrs(
-                name="CogView4",
-                base=BaseModelType.CogView4,
-                type=ModelType.Main,
-                submodel_type=SubModelType.TextEncoder,
-            ).model_on_device() as (_, glm_tokenizer),
+            context.models.load(self.glm_encoder.text_encoder).model_on_device() as (_, glm_text_encoder),
+            context.models.load(self.glm_encoder.tokenizer).model_on_device() as (_, glm_tokenizer),
         ):
             context.util.signal_progress("Running GLM text encoder")
             assert isinstance(glm_text_encoder, GlmModel)
-            # TODO(ryand): Can I use a narrower type than AutoTokenizer here?
-            assert isinstance(glm_tokenizer, AutoTokenizer)
+            assert isinstance(glm_tokenizer, PreTrainedTokenizerFast)
 
             text_inputs = glm_tokenizer(
                 prompt,
                 padding="longest",
-                max_sequence_length=max_seq_len,
+                max_length=max_seq_len,
                 truncation=True,
                 add_special_tokens=True,
                 return_tensors="pt",
