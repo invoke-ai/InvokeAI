@@ -1,18 +1,25 @@
+import abc
+import json
 from pathlib import Path
+from typing import Any
 
+import pydantic
 import pytest
 import torch
+from polyfactory.factories.pydantic_factory import ModelFactory
+from sympy.testing.pytest import slow
 from torch import tensor
 
 from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
-from invokeai.backend.model_manager.config import InvalidModelConfigException, MainDiffusersConfig, ModelVariantType
-from invokeai.backend.model_manager.probe import (
+from invokeai.backend.model_manager.config import *
+from invokeai.backend.model_manager.legacy_probe import (
     CkptType,
     ModelProbe,
     VaeFolderProbe,
     get_default_settings_control_adapters,
     get_default_settings_main,
 )
+from invokeai.backend.model_manager.search import ModelSearch
 
 
 @pytest.mark.parametrize(
@@ -88,3 +95,135 @@ def test_probe_sd1_diffusers_inpainting(datadir: Path):
     assert config.base is BaseModelType.StableDiffusion1
     assert config.variant is ModelVariantType.Inpaint
     assert config.repo_variant is ModelRepoVariant.FP16
+
+
+class MinimalConfigExample(ModelConfigBase):
+    type: ModelType = ModelType.Main
+    format: ModelFormat = ModelFormat.Checkpoint
+    fun_quote: str
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        return mod.path.suffix == ".json"
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        with open(mod.path, "r") as f:
+            contents = json.load(f)
+
+        return {
+            "fun_quote": contents["quote"],
+            "base": BaseModelType.Any,
+        }
+
+
+def test_minimal_working_example(datadir: Path):
+    model_path = datadir / "minimal_config_model.json"
+    overrides = {"base": BaseModelType.StableDiffusion1}
+    config = ModelConfigBase.classify(model_path, **overrides)
+
+    assert isinstance(config, MinimalConfigExample)
+    assert config.base == BaseModelType.StableDiffusion1
+    assert config.path == model_path.as_posix()
+    assert config.fun_quote == "Minimal working example of a ModelConfigBase subclass"
+
+
+def test_regression_against_model_probe(datadir: Path):
+    """Ensure ModelConfigBase.classify returns consistent results as ModelProbe.probe"""
+    model_paths = ModelSearch().search(datadir)  # TODO: add more 'stripped' models to test_model_probe directory
+    for path in model_paths:
+        legacy_config = new_config = None
+        probe_success = classify_success = True
+
+        try:
+            legacy_config = ModelProbe.probe(path)
+        except InvalidModelConfigException:
+            probe_success = False
+
+        try:
+            new_config = ModelConfigBase.classify(path)
+        except InvalidModelConfigException:
+            classify_success = False
+
+        if probe_success and classify_success:
+            assert legacy_config == new_config
+
+        elif probe_success:
+            assert type(legacy_config) in ModelConfigBase._USING_LEGACY_PROBE
+
+        elif classify_success:
+            assert type(new_config) not in ModelConfigBase._USING_LEGACY_PROBE
+
+        else:
+            raise ValueError(f"Both probe and classify failed to classify model at path {path}.")
+
+
+class ConfigMocker:
+    """Utility class to create config instances with random data"""
+
+    def __init__(self):
+        self._factories = {}
+
+    def mock(self, config_cls, count):
+        if config_cls not in self._factories:
+
+            class Factory(ModelFactory[config_cls]):
+                __use_defaults__ = True
+                __random_seed__ = 1234
+                __check_model__ = True
+
+            f = Factory()
+            self._factories[config_cls] = f
+        factory = self._factories[config_cls]
+        return [factory.build() for _ in range(count)]
+
+
+@slow
+def test_serialisation_roundtrip():
+    """After classification, models are serialised to json and stored in the database.
+    We need to ensure they are de-serialised into the original config with all relevant fields restored.
+    """
+    mocker = ConfigMocker()
+
+    excluded = {MinimalConfigExample}
+    for config_cls in concrete_subclasses(ModelConfigBase) - excluded:
+        trials_per_class = 50
+        configs_with_random_data = mocker.mock(config_cls, trials_per_class)
+
+        for config in configs_with_random_data:
+            as_json = config.model_dump_json()
+            as_dict = json.loads(as_json)
+            reconstructed = ModelConfigFactory.make_config(as_dict)
+            assert isinstance(reconstructed, config_cls)
+            assert config.model_dump_json() == reconstructed.model_dump_json()
+
+
+def test_inheritance_order():
+    """
+       Safeguard test to warn against incorrect inheritance order.
+
+       Config classes using multiple inheritance should inherit from ModelConfigBase last
+       to ensure that more specific fields take precedence over the generic defaults.
+
+       It may be worth rethinking our config taxonomy in the future, but in the meantime,
+       this test can help prevent the debugging effort I went through discovering this.
+       """
+    for config_cls in concrete_subclasses(ModelConfigBase):
+        excluded = { abc.ABC, pydantic.BaseModel, object }
+        inheritance_list = [cls for cls in config_cls.mro() if cls not in excluded]
+        assert inheritance_list[-1] is ModelConfigBase
+
+
+def test_concrete_subclasses():
+    excluded = { MinimalConfigExample }
+    config_classes = concrete_subclasses(ModelConfigBase) - excluded
+    expected = {
+        CLIPGEmbedDiffusersConfig, MainGGUFCheckpointConfig, T2IAdapterConfig, TextualInversionFolderConfig,
+        IPAdapterInvokeAIConfig, ControlNetDiffusersConfig, ControlLoRALyCORISConfig, MainDiffusersConfig,
+        LoRALyCORISConfig, CLIPVisionDiffusersConfig, MainCheckpointConfig, T5EncoderConfig, IPAdapterCheckpointConfig,
+        VAEDiffusersConfig, LoRADiffusersConfig, ControlNetCheckpointConfig, FluxReduxConfig,
+        T5EncoderBnbQuantizedLlmInt8bConfig, SpandrelImageToImageConfig, MainBnbQuantized4bCheckpointConfig,
+        TextualInversionFileConfig, CLIPLEmbedDiffusersConfig, VAECheckpointConfig, ControlLoRADiffusersConfig,
+        SigLIPConfig,
+    }
+    assert config_classes == expected
