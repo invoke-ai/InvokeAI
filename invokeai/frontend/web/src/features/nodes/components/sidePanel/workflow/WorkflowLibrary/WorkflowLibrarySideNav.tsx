@@ -1,5 +1,5 @@
 import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
-import { Button, Checkbox, Flex, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Checkbox, Collapse, Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -65,53 +65,70 @@ export const WorkflowLibrarySideNav = () => {
   }, [categories]);
 
   return (
-    <Flex flexDir="column" gap={2} h="full">
-      <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
-        {t('workflows.yourWorkflows')}
-      </CategoryButton>
-      {categoryOptions.includes('project') && (
-        <Flex flexDir="column" gap={2} pl={4}>
-          <CategoryButton size="sm" onClick={selectPrivateWorkflows} isSelected={isPrivateWorkflowsExclusivelySelected}>
-            {t('workflows.private')}
-          </CategoryButton>
-          <CategoryButton
-            size="sm"
-            rightIcon={<PiUsersBold />}
-            onClick={selectSharedWorkflows}
-            isSelected={isSharedWorkflowsExclusivelySelected}
+    <Flex flexDir="column" h="full">
+      <Box w="full" pb={2}>
+        <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
+          {t('workflows.yourWorkflows')}
+        </CategoryButton>
+        {categoryOptions.includes('project') && (
+          <Collapse
+            in={
+              isYourWorkflowsSelected || isPrivateWorkflowsExclusivelySelected || isSharedWorkflowsExclusivelySelected
+            }
           >
-            {t('workflows.shared')}
-          </CategoryButton>
-        </Flex>
-      )}
-      <CategoryButton isSelected={isDefaultWorkflowsExclusivelySelected} onClick={selectDefaultWorkflows}>
-        {t('workflows.browseWorkflows')}
-      </CategoryButton>
-
-      <Flex flexDir="column" gap={2} pl={4} overflow="hidden">
-        <Button
-          isDisabled={!isDefaultWorkflowsExclusivelySelected || selectedTags.length === 0}
-          onClick={resetTags}
-          size="sm"
-          variant="link"
-          fontWeight="bold"
-          justifyContent="flex-start"
-          flexGrow={0}
-          leftIcon={<PiArrowCounterClockwiseBold />}
-          h={8}
-        >
-          {t('workflows.resetTags')}
-        </Button>
-        <Flex flexDir="column" gap={2} overflow="auto">
-          {WORKFLOW_TAGS.map((tagCategory) => (
-            <TagCategory
-              key={tagCategory.category}
-              tagCategory={tagCategory}
-              isDisabled={!isDefaultWorkflowsExclusivelySelected}
-            />
-          ))}
-        </Flex>
-      </Flex>
+            <Flex flexDir="column" gap={2} pl={4} pt={2}>
+              <CategoryButton
+                size="sm"
+                onClick={selectPrivateWorkflows}
+                isSelected={isPrivateWorkflowsExclusivelySelected}
+              >
+                {t('workflows.private')}
+              </CategoryButton>
+              <CategoryButton
+                size="sm"
+                rightIcon={<PiUsersBold />}
+                onClick={selectSharedWorkflows}
+                isSelected={isSharedWorkflowsExclusivelySelected}
+              >
+                {t('workflows.shared')}
+                <Spacer />
+              </CategoryButton>
+            </Flex>
+          </Collapse>
+        )}
+      </Box>
+      <Box w="full">
+        <CategoryButton isSelected={isDefaultWorkflowsExclusivelySelected} onClick={selectDefaultWorkflows}>
+          {t('workflows.browseWorkflows')}
+        </CategoryButton>
+        <Collapse in={isDefaultWorkflowsExclusivelySelected}>
+          <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden">
+            <Button
+              isDisabled={!isDefaultWorkflowsExclusivelySelected || selectedTags.length === 0}
+              onClick={resetTags}
+              size="sm"
+              variant="link"
+              fontWeight="bold"
+              justifyContent="flex-start"
+              flexGrow={0}
+              flexShrink={0}
+              leftIcon={<PiArrowCounterClockwiseBold />}
+              h={8}
+            >
+              {t('workflows.resetTags')}
+            </Button>
+            <Flex flexDir="column" gap={2} overflow="auto">
+              {WORKFLOW_TAGS.map((tagCategory) => (
+                <TagCategory
+                  key={tagCategory.category}
+                  tagCategory={tagCategory}
+                  isDisabled={!isDefaultWorkflowsExclusivelySelected}
+                />
+              ))}
+            </Flex>
+          </Flex>
+        </Collapse>
+      </Box>
     </Flex>
   );
 };
@@ -119,12 +136,14 @@ export const WorkflowLibrarySideNav = () => {
 const CategoryButton = memo(({ isSelected, ...rest }: ButtonProps & { isSelected: boolean }) => {
   return (
     <Button
-      colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="ghost"
-      fontWeight="bold"
       justifyContent="flex-start"
       size="md"
+      flexShrink={0}
+      w="full"
       {...rest}
+      bg={isSelected ? 'base.700' : undefined}
+      color={isSelected ? 'base.50' : undefined}
     />
   );
 });
@@ -143,7 +162,7 @@ const TagCategory = memo(
 
     return (
       <Flex flexDir="column" gap={2}>
-        <Text fontWeight="semibold" color="base.300" opacity={isDisabled ? 0.5 : 1}>
+        <Text fontWeight="semibold" color="base.300" opacity={isDisabled ? 0.5 : 1} flexShrink={0}>
           {tagCategory.category}
         </Text>
         <Flex flexDir="column" gap={2} pl={4}>
@@ -176,7 +195,7 @@ const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: WorkflowTag }
   }
 
   return (
-    <Checkbox isChecked={isSelected} onChange={onChange} {...rest}>
+    <Checkbox isChecked={isSelected} onChange={onChange} {...rest} flexShrink={0}>
       <Text>{`${tag} (${count})`}</Text>
     </Checkbox>
   );

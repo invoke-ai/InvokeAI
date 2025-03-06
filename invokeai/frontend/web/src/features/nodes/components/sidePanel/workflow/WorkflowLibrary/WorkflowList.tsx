@@ -153,7 +153,7 @@ const WorkflowListContent = memo(
       <Flex flexDir="column" gap={4} flex={1} minH={0}>
         <Grid
           ref={ref}
-          templateColumns="repeat(auto-fit, minmax(340px, 3fr))"
+          templateColumns="repeat(auto-fill, minmax(340px, 1fr))"
           gridAutoFlow="dense"
           gap={4}
           overflow="scroll"
