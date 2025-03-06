@@ -2457,7 +2457,7 @@ export type components = {
             file: Blob;
             /**
              * Metadata
-             * @description The metadata to associate with the image
+             * @description The metadata to associate with the image, must be a stringified JSON dict
              */
             metadata?: string | null;
         };
