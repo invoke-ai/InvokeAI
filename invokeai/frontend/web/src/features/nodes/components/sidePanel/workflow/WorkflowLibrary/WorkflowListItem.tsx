@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { ShareWorkflowButton } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/ShareWorkflow';
 import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
@@ -127,6 +128,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
               <DeleteWorkflow workflowId={workflow.workflow_id} />
             </>
           )}
+          {workflow.category === 'project' && <ShareWorkflowButton workflow={workflow} />}
         </Flex>
       </Flex>
     </Flex>
