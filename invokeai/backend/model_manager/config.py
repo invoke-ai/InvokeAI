@@ -309,7 +309,6 @@ class ModelConfigBase(ABC, BaseModel):
         format = cls.model_fields["format"].default.value
         return Tag(f"{type}.{format}")
 
-
     @classmethod
     @abstractmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
@@ -383,6 +382,7 @@ def legacy_probe(cls):
 
 class CheckpointConfigBase(BaseModel):
     """Base class for checkpoint-style models."""
+
     format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b, ModelFormat.GGUFQuantized] = Field(
         description="Format of the provided checkpoint model", default=ModelFormat.Checkpoint
     )
@@ -463,6 +463,7 @@ class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
 @legacy_probe
 class VAECheckpointConfig(CheckpointConfigBase, ModelConfigBase):
     """Model config for standalone VAE models."""
+
     type: Literal[ModelType.VAE] = ModelType.VAE
 
 
@@ -571,6 +572,7 @@ class IPAdapterCheckpointConfig(IPAdapterConfigBase, ModelConfigBase):
 @legacy_probe
 class CLIPEmbedDiffusersConfig(DiffusersConfigBase, ModelConfigBase):
     """Model config for Clip Embeddings."""
+
     variant: ClipVariantType = Field(description="Clip variant for this model")
     type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
@@ -663,7 +665,7 @@ def concrete_subclasses(base):
     return {sc for sc in subclasses if not isabstract(sc)}
 
 
-config_classes = sorted(concrete_subclasses(ModelConfigBase), key=lambda c: c.__name__) # sorted for consistency
+config_classes = sorted(concrete_subclasses(ModelConfigBase), key=lambda c: c.__name__)  # sorted for consistency
 AnyModelConfig = Annotated[
     Union[tuple(Annotated[cls, cls.get_tag()] for cls in config_classes)],
     Discriminator(get_model_discriminator_value),
@@ -682,4 +684,3 @@ class ModelConfigFactory:
             model.converted_at = timestamp
         validate_hash(model.hash)
         return model  # type: ignore
-
