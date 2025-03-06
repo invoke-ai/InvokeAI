@@ -6,9 +6,10 @@ from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, 
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -45,17 +46,15 @@ async def upload_image(
     board_id: Optional[str] = Query(default=None, description="The board to add this image to, if any"),
     session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
-    metadata: Optional[JsonValue] = Body(
-        default=None, description="The metadata to associate with the image", embed=True
+    metadata: Optional[str] = Body(
+        default=None,
+        description="The metadata to associate with the image, must be a stringified JSON dict",
+        embed=True,
     ),
 ) -> ImageDTO:
     """Uploads an image"""
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
-
-    _metadata = None
-    _workflow = None
-    _graph = None
 
     contents = await file.read()
     try:
@@ -67,30 +66,13 @@ async def upload_image(
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
 
-    # TODO: retain non-invokeai metadata on upload?
-    # attempt to parse metadata from image
-    metadata_raw = metadata if isinstance(metadata, str) else pil_image.info.get("invokeai_metadata", None)
-    if isinstance(metadata_raw, str):
-        _metadata = metadata_raw
-    else:
-        ApiDependencies.invoker.services.logger.debug("Failed to parse metadata for uploaded image")
-        pass
-
-    # attempt to parse workflow from image
-    workflow_raw = pil_image.info.get("invokeai_workflow", None)
-    if isinstance(workflow_raw, str):
-        _workflow = workflow_raw
-    else:
-        ApiDependencies.invoker.services.logger.debug("Failed to parse workflow for uploaded image")
-        pass
-
-    # attempt to extract graph from image
-    graph_raw = pil_image.info.get("invokeai_graph", None)
-    if isinstance(graph_raw, str):
-        _graph = graph_raw
-    else:
-        ApiDependencies.invoker.services.logger.debug("Failed to parse graph for uploaded image")
-        pass
+    extracted_metadata = extract_metadata_from_image(
+        pil_image=pil_image,
+        invokeai_metadata_override=metadata,
+        invokeai_workflow_override=None,
+        invokeai_graph_override=None,
+        logger=ApiDependencies.invoker.services.logger,
+    )
 
     try:
         image_dto = ApiDependencies.invoker.services.images.create(
@@ -99,9 +81,9 @@ async def upload_image(
             image_category=image_category,
             session_id=session_id,
             board_id=board_id,
-            metadata=_metadata,
-            workflow=_workflow,
-            graph=_graph,
+            metadata=extracted_metadata.invokeai_metadata,
+            workflow=extracted_metadata.invokeai_workflow,
+            graph=extracted_metadata.invokeai_graph,
             is_intermediate=is_intermediate,
         )
 
