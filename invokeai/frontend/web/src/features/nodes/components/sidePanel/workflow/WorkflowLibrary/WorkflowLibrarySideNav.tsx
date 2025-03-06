@@ -11,6 +11,7 @@ import {
   workflowSelectedTagsRese,
   workflowSelectedTagToggled,
 } from 'features/nodes/store/workflowSlice';
+import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
@@ -129,6 +130,8 @@ export const WorkflowLibrarySideNav = () => {
           </Flex>
         </Collapse>
       </Flex>
+      <Spacer />
+      <UploadWorkflowButton />
     </Flex>
   );
 };

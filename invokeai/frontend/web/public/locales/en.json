@@ -1699,7 +1699,6 @@
         "openWorkflow": "Open Workflow",
         "updated": "Updated",
         "uploadWorkflow": "Load from File",
-        "uploadAndSaveWorkflow": "Upload to Library",
         "deleteWorkflow": "Delete Workflow",
         "deleteWorkflow2": "Are you sure you want to delete this workflow? This cannot be undone.",
         "unnamedWorkflow": "Unnamed Workflow",

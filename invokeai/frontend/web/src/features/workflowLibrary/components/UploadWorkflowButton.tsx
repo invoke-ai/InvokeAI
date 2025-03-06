@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { Button } from '@invoke-ai/ui-library';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { saveWorkflowAs } from 'features/workflowLibrary/components/SaveWorkflowAsDialog';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
@@ -7,7 +7,7 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
 
-const UploadWorkflowButton = () => {
+export const UploadWorkflowButton = memo(() => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
   const workflowLibraryModal = useWorkflowLibraryModal();
@@ -38,18 +38,13 @@ const UploadWorkflowButton = () => {
   });
   return (
     <>
-      <IconButton
-        aria-label={t('workflows.uploadAndSaveWorkflow')}
-        tooltip={t('workflows.uploadAndSaveWorkflow')}
-        icon={<PiUploadSimpleBold />}
-        {...getRootProps()}
-        pointerEvents="auto"
-        variant="ghost"
-      />
+      <Button leftIcon={<PiUploadSimpleBold />} {...getRootProps()} pointerEvents="auto" variant="ghost">
+        {t('workflows.uploadWorkflow')}
+      </Button>
 
       <input {...getInputProps()} />
     </>
   );
-};
+});
 
-export default memo(UploadWorkflowButton);
+UploadWorkflowButton.displayName = 'UploadWorkflowButton';
