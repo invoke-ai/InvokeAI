@@ -1,7 +1,7 @@
 from typing import Callable
 
 import torch
-from diffusers import CogView4Transformer2DModel, FlowMatchEulerDiscreteScheduler
+from diffusers import CogView4Transformer2DModel
 from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
 from tqdm import tqdm
 
@@ -116,62 +116,29 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return cfg_scale
 
-    def _init_scheduler(self) -> FlowMatchEulerDiscreteScheduler:
-        # The default FlowMatchEulerDiscreteScheduler configs are copied from:
-        # https://huggingface.co/THUDM/CogView4-6B/blob/fb6f57289c73ac6d139e8d81bd5a4602d1877847/scheduler/scheduler_config.json
-        return FlowMatchEulerDiscreteScheduler(
-            num_train_timesteps=1000,
-            shift=1.0,
-            use_dynamic_shifting=True,
-            base_shift=0.25,
-            max_shift=0.75,
-            base_image_seq_len=256,
-            max_image_seq_len=4096,
-            invert_sigmas=False,
-            shift_terminal=None,
-            use_karras_sigmas=False,
-            use_exponential_sigmas=False,
-            use_beta_sigmas=False,
-            time_shift_type="linear",
-        )
-
-    def _calculate_timestep_shift(
-        self,
-        image_seq_len: int,
-        base_seq_len: int = 256,
-        base_shift: float = 0.25,
-        max_shift: float = 0.75,
-    ) -> float:
-        m = (image_seq_len / base_seq_len) ** 0.5
-        mu = m * max_shift + base_shift
-        return mu
-
-    def _prepare_timesteps(
-        self,
-        scheduler: FlowMatchEulerDiscreteScheduler,
-        num_steps: int,
-        image_seq_len: int,
-    ) -> list[int]:
+    def _prepare_timesteps(self, num_steps: int, image_seq_len: int) -> list[float]:
         """Prepare the timestep schedule."""
+        # The default FlowMatchEulerDiscreteScheduler for CogView4 can be found here:
+        # https://huggingface.co/THUDM/CogView4-6B/blob/fb6f57289c73ac6d139e8d81bd5a4602d1877847/scheduler/scheduler_config.json
+        # We re-implement this logic here to avoid all the complexity of working with the diffusers schedulers.
+        # Note that the timestep schedule initialization is pretty similar to that used for Flux. The main difference is
+        # that we use a linear timestep shift instead of the exponential shift used in Flux.
 
-        # TODO(ryand): Clean this up. It was copied from diffusers, but there's a bunch of duplicate logic here.
-        timesteps = torch.linspace(scheduler.config.num_train_timesteps, 1.0, num_steps)
-        timesteps = timesteps.to(torch.int64).to(torch.float32)
-        sigmas = timesteps / scheduler.config.num_train_timesteps
-        mu = self._calculate_timestep_shift(
-            image_seq_len,
-            scheduler.config.base_image_seq_len,
-            scheduler.config.base_shift,
-            scheduler.config.max_shift,
-        )
-        scheduler.set_timesteps(
-            num_inference_steps=num_steps,
-            device=TorchDevice.choose_torch_device(),
-            sigmas=sigmas,
-            mu=mu,
-            timesteps=timesteps,
-        )
-        timesteps = scheduler.timesteps
+        def calculate_timestep_shift(
+            image_seq_len: int, base_seq_len: int = 256, base_shift: float = 0.25, max_shift: float = 0.75
+        ) -> float:
+            m = (image_seq_len / base_seq_len) ** 0.5
+            mu = m * max_shift + base_shift
+            return mu
+
+        def apply_linear_timestep_shift(mu: float, sigma: float, timesteps: torch.Tensor) -> torch.Tensor:
+            return mu / (mu + (1 / timesteps - 1) ** sigma)
+
+        # Add +1 step to account for the final timestep of 0.0.
+        timesteps = torch.linspace(1, 0, num_steps + 1)
+        mu = calculate_timestep_shift(image_seq_len)
+        timesteps = apply_linear_timestep_shift(mu, 1.0, timesteps)
+
         return timesteps.tolist()
 
     def _run_diffusion(
@@ -218,8 +185,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_seq_len = ((self.height // LATENT_SCALE_FACTOR) * (self.width // LATENT_SCALE_FACTOR)) // (
             transformer_info.model.config.patch_size**2
         )
-        scheduler = self._init_scheduler()
-        timesteps = self._prepare_timesteps(scheduler=scheduler, num_steps=self.steps, image_seq_len=image_seq_len)
+        timesteps = self._prepare_timesteps(num_steps=self.steps, image_seq_len=image_seq_len)
 
         # Resume here...
 
