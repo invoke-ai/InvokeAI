@@ -119,7 +119,10 @@ class MinimalConfigExample(ModelConfigBase):
         with open(mod.path, "r") as f:
             contents = json.load(f)
 
-        return {"fun_quote": contents["quote"], "base": BaseModelType.Any}
+        return {
+            "fun_quote": contents["quote"],
+            "base": BaseModelType.Any,
+        }
 
 
 def test_minimal_working_example(datadir: Path):
