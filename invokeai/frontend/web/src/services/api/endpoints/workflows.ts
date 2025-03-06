@@ -78,6 +78,14 @@ export const workflowsApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
     }),
+    getCounts: build.query<
+      paths['/api/v1/workflows/counts']['get']['responses']['200']['content']['application/json'],
+      NonNullable<paths['/api/v1/workflows/counts']['get']['parameters']['query']>
+    >({
+      query: (params) => ({
+        url: `${buildWorkflowsUrl('counts')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
+      }),
+    }),
     listWorkflowsInfinite: build.infiniteQuery<
       paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
       NonNullable<paths['/api/v1/workflows/']['get']['parameters']['query']>,
@@ -130,6 +138,7 @@ export const workflowsApi = api.injectEndpoints({
 });
 
 export const {
+  useGetCountsQuery,
   useLazyGetWorkflowQuery,
   useGetWorkflowQuery,
   useCreateWorkflowMutation,

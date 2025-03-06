@@ -22,14 +22,22 @@ export type NodesState = {
 
 export type WorkflowMode = 'edit' | 'view';
 
+export const WORKFLOW_TAGS = [
+  { category: 'Industry', tags: ['Architecture', 'Fashion', 'Game Dev', 'Food'] },
+  { category: 'Task', tags: ['Upscaling', 'Text to Image', 'Image to Image'] },
+  { category: 'Base Model', tags: ['SD1.5', 'SDXL', 'Bria', 'FLUX'] },
+  { category: 'Tech Showcase', tags: ['Control', 'Reference Image'] },
+] as const;
+export type WorkflowTag = (typeof WORKFLOW_TAGS)[number]['tags'][number];
+
 export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   _version: 1;
   isTouched: boolean;
   mode: WorkflowMode;
-  categories: WorkflowCategory[];
+  selectedTags: WorkflowTag[];
+  selectedCategories: WorkflowCategory[];
   searchTerm: string;
   orderBy?: WorkflowRecordOrderBy;
   orderDirection: SQLiteDirection;
-  categorySections: Record<string, boolean>;
   formFieldInitialValues: Record<string, StatefulFieldValue>;
 };

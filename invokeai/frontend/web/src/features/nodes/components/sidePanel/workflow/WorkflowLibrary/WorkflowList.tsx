@@ -3,10 +3,11 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import {
-  selectWorkflowCategories,
+  selectWorkflowLibrarySelectedTags,
   selectWorkflowOrderBy,
   selectWorkflowOrderDirection,
   selectWorkflowSearchTerm,
+  selectWorkflowSelectedCategories,
 } from 'features/nodes/store/workflowSlice';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,13 +18,14 @@ import { useDebounce } from 'use-debounce';
 
 import { WorkflowListItem } from './WorkflowListItem';
 
-const PER_PAGE = 3;
+const PER_PAGE = 30;
 
 const useInfiniteQueryAry = () => {
-  const categories = useAppSelector(selectWorkflowCategories);
+  const categories = useAppSelector(selectWorkflowSelectedCategories);
   const orderBy = useAppSelector(selectWorkflowOrderBy);
   const direction = useAppSelector(selectWorkflowOrderDirection);
   const query = useAppSelector(selectWorkflowSearchTerm);
+  const tags = useAppSelector(selectWorkflowLibrarySelectedTags);
   const [debouncedQuery] = useDebounce(query, 500);
 
   const queryArg = useMemo(() => {
@@ -34,8 +36,9 @@ const useInfiniteQueryAry = () => {
       direction,
       categories,
       query: debouncedQuery,
+      tags: categories.length === 1 && categories.includes('default') ? tags : [],
     } satisfies Parameters<typeof useListWorkflowsQuery>[0];
-  }, [orderBy, direction, categories, debouncedQuery]);
+  }, [orderBy, direction, categories, debouncedQuery, tags]);
 
   return queryArg;
 };
@@ -163,9 +166,18 @@ const WorkflowListContent = memo(
           ))}
         </Grid>
         <Spacer />
-        <Button onClick={loadMore} isDisabled={!hasNextPage} isLoading={isFetching}>
-          {t('nodes.loadMore')}
-        </Button>
+        {hasNextPage && (
+          <Button
+            onClick={loadMore}
+            isLoading={isFetching}
+            loadingText={t('common.loading')}
+            variant="ghost"
+            w="min-content"
+            alignSelf="center"
+          >
+            {t('workflows.loadMore')}
+          </Button>
+        )}
       </Flex>
     );
   }
