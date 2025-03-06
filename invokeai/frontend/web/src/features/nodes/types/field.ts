@@ -173,6 +173,10 @@ const zSD3MainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SD3MainModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zCogView4MainModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('CogView4MainModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zFluxMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxMainModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -269,6 +273,7 @@ const zStatefulFieldType = z.union([
   zMainModelFieldType,
   zSDXLMainModelFieldType,
   zSD3MainModelFieldType,
+  zCogView4MainModelFieldType,
   zFluxMainModelFieldType,
   zSDXLRefinerModelFieldType,
   zVAEModelFieldType,
@@ -305,6 +310,7 @@ const modelFieldTypeNames = [
   zMainModelFieldType.shape.name.value,
   zSDXLMainModelFieldType.shape.name.value,
   zSD3MainModelFieldType.shape.name.value,
+  zCogView4MainModelFieldType.shape.name.value,
   zFluxMainModelFieldType.shape.name.value,
   zSDXLRefinerModelFieldType.shape.name.value,
   zVAEModelFieldType.shape.name.value,
@@ -806,6 +812,26 @@ export type SD3MainModelFieldInputTemplate = z.infer<typeof zSD3MainModelFieldIn
 export const isSD3MainModelFieldInputInstance = buildInstanceTypeGuard(zSD3MainModelFieldInputInstance);
 export const isSD3MainModelFieldInputTemplate =
   buildTemplateTypeGuard<SD3MainModelFieldInputTemplate>('SD3MainModelField');
+// #endregion
+
+// #region CogView4MainModelField
+const zCogView4MainModelFieldValue = zMainModelFieldValue;
+const zCogView4MainModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zCogView4MainModelFieldValue,
+});
+const zCogView4MainModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zCogView4MainModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zCogView4MainModelFieldValue,
+});
+const zCogView4MainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zCogView4MainModelFieldType,
+});
+export type CogView4MainModelFieldInputInstance = z.infer<typeof zCogView4MainModelFieldInputInstance>;
+export type CogView4MainModelFieldInputTemplate = z.infer<typeof zCogView4MainModelFieldInputTemplate>;
+export const isCogView4MainModelFieldInputInstance = buildInstanceTypeGuard(zCogView4MainModelFieldInputInstance);
+export const isCogView4MainModelFieldInputTemplate =
+  buildTemplateTypeGuard<CogView4MainModelFieldInputTemplate>('CogView4MainModelField');
 // #endregion
 
 // #region FluxMainModelField
@@ -1736,6 +1762,7 @@ export const zStatefulFieldValue = z.union([
   zSDXLMainModelFieldValue,
   zFluxMainModelFieldValue,
   zSD3MainModelFieldValue,
+  zCogView4MainModelFieldValue,
   zSDXLRefinerModelFieldValue,
   zVAEModelFieldValue,
   zLoRAModelFieldValue,
@@ -1781,6 +1808,7 @@ const zStatefulFieldInputInstance = z.union([
   zMainModelFieldInputInstance,
   zFluxMainModelFieldInputInstance,
   zSD3MainModelFieldInputInstance,
+  zCogView4MainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
   zVAEModelFieldInputInstance,
@@ -1821,6 +1849,7 @@ const zStatefulFieldInputTemplate = z.union([
   zMainModelFieldInputTemplate,
   zFluxMainModelFieldInputTemplate,
   zSD3MainModelFieldInputTemplate,
+  zCogView4MainModelFieldInputTemplate,
   zSDXLMainModelFieldInputTemplate,
   zSDXLRefinerModelFieldInputTemplate,
   zVAEModelFieldInputTemplate,
@@ -1867,6 +1896,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zMainModelFieldOutputTemplate,
   zFluxMainModelFieldOutputTemplate,
   zSD3MainModelFieldOutputTemplate,
+  zCogView4MainModelFieldOutputTemplate,
   zSDXLMainModelFieldOutputTemplate,
   zSDXLRefinerModelFieldOutputTemplate,
   zVAEModelFieldOutputTemplate,
