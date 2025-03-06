@@ -5,7 +5,7 @@
   "description": "Simple text to image workflow with a LoRA",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "text to image, lora, default",
+  "tags": "text to image, lora, text to image",
   "notes": "",
   "exposedFields": [
     {

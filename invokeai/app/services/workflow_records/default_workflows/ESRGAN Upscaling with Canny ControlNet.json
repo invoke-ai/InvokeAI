@@ -5,7 +5,7 @@
   "description": "Sample workflow for using Upscaling with ControlNet with SD1.5",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "upscale, controlnet, default",
+  "tags": "upscaling, controlnet, default",
   "notes": "",
   "exposedFields": [
     {

@@ -5,7 +5,7 @@
   "description": "Sample workflow using Prompt from File node",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "text2image, prompt from file, default",
+  "tags": "text2image, prompt from file, default, text to image",
   "notes": "",
   "exposedFields": [
     {

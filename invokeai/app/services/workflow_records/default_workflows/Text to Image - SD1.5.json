@@ -5,7 +5,7 @@
   "description": "Sample text to image workflow for Stable Diffusion 1.5/2",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "text2image, SD1.5, SD2, default",
+  "tags": "text2image, SD1.5, SD2, text to image",
   "notes": "",
   "exposedFields": [
     {
