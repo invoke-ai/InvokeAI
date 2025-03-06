@@ -247,6 +247,10 @@ export const isSD3MainModelModelConfig = (config: AnyModelConfig): config is Mai
   return config.type === 'main' && config.base === 'sd-3';
 };
 
+export const isCogView4MainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'cogview4';
+};
+
 export const isFluxMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux';
 };

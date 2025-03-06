@@ -5,6 +5,7 @@ import type {
   CLIPEmbedModelFieldInputTemplate,
   CLIPGEmbedModelFieldInputTemplate,
   CLIPLEmbedModelFieldInputTemplate,
+  CogView4MainModelFieldInputTemplate,
   ColorFieldInputTemplate,
   ControlLoRAModelFieldInputTemplate,
   ControlNetModelFieldInputTemplate,
@@ -343,6 +344,20 @@ const buildSD3MainModelFieldInputTemplate: FieldInputTemplateBuilder<SD3MainMode
   fieldType,
 }) => {
   const template: SD3MainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildCogView4MainModelFieldInputTemplate: FieldInputTemplateBuilder<CogView4MainModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CogView4MainModelFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -761,6 +776,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   SchedulerField: buildSchedulerFieldInputTemplate,
   SDXLMainModelField: buildSDXLMainModelFieldInputTemplate,
   SD3MainModelField: buildSD3MainModelFieldInputTemplate,
+  CogView4MainModelField: buildCogView4MainModelFieldInputTemplate,
   FluxMainModelField: buildFluxMainModelFieldInputTemplate,
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
