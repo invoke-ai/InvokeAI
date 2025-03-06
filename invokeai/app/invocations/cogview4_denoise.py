@@ -2,24 +2,21 @@ from typing import Callable
 
 import torch
 from diffusers import CogView4Transformer2DModel
-from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    CogView4ConditioningField,
     FieldDescriptions,
     Input,
     InputField,
-    SD3ConditioningField,
     WithBoard,
     WithMetadata,
 )
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
-from invokeai.backend.sd3.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import CogView4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -36,16 +33,16 @@ from invokeai.backend.util.devices import TorchDevice
 class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run the denoising process with a CogView4 model."""
 
-    positive_conditioning: SD3ConditioningField = InputField(
+    positive_conditioning: CogView4ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: SD3ConditioningField = InputField(
+    negative_conditioning: CogView4ConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     cfg_scale: float | list[float] = InputField(default=3.5, description=FieldDescriptions.cfg_scale, title="CFG Scale")
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
-    steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
+    steps: int = InputField(default=25, gt=0, description=FieldDescriptions.steps)
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
     @torch.no_grad()
@@ -150,7 +147,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         transformer_info = context.models.load_by_attrs(
             name="CogView4",
-            base=BaseModelType.StableDiffusion3,
+            base=BaseModelType.CogView4,
             type=ModelType.Main,
             submodel_type=SubModelType.Transformer,
         )
@@ -181,35 +178,21 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         target_size = torch.tensor([(self.height, self.width)], dtype=prompt_embeds.dtype, device=device)
         crops_coords_top_left = torch.tensor([(0, 0)], dtype=prompt_embeds.dtype, device=device)
 
-        # Prepare timesteps
+        # Prepare the timestep schedule.
         image_seq_len = ((self.height // LATENT_SCALE_FACTOR) * (self.width // LATENT_SCALE_FACTOR)) // (
             transformer_info.model.config.patch_size**2
         )
         timesteps = self._prepare_timesteps(num_steps=self.steps, image_seq_len=image_seq_len)
-
-        # Resume here...
-
-        # Prepare the timestep schedule.
-        # We add an extra step to the end to account for the final timestep of 0.0.
-        timesteps: list[float] = torch.linspace(1, 0, self.steps + 1).tolist()
-        # Clip the timesteps schedule based on denoising_start and denoising_end.
-        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+        # TODO(ryand): Add timestep schedule clipping.
         total_steps = len(timesteps) - 1
 
         # Prepare the CFG scale list.
         cfg_scale = self._prepare_cfg_scale(total_steps)
 
-        # Load the input latents, if provided.
-        init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
-        if init_latents is not None:
-            init_latents = init_latents.to(device=device, dtype=inference_dtype)
-
         # Generate initial latent noise.
-        num_channels_latents = transformer_info.model.config.in_channels
-        assert isinstance(num_channels_latents, int)
         noise = self._get_noise(
             batch_size=1,
-            num_channels_latents=num_channels_latents,
+            num_channels_latents=transformer_info.model.config.in_channels,
             height=self.height,
             width=self.width,
             dtype=inference_dtype,
@@ -217,32 +200,8 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             seed=self.seed,
         )
 
-        # Prepare input latent image.
-        if init_latents is not None:
-            # Noise the init_latents by the appropriate amount for the first timestep.
-            t_0 = timesteps[0]
-            latents = t_0 * noise + (1.0 - t_0) * init_latents
-        else:
-            # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
-            if self.denoising_start > 1e-5:
-                raise ValueError("denoising_start should be 0 when initial latents are not provided.")
-            latents = noise
-
-        # If len(timesteps) == 1, then short-circuit. We are just noising the input latents, but not taking any
-        # denoising steps.
-        if len(timesteps) <= 1:
-            return latents
-
-        # Prepare inpaint extension.
-        inpaint_mask = self._prep_inpaint_mask(context, latents)
-        inpaint_extension: InpaintExtension | None = None
-        if inpaint_mask is not None:
-            assert init_latents is not None
-            inpaint_extension = InpaintExtension(
-                init_latents=init_latents,
-                inpaint_mask=inpaint_mask,
-                noise=noise,
-            )
+        # TODO(ryand): Handle image-to-image.
+        latents: torch.Tensor = noise
 
         step_callback = self._build_step_callback(context)
 
@@ -256,10 +215,10 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        with transformer_info.model_on_device() as (cached_weights, transformer):
-            assert isinstance(transformer, SD3Transformer2DModel)
+        with transformer_info.model_on_device() as (_, transformer):
+            assert isinstance(transformer, CogView4Transformer2DModel)
 
-            # 6. Denoising loop
+            # Denoising loop
             for step_idx, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
                 # Expand the latents if we are doing CFG.
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
@@ -269,10 +228,11 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
                 noise_pred = transformer(
                     hidden_states=latent_model_input,
-                    timestep=timestep,
                     encoder_hidden_states=prompt_embeds,
-                    pooled_projections=pooled_prompt_embeds,
-                    joint_attention_kwargs=None,
+                    timestep=timestep,
+                    original_size=original_size,
+                    target_size=target_size,
+                    crop_coords=crops_coords_top_left,
                     return_dict=False,
                 )[0]
 
@@ -283,12 +243,10 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
                 # Compute the previous noisy sample x_t -> x_t-1.
                 latents_dtype = latents.dtype
+                # TODO(ryand): Is casting to float32 necessary for precision/stability? I copied this from SD3.
                 latents = latents.to(dtype=torch.float32)
                 latents = latents + (t_prev - t_curr) * noise_pred
                 latents = latents.to(dtype=latents_dtype)
-
-                if inpaint_extension is not None:
-                    latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, t_prev)
 
                 step_callback(
                     PipelineIntermediateState(
@@ -304,6 +262,6 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, BaseModelType.StableDiffusion3)
+            context.util.sd_step_callback(state, BaseModelType.CogView4)
 
         return step_callback
