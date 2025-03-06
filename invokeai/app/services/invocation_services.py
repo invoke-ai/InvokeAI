@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
+    from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 
@@ -65,6 +66,7 @@ class InvocationServices:
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
         style_preset_records: "StylePresetRecordsStorageBase",
         style_preset_image_files: "StylePresetImageFileStorageBase",
+        workflow_thumbnails: "WorkflowThumbnailServiceBase",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -91,3 +93,4 @@ class InvocationServices:
         self.conditioning = conditioning
         self.style_preset_records = style_preset_records
         self.style_preset_image_files = style_preset_image_files
+        self.workflow_thumbnails = workflow_thumbnails

@@ -3,7 +3,11 @@ from typing import Optional
 import torch
 import torchvision
 
-from invokeai.backend.flux.text_conditioning import FluxRegionalTextConditioning, FluxTextConditioning
+from invokeai.backend.flux.text_conditioning import (
+    FluxReduxConditioning,
+    FluxRegionalTextConditioning,
+    FluxTextConditioning,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Range
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.mask import to_standard_float_mask
@@ -32,14 +36,19 @@ class RegionalPromptingExtension:
         return order[block_index % len(order)]
 
     @classmethod
-    def from_text_conditioning(cls, text_conditioning: list[FluxTextConditioning], img_seq_len: int):
+    def from_text_conditioning(
+        cls,
+        text_conditioning: list[FluxTextConditioning],
+        redux_conditioning: list[FluxReduxConditioning],
+        img_seq_len: int,
+    ):
         """Create a RegionalPromptingExtension from a list of text conditionings.
 
         Args:
             text_conditioning (list[FluxTextConditioning]): The text conditionings to use for regional prompting.
             img_seq_len (int): The image sequence length (i.e. packed_height * packed_width).
         """
-        regional_text_conditioning = cls._concat_regional_text_conditioning(text_conditioning)
+        regional_text_conditioning = cls._concat_regional_text_conditioning(text_conditioning, redux_conditioning)
         attn_mask_with_restricted_img_self_attn = cls._prepare_restricted_attn_mask(
             regional_text_conditioning, img_seq_len
         )
@@ -202,6 +211,7 @@ class RegionalPromptingExtension:
     def _concat_regional_text_conditioning(
         cls,
         text_conditionings: list[FluxTextConditioning],
+        redux_conditionings: list[FluxReduxConditioning],
     ) -> FluxRegionalTextConditioning:
         """Concatenate regional text conditioning data into a single conditioning tensor (with associated masks)."""
         concat_t5_embeddings: list[torch.Tensor] = []
@@ -217,17 +227,26 @@ class RegionalPromptingExtension:
                 global_clip_embedding = text_conditioning.clip_embeddings
                 break
 
+        # Handle T5 text embeddings.
         cur_t5_embedding_len = 0
         for text_conditioning in text_conditionings:
             concat_t5_embeddings.append(text_conditioning.t5_embeddings)
-
             concat_t5_embedding_ranges.append(
                 Range(start=cur_t5_embedding_len, end=cur_t5_embedding_len + text_conditioning.t5_embeddings.shape[1])
             )
-
             image_masks.append(text_conditioning.mask)
-
             cur_t5_embedding_len += text_conditioning.t5_embeddings.shape[1]
+
+        # Handle Redux embeddings.
+        for redux_conditioning in redux_conditionings:
+            concat_t5_embeddings.append(redux_conditioning.redux_embeddings)
+            concat_t5_embedding_ranges.append(
+                Range(
+                    start=cur_t5_embedding_len, end=cur_t5_embedding_len + redux_conditioning.redux_embeddings.shape[1]
+                )
+            )
+            image_masks.append(redux_conditioning.mask)
+            cur_t5_embedding_len += redux_conditioning.redux_embeddings.shape[1]
 
         t5_embeddings = torch.cat(concat_t5_embeddings, dim=1)
 

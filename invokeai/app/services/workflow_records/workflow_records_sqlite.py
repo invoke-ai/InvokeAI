@@ -14,8 +14,8 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowRecordListItemDTO,
     WorkflowRecordListItemDTOValidator,
     WorkflowRecordOrderBy,
+    WorkflowValidator,
     WorkflowWithoutID,
-    WorkflowWithoutIDValidator,
 )
 from invokeai.app.util.misc import uuid_string
 
@@ -55,9 +55,10 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         return WorkflowRecordDTO.from_dict(dict(row))
 
     def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
+        if workflow.meta.category is WorkflowCategory.Default:
+            raise ValueError("Default workflows cannot be created via this method")
+
         try:
-            # Only user workflows may be created by this method
-            assert workflow.meta.category is WorkflowCategory.User
             workflow_with_id = Workflow(**workflow.model_dump(), id=uuid_string())
             cursor = self._conn.cursor()
             cursor.execute(
@@ -77,6 +78,9 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         return self.get(workflow_with_id.id)
 
     def update(self, workflow: Workflow) -> WorkflowRecordDTO:
+        if workflow.meta.category is WorkflowCategory.Default:
+            raise ValueError("Default workflows cannot be updated")
+
         try:
             cursor = self._conn.cursor()
             cursor.execute(
@@ -94,6 +98,9 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         return self.get(workflow.id)
 
     def delete(self, workflow_id: str) -> None:
+        if self.get(workflow_id).workflow.meta.category is WorkflowCategory.Default:
+            raise ValueError("Default workflows cannot be deleted")
+
         try:
             cursor = self._conn.cursor()
             cursor.execute(
@@ -187,27 +194,68 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         """
 
         try:
-            workflows: list[Workflow] = []
+            cursor = self._conn.cursor()
+            workflows_from_file: list[Workflow] = []
+            workflows_to_update: list[Workflow] = []
+            workflows_to_add: list[Workflow] = []
             workflows_dir = Path(__file__).parent / Path("default_workflows")
             workflow_paths = workflows_dir.glob("*.json")
             for path in workflow_paths:
                 bytes_ = path.read_bytes()
-                workflow_without_id = WorkflowWithoutIDValidator.validate_json(bytes_)
-                workflow = Workflow(**workflow_without_id.model_dump(), id=uuid_string())
-                workflows.append(workflow)
-            # Only default workflows may be managed by this method
-            assert all(w.meta.category is WorkflowCategory.Default for w in workflows)
-            cursor = self._conn.cursor()
-            cursor.execute(
-                """--sql
-                DELETE FROM workflow_library
-                WHERE category = 'default';
-                """
-            )
-            for w in workflows:
+                workflow_from_file = WorkflowValidator.validate_json(bytes_)
+
+                assert workflow_from_file.id.startswith("default_"), (
+                    f'Invalid default workflow ID (must start with "default_"): {workflow_from_file.id}'
+                )
+
+                assert workflow_from_file.meta.category is WorkflowCategory.Default, (
+                    f"Invalid default workflow category: {workflow_from_file.meta.category}"
+                )
+
+                workflows_from_file.append(workflow_from_file)
+
+                try:
+                    workflow_from_db = self.get(workflow_from_file.id).workflow
+                    if workflow_from_file != workflow_from_db:
+                        self._invoker.services.logger.debug(
+                            f"Updating library workflow {workflow_from_file.name} ({workflow_from_file.id})"
+                        )
+                        workflows_to_update.append(workflow_from_file)
+                    continue
+                except WorkflowNotFoundError:
+                    self._invoker.services.logger.debug(
+                        f"Adding missing default workflow {workflow_from_file.name} ({workflow_from_file.id})"
+                    )
+                    workflows_to_add.append(workflow_from_file)
+                    continue
+
+            library_workflows_from_db = self.get_many(
+                order_by=WorkflowRecordOrderBy.Name,
+                direction=SQLiteDirection.Ascending,
+                category=WorkflowCategory.Default,
+            ).items
+
+            workflows_from_file_ids = [w.id for w in workflows_from_file]
+
+            for w in library_workflows_from_db:
+                if w.workflow_id not in workflows_from_file_ids:
+                    self._invoker.services.logger.debug(
+                        f"Deleting obsolete default workflow {w.name} ({w.workflow_id})"
+                    )
+                    # We cannot use the `delete` method here, as it only deletes non-default workflows
+                    cursor.execute(
+                        """--sql
+                        DELETE from workflow_library
+                        WHERE workflow_id = ?;
+                        """,
+                        (w.workflow_id,),
+                    )
+
+            for w in workflows_to_add:
+                # We cannot use the `create` method here, as it only creates non-default workflows
                 cursor.execute(
                     """--sql
-                    INSERT OR REPLACE INTO workflow_library (
+                    INSERT INTO workflow_library (
                         workflow_id,
                         workflow
                     )
@@ -215,6 +263,18 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     """,
                     (w.id, w.model_dump_json()),
                 )
+
+            for w in workflows_to_update:
+                # We cannot use the `update` method here, as it only updates non-default workflows
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?
+                    WHERE workflow_id = ?;
+                    """,
+                    (w.model_dump_json(), w.id),
+                )
+
             self._conn.commit()
         except Exception:
             self._conn.rollback()

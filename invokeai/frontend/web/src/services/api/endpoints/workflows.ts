@@ -78,13 +78,41 @@ export const workflowsApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
     }),
+    setWorkflowThumbnail: build.mutation<void, { workflow_id: string; image: File }>({
+      query: ({ workflow_id, image }) => {
+        const formData = new FormData();
+        formData.append('image', image);
+        return {
+          url: buildWorkflowsUrl(`i/${workflow_id}/thumbnail`),
+          method: 'PUT',
+          body: formData,
+        };
+      },
+      invalidatesTags: (result, error, { workflow_id }) => [
+        { type: 'Workflow', id: workflow_id },
+        { type: 'WorkflowsRecent', id: LIST_TAG },
+      ],
+    }),
+    deleteWorkflowThumbnail: build.mutation<void, string>({
+      query: (workflow_id) => ({
+        url: buildWorkflowsUrl(`i/${workflow_id}/thumbnail`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, workflow_id) => [
+        { type: 'Workflow', id: workflow_id },
+        { type: 'WorkflowsRecent', id: LIST_TAG },
+      ],
+    }),
   }),
 });
 
 export const {
   useLazyGetWorkflowQuery,
+  useGetWorkflowQuery,
   useCreateWorkflowMutation,
   useDeleteWorkflowMutation,
   useUpdateWorkflowMutation,
   useListWorkflowsQuery,
+  useSetWorkflowThumbnailMutation,
+  useDeleteWorkflowThumbnailMutation,
 } = workflowsApi;

@@ -1,5 +1,6 @@
 import type { FormControlProps } from '@invoke-ai/ui-library';
-import { Flex, FormControl, FormControlGroup, FormLabel, Input, Textarea } from '@invoke-ai/ui-library';
+import { Box, Flex, FormControl, FormControlGroup, FormLabel, Image, Input, Textarea } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -16,11 +17,15 @@ import {
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
+
+import { WorkflowThumbnailEditor } from './WorkflowThumbnail/WorkflowThumbnailEditor';
 
 const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
-  const { author, name, description, tags, version, contact, notes } = workflow;
+  const { id, author, name, description, tags, version, contact, notes } = workflow;
 
   return {
+    id,
     name,
     author,
     description,
@@ -32,7 +37,7 @@ const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
 });
 
 const WorkflowGeneralTab = () => {
-  const { author, name, description, tags, version, contact, notes } = useAppSelector(selector);
+  const { id, author, name, description, tags, version, contact, notes } = useAppSelector(selector);
   const dispatch = useAppDispatch();
 
   const handleChangeName = useCallback(
@@ -89,6 +94,7 @@ const WorkflowGeneralTab = () => {
             <FormLabel>{t('nodes.workflowName')}</FormLabel>
             <Input variant="darkFilled" value={name} onChange={handleChangeName} />
           </FormControl>
+          <Thumbnail id={id} />
           <FormControl>
             <FormLabel>{t('nodes.workflowVersion')}</FormLabel>
             <Input variant="darkFilled" value={version} onChange={handleChangeVersion} />
@@ -137,4 +143,46 @@ export default memo(WorkflowGeneralTab);
 
 const formControlProps: FormControlProps = {
   flexShrink: 0,
+};
+
+const Thumbnail = ({ id }: { id?: string | null }) => {
+  const { t } = useTranslation();
+
+  const { data } = useGetWorkflowQuery(id ?? skipToken);
+
+  if (!data) {
+    return null;
+  }
+
+  if (data.workflow.meta.category === 'default' && data.thumbnail_url) {
+    // This is a default workflow and it has a thumbnail set. Users may only view the thumbnail.
+    return (
+      <FormControl>
+        <FormLabel>{t('workflows.workflowThumbnail')}</FormLabel>
+        <Box position="relative" flexShrink={0}>
+          <Image
+            src={data.thumbnail_url}
+            objectFit="cover"
+            objectPosition="50% 50%"
+            w={100}
+            h={100}
+            borderRadius="base"
+          />
+        </Box>
+      </FormControl>
+    );
+  }
+
+  if (data.workflow.meta.category !== 'default') {
+    // This is a user workflow and they may edit the thumbnail.
+    return (
+      <FormControl>
+        <FormLabel>{t('workflows.workflowThumbnail')}</FormLabel>
+        <WorkflowThumbnailEditor thumbnailUrl={data.thumbnail_url} workflowId={data.workflow_id} />
+      </FormControl>
+    );
+  }
+
+  // This is a default workflow and it does not have a thumbnail set. Users may not edit the thumbnail.
+  return null;
 };

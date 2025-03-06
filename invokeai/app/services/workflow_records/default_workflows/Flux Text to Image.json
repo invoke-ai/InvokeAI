@@ -1,4 +1,5 @@
 {
+  "id": "default_444fe292-896b-44fd-bfc6-c0b5d220fffc",
   "name": "FLUX Text to Image",
   "author": "InvokeAI",
   "description": "A simple text-to-image workflow using FLUX dev or schnell models.",

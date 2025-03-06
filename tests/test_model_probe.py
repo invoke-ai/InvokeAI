@@ -1,7 +1,9 @@
+import abc
 import json
 from pathlib import Path
 from typing import Any
 
+import pydantic
 import pytest
 import torch
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -204,3 +206,20 @@ def test_serialisation_roundtrip():
             reconstructed = ModelConfigFactory.make_config(as_dict)
             assert isinstance(reconstructed, config_cls)
             assert config.model_dump_json() == reconstructed.model_dump_json()
+
+
+def test_inheritance_order():
+    """
+       Safeguard test to warn against incorrect inheritance order.
+
+       Config classes using multiple inheritance should inherit from ModelConfigBase last
+       to ensure that more specific fields take precedence over the generic defaults.
+
+       It may be worth rethinking our config taxonomy in the future, but in the meantime,
+       this test can help prevent the debugging effort I went through discovering this.
+       """
+    for config_cls in concrete_subclasses(ModelConfigBase):
+        excluded = { abc.ABC, pydantic.BaseModel, object }
+        inheritance_list = [cls for cls in config_cls.mro() if cls not in excluded]
+        assert inheritance_list[-1] is ModelConfigBase
+

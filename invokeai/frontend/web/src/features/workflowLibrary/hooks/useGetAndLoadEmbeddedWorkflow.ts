@@ -1,6 +1,5 @@
-import { useAppDispatch } from 'app/store/storeHooks';
-import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { toast } from 'features/toast/toast';
+import { useLoadWorkflow } from 'features/workflowLibrary/hooks/useLoadWorkflow';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLazyGetImageWorkflowQuery } from 'services/api/endpoints/images';
@@ -11,15 +10,15 @@ type UseGetAndLoadEmbeddedWorkflowOptions = {
 };
 
 export const useGetAndLoadEmbeddedWorkflow = (options?: UseGetAndLoadEmbeddedWorkflowOptions) => {
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const [_getAndLoadEmbeddedWorkflow, result] = useLazyGetImageWorkflowQuery();
+  const loadWorkflow = useLoadWorkflow();
   const getAndLoadEmbeddedWorkflow = useCallback(
     async (imageName: string) => {
       try {
         const { data } = await _getAndLoadEmbeddedWorkflow(imageName);
         if (data) {
-          dispatch(workflowLoadRequested({ data, asCopy: true }));
+          loadWorkflow(data);
           // No toast - the listener for this action does that after the workflow is loaded
           options?.onSuccess && options?.onSuccess();
         } else {
@@ -38,7 +37,7 @@ export const useGetAndLoadEmbeddedWorkflow = (options?: UseGetAndLoadEmbeddedWor
         options?.onError && options?.onError();
       }
     },
-    [_getAndLoadEmbeddedWorkflow, dispatch, options, t]
+    [_getAndLoadEmbeddedWorkflow, loadWorkflow, options, t]
   );
 
   return [getAndLoadEmbeddedWorkflow, result] as const;

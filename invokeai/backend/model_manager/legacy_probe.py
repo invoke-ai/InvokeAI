@@ -15,6 +15,7 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
 from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlabs_ip_adapter
+from invokeai.backend.flux.redux.flux_redux_state_dict_utils import is_state_dict_likely_flux_redux
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -139,6 +140,7 @@ class ModelProbe(object):
         "FluxControlNetModel": ModelType.ControlNet,
         "SD3Transformer2DModel": ModelType.Main,
         "CLIPTextModelWithProjection": ModelType.CLIPEmbed,
+        "SiglipModel": ModelType.SigLIP,
     }
 
     TYPE2VARIANT: Dict[ModelType, Callable[[str], Optional[AnyVariant]]] = {ModelType.CLIPEmbed: get_clip_variant_type}
@@ -266,6 +268,9 @@ class ModelProbe(object):
 
         if isinstance(ckpt, dict) and is_state_dict_likely_flux_control(ckpt):
             return ModelType.ControlLoRa
+
+        if isinstance(ckpt, dict) and is_state_dict_likely_flux_redux(ckpt):
+            return ModelType.FluxRedux
 
         for key in [str(k) for k in ckpt.keys()]:
             if key.startswith(
@@ -752,6 +757,16 @@ class SpandrelImageToImageCheckpointProbe(CheckpointProbeBase):
         return BaseModelType.Any
 
 
+class SigLIPCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
+class FluxReduxCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Flux
+
+
 ########################################################
 # classes for probing folders
 #######################################################
@@ -1022,6 +1037,16 @@ class SpandrelImageToImageFolderProbe(FolderProbeBase):
         raise NotImplementedError()
 
 
+class SigLIPFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
+class FluxReduxFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        raise NotImplementedError()
+
+
 class T2IAdapterFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         config_file = self.model_path / "config.json"
@@ -1055,6 +1080,8 @@ ModelProbe.register_probe("diffusers", ModelType.CLIPEmbed, CLIPEmbedFolderProbe
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelImageToImageFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.SigLIP, SigLIPFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.FluxRedux, FluxReduxFolderProbe)
 
 ModelProbe.register_probe("checkpoint", ModelType.Main, PipelineCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.VAE, VaeCheckpointProbe)
@@ -1066,5 +1093,7 @@ ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpoint
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.SpandrelImageToImage, SpandrelImageToImageCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.SigLIP, SigLIPCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.FluxRedux, FluxReduxCheckpointProbe)
 
 ModelProbe.register_probe("onnx", ModelType.ONNX, ONNXFolderProbe)

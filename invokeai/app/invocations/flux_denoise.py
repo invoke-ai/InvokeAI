@@ -15,6 +15,7 @@ from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
     FluxConditioningField,
+    FluxReduxConditioningField,
     ImageField,
     Input,
     InputField,
@@ -46,7 +47,7 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
-from invokeai.backend.flux.text_conditioning import FluxTextConditioning
+from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
 from invokeai.backend.model_manager.config import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
@@ -101,6 +102,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     negative_text_conditioning: FluxConditioningField | list[FluxConditioningField] | None = InputField(
         default=None,
         description="Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
+        input=Input.Connection,
+    )
+    redux_conditioning: FluxReduxConditioningField | list[FluxReduxConditioningField] | None = InputField(
+        default=None,
+        description="FLUX Redux conditioning tensor.",
         input=Input.Connection,
     )
     cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
@@ -190,11 +196,23 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 dtype=inference_dtype,
                 device=TorchDevice.choose_torch_device(),
             )
+        redux_conditionings: list[FluxReduxConditioning] = self._load_redux_conditioning(
+            context=context,
+            redux_cond_field=self.redux_conditioning,
+            packed_height=packed_h,
+            packed_width=packed_w,
+            device=TorchDevice.choose_torch_device(),
+            dtype=inference_dtype,
+        )
         pos_regional_prompting_extension = RegionalPromptingExtension.from_text_conditioning(
-            pos_text_conditionings, img_seq_len=packed_h * packed_w
+            text_conditioning=pos_text_conditionings,
+            redux_conditioning=redux_conditionings,
+            img_seq_len=packed_h * packed_w,
         )
         neg_regional_prompting_extension = (
-            RegionalPromptingExtension.from_text_conditioning(neg_text_conditionings, img_seq_len=packed_h * packed_w)
+            RegionalPromptingExtension.from_text_conditioning(
+                text_conditioning=neg_text_conditionings, redux_conditioning=[], img_seq_len=packed_h * packed_w
+            )
             if neg_text_conditionings
             else None
         )
@@ -399,6 +417,42 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             text_conditionings.append(FluxTextConditioning(t5_embeddings, clip_embeddings, mask))
 
         return text_conditionings
+
+    def _load_redux_conditioning(
+        self,
+        context: InvocationContext,
+        redux_cond_field: FluxReduxConditioningField | list[FluxReduxConditioningField] | None,
+        packed_height: int,
+        packed_width: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> list[FluxReduxConditioning]:
+        # Normalize to a list of FluxReduxConditioningFields.
+        if redux_cond_field is None:
+            return []
+
+        redux_cond_list = (
+            [redux_cond_field] if isinstance(redux_cond_field, FluxReduxConditioningField) else redux_cond_field
+        )
+
+        redux_conditionings: list[FluxReduxConditioning] = []
+        for redux_cond_field in redux_cond_list:
+            # Load the Redux conditioning tensor.
+            redux_cond_data = context.tensors.load(redux_cond_field.conditioning.tensor_name)
+            redux_cond_data.to(device=device, dtype=dtype)
+
+            # Load the mask, if provided.
+            mask: Optional[torch.Tensor] = None
+            if redux_cond_field.mask is not None:
+                mask = context.tensors.load(redux_cond_field.mask.tensor_name)
+                mask = mask.to(device=device)
+                mask = RegionalPromptingExtension.preprocess_regional_prompt_mask(
+                    mask, packed_height, packed_width, dtype, device
+                )
+
+            redux_conditionings.append(FluxReduxConditioning(redux_embeddings=redux_cond_data, mask=mask))
+
+        return redux_conditionings
 
     @classmethod
     def prep_cfg_scale(

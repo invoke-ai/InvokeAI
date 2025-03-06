@@ -1,17 +1,21 @@
 import { logger } from 'app/logging/logger';
+import { useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, WorkflowsState } from 'features/nodes/store/types';
+import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { zWorkflowV3 } from 'features/nodes/types/workflow';
 import i18n from 'i18n';
 import { pick } from 'lodash-es';
+import { useCallback } from 'react';
 import { fromZodError } from 'zod-validation-error';
 
 const log = logger('workflows');
 
-export type BuildWorkflowArg = {
+type BuildWorkflowArg = {
   nodes: NodesState['nodes'];
   edges: NodesState['edges'];
   workflow: WorkflowsState;
@@ -34,7 +38,7 @@ const workflowKeys = [
 type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV3;
 
 export const buildWorkflowFast: BuildWorkflowFunction = ({ nodes, edges, workflow }: BuildWorkflowArg): WorkflowV3 => {
-  const clonedWorkflow = pick(deepClone(workflow), workflowKeys);
+  const clonedWorkflow = pick(workflow, workflowKeys);
 
   const newWorkflow: WorkflowV3 = {
     ...clonedWorkflow,
@@ -42,46 +46,27 @@ export const buildWorkflowFast: BuildWorkflowFunction = ({ nodes, edges, workflo
     edges: [],
   };
 
-  nodes.forEach((node) => {
+  for (const node of nodes) {
     if (isInvocationNode(node) && node.type) {
-      newWorkflow.nodes.push({
-        id: node.id,
-        type: node.type,
-        data: deepClone(node.data),
-        position: { ...node.position },
-      });
+      const { id, type, data, position } = node;
+      newWorkflow.nodes.push({ id, type, data, position });
     } else if (isNotesNode(node) && node.type) {
-      newWorkflow.nodes.push({
-        id: node.id,
-        type: node.type,
-        data: deepClone(node.data),
-        position: { ...node.position },
-      });
+      const { id, type, data, position } = node;
+      newWorkflow.nodes.push({ id, type, data, position });
     }
-  });
+  }
 
-  edges.forEach((edge) => {
+  for (const edge of edges) {
     if (edge.type === 'default' && edge.sourceHandle && edge.targetHandle) {
-      newWorkflow.edges.push({
-        id: edge.id,
-        type: edge.type,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle,
-        hidden: edge.hidden,
-      });
+      const { id, type, source, target, sourceHandle, targetHandle, hidden } = edge;
+      newWorkflow.edges.push({ id, type, source, target, sourceHandle, targetHandle, hidden });
     } else if (edge.type === 'collapsed') {
-      newWorkflow.edges.push({
-        id: edge.id,
-        type: edge.type,
-        source: edge.source,
-        target: edge.target,
-      });
+      const { id, type, source, target } = edge;
+      newWorkflow.edges.push({ id, type, source, target });
     }
-  });
+  }
 
-  return newWorkflow;
+  return deepClone(newWorkflow);
 };
 
 export const buildWorkflowWithValidation = ({ nodes, edges, workflow }: BuildWorkflowArg): WorkflowV3 | null => {
@@ -101,4 +86,16 @@ export const buildWorkflowWithValidation = ({ nodes, edges, workflow }: BuildWor
   }
 
   return result.data;
+};
+
+export const useBuildWorkflowFast = (): (() => WorkflowV3) => {
+  const store = useAppStore();
+  const buildWorkflow = useCallback(() => {
+    const state = store.getState();
+    const { nodes, edges } = selectNodesSlice(state);
+    const workflow = selectWorkflowSlice(state);
+    return buildWorkflowFast({ nodes, edges, workflow });
+  }, [store]);
+
+  return buildWorkflow;
 };

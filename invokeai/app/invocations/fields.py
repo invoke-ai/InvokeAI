@@ -57,6 +57,8 @@ class UIType(str, Enum, metaclass=MetaEnum):
     CLIPGEmbedModel = "CLIPGEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     ControlLoRAModel = "ControlLoRAModelField"
+    SigLipModel = "SigLipModelField"
+    FluxReduxModel = "FluxReduxModelField"
     # endregion
 
     # region Misc Field Types
@@ -152,6 +154,7 @@ class FieldDescriptions:
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
     spandrel_image_to_image_model = "Image-to-Image model"
+    vllm_model = "VLLM model"
     lora_weight = "The weight at which the LoRA is applied to each model"
     compel_prompt = "Prompt to be parsed by Compel to create a conditioning tensor"
     raw_prompt = "Raw prompt text (no parsing)"
@@ -201,6 +204,7 @@ class FieldDescriptions:
     freeu_b1 = "Scaling factor for stage 1 to amplify the contributions of backbone features."
     freeu_b2 = "Scaling factor for stage 2 to amplify the contributions of backbone features."
     instantx_control_mode = "The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'."
+    flux_redux_conditioning = "FLUX Redux conditioning tensor"
 
 
 class ImageField(BaseModel):
@@ -252,6 +256,17 @@ class FluxConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
+        "included regions should be set to True.",
+    )
+
+
+class FluxReduxConditioningField(BaseModel):
+    """A FLUX Redux conditioning tensor primitive value"""
+
+    conditioning: TensorField = Field(description="The Redux image conditioning tensor.")
     mask: Optional[TensorField] = Field(
         default=None,
         description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "

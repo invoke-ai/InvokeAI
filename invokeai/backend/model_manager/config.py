@@ -87,6 +87,8 @@ class ModelType(str, Enum):
     T2IAdapter = "t2i_adapter"
     T5Encoder = "t5_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
+    SigLIP = "siglip"
+    FluxRedux = "flux_redux"
 
 
 class SubModelType(str, Enum):
@@ -569,20 +571,18 @@ class IPAdapterCheckpointConfig(IPAdapterConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
 
-@legacy_probe
-class CLIPEmbedDiffusersConfig(DiffusersConfigBase, ModelConfigBase):
-    """Model config for Clip Embeddings."""
 
+class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
+    """Model config for Clip Embeddings."""
     variant: ClipVariantType = Field(description="Clip variant for this model")
     type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
 @legacy_probe
-class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig):
+class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, ModelConfigBase):
     """Model config for CLIP-G Embeddings."""
-
-    variant: ClipVariantType = ClipVariantType.G
+    variant: Literal[ClipVariantType.G] = ClipVariantType.G
 
     @classmethod
     def get_tag(cls) -> Tag:
@@ -590,18 +590,16 @@ class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig):
 
 
 @legacy_probe
-class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig):
+class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig,  ModelConfigBase):
     """Model config for CLIP-L Embeddings."""
-
-    variant: ClipVariantType = ClipVariantType.L
-
+    variant: Literal[ClipVariantType.L] = ClipVariantType.L
     @classmethod
     def get_tag(cls) -> Tag:
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.L.value}")
 
 
 @legacy_probe
-class CLIPVisionDiffusersConfig(ModelConfigBase, DiffusersConfigBase):
+class CLIPVisionDiffusersConfig(DiffusersConfigBase, ModelConfigBase):
     """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
@@ -609,7 +607,7 @@ class CLIPVisionDiffusersConfig(ModelConfigBase, DiffusersConfigBase):
 
 
 @legacy_probe
-class T2IAdapterConfig(ModelConfigBase, DiffusersConfigBase, ControlAdapterConfigBase):
+class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
@@ -623,6 +621,21 @@ class SpandrelImageToImageConfig(ModelConfigBase):
     _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.SLOW  # requires loading the model from disk
 
     type: Literal[ModelType.SpandrelImageToImage] = ModelType.SpandrelImageToImage
+    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+
+@legacy_probe
+class SigLIPConfig(DiffusersConfigBase, ModelConfigBase):
+    """Model config for SigLIP."""
+
+    type: Literal[ModelType.SigLIP] = ModelType.SigLIP
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+
+@legacy_probe
+class FluxReduxConfig(ModelConfigBase):
+    """Model config for FLUX Tools Redux model."""
+
+    type: Literal[ModelType.FluxRedux] = ModelType.FluxRedux
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
 
@@ -650,10 +663,13 @@ def get_model_discriminator_value(v: Any) -> str:
         type_ = v.type.value
         variant_ = getattr(v, "variant", None)
 
-    # Ideally, each config would be uniquely identified without the need for special-case logic.
-    # However, due to pre-existing inconsistencies in our config taxonomy, this is not currently feasible without a refactor.
-    # Such a refactor would require careful thought and testing to ensure backwards compatibility with existing values stored in the database.
-    if type_ == ModelType.CLIPEmbed.value and format_ == ModelFormat.Diffusers.value and variant_:
+    # Ideally, each config would be uniquely identified with a combination of fields
+    # i.e. (type, format, variant) without any special cases. Alas...
+
+    # Previously, CLIPEmbed did not have any variants, meaning older database entries lack a variant field.
+    # To maintain compatibility, we default to ClipVariantType.L in this case.
+    if type_ == ModelType.CLIPEmbed.value and format_ == ModelFormat.Diffusers.value:
+        variant_ = variant_ or ClipVariantType.L.value
         return f"{type_}.{format_}.{variant_}"
     return f"{type_}.{format_}"
 

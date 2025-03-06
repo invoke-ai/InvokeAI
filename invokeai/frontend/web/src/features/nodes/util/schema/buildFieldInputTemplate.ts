@@ -15,6 +15,7 @@ import type {
   FloatFieldInputTemplate,
   FloatGeneratorFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
+  FluxReduxModelFieldInputTemplate,
   FluxVAEModelFieldInputTemplate,
   ImageFieldCollectionInputTemplate,
   ImageFieldInputTemplate,
@@ -30,6 +31,7 @@ import type {
   SD3MainModelFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
   SDXLRefinerModelFieldInputTemplate,
+  SigLipModelFieldInputTemplate,
   SpandrelImageToImageModelFieldInputTemplate,
   StatefulFieldType,
   StatelessFieldInputTemplate,
@@ -527,6 +529,33 @@ const buildSpandrelImageToImageModelFieldInputTemplate: FieldInputTemplateBuilde
 
   return template;
 };
+
+const buildSigLipModelFieldInputTemplate: FieldInputTemplateBuilder<SigLipModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SigLipModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
+const buildFluxReduxModelFieldInputTemplate: FieldInputTemplateBuilder<FluxReduxModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FluxReduxModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
 const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -729,6 +758,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
   ControlLoRAModelField: buildControlLoRAModelFieldInputTemplate,
+  SigLipModelField: buildSigLipModelFieldInputTemplate,
+  FluxReduxModelField: buildFluxReduxModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,

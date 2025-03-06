@@ -54,13 +54,6 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
   // Parse the raw workflow data & migrate it to the latest version
   const _workflow = parseAndMigrateWorkflow(workflow);
 
-  // System workflows are only allowed to be used as templates.
-  // If a system workflow is loaded, change its category to user and remove its ID so that we can save it as a user workflow.
-  if (_workflow.meta.category === 'default') {
-    _workflow.meta.category = 'user';
-    _workflow.id = undefined;
-  }
-
   // Now we can validate the graph
   const { nodes, edges } = _workflow;
   const warnings: WorkflowWarning[] = [];

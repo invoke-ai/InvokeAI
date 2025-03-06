@@ -11,12 +11,12 @@ import type { MouseEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiPencilBold, PiShareFatBold, PiTrashBold } from 'react-icons/pi';
-import type { WorkflowRecordListItemDTO } from 'services/api/types';
+import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 import { useShareWorkflow } from './ShareWorkflowModal';
 import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
-export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
+export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
   const { t } = useTranslation();
   const projectUrl = useStore($projectUrl);
   const [isHovered, setIsHovered] = useState(false);
@@ -39,15 +39,23 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
 
-  const handleClickLoad = useCallback(() => {
-    setIsHovered(false);
-    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
-  }, [loadWorkflow, workflow.workflow_id]);
+  const handleClickLoad = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      setIsHovered(false);
+      loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
+    },
+    [loadWorkflow, workflow.workflow_id]
+  );
 
-  const handleClickEdit = useCallback(() => {
-    setIsHovered(false);
-    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
-  }, [loadWorkflow, workflow.workflow_id]);
+  const handleClickEdit = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      setIsHovered(false);
+      loadWorkflow.loadWithDialog(workflow.workflow_id, 'edit');
+    },
+    [loadWorkflow, workflow.workflow_id]
+  );
 
   const handleClickDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {

@@ -1,4 +1,5 @@
 {
+  "id": "default_e71d153c-2089-43c7-bd2c-f61f37d4c1c1",
   "name": "Text to Image with LoRA",
   "author": "InvokeAI",
   "description": "Simple text to image workflow with a LoRA",

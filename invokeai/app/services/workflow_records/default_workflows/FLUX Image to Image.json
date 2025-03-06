@@ -1,4 +1,5 @@
 {
+  "id": "default_cbf0e034-7b54-4b2c-b670-3b1e2e4b4a88",
   "name": "FLUX Image to Image",
   "author": "InvokeAI",
   "description": "A simple image-to-image workflow using a FLUX dev model. ",
