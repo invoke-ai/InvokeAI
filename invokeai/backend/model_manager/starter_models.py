@@ -592,12 +592,13 @@ swinir = StarterModel(
 )
 
 # endregion
+
 # region CogView4
 cogview4 = StarterModel(
     name="CogView4",
     base=BaseModelType.CogView4,
     source="THUDM/CogView4-6B",
-    description="The base CogView4 model.",
+    description="The base CogView4 model (~29GB).",
     type=ModelType.Main,
 )
 # endregion
