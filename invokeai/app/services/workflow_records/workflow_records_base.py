@@ -58,3 +58,8 @@ class WorkflowRecordsStorageBase(ABC):
     ) -> int:
         """Gets the count of workflows for the given tags and categories."""
         pass
+
+    @abstractmethod
+    def update_opened_at(self, workflow_id: str) -> None:
+        """Open a workflow."""
+        pass

@@ -19,6 +19,8 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
 )
 from invokeai.app.util.misc import uuid_string
 
+SQL_TIME_FORMAT = "%Y-%m-%d %H:%M:%f"
+
 
 class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
@@ -32,15 +34,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
     def get(self, workflow_id: str) -> WorkflowRecordDTO:
         """Gets a workflow by ID. Updates the opened_at column."""
         cursor = self._conn.cursor()
-        cursor.execute(
-            """--sql
-            UPDATE workflow_library
-            SET opened_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
-            WHERE workflow_id = ?;
-            """,
-            (workflow_id,),
-        )
-        self._conn.commit()
         cursor.execute(
             """--sql
             SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
@@ -285,6 +278,22 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
         cursor.execute(stmt, tuple(params))
         return cursor.fetchone()[0]
+
+    def update_opened_at(self, workflow_id: str) -> None:
+        try:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                f"""--sql
+                UPDATE workflow_library
+                SET opened_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                WHERE workflow_id = ?;
+                """,
+                (workflow_id,),
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
 
     def _sync_default_workflows(self) -> None:
         """Syncs default workflows to the database. Internal use only."""
