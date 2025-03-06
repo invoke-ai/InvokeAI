@@ -237,6 +237,55 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             total=total,
         )
 
+    def get_counts(
+        self,
+        tags: Optional[list[str]],
+        categories: Optional[list[WorkflowCategory]],
+    ) -> int:
+        cursor = self._conn.cursor()
+
+        # Start with an empty list of conditions and params
+        conditions: list[str] = []
+        params: list[str | int] = []
+
+        if tags:
+            # Construct a list of conditions for each tag
+            tags_conditions = ["tags LIKE ?" for _ in tags]
+            tags_conditions_joined = " OR ".join(tags_conditions)
+            tags_condition = f"({tags_conditions_joined})"
+
+            # And the params for the tags, case-insensitive
+            tags_params = [f"%{t.strip()}%" for t in tags]
+
+            conditions.append(tags_condition)
+            params.extend(tags_params)
+
+        if categories:
+            # Ensure all categories are valid (is this necessary?)
+            assert all(c in WorkflowCategory for c in categories)
+
+            # Construct a placeholder string for the number of categories
+            placeholders = ", ".join("?" for _ in categories)
+
+            # Construct the condition string & params
+            conditions.append(f"category IN ({placeholders})")
+            params.extend([category.value for category in categories])
+
+        stmt = """--sql
+            SELECT COUNT(*)
+            FROM workflow_library
+            """
+
+        if conditions:
+            # If there are conditions, add a WHERE clause and then join the conditions
+            stmt += " WHERE "
+
+            all_conditions = " AND ".join(conditions)
+            stmt += all_conditions
+
+        cursor.execute(stmt, tuple(params))
+        return cursor.fetchone()[0]
+
     def _sync_default_workflows(self) -> None:
         """Syncs default workflows to the database. Internal use only."""
 
@@ -261,13 +310,13 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 bytes_ = path.read_bytes()
                 workflow_from_file = WorkflowValidator.validate_json(bytes_)
 
-                assert workflow_from_file.id.startswith("default_"), (
-                    f'Invalid default workflow ID (must start with "default_"): {workflow_from_file.id}'
-                )
+                assert workflow_from_file.id.startswith(
+                    "default_"
+                ), f'Invalid default workflow ID (must start with "default_"): {workflow_from_file.id}'
 
-                assert workflow_from_file.meta.category is WorkflowCategory.Default, (
-                    f"Invalid default workflow category: {workflow_from_file.meta.category}"
-                )
+                assert (
+                    workflow_from_file.meta.category is WorkflowCategory.Default
+                ), f"Invalid default workflow category: {workflow_from_file.meta.category}"
 
                 workflows_from_file.append(workflow_from_file)
 

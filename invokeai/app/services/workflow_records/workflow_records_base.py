@@ -49,3 +49,12 @@ class WorkflowRecordsStorageBase(ABC):
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass
+
+    @abstractmethod
+    def get_counts(
+        self,
+        tags: Optional[list[str]],
+        categories: Optional[list[WorkflowCategory]],
+    ) -> int:
+        """Gets the count of workflows for the given tags and categories."""
+        pass
