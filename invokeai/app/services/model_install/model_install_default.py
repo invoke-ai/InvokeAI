@@ -645,13 +645,14 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
         config = config or ModelRecordChanges()
-        overrides = config.model_dump()
+        hash_algo = self._app_config.hashing_algorithm
+        fields = config.model_dump()
+        overrides = {"hash_algo": hash_algo, **fields}
+
         try:
             return ModelConfigBase.classify(model_path, **overrides)
         except InvalidModelConfigException:
-            return ModelProbe.probe(
-                model_path=model_path, fields=overrides, hash_algo=self._app_config.hashing_algorithm
-            )  # type: ignore
+            return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None

@@ -30,20 +30,16 @@ from typing import ClassVar, Literal, Optional, TypeAlias, Union
 
 import diffusers
 import onnxruntime as ort
-import safetensors.torch
 import torch
 from diffusers.models.modeling_utils import ModelMixin
-from picklescan.scanner import scan_file_path
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.raw_model import RawModel
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
-from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 logger = logging.getLogger(__name__)
 
@@ -216,23 +212,7 @@ class ModelOnDisk:
             self.name = path.name
 
     def lazy_load_state_dict(self) -> dict[str, torch.Tensor]:
-        if self.format_type == ModelFormat.Diffusers:
-            raise NotImplementedError()
-
-        with SilenceWarnings():
-            if self.path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
-                scan_result = scan_file_path(self.path)
-                if scan_result.infected_files != 0 or scan_result.scan_err:
-                    raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
-                checkpoint = torch.load(self.path, map_location="cpu")
-
-            elif self.path.suffix.endswith(".gguf"):
-                checkpoint = gguf_sd_loader(self.path, compute_dtype=torch.float32)
-            else:
-                checkpoint = safetensors.torch.load_file(self.path)
-
-        state_dict = checkpoint.get("state_dict") or checkpoint
-        return state_dict
+        raise NotImplementedError()
 
 
 class MatchSpeed(int, Enum):
@@ -286,24 +266,43 @@ class ModelConfigBase(ABC, BaseModel):
         description="Loadable submodels in this model", default=None
     )
 
-    def __init__(self, **fields):
-        path = Path(fields["path"])
-        fields["path"] = path.as_posix()
+    _USING_LEGACY_PROBE: ClassVar[set] = set()
+    _USING_CLASSIFY_API: ClassVar[set] = set()
+    _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.MED
 
-        default_hash_algo: HASHING_ALGORITHMS = "blake3_single"
-        fields["hash_algo"] = hash_algo = fields.get("hash_algo", default_hash_algo)
-        fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(path)
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if issubclass(cls, LegacyProbeMixin):
+            ModelConfigBase._USING_LEGACY_PROBE.add(cls)
+        else:
+            ModelConfigBase._USING_CLASSIFY_API.add(cls)
 
-        name = fields.get("name")
-        if not name:
-            if path.suffix in {".safetensors", ".bin", ".pt", ".ckpt"}:
-                fields["name"] = path.stem
-            else:
-                fields["name"] = path.name
+    @staticmethod
+    def all_config_classes():
+        subclasses = ModelConfigBase._USING_LEGACY_PROBE | ModelConfigBase._USING_CLASSIFY_API
+        concrete = {cls for cls in subclasses if not isabstract(cls)}
+        return concrete
 
-        fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
-        fields["source"] = fields.get("source") or path.as_posix()
-        super().__init__(**fields)
+    @staticmethod
+    def classify(path: Path, **overrides):
+        """
+        Returns the best matching ModelConfig instance from a model's file/folder path.
+        Raises InvalidModelConfigException if no valid configuration is found.
+        Created to deprecate ModelProbe.probe
+        """
+        candidates = ModelConfigBase._USING_CLASSIFY_API
+        sorted_by_match_speed = sorted(candidates, key=lambda cls: cls._MATCH_SPEED)
+        mod = ModelOnDisk(path)
+
+        for config_cls in sorted_by_match_speed:
+            try:
+                return config_cls.from_model_on_disk(mod, **overrides)
+            except InvalidModelConfigException:
+                logger.debug(f"ModelConfig '{config_cls.__name__}' failed to parse '{mod.path}', trying next config")
+            except Exception as e:
+                logger.error(f"Unexpected exception while parsing '{config_cls.__name__}': {e}, trying next config")
+
+        raise InvalidModelConfigException("No valid config found")
 
     @classmethod
     def get_tag(cls) -> Tag:
@@ -333,56 +332,32 @@ class ModelConfigBase(ABC, BaseModel):
             raise InvalidModelConfigException(f"Path {mod.path} does not match {cls.__name__} format")
 
         fields = cls.parse(mod)
-        fields["path"] = fields.get("path") or mod.path
+
+        fields["path"] = mod.path.as_posix()
+        fields["source"] = fields.get("source") or fields["path"]
+        fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
+        fields["name"] = mod.name
+        default_hash_algo: HASHING_ALGORITHMS = "blake3_single"
+        fields["hash_algo"] = hash_algo = fields.get("hash_algo", default_hash_algo)
+        fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(mod.path)
+
         fields.update(overrides)
         return cls(**fields)
 
-    _USING_LEGACY_PROBE: ClassVar[set] = set()
-    _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.MED
 
-    @staticmethod
-    def classify(path: Path, **overrides):
-        """
-        Returns the best matching ModelConfig instance from a model's file/folder path.
-        Raises InvalidModelConfigException if no valid configuration is found.
-        Created to deprecate ModelProbe.probe
-        """
-        candidates = concrete_subclasses(ModelConfigBase) - ModelConfigBase._USING_LEGACY_PROBE
-        sorted_by_match_speed = sorted(candidates, key=lambda cls: cls._MATCH_SPEED)
-        mod = ModelOnDisk(path)
+class LegacyProbeMixin:
+    """Mixin for classes using the legacy probe for model classification."""
 
-        for config_cls in sorted_by_match_speed:
-            try:
-                return config_cls.from_model_on_disk(mod, **overrides)
-            except InvalidModelConfigException:
-                logger.debug(f"ModelConfig '{config_cls.__name__}' failed to parse '{mod.path}', trying next config")
-            except Exception as e:
-                logger.error(f"Unexpected exception while parsing '{config_cls.__name__}': {e}, trying next config")
+    @classmethod
+    def matches(cls, *args, **kwargs):
+        raise NotImplementedError(f"Method 'matches' not implemented for {cls.__name__}")
 
-        raise InvalidModelConfigException("No valid config found")
+    @classmethod
+    def parse(cls, *args, **kwargs):
+        raise NotImplementedError(f"Method 'parse' not implemented for {cls.__name__}")
 
 
-def legacy_probe(cls):
-    """Registers classes using the legacy probe for model classification.
-    NOT intended for bass classes like LoRAConfigBase OR T5EncoderConfigBase
-    To port a config over, remove this decorator and implement 'matches' and 'parse'.
-    """
-
-    def matches(c):
-        raise NotImplementedError()
-
-    def parse(c):
-        raise NotImplementedError()
-
-    cls.matches = cls.matches or classmethod(matches)
-    cls.parse = cls.parse or classmethod(parse)
-    cls.__abstractmethods__ -= {"matches", "parse"}
-
-    ModelConfigBase._USING_LEGACY_PROBE.add(cls)
-    return cls
-
-
-class CheckpointConfigBase(BaseModel):
+class CheckpointConfigBase(ABC, BaseModel):
     """Base class for checkpoint-style models."""
 
     format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b, ModelFormat.GGUFQuantized] = Field(
@@ -394,51 +369,47 @@ class CheckpointConfigBase(BaseModel):
     )
 
 
-class DiffusersConfigBase(BaseModel):
+class DiffusersConfigBase(ABC, BaseModel):
     """Base class for diffusers-style models."""
 
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
     repo_variant: Optional[ModelRepoVariant] = ModelRepoVariant.Default
 
 
-class LoRAConfigBase(BaseModel):
+class LoRAConfigBase(ABC, BaseModel):
     """Base class for LoRA models."""
 
     type: Literal[ModelType.LoRA] = ModelType.LoRA
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
 
 
-class T5EncoderConfigBase(BaseModel):
+class T5EncoderConfigBase(ABC, BaseModel):
     """Base class for diffusers-style models."""
 
     type: Literal[ModelType.T5Encoder] = ModelType.T5Encoder
 
 
-@legacy_probe
-class T5EncoderConfig(T5EncoderConfigBase, ModelConfigBase):
+class T5EncoderConfig(T5EncoderConfigBase, LegacyProbeMixin, ModelConfigBase):
     format: Literal[ModelFormat.T5Encoder] = ModelFormat.T5Encoder
 
 
-@legacy_probe
-class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase, ModelConfigBase):
+class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase, LegacyProbeMixin, ModelConfigBase):
     format: Literal[ModelFormat.BnbQuantizedLlmInt8b] = ModelFormat.BnbQuantizedLlmInt8b
 
 
-@legacy_probe
-class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
+class LoRALyCORISConfig(LoRAConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for LoRA/Lycoris models."""
 
     format: Literal[ModelFormat.LyCORIS] = ModelFormat.LyCORIS
 
 
-class ControlAdapterConfigBase(BaseModel):
+class ControlAdapterConfigBase(ABC, BaseModel):
     default_settings: Optional[ControlAdapterDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
 
 
-@legacy_probe
-class ControlLoRALyCORISConfig(ControlAdapterConfigBase, ModelConfigBase):
+class ControlLoRALyCORISConfig(ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for Control LoRA models."""
 
     type: Literal[ModelType.ControlLoRa] = ModelType.ControlLoRa
@@ -446,8 +417,7 @@ class ControlLoRALyCORISConfig(ControlAdapterConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.LyCORIS] = ModelFormat.LyCORIS
 
 
-@legacy_probe
-class ControlLoRADiffusersConfig(ControlAdapterConfigBase, ModelConfigBase):
+class ControlLoRADiffusersConfig(ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for Control LoRA models."""
 
     type: Literal[ModelType.ControlLoRa] = ModelType.ControlLoRa
@@ -455,60 +425,53 @@ class ControlLoRADiffusersConfig(ControlAdapterConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
+class LoRADiffusersConfig(LoRAConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for LoRA/Diffusers models."""
 
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class VAECheckpointConfig(CheckpointConfigBase, ModelConfigBase):
+class VAECheckpointConfig(CheckpointConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for standalone VAE models."""
 
     type: Literal[ModelType.VAE] = ModelType.VAE
 
 
-@legacy_probe
-class VAEDiffusersConfig(ModelConfigBase):
+class VAEDiffusersConfig(LegacyProbeMixin, ModelConfigBase):
     """Model config for standalone VAE models (diffusers version)."""
 
     type: Literal[ModelType.VAE] = ModelType.VAE
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfigBase):
+class ControlNetDiffusersConfig(DiffusersConfigBase, ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase, ModelConfigBase):
+class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
 
 
-@legacy_probe
-class TextualInversionFileConfig(ModelConfigBase):
+class TextualInversionFileConfig(LegacyProbeMixin, ModelConfigBase):
     """Model config for textual inversion embeddings."""
 
     type: Literal[ModelType.TextualInversion] = ModelType.TextualInversion
     format: Literal[ModelFormat.EmbeddingFile] = ModelFormat.EmbeddingFile
 
 
-@legacy_probe
-class TextualInversionFolderConfig(ModelConfigBase):
+class TextualInversionFolderConfig(LegacyProbeMixin, ModelConfigBase):
     """Model config for textual inversion embeddings."""
 
     type: Literal[ModelType.TextualInversion] = ModelType.TextualInversion
     format: Literal[ModelFormat.EmbeddingFolder] = ModelFormat.EmbeddingFolder
 
 
-class MainConfigBase(BaseModel):
+class MainConfigBase(ABC, BaseModel):
     type: Literal[ModelType.Main] = ModelType.Main
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
     default_settings: Optional[MainModelDefaultSettings] = Field(
@@ -517,16 +480,14 @@ class MainConfigBase(BaseModel):
     variant: AnyVariant = ModelVariantType.Normal
 
 
-@legacy_probe
-class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase, ModelConfigBase):
+class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for main checkpoint models."""
 
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
 
 
-@legacy_probe
-class MainBnbQuantized4bCheckpointConfig(CheckpointConfigBase, MainConfigBase, ModelConfigBase):
+class MainBnbQuantized4bCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for main checkpoint models."""
 
     format: Literal[ModelFormat.BnbQuantizednf4b] = ModelFormat.BnbQuantizednf4b
@@ -534,8 +495,7 @@ class MainBnbQuantized4bCheckpointConfig(CheckpointConfigBase, MainConfigBase, M
     upcast_attention: bool = False
 
 
-@legacy_probe
-class MainGGUFCheckpointConfig(CheckpointConfigBase, MainConfigBase, ModelConfigBase):
+class MainGGUFCheckpointConfig(CheckpointConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for main checkpoint models."""
 
     format: Literal[ModelFormat.GGUFQuantized] = ModelFormat.GGUFQuantized
@@ -543,19 +503,17 @@ class MainGGUFCheckpointConfig(CheckpointConfigBase, MainConfigBase, ModelConfig
     upcast_attention: bool = False
 
 
-@legacy_probe
-class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase, ModelConfigBase):
+class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for main diffusers models."""
 
     pass
 
 
-class IPAdapterConfigBase(BaseModel):
+class IPAdapterConfigBase(ABC, BaseModel):
     type: Literal[ModelType.IPAdapter] = ModelType.IPAdapter
 
 
-@legacy_probe
-class IPAdapterInvokeAIConfig(IPAdapterConfigBase, ModelConfigBase):
+class IPAdapterInvokeAIConfig(IPAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for IP Adapter diffusers format models."""
 
     # TODO(ryand): Should we deprecate this field? From what I can tell, it hasn't been probed correctly for a long
@@ -564,24 +522,23 @@ class IPAdapterInvokeAIConfig(IPAdapterConfigBase, ModelConfigBase):
     format: Literal[ModelFormat.InvokeAI] = ModelFormat.InvokeAI
 
 
-@legacy_probe
-class IPAdapterCheckpointConfig(IPAdapterConfigBase, ModelConfigBase):
+class IPAdapterCheckpointConfig(IPAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for IP Adapter checkpoint format models."""
 
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
 
-
 class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
     """Model config for Clip Embeddings."""
+
     variant: ClipVariantType = Field(description="Clip variant for this model")
     type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, ModelConfigBase):
+class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, LegacyProbeMixin, ModelConfigBase):
     """Model config for CLIP-G Embeddings."""
+
     variant: Literal[ClipVariantType.G] = ClipVariantType.G
 
     @classmethod
@@ -589,33 +546,31 @@ class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, ModelConfigBase):
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.G.value}")
 
 
-@legacy_probe
-class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig,  ModelConfigBase):
+class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig, LegacyProbeMixin, ModelConfigBase):
     """Model config for CLIP-L Embeddings."""
+
     variant: Literal[ClipVariantType.L] = ClipVariantType.L
+
     @classmethod
     def get_tag(cls) -> Tag:
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.L.value}")
 
 
-@legacy_probe
-class CLIPVisionDiffusersConfig(DiffusersConfigBase, ModelConfigBase):
+class CLIPVisionDiffusersConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase, ModelConfigBase):
+class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class SpandrelImageToImageConfig(ModelConfigBase):
+class SpandrelImageToImageConfig(LegacyProbeMixin, ModelConfigBase):
     """Model config for Spandrel Image to Image models."""
 
     _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.SLOW  # requires loading the model from disk
@@ -623,16 +578,15 @@ class SpandrelImageToImageConfig(ModelConfigBase):
     type: Literal[ModelType.SpandrelImageToImage] = ModelType.SpandrelImageToImage
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
-@legacy_probe
-class SigLIPConfig(DiffusersConfigBase, ModelConfigBase):
+
+class SigLIPConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
     """Model config for SigLIP."""
 
     type: Literal[ModelType.SigLIP] = ModelType.SigLIP
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-@legacy_probe
-class FluxReduxConfig(ModelConfigBase):
+class FluxReduxConfig(LegacyProbeMixin, ModelConfigBase):
     """Model config for FLUX Tools Redux model."""
 
     type: Literal[ModelType.FluxRedux] = ModelType.FluxRedux
@@ -674,14 +628,7 @@ def get_model_discriminator_value(v: Any) -> str:
     return f"{type_}.{format_}"
 
 
-def concrete_subclasses(base):
-    subclasses = set(base.__subclasses__())
-    for sc in base.__subclasses__():
-        subclasses.update(concrete_subclasses(sc))
-    return {sc for sc in subclasses if not isabstract(sc)}
-
-
-config_classes = sorted(concrete_subclasses(ModelConfigBase), key=lambda c: c.__name__)  # sorted for consistency
+config_classes = sorted(ModelConfigBase.all_config_classes(), key=lambda c: c.__name__)  # sorted for consistency
 AnyModelConfig = Annotated[
     Union[tuple(Annotated[cls, cls.get_tag()] for cls in config_classes)],
     Discriminator(get_model_discriminator_value),

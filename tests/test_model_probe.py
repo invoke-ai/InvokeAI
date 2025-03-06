@@ -10,8 +10,18 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 from sympy.testing.pytest import slow
 from torch import tensor
 
-from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
-from invokeai.backend.model_manager.config import *
+from invokeai.backend.model_manager.config import (
+    BaseModelType,
+    InvalidModelConfigException,
+    MainDiffusersConfig,
+    ModelConfigBase,
+    ModelConfigFactory,
+    ModelFormat,
+    ModelOnDisk,
+    ModelRepoVariant,
+    ModelType,
+    ModelVariantType,
+)
 from invokeai.backend.model_manager.legacy_probe import (
     CkptType,
     ModelProbe,
@@ -152,30 +162,10 @@ def test_regression_against_model_probe(datadir: Path):
             assert type(legacy_config) in ModelConfigBase._USING_LEGACY_PROBE
 
         elif classify_success:
-            assert type(new_config) not in ModelConfigBase._USING_LEGACY_PROBE
+            assert type(new_config) in ModelConfigBase._USING_CLASSIFY_API
 
         else:
             raise ValueError(f"Both probe and classify failed to classify model at path {path}.")
-
-
-class ConfigMocker:
-    """Utility class to create config instances with random data"""
-
-    def __init__(self):
-        self._factories = {}
-
-    def mock(self, config_cls, count):
-        if config_cls not in self._factories:
-
-            class Factory(ModelFactory[config_cls]):
-                __use_defaults__ = True
-                __random_seed__ = 1234
-                __check_model__ = True
-
-            f = Factory()
-            self._factories[config_cls] = f
-        factory = self._factories[config_cls]
-        return [factory.build() for _ in range(count)]
 
 
 @slow
@@ -183,12 +173,20 @@ def test_serialisation_roundtrip():
     """After classification, models are serialised to json and stored in the database.
     We need to ensure they are de-serialised into the original config with all relevant fields restored.
     """
-    mocker = ConfigMocker()
-
     excluded = {MinimalConfigExample}
-    for config_cls in concrete_subclasses(ModelConfigBase) - excluded:
+    for config_cls in ModelConfigBase.all_config_classes() - excluded:
         trials_per_class = 50
-        configs_with_random_data = mocker.mock(config_cls, trials_per_class)
+
+        factory_args = {
+            "__use_defaults__": True,
+            "__random_seed__": 1234,
+            "__check_model__": True,
+        }
+        factory = ModelFactory.create_factory(config_cls, **factory_args)
+
+        configs_with_random_data = [
+            factory.build() for _ in range(trials_per_class)
+        ]  # mocker.mock(config_cls, trials_per_class)
 
         for config in configs_with_random_data:
             as_json = config.model_dump_json()
@@ -200,30 +198,15 @@ def test_serialisation_roundtrip():
 
 def test_inheritance_order():
     """
-       Safeguard test to warn against incorrect inheritance order.
+    Safeguard test to warn against incorrect inheritance order.
 
-       Config classes using multiple inheritance should inherit from ModelConfigBase last
-       to ensure that more specific fields take precedence over the generic defaults.
+    Config classes using multiple inheritance should inherit from ModelConfigBase last
+    to ensure that more specific fields take precedence over the generic defaults.
 
-       It may be worth rethinking our config taxonomy in the future, but in the meantime,
-       this test can help prevent the debugging effort I went through discovering this.
-       """
-    for config_cls in concrete_subclasses(ModelConfigBase):
-        excluded = { abc.ABC, pydantic.BaseModel, object }
+    It may be worth rethinking our config taxonomy in the future, but in the meantime,
+    this test can help prevent the debugging effort I went through discovering this.
+    """
+    for config_cls in ModelConfigBase.all_config_classes():
+        excluded = {abc.ABC, pydantic.BaseModel, object}
         inheritance_list = [cls for cls in config_cls.mro() if cls not in excluded]
         assert inheritance_list[-1] is ModelConfigBase
-
-
-def test_concrete_subclasses():
-    excluded = { MinimalConfigExample }
-    config_classes = concrete_subclasses(ModelConfigBase) - excluded
-    expected = {
-        CLIPGEmbedDiffusersConfig, MainGGUFCheckpointConfig, T2IAdapterConfig, TextualInversionFolderConfig,
-        IPAdapterInvokeAIConfig, ControlNetDiffusersConfig, ControlLoRALyCORISConfig, MainDiffusersConfig,
-        LoRALyCORISConfig, CLIPVisionDiffusersConfig, MainCheckpointConfig, T5EncoderConfig, IPAdapterCheckpointConfig,
-        VAEDiffusersConfig, LoRADiffusersConfig, ControlNetCheckpointConfig, FluxReduxConfig,
-        T5EncoderBnbQuantizedLlmInt8bConfig, SpandrelImageToImageConfig, MainBnbQuantized4bCheckpointConfig,
-        TextualInversionFileConfig, CLIPLEmbedDiffusersConfig, VAECheckpointConfig, ControlLoRADiffusersConfig,
-        SigLIPConfig,
-    }
-    assert config_classes == expected
