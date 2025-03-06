@@ -40,6 +40,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
 
     # region Model Field Types
     MainModel = "MainModelField"
+    CogView4MainModel = "CogView4MainModelField"
     FluxMainModel = "FluxMainModelField"
     SD3MainModel = "SD3MainModelField"
     SDXLMainModel = "SDXLMainModelField"
@@ -137,6 +138,7 @@ class FieldDescriptions:
     noise = "Noise tensor"
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
     t5_encoder = "T5 tokenizer and text encoder"
+    glm_encoder = "GLM (THUDM) tokenizer and text encoder"
     clip_embed_model = "CLIP Embed loader"
     clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
@@ -151,6 +153,7 @@ class FieldDescriptions:
     main_model = "Main model (UNet, VAE, CLIP) to load"
     flux_model = "Flux model (Transformer) to load"
     sd3_model = "SD3 model (MMDiTX) to load"
+    cogview4_model = "CogView4 model (Transformer) to load"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
