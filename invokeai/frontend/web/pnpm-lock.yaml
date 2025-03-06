@@ -50,9 +50,6 @@ dependencies:
   compare-versions:
     specifier: ^6.1.1
     version: 6.1.1
-  dateformat:
-    specifier: ^5.0.3
-    version: 5.0.3
   fracturedjsonjs:
     specifier: ^4.0.2
     version: 4.0.2
@@ -226,9 +223,6 @@ devDependencies:
   '@storybook/theming':
     specifier: ^8.3.4
     version: 8.3.4(storybook@8.3.4)
-  '@types/dateformat':
-    specifier: ^5.0.2
-    version: 5.0.2
   '@types/lodash-es':
     specifier: ^4.17.12
     version: 4.17.12
@@ -3355,10 +3349,6 @@ packages:
       '@types/d3-selection': 3.0.10
     dev: false
 
-  /@types/dateformat@5.0.2:
-    resolution: {integrity: sha512-M95hNBMa/hnwErH+a+VOD/sYgTmo15OTYTM2Hr52/e0OdOuY+Crag+kd3/ioZrhg0WGbl9Sm3hR7UU+MH6rfOw==}
-    dev: true
-
   /@types/diff-match-patch@1.0.36:
     resolution: {integrity: sha512-xFdR6tkm0MWvBfO8xXCSsinYxHcqkQUlcHeSpMC2ukzOb6lwQAfDmW+Qt0AvlGd8HpsS28qKsB+oPeJn9I39jg==}
     dev: false
@@ -4855,11 +4845,6 @@ packages:
     dependencies:
       '@babel/runtime': 7.25.7
     dev: true
-
-  /dateformat@5.0.3:
-    resolution: {integrity: sha512-Kvr6HmPXUMerlLcLF+Pwq3K7apHpYmGDVqrxcDasBg86UcKeTSNWbEzU8bwdXnxnR44FtMhJAxI4Bov6Y/KUfA==}
-    engines: {node: '>=12.20'}
-    dev: false
 
   /de-indent@1.0.2:
     resolution: {integrity: sha512-e/1zu3xH5MQryN2zdVaF0OrdNLUbvWxzMbi+iNA6Bky7l1RoP8a2fIbRocyHclXt/arDrrR6lL3TqFD9pMQTsg==}
