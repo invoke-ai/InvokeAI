@@ -219,3 +219,13 @@ async def get_workflow_thumbnail(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@workflows_router.get("/counts", operation_id="get_counts")
+async def get_counts(
+    tags: Optional[list[str]] = Query(default=None, description="The tags to include"),
+    categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
+) -> int:
+    """Gets a the count of workflows that include the specified tags and categories"""
+
+    return ApiDependencies.invoker.services.workflow_records.get_counts(tags=tags, categories=categories)
