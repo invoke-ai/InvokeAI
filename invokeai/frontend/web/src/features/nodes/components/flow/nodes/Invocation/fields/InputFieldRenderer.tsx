@@ -29,6 +29,8 @@ import {
   isCLIPGEmbedModelFieldInputTemplate,
   isCLIPLEmbedModelFieldInputInstance,
   isCLIPLEmbedModelFieldInputTemplate,
+  isCogView4MainModelFieldInputInstance,
+  isCogView4MainModelFieldInputTemplate,
   isColorFieldInputInstance,
   isColorFieldInputTemplate,
   isControlLoRAModelFieldInputInstance,
@@ -106,6 +108,7 @@ import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
 import CLIPEmbedModelFieldInputComponent from './inputs/CLIPEmbedModelFieldInputComponent';
 import CLIPGEmbedModelFieldInputComponent from './inputs/CLIPGEmbedModelFieldInputComponent';
 import CLIPLEmbedModelFieldInputComponent from './inputs/CLIPLEmbedModelFieldInputComponent';
+import CogView4MainModelFieldInputComponent from './inputs/CogView4MainModelFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import ControlLoRAModelFieldInputComponent from './inputs/ControlLoraModelFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
@@ -410,6 +413,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <SD3MainModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isCogView4MainModelFieldInputTemplate(template)) {
+    if (!isCogView4MainModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <CogView4MainModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isSDXLMainModelFieldInputTemplate(template)) {

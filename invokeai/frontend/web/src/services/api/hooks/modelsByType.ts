@@ -11,6 +11,7 @@ import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
+  isCogView4MainModelModelConfig,
   isControlLayerModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
@@ -61,6 +62,7 @@ export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
 export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
+export const useCogView4Models = buildModelsHook(isCogView4MainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlLoRAModel = buildModelsHook(isControlLoRAModelConfig);

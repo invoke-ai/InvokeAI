@@ -11,6 +11,7 @@ export const MODEL_TYPE_MAP = {
   sdxl: 'Stable Diffusion XL',
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
   flux: 'FLUX',
+  cogview4: 'CogView4',
 };
 
 /**
@@ -24,6 +25,7 @@ export const MODEL_TYPE_SHORT_MAP = {
   sdxl: 'SDXL',
   'sdxl-refiner': 'SDXLR',
   flux: 'FLUX',
+  cogview4: 'CogView4',
 };
 
 /**
@@ -55,6 +57,10 @@ export const CLIP_SKIP_MAP = {
     markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
   },
   flux: {
+    maxClip: 0,
+    markers: [],
+  },
+  cogview4: {
     maxClip: 0,
     markers: [],
   },

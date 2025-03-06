@@ -53,6 +53,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   MainModelField: 'teal.500',
   FluxMainModelField: 'teal.500',
   SD3MainModelField: 'teal.500',
+  CogView4MainModelField: 'teal.500',
   SDXLMainModelField: 'teal.500',
   SDXLRefinerModelField: 'teal.500',
   SpandrelImageToImageModelField: 'teal.500',
