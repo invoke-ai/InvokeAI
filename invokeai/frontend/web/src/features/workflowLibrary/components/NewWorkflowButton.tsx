@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { Button } from '@invoke-ai/ui-library';
 import { useNewWorkflow } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -20,13 +20,9 @@ export const NewWorkflowButton = memo(() => {
   );
 
   return (
-    <IconButton
-      onClick={onClickNewWorkflow}
-      variant="ghost"
-      aria-label={t('nodes.newWorkflow')}
-      tooltip={t('nodes.newWorkflow')}
-      icon={<PiFilePlusBold />}
-    />
+    <Button onClick={onClickNewWorkflow} variant="ghost" leftIcon={<PiFilePlusBold />}>
+      {t('nodes.newWorkflow')}
+    </Button>
   );
 });
 
