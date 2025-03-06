@@ -1685,7 +1685,7 @@
         "created": "Created",
         "descending": "Descending",
         "workflows": "Workflows",
-        "workflowLibrary": "Library",
+        "workflowLibrary": "Workflow Library",
         "loadMore": "Load More",
         "allLoaded": "All Workflows Loaded",
         "searchPlaceholder": "Search by name, description or tags",
