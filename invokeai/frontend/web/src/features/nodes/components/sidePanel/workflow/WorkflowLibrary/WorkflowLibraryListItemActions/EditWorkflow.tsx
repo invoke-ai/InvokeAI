@@ -1,6 +1,6 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
-import type { MouseEvent} from 'react';
+import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPencilBold } from 'react-icons/pi';
