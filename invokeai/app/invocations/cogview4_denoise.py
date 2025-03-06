@@ -40,8 +40,8 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     cfg_scale: float | list[float] = InputField(default=3.5, description=FieldDescriptions.cfg_scale, title="CFG Scale")
-    width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
-    height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
+    width: int = InputField(default=1024, multiple_of=32, description="Width of the generated image.")
+    height: int = InputField(default=1024, multiple_of=32, description="Height of the generated image.")
     steps: int = InputField(default=25, gt=0, description=FieldDescriptions.steps)
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
