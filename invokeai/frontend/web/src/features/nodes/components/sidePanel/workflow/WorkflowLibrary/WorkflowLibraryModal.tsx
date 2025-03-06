@@ -31,7 +31,7 @@ export const WorkflowLibraryModal = () => {
           <Flex gap={4} h="100%">
             <WorkflowLibrarySideNav />
             <Divider orientation="vertical" />
-            <Flex flexDir="column" flex={1} gap={6}>
+            <Flex flexDir="column" flex={1} gap={4}>
               <WorkflowLibraryTopNav />
               <WorkflowList />
             </Flex>

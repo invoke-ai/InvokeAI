@@ -50,7 +50,7 @@ export const WorkflowSearch = memo(({ searchInputRef }: { searchInputRef: RefObj
       <InputGroup>
         <Input
           ref={searchInputRef}
-          placeholder={t('stylePresets.searchByName')}
+          placeholder={t('workflows.searchPlaceholder')}
           value={searchTerm}
           onKeyDown={handleKeydown}
           onChange={handleChange}

@@ -1,35 +1,50 @@
-/* eslint-disable i18next/no-literal-string */
-import { Button, Flex } from '@invoke-ai/ui-library';
+import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowCategories, workflowCategoriesChanged } from 'features/nodes/store/workflowSlice';
-import type { WorkflowCategory } from 'features/nodes/types/workflow';
-import { useCallback, useMemo } from 'react';
-import { PiUsersBold } from 'react-icons/pi';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { WORKFLOW_TAGS, type WorkflowTag } from 'features/nodes/store/types';
+import {
+  selectWorkflowLibrarySelectedTags,
+  selectWorkflowSelectedCategories,
+  workflowSelectedCategoriesChanged,
+  workflowSelectedTagsRese,
+  workflowSelectedTagToggled,
+} from 'features/nodes/store/workflowSlice';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
+import { useGetCountsQuery } from 'services/api/endpoints/workflows';
 
 export const WorkflowLibrarySideNav = () => {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
-  const categories = useAppSelector(selectWorkflowCategories);
+  const categories = useAppSelector(selectWorkflowSelectedCategories);
   const categoryOptions = useStore($workflowCategories);
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
 
-  const handleCategoryChange = useCallback(
-    (categories: WorkflowCategory[]) => {
-      dispatch(workflowCategoriesChanged(categories));
-    },
-    [dispatch]
-  );
+  const selectYourWorkflows = useCallback(() => {
+    dispatch(workflowSelectedCategoriesChanged(categoryOptions.includes('project') ? ['user', 'project'] : ['user']));
+  }, [categoryOptions, dispatch]);
 
-  const handleSelectYourWorkflows = useCallback(() => {
-    if (categoryOptions.includes('project')) {
-      handleCategoryChange(['user', 'project']);
-    } else {
-      handleCategoryChange(['user']);
-    }
-  }, [categoryOptions, handleCategoryChange]);
+  const selectPrivateWorkflows = useCallback(() => {
+    dispatch(workflowSelectedCategoriesChanged(['user']));
+  }, [dispatch]);
 
-  const isYourWorkflowsActive = useMemo(() => {
+  const selectSharedWorkflows = useCallback(() => {
+    dispatch(workflowSelectedCategoriesChanged(['project']));
+  }, [dispatch]);
+
+  const selectDefaultWorkflows = useCallback(() => {
+    dispatch(workflowSelectedCategoriesChanged(['default']));
+  }, [dispatch]);
+
+  const resetTags = useCallback(() => {
+    dispatch(workflowSelectedTagsRese());
+  }, [dispatch]);
+
+  const isYourWorkflowsSelected = useMemo(() => {
     if (categoryOptions.includes('project')) {
       return categories.includes('user') && categories.includes('project');
     } else {
@@ -37,97 +52,133 @@ export const WorkflowLibrarySideNav = () => {
     }
   }, [categoryOptions, categories]);
 
+  const isPrivateWorkflowsExclusivelySelected = useMemo(() => {
+    return categories.length === 1 && categories.includes('user');
+  }, [categories]);
+
+  const isSharedWorkflowsExclusivelySelected = useMemo(() => {
+    return categories.length === 1 && categories.includes('project');
+  }, [categories]);
+
+  const isDefaultWorkflowsExclusivelySelected = useMemo(() => {
+    return categories.length === 1 && categories.includes('default');
+  }, [categories]);
+
   return (
     <Flex flexDir="column" gap={2} h="full">
-      <Button
-        variant="ghost"
-        fontWeight="bold"
-        justifyContent="flex-start"
-        size="md"
-        isActive={isYourWorkflowsActive}
-        onClick={handleSelectYourWorkflows}
-        _active={{
-          bg: 'base.700',
-          color: 'base.100',
-        }}
-      >
-        Your Workflows
-      </Button>
+      <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
+        {t('workflows.yourWorkflows')}
+      </CategoryButton>
       {categoryOptions.includes('project') && (
         <Flex flexDir="column" gap={2} pl={4}>
-          <Button
-            variant="ghost"
-            fontWeight="bold"
-            justifyContent="flex-start"
-            size="sm"
-            isActive={categories.length === 1 && categories.includes('user')}
-            onClick={handleCategoryChange.bind(null, ['user'])}
-            _active={{
-              bg: 'base.700',
-              color: 'base.100',
-            }}
-          >
-            Private
-          </Button>
-          <Button
-            variant="ghost"
-            fontWeight="bold"
-            justifyContent="flex-start"
+          <CategoryButton size="sm" onClick={selectPrivateWorkflows} isSelected={isPrivateWorkflowsExclusivelySelected}>
+            {t('workflows.private')}
+          </CategoryButton>
+          <CategoryButton
             size="sm"
             rightIcon={<PiUsersBold />}
-            isActive={categories.length === 1 && categories.includes('project')}
-            onClick={handleCategoryChange.bind(null, ['project'])}
-            _active={{
-              bg: 'base.700',
-              color: 'base.100',
-            }}
+            onClick={selectSharedWorkflows}
+            isSelected={isSharedWorkflowsExclusivelySelected}
           >
-            Shared
-          </Button>
+            {t('workflows.shared')}
+          </CategoryButton>
         </Flex>
       )}
-      <Button
-        variant="ghost"
-        fontWeight="bold"
-        justifyContent="flex-start"
-        size="md"
-        isActive={categories.includes('default')}
-        onClick={handleCategoryChange.bind(null, ['default'])}
-        _active={{
-          bg: 'base.700',
-          color: 'base.100',
-        }}
-      >
-        Browse Workflows
-      </Button>
+      <CategoryButton isSelected={isDefaultWorkflowsExclusivelySelected} onClick={selectDefaultWorkflows}>
+        {t('workflows.browseWorkflows')}
+      </CategoryButton>
 
-      {/* these are obviously placeholders - we need to figure out the best way to do this. leaning towards "tags" so that we can filter and/or have multiple selected eventually */}
-      <Flex flexDir="column" gap={2} pl={4}>
+      <Flex flexDir="column" gap={2} pl={4} overflow="hidden">
         <Button
-          variant="ghost"
+          isDisabled={!isDefaultWorkflowsExclusivelySelected || selectedTags.length === 0}
+          onClick={resetTags}
+          size="sm"
+          variant="link"
           fontWeight="bold"
           justifyContent="flex-start"
-          size="sm"
-          _active={{
-            bg: 'base.700',
-            color: 'base.100',
-          }}
+          flexGrow={0}
+          leftIcon={<PiArrowCounterClockwiseBold />}
+          h={8}
         >
-          Architecture
+          {t('workflows.resetTags')}
         </Button>
-        <Button
-          variant="ghost"
-          fontWeight="bold"
-          justifyContent="flex-start"
-          size="sm"
-          _active={{
-            bg: 'base.700',
-            color: 'base.100',
-          }}
-        >
-          Fashion
-        </Button>
+        <Flex flexDir="column" gap={2} overflow="auto">
+          {WORKFLOW_TAGS.map((tagCategory) => (
+            <TagCategory
+              key={tagCategory.category}
+              tagCategory={tagCategory}
+              isDisabled={!isDefaultWorkflowsExclusivelySelected}
+            />
+          ))}
+        </Flex>
       </Flex>
     </Flex>
   );
 };
+
+const CategoryButton = memo(({ isSelected, ...rest }: ButtonProps & { isSelected: boolean }) => {
+  return (
+    <Button
+      colorScheme={isSelected ? 'invokeBlue' : 'base'}
+      variant="ghost"
+      fontWeight="bold"
+      justifyContent="flex-start"
+      size="md"
+      {...rest}
+    />
+  );
+});
+CategoryButton.displayName = 'NavButton';
+
+const TagCategory = memo(
+  ({ tagCategory, isDisabled }: { tagCategory: (typeof WORKFLOW_TAGS)[number]; isDisabled: boolean }) => {
+    const { count } = useGetCountsQuery(
+      { tags: [...tagCategory.tags], categories: ['default'] },
+      { selectFromResult: ({ data }) => ({ count: data ?? 0 }) }
+    );
+
+    if (count === 0) {
+      return null;
+    }
+
+    return (
+      <Flex flexDir="column" gap={2}>
+        <Text fontWeight="semibold" color="base.300" opacity={isDisabled ? 0.5 : 1}>
+          {tagCategory.category}
+        </Text>
+        <Flex flexDir="column" gap={2} pl={4}>
+          {tagCategory.tags.map((tag) => (
+            <TagCheckbox key={tag} tag={tag} isDisabled={isDisabled} />
+          ))}
+        </Flex>
+      </Flex>
+    );
+  }
+);
+TagCategory.displayName = 'TagCategory';
+
+const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: WorkflowTag }) => {
+  const dispatch = useAppDispatch();
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const isSelected = selectedTags.includes(tag);
+
+  const onChange = useCallback(() => {
+    dispatch(workflowSelectedTagToggled(tag));
+  }, [dispatch, tag]);
+
+  const { count } = useGetCountsQuery(
+    { tags: [tag], categories: ['default'] },
+    { selectFromResult: ({ data }) => ({ count: data ?? 0 }) }
+  );
+
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <Checkbox isChecked={isSelected} onChange={onChange} {...rest}>
+      <Text>{`${tag} (${count})`}</Text>
+    </Checkbox>
+  );
+});
+TagCheckbox.displayName = 'TagCheckbox';
