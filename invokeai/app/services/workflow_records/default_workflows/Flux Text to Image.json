@@ -5,7 +5,7 @@
   "description": "A simple text-to-image workflow using FLUX dev or schnell models.",
   "version": "1.1.0",
   "contact": "",
-  "tags": "text2image, flux",
+  "tags": "text2image, flux, text to image",
   "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend 4 steps for FLUX schnell models and 30 steps for FLUX dev models.",
   "exposedFields": [
     {

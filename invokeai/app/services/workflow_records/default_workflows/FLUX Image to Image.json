@@ -5,7 +5,7 @@
   "description": "A simple image-to-image workflow using a FLUX dev model. ",
   "version": "1.1.0",
   "contact": "",
-  "tags": "image2image, flux, image-to-image",
+  "tags": "image2image, flux, image-to-image, image to image",
   "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend using FLUX dev models for image-to-image workflows. The image-to-image performance with FLUX schnell models is poor.",
   "exposedFields": [
     {
