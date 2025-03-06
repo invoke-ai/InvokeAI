@@ -1691,6 +1691,7 @@
         "searchPlaceholder": "Search by name, description or tags",
         "filterByTags": "Filter by Tags",
         "yourWorkflows": "Your Workflows",
+        "recentlyOpened": "Recently Opened",
         "private": "Private",
         "shared": "Shared",
         "browseWorkflows": "Browse Workflows",

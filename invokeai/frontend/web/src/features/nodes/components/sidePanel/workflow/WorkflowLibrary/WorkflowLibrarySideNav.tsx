@@ -1,5 +1,5 @@
 import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
-import { Button, Checkbox, Collapse, Flex, Spacer, Text } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
@@ -11,12 +11,14 @@ import {
   workflowSelectedTagsRese,
   workflowSelectedTagToggled,
 } from 'features/nodes/store/workflowSlice';
+import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
-import { useGetCountsQuery } from 'services/api/endpoints/workflows';
+import { useGetCountsQuery, useListWorkflowsQuery } from 'services/api/endpoints/workflows';
+import type { S } from 'services/api/types';
 
 export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
@@ -66,8 +68,16 @@ export const WorkflowLibrarySideNav = () => {
   }, [categories]);
 
   return (
-    <Flex flexDir="column" h="full">
-      <Flex w="full" pb={2}>
+    <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={1}>
+      <Flex flexDir="column" w="full" pb={2}>
+        <Text px={3} py={2} fontSize="md" fontWeight="semibold">
+          {t('workflows.recentlyOpened')}
+        </Text>
+        <Flex flexDir="column" gap={2} pl={4}>
+          <RecentWorkflows />
+        </Flex>
+      </Flex>
+      <Flex flexDir="column" w="full" pb={2}>
         <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
           {t('workflows.yourWorkflows')}
         </CategoryButton>
@@ -98,7 +108,7 @@ export const WorkflowLibrarySideNav = () => {
           </Collapse>
         )}
       </Flex>
-      <Flex w="full" h="full" minH={0} overflow="hidden" flexDir="column">
+      <Flex h="full" minH={0} overflow="hidden" flexDir="column">
         <CategoryButton isSelected={isDefaultWorkflowsExclusivelySelected} onClick={selectDefaultWorkflows}>
           {t('workflows.browseWorkflows')}
         </CategoryButton>
@@ -135,6 +145,60 @@ export const WorkflowLibrarySideNav = () => {
     </Flex>
   );
 };
+
+const recentWorkflowsQueryArg = {
+  page: 0,
+  per_page: 5,
+  order_by: 'opened_at',
+  direction: 'DESC',
+} satisfies Parameters<typeof useListWorkflowsQuery>[0];
+
+const RecentWorkflows = memo(() => {
+  const { t } = useTranslation();
+  const { data, isLoading } = useListWorkflowsQuery(recentWorkflowsQueryArg);
+
+  if (isLoading) {
+    return <Text variant="subtext">{t('common.loading')}</Text>;
+  }
+
+  if (!data) {
+    return <Text variant="subtext">{t('workflows.noRecentWorkflows')}</Text>;
+  }
+
+  return (
+    <>
+      {data.items.map((workflow) => {
+        return <RecentWorkflowButton key={workflow.workflow_id} workflow={workflow} />;
+      })}
+    </>
+  );
+});
+RecentWorkflows.displayName = 'RecentWorkflows';
+
+const RecentWorkflowButton = memo(({ workflow }: { workflow: S['WorkflowRecordListItemWithThumbnailDTO'] }) => {
+  const loadWorkflow = useLoadWorkflow();
+  const load = useCallback(() => {
+    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
+  }, [loadWorkflow, workflow.workflow_id]);
+
+  return (
+    <Flex
+      role="button"
+      key={workflow.workflow_id}
+      gap={2}
+      alignItems="center"
+      _hover={{ textDecoration: 'underline' }}
+      color="base.300"
+      onClick={load}
+    >
+      <Text as="span" noOfLines={1} w="full" fontWeight="semibold">
+        {workflow.name}
+      </Text>
+      {workflow.category === 'project' && <Icon as={PiUsersBold} boxSize="12px" />}
+    </Flex>
+  );
+});
+RecentWorkflowButton.displayName = 'RecentWorkflowButton';
 
 const CategoryButton = memo(({ isSelected, ...rest }: ButtonProps & { isSelected: boolean }) => {
   return (

@@ -84,7 +84,7 @@ const initialWorkflowState: WorkflowState = {
   mode: 'view',
   formFieldInitialValues: {},
   searchTerm: '',
-  orderBy: undefined, // initial value is decided in component
+  orderBy: 'opened_at', // initial value is decided in component
   orderDirection: 'DESC',
   selectedTags: [],
   selectedCategories: ['user'],

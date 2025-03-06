@@ -1,6 +1,4 @@
 import { Flex, FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $projectId } from 'app/store/nanostores/projectId';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   selectWorkflowOrderBy,
@@ -22,7 +20,6 @@ type Direction = z.infer<typeof zDirection>;
 const isDirection = (v: unknown): v is Direction => zDirection.safeParse(v).success;
 
 export const WorkflowSortControl = () => {
-  const projectId = useStore($projectId);
   const { t } = useTranslation();
 
   const orderBy = useAppSelector(selectWorkflowOrderBy);
@@ -68,15 +65,12 @@ export const WorkflowSortControl = () => {
     [dispatch]
   );
 
-  // In OSS, we don't have the concept of "opened_at" for workflows. This is only available in the Enterprise version.
-  const defaultOrderBy = projectId !== undefined ? 'opened_at' : 'created_at';
-
   return (
     <Flex flexDir="row" gap={6}>
       <FormControl orientation="horizontal" gap={0} w="auto">
         <FormLabel>{t('common.orderBy')}</FormLabel>
-        <Select value={orderBy ?? defaultOrderBy} onChange={onChangeOrderBy} size="sm">
-          {projectId !== undefined && <option value="opened_at">{ORDER_BY_LABELS['opened_at']}</option>}
+        <Select value={orderBy ?? 'opened_at'} onChange={onChangeOrderBy} size="sm">
+          <option value="opened_at">{ORDER_BY_LABELS['opened_at']}</option>
           <option value="created_at">{ORDER_BY_LABELS['created_at']}</option>
           <option value="updated_at">{ORDER_BY_LABELS['updated_at']}</option>
           <option value="name">{ORDER_BY_LABELS['name']}</option>
