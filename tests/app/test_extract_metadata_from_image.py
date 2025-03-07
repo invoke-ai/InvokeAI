@@ -41,14 +41,14 @@ def test_extract_valid_metadata_from_image(mock_logger, valid_metadata, valid_wo
     with patch(
         "invokeai.app.services.workflow_records.workflow_records_common.WorkflowWithoutIDValidator.validate_json"
     ) as mock_workflow_validate:
-        with patch("invokeai.app.services.shared.graph.Graph.model_validate_json") as mock_graph_validate:
+        with patch("invokeai.app.services.shared.graph.Graph.model_validate_json") as _mock_graph_validate:
             result = extract_metadata_from_image(mock_image, None, None, None, mock_logger)
 
             # Assert correct calls to validators
             mock_workflow_validate.assert_called_once_with(valid_workflow)
             # TODO(psyche): The extract_metadata_from_image does not validate the graph correctly. See note in `extract_metadata_from_image.py`.
             # Skipping this.
-            # mock_graph_validate.assert_called_once_with(valid_graph)
+            # _mock_graph_validate.assert_called_once_with(valid_graph)
 
             # Assert correct extraction
             assert result == ExtractedMetadata(
