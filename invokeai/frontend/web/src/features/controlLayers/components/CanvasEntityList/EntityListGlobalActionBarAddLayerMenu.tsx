@@ -9,7 +9,7 @@ import {
   useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
+import { selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -23,7 +23,6 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
 
   return (
@@ -52,7 +51,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance} isDisabled={isSD3}>
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage} isDisabled={isFLUX || isSD3}>
+          <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage} isDisabled={isSD3}>
             {t('controlLayers.regionalReferenceImage')}
           </MenuItem>
         </MenuGroup>

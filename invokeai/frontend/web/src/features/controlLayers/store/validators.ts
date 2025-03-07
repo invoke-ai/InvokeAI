@@ -44,33 +44,33 @@ export const getRegionalGuidanceWarnings = (
     if (model.base === 'sd-3' || model.base === 'sd-2') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
-    } else if (model.base === 'flux') {
+      return warnings;
+    }
+
+    if (model.base === 'flux') {
       // Some features are not supported for flux models
       if (entity.negativePrompt !== null) {
         warnings.push(WARNINGS.RG_NEGATIVE_PROMPT_NOT_SUPPORTED);
       }
-      if (entity.referenceImages.length > 0) {
-        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
-      }
       if (entity.autoNegative) {
         warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
       }
-    } else {
-      entity.referenceImages.forEach(({ ipAdapter }) => {
-        if (!ipAdapter.model) {
-          // No model selected
-          warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-        } else if (ipAdapter.model.base !== model.base) {
-          // Supported model architecture but doesn't match
-          warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
-        }
-
-        if (!ipAdapter.image) {
-          // No image selected
-          warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
-        }
-      });
     }
+
+    entity.referenceImages.forEach(({ ipAdapter }) => {
+      if (!ipAdapter.model) {
+        // No model selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
+      } else if (ipAdapter.model.base !== model.base) {
+        // Supported model architecture but doesn't match
+        warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+      }
+
+      if (!ipAdapter.image) {
+        // No image selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
+    });
   }
 
   return warnings;
@@ -82,22 +82,27 @@ export const getGlobalReferenceImageWarnings = (
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
-  if (!entity.ipAdapter.model) {
-    // No model selected
-    warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-  } else if (model) {
+  if (model) {
     if (model.base === 'sd-3' || model.base === 'sd-2') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
-    } else if (entity.ipAdapter.model.base !== model.base) {
+      return warnings;
+    }
+
+    const { ipAdapter } = entity;
+
+    if (!ipAdapter.model) {
+      // No model selected
+      warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
+    } else if (ipAdapter.model.base !== model.base) {
       // Supported model architecture but doesn't match
       warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
     }
-  }
 
-  if (!entity.ipAdapter.image) {
-    // No image selected
-    warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+    if (!entity.ipAdapter.image) {
+      // No image selected
+      warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+    }
   }
 
   return warnings;
