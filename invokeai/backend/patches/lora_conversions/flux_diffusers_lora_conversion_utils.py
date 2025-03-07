@@ -4,7 +4,7 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
-from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict, diffusers_adaLN_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
@@ -82,6 +82,12 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
             values = get_lora_layer_values(src_layer_dict)
             layers[dst_key] = any_lora_layer_from_state_dict(values)
 
+    def add_adaLN_lora_layer_if_present(src_key: str, dst_key: str) -> None:
+        if src_key in grouped_state_dict:
+            src_layer_dict = grouped_state_dict.pop(src_key)
+            values = get_lora_layer_values(src_layer_dict)
+            layers[dst_key] = diffusers_adaLN_lora_layer_from_state_dict(values)
+    
     def add_qkv_lora_layer_if_present(
         src_keys: list[str],
         src_weight_shapes: list[tuple[int, int]],
@@ -124,8 +130,8 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     add_lora_layer_if_present("time_text_embed.text_embedder.linear_2", "vector_in.out_layer")
 
     # time_text_embed.guidance_embedder -> guidance_in.
-    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_1", "guidance_in")
-    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_2", "guidance_in")
+    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_1", "guidance_in.in_layer")
+    add_lora_layer_if_present("time_text_embed.guidance_embedder.linear_2", "guidance_in.out_layer")
 
     # context_embedder -> txt_in.
     add_lora_layer_if_present("context_embedder", "txt_in")
@@ -223,6 +229,10 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
 
     # Final layer.
     add_lora_layer_if_present("proj_out", "final_layer.linear")
+    add_adaLN_lora_layer_if_present(
+        'norm_out.linear',
+        'final_layer.adaLN_modulation.1',
+    )
 
     # Assert that all keys were processed.
     assert len(grouped_state_dict) == 0
