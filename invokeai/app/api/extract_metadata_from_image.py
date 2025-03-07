@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from PIL import Image
 
-from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutIDValidator
 
 
@@ -95,8 +94,25 @@ def extract_metadata_from_image(
     # always store graphs as a stringified JSON Graph. So, we expect it to be a string here.
     if isinstance(graph_raw, str):
         try:
-            # Validate the graph JSON before storing it
-            Graph.model_validate_json(graph_raw)
+            # TODO(psyche): Due to pydantic's handling of None values, it is possible for the graph to fail validation,
+            # even if it is a direct dump of a valid graph. Node fields in the graph are allowed to have be unset if
+            # they have incoming connections, but something about the ser/de process cannot adequately handle this.
+            #
+            # In lieu of fixing the graph validation, we will just do a simple check here to see if the graph is dict
+            # with the correct keys. This is not a perfect solution, but it should be good enough for now.
+
+            # FIX ME: Validate the graph JSON before storing it
+            # Graph.model_validate_json(graph_raw)
+
+            # Crappy workaround to validate JSON
+            graph_parsed = json.loads(graph_raw)
+            if not isinstance(graph_parsed, dict):
+                raise ValueError("Not a dict")
+            if not isinstance(graph_parsed.get("nodes", None), dict):
+                raise ValueError("'nodes' is not a dict")
+            if not isinstance(graph_parsed.get("edges", None), list):
+                raise ValueError("'edges' is not a list")
+
             # Looks good, overwrite the fallback value
             stringified_graph = graph_raw
         except Exception as e:
