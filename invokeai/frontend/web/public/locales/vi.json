@@ -2256,7 +2256,6 @@
         "opened": "Ngày Mở",
         "deleteWorkflow": "Xoá Workflow",
         "workflowEditorMenu": "Menu Biên Tập Workflow",
-        "uploadAndSaveWorkflow": "Tải Lên Thư Viện",
         "openLibrary": "Mở Thư Viện",
         "builder": {
             "resetAllNodeFields": "Tải Lại Các Vùng Node",
