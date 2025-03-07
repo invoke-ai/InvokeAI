@@ -8036,12 +8036,6 @@ export type components = {
              */
             redux_model?: components["schemas"]["ModelIdentifierField"];
             /**
-             * SigLIP Model
-             * @description The SigLIP model to use.
-             * @default null
-             */
-            siglip_model?: components["schemas"]["ModelIdentifierField"];
-            /**
              * type
              * @default flux_redux
              * @constant
