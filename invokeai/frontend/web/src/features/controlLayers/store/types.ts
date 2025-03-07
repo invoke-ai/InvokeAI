@@ -233,6 +233,13 @@ const zIPAdapterConfig = z.object({
 });
 export type IPAdapterConfig = z.infer<typeof zIPAdapterConfig>;
 
+const zFLUXReduxConfig = z.object({
+  type: z.literal('flux_redux'),
+  image: zImageWithDims.nullable(),
+  model: zServerValidatedModelIdentifierField.nullable(),
+});
+export type FLUXReduxConfig = z.infer<typeof zFLUXReduxConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -242,9 +249,15 @@ const zCanvasEntityBase = z.object({
 
 const zCanvasReferenceImageState = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),
-  ipAdapter: zIPAdapterConfig,
+  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
 });
 export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
+
+export const isIPAdapterConfig = (config: IPAdapterConfig | FLUXReduxConfig): config is IPAdapterConfig =>
+  config.type === 'ip_adapter';
+
+export const isFLUXReduxConfig = (config: IPAdapterConfig | FLUXReduxConfig): config is FLUXReduxConfig =>
+  config.type === 'flux_redux';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -253,7 +266,7 @@ const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 
 const zRegionalGuidanceReferenceImageState = z.object({
   id: zId,
-  ipAdapter: zIPAdapterConfig,
+  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
 });
 export type RegionalGuidanceReferenceImageState = z.infer<typeof zRegionalGuidanceReferenceImageState>;
 

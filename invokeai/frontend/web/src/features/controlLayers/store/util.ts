@@ -9,6 +9,7 @@ import type {
   CanvasRegionalGuidanceState,
   ControlLoRAConfig,
   ControlNetConfig,
+  FLUXReduxConfig,
   ImageWithDims,
   IPAdapterConfig,
   RgbColor,
@@ -69,6 +70,11 @@ export const initialIPAdapter: IPAdapterConfig = {
   method: 'full',
   clipVisionModel: 'ViT-H',
   weight: 1,
+};
+export const initialFLUXRedux: FLUXReduxConfig = {
+  type: 'flux_redux',
+  image: null,
+  model: null,
 };
 export const initialT2IAdapter: T2IAdapterConfig = {
   type: 't2i_adapter',

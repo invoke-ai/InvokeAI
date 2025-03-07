@@ -281,6 +281,7 @@ export const buildSD1Graph = async (
     posCondCollect,
     negCondCollect,
     ipAdapterCollect,
+    fluxReduxCollect: null,
   });
 
   const totalIPAdaptersAdded =

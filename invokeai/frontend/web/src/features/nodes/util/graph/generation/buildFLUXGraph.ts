@@ -7,6 +7,7 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
+import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -233,6 +234,17 @@ export const buildFLUXGraph = async (
     model: modelConfig,
   });
 
+  const fluxReduxCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('ip_adapter_collector'),
+  });
+  const fluxReduxResult = addFLUXReduxes({
+    entities: canvas.referenceImages.entities,
+    g,
+    collector: fluxReduxCollect,
+    model: modelConfig,
+  });
+
   const regionsResult = await addRegions({
     manager,
     regions: canvas.regionalGuidance.entities,
@@ -244,6 +256,7 @@ export const buildFLUXGraph = async (
     posCondCollect,
     negCondCollect: null,
     ipAdapterCollect,
+    fluxReduxCollect,
   });
 
   const totalIPAdaptersAdded =
@@ -253,6 +266,16 @@ export const buildFLUXGraph = async (
   } else {
     g.deleteNode(ipAdapterCollect.id);
   }
+
+  const totalReduxesAdded =
+    fluxReduxResult.addedFLUXReduxes + regionsResult.reduce((acc, r) => acc + r.addedFLUXReduxes, 0);
+  if (totalReduxesAdded > 0) {
+    g.addEdge(fluxReduxCollect, 'collection', denoise, 'redux_conditioning');
+  } else {
+    g.deleteNode(fluxReduxCollect.id);
+  }
+
+  // TODO: Add FLUX Reduxes to denoise node like we do for ipa
 
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);

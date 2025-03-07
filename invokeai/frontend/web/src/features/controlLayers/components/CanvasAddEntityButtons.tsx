@@ -9,7 +9,7 @@ import {
   useAddRegionalGuidance,
   useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
-import { selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
+import { selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -22,7 +22,6 @@ export const CanvasAddEntityButtons = memo(() => {
   const addControlLayer = useAddControlLayer();
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
-  const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
 
   return (
@@ -75,7 +74,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalReferenceImage}
-              isDisabled={isFLUX || isSD3}
+              isDisabled={isSD3}
             >
               {t('controlLayers.regionalReferenceImage')}
             </Button>

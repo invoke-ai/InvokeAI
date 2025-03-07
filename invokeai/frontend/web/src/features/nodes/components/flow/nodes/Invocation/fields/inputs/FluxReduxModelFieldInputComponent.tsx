@@ -6,7 +6,7 @@ import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { FluxReduxModelFieldInputInstance, FluxReduxModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useFluxReduxModels } from 'services/api/hooks/modelsByType';
-import type { FluxReduxModelConfig } from 'services/api/types';
+import type { FLUXReduxModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -19,7 +19,7 @@ const FluxReduxModelFieldInputComponent = (
   const [modelConfigs, { isLoading }] = useFluxReduxModels();
 
   const _onChange = useCallback(
-    (value: FluxReduxModelConfig | null) => {
+    (value: FLUXReduxModelConfig | null) => {
       if (!value) {
         return;
       }

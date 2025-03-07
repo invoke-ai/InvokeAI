@@ -38,6 +38,7 @@ import type { UndoableOptions } from 'redux-undo';
 import type {
   ControlLoRAModelConfig,
   ControlNetModelConfig,
+  FLUXReduxModelConfig,
   ImageDTO,
   IPAdapterModelConfig,
   T2IAdapterModelConfig,
@@ -76,6 +77,7 @@ import {
   imageDTOToImageWithDims,
   initialControlLoRA,
   initialControlNet,
+  initialFLUXRedux,
   initialIPAdapter,
   initialT2IAdapter,
 } from './util';
@@ -619,11 +621,16 @@ export const canvasSlice = createSlice({
       if (!entity) {
         return;
       }
+      if (entity.ipAdapter.type !== 'ip_adapter') {
+        return;
+      }
       entity.ipAdapter.method = method;
     },
     referenceImageIPAdapterModelChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ modelConfig: IPAdapterModelConfig | null }, 'reference_image'>>
+      action: PayloadAction<
+        EntityIdentifierPayload<{ modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | null }, 'reference_image'>
+      >
     ) => {
       const { entityIdentifier, modelConfig } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -631,12 +638,39 @@ export const canvasSlice = createSlice({
         return;
       }
       entity.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
-      // Ensure that the IP Adapter model is compatible with the CLIP Vision model
-      if (entity.ipAdapter.model?.base === 'flux') {
-        entity.ipAdapter.clipVisionModel = 'ViT-L';
-      } else if (entity.ipAdapter.clipVisionModel === 'ViT-L') {
-        // Fall back to ViT-H (ViT-G would also work)
-        entity.ipAdapter.clipVisionModel = 'ViT-H';
+
+      if (!entity.ipAdapter.model) {
+        return;
+      }
+
+      if (entity.ipAdapter.type === 'ip_adapter' && entity.ipAdapter.model.type === 'flux_redux') {
+        // Switching from ip_adapter to flux_redux
+        entity.ipAdapter = {
+          ...initialFLUXRedux,
+          image: entity.ipAdapter.image,
+          model: entity.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (entity.ipAdapter.type === 'flux_redux' && entity.ipAdapter.model.type === 'ip_adapter') {
+        // Switching from flux_redux to ip_adapter
+        entity.ipAdapter = {
+          ...initialIPAdapter,
+          image: entity.ipAdapter.image,
+          model: entity.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (entity.ipAdapter.type === 'ip_adapter') {
+        // Ensure that the IP Adapter model is compatible with the CLIP Vision model
+        if (entity.ipAdapter.model?.base === 'flux') {
+          entity.ipAdapter.clipVisionModel = 'ViT-L';
+        } else if (entity.ipAdapter.clipVisionModel === 'ViT-L') {
+          // Fall back to ViT-H (ViT-G would also work)
+          entity.ipAdapter.clipVisionModel = 'ViT-H';
+        }
       }
     },
     referenceImageIPAdapterCLIPVisionModelChanged: (
@@ -646,6 +680,9 @@ export const canvasSlice = createSlice({
       const { entityIdentifier, clipVisionModel } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
+        return;
+      }
+      if (entity.ipAdapter.type !== 'ip_adapter') {
         return;
       }
       entity.ipAdapter.clipVisionModel = clipVisionModel;
@@ -659,6 +696,9 @@ export const canvasSlice = createSlice({
       if (!entity) {
         return;
       }
+      if (entity.ipAdapter.type !== 'ip_adapter') {
+        return;
+      }
       entity.ipAdapter.weight = weight;
     },
     referenceImageIPAdapterBeginEndStepPctChanged: (
@@ -668,6 +708,9 @@ export const canvasSlice = createSlice({
       const { entityIdentifier, beginEndStepPct } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
+        return;
+      }
+      if (entity.ipAdapter.type !== 'ip_adapter') {
         return;
       }
       entity.ipAdapter.beginEndStepPct = beginEndStepPct;
@@ -843,6 +886,10 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
+      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+        return;
+      }
+
       referenceImage.ipAdapter.weight = weight;
     },
     rgIPAdapterBeginEndStepPctChanged: (
@@ -856,6 +903,10 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
+      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+        return;
+      }
+
       referenceImage.ipAdapter.beginEndStepPct = beginEndStepPct;
     },
     rgIPAdapterMethodChanged: (
@@ -869,6 +920,10 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
+      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+        return;
+      }
+
       referenceImage.ipAdapter.method = method;
     },
     rgIPAdapterModelChanged: (
@@ -877,7 +932,7 @@ export const canvasSlice = createSlice({
         EntityIdentifierPayload<
           {
             referenceImageId: string;
-            modelConfig: IPAdapterModelConfig | null;
+            modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | null;
           },
           'regional_guidance'
         >
@@ -889,12 +944,39 @@ export const canvasSlice = createSlice({
         return;
       }
       referenceImage.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
-      // Ensure that the IP Adapter model is compatible with the CLIP Vision model
-      if (referenceImage.ipAdapter.model?.base === 'flux') {
-        referenceImage.ipAdapter.clipVisionModel = 'ViT-L';
-      } else if (referenceImage.ipAdapter.clipVisionModel === 'ViT-L') {
-        // Fall back to ViT-H (ViT-G would also work)
-        referenceImage.ipAdapter.clipVisionModel = 'ViT-H';
+
+      if (!referenceImage.ipAdapter.model) {
+        return;
+      }
+
+      if (referenceImage.ipAdapter.type === 'ip_adapter' && referenceImage.ipAdapter.model.type === 'flux_redux') {
+        // Switching from ip_adapter to flux_redux
+        referenceImage.ipAdapter = {
+          ...initialFLUXRedux,
+          image: referenceImage.ipAdapter.image,
+          model: referenceImage.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (referenceImage.ipAdapter.type === 'flux_redux' && referenceImage.ipAdapter.model.type === 'ip_adapter') {
+        // Switching from flux_redux to ip_adapter
+        referenceImage.ipAdapter = {
+          ...initialIPAdapter,
+          image: referenceImage.ipAdapter.image,
+          model: referenceImage.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (referenceImage.ipAdapter.type === 'ip_adapter') {
+        // Ensure that the IP Adapter model is compatible with the CLIP Vision model
+        if (referenceImage.ipAdapter.model?.base === 'flux') {
+          referenceImage.ipAdapter.clipVisionModel = 'ViT-L';
+        } else if (referenceImage.ipAdapter.clipVisionModel === 'ViT-L') {
+          // Fall back to ViT-H (ViT-G would also work)
+          referenceImage.ipAdapter.clipVisionModel = 'ViT-H';
+        }
       }
     },
     rgIPAdapterCLIPVisionModelChanged: (
@@ -908,6 +990,10 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
+      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+        return;
+      }
+
       referenceImage.ipAdapter.clipVisionModel = clipVisionModel;
     },
     //#region Inpaint mask
