@@ -1,9 +1,10 @@
-import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
+import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { Weight } from 'features/controlLayers/components/common/Weight';
+import { CLIPVisionModel } from 'features/controlLayers/components/IPAdapter/CLIPVisionModel';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterSettingsEmptyState } from 'features/controlLayers/components/IPAdapter/IPAdapterSettingsEmptyState';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -25,7 +26,7 @@ import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
+import type { FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
 import { IPAdapterModel } from './IPAdapterModel';
@@ -65,7 +66,7 @@ const IPAdapterSettingsContent = memo(() => {
   );
 
   const onChangeModel = useCallback(
-    (modelConfig: IPAdapterModelConfig) => {
+    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig) => {
       dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier, modelConfig }));
     },
     [dispatch, entityIdentifier]
@@ -98,14 +99,14 @@ const IPAdapterSettingsContent = memo(() => {
     <CanvasEntitySettingsWrapper>
       <Flex flexDir="column" gap={2} position="relative" w="full">
         <Flex gap={2} alignItems="center" w="full">
-          <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-            <IPAdapterModel
-              modelKey={ipAdapter.model?.key ?? null}
-              onChangeModel={onChangeModel}
-              clipVisionModel={ipAdapter.clipVisionModel}
-              onChangeCLIPVisionModel={onChangeCLIPVisionModel}
-            />
-          </Box>
+          <IPAdapterModel
+            isRegionalGuidance={false}
+            modelKey={ipAdapter.model?.key ?? null}
+            onChangeModel={onChangeModel}
+          />
+          {ipAdapter.type === 'ip_adapter' && (
+            <CLIPVisionModel model={ipAdapter.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+          )}
           <IconButton
             onClick={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
@@ -116,12 +117,14 @@ const IPAdapterSettingsContent = memo(() => {
           />
         </Flex>
         <Flex gap={2} w="full" alignItems="center">
-          <Flex flexDir="column" gap={2} w="full">
-            {!isFLUX && <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />}
-            <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
-            <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
-          </Flex>
-          <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
+          {ipAdapter.type === 'ip_adapter' && (
+            <Flex flexDir="column" gap={2} w="full">
+              {!isFLUX && <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />}
+              <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
+              <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+            </Flex>
+          )}
+          <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
             <IPAdapterImagePreview
               image={ipAdapter.image}
               onChangeImage={onChangeImage}

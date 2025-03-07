@@ -18,6 +18,7 @@ type AddedRegionResult = {
   addedNegativePrompt: boolean;
   addedAutoNegativePositivePrompt: boolean;
   addedIPAdapters: number;
+  addedFLUXReduxes: number;
 };
 
 type AddRegionsArg = {
@@ -31,6 +32,7 @@ type AddRegionsArg = {
   posCondCollect: Invocation<'collect'>;
   negCondCollect: Invocation<'collect'> | null;
   ipAdapterCollect: Invocation<'collect'>;
+  fluxReduxCollect: Invocation<'collect'> | null;
 };
 
 /**
@@ -45,6 +47,7 @@ type AddRegionsArg = {
  * @param posCondCollect The positive conditioning collector
  * @param negCondCollect The negative conditioning collector
  * @param ipAdapterCollect The IP adapter collector
+ * @param fluxReduxConnect The IP adapter collector
  * @returns A promise that resolves to the regions that were successfully added to the graph
  */
 
@@ -59,6 +62,7 @@ export const addRegions = async ({
   posCondCollect,
   negCondCollect,
   ipAdapterCollect,
+  fluxReduxCollect,
 }: AddRegionsArg): Promise<AddedRegionResult[]> => {
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
@@ -75,6 +79,7 @@ export const addRegions = async ({
       addedNegativePrompt: false,
       addedAutoNegativePositivePrompt: false,
       addedIPAdapters: 0,
+      addedFLUXReduxes: 0,
     };
 
     const getImageDTOResult = await withResultAsync(() => {
@@ -269,30 +274,52 @@ export const addRegions = async ({
     }
 
     for (const { id, ipAdapter } of region.referenceImages) {
-      assert(!isFLUX, 'Regional IP adapters are not supported for FLUX.');
+      if (ipAdapter.type === 'ip_adapter') {
+        assert(!isFLUX, 'Regional IP adapters are not supported for FLUX.');
 
-      result.addedIPAdapters++;
-      const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
-      assert(model, 'IP Adapter model is required');
-      assert(image, 'IP Adapter image is required');
+        result.addedIPAdapters++;
+        const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
+        assert(model, 'IP Adapter model is required');
+        assert(image, 'IP Adapter image is required');
 
-      const ipAdapterNode = g.addNode({
-        id: `ip_adapter_${id}`,
-        type: 'ip_adapter',
-        weight,
-        method,
-        ip_adapter_model: model,
-        clip_vision_model: clipVisionModel,
-        begin_step_percent: beginEndStepPct[0],
-        end_step_percent: beginEndStepPct[1],
-        image: {
-          image_name: image.image_name,
-        },
-      });
+        const ipAdapterNode = g.addNode({
+          id: `ip_adapter_${id}`,
+          type: 'ip_adapter',
+          weight,
+          method,
+          ip_adapter_model: model,
+          clip_vision_model: clipVisionModel,
+          begin_step_percent: beginEndStepPct[0],
+          end_step_percent: beginEndStepPct[1],
+          image: {
+            image_name: image.image_name,
+          },
+        });
 
-      // Connect the mask to the conditioning
-      g.addEdge(maskToTensor, 'mask', ipAdapterNode, 'mask');
-      g.addEdge(ipAdapterNode, 'ip_adapter', ipAdapterCollect, 'item');
+        // Connect the mask to the conditioning
+        g.addEdge(maskToTensor, 'mask', ipAdapterNode, 'mask');
+        g.addEdge(ipAdapterNode, 'ip_adapter', ipAdapterCollect, 'item');
+      } else if (ipAdapter.type === 'flux_redux') {
+        assert(isFLUX, 'Regional FLUX Redux requires FLUX.');
+        assert(fluxReduxCollect !== null, 'FLUX Redux collector is required.');
+        result.addedFLUXReduxes++;
+        const { model: fluxReduxModel, image } = ipAdapter;
+        assert(fluxReduxModel, 'FLUX Redux model is required');
+        assert(image, 'FLUX Redux image is required');
+
+        const fluxReduxNode = g.addNode({
+          id: `flux_redux_${id}`,
+          type: 'flux_redux',
+          redux_model: fluxReduxModel,
+          image: {
+            image_name: image.image_name,
+          },
+        });
+
+        // Connect the mask to the conditioning
+        g.addEdge(maskToTensor, 'mask', fluxReduxNode, 'mask');
+        g.addEdge(fluxReduxNode, 'redux_cond', fluxReduxCollect, 'item');
+      }
     }
 
     results.push(result);

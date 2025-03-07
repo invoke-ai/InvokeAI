@@ -19,7 +19,6 @@ import {
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
-  isNonRefinerMainModelConfig,
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
   isSD3MainModelModelConfig,
@@ -39,7 +38,7 @@ const buildModelsHook =
     typeGuard: (config: AnyModelConfig, excludeSubmodels?: boolean) => config is T,
     excludeSubmodels?: boolean
   ) =>
-  () => {
+  (filter: (config: T) => boolean = () => true) => {
     const result = useGetModelConfigsQuery(undefined);
     const modelConfigs = useMemo(() => {
       if (!result.data) {
@@ -48,13 +47,13 @@ const buildModelsHook =
 
       return modelConfigsAdapterSelectors
         .selectAll(result.data)
-        .filter((config) => typeGuard(config, excludeSubmodels));
-    }, [result]);
+        .filter((config) => typeGuard(config, excludeSubmodels))
+        .filter(filter);
+    }, [filter, result.data]);
 
     return [modelConfigs, result] as const;
   };
 
-export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
@@ -78,6 +77,9 @@ export const useFluxVAEModels = (args?: ModelHookArgs) =>
 export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
 export const useSigLipModels = buildModelsHook(isSigLipModelConfig);
 export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);
+export const useIPAdapterOrFLUXReduxModels = buildModelsHook(
+  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
+);
 
 // const buildModelsSelector =
 //   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>
