@@ -18,6 +18,9 @@ from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_no_proj_mlp_format import (
     state_dict_keys as flux_diffusers_no_proj_mlp_state_dict_keys,
 )
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_with_norm_out_format import (
+    state_dict_keys as flux_diffusers_with_norm_out_state_dict_keys,
+)
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_kohya_format import (
     state_dict_keys as flux_kohya_state_dict_keys,
 )
@@ -29,6 +32,7 @@ from tests.backend.patches.lora_conversions.lora_state_dicts.utils import keys_t
     [
         flux_diffusers_state_dict_keys,
         flux_diffusers_no_proj_mlp_state_dict_keys,
+        flux_diffusers_with_norm_out_state_dict_keys,
         flux_diffusers_base_model_state_dict_keys,
     ],
 )
@@ -56,6 +60,7 @@ def test_is_state_dict_likely_in_flux_diffusers_format_false(sd_keys: dict[str, 
     [
         flux_diffusers_state_dict_keys,
         flux_diffusers_no_proj_mlp_state_dict_keys,
+        flux_diffusers_with_norm_out_state_dict_keys,
         flux_diffusers_base_model_state_dict_keys,
     ],
 )
