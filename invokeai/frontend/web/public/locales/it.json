@@ -1734,7 +1734,6 @@
         "userWorkflows": "Flussi di lavoro utente",
         "projectWorkflows": "Flussi di lavoro del progetto",
         "defaultWorkflows": "Flussi di lavoro predefiniti",
-        "uploadAndSaveWorkflow": "Carica nella libreria",
         "chooseWorkflowFromLibrary": "Scegli il flusso di lavoro dalla libreria",
         "deleteWorkflow2": "Vuoi davvero eliminare questo flusso di lavoro? Questa operazione non può essere annullata.",
         "edit": "Modifica",
