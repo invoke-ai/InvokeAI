@@ -2771,81 +2771,6 @@ export type components = {
              */
             bulk_download_item_name: string;
         };
-        /**
-         * CLIPEmbedDiffusersConfig
-         * @description Model config for Clip Embeddings.
-         */
-        CLIPEmbedDiffusersConfig: {
-            /**
-             * Key
-             * @description A unique key for this model.
-             */
-            key: string;
-            /**
-             * Hash
-             * @description The hash of the model file(s).
-             */
-            hash: string;
-            /**
-             * Path
-             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
-             */
-            path: string;
-            /**
-             * Name
-             * @description Name of the model.
-             */
-            name: string;
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
-            /** @default  */
-            repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
-            /**
-             * Type
-             * @default clip_embed
-             * @constant
-             * @enum {string}
-             */
-            type: "clip_embed";
-            /** @default large */
-            variant?: components["schemas"]["ClipVariantType"];
-        };
         /** CLIPField */
         CLIPField: {
             /** @description Info to load tokenizer submodel */
@@ -2888,13 +2813,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default clip_embed
+             * @constant
+             * @enum {string}
+             */
+            type: "clip_embed";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -2902,6 +2836,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -2919,24 +2863,15 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
             /** @default  */
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
             /**
-             * Type
-             * @default clip_embed
+             * Variant
+             * @default gigantic
              * @constant
              * @enum {string}
              */
-            type: "clip_embed";
-            /** @default gigantic */
-            variant?: components["schemas"]["ClipVariantType"];
+            variant?: "gigantic";
         };
         /**
          * CLIPLEmbedDiffusersConfig
@@ -2963,13 +2898,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default clip_embed
+             * @constant
+             * @enum {string}
+             */
+            type: "clip_embed";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -2977,6 +2921,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -2994,24 +2948,15 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
             /** @default  */
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
             /**
-             * Type
-             * @default clip_embed
+             * Variant
+             * @default large
              * @constant
              * @enum {string}
              */
-            type: "clip_embed";
-            /** @default large */
-            variant?: components["schemas"]["ClipVariantType"];
+            variant?: "large";
         };
         /**
          * CLIPOutput
@@ -3117,13 +3062,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default clip_vision
+             * @constant
+             * @enum {string}
+             */
+            type: "clip_vision";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -3131,6 +3085,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -3148,22 +3112,8 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
             /** @default  */
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
-            /**
-             * Type
-             * @default clip_vision
-             * @constant
-             * @enum {string}
-             */
-            type: "clip_vision";
         };
         /**
          * CV2 Infill
@@ -4473,8 +4423,6 @@ export type components = {
          * @description Model config for Control LoRA models.
          */
         ControlLoRADiffusersConfig: {
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Key
              * @description A unique key for this model.
@@ -4495,13 +4443,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default control_lora
+             * @constant
+             * @enum {string}
+             */
+            type: "control_lora";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -4509,6 +4466,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -4526,25 +4493,13 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default control_lora
-             * @constant
-             * @enum {string}
-             */
-            type: "control_lora";
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
             trigger_phrases?: string[] | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
         };
         /** ControlLoRAField */
         ControlLoRAField: {
@@ -4563,8 +4518,6 @@ export type components = {
          * @description Model config for Control LoRA models.
          */
         ControlLoRALyCORISConfig: {
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Key
              * @description A unique key for this model.
@@ -4585,37 +4538,6 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
-            /** @description The base model. */
-            base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
-            /**
-             * Source
-             * @description The original source of the model (path, URL or repo_id).
-             */
-            source: string;
-            /** @description The type of source */
-            source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Source Api Response
-             * @description The original API response from the source, as stringified JSON.
-             */
-            source_api_response?: string | null;
-            /**
-             * Cover Image
-             * @description Url for image to preview model
-             */
-            cover_image?: string | null;
-            /**
-             * Submodels
-             * @description Loadable submodels in this model
-             */
-            submodels?: {
-                [key: string]: components["schemas"]["SubmodelDefinition"];
-            } | null;
             /**
              * Type
              * @default control_lora
@@ -4624,25 +4546,61 @@ export type components = {
              */
             type: "control_lora";
             /**
-             * Trigger Phrases
-             * @description Set of trigger phrases for this model
-             */
-            trigger_phrases?: string[] | null;
-            /**
              * Format
              * @default lycoris
              * @constant
              * @enum {string}
              */
             format: "lycoris";
+            /** @description The base model. */
+            base: components["schemas"]["BaseModelType"];
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response?: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image?: string | null;
+            /**
+             * Submodels
+             * @description Loadable submodels in this model
+             */
+            submodels?: {
+                [key: string]: components["schemas"]["SubmodelDefinition"];
+            } | null;
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases?: string[] | null;
         };
         /**
          * ControlNetCheckpointConfig
          * @description Model config for ControlNet models (diffusers version).
          */
         ControlNetCheckpointConfig: {
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Key
              * @description A unique key for this model.
@@ -4663,13 +4621,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default controlnet
+             * @constant
+             * @enum {string}
+             */
+            type: "controlnet";
+            /**
+             * Format
+             * @description Format of the provided checkpoint model
+             * @default checkpoint
+             * @enum {string}
+             */
+            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -4677,6 +4644,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -4694,13 +4671,8 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Config Path
              * @description path to the checkpoint model config file
@@ -4711,21 +4683,12 @@ export type components = {
              * @description When this model was last converted to diffusers
              */
             converted_at?: number | null;
-            /**
-             * Type
-             * @default controlnet
-             * @constant
-             * @enum {string}
-             */
-            type: "controlnet";
         };
         /**
          * ControlNetDiffusersConfig
          * @description Model config for ControlNet models (diffusers version).
          */
         ControlNetDiffusersConfig: {
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Key
              * @description A unique key for this model.
@@ -4746,13 +4709,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default controlnet
+             * @constant
+             * @enum {string}
+             */
+            type: "controlnet";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -4760,6 +4732,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -4777,22 +4759,10 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /** @default  */
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
-            /**
-             * Type
-             * @default controlnet
-             * @constant
-             * @enum {string}
-             */
-            type: "controlnet";
         };
         /**
          * ControlNet
@@ -7951,13 +7921,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default flux_redux
+             * @constant
+             * @enum {string}
+             */
+            type: "flux_redux";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             * @enum {string}
+             */
+            format: "checkpoint";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -7965,6 +7944,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -7982,20 +7971,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default flux_redux
-             * @constant
-             * @enum {string}
-             */
-            type: "flux_redux";
-            /**
-             * Format
-             * @default checkpoint
-             * @constant
-             * @enum {string}
-             */
-            format: "checkpoint";
         };
         /**
          * FLUX Redux
@@ -8789,13 +8764,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default ip_adapter
+             * @constant
+             * @enum {string}
+             */
+            type: "ip_adapter";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             * @enum {string}
+             */
+            format: "checkpoint";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -8803,6 +8787,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -8820,19 +8814,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default ip_adapter
-             * @constant
-             * @enum {string}
-             */
-            type: "ip_adapter";
-            /**
-             * Format
-             * @constant
-             * @enum {string}
-             */
-            format: "checkpoint";
         };
         /** IPAdapterField */
         IPAdapterField: {
@@ -8979,13 +8960,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default ip_adapter
+             * @constant
+             * @enum {string}
+             */
+            type: "ip_adapter";
+            /**
+             * Format
+             * @default invokeai
+             * @constant
+             * @enum {string}
+             */
+            format: "invokeai";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -8993,6 +8983,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -9010,21 +9010,8 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default ip_adapter
-             * @constant
-             * @enum {string}
-             */
-            type: "ip_adapter";
             /** Image Encoder Model Id */
             image_encoder_model_id: string;
-            /**
-             * Format
-             * @constant
-             * @enum {string}
-             */
-            format: "invokeai";
         };
         /**
          * IPAdapterMetadataField
@@ -12928,13 +12915,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default lora
+             * @constant
+             * @enum {string}
+             */
+            type: "lora";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -12942,6 +12938,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -12960,24 +12966,10 @@ export type components = {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
-             * Type
-             * @default lora
-             * @constant
-             * @enum {string}
-             */
-            type: "lora";
-            /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
             trigger_phrases?: string[] | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
         };
         /** LoRAField */
         LoRAField: {
@@ -13093,13 +13085,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default lora
+             * @constant
+             * @enum {string}
+             */
+            type: "lora";
+            /**
+             * Format
+             * @default lycoris
+             * @constant
+             * @enum {string}
+             */
+            format: "lycoris";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -13107,6 +13108,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -13125,24 +13136,10 @@ export type components = {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
-             * Type
-             * @default lora
-             * @constant
-             * @enum {string}
-             */
-            type: "lora";
-            /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
             trigger_phrases?: string[] | null;
-            /**
-             * Format
-             * @default lycoris
-             * @constant
-             * @enum {string}
-             */
-            format: "lycoris";
         };
         /**
          * LoRAMetadataField
@@ -13367,13 +13364,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default main
+             * @constant
+             * @enum {string}
+             */
+            type: "main";
+            /**
+             * Format
+             * @default bnb_quantized_nf4b
+             * @constant
+             * @enum {string}
+             */
+            format: "bnb_quantized_nf4b";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -13381,6 +13387,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -13399,13 +13415,6 @@ export type components = {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
-             * Type
-             * @default main
-             * @constant
-             * @enum {string}
-             */
-            type: "main";
-            /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
@@ -13417,13 +13426,6 @@ export type components = {
              * @default normal
              */
             variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
-            /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
             /**
              * Config Path
              * @description path to the checkpoint model config file
@@ -13467,13 +13469,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default main
+             * @constant
+             * @enum {string}
+             */
+            type: "main";
+            /**
+             * Format
+             * @description Format of the provided checkpoint model
+             * @default checkpoint
+             * @enum {string}
+             */
+            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -13481,6 +13492,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -13499,13 +13520,6 @@ export type components = {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
-             * Type
-             * @default main
-             * @constant
-             * @enum {string}
-             */
-            type: "main";
-            /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
@@ -13517,13 +13531,6 @@ export type components = {
              * @default normal
              */
             variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
-            /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
             /**
              * Config Path
              * @description path to the checkpoint model config file
@@ -13567,13 +13574,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default main
+             * @constant
+             * @enum {string}
+             */
+            type: "main";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -13581,6 +13597,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -13599,13 +13625,6 @@ export type components = {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
-             * Type
-             * @default main
-             * @constant
-             * @enum {string}
-             */
-            type: "main";
-            /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
@@ -13617,13 +13636,6 @@ export type components = {
              * @default normal
              */
             variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
             /** @default  */
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
         };
@@ -13652,13 +13664,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default main
+             * @constant
+             * @enum {string}
+             */
+            type: "main";
+            /**
+             * Format
+             * @default gguf_quantized
+             * @constant
+             * @enum {string}
+             */
+            format: "gguf_quantized";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -13666,6 +13687,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -13684,13 +13715,6 @@ export type components = {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
-             * Type
-             * @default main
-             * @constant
-             * @enum {string}
-             */
-            type: "main";
-            /**
              * Trigger Phrases
              * @description Set of trigger phrases for this model
              */
@@ -13702,13 +13726,6 @@ export type components = {
              * @default normal
              */
             variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | null;
-            /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
             /**
              * Config Path
              * @description path to the checkpoint model config file
@@ -15829,7 +15846,7 @@ export type components = {
              * Config Out
              * @description After successful installation, this will hold the configuration object.
              */
-            config_out?: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"]) | null;
+            config_out?: (components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"]) | null;
             /**
              * Inplace
              * @description Leave model in its current location; otherwise install under models directory
@@ -15915,7 +15932,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"];
+            config: components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -15936,7 +15953,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"];
+            config: components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -16080,7 +16097,7 @@ export type components = {
          */
         ModelsList: {
             /** Models */
-            models: (components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"])[];
+            models: (components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"])[];
         };
         /**
          * Multiply Integers
@@ -18931,13 +18948,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default siglip
+             * @constant
+             * @enum {string}
+             */
+            type: "siglip";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -18945,6 +18971,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -18962,22 +18998,8 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
             /** @default  */
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
-            /**
-             * Type
-             * @default siglip
-             * @constant
-             * @enum {string}
-             */
-            type: "siglip";
         };
         /**
          * Image-to-Image (Autoscale)
@@ -19073,13 +19095,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default spandrel_image_to_image
+             * @constant
+             * @enum {string}
+             */
+            type: "spandrel_image_to_image";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             * @enum {string}
+             */
+            format: "checkpoint";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -19087,6 +19118,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -19104,20 +19145,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default spandrel_image_to_image
-             * @constant
-             * @enum {string}
-             */
-            type: "spandrel_image_to_image";
-            /**
-             * Format
-             * @default checkpoint
-             * @constant
-             * @enum {string}
-             */
-            format: "checkpoint";
         };
         /**
          * Image-to-Image
@@ -19788,8 +19815,6 @@ export type components = {
          * @description Model config for T2I.
          */
         T2IAdapterConfig: {
-            /** @description Default settings for this model */
-            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Key
              * @description A unique key for this model.
@@ -19810,13 +19835,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default t2i_adapter
+             * @constant
+             * @enum {string}
+             */
+            type: "t2i_adapter";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -19824,6 +19858,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -19841,22 +19885,10 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
+            /** @description Default settings for this model */
+            default_settings?: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /** @default  */
             repo_variant?: components["schemas"]["ModelRepoVariant"] | null;
-            /**
-             * Type
-             * @default t2i_adapter
-             * @constant
-             * @enum {string}
-             */
-            type: "t2i_adapter";
         };
         /** T2IAdapterField */
         T2IAdapterField: {
@@ -20030,13 +20062,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default t5_encoder
+             * @constant
+             * @enum {string}
+             */
+            type: "t5_encoder";
+            /**
+             * Format
+             * @default bnb_quantized_int8b
+             * @constant
+             * @enum {string}
+             */
+            format: "bnb_quantized_int8b";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -20044,6 +20085,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -20061,20 +20112,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default t5_encoder
-             * @constant
-             * @enum {string}
-             */
-            type: "t5_encoder";
-            /**
-             * Format
-             * @default bnb_quantized_int8b
-             * @constant
-             * @enum {string}
-             */
-            format: "bnb_quantized_int8b";
         };
         /** T5EncoderConfig */
         T5EncoderConfig: {
@@ -20098,13 +20135,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default t5_encoder
+             * @constant
+             * @enum {string}
+             */
+            type: "t5_encoder";
+            /**
+             * Format
+             * @default t5_encoder
+             * @constant
+             * @enum {string}
+             */
+            format: "t5_encoder";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -20112,6 +20158,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -20129,20 +20185,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default t5_encoder
-             * @constant
-             * @enum {string}
-             */
-            type: "t5_encoder";
-            /**
-             * Format
-             * @default t5_encoder
-             * @constant
-             * @enum {string}
-             */
-            format: "t5_encoder";
         };
         /** T5EncoderField */
         T5EncoderField: {
@@ -20203,13 +20245,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default embedding
+             * @constant
+             * @enum {string}
+             */
+            type: "embedding";
+            /**
+             * Format
+             * @default embedding_file
+             * @constant
+             * @enum {string}
+             */
+            format: "embedding_file";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -20217,6 +20268,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -20234,20 +20295,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default embedding
-             * @constant
-             * @enum {string}
-             */
-            type: "embedding";
-            /**
-             * Format
-             * @default embedding_file
-             * @constant
-             * @enum {string}
-             */
-            format: "embedding_file";
         };
         /**
          * TextualInversionFolderConfig
@@ -20274,13 +20321,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default embedding
+             * @constant
+             * @enum {string}
+             */
+            type: "embedding";
+            /**
+             * Format
+             * @default embedding_folder
+             * @constant
+             * @enum {string}
+             */
+            format: "embedding_folder";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -20288,6 +20344,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -20305,20 +20371,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default embedding
-             * @constant
-             * @enum {string}
-             */
-            type: "embedding";
-            /**
-             * Format
-             * @default embedding_folder
-             * @constant
-             * @enum {string}
-             */
-            format: "embedding_folder";
         };
         /** Tile */
         Tile: {
@@ -20838,13 +20890,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default vae
+             * @constant
+             * @enum {string}
+             */
+            type: "vae";
+            /**
+             * Format
+             * @description Format of the provided checkpoint model
+             * @default checkpoint
+             * @enum {string}
+             */
+            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -20852,6 +20913,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -20870,13 +20941,6 @@ export type components = {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
             /**
-             * Format
-             * @description Format of the provided checkpoint model
-             * @default checkpoint
-             * @enum {string}
-             */
-            format: "checkpoint" | "bnb_quantized_nf4b" | "gguf_quantized";
-            /**
              * Config Path
              * @description path to the checkpoint model config file
              */
@@ -20886,13 +20950,6 @@ export type components = {
              * @description When this model was last converted to diffusers
              */
             converted_at?: number | null;
-            /**
-             * Type
-             * @default vae
-             * @constant
-             * @enum {string}
-             */
-            type: "vae";
         };
         /**
          * VAEDiffusersConfig
@@ -20919,13 +20976,22 @@ export type components = {
              * @description Name of the model.
              */
             name: string;
+            /**
+             * Type
+             * @default vae
+             * @constant
+             * @enum {string}
+             */
+            type: "vae";
+            /**
+             * Format
+             * @default diffusers
+             * @constant
+             * @enum {string}
+             */
+            format: "diffusers";
             /** @description The base model. */
             base: components["schemas"]["BaseModelType"];
-            /**
-             * Description
-             * @description Model description
-             */
-            description?: string | null;
             /**
              * Source
              * @description The original source of the model (path, URL or repo_id).
@@ -20933,6 +20999,16 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Hash Algo
+             * @description The algorithm used to compute the hash.
+             */
+            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
+            /**
+             * Description
+             * @description Model description
+             */
+            description?: string | null;
             /**
              * Source Api Response
              * @description The original API response from the source, as stringified JSON.
@@ -20950,20 +21026,6 @@ export type components = {
             submodels?: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
-            /**
-             * Type
-             * @default vae
-             * @constant
-             * @enum {string}
-             */
-            type: "vae";
-            /**
-             * Format
-             * @default diffusers
-             * @constant
-             * @enum {string}
-             */
-            format: "diffusers";
         };
         /** VAEField */
         VAEField: {
@@ -21466,7 +21528,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"];
+                    "application/json": components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"];
                 };
             };
             /** @description Validation Error */
@@ -21498,7 +21560,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"];
+                    "application/json": components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"];
                 };
             };
             /** @description Bad request */
@@ -21595,7 +21657,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"];
+                    "application/json": components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"];
                 };
             };
             /** @description Bad request */
@@ -22095,7 +22157,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["CLIPEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["FluxReduxConfig"];
+                    "application/json": components["schemas"]["CLIPGEmbedDiffusersConfig"] | components["schemas"]["CLIPLEmbedDiffusersConfig"] | components["schemas"]["CLIPVisionDiffusersConfig"] | components["schemas"]["ControlLoRADiffusersConfig"] | components["schemas"]["ControlLoRALyCORISConfig"] | components["schemas"]["ControlNetCheckpointConfig"] | components["schemas"]["ControlNetDiffusersConfig"] | components["schemas"]["FluxReduxConfig"] | components["schemas"]["IPAdapterCheckpointConfig"] | components["schemas"]["IPAdapterInvokeAIConfig"] | components["schemas"]["LoRADiffusersConfig"] | components["schemas"]["LoRALyCORISConfig"] | components["schemas"]["MainBnbQuantized4bCheckpointConfig"] | components["schemas"]["MainCheckpointConfig"] | components["schemas"]["MainDiffusersConfig"] | components["schemas"]["MainGGUFCheckpointConfig"] | components["schemas"]["SigLIPConfig"] | components["schemas"]["SpandrelImageToImageConfig"] | components["schemas"]["T2IAdapterConfig"] | components["schemas"]["T5EncoderBnbQuantizedLlmInt8bConfig"] | components["schemas"]["T5EncoderConfig"] | components["schemas"]["TextualInversionFileConfig"] | components["schemas"]["TextualInversionFolderConfig"] | components["schemas"]["VAECheckpointConfig"] | components["schemas"]["VAEDiffusersConfig"];
                 };
             };
             /** @description Bad request */
