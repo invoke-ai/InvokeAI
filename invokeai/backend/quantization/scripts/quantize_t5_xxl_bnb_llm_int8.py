@@ -27,7 +27,7 @@ def main():
     """
     model_path = Path("/data/misc/text_encoder_2")
 
-    with log_time("Intialize T5 on meta device"):
+    with log_time("Initialize T5 on meta device"):
         model_config = AutoConfig.from_pretrained(model_path)
         with accelerate.init_empty_weights():
             model = AutoModelForTextEncoding.from_config(model_config)
