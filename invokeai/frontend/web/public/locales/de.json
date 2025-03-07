@@ -113,7 +113,8 @@
         "end": "Ende",
         "layout": "Layout",
         "board": "Ordner",
-        "combinatorial": "Kombinatorisch"
+        "combinatorial": "Kombinatorisch",
+        "saveChanges": "Änderungen speichern"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -761,7 +762,16 @@
         "workflowDeleted": "Arbeitsablauf gelöscht",
         "errorCopied": "Fehler kopiert",
         "layerCopiedToClipboard": "Ebene in die Zwischenablage kopiert",
-        "sentToCanvas": "An Leinwand gesendet"
+        "sentToCanvas": "An Leinwand gesendet",
+        "problemDeletingWorkflow": "Problem beim Löschen des Arbeitsablaufs",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Es darf maximal 1 PNG- oder JPEG-Bild sein.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Es dürfen maximal {{count}} PNG- oder JPEG-Bilder sein.",
+        "problemRetrievingWorkflow": "Problem beim Abrufen des Arbeitsablaufs",
+        "uploadFailedInvalidUploadDesc": "Müssen PNG- oder JPEG-Bilder sein.",
+        "pasteSuccess": "Eingefügt in {{destination}}",
+        "pasteFailed": "Einfügen fehlgeschlagen",
+        "unableToCopy": "Kopieren nicht möglich",
+        "unableToCopyDesc_theseSteps": "diese Schritte"
     },
     "accessibility": {
         "uploadImage": "Bild hochladen",
@@ -1314,7 +1324,8 @@
         "nodeName": "Knotenname",
         "description": "Beschreibung",
         "loadWorkflowDesc": "Arbeitsablauf laden?",
-        "loadWorkflowDesc2": "Ihr aktueller Arbeitsablauf enthält nicht gespeicherte Änderungen."
+        "loadWorkflowDesc2": "Ihr aktueller Arbeitsablauf enthält nicht gespeicherte Änderungen.",
+        "loadingTemplates": "Lade {{name}}"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
