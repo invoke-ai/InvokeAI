@@ -58,6 +58,7 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
   const isSubTypeMatch = doesCardinalityMatch && (isIntToFloat || isIntToString || isFloatToString);
 
   const isTargetAnyType = targetType.name === 'AnyField';
+  const isSourceAnyType = sourceType.name === 'AnyField';
 
   // One of these must be true for the connection to be valid
   return (
@@ -67,6 +68,7 @@ export const validateConnectionTypes = (sourceType: FieldType, targetType: Field
     isGenericCollectionToAnyCollectionOrSingleOrCollection ||
     isCollectionToGenericCollection ||
     isSubTypeMatch ||
-    isTargetAnyType
+    isTargetAnyType ||
+    isSourceAnyType
   );
 };
