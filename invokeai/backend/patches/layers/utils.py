@@ -10,6 +10,7 @@ from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.norm_layer import NormLayer
+from invokeai.backend.patches.layers.diffusers_ada_ln_lora_layer import DiffusersAdaLN_LoRALayer
 
 
 def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> BaseLayerPatch:
@@ -33,3 +34,10 @@ def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> BaseL
         return NormLayer.from_state_dict_values(state_dict)
     else:
         raise ValueError(f"Unsupported lora format: {state_dict.keys()}")
+
+
+def diffusers_adaLN_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> DiffusersAdaLN_LoRALayer:
+    if not "lora_up.weight" in state_dict:
+        raise ValueError(f"Unsupported lora format: {state_dict.keys()}")
+    
+    return DiffusersAdaLN_LoRALayer.from_state_dict_values(state_dict)
