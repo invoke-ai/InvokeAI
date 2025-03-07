@@ -1741,6 +1741,8 @@
             "row": "Row",
             "column": "Column",
             "container": "Container",
+            "containerRowLayout": "Container (row layout)",
+            "containerColumnLayout": "Container (column layout)",
             "heading": "Heading",
             "text": "Text",
             "divider": "Divider",

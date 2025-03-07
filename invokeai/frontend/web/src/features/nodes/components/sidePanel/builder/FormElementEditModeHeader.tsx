@@ -9,7 +9,7 @@ import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { formElementRemoved } from 'features/nodes/store/workflowSlice';
 import type { FormElement, NodeFieldElement } from 'features/nodes/types/workflow';
 import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
-import { startCase } from 'lodash-es';
+import { camelCase } from 'lodash-es';
 import type { RefObject } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -103,15 +103,16 @@ const RemoveElementButton = memo(({ element }: { element: FormElement }) => {
 RemoveElementButton.displayName = 'RemoveElementButton';
 
 const Label = memo(({ element }: { element: FormElement }) => {
+  const { t } = useTranslation();
   const label = useMemo(() => {
     if (isContainerElement(element) && element.data.layout === 'column') {
-      return `Container (column layout)`;
+      return t('workflows.builder.containerColumnLayout');
     }
     if (isContainerElement(element) && element.data.layout === 'row') {
-      return `Container (row layout)`;
+      return t('workflows.builder.containerRowLayout');
     }
-    return startCase(element.type);
-  }, [element]);
+    return t(`workflows.builder.${camelCase(element.type)}`);
+  }, [element, t]);
 
   return (
     <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all" userSelect="none">
