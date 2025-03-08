@@ -553,8 +553,10 @@ class AnyOutput(BaseInvocationOutput):
 class SwitcherInvocation(BaseInvocation):
     a: Any = InputField(description="The first input", ui_type=UIType.Any)
     b: Any = InputField(description="The second input", ui_type=UIType.Any)
-    switch: bool = InputField(description="Switch between the two inputs")
+    switch: bool = InputField(
+        description="Switch between the two inputs. If false, the first input is returned. If true, the second input is returned."
+    )
 
     def invoke(self, context: InvocationContext) -> AnyOutput:
-        value = self.a if self.switch else self.b
+        value = self.b if self.switch else self.a
         return AnyOutput(value=value)
