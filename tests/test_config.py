@@ -274,7 +274,7 @@ def test_deny_nodes(patch_rootdir):
 
     # We've changed the config, we need to invalidate the typeadapter cache so that the new config is used for
     # subsequent graph validations
-    BaseInvocation.invalidate_typeadapter()
+    BaseInvocation.get_typeadapter.cache_clear()
 
     # confirm graph validation fails when using denied node
     Graph.model_validate({"nodes": {"1": {"id": "1", "type": "integer"}}})
@@ -296,4 +296,4 @@ def test_deny_nodes(patch_rootdir):
 
     # Reset the config so that it doesn't affect other tests
     get_config.cache_clear()
-    BaseInvocation.invalidate_typeadapter()
+    BaseInvocation.get_typeadapter.cache_clear()
