@@ -8,6 +8,7 @@ import sys
 import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
+from functools import lru_cache
 from inspect import signature
 from typing import (
     TYPE_CHECKING,
@@ -27,7 +28,6 @@ import semver
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
-from typing_extensions import TypeAliasType
 
 from invokeai.app.invocations.fields import (
     FieldKind,
@@ -101,14 +101,12 @@ class BaseInvocationOutput(BaseModel):
     """
 
     _output_classes: ClassVar[set[BaseInvocationOutput]] = set()
-    _typeadapter: ClassVar[Optional[TypeAdapter[Any]]] = None
-    _typeadapter_needs_update: ClassVar[bool] = False
 
     @classmethod
     def register_output(cls, output: BaseInvocationOutput) -> None:
         """Registers an invocation output."""
         cls._output_classes.add(output)
-        cls._typeadapter_needs_update = True
+        cls.get_typeadapter.cache_clear()
 
     @classmethod
     def get_outputs(cls) -> Iterable[BaseInvocationOutput]:
@@ -116,15 +114,15 @@ class BaseInvocationOutput(BaseModel):
         return cls._output_classes
 
     @classmethod
+    @lru_cache(maxsize=1)
     def get_typeadapter(cls) -> TypeAdapter[Any]:
-        """Gets a pydantc TypeAdapter for the union of all invocation output types."""
-        if not cls._typeadapter or cls._typeadapter_needs_update:
-            AnyInvocationOutput = TypeAliasType(
-                "AnyInvocationOutput", Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")]
-            )
-            cls._typeadapter = TypeAdapter(AnyInvocationOutput)
-            cls._typeadapter_needs_update = False
-        return cls._typeadapter
+        """Gets a pydantic TypeAdapter for the union of all invocation output types.
+
+        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
+        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
+        the updated allowlist and denylist.
+        """
+        return TypeAdapter(Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")])
 
     @classmethod
     def get_output_types(cls) -> Iterable[str]:
@@ -174,8 +172,6 @@ class BaseInvocation(ABC, BaseModel):
     """
 
     _invocation_classes: ClassVar[set[BaseInvocation]] = set()
-    _typeadapter: ClassVar[Optional[TypeAdapter[Any]]] = None
-    _typeadapter_needs_update: ClassVar[bool] = False
 
     @classmethod
     def get_type(cls) -> str:
@@ -186,25 +182,18 @@ class BaseInvocation(ABC, BaseModel):
     def register_invocation(cls, invocation: BaseInvocation) -> None:
         """Registers an invocation."""
         cls._invocation_classes.add(invocation)
-        cls._typeadapter_needs_update = True
+        cls.get_typeadapter.cache_clear()
 
     @classmethod
+    @lru_cache(maxsize=1)
     def get_typeadapter(cls) -> TypeAdapter[Any]:
-        """Gets a pydantc TypeAdapter for the union of all invocation types."""
-        if not cls._typeadapter or cls._typeadapter_needs_update:
-            AnyInvocation = TypeAliasType(
-                "AnyInvocation", Annotated[Union[tuple(cls.get_invocations())], Field(discriminator="type")]
-            )
-            cls._typeadapter = TypeAdapter(AnyInvocation)
-            cls._typeadapter_needs_update = False
-        return cls._typeadapter
+        """Gets a pydantic TypeAdapter for the union of all invocation types.
 
-    @classmethod
-    def invalidate_typeadapter(cls) -> None:
-        """Invalidates the typeadapter, forcing it to be rebuilt on next access. If the invocation allowlist or
-        denylist is changed, this should be called to ensure the typeadapter is updated and validation respects
-        the updated allowlist and denylist."""
-        cls._typeadapter_needs_update = True
+        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
+        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
+        the updated allowlist and denylist.
+        """
+        return TypeAdapter(Annotated[Union[tuple(cls.get_invocations())], Field(discriminator="type")])
 
     @classmethod
     def get_invocations(cls) -> Iterable[BaseInvocation]:
