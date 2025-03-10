@@ -5,12 +5,12 @@ import torch
 from tqdm import tqdm
 
 from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFluxOutput, sum_controlnet_flux_outputs
-from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.model import Flux
+from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 
@@ -26,7 +26,7 @@ def denoise(
     step_callback: Callable[[PipelineIntermediateState], None],
     guidance: float,
     cfg_scale: list[float],
-    inpaint_extension: InpaintExtension | None,
+    inpaint_extension: RectifiedFlowInpaintExtension | None,
     controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
     pos_ip_adapter_extensions: list[XLabsIPAdapterExtension],
     neg_ip_adapter_extensions: list[XLabsIPAdapterExtension],

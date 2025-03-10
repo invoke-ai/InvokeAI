@@ -24,7 +24,7 @@ from invokeai.app.invocations.sd3_text_encoder import SD3_T5_MAX_SEQ_LEN
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager import BaseModelType
-from invokeai.backend.sd3.extensions.inpaint_extension import InpaintExtension
+from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -263,10 +263,10 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Prepare inpaint extension.
         inpaint_mask = self._prep_inpaint_mask(context, latents)
-        inpaint_extension: InpaintExtension | None = None
+        inpaint_extension: RectifiedFlowInpaintExtension | None = None
         if inpaint_mask is not None:
             assert init_latents is not None
-            inpaint_extension = InpaintExtension(
+            inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
                 noise=noise,
