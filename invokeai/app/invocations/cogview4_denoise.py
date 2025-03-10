@@ -191,8 +191,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         total_steps = len(timesteps) - 1
 
         # Prepare the CFG scale list.
-        # TODO(ryand): Implement this.
-        # cfg_scale = self._prepare_cfg_scale(total_steps)
+        cfg_scale = self._prepare_cfg_scale(total_steps)
 
         # Load the input latents, if provided.
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -276,7 +275,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         return_dict=False,
                     )[0]
 
-                    noise_pred = noise_pred_uncond + self.cfg_scale * (noise_pred_cond - noise_pred_uncond)
+                    noise_pred = noise_pred_uncond + cfg_scale[step_idx] * (noise_pred_cond - noise_pred_uncond)
                 else:
                     noise_pred = noise_pred_cond
 
