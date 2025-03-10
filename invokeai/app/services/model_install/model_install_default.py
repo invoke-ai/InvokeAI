@@ -647,10 +647,9 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or ModelRecordChanges()
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
-        overrides = {"hash_algo": hash_algo, **fields}
 
         try:
-            return ModelConfigBase.classify(model_path, **overrides)
+            return ModelConfigBase.classify(model_path, **fields)
         except InvalidModelConfigException:
             return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
 
