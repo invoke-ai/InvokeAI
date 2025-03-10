@@ -255,7 +255,6 @@ class ModelConfigBase(ABC, BaseModel):
     source: str = Field(description="The original source of the model (path, URL or repo_id).")
     source_type: ModelSourceType = Field(description="The type of source")
 
-    hash_algo: Optional[HASHING_ALGORITHMS] = Field(description="The algorithm used to compute the hash.", default=None)
     description: Optional[str] = Field(description="Model description", default=None)
     source_api_response: Optional[str] = Field(
         description="The original API response from the source, as stringified JSON.", default=None

@@ -186,9 +186,7 @@ def test_serialisation_roundtrip():
         }
         factory = ModelFactory.create_factory(config_cls, **factory_args)
 
-        configs_with_random_data = [
-            factory.build() for _ in range(trials_per_class)
-        ]
+        configs_with_random_data = [factory.build() for _ in range(trials_per_class)]
 
         for config in configs_with_random_data:
             as_json = config.model_dump_json()
