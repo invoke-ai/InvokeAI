@@ -2837,11 +2837,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -2921,11 +2916,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -3085,11 +3075,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -4467,11 +4452,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -4562,11 +4542,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -4644,11 +4619,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -4732,11 +4702,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -7945,11 +7910,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -8788,11 +8748,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -8983,11 +8938,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -12939,11 +12889,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -13108,11 +13053,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -13388,11 +13328,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -13492,11 +13427,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -13598,11 +13528,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -13687,11 +13612,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -18972,11 +18892,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -19118,11 +19033,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -19859,11 +19769,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -20086,11 +19991,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -20158,11 +20058,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -20269,11 +20164,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -20344,11 +20234,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
@@ -20914,11 +20799,6 @@ export type components = {
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
             /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
-            /**
              * Description
              * @description Model description
              */
@@ -20999,11 +20879,6 @@ export type components = {
             source: string;
             /** @description The type of source */
             source_type: components["schemas"]["ModelSourceType"];
-            /**
-             * Hash Algo
-             * @description The algorithm used to compute the hash.
-             */
-            hash_algo?: ("blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256") | null;
             /**
              * Description
              * @description Model description
