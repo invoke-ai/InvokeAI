@@ -139,8 +139,10 @@ def test_minimal_working_example(datadir: Path):
 
 
 def test_regression_against_model_probe(datadir: Path):
-    """Ensure ModelConfigBase.classify returns consistent results as ModelProbe.probe"""
-    model_paths = ModelSearch().search(datadir)  # TODO: add more 'stripped' models to test_model_probe directory
+    """Verifies results from ModelConfigBase.classify are consistent with those from ModelProbe.probe.
+    The test paths are gathered from the 'test_model_probe' directory.
+    """
+    model_paths = ModelSearch().search(datadir)
     for path in model_paths:
         legacy_config = new_config = None
         probe_success = classify_success = True
@@ -186,7 +188,7 @@ def test_serialisation_roundtrip():
 
         configs_with_random_data = [
             factory.build() for _ in range(trials_per_class)
-        ]  # mocker.mock(config_cls, trials_per_class)
+        ]
 
         for config in configs_with_random_data:
             as_json = config.model_dump_json()
@@ -203,8 +205,8 @@ def test_inheritance_order():
     Config classes using multiple inheritance should inherit from ModelConfigBase last
     to ensure that more specific fields take precedence over the generic defaults.
 
-    It may be worth rethinking our config taxonomy in the future, but in the meantime,
-    this test can help prevent the debugging effort I went through discovering this.
+    It may be worth rethinking our config taxonomy in the future, but in the meantime
+    this test can help prevent debugging effort.
     """
     for config_cls in ModelConfigBase.all_config_classes():
         excluded = {abc.ABC, pydantic.BaseModel, object}

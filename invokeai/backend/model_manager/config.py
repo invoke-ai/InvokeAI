@@ -230,7 +230,6 @@ class ModelConfigBase(ABC, BaseModel):
     To create a new config type, inherit from this class and implement its interface:
     - (mandatory) override methods 'matches' and 'parse'
     - (mandatory) define fields 'type' and 'format' as class attributes
-    - (mandatory) return field 'base' in 'matches' return value OR as a class attribute
 
     - (optional) override method 'get_tag'
     - (optional) override field _MATCH_SPEED
