@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
 from diffusers import CogView4Transformer2DModel
@@ -11,12 +11,14 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    LatentsField,
     WithBoard,
     WithMetadata,
 )
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import CogView4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -33,6 +35,12 @@ from invokeai.backend.util.devices import TorchDevice
 class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run the denoising process with a CogView4 model."""
 
+    # If latents is provided, this means we are doing image-to-image.
+    latents: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+    denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     transformer: TransformerField = InputField(
         description=FieldDescriptions.cogview4_model, input=Input.Connection, title="Transformer"
     )
@@ -135,9 +143,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             return mu / (mu + (1 / t - 1) ** sigma)
 
         mu = calculate_timestep_shift(image_seq_len)
-        sigmas = timesteps / 1000.0
-        sigmas = time_shift_linear(mu, 1.0, sigmas)
-
+        sigmas = time_shift_linear(mu, 1.0, timesteps)
         return sigmas.tolist()
 
     def _run_diffusion(
@@ -178,21 +184,27 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         assert isinstance(patch_size, int)
         image_seq_len = ((self.height // LATENT_SCALE_FACTOR) * (self.width // LATENT_SCALE_FACTOR)) // (patch_size**2)
         # We add an extra step to the end to account for the final timestep of 0.0.
-        timesteps_torch = torch.linspace(1000, 0, self.steps + 1)
-        sigmas = self._convert_timesteps_to_sigmas(image_seq_len, timesteps_torch)
-        timesteps: list[float] = timesteps_torch.tolist()
-
-        # TODO(ryand): Add timestep schedule clipping.
+        timesteps: list[float] = torch.linspace(1, 0, self.steps + 1).tolist()
+        # Clip the timesteps schedule based on denoising_start and denoising_end.
+        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+        sigmas = self._convert_timesteps_to_sigmas(image_seq_len, torch.tensor(timesteps))
         total_steps = len(timesteps) - 1
 
         # Prepare the CFG scale list.
         # TODO(ryand): Implement this.
         # cfg_scale = self._prepare_cfg_scale(total_steps)
 
+        # Load the input latents, if provided.
+        init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
+        if init_latents is not None:
+            init_latents = init_latents.to(device=device, dtype=inference_dtype)
+
         # Generate initial latent noise.
+        num_channels_latents = transformer_info.model.config.in_channels  # type: ignore
+        assert isinstance(num_channels_latents, int)
         noise = self._get_noise(
             batch_size=1,
-            num_channels_latents=transformer_info.model.config.in_channels,
+            num_channels_latents=num_channels_latents,
             height=self.height,
             width=self.width,
             dtype=inference_dtype,
@@ -200,8 +212,21 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             seed=self.seed,
         )
 
-        # TODO(ryand): Handle image-to-image.
-        latents: torch.Tensor = noise
+        # Prepare input latent image.
+        if init_latents is not None:
+            # Noise the init_latents by the appropriate amount for the first timestep.
+            s_0 = sigmas[0]
+            latents = s_0 * noise + (1.0 - s_0) * init_latents
+        else:
+            # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
+            if self.denoising_start > 1e-5:
+                raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            latents = noise
+
+        # If len(timesteps) == 1, then short-circuit. We are just noising the input latents, but not taking any
+        # denoising steps.
+        if len(timesteps) <= 1:
+            return latents
 
         step_callback = self._build_step_callback(context)
 
@@ -225,7 +250,8 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 sigma_prev = sigmas[step_idx + 1]
 
                 # Expand the timestep to match the latent model input.
-                timestep = torch.tensor([t_curr], device=device).expand(latents.shape[0])
+                # Multiply by 1000 to match the default FlowMatchEulerDiscreteScheduler num_train_timesteps.
+                timestep = torch.tensor([t_curr * 1000], device=device).expand(latents.shape[0])
 
                 # TODO(ryand): Support both sequential and batched CFG inference.
                 noise_pred_cond = transformer(
