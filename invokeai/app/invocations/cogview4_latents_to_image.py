@@ -5,7 +5,7 @@ from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from einops import rearrange
 from PIL import Image
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
@@ -31,6 +31,7 @@ from invokeai.backend.util.devices import TorchDevice
     tags=["latents", "image", "vae", "l2i", "cogview4"],
     category="latents",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
 class CogView4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""
