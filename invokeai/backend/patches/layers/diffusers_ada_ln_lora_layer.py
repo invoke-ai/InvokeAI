@@ -14,5 +14,6 @@ class DiffusersAdaLN_LoRALayer(LoRALayer):
         # while in diffusers it split into scale, shift. 
         # So we swap the linear projection weights in order to be able to use Flux implementation
 
-        weight = super().get_weight(orig_weight) 
-        return swap_shift_scale(weight)
+        weight = super().get_weight(orig_weight)
+        weight = swap_shift_scale(weight)
+        return weight
