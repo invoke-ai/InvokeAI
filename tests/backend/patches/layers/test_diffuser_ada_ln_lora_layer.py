@@ -29,27 +29,29 @@ def test_diffusers_adaLN_lora_layer_get_weight():
     rank = 4
     alpha = 16.0
 
-    lora = LoRALayer(
+    normal_layer = LoRALayer(
         up=torch.ones(out_features, rank), 
         mid=None, 
         down=torch.ones(rank, big_in_features), 
         alpha=alpha, 
         bias=None
     )
-    layer = DiffusersAdaLN_LoRALayer(
+    diffuser_adaLN_layer = DiffusersAdaLN_LoRALayer(
         up=torch.ones(out_features, rank), 
         mid=None, 
         down=torch.ones(rank, big_in_features), 
         alpha=alpha, 
         bias=None
     )
+
+    assert(isinstance(diffuser_adaLN_layer, LoRALayer))
 
     # mock original weight, normally ignored in our loRA
     orig_weight = torch.ones(small_in_features)
 
-    diffuser_weight = layer.get_weight(orig_weight)
-    lora_weight = lora.get_weight(orig_weight)
+    diffuser_weight = diffuser_adaLN_layer.get_weight(orig_weight)
+    normal_weight = normal_layer.get_weight(orig_weight)
 
     # diffusers lora weight should be flipped
-    assert(torch.allclose(diffuser_weight, swap_shift_scale(lora_weight)))
+    assert(torch.allclose(diffuser_weight, swap_shift_scale(normal_weight)))
 
