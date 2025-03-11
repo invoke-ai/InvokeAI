@@ -76,7 +76,7 @@ export const workflowsApi = api.injectEndpoints({
       NonNullable<paths['/api/v1/workflows/tag_counts_with_filter']['get']['parameters']['query']>
     >({
       query: (params) => ({
-        url: `${buildWorkflowsUrl('counts_by_tag_for_categories')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
+        url: `${buildWorkflowsUrl('tag_counts_with_filter')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
       }),
       providesTags: ['WorkflowTagCountsWithFilter'],
     }),
