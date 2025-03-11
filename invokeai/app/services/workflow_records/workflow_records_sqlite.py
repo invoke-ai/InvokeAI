@@ -166,7 +166,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
             # Construct a list of conditions for each tag
             tags_conditions = ["tags LIKE ?" for _ in tags]
-            tags_conditions_joined = " OR ".join(tags_conditions)
+            tags_conditions_joined = " AND ".join(tags_conditions)
             tags_condition = f"({tags_conditions_joined})"
 
             # And the params for the tags, case-insensitive
@@ -230,54 +230,59 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             total=total,
         )
 
-    def get_counts(
+    def get_tag_counts_with_filter(
         self,
-        tags: Optional[list[str]],
-        categories: Optional[list[WorkflowCategory]],
-    ) -> int:
+        tags_to_count: list[str],
+        selected_tags: Optional[list[str]] = None,
+        categories: Optional[list[WorkflowCategory]] = None,
+    ) -> dict[str, int]:
+        if not tags_to_count:
+            return {}
+
         cursor = self._conn.cursor()
+        result: dict[str, int] = {}
+        selected_tags = selected_tags or []
 
-        # Start with an empty list of conditions and params
-        conditions: list[str] = []
-        params: list[str | int] = []
+        # Base conditions for categories and selected tags
+        base_conditions: list[str] = []
+        base_params: list[str | int] = []
 
-        if tags:
-            # Construct a list of conditions for each tag
-            tags_conditions = ["tags LIKE ?" for _ in tags]
-            tags_conditions_joined = " OR ".join(tags_conditions)
-            tags_condition = f"({tags_conditions_joined})"
-
-            # And the params for the tags, case-insensitive
-            tags_params = [f"%{t.strip()}%" for t in tags]
-
-            conditions.append(tags_condition)
-            params.extend(tags_params)
-
+        # Add category conditions
         if categories:
-            # Ensure all categories are valid (is this necessary?)
             assert all(c in WorkflowCategory for c in categories)
-
-            # Construct a placeholder string for the number of categories
             placeholders = ", ".join("?" for _ in categories)
+            base_conditions.append(f"category IN ({placeholders})")
+            base_params.extend([category.value for category in categories])
 
-            # Construct the condition string & params
-            conditions.append(f"category IN ({placeholders})")
-            params.extend([category.value for category in categories])
+        # Add selected tags conditions (AND logic)
+        for tag in selected_tags:
+            base_conditions.append("tags LIKE ?")
+            base_params.append(f"%{tag.strip()}%")
 
-        stmt = """--sql
-            SELECT COUNT(*)
-            FROM workflow_library
-            """
+        # For each tag to count, run a separate query
+        for tag in tags_to_count:
+            # Start with the base conditions
+            conditions = base_conditions.copy()
+            params = base_params.copy()
 
-        if conditions:
-            # If there are conditions, add a WHERE clause and then join the conditions
-            stmt += " WHERE "
+            # Add this specific tag condition
+            conditions.append("tags LIKE ?")
+            params.append(f"%{tag.strip()}%")
 
-            all_conditions = " AND ".join(conditions)
-            stmt += all_conditions
+            # Construct the full query
+            stmt = """--sql
+                SELECT COUNT(*)
+                FROM workflow_library
+                """
 
-        cursor.execute(stmt, tuple(params))
-        return cursor.fetchone()[0]
+            if conditions:
+                stmt += " WHERE " + " AND ".join(conditions)
+
+            cursor.execute(stmt, params)
+            count = cursor.fetchone()[0]
+            result[tag] = count
+
+        return result
 
     def update_opened_at(self, workflow_id: str) -> None:
         try:
