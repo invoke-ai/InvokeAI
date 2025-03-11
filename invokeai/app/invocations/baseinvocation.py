@@ -100,35 +100,6 @@ class BaseInvocationOutput(BaseModel):
     All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
     """
 
-    _output_classes: ClassVar[set[BaseInvocationOutput]] = set()
-
-    @classmethod
-    def register_output(cls, output: BaseInvocationOutput) -> None:
-        """Registers an invocation output."""
-        cls._output_classes.add(output)
-        cls.get_typeadapter.cache_clear()
-
-    @classmethod
-    def get_outputs(cls) -> Iterable[BaseInvocationOutput]:
-        """Gets all invocation outputs."""
-        return cls._output_classes
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def get_typeadapter(cls) -> TypeAdapter[Any]:
-        """Gets a pydantic TypeAdapter for the union of all invocation output types.
-
-        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
-        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
-        the updated allowlist and denylist.
-        """
-        return TypeAdapter(Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")])
-
-    @classmethod
-    def get_output_types(cls) -> Iterable[str]:
-        """Gets all invocation output types."""
-        return (i.get_type() for i in BaseInvocationOutput.get_outputs())
-
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocationOutput]) -> None:
         """Adds various UI-facing attributes to the invocation output's OpenAPI schema."""
@@ -171,66 +142,15 @@ class BaseInvocation(ABC, BaseModel):
     All invocations must use the `@invocation` decorator to provide their unique type.
     """
 
-    _invocation_classes: ClassVar[set[BaseInvocation]] = set()
-
     @classmethod
     def get_type(cls) -> str:
         """Gets the invocation's type, as provided by the `@invocation` decorator."""
         return cls.model_fields["type"].default
 
     @classmethod
-    def register_invocation(cls, invocation: BaseInvocation) -> None:
-        """Registers an invocation."""
-        cls._invocation_classes.add(invocation)
-        cls.get_typeadapter.cache_clear()
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def get_typeadapter(cls) -> TypeAdapter[Any]:
-        """Gets a pydantic TypeAdapter for the union of all invocation types.
-
-        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
-        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
-        the updated allowlist and denylist.
-        """
-        return TypeAdapter(Annotated[Union[tuple(cls.get_invocations())], Field(discriminator="type")])
-
-    @classmethod
-    def get_invocations(cls) -> Iterable[BaseInvocation]:
-        """Gets all invocations, respecting the allowlist and denylist."""
-        app_config = get_config()
-        allowed_invocations: set[BaseInvocation] = set()
-        for sc in cls._invocation_classes:
-            invocation_type = sc.get_type()
-            is_in_allowlist = (
-                invocation_type in app_config.allow_nodes if isinstance(app_config.allow_nodes, list) else True
-            )
-            is_in_denylist = (
-                invocation_type in app_config.deny_nodes if isinstance(app_config.deny_nodes, list) else False
-            )
-            if is_in_allowlist and not is_in_denylist:
-                allowed_invocations.add(sc)
-        return allowed_invocations
-
-    @classmethod
-    def get_invocations_map(cls) -> dict[str, BaseInvocation]:
-        """Gets a map of all invocation types to their invocation classes."""
-        return {i.get_type(): i for i in BaseInvocation.get_invocations()}
-
-    @classmethod
-    def get_invocation_types(cls) -> Iterable[str]:
-        """Gets all invocation types."""
-        return (i.get_type() for i in BaseInvocation.get_invocations())
-
-    @classmethod
     def get_output_annotation(cls) -> BaseInvocationOutput:
         """Gets the invocation's output annotation (i.e. the return annotation of its `invoke()` method)."""
         return signature(cls.invoke).return_annotation
-
-    @classmethod
-    def get_invocation_for_type(cls, invocation_type: str) -> BaseInvocation | None:
-        """Gets the invocation class for a given invocation type."""
-        return cls.get_invocations_map().get(invocation_type)
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocation]) -> None:
@@ -327,6 +247,87 @@ class BaseInvocation(ABC, BaseModel):
 
 
 TBaseInvocation = TypeVar("TBaseInvocation", bound=BaseInvocation)
+
+
+class InvocationRegistry:
+    _invocation_classes: ClassVar[set[type[BaseInvocation]]] = set()
+    _output_classes: ClassVar[set[type[BaseInvocationOutput]]] = set()
+
+    @classmethod
+    def register_invocation(cls, invocation: type[BaseInvocation]) -> None:
+        """Registers an invocation."""
+        cls._invocation_classes.add(invocation)
+        cls.get_invocation_typeadapter.cache_clear()
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def get_invocation_typeadapter(cls) -> TypeAdapter[Any]:
+        """Gets a pydantic TypeAdapter for the union of all invocation types.
+
+        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
+        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
+        the updated allowlist and denylist.
+        """
+        return TypeAdapter(Annotated[Union[tuple(cls.get_invocation_classes())], Field(discriminator="type")])
+
+    @classmethod
+    def get_invocation_classes(cls) -> Iterable[type[BaseInvocation]]:
+        """Gets all invocations, respecting the allowlist and denylist."""
+        app_config = get_config()
+        allowed_invocations: set[type[BaseInvocation]] = set()
+        for sc in cls._invocation_classes:
+            invocation_type = sc.get_type()
+            is_in_allowlist = (
+                invocation_type in app_config.allow_nodes if isinstance(app_config.allow_nodes, list) else True
+            )
+            is_in_denylist = (
+                invocation_type in app_config.deny_nodes if isinstance(app_config.deny_nodes, list) else False
+            )
+            if is_in_allowlist and not is_in_denylist:
+                allowed_invocations.add(sc)
+        return allowed_invocations
+
+    @classmethod
+    def get_invocations_map(cls) -> dict[str, type[BaseInvocation]]:
+        """Gets a map of all invocation types to their invocation classes."""
+        return {i.get_type(): i for i in cls.get_invocation_classes()}
+
+    @classmethod
+    def get_invocation_types(cls) -> Iterable[str]:
+        """Gets all invocation types."""
+        return (i.get_type() for i in cls.get_invocation_classes())
+
+    @classmethod
+    def get_invocation_for_type(cls, invocation_type: str) -> type[BaseInvocation] | None:
+        """Gets the invocation class for a given invocation type."""
+        return cls.get_invocations_map().get(invocation_type)
+
+    @classmethod
+    def register_output(cls, output: "type[TBaseInvocationOutput]") -> None:
+        """Registers an invocation output."""
+        cls._output_classes.add(output)
+        cls.get_output_typeadapter.cache_clear()
+
+    @classmethod
+    def get_output_classes(cls) -> Iterable[type[BaseInvocationOutput]]:
+        """Gets all invocation outputs."""
+        return cls._output_classes
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def get_output_typeadapter(cls) -> TypeAdapter[Any]:
+        """Gets a pydantic TypeAdapter for the union of all invocation output types.
+
+        This method is cached to avoid rebuilding the TypeAdapter on every access. If the invocation allowlist or
+        denylist is changed, the cache should be cleared to ensure the TypeAdapter is updated and validation respects
+        the updated allowlist and denylist.
+        """
+        return TypeAdapter(Annotated[Union[tuple(cls._output_classes)], Field(discriminator="type")])
+
+    @classmethod
+    def get_output_types(cls) -> Iterable[str]:
+        """Gets all invocation output types."""
+        return (i.get_type() for i in cls.get_output_classes())
 
 
 RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
@@ -442,8 +443,8 @@ def invocation(
         node_pack = cls.__module__.split(".")[0]
 
         # Handle the case where an existing node is being clobbered by the one we are registering
-        if invocation_type in BaseInvocation.get_invocation_types():
-            clobbered_invocation = BaseInvocation.get_invocation_for_type(invocation_type)
+        if invocation_type in InvocationRegistry.get_invocation_types():
+            clobbered_invocation = InvocationRegistry.get_invocation_for_type(invocation_type)
             # This should always be true - we just checked if the invocation type was in the set
             assert clobbered_invocation is not None
 
@@ -528,8 +529,7 @@ def invocation(
         )
         cls.__doc__ = docstring
 
-        # TODO: how to type this correctly? it's typed as ModelMetaclass, a private class in pydantic
-        BaseInvocation.register_invocation(cls)  # type: ignore
+        InvocationRegistry.register_invocation(cls)
 
         return cls
 
@@ -554,7 +554,7 @@ def invocation_output(
         if re.compile(r"^\S+$").match(output_type) is None:
             raise ValueError(f'"output_type" must consist of non-whitespace characters, got "{output_type}"')
 
-        if output_type in BaseInvocationOutput.get_output_types():
+        if output_type in InvocationRegistry.get_output_types():
             raise ValueError(f'Invocation type "{output_type}" already exists')
 
         validate_fields(cls.model_fields, output_type)
@@ -575,7 +575,7 @@ def invocation_output(
         )
         cls.__doc__ = docstring
 
-        BaseInvocationOutput.register_output(cls)  # type: ignore # TODO: how to type this correctly?
+        InvocationRegistry.register_output(cls)
 
         return cls
 
