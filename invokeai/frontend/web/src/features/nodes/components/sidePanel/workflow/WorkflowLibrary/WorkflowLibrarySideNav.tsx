@@ -130,7 +130,7 @@ export const WorkflowLibrarySideNav = () => {
               leftIcon={<PiArrowCounterClockwiseBold />}
               h={8}
             >
-              {t('workflows.resetFilters')}
+              {t('workflows.deselectAll')}
             </Button>
             <Flex flexDir="column" gap={2} overflow="auto">
               {tagCategoryOptions.map((tagCategory) => (
