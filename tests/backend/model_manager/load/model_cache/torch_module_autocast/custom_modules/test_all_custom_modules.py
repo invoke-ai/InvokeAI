@@ -16,7 +16,6 @@ from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
-from invokeai.backend.patches.layers.diffusers_ada_ln_lora_layer import DiffusersAdaLN_LoRALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
@@ -347,7 +346,6 @@ PatchUnderTest = tuple[list[tuple[BaseLayerPatch, float]], torch.Tensor]
         "multiple_loras",
         "concatenated_lora",
         "flux_control_lora",
-        "diffusers_adaLN_lora",
         "single_lokr",
         "single_dora",
     ]
