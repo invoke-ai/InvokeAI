@@ -6,6 +6,7 @@ import type { WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySl
 import {
   $workflowLibraryCategoriesOptions,
   $workflowLibraryTagCategoriesOptions,
+  $workflowLibraryTagOptions,
   selectWorkflowLibraryCategories,
   selectWorkflowLibraryTags,
   workflowLibraryCategoriesChanged,
@@ -19,7 +20,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
-import { useGetCountsQuery, useListWorkflowsQuery } from 'services/api/endpoints/workflows';
+import { useGetTagCountsWithFilterQuery, useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import type { S } from 'services/api/types';
 
 export const WorkflowLibrarySideNav = () => {
@@ -179,6 +180,31 @@ const RecentWorkflows = memo(() => {
 });
 RecentWorkflows.displayName = 'RecentWorkflows';
 
+const useCountForIndividualTag = (tag: string) => {
+  const allTags = useStore($workflowLibraryTagOptions);
+  const tags = useAppSelector(selectWorkflowLibraryTags);
+  const queryArg = useMemo<Parameters<typeof useGetTagCountsWithFilterQuery>[0]>(
+    () => ({
+      tags_to_count: allTags,
+      selected_tags: tags,
+      categories: ['default'], // We only allow filtering by tag for default workflows
+    }),
+    [allTags, tags]
+  );
+  const queryOptions = useMemo<Parameters<typeof useGetTagCountsWithFilterQuery>[1]>(
+    () => ({
+      selectFromResult: ({ data }) => ({
+        count: data?.[tag] ?? 0,
+      }),
+    }),
+    [tag]
+  );
+
+  const { count } = useGetTagCountsWithFilterQuery(queryArg, queryOptions);
+
+  return count;
+};
+
 const RecentWorkflowButton = memo(({ workflow }: { workflow: S['WorkflowRecordListItemWithThumbnailDTO'] }) => {
   const loadWorkflow = useLoadWorkflow();
   const load = useCallback(() => {
@@ -222,14 +248,6 @@ CategoryButton.displayName = 'NavButton';
 
 const TagCategory = memo(({ tagCategory, isDisabled }: { tagCategory: WorkflowTagCategory; isDisabled: boolean }) => {
   const { t } = useTranslation();
-  const { count } = useGetCountsQuery(
-    { tags: [...tagCategory.tags], categories: ['default'] },
-    { selectFromResult: ({ data }) => ({ count: data ?? 0 }) }
-  );
-
-  if (count === 0) {
-    return null;
-  }
 
   return (
     <Flex flexDir="column" gap={2}>
@@ -250,19 +268,11 @@ const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: string }) => 
   const dispatch = useAppDispatch();
   const selectedTags = useAppSelector(selectWorkflowLibraryTags);
   const isSelected = selectedTags.includes(tag);
+  const count = useCountForIndividualTag(tag);
 
   const onChange = useCallback(() => {
     dispatch(workflowLibraryTagToggled(tag));
   }, [dispatch, tag]);
-
-  const { count } = useGetCountsQuery(
-    { tags: [tag], categories: ['default'] },
-    { selectFromResult: ({ data }) => ({ count: data ?? 0 }) }
-  );
-
-  if (count === 0) {
-    return null;
-  }
 
   return (
     <Checkbox isChecked={isSelected} onChange={onChange} {...rest} flexShrink={0}>

@@ -44,6 +44,7 @@ const tagTypes = [
   'LoRAModel',
   'SDXLRefinerModel',
   'Workflow',
+  'WorkflowTagCountsWithFilter',
   'StylePreset',
   'Schema',
   'QueueCountsByDestination',

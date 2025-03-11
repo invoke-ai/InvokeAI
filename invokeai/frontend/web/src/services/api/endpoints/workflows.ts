@@ -30,6 +30,7 @@ export const workflowsApi = api.injectEndpoints({
         // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow_id },
+        'WorkflowTagCountsWithFilter',
       ],
     }),
     createWorkflow: build.mutation<
@@ -44,6 +45,7 @@ export const workflowsApi = api.injectEndpoints({
       invalidatesTags: [
         // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
+        'WorkflowTagCountsWithFilter',
       ],
     }),
     updateWorkflow: build.mutation<
@@ -55,7 +57,10 @@ export const workflowsApi = api.injectEndpoints({
         method: 'PATCH',
         body: { workflow },
       }),
-      invalidatesTags: (response, error, workflow) => [{ type: 'Workflow', id: workflow.id }],
+      invalidatesTags: (response, error, workflow) => [
+        { type: 'Workflow', id: workflow.id },
+        'WorkflowTagCountsWithFilter',
+      ],
     }),
     listWorkflows: build.query<
       paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
@@ -66,13 +71,14 @@ export const workflowsApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
     }),
-    getCounts: build.query<
-      paths['/api/v1/workflows/counts']['get']['responses']['200']['content']['application/json'],
-      NonNullable<paths['/api/v1/workflows/counts']['get']['parameters']['query']>
+    getTagCountsWithFilter: build.query<
+      paths['/api/v1/workflows/tag_counts_with_filter']['get']['responses']['200']['content']['application/json'],
+      NonNullable<paths['/api/v1/workflows/tag_counts_with_filter']['get']['parameters']['query']>
     >({
       query: (params) => ({
-        url: `${buildWorkflowsUrl('counts')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
+        url: `${buildWorkflowsUrl('counts_by_tag_for_categories')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
       }),
+      providesTags: ['WorkflowTagCountsWithFilter'],
     }),
     listWorkflowsInfinite: build.infiniteQuery<
       paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
@@ -144,7 +150,7 @@ export const workflowsApi = api.injectEndpoints({
 
 export const {
   useUpdateOpenedAtMutation,
-  useGetCountsQuery,
+  useGetTagCountsWithFilterQuery,
   useLazyGetWorkflowQuery,
   useGetWorkflowQuery,
   useCreateWorkflowMutation,

@@ -2,7 +2,7 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
 type WorkflowLibraryState = {
@@ -95,4 +95,7 @@ export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
 ];
 export const $workflowLibraryTagCategoriesOptions = atom<WorkflowTagCategory[]>(
   DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES
+);
+export const $workflowLibraryTagOptions = computed($workflowLibraryTagCategoriesOptions, (tagCategories) =>
+  tagCategories.flatMap(({ tags }) => tags)
 );
