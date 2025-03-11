@@ -72,7 +72,7 @@ export const workflowLibraryPersistConfig: PersistConfig<WorkflowLibraryState> =
   persistDenylist: [],
 };
 
-export const selectWorkflowLibrarySlice = (state: RootState) => state.workflowLibrary;
+const selectWorkflowLibrarySlice = (state: RootState) => state.workflowLibrary;
 const createWorkflowLibrarySelector = <T>(selector: Selector<WorkflowLibraryState, T>) =>
   createSelector(selectWorkflowLibrarySlice, selector);
 

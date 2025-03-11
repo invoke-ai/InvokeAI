@@ -19,13 +19,12 @@ import { $store } from 'app/store/nanostores/store';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
-import type {
-  WorkflowTagCategory} from 'features/nodes/store/workflowLibrarySlice';
+import type { WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
 import {
   $workflowLibraryCategoriesOptions,
   $workflowLibraryTagCategoriesOptions,
   DEFAULT_WORKFLOW_LIBRARY_CATEGORIES,
-  DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES
+  DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES,
 } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, ReactNode } from 'react';
