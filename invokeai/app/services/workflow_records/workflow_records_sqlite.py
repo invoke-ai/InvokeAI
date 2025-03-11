@@ -166,7 +166,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
             # Construct a list of conditions for each tag
             tags_conditions = ["tags LIKE ?" for _ in tags]
-            tags_conditions_joined = " AND ".join(tags_conditions)
+            tags_conditions_joined = " OR ".join(tags_conditions)
             tags_condition = f"({tags_conditions_joined})"
 
             # And the params for the tags, case-insensitive
@@ -229,6 +229,52 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             pages=pages,
             total=total,
         )
+
+    def counts_by_tag(
+        self,
+        tags: list[str],
+        categories: Optional[list[WorkflowCategory]] = None,
+    ) -> dict[str, int]:
+        if not tags:
+            return {}
+
+        cursor = self._conn.cursor()
+        result: dict[str, int] = {}
+        # Base conditions for categories and selected tags
+        base_conditions: list[str] = []
+        base_params: list[str | int] = []
+
+        # Add category conditions
+        if categories:
+            assert all(c in WorkflowCategory for c in categories)
+            placeholders = ", ".join("?" for _ in categories)
+            base_conditions.append(f"category IN ({placeholders})")
+            base_params.extend([category.value for category in categories])
+
+        # For each tag to count, run a separate query
+        for tag in tags:
+            # Start with the base conditions
+            conditions = base_conditions.copy()
+            params = base_params.copy()
+
+            # Add this specific tag condition
+            conditions.append("tags LIKE ?")
+            params.append(f"%{tag.strip()}%")
+
+            # Construct the full query
+            stmt = """--sql
+                SELECT COUNT(*)
+                FROM workflow_library
+                """
+
+            if conditions:
+                stmt += " WHERE " + " AND ".join(conditions)
+
+            cursor.execute(stmt, params)
+            count = cursor.fetchone()[0]
+            result[tag] = count
+
+        return result
 
     def get_tag_counts_with_filter(
         self,

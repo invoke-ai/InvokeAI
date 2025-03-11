@@ -51,20 +51,12 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_tag_counts_with_filter(
+    def counts_by_tag(
         self,
-        tags_to_count: list[str],
-        selected_tags: Optional[list[str]] = None,
+        tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
     ) -> dict[str, int]:
-        """
-        For each tag in tags_to_count, count workflows matching:
-        - All selected_tags (AND logic filter)
-        - AND the specific tag being counted
-        - Filtered by categories if provided
-
-        Returns a dictionary of tag -> count.
-        """
+        """Gets a dictionary of counts for each of the provided tags."""
         pass
 
     @abstractmethod
