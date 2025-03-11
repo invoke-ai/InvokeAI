@@ -1447,9 +1447,29 @@ export type paths = {
         };
         /**
          * Get Counts By Tag
-         * @description Gets tag counts with a filter
+         * @description Counts workflows by tag
          */
         get: operations["get_counts_by_tag"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/counts_by_category": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts By Category
+         * @description Counts workflows by category
+         */
+        get: operations["counts_by_category"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24483,6 +24503,44 @@ export interface operations {
                 tags: string[];
                 /** @description The categories to include */
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
+                /** @description Whether to include/exclude recent workflows */
+                has_been_opened?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    counts_by_category: {
+        parameters: {
+            query: {
+                /** @description The categories to include */
+                categories: components["schemas"]["WorkflowCategory"][];
+                /** @description Whether to include/exclude recent workflows */
+                has_been_opened?: boolean | null;
             };
             header?: never;
             path?: never;
