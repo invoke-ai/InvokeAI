@@ -221,17 +221,14 @@ async def get_workflow_thumbnail(
         raise HTTPException(status_code=404)
 
 
-@workflows_router.get("/tag_counts_with_filter", operation_id="get_tag_counts_with_filter")
-async def get_tag_counts_with_filter(
-    tags_to_count: list[str] = Query(description="The tags to get counts for"),
-    selected_tags: Optional[list[str]] = Query(default=None, description="The tags to include"),
+@workflows_router.get("/counts_by_tag", operation_id="get_counts_by_tag")
+async def get_counts_by_tag(
+    tags: list[str] = Query(description="The tags to get counts for"),
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
 ) -> dict[str, int]:
     """Gets tag counts with a filter"""
 
-    return ApiDependencies.invoker.services.workflow_records.get_tag_counts_with_filter(
-        tags_to_count=tags_to_count, categories=categories, selected_tags=selected_tags
-    )
+    return ApiDependencies.invoker.services.workflow_records.counts_by_tag(tags=tags, categories=categories)
 
 
 @workflows_router.put(
