@@ -11,6 +11,7 @@ type WorkflowLibraryState = {
   direction: SQLiteDirection;
   tags: string[];
   categories: WorkflowCategory[];
+  showOpenedWorkflowsOnly: boolean;
 };
 
 const initialWorkflowLibraryState: WorkflowLibraryState = {
@@ -19,6 +20,7 @@ const initialWorkflowLibraryState: WorkflowLibraryState = {
   direction: 'DESC',
   tags: [],
   categories: ['user'],
+  showOpenedWorkflowsOnly: false,
 };
 
 export const workflowLibrarySlice = createSlice({
@@ -37,6 +39,9 @@ export const workflowLibrarySlice = createSlice({
     workflowLibraryCategoriesChanged: (state, action: PayloadAction<WorkflowCategory[]>) => {
       state.categories = action.payload;
       state.searchTerm = '';
+    },
+    workflowLibraryShowOpenedWorkflowsOnlyChanged: (state, action: PayloadAction<boolean>) => {
+      state.showOpenedWorkflowsOnly = action.payload;
     },
     workflowLibraryTagToggled: (state, action: PayloadAction<string>) => {
       const tag = action.payload;
@@ -58,6 +63,7 @@ export const {
   workflowLibraryOrderByChanged,
   workflowLibraryDirectionChanged,
   workflowLibraryCategoriesChanged,
+  workflowLibraryShowOpenedWorkflowsOnlyChanged,
   workflowLibraryTagToggled,
   workflowLibraryTagsReset,
 } = workflowLibrarySlice.actions;
@@ -82,6 +88,7 @@ export const selectWorkflowLibraryOrderBy = createWorkflowLibrarySelector(({ ord
 export const selectWorkflowLibraryDirection = createWorkflowLibrarySelector(({ direction }) => direction);
 export const selectWorkflowLibraryTags = createWorkflowLibrarySelector(({ tags }) => tags);
 export const selectWorkflowLibraryCategories = createWorkflowLibrarySelector(({ categories }) => categories);
+export const selectWorkflowLibraryShowOpenedWorkflowsOnly = createWorkflowLibrarySelector(({ showOpenedWorkflowsOnly }) => showOpenedWorkflowsOnly);
 
 export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default'] satisfies WorkflowCategory[];
 export const $workflowLibraryCategoriesOptions = atom<WorkflowCategory[]>(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);

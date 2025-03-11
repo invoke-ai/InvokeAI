@@ -18,11 +18,11 @@ export const ViewWorkflow = ({ workflowId }: { workflowId: string }) => {
   );
 
   return (
-    <Tooltip label={t('workflows.edit')} closeOnScroll>
+    <Tooltip label={t('workflows.view')} closeOnScroll>
       <IconButton
         size="sm"
         variant="ghost"
-        aria-label={t('workflows.edit')}
+        aria-label={t('workflows.view')}
         onClick={handleClickLoad}
         icon={<PiEyeBold />}
       />

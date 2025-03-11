@@ -8,6 +8,7 @@ import {
   selectWorkflowLibraryHasSearchTerm,
   selectWorkflowLibraryOrderBy,
   selectWorkflowLibrarySearchTerm,
+  selectWorkflowLibraryShowOpenedWorkflowsOnly,
   selectWorkflowLibraryTags,
 } from 'features/nodes/store/workflowLibrarySlice';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -26,6 +27,7 @@ const useInfiniteQueryAry = () => {
   const direction = useAppSelector(selectWorkflowLibraryDirection);
   const query = useAppSelector(selectWorkflowLibrarySearchTerm);
   const tags = useAppSelector(selectWorkflowLibraryTags);
+  const showOpenedWorkflowsOnly = useAppSelector(selectWorkflowLibraryShowOpenedWorkflowsOnly);
   const [debouncedQuery] = useDebounce(query, 500);
 
   const queryArg = useMemo(() => {
@@ -37,8 +39,9 @@ const useInfiniteQueryAry = () => {
       categories,
       query: debouncedQuery,
       tags: categories.length === 1 && categories.includes('default') ? tags : [],
+      is_recent: showOpenedWorkflowsOnly,
     } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
-  }, [orderBy, direction, categories, debouncedQuery, tags]);
+  }, [orderBy, direction, categories, debouncedQuery, tags, showOpenedWorkflowsOnly]);
 
   return queryArg;
 };

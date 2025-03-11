@@ -1726,6 +1726,7 @@
         "loadWorkflow": "$t(common.load) Workflow",
         "autoLayout": "Auto Layout",
         "edit": "Edit",
+        "view": "View",
         "download": "Download",
         "copyShareLink": "Copy Share Link",
         "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
