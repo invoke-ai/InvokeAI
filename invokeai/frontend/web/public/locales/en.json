@@ -1695,7 +1695,7 @@
         "private": "Private",
         "shared": "Shared",
         "browseWorkflows": "Browse Workflows",
-        "resetTags": "Reset Tags",
+        "resetFilters": "Reset Filters",
         "opened": "Opened",
         "openWorkflow": "Open Workflow",
         "updated": "Updated",
