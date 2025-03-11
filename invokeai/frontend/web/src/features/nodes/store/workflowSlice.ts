@@ -11,11 +11,7 @@ import {
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  NodesState,
-  WorkflowMode,
-  WorkflowsState as WorkflowState,
-} from 'features/nodes/store/types';
+import type { NodesState, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
@@ -38,9 +34,7 @@ import {
   isTextElement,
 } from 'features/nodes/types/workflow';
 import { isEqual } from 'lodash-es';
-import { atom } from 'nanostores';
 import { useMemo } from 'react';
-import type { WorkflowRecordOrderBy } from 'services/api/types';
 
 import { selectNodesSlice } from './selectors';
 
@@ -379,19 +373,3 @@ export const useElement = (id: string): FormElement | undefined => {
   const element = useAppSelector(selector);
   return element;
 };
-
-export const DEFAULT_WORKFLOW_CATEGORIES = ['user', 'default'] satisfies WorkflowCategory[];
-export const $workflowCategories = atom<WorkflowCategory[]>(DEFAULT_WORKFLOW_CATEGORIES);
-export const $selectedWorkflowCategories = atom<WorkflowCategory[]>(['user']);
-
-export const DEFAULT_WORKFLOW_TAG_CATEGORIES = {
-  Industry: ['Architecture', 'Fashion', 'Game Dev', 'Food'],
-  'Common Tasks': ['Upscaling', 'Text to Image', 'Image to Image'],
-  'Model Architecture': ['SD1.5', 'SDXL', 'Bria', 'FLUX'],
-  'Tech Showcase': ['Control', 'Reference Image'],
-} satisfies Record<string, string[]>;
-export const $workflowTagCategories = atom<Record<string, string[]>>(DEFAULT_WORKFLOW_TAG_CATEGORIES);
-export const $selectedWorkflowTags = atom<string[]>([]);
-
-export const $workflowLibarySearchTerm = atom<string>('');
-export const $workflowLibraryOrderBy = atom<WorkflowRecordOrderBy>('opened_at');
