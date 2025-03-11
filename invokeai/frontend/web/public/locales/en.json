@@ -1692,6 +1692,7 @@
         "filterByTags": "Filter by Tags",
         "yourWorkflows": "Your Workflows",
         "recentlyOpened": "Recently Opened",
+        "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
         "browseWorkflows": "Browse Workflows",

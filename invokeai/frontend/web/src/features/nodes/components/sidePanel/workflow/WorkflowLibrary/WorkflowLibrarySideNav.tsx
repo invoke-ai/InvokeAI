@@ -26,6 +26,7 @@ import { useGetCountsByTagQuery, useListWorkflowsQuery } from 'services/api/endp
 import type { S } from 'services/api/types';
 
 export const WorkflowLibrarySideNav = () => {
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const categories = useAppSelector(selectWorkflowLibraryCategories);
   const categoryOptions = useStore($workflowLibraryCategoriesOptions);
@@ -89,10 +90,17 @@ export const WorkflowLibrarySideNav = () => {
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={1}>
       <Flex flexDir="column" w="full" pb={2}>
-        <CategoryButton isSelected={isRecentWorkflowsSelected} onClick={selectRecentWorkflows}></CategoryButton>
+        <CategoryButton isSelected={isRecentWorkflowsSelected} onClick={selectRecentWorkflows}>
+          {t('workflows.recentlyOpened')}
+        </CategoryButton>
+        <Flex flexDir="column" gap={2} pl={4}>
+          <RecentWorkflows />
+        </Flex>
       </Flex>
       <Flex flexDir="column" w="full" pb={2}>
-        <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}></CategoryButton>
+        <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
+          {t('workflows.yourWorkflows')}
+        </CategoryButton>
         {categoryOptions.includes('project') && (
           <Collapse
             in={
@@ -104,13 +112,16 @@ export const WorkflowLibrarySideNav = () => {
                 size="sm"
                 onClick={selectPrivateWorkflows}
                 isSelected={isPrivateWorkflowsExclusivelySelected}
-              ></CategoryButton>
+              >
+                {t('workflows.private')}
+              </CategoryButton>
               <CategoryButton
                 size="sm"
                 rightIcon={<PiUsersBold />}
                 onClick={selectSharedWorkflows}
                 isSelected={isSharedWorkflowsExclusivelySelected}
               >
+                {t('workflows.shared')}
                 <Spacer />
               </CategoryButton>
             </Flex>
@@ -118,10 +129,9 @@ export const WorkflowLibrarySideNav = () => {
         )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
-        <CategoryButton
-          isSelected={isDefaultWorkflowsExclusivelySelected}
-          onClick={selectDefaultWorkflows}
-        ></CategoryButton>
+        <CategoryButton isSelected={isDefaultWorkflowsExclusivelySelected} onClick={selectDefaultWorkflows}>
+          {t('workflows.browseWorkflows')}
+        </CategoryButton>
         <Collapse in={isDefaultWorkflowsExclusivelySelected}>
           <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden" h="100%" minH={0}>
             <Button
@@ -135,7 +145,9 @@ export const WorkflowLibrarySideNav = () => {
               flexShrink={0}
               leftIcon={<PiArrowCounterClockwiseBold />}
               h={8}
-            ></Button>
+            >
+              {t('workflows.deselectAll')}
+            </Button>
             <Flex flexDir="column" gap={2} overflow="auto">
               {tagCategoryOptions.map((tagCategory) => (
                 <TagCategory
@@ -172,7 +184,7 @@ const RecentWorkflows = memo(() => {
   }
 
   if (data.items.length === 0) {
-    return <Text variant="subtext">{t('workflows.noRecentWorkflows')}</Text>;
+    return <Text variant="subtext" p={4}>{t('workflows.noRecentWorkflows')}</Text>;
   }
 
   return (
@@ -216,6 +228,7 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
     () =>
       ({
         tags: allTags,
+        categories: ['default'], // We only allow filtering by tag for default workflows
       }) satisfies Parameters<typeof useGetCountsByTagQuery>[0],
     [allTags]
   );
