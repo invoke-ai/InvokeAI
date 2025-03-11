@@ -39,7 +39,7 @@ const useInfiniteQueryAry = () => {
       categories,
       query: debouncedQuery,
       tags: categories.length === 1 && categories.includes('default') ? tags : [],
-      is_recent: showOpenedWorkflowsOnly,
+      is_recent: showOpenedWorkflowsOnly || undefined,
     } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
   }, [orderBy, direction, categories, debouncedQuery, tags, showOpenedWorkflowsOnly]);
 
@@ -55,7 +55,7 @@ const queryOptions = {
   },
 } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[1];
 
-export const WorkflowList = () => {
+export const WorkflowList = memo(() => {
   const queryArg = useInfiniteQueryAry();
   const { items, isFetching, isLoading, fetchNextPage, hasNextPage } = useListWorkflowsInfiniteInfiniteQuery(
     queryArg,
@@ -82,7 +82,8 @@ export const WorkflowList = () => {
       isFetching={isFetching}
     />
   );
-};
+});
+WorkflowList.displayName = 'WorkflowList';
 
 const NoItems = memo(() => {
   const { t } = useTranslation();
