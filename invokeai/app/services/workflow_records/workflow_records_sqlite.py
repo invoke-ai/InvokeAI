@@ -118,6 +118,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         per_page: Optional[int] = None,
         query: Optional[str] = None,
         tags: Optional[list[str]] = None,
+        is_recent: Optional[bool] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         # sanitize!
         assert order_by in WorkflowRecordOrderBy
@@ -174,6 +175,11 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
             conditions.append(tags_condition)
             params.extend(tags_params)
+
+        if is_recent:
+            conditions.append("opened_at IS NOT NULL")
+        elif is_recent is False:
+            conditions.append("opened_at IS NULL")
 
         # Ignore whitespace in the query
         stripped_query = query.strip() if query else None
@@ -370,13 +376,13 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 bytes_ = path.read_bytes()
                 workflow_from_file = WorkflowValidator.validate_json(bytes_)
 
-                assert workflow_from_file.id.startswith("default_"), (
-                    f'Invalid default workflow ID (must start with "default_"): {workflow_from_file.id}'
-                )
+                assert workflow_from_file.id.startswith(
+                    "default_"
+                ), f'Invalid default workflow ID (must start with "default_"): {workflow_from_file.id}'
 
-                assert workflow_from_file.meta.category is WorkflowCategory.Default, (
-                    f"Invalid default workflow category: {workflow_from_file.meta.category}"
-                )
+                assert (
+                    workflow_from_file.meta.category is WorkflowCategory.Default
+                ), f"Invalid default workflow category: {workflow_from_file.meta.category}"
 
                 workflows_from_file.append(workflow_from_file)
 

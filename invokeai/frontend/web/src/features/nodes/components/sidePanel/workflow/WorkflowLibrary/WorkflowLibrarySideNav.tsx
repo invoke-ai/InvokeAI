@@ -156,6 +156,7 @@ const recentWorkflowsQueryArg = {
   per_page: 5,
   order_by: 'opened_at',
   direction: 'DESC',
+  is_recent: true,
 } satisfies Parameters<typeof useListWorkflowsQuery>[0];
 
 const RecentWorkflows = memo(() => {
