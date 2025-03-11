@@ -28,6 +28,7 @@ import type {
   IntegerGeneratorFieldValue,
   IPAdapterModelFieldValue,
   LoRAModelFieldValue,
+  LLaVAModelFieldValue,
   MainModelFieldValue,
   ModelIdentifierFieldValue,
   SchedulerFieldValue,
@@ -65,6 +66,7 @@ import {
   zIntegerGeneratorFieldValue,
   zIPAdapterModelFieldValue,
   zLoRAModelFieldValue,
+  zLLaVAModelFieldValue,
   zMainModelFieldValue,
   zModelIdentifierFieldValue,
   zSchedulerFieldValue,
@@ -380,6 +382,9 @@ export const nodesSlice = createSlice({
     fieldLoRAModelValueChanged: (state, action: FieldValueAction<LoRAModelFieldValue>) => {
       fieldValueReducer(state, action, zLoRAModelFieldValue);
     },
+    fieldLLaVAModelValueChanged: (state, action: FieldValueAction<LLaVAModelFieldValue>) => {
+      fieldValueReducer(state, action, zLLaVAModelFieldValue);
+    },
     fieldControlNetModelValueChanged: (state, action: FieldValueAction<ControlNetModelFieldValue>) => {
       fieldValueReducer(state, action, zControlNetModelFieldValue);
     },
@@ -509,6 +514,7 @@ export const {
   fieldSpandrelImageToImageModelValueChanged,
   fieldLabelChanged,
   fieldLoRAModelValueChanged,
+  fieldLLaVAModelValueChanged,
   fieldModelIdentifierValueChanged,
   fieldMainModelValueChanged,
   fieldIntegerValueChanged,
@@ -633,6 +639,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldT2IAdapterModelValueChanged,
   fieldLabelChanged,
   fieldLoRAModelValueChanged,
+  fieldLLaVAModelValueChanged,
   fieldMainModelValueChanged,
   fieldIntegerValueChanged,
   fieldIntegerCollectionValueChanged,

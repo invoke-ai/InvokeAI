@@ -6,6 +6,8 @@ from invokeai.app.invocations.fields import ImageField, InputField, UIComponent
 from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.llava_onevision_model import LlavaOnevisionModel
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.invocations.fields import FieldDescriptions, UIType
 from invokeai.backend.model_manager.config import BaseModelType, ModelType
 from invokeai.backend.util.devices import TorchDevice
 
@@ -20,11 +22,11 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
         description="Input text prompt.",
         ui_component=UIComponent.Textarea,
     )
-    # vllm_model: ModelIdentifierField = InputField(
-    #     title="Image-to-Image Model",
-    #     description=FieldDescriptions.vllm_model,
-    #     ui_type=UIType.LlavaOnevisionModel,
-    # )
+    vllm_model: ModelIdentifierField = InputField(
+        title="Image-to-Image Model",
+        description=FieldDescriptions.vllm_model,
+        ui_type=UIType.LlavaOnevisionModel,
+    )
 
     def _get_images(self, context: InvocationContext) -> list[Image]:
         if self.images is None:
