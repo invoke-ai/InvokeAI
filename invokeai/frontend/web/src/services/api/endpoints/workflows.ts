@@ -99,7 +99,12 @@ export const workflowsApi = api.injectEndpoints({
       providesTags: (result) => {
         const tags: ApiTagDescription[] = ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }];
         if (result) {
-          tags.push(...result.items.map((workflow) => ({ type: 'Workflow', id: workflow.workflow_id }) as const));
+          tags.push(
+            ...result.pages
+              .map(({ items }) => items)
+              .flat()
+              .map((workflow) => ({ type: 'Workflow', id: workflow.workflow_id }) as const)
+          );
         }
         return tags;
       },
