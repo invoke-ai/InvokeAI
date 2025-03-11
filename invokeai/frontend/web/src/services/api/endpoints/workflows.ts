@@ -108,7 +108,11 @@ export const workflowsApi = api.injectEndpoints({
         url: buildWorkflowsUrl(`i/${workflow_id}/opened_at`),
         method: 'PUT',
       }),
-      invalidatesTags: (result, error, { workflow_id }) => [{ type: 'Workflow', id: workflow_id }],
+      invalidatesTags: (result, error, { workflow_id }) => [
+        { type: 'Workflow', id: workflow_id },
+        // Because this may change the order of the list, we need to invalidate the whole list
+        { type: 'Workflow', id: LIST_TAG },
+      ],
     }),
     setWorkflowThumbnail: build.mutation<void, { workflow_id: string; image: File }>({
       query: ({ workflow_id, image }) => {
