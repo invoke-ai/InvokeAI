@@ -19,6 +19,7 @@ import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/galle
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
 import { modelManagerV2PersistConfig, modelManagerV2Slice } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/nodes/store/nodesSlice';
+import { workflowLibraryPersistConfig, workflowLibrarySlice } from 'features/nodes/store/workflowLibrarySlice';
 import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
@@ -68,6 +69,7 @@ const allReducers = {
   [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
   [canvasStagingAreaSlice.name]: canvasStagingAreaSlice.reducer,
   [lorasSlice.name]: lorasSlice.reducer,
+  [workflowLibrarySlice.name]: workflowLibrarySlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -113,6 +115,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [canvasSettingsPersistConfig.name]: canvasSettingsPersistConfig,
   [canvasStagingAreaPersistConfig.name]: canvasStagingAreaPersistConfig,
   [lorasPersistConfig.name]: lorasPersistConfig,
+  [workflowLibraryPersistConfig.name]: workflowLibraryPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

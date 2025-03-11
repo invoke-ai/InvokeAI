@@ -12,9 +12,9 @@ import {
   Input,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { deepClone } from 'common/util/deepClone';
+import { $workflowLibraryCategoriesOptions } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { isDraftWorkflow, useCreateLibraryWorkflow } from 'features/workflowLibrary/hooks/useCreateNewWorkflow';
 import { t } from 'i18next';
@@ -83,7 +83,7 @@ export const SaveWorkflowAsDialog = () => {
 };
 
 const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement> }) => {
-  const workflowCategories = useStore($workflowCategories);
+  const workflowCategories = useStore($workflowLibraryCategoriesOptions);
   const [name, setName] = useState(() => {
     if (workflow) {
       return getInitialName(workflow);
