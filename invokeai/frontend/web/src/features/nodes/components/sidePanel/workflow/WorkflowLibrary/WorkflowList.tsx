@@ -39,7 +39,7 @@ const useInfiniteQueryAry = () => {
       categories,
       query: debouncedQuery,
       tags: categories.length === 1 && categories.includes('default') ? tags : [],
-      is_recent: showOpenedWorkflowsOnly || undefined,
+      has_been_opened: showOpenedWorkflowsOnly || undefined,
     } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
   }, [orderBy, direction, categories, debouncedQuery, tags, showOpenedWorkflowsOnly]);
 
