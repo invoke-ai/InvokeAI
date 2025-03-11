@@ -1,6 +1,7 @@
 import queryString from 'query-string';
 import type { paths } from 'services/api/schema';
 
+import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
 
 /**
@@ -93,6 +94,13 @@ export const workflowsApi = api.injectEndpoints({
         getPreviousPageParam: (_firstPage, _allPages, firstPageParam, _allPageParams) => {
           return firstPageParam > -1 ? firstPageParam - 1 : undefined;
         },
+      },
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }];
+        if (result) {
+          tags.push(...result.items.map((workflow) => ({ type: 'Workflow', id: workflow.workflow_id }) as const));
+        }
+        return tags;
       },
     }),
     updateOpenedAt: build.mutation<void, { workflow_id: string }>({
