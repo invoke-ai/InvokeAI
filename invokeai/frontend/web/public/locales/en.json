@@ -846,6 +846,7 @@
         "starterModels": "Starter Models",
         "starterModelsInModelManager": "Starter Models can be found in Model Manager",
         "controlLora": "Control LoRA",
+        "llavaOnevision": "LLaVA OneVision",
         "syncModels": "Sync Models",
         "textualInversions": "Textual Inversions",
         "triggerPhrases": "Trigger Phrases",

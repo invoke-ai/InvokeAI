@@ -55,6 +55,7 @@ export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
 export type CLIPEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
 export type CLIPLEmbedModelConfig = S['CLIPLEmbedDiffusersConfig'];
 export type CLIPGEmbedModelConfig = S['CLIPGEmbedDiffusersConfig'];
+export type LlavaOnevisionConfig = S['LlavaOnevisionConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
@@ -80,7 +81,8 @@ export type AnyModelConfig =
   | MainModelConfig
   | CLIPVisionDiffusersConfig
   | SigLipModelConfig
-  | FLUXReduxModelConfig;
+  | FLUXReduxModelConfig
+  | LlavaOnevisionConfig;
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
@@ -161,6 +163,10 @@ export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdap
 
 export const isCLIPVisionModelConfig = (config: AnyModelConfig): config is CLIPVisionDiffusersConfig => {
   return config.type === 'clip_vision';
+};
+
+export const isLLaVAModelConfig = (config: AnyModelConfig): config is LlavaOnevisionConfig => {
+  return config.type === 'llava_onevision';
 };
 
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {

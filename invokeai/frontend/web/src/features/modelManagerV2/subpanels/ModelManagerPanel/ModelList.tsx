@@ -16,6 +16,7 @@ import {
   useEmbeddingModels,
   useFluxReduxModels,
   useIPAdapterModels,
+  useLLaVAModels,
   useLoRAModels,
   useMainModels,
   useRefinerModels,
@@ -124,6 +125,12 @@ const ModelList = () => {
   const filteredFluxReduxModels = useMemo(
     () => modelsFilter(fluxReduxModels, searchTerm, filteredModelType),
     [fluxReduxModels, searchTerm, filteredModelType]
+  );
+
+  const [llavaOneVisionModels, { isLoading: isLoadingLlavaOneVisionModels }] = useLLaVAModels();
+  const filteredLlavaOneVisionModels = useMemo(
+    () => modelsFilter(llavaOneVisionModels, searchTerm, filteredModelType),
+    [llavaOneVisionModels, searchTerm, filteredModelType]
   );
 
   const totalFilteredModels = useMemo(() => {
@@ -236,6 +243,17 @@ const ModelList = () => {
         {!isLoadingClipEmbedModels && filteredClipEmbedModels.length > 0 && (
           <ModelListWrapper title={t('modelManager.clipEmbed')} modelList={filteredClipEmbedModels} key="clip-embed" />
         )}
+
+        {/* LLaVA OneVision List */}
+        {isLoadingLlavaOneVisionModels && <FetchingModelsLoader loadingMessage="Loading LLaVA OneVision Models..." />}
+        {!isLoadingLlavaOneVisionModels && filteredLlavaOneVisionModels.length > 0 && (
+          <ModelListWrapper
+            title={t('modelManager.llavaOnevision')}
+            modelList={filteredLlavaOneVisionModels}
+            key="llava-onevision"
+          />
+        )}
+
         {/* Spandrel Image to Image List */}
         {isLoadingSpandrelImageToImageModels && (
           <FetchingModelsLoader loadingMessage="Loading Image-to-Image Models..." />
