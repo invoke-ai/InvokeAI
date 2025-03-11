@@ -27,6 +27,7 @@ export const workflowsApi = api.injectEndpoints({
         method: 'DELETE',
       }),
       invalidatesTags: (result, error, workflow_id) => [
+        // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow_id },
       ],
@@ -40,7 +41,10 @@ export const workflowsApi = api.injectEndpoints({
         method: 'POST',
         body: { workflow },
       }),
-      invalidatesTags: [{ type: 'Workflow', id: LIST_TAG }],
+      invalidatesTags: [
+        // Because this may change the order of the list, we need to invalidate the whole list
+        { type: 'Workflow', id: LIST_TAG },
+      ],
     }),
     updateWorkflow: build.mutation<
       paths['/api/v1/workflows/i/{workflow_id}']['patch']['responses']['200']['content']['application/json'],
