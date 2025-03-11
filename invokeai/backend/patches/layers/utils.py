@@ -46,6 +46,7 @@ def swap_shift_scale_for_linear_weight(weight: torch.Tensor) -> torch.Tensor:
 def decomposite_weight_matric_with_rank(
     delta: torch.Tensor,
     rank: int,
+    epsilon: float = 1e-8,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Decompose given matrix with a specified rank."""
     U, S, V = torch.svd(delta)
@@ -55,50 +56,9 @@ def decomposite_weight_matric_with_rank(
     S_r = S[:rank]
     V_r = V[:, :rank]
 
-    S_sqrt = torch.sqrt(S_r)
+    S_sqrt = torch.sqrt(S_r + epsilon) # regularization
 
     up = torch.matmul(U_r, torch.diag(S_sqrt))
     down = torch.matmul(torch.diag(S_sqrt), V_r.T)
 
     return up, down
-
-
-def approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRALayer:
-    '''Approximate given diffusers AdaLN loRA layer in our Flux model'''
-
-    if not "lora_up.weight" in state_dict:
-        raise ValueError(f"Unsupported lora format: {state_dict.keys()}, missing lora_up")
-    
-    if not "lora_down.weight" in state_dict:
-        raise ValueError(f"Unsupported lora format: {state_dict.keys()}, missing lora_down")
-    
-    up = state_dict.pop('lora_up.weight')
-    down = state_dict.pop('lora_down.weight')
-
-    dtype = up.dtype
-    device = up.device
-    up_shape = up.shape
-    down_shape = down.shape
-    
-    # desired low rank
-    rank = up_shape[1]
-
-    # up scaling for more precise
-    up.double()
-    down.double()
-    weight  = up.reshape(up.shape[0], -1) @ down.reshape(down.shape[0], -1)
-
-    # swap to our linear format
-    swapped = swap_shift_scale_for_linear_weight(weight)
-
-    _up, _down = decomposite_weight_matric_with_rank(swapped, rank)
-
-    assert(_up.shape == up_shape)
-    assert(_down.shape == down_shape)
-
-    # down scaling to original dtype, device
-    state_dict['lora_up.weight'] = _up.to(dtype).to(device=device)
-    state_dict['lora_down.weight'] = _down.to(dtype).to(device=device)
-
-    return LoRALayer.from_state_dict_values(state_dict)
-
