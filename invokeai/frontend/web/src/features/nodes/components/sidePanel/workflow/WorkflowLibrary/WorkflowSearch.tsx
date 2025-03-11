@@ -1,6 +1,9 @@
 import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowSearchTerm, workflowSearchTermChanged } from 'features/nodes/store/workflowSlice';
+import {
+  selectWorkflowLibrarySearchTerm,
+  workflowLibrarySearchTermChanged,
+} from 'features/nodes/store/workflowLibrarySlice';
 import type { ChangeEvent, KeyboardEvent, RefObject } from 'react';
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,18 +11,18 @@ import { PiXBold } from 'react-icons/pi';
 
 export const WorkflowSearch = memo(({ searchInputRef }: { searchInputRef: RefObject<HTMLInputElement> }) => {
   const dispatch = useAppDispatch();
-  const searchTerm = useAppSelector(selectWorkflowSearchTerm);
+  const searchTerm = useAppSelector(selectWorkflowLibrarySearchTerm);
   const { t } = useTranslation();
 
   const handleWorkflowSearch = useCallback(
     (newSearchTerm: string) => {
-      dispatch(workflowSearchTermChanged(newSearchTerm));
+      dispatch(workflowLibrarySearchTermChanged(newSearchTerm));
     },
     [dispatch]
   );
 
   const clearWorkflowSearch = useCallback(() => {
-    dispatch(workflowSearchTermChanged(''));
+    dispatch(workflowLibrarySearchTermChanged(''));
   }, [dispatch]);
 
   const handleKeydown = useCallback(

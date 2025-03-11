@@ -1,16 +1,17 @@
 import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
 import { Button, Checkbox, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { WORKFLOW_TAGS, type WorkflowTag } from 'features/nodes/store/types';
+import type { WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
 import {
-  selectWorkflowLibrarySelectedTags,
-  selectWorkflowSelectedCategories,
-  workflowSelectedCategoriesChanged,
-  workflowSelectedTagsRese,
-  workflowSelectedTagToggled,
-} from 'features/nodes/store/workflowSlice';
+  $workflowLibraryCategoriesOptions,
+  $workflowLibraryTagCategoriesOptions,
+  selectWorkflowLibraryCategories,
+  selectWorkflowLibraryTags,
+  workflowLibraryCategoriesChanged,
+  workflowLibraryTagsReset,
+  workflowLibraryTagToggled,
+} from 'features/nodes/store/workflowLibrarySlice';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
@@ -24,28 +25,29 @@ import type { S } from 'services/api/types';
 export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch();
-  const categories = useAppSelector(selectWorkflowSelectedCategories);
-  const categoryOptions = useStore($workflowCategories);
-  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const categories = useAppSelector(selectWorkflowLibraryCategories);
+  const categoryOptions = useStore($workflowLibraryCategoriesOptions);
+  const tags = useAppSelector(selectWorkflowLibraryTags);
+  const tagCategoryOptions = useStore($workflowLibraryTagCategoriesOptions);
 
   const selectYourWorkflows = useCallback(() => {
-    dispatch(workflowSelectedCategoriesChanged(categoryOptions.includes('project') ? ['user', 'project'] : ['user']));
+    dispatch(workflowLibraryCategoriesChanged(categoryOptions.includes('project') ? ['user', 'project'] : ['user']));
   }, [categoryOptions, dispatch]);
 
   const selectPrivateWorkflows = useCallback(() => {
-    dispatch(workflowSelectedCategoriesChanged(['user']));
+    dispatch(workflowLibraryCategoriesChanged(['user']));
   }, [dispatch]);
 
   const selectSharedWorkflows = useCallback(() => {
-    dispatch(workflowSelectedCategoriesChanged(['project']));
+    dispatch(workflowLibraryCategoriesChanged(['project']));
   }, [dispatch]);
 
   const selectDefaultWorkflows = useCallback(() => {
-    dispatch(workflowSelectedCategoriesChanged(['default']));
+    dispatch(workflowLibraryCategoriesChanged(['default']));
   }, [dispatch]);
 
   const resetTags = useCallback(() => {
-    dispatch(workflowSelectedTagsRese());
+    dispatch(workflowLibraryTagsReset());
   }, [dispatch]);
 
   const isYourWorkflowsSelected = useMemo(() => {
@@ -116,7 +118,7 @@ export const WorkflowLibrarySideNav = () => {
         <Collapse in={isDefaultWorkflowsExclusivelySelected}>
           <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden" h="100%" minH={0}>
             <Button
-              isDisabled={!isDefaultWorkflowsExclusivelySelected || selectedTags.length === 0}
+              isDisabled={!isDefaultWorkflowsExclusivelySelected || tags.length === 0}
               onClick={resetTags}
               size="sm"
               variant="link"
@@ -130,9 +132,9 @@ export const WorkflowLibrarySideNav = () => {
               {t('workflows.resetTags')}
             </Button>
             <Flex flexDir="column" gap={2} overflow="auto">
-              {WORKFLOW_TAGS.map((tagCategory) => (
+              {tagCategoryOptions.map((tagCategory) => (
                 <TagCategory
-                  key={tagCategory.category}
+                  key={tagCategory.categoryTKey}
                   tagCategory={tagCategory}
                   isDisabled={!isDefaultWorkflowsExclusivelySelected}
                 />
@@ -218,40 +220,39 @@ const CategoryButton = memo(({ isSelected, ...rest }: ButtonProps & { isSelected
 });
 CategoryButton.displayName = 'NavButton';
 
-const TagCategory = memo(
-  ({ tagCategory, isDisabled }: { tagCategory: (typeof WORKFLOW_TAGS)[number]; isDisabled: boolean }) => {
-    const { count } = useGetCountsQuery(
-      { tags: [...tagCategory.tags], categories: ['default'] },
-      { selectFromResult: ({ data }) => ({ count: data ?? 0 }) }
-    );
+const TagCategory = memo(({ tagCategory, isDisabled }: { tagCategory: WorkflowTagCategory; isDisabled: boolean }) => {
+  const { t } = useTranslation();
+  const { count } = useGetCountsQuery(
+    { tags: [...tagCategory.tags], categories: ['default'] },
+    { selectFromResult: ({ data }) => ({ count: data ?? 0 }) }
+  );
 
-    if (count === 0) {
-      return null;
-    }
-
-    return (
-      <Flex flexDir="column" gap={2}>
-        <Text fontWeight="semibold" color="base.300" opacity={isDisabled ? 0.5 : 1} flexShrink={0}>
-          {tagCategory.category}
-        </Text>
-        <Flex flexDir="column" gap={2} pl={4}>
-          {tagCategory.tags.map((tag) => (
-            <TagCheckbox key={tag} tag={tag} isDisabled={isDisabled} />
-          ))}
-        </Flex>
-      </Flex>
-    );
+  if (count === 0) {
+    return null;
   }
-);
+
+  return (
+    <Flex flexDir="column" gap={2}>
+      <Text fontWeight="semibold" color="base.300" opacity={isDisabled ? 0.5 : 1} flexShrink={0}>
+        {t(tagCategory.categoryTKey)}
+      </Text>
+      <Flex flexDir="column" gap={2} pl={4}>
+        {tagCategory.tags.map((tag) => (
+          <TagCheckbox key={tag} tag={tag} isDisabled={isDisabled} />
+        ))}
+      </Flex>
+    </Flex>
+  );
+});
 TagCategory.displayName = 'TagCategory';
 
-const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: WorkflowTag }) => {
+const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: string }) => {
   const dispatch = useAppDispatch();
-  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const selectedTags = useAppSelector(selectWorkflowLibraryTags);
   const isSelected = selectedTags.includes(tag);
 
   const onChange = useCallback(() => {
-    dispatch(workflowSelectedTagToggled(tag));
+    dispatch(workflowLibraryTagToggled(tag));
   }, [dispatch, tag]);
 
   const { count } = useGetCountsQuery(
