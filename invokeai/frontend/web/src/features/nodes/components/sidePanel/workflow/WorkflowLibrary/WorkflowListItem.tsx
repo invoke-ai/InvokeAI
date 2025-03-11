@@ -5,7 +5,7 @@ import { ShareWorkflowButton } from 'features/nodes/components/sidePanel/workflo
 import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
 import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold, PiUsersBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
@@ -29,7 +29,7 @@ const sx: SystemStyleObject = {
   },
 };
 
-export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
+export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
   const { t } = useTranslation();
 
   const workflowId = useAppSelector(selectWorkflowId);
@@ -139,4 +139,5 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       </Flex>
     </Flex>
   );
-};
+});
+WorkflowListItem.displayName = 'WorkflowListItem';
