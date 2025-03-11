@@ -1438,7 +1438,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/workflows/tag_counts_with_filter": {
+    "/api/v1/workflows/counts_by_tag": {
         parameters: {
             query?: never;
             header?: never;
@@ -1446,10 +1446,10 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Get Tag Counts With Filter
+         * Get Counts By Tag
          * @description Gets tag counts with a filter
          */
-        get: operations["get_tag_counts_with_filter"];
+        get: operations["get_counts_by_tag"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24474,13 +24474,11 @@ export interface operations {
             };
         };
     };
-    get_tag_counts_with_filter: {
+    get_counts_by_tag: {
         parameters: {
             query: {
                 /** @description The tags to get counts for */
-                tags_to_count: string[];
-                /** @description The tags to include */
-                selected_tags?: string[] | null;
+                tags: string[];
                 /** @description The categories to include */
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
             };
