@@ -9,13 +9,14 @@ import {
   ModalOverlay,
 } from '@invoke-ai/ui-library';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { WorkflowLibrarySideNav } from './WorkflowLibrarySideNav';
 import { WorkflowLibraryTopNav } from './WorkflowLibraryTopNav';
 import { WorkflowList } from './WorkflowList';
 
-export const WorkflowLibraryModal = () => {
+export const WorkflowLibraryModal = memo(() => {
   const { t } = useTranslation();
   const workflowLibraryModal = useWorkflowLibraryModal();
   return (
@@ -42,4 +43,6 @@ export const WorkflowLibraryModal = () => {
       </ModalContent>
     </Modal>
   );
-};
+});
+
+WorkflowLibraryModal.displayName = 'WorkflowLibraryModal';
