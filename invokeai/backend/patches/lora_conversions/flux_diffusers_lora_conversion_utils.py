@@ -4,7 +4,7 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
-from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict, diffusers_adaLN_lora_layer_from_state_dict
+from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict, approximate_flux_adaLN_lora_layer_from_diffusers_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
@@ -103,7 +103,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
         if src_key in grouped_state_dict:
             src_layer_dict = grouped_state_dict.pop(src_key)
             values = get_lora_layer_values(src_layer_dict)
-            layers[dst_key] = diffusers_adaLN_lora_layer_from_state_dict(values)
+            layers[dst_key] = approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(values)
     
     def add_qkv_lora_layer_if_present(
         src_keys: list[str],

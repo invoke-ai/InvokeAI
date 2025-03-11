@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Tuple
 
 import torch
 
@@ -10,7 +10,6 @@ from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.norm_layer import NormLayer
-from invokeai.backend.patches.layers.diffusers_ada_ln_lora_layer import DiffusersAdaLN_LoRALayer
 
 
 def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> BaseLayerPatch:
@@ -36,8 +35,70 @@ def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> BaseL
         raise ValueError(f"Unsupported lora format: {state_dict.keys()}")
 
 
-def diffusers_adaLN_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> DiffusersAdaLN_LoRALayer:
+
+def swap_shift_scale_for_linear_weight(weight: torch.Tensor) -> torch.Tensor:
+    """Swap shift/scale for given linear layer back and forth"""
+    # In SD3 and Flux implementation of AdaLayerNormContinuous, it split linear projection output into shift, scale;
+    # while in diffusers it split into scale, shift. This will flip them around
+    chunk1, chunk2 = weight.chunk(2, dim=0) 
+    return torch.cat([chunk2, chunk1], dim=0)
+
+def decomposite_weight_matric_with_rank(
+    delta: torch.Tensor,
+    rank: int,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Decompose given matrix with a specified rank."""
+    U, S, V = torch.svd(delta)
+
+    # Truncate to rank r:
+    U_r = U[:, :rank]
+    S_r = S[:rank]
+    V_r = V[:, :rank]
+
+    S_sqrt = torch.sqrt(S_r)
+
+    up = torch.matmul(U_r, torch.diag(S_sqrt))
+    down = torch.matmul(torch.diag(S_sqrt), V_r.T)
+
+    return up, down
+
+
+def approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRALayer:
+    '''Approximate given diffusers AdaLN loRA layer in our Flux model'''
+
     if not "lora_up.weight" in state_dict:
-        raise ValueError(f"Unsupported lora format: {state_dict.keys()}")
+        raise ValueError(f"Unsupported lora format: {state_dict.keys()}, missing lora_up")
     
-    return DiffusersAdaLN_LoRALayer.from_state_dict_values(state_dict)
+    if not "lora_down.weight" in state_dict:
+        raise ValueError(f"Unsupported lora format: {state_dict.keys()}, missing lora_down")
+    
+    up = state_dict.pop('lora_up.weight')
+    down = state_dict.pop('lora_down.weight')
+
+    dtype = up.dtype
+    device = up.device
+    up_shape = up.shape
+    down_shape = down.shape
+    
+    # desired low rank
+    rank = up_shape[1]
+
+    # up scaling for more precise
+    up.double()
+    down.double()
+    weight  = up.reshape(up.shape[0], -1) @ down.reshape(down.shape[0], -1)
+
+    # swap to our linear format
+    swapped = swap_shift_scale_for_linear_weight(weight)
+
+    _up, _down = decomposite_weight_matric_with_rank(swapped, rank)
+
+    assert(_up.shape == up_shape)
+    assert(_down.shape == down_shape)
+
+    # down scaling to original dtype, device
+    state_dict['lora_up.weight'] = _up.to(dtype).to(device=device)
+    state_dict['lora_down.weight'] = _down.to(dtype).to(device=device)
+
+    return LoRALayer.from_state_dict_values(state_dict)
+
