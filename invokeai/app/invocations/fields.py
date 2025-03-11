@@ -59,6 +59,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     ControlLoRAModel = "ControlLoRAModelField"
     SigLipModel = "SigLipModelField"
     FluxReduxModel = "FluxReduxModelField"
+    LlavaOnevisionModel = "LLaVAModelField"
     # endregion
 
     # region Misc Field Types
@@ -205,6 +206,7 @@ class FieldDescriptions:
     freeu_b2 = "Scaling factor for stage 2 to amplify the contributions of backbone features."
     instantx_control_mode = "The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'."
     flux_redux_conditioning = "FLUX Redux conditioning tensor"
+    vllm_model = "The VLLM model to use"
 
 
 class ImageField(BaseModel):

@@ -32,6 +32,8 @@ import {
   isColorFieldInputTemplate,
   isControlLoRAModelFieldInputInstance,
   isControlLoRAModelFieldInputTemplate,
+  isLLaVAModelFieldInputInstance,
+  isLLaVAModelFieldInputTemplate,
   isControlNetModelFieldInputInstance,
   isControlNetModelFieldInputTemplate,
   isEnumFieldInputInstance,
@@ -103,6 +105,7 @@ import CLIPGEmbedModelFieldInputComponent from './inputs/CLIPGEmbedModelFieldInp
 import CLIPLEmbedModelFieldInputComponent from './inputs/CLIPLEmbedModelFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import ControlLoRAModelFieldInputComponent from './inputs/ControlLoraModelFieldInputComponent';
+import LLaVAModelFieldInputComponent from './inputs/LLaVAModelFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import FluxMainModelFieldInputComponent from './inputs/FluxMainModelFieldInputComponent';
@@ -301,6 +304,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <ControlLoRAModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isLLaVAModelFieldInputTemplate(template)) {
+    if (!isLLaVAModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <LLaVAModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isFluxVAEModelFieldInputTemplate(template)) {
