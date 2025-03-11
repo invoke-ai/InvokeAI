@@ -1438,7 +1438,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/workflows/counts": {
+    "/api/v1/workflows/tag_counts_with_filter": {
         parameters: {
             query?: never;
             header?: never;
@@ -1446,10 +1446,10 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Get Counts
-         * @description Gets a the count of workflows that include the specified tags and categories
+         * Get Tag Counts With Filter
+         * @description Gets tag counts with a filter
          */
-        get: operations["get_counts"];
+        get: operations["get_tag_counts_with_filter"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24474,11 +24474,13 @@ export interface operations {
             };
         };
     };
-    get_counts: {
+    get_tag_counts_with_filter: {
         parameters: {
-            query?: {
+            query: {
+                /** @description The tags to get counts for */
+                tags_to_count: string[];
                 /** @description The tags to include */
-                tags?: string[] | null;
+                selected_tags?: string[] | null;
                 /** @description The categories to include */
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
             };
@@ -24494,7 +24496,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": number;
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
             /** @description Validation Error */
