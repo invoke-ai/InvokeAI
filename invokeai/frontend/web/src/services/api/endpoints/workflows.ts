@@ -71,12 +71,12 @@ export const workflowsApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
     }),
-    getTagCountsWithFilter: build.query<
-      paths['/api/v1/workflows/tag_counts_with_filter']['get']['responses']['200']['content']['application/json'],
-      NonNullable<paths['/api/v1/workflows/tag_counts_with_filter']['get']['parameters']['query']>
+    getCountsByTag: build.query<
+      paths['/api/v1/workflows/counts_by_tag']['get']['responses']['200']['content']['application/json'],
+      NonNullable<paths['/api/v1/workflows/counts_by_tag']['get']['parameters']['query']>
     >({
       query: (params) => ({
-        url: `${buildWorkflowsUrl('tag_counts_with_filter')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
+        url: `${buildWorkflowsUrl('counts_by_tag')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
       }),
       providesTags: ['WorkflowTagCountsWithFilter'],
     }),
@@ -150,7 +150,7 @@ export const workflowsApi = api.injectEndpoints({
 
 export const {
   useUpdateOpenedAtMutation,
-  useGetTagCountsWithFilterQuery,
+  useGetCountsByTagQuery,
   useLazyGetWorkflowQuery,
   useGetWorkflowQuery,
   useCreateWorkflowMutation,
