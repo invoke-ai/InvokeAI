@@ -51,10 +51,7 @@ export const workflowsApi = api.injectEndpoints({
         method: 'PATCH',
         body: { workflow },
       }),
-      invalidatesTags: (response, error, workflow) => [
-        { type: 'Workflow', id: LIST_TAG },
-        { type: 'Workflow', id: workflow.id },
-      ],
+      invalidatesTags: (response, error, workflow) => [{ type: 'Workflow', id: workflow.id }],
     }),
     listWorkflows: build.query<
       paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
