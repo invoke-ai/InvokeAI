@@ -18,7 +18,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.util.step_callback import flux_step_callback, stable_diffusion_step_callback
+from invokeai.app.util.step_callback import diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
 )
@@ -582,7 +582,7 @@ class UtilInterface(InvocationContextInterface):
             base_model: The base model for the current denoising step.
         """
 
-        stable_diffusion_step_callback(
+        diffusion_step_callback(
             signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
             base_model=base_model,
@@ -600,9 +600,10 @@ class UtilInterface(InvocationContextInterface):
             intermediate_state: The intermediate state of the diffusion pipeline.
         """
 
-        flux_step_callback(
+        diffusion_step_callback(
             signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
+            base_model=BaseModelType.Flux,
             is_canceled=self.is_canceled,
         )
 
