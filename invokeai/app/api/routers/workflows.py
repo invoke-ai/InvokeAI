@@ -105,6 +105,7 @@ async def list_workflows(
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories of workflow to get"),
     tags: Optional[list[str]] = Query(default=None, description="The tags of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
+    is_recent: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""
     workflows_with_thumbnails: list[WorkflowRecordListItemWithThumbnailDTO] = []
@@ -116,6 +117,7 @@ async def list_workflows(
         query=query,
         categories=categories,
         tags=tags,
+        is_recent=is_recent,
     )
     for workflow in workflows.items:
         workflows_with_thumbnails.append(

@@ -21157,7 +21157,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string;
+            opened_at: string | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -21187,7 +21187,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string;
+            opened_at: string | null;
             /**
              * Description
              * @description The description of the workflow.
@@ -21238,7 +21238,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string;
+            opened_at: string | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -24300,6 +24300,8 @@ export interface operations {
                 tags?: string[] | null;
                 /** @description The text to query by (matches name and description) */
                 query?: string | null;
+                /** @description Whether to include/exclude recent workflows */
+                is_recent?: boolean | null;
             };
             header?: never;
             path?: never;
