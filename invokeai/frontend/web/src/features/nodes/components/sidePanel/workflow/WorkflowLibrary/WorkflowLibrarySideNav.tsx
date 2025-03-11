@@ -22,7 +22,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
-import { useGetCountsByTagQuery, useListWorkflowsQuery } from 'services/api/endpoints/workflows';
+import { useGetCountsByTagQuery } from 'services/api/endpoints/workflows';
 import type { S } from 'services/api/types';
 
 export const WorkflowLibrarySideNav = () => {
@@ -93,9 +93,6 @@ export const WorkflowLibrarySideNav = () => {
         <CategoryButton isSelected={isRecentWorkflowsSelected} onClick={selectRecentWorkflows}>
           {t('workflows.recentlyOpened')}
         </CategoryButton>
-        <Flex flexDir="column" gap={2} pl={4}>
-          <RecentWorkflows />
-        </Flex>
       </Flex>
       <Flex flexDir="column" w="full" pb={2}>
         <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
@@ -166,36 +163,6 @@ export const WorkflowLibrarySideNav = () => {
     </Flex>
   );
 };
-
-const recentWorkflowsQueryArg = {
-  page: 0,
-  per_page: 5,
-  order_by: 'opened_at',
-  direction: 'DESC',
-  is_recent: true,
-} satisfies Parameters<typeof useListWorkflowsQuery>[0];
-
-const RecentWorkflows = memo(() => {
-  const { t } = useTranslation();
-  const { data, isLoading } = useListWorkflowsQuery(recentWorkflowsQueryArg);
-
-  if (isLoading || !data) {
-    return <Text variant="subtext">{t('common.loading')}</Text>;
-  }
-
-  if (data.items.length === 0) {
-    return <Text variant="subtext" p={4}>{t('workflows.noRecentWorkflows')}</Text>;
-  }
-
-  return (
-    <>
-      {data.items.map((workflow) => {
-        return <RecentWorkflowButton key={workflow.workflow_id} workflow={workflow} />;
-      })}
-    </>
-  );
-});
-RecentWorkflows.displayName = 'RecentWorkflows';
 
 const useCountForIndividualTag = (tag: string) => {
   const allTags = useStore($workflowLibraryTagOptions);
