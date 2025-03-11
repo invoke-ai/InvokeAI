@@ -23,7 +23,7 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
         ui_component=UIComponent.Textarea,
     )
     vllm_model: ModelIdentifierField = InputField(
-        title="Image-to-Image Model",
+        title="LLaVA Model Type",
         description=FieldDescriptions.vllm_model,
         ui_type=UIType.LlavaOnevisionModel,
     )
@@ -39,10 +39,7 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> StringOutput:
         images = self._get_images(context)
 
-        # with context.models.load(self.vllm_model) as vllm_model:
-        with context.models.load_by_attrs(
-            name="LLaVA Onevision Qwen2 0.5B", base=BaseModelType.Any, type=ModelType.LlavaOnevision
-        ) as vllm_model:
+        with context.models.load(self.vllm_model) as vllm_model:
             assert isinstance(vllm_model, LlavaOnevisionModel)
             output = vllm_model.run(
                 prompt=self.prompt,
