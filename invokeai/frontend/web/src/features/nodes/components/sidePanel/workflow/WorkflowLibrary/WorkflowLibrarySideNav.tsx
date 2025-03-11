@@ -8,8 +8,10 @@ import {
   $workflowLibraryTagCategoriesOptions,
   $workflowLibraryTagOptions,
   selectWorkflowLibraryCategories,
+  selectWorkflowLibraryShowOpenedWorkflowsOnly,
   selectWorkflowLibraryTags,
   workflowLibraryCategoriesChanged,
+  workflowLibraryShowOpenedWorkflowsOnlyChanged,
   workflowLibraryTagsReset,
   workflowLibraryTagToggled,
 } from 'features/nodes/store/workflowLibrarySlice';
@@ -24,27 +26,36 @@ import { useGetCountsByTagQuery, useListWorkflowsQuery } from 'services/api/endp
 import type { S } from 'services/api/types';
 
 export const WorkflowLibrarySideNav = () => {
-  const { t } = useTranslation();
   const dispatch = useDispatch();
   const categories = useAppSelector(selectWorkflowLibraryCategories);
   const categoryOptions = useStore($workflowLibraryCategoriesOptions);
   const tags = useAppSelector(selectWorkflowLibraryTags);
+  const showOpenedWorkflowsOnly = useAppSelector(selectWorkflowLibraryShowOpenedWorkflowsOnly);
   const tagCategoryOptions = useStore($workflowLibraryTagCategoriesOptions);
 
   const selectYourWorkflows = useCallback(() => {
     dispatch(workflowLibraryCategoriesChanged(categoryOptions.includes('project') ? ['user', 'project'] : ['user']));
+    dispatch(workflowLibraryShowOpenedWorkflowsOnlyChanged(false));
   }, [categoryOptions, dispatch]);
 
   const selectPrivateWorkflows = useCallback(() => {
     dispatch(workflowLibraryCategoriesChanged(['user']));
+    dispatch(workflowLibraryShowOpenedWorkflowsOnlyChanged(false));
   }, [dispatch]);
 
   const selectSharedWorkflows = useCallback(() => {
     dispatch(workflowLibraryCategoriesChanged(['project']));
+    dispatch(workflowLibraryShowOpenedWorkflowsOnlyChanged(false));
   }, [dispatch]);
 
   const selectDefaultWorkflows = useCallback(() => {
     dispatch(workflowLibraryCategoriesChanged(['default']));
+    dispatch(workflowLibraryShowOpenedWorkflowsOnlyChanged(false));
+  }, [dispatch]);
+
+  const selectRecentWorkflows = useCallback(() => {
+    dispatch(workflowLibraryCategoriesChanged(['default', 'user', 'project']));
+    dispatch(workflowLibraryShowOpenedWorkflowsOnlyChanged(true));
   }, [dispatch]);
 
   const resetTags = useCallback(() => {
@@ -53,38 +64,35 @@ export const WorkflowLibrarySideNav = () => {
 
   const isYourWorkflowsSelected = useMemo(() => {
     if (categoryOptions.includes('project')) {
-      return categories.includes('user') && categories.includes('project');
+      return categories.includes('user') && categories.includes('project') && !showOpenedWorkflowsOnly;
     } else {
-      return categories.includes('user');
+      return categories.includes('user') && !showOpenedWorkflowsOnly;
     }
-  }, [categoryOptions, categories]);
+  }, [categoryOptions, categories, showOpenedWorkflowsOnly]);
 
   const isPrivateWorkflowsExclusivelySelected = useMemo(() => {
-    return categories.length === 1 && categories.includes('user');
-  }, [categories]);
+    return categories.length === 1 && categories.includes('user') && !showOpenedWorkflowsOnly;
+  }, [categories, showOpenedWorkflowsOnly]);
 
   const isSharedWorkflowsExclusivelySelected = useMemo(() => {
-    return categories.length === 1 && categories.includes('project');
-  }, [categories]);
+    return categories.length === 1 && categories.includes('project') && !showOpenedWorkflowsOnly;
+  }, [categories, showOpenedWorkflowsOnly]);
 
   const isDefaultWorkflowsExclusivelySelected = useMemo(() => {
-    return categories.length === 1 && categories.includes('default');
-  }, [categories]);
+    return categories.length === 1 && categories.includes('default') && !showOpenedWorkflowsOnly;
+  }, [categories, showOpenedWorkflowsOnly]);
+
+  const isRecentWorkflowsSelected = useMemo(() => {
+    return categories.length === 3 && showOpenedWorkflowsOnly;
+  }, [categories, showOpenedWorkflowsOnly]);
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={1}>
       <Flex flexDir="column" w="full" pb={2}>
-        <Text px={3} py={2} fontSize="md" fontWeight="semibold">
-          {t('workflows.recentlyOpened')}
-        </Text>
-        <Flex flexDir="column" gap={2} pl={4}>
-          <RecentWorkflows />
-        </Flex>
+        <CategoryButton isSelected={isRecentWorkflowsSelected} onClick={selectRecentWorkflows}></CategoryButton>
       </Flex>
       <Flex flexDir="column" w="full" pb={2}>
-        <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}>
-          {t('workflows.yourWorkflows')}
-        </CategoryButton>
+        <CategoryButton isSelected={isYourWorkflowsSelected} onClick={selectYourWorkflows}></CategoryButton>
         {categoryOptions.includes('project') && (
           <Collapse
             in={
@@ -96,16 +104,13 @@ export const WorkflowLibrarySideNav = () => {
                 size="sm"
                 onClick={selectPrivateWorkflows}
                 isSelected={isPrivateWorkflowsExclusivelySelected}
-              >
-                {t('workflows.private')}
-              </CategoryButton>
+              ></CategoryButton>
               <CategoryButton
                 size="sm"
                 rightIcon={<PiUsersBold />}
                 onClick={selectSharedWorkflows}
                 isSelected={isSharedWorkflowsExclusivelySelected}
               >
-                {t('workflows.shared')}
                 <Spacer />
               </CategoryButton>
             </Flex>
@@ -113,9 +118,10 @@ export const WorkflowLibrarySideNav = () => {
         )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
-        <CategoryButton isSelected={isDefaultWorkflowsExclusivelySelected} onClick={selectDefaultWorkflows}>
-          {t('workflows.browseWorkflows')}
-        </CategoryButton>
+        <CategoryButton
+          isSelected={isDefaultWorkflowsExclusivelySelected}
+          onClick={selectDefaultWorkflows}
+        ></CategoryButton>
         <Collapse in={isDefaultWorkflowsExclusivelySelected}>
           <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden" h="100%" minH={0}>
             <Button
@@ -129,9 +135,7 @@ export const WorkflowLibrarySideNav = () => {
               flexShrink={0}
               leftIcon={<PiArrowCounterClockwiseBold />}
               h={8}
-            >
-              {t('workflows.deselectAll')}
-            </Button>
+            ></Button>
             <Flex flexDir="column" gap={2} overflow="auto">
               {tagCategoryOptions.map((tagCategory) => (
                 <TagCategory
@@ -163,11 +167,11 @@ const RecentWorkflows = memo(() => {
   const { t } = useTranslation();
   const { data, isLoading } = useListWorkflowsQuery(recentWorkflowsQueryArg);
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <Text variant="subtext">{t('common.loading')}</Text>;
   }
 
-  if (!data) {
+  if (data.items.length === 0) {
     return <Text variant="subtext">{t('workflows.noRecentWorkflows')}</Text>;
   }
 
@@ -212,7 +216,6 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
     () =>
       ({
         tags: allTags,
-        categories: ['default'], // We only allow filtering by tag for default workflows
       }) satisfies Parameters<typeof useGetCountsByTagQuery>[0],
     [allTags]
   );

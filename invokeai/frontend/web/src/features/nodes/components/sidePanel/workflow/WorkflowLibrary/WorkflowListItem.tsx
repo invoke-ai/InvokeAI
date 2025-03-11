@@ -13,7 +13,6 @@ import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types'
 import { DeleteWorkflow } from './WorkflowLibraryListItemActions/DeleteWorkflow';
 import { DownloadWorkflow } from './WorkflowLibraryListItemActions/DownloadWorkflow';
 import { EditWorkflow } from './WorkflowLibraryListItemActions/EditWorkflow';
-import { SaveWorkflow } from './WorkflowLibraryListItemActions/SaveWorkflow';
 import { ViewWorkflow } from './WorkflowLibraryListItemActions/ViewWorkflow';
 
 const IMAGE_THUMBNAIL_SIZE = '80px';
@@ -81,19 +80,32 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         minWidth={IMAGE_THUMBNAIL_SIZE}
         borderRadius="base"
       />
-      <Flex flexDir="column" gap={1} justifyContent="flex-start">
-        <Flex gap={4} alignItems="center">
-          <Text noOfLines={2}>{workflow.name}</Text>
+      <Flex flexDir="column" gap={1} justifyContent="space-between">
+        <Flex flexDir="column" gap={1}>
+          <Flex gap={4} alignItems="center">
+            <Text noOfLines={2}>{workflow.name}</Text>
 
-          {isActive && (
-            <Badge color="invokeBlue.400" borderColor="invokeBlue.700" borderWidth={1} bg="transparent" flexShrink={0}>
-              {t('workflows.opened')}
-            </Badge>
-          )}
+            {isActive && (
+              <Badge
+                color="invokeBlue.400"
+                borderColor="invokeBlue.700"
+                borderWidth={1}
+                bg="transparent"
+                flexShrink={0}
+              >
+                {t('workflows.opened')}
+              </Badge>
+            )}
+          </Flex>
+          <Text variant="subtext" fontSize="xs" noOfLines={2}>
+            {workflow.description}
+          </Text>
         </Flex>
-        <Text variant="subtext" fontSize="xs" noOfLines={2}>
-          {workflow.description}
-        </Text>
+        {workflow.opened_at && (
+          <Text variant="subtext" fontSize="xs" noOfLines={2} justifySelf="flex-end">
+            {t('workflows.opened')}: {new Date(workflow.opened_at).toLocaleString()}
+          </Text>
+        )}
       </Flex>
 
       <Spacer />
@@ -114,13 +126,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
           right={0}
           bottom={0}
         >
-          {workflow.category === 'default' && (
-            <>
-              {/* need to consider what is useful here and which icons show that. idea is to "try it out"/"view" or "clone for your own changes" */}
-              <ViewWorkflow workflowId={workflow.workflow_id} />
-              <SaveWorkflow workflowId={workflow.workflow_id} />
-            </>
-          )}
+          {workflow.category === 'default' && <ViewWorkflow workflowId={workflow.workflow_id} />}
           {workflow.category !== 'default' && (
             <>
               <EditWorkflow workflowId={workflow.workflow_id} />
