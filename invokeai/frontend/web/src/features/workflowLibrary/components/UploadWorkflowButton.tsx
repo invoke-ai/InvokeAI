@@ -38,7 +38,13 @@ export const UploadWorkflowButton = memo(() => {
   });
   return (
     <>
-      <Button leftIcon={<PiUploadSimpleBold />} {...getRootProps()} pointerEvents="auto" variant="ghost">
+      <Button
+        leftIcon={<PiUploadSimpleBold />}
+        {...getRootProps()}
+        pointerEvents="auto"
+        variant="ghost"
+        justifyContent="flex-start"
+      >
         {t('workflows.uploadWorkflow')}
       </Button>
 
