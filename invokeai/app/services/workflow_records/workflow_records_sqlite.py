@@ -240,6 +240,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self,
         tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
+        has_been_opened: Optional[bool] = None,
     ) -> dict[str, int]:
         if not tags:
             return {}
@@ -256,6 +257,11 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             placeholders = ", ".join("?" for _ in categories)
             base_conditions.append(f"category IN ({placeholders})")
             base_params.extend([category.value for category in categories])
+
+        if has_been_opened:
+            base_conditions.append("opened_at IS NOT NULL")
+        elif has_been_opened is False:
+            base_conditions.append("opened_at IS NULL")
 
         # For each tag to count, run a separate query
         for tag in tags:
@@ -279,6 +285,54 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             cursor.execute(stmt, params)
             count = cursor.fetchone()[0]
             result[tag] = count
+
+        return result
+
+    def counts_by_category(
+        self,
+        categories: list[WorkflowCategory],
+        has_been_opened: Optional[bool] = None,
+    ) -> dict[str, int]:
+        cursor = self._conn.cursor()
+        result: dict[str, int] = {}
+        # Base conditions for categories
+        base_conditions: list[str] = []
+        base_params: list[str | int] = []
+
+        # Add category conditions
+        if categories:
+            assert all(c in WorkflowCategory for c in categories)
+            placeholders = ", ".join("?" for _ in categories)
+            base_conditions.append(f"category IN ({placeholders})")
+            base_params.extend([category.value for category in categories])
+
+        if has_been_opened:
+            base_conditions.append("opened_at IS NOT NULL")
+        elif has_been_opened is False:
+            base_conditions.append("opened_at IS NULL")
+
+        # For each category to count, run a separate query
+        for category in categories:
+            # Start with the base conditions
+            conditions = base_conditions.copy()
+            params = base_params.copy()
+
+            # Add this specific category condition
+            conditions.append("category = ?")
+            params.append(category.value)
+
+            # Construct the full query
+            stmt = """--sql
+                SELECT COUNT(*)
+                FROM workflow_library
+                """
+
+            if conditions:
+                stmt += " WHERE " + " AND ".join(conditions)
+
+            cursor.execute(stmt, params)
+            count = cursor.fetchone()[0]
+            result[category.value] = count
 
         return result
 

@@ -52,10 +52,20 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
+    def counts_by_category(
+        self,
+        categories: list[WorkflowCategory],
+        has_been_opened: Optional[bool] = None,
+    ) -> dict[str, int]:
+        """Gets a dictionary of counts for each of the provided categories."""
+        pass
+
+    @abstractmethod
     def counts_by_tag(
         self,
         tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
+        has_been_opened: Optional[bool] = None,
     ) -> dict[str, int]:
         """Gets a dictionary of counts for each of the provided tags."""
         pass
