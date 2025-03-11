@@ -24301,7 +24301,7 @@ export interface operations {
                 /** @description The text to query by (matches name and description) */
                 query?: string | null;
                 /** @description Whether to include/exclude recent workflows */
-                is_recent?: boolean | null;
+                has_been_opened?: boolean | null;
             };
             header?: never;
             path?: never;
