@@ -183,21 +183,55 @@ RecentWorkflows.displayName = 'RecentWorkflows';
 const useCountForIndividualTag = (tag: string) => {
   const allTags = useStore($workflowLibraryTagOptions);
   const tags = useAppSelector(selectWorkflowLibraryTags);
-  const queryArg = useMemo<Parameters<typeof useGetTagCountsWithFilterQuery>[0]>(
-    () => ({
-      tags_to_count: allTags,
-      selected_tags: tags,
-      categories: ['default'], // We only allow filtering by tag for default workflows
-    }),
+  const queryArg = useMemo(
+    () =>
+      ({
+        tags_to_count: allTags,
+        selected_tags: tags,
+        categories: ['default'], // We only allow filtering by tag for default workflows
+      }) satisfies Parameters<typeof useGetTagCountsWithFilterQuery>[0],
     [allTags, tags]
   );
-  const queryOptions = useMemo<Parameters<typeof useGetTagCountsWithFilterQuery>[1]>(
-    () => ({
-      selectFromResult: ({ data }) => ({
-        count: data?.[tag] ?? 0,
-      }),
-    }),
+  const queryOptions = useMemo(
+    () =>
+      ({
+        selectFromResult: ({ data }) => ({
+          count: data?.[tag] ?? 0,
+        }),
+      }) satisfies Parameters<typeof useGetTagCountsWithFilterQuery>[1],
     [tag]
+  );
+
+  const { count } = useGetTagCountsWithFilterQuery(queryArg, queryOptions);
+
+  return count;
+};
+
+const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
+  const allTags = useStore($workflowLibraryTagOptions);
+  const tags = useAppSelector(selectWorkflowLibraryTags);
+  const queryArg = useMemo(
+    () =>
+      ({
+        tags_to_count: allTags,
+        selected_tags: tags,
+        categories: ['default'], // We only allow filtering by tag for default workflows
+      }) satisfies Parameters<typeof useGetTagCountsWithFilterQuery>[0],
+    [allTags, tags]
+  );
+  const queryOptions = useMemo(
+    () =>
+      ({
+        selectFromResult: ({ data }) => {
+          if (!data) {
+            return { count: 0 };
+          }
+          return {
+            count: tagCategory.tags.reduce((acc, tag) => acc + (data[tag] ?? 0), 0),
+          };
+        },
+      }) satisfies Parameters<typeof useGetTagCountsWithFilterQuery>[1],
+    [tagCategory]
   );
 
   const { count } = useGetTagCountsWithFilterQuery(queryArg, queryOptions);
@@ -248,6 +282,11 @@ CategoryButton.displayName = 'NavButton';
 
 const TagCategory = memo(({ tagCategory, isDisabled }: { tagCategory: WorkflowTagCategory; isDisabled: boolean }) => {
   const { t } = useTranslation();
+  const count = useCountForTagCategory(tagCategory);
+
+  if (count === 0) {
+    return null;
+  }
 
   return (
     <Flex flexDir="column" gap={2}>
@@ -273,6 +312,10 @@ const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: string }) => 
   const onChange = useCallback(() => {
     dispatch(workflowLibraryTagToggled(tag));
   }, [dispatch, tag]);
+
+  if (count === 0) {
+    return null;
+  }
 
   return (
     <Checkbox isChecked={isSelected} onChange={onChange} {...rest} flexShrink={0}>
