@@ -9,13 +9,22 @@ class Migration18Callback:
 
     def _make_workflow_opened_at_nullable(self, cursor: sqlite3.Cursor) -> None:
         """
-        - Makes the `opened_at` column on workflow library table nullable by adding a new column
-        and deprecating the old one.
+        Make the `opened_at` column nullable in the `workflow_library` table. This is accomplished by:
+            - Renaming the existing column to `opened_at_deprecated`
+            - Drop the existing `idx_workflow_library_opened_at` index
+            - Adding a new nullable column `opened_at` (no data migration needed, all values will be NULL)
+            - Recreate the `idx_workflow_library_opened_at` index on the `opened_at` column
         """
         # Rename existing column to deprecated
         cursor.execute("ALTER TABLE workflow_library RENAME COLUMN opened_at TO opened_at_deprecated;")
-        # Add new nullable column
+        # For index renaming in SQLite, we need to drop and recreate
+        cursor.execute("DROP INDEX IF EXISTS idx_workflow_library_opened_at;")
+        # Add new nullable column - all values will be NULL - no migration of data needed
         cursor.execute("ALTER TABLE workflow_library ADD COLUMN opened_at DATETIME;")
+        # Create new index on the new column
+        cursor.execute(
+            "CREATE INDEX idx_workflow_library_opened_at ON workflow_library(opened_at);",
+        )
 
 
 def build_migration_18() -> Migration:
@@ -23,7 +32,11 @@ def build_migration_18() -> Migration:
     Build the migration from database version 17 to 18.
 
     This migration does the following:
-        - Makes the `opened_at` column on workflow library table nullable.
+        - Make the `opened_at` column nullable in the `workflow_library` table. This is accomplished by:
+            - Renaming the existing column to `opened_at_deprecated`
+            - Drop the existing `idx_workflow_library_opened_at` index
+            - Adding a new nullable column `opened_at` (no data migration needed, all values will be NULL)
+            - Recreate the `idx_workflow_library_opened_at` index on the `opened_at` column
     """
     migration_18 = Migration(
         from_version=17,
