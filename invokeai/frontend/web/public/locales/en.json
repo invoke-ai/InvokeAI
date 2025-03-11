@@ -1695,7 +1695,7 @@
         "private": "Private",
         "shared": "Shared",
         "browseWorkflows": "Browse Workflows",
-        "resetFilters": "Reset Filters",
+        "deselectAll": "Deselect All",
         "opened": "Opened",
         "openWorkflow": "Open Workflow",
         "updated": "Updated",
