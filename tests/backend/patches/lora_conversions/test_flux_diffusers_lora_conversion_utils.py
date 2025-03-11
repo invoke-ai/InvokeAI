@@ -1,7 +1,6 @@
-import unittest.mock
 import pytest
 import torch
-import unittest
+from unittest import mock
 
 
 from invokeai.backend.patches.layers.utils import swap_shift_scale_for_linear_weight
@@ -159,7 +158,7 @@ def test_adaLN_should_be_approximated_if_present_while_converting():
     adaLN_layer_key = 'final_layer.adaLN_modulation.1'
     prefixed_layer_key = FLUX_LORA_TRANSFORMER_PREFIX + adaLN_layer_key
 
-    with unittest.mock.patch(
+    with mock.patch(
         'invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils.approximate_flux_adaLN_lora_layer_from_diffusers_state_dict'
     ) as mock_approximate_func:
         model = lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
