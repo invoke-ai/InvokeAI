@@ -46,7 +46,7 @@ class WorkflowRecordsStorageBase(ABC):
         per_page: Optional[int],
         query: Optional[str],
         tags: Optional[list[str]],
-        is_recent: Optional[bool],
+        has_been_opened: Optional[bool],
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass
