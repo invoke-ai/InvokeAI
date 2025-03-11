@@ -19,15 +19,6 @@ export const workflowsApi = api.injectEndpoints({
     >({
       query: (workflow_id) => buildWorkflowsUrl(`i/${workflow_id}`),
       providesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }, 'FetchOnReconnect'],
-      onQueryStarted: async (arg, api) => {
-        const { dispatch, queryFulfilled } = api;
-        try {
-          await queryFulfilled;
-          dispatch(workflowsApi.util.invalidateTags([{ type: 'WorkflowsRecent', id: LIST_TAG }]));
-        } catch {
-          // no-op
-        }
-      },
     }),
     deleteWorkflow: build.mutation<void, string>({
       query: (workflow_id) => ({
@@ -37,7 +28,6 @@ export const workflowsApi = api.injectEndpoints({
       invalidatesTags: (result, error, workflow_id) => [
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow_id },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
       ],
     }),
     createWorkflow: build.mutation<
@@ -49,10 +39,7 @@ export const workflowsApi = api.injectEndpoints({
         method: 'POST',
         body: { workflow },
       }),
-      invalidatesTags: [
-        { type: 'Workflow', id: LIST_TAG },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
-      ],
+      invalidatesTags: [{ type: 'Workflow', id: LIST_TAG }],
     }),
     updateWorkflow: build.mutation<
       paths['/api/v1/workflows/i/{workflow_id}']['patch']['responses']['200']['content']['application/json'],
@@ -64,7 +51,6 @@ export const workflowsApi = api.injectEndpoints({
         body: { workflow },
       }),
       invalidatesTags: (response, error, workflow) => [
-        { type: 'WorkflowsRecent', id: LIST_TAG },
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow.id },
       ],
@@ -126,20 +112,14 @@ export const workflowsApi = api.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: (result, error, { workflow_id }) => [
-        { type: 'Workflow', id: workflow_id },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
-      ],
+      invalidatesTags: (result, error, { workflow_id }) => [{ type: 'Workflow', id: workflow_id }],
     }),
     deleteWorkflowThumbnail: build.mutation<void, string>({
       query: (workflow_id) => ({
         url: buildWorkflowsUrl(`i/${workflow_id}/thumbnail`),
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, workflow_id) => [
-        { type: 'Workflow', id: workflow_id },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
-      ],
+      invalidatesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }],
     }),
   }),
 });
