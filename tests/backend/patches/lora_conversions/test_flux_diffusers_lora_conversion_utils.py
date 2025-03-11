@@ -1,9 +1,12 @@
 import pytest
 import torch
 
+
+from invokeai.backend.patches.layers.utils import swap_shift_scale_for_linear_weight
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
+    approximate_flux_adaLN_lora_layer_from_diffusers_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
@@ -97,3 +100,55 @@ def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
     # Check that an error is raised.
     with pytest.raises(AssertionError):
         lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
+
+
+@pytest.mark.parametrize("layer_sd_keys",[
+    {}, # no keys
+    {'lora_A.weight': [1024, 8], 'lora_B.weight': [8, 512]}, # wrong keys
+    {'lora_up.weight': [1024, 8],}, # missing key
+    {'lora_down.weight': [8, 512],}, # missing key
+])
+def test_approximate_adaLN_from_state_dict_should_only_accept_vanilla_LoRA_format(layer_sd_keys: dict[str, list[int]]):
+    """Should only accept the valid state dict"""
+    layer_state_dict = keys_to_mock_state_dict(layer_sd_keys)
+
+    with pytest.raises(ValueError):
+        approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(layer_state_dict)
+
+
+@pytest.mark.parametrize("dtype, rtol", [
+   (torch.float32, 1e-4),
+   (torch.half, 1e-3),
+])
+def test_approximate_adaLN_from_state_dict_should_work(dtype: torch.dtype, rtol: float, rate: float = 0.99):
+    """Test that we should approximate good enough adaLN layer from diffusers state dict.
+    This should tolorance some kind of errorness respect to input dtype"""
+    input_dim = 1024
+    output_dim = 512
+    rank = 8  # Low rank
+    total = input_dim * output_dim
+
+    up = torch.randn(input_dim, rank, dtype=dtype)
+    down = torch.randn(rank, output_dim, dtype=dtype)
+
+    layer_state_dict = {
+        'lora_up.weight': up,
+        'lora_down.weight': down
+    }
+
+    # XXX Layer patcher cast things to f32
+    original = up.float() @ down.float()
+    swapped = swap_shift_scale_for_linear_weight(original)
+
+    layer = approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(layer_state_dict)
+    weight = layer.get_weight(original).float()
+
+    print(weight.dtype, swapped.dtype, layer.up.dtype)
+
+    close_count = torch.isclose(weight, swapped, rtol=rtol).sum().item()
+    close_rate = close_count / total
+
+    assert close_rate > rate
+
+
+
