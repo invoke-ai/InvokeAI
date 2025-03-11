@@ -21,6 +21,7 @@ from invokeai.app.invocations import *  # noqa: F401 F403
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    InvocationRegistry,
     invocation,
     invocation_output,
 )
@@ -283,7 +284,7 @@ class AnyInvocation(BaseInvocation):
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
         def validate_invocation(v: Any) -> "AnyInvocation":
-            return BaseInvocation.get_typeadapter().validate_python(v)
+            return InvocationRegistry.get_invocation_typeadapter().validate_python(v)
 
         return core_schema.no_info_plain_validator_function(validate_invocation)
 
@@ -294,7 +295,7 @@ class AnyInvocation(BaseInvocation):
         # Nodes are too powerful, we have to make our own OpenAPI schema manually
         # No but really, because the schema is dynamic depending on loaded nodes, we need to generate it manually
         oneOf: list[dict[str, str]] = []
-        names = [i.__name__ for i in BaseInvocation.get_invocations()]
+        names = [i.__name__ for i in InvocationRegistry.get_invocation_classes()]
         for name in sorted(names):
             oneOf.append({"$ref": f"#/components/schemas/{name}"})
         return {"oneOf": oneOf}
@@ -304,7 +305,7 @@ class AnyInvocationOutput(BaseInvocationOutput):
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler):
         def validate_invocation_output(v: Any) -> "AnyInvocationOutput":
-            return BaseInvocationOutput.get_typeadapter().validate_python(v)
+            return InvocationRegistry.get_output_typeadapter().validate_python(v)
 
         return core_schema.no_info_plain_validator_function(validate_invocation_output)
 
@@ -316,7 +317,7 @@ class AnyInvocationOutput(BaseInvocationOutput):
         # No but really, because the schema is dynamic depending on loaded nodes, we need to generate it manually
 
         oneOf: list[dict[str, str]] = []
-        names = [i.__name__ for i in BaseInvocationOutput.get_outputs()]
+        names = [i.__name__ for i in InvocationRegistry.get_output_classes()]
         for name in sorted(names):
             oneOf.append({"$ref": f"#/components/schemas/{name}"})
         return {"oneOf": oneOf}

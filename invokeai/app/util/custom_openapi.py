@@ -4,7 +4,10 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from pydantic.json_schema import models_json_schema
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, UIConfigBase
+from invokeai.app.invocations.baseinvocation import (
+    InvocationRegistry,
+    UIConfigBase,
+)
 from invokeai.app.invocations.fields import InputFieldJSONSchemaExtra, OutputFieldJSONSchemaExtra
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.events.events_common import EventBase
@@ -56,14 +59,14 @@ def get_openapi_func(
         invocation_output_map_required: list[str] = []
 
         # We need to manually add all outputs to the schema - pydantic doesn't add them because they aren't used directly.
-        for output in BaseInvocationOutput.get_outputs():
+        for output in InvocationRegistry.get_output_classes():
             json_schema = output.model_json_schema(mode="serialization", ref_template="#/components/schemas/{model}")
             move_defs_to_top_level(openapi_schema, json_schema)
             openapi_schema["components"]["schemas"][output.__name__] = json_schema
 
         # Technically, invocations are added to the schema by pydantic, but we still need to manually set their output
         # property, so we'll just do it all manually.
-        for invocation in BaseInvocation.get_invocations():
+        for invocation in InvocationRegistry.get_invocation_classes():
             json_schema = invocation.model_json_schema(
                 mode="serialization", ref_template="#/components/schemas/{model}"
             )
