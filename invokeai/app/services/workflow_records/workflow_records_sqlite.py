@@ -282,60 +282,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
         return result
 
-    def get_tag_counts_with_filter(
-        self,
-        tags_to_count: list[str],
-        selected_tags: Optional[list[str]] = None,
-        categories: Optional[list[WorkflowCategory]] = None,
-    ) -> dict[str, int]:
-        if not tags_to_count:
-            return {}
-
-        cursor = self._conn.cursor()
-        result: dict[str, int] = {}
-        selected_tags = selected_tags or []
-
-        # Base conditions for categories and selected tags
-        base_conditions: list[str] = []
-        base_params: list[str | int] = []
-
-        # Add category conditions
-        if categories:
-            assert all(c in WorkflowCategory for c in categories)
-            placeholders = ", ".join("?" for _ in categories)
-            base_conditions.append(f"category IN ({placeholders})")
-            base_params.extend([category.value for category in categories])
-
-        # Add selected tags conditions (AND logic)
-        for tag in selected_tags:
-            base_conditions.append("tags LIKE ?")
-            base_params.append(f"%{tag.strip()}%")
-
-        # For each tag to count, run a separate query
-        for tag in tags_to_count:
-            # Start with the base conditions
-            conditions = base_conditions.copy()
-            params = base_params.copy()
-
-            # Add this specific tag condition
-            conditions.append("tags LIKE ?")
-            params.append(f"%{tag.strip()}%")
-
-            # Construct the full query
-            stmt = """--sql
-                SELECT COUNT(*)
-                FROM workflow_library
-                """
-
-            if conditions:
-                stmt += " WHERE " + " AND ".join(conditions)
-
-            cursor.execute(stmt, params)
-            count = cursor.fetchone()[0]
-            result[tag] = count
-
-        return result
-
     def update_opened_at(self, workflow_id: str) -> None:
         try:
             cursor = self._conn.cursor()
