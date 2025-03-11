@@ -227,10 +227,25 @@ async def get_workflow_thumbnail(
 async def get_counts_by_tag(
     tags: list[str] = Query(description="The tags to get counts for"),
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
+    has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
 ) -> dict[str, int]:
-    """Gets tag counts with a filter"""
+    """Counts workflows by tag"""
 
-    return ApiDependencies.invoker.services.workflow_records.counts_by_tag(tags=tags, categories=categories)
+    return ApiDependencies.invoker.services.workflow_records.counts_by_tag(
+        tags=tags, categories=categories, has_been_opened=has_been_opened
+    )
+
+
+@workflows_router.get("/counts_by_category", operation_id="counts_by_category")
+async def counts_by_category(
+    categories: list[WorkflowCategory] = Query(description="The categories to include"),
+    has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+) -> dict[str, int]:
+    """Counts workflows by category"""
+
+    return ApiDependencies.invoker.services.workflow_records.counts_by_category(
+        categories=categories, has_been_opened=has_been_opened
+    )
 
 
 @workflows_router.put(
