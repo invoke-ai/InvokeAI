@@ -1,5 +1,7 @@
+import unittest.mock
 import pytest
 import torch
+import unittest
 
 
 from invokeai.backend.patches.layers.utils import swap_shift_scale_for_linear_weight
@@ -150,5 +152,20 @@ def test_approximate_adaLN_from_state_dict_should_work(dtype: torch.dtype, rtol:
 
     assert close_rate > rate
 
+def test_adaLN_should_be_approximated_if_present_while_converting():
+    """AdaLN layer should be approximated if existed inside given model"""
+    state_dict = keys_to_mock_state_dict(flux_diffusers_with_norm_out_state_dict_keys)
 
+    adaLN_layer_key = 'final_layer.adaLN_modulation.1'
+    prefixed_layer_key = FLUX_LORA_TRANSFORMER_PREFIX + adaLN_layer_key
 
+    with unittest.mock.patch(
+        'invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils.approximate_flux_adaLN_lora_layer_from_diffusers_state_dict'
+    ) as mock_approximate_func:
+        model = lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
+
+        # Check that the model has the correct number of LoRA layers.
+        assert all(k.startswith(FLUX_LORA_TRANSFORMER_PREFIX) for k in model.layers.keys())
+
+        assert prefixed_layer_key in model.layers.keys()
+        assert mock_approximate_func.call_count == 1
