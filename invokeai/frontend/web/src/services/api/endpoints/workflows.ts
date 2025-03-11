@@ -30,7 +30,8 @@ export const workflowsApi = api.injectEndpoints({
         // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow_id },
-        'WorkflowTagCountsWithFilter',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
       ],
     }),
     createWorkflow: build.mutation<
@@ -45,7 +46,8 @@ export const workflowsApi = api.injectEndpoints({
       invalidatesTags: [
         // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
-        'WorkflowTagCountsWithFilter',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
       ],
     }),
     updateWorkflow: build.mutation<
@@ -59,7 +61,8 @@ export const workflowsApi = api.injectEndpoints({
       }),
       invalidatesTags: (response, error, workflow) => [
         { type: 'Workflow', id: workflow.id },
-        'WorkflowTagCountsWithFilter',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
       ],
     }),
     listWorkflows: build.query<
@@ -78,7 +81,16 @@ export const workflowsApi = api.injectEndpoints({
       query: (params) => ({
         url: `${buildWorkflowsUrl('counts_by_tag')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
       }),
-      providesTags: ['WorkflowTagCountsWithFilter'],
+      providesTags: ['WorkflowTagCounts'],
+    }),
+    getCountsByCategory: build.query<
+      paths['/api/v1/workflows/counts_by_category']['get']['responses']['200']['content']['application/json'],
+      NonNullable<paths['/api/v1/workflows/counts_by_category']['get']['parameters']['query']>
+    >({
+      query: (params) => ({
+        url: `${buildWorkflowsUrl('counts_by_category')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
+      }),
+      providesTags: ['WorkflowCategoryCounts'],
     }),
     listWorkflowsInfinite: build.infiniteQuery<
       paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
@@ -151,6 +163,7 @@ export const workflowsApi = api.injectEndpoints({
 export const {
   useUpdateOpenedAtMutation,
   useGetCountsByTagQuery,
+  useGetCountsByCategoryQuery,
   useLazyGetWorkflowQuery,
   useGetWorkflowQuery,
   useCreateWorkflowMutation,

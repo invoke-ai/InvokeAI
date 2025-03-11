@@ -2,33 +2,59 @@ import { Button, Flex, Grid, GridItem, Spacer, Spinner } from '@invoke-ai/ui-lib
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import type { WorkflowLibraryView } from 'features/nodes/store/workflowLibrarySlice';
 import {
-  selectWorkflowLibraryCategories,
   selectWorkflowLibraryDirection,
   selectWorkflowLibraryHasSearchTerm,
   selectWorkflowLibraryOrderBy,
   selectWorkflowLibrarySearchTerm,
-  selectWorkflowLibraryShowOpenedWorkflowsOnly,
-  selectWorkflowLibraryTags,
+  selectWorkflowLibrarySelectedTags,
+  selectWorkflowLibraryView,
 } from 'features/nodes/store/workflowLibrarySlice';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
 import type { S } from 'services/api/types';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 import { useDebounce } from 'use-debounce';
 
 import { WorkflowListItem } from './WorkflowListItem';
 
 const PER_PAGE = 30;
 
+const getCategories = (view: WorkflowLibraryView): WorkflowCategory[] => {
+  switch (view) {
+    case 'defaults':
+      return ['default'];
+    case 'recent':
+      return ['user', 'project', 'default'];
+    case 'yours':
+      return ['user', 'project'];
+    case 'private':
+      return ['user'];
+    case 'shared':
+      return ['project'];
+    default:
+      assert<Equals<typeof view, never>>(false);
+  }
+};
+
+const getHasBeenOpened = (view: WorkflowLibraryView): boolean | undefined => {
+  if (view === 'recent') {
+    return true;
+  }
+  return undefined;
+};
+
 const useInfiniteQueryAry = () => {
-  const categories = useAppSelector(selectWorkflowLibraryCategories);
   const orderBy = useAppSelector(selectWorkflowLibraryOrderBy);
   const direction = useAppSelector(selectWorkflowLibraryDirection);
-  const query = useAppSelector(selectWorkflowLibrarySearchTerm);
-  const tags = useAppSelector(selectWorkflowLibraryTags);
-  const showOpenedWorkflowsOnly = useAppSelector(selectWorkflowLibraryShowOpenedWorkflowsOnly);
-  const [debouncedQuery] = useDebounce(query, 500);
+  const searchTerm = useAppSelector(selectWorkflowLibrarySearchTerm);
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const view = useAppSelector(selectWorkflowLibraryView);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
   const queryArg = useMemo(() => {
     return {
@@ -36,12 +62,12 @@ const useInfiniteQueryAry = () => {
       per_page: PER_PAGE,
       order_by: orderBy ?? 'opened_at',
       direction,
-      categories,
-      query: debouncedQuery,
-      tags: categories.length === 1 && categories.includes('default') ? tags : [],
-      has_been_opened: showOpenedWorkflowsOnly || undefined,
+      categories: getCategories(view),
+      query: debouncedSearchTerm,
+      tags: view === 'defaults' ? selectedTags : [],
+      has_been_opened: getHasBeenOpened(view),
     } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
-  }, [orderBy, direction, categories, debouncedQuery, tags, showOpenedWorkflowsOnly]);
+  }, [orderBy, direction, view, debouncedSearchTerm, selectedTags]);
 
   return queryArg;
 };

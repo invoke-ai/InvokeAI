@@ -5,22 +5,22 @@ import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
+export type WorkflowLibraryView = 'recent' | 'yours' | 'private' | 'shared' | 'defaults';
+
 type WorkflowLibraryState = {
-  searchTerm: string;
+  view: WorkflowLibraryView;
   orderBy: WorkflowRecordOrderBy;
   direction: SQLiteDirection;
-  tags: string[];
-  categories: WorkflowCategory[];
-  showOpenedWorkflowsOnly: boolean;
+  searchTerm: string;
+  selectedTags: string[];
 };
 
 const initialWorkflowLibraryState: WorkflowLibraryState = {
   searchTerm: '',
   orderBy: 'opened_at',
   direction: 'DESC',
-  tags: [],
-  categories: ['user'],
-  showOpenedWorkflowsOnly: false,
+  selectedTags: [],
+  view: 'defaults',
 };
 
 export const workflowLibrarySlice = createSlice({
@@ -36,24 +36,21 @@ export const workflowLibrarySlice = createSlice({
     workflowLibraryDirectionChanged: (state, action: PayloadAction<SQLiteDirection>) => {
       state.direction = action.payload;
     },
-    workflowLibraryCategoriesChanged: (state, action: PayloadAction<WorkflowCategory[]>) => {
-      state.categories = action.payload;
+    workflowLibraryViewChanged: (state, action: PayloadAction<WorkflowLibraryState['view']>) => {
+      state.view = action.payload;
       state.searchTerm = '';
-    },
-    workflowLibraryShowOpenedWorkflowsOnlyChanged: (state, action: PayloadAction<boolean>) => {
-      state.showOpenedWorkflowsOnly = action.payload;
     },
     workflowLibraryTagToggled: (state, action: PayloadAction<string>) => {
       const tag = action.payload;
-      const tags = state.tags;
+      const tags = state.selectedTags;
       if (tags.includes(tag)) {
-        state.tags = tags.filter((t) => t !== tag);
+        state.selectedTags = tags.filter((t) => t !== tag);
       } else {
-        state.tags = [...tags, tag];
+        state.selectedTags = [...tags, tag];
       }
     },
     workflowLibraryTagsReset: (state) => {
-      state.tags = [];
+      state.selectedTags = [];
     },
   },
 });
@@ -62,10 +59,9 @@ export const {
   workflowLibrarySearchTermChanged,
   workflowLibraryOrderByChanged,
   workflowLibraryDirectionChanged,
-  workflowLibraryCategoriesChanged,
-  workflowLibraryShowOpenedWorkflowsOnlyChanged,
   workflowLibraryTagToggled,
   workflowLibraryTagsReset,
+  workflowLibraryViewChanged,
 } = workflowLibrarySlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -86,11 +82,10 @@ export const selectWorkflowLibrarySearchTerm = createWorkflowLibrarySelector(({ 
 export const selectWorkflowLibraryHasSearchTerm = createWorkflowLibrarySelector(({ searchTerm }) => !!searchTerm);
 export const selectWorkflowLibraryOrderBy = createWorkflowLibrarySelector(({ orderBy }) => orderBy);
 export const selectWorkflowLibraryDirection = createWorkflowLibrarySelector(({ direction }) => direction);
-export const selectWorkflowLibraryTags = createWorkflowLibrarySelector(({ tags }) => tags);
-export const selectWorkflowLibraryCategories = createWorkflowLibrarySelector(({ categories }) => categories);
-export const selectWorkflowLibraryShowOpenedWorkflowsOnly = createWorkflowLibrarySelector(({ showOpenedWorkflowsOnly }) => showOpenedWorkflowsOnly);
+export const selectWorkflowLibrarySelectedTags = createWorkflowLibrarySelector(({ selectedTags }) => selectedTags);
+export const selectWorkflowLibraryView = createWorkflowLibrarySelector(({ view }) => view);
 
-export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default'] satisfies WorkflowCategory[];
+export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default', 'project'] satisfies WorkflowCategory[];
 export const $workflowLibraryCategoriesOptions = atom<WorkflowCategory[]>(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);
 
 export type WorkflowTagCategory = { categoryTKey: string; tags: string[] };
