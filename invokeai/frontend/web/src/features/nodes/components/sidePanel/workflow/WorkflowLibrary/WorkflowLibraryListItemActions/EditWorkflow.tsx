@@ -30,7 +30,8 @@ export const EditWorkflow = ({ workflowId }: { workflowId: string }) => {
     <Tooltip label={t('workflows.edit')} closeOnScroll>
       <IconButton
         size="sm"
-        variant="ghost"
+        variant="link"
+        alignSelf="stretch"
         aria-label={t('workflows.edit')}
         onClick={handleClickEdit}
         icon={<PiPencilBold />}

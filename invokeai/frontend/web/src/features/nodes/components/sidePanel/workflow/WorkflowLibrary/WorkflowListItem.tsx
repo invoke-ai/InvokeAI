@@ -15,8 +15,8 @@ import { DownloadWorkflow } from './WorkflowLibraryListItemActions/DownloadWorkf
 import { EditWorkflow } from './WorkflowLibraryListItemActions/EditWorkflow';
 import { ViewWorkflow } from './WorkflowLibraryListItemActions/ViewWorkflow';
 
-const IMAGE_THUMBNAIL_SIZE = '80px';
-const FALLBACK_ICON_SIZE = '24px';
+const IMAGE_THUMBNAIL_SIZE = '108px';
+const FALLBACK_ICON_SIZE = '32px';
 
 const WORKFLOW_ACTION_BUTTONS_CN = 'workflow-action-buttons';
 
@@ -51,87 +51,74 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
 
   return (
     <Flex
+      position="relative"
       role="button"
-      gap={4}
       onClick={handleClickLoad}
       cursor="pointer"
       bg="base.750"
-      p={2}
-      ps={3}
       borderRadius="base"
       w="full"
       alignItems="stretch"
       sx={sx}
+      gap={2}
     >
-      <Image
-        src={workflow.thumbnail_url ?? undefined}
-        fallbackStrategy="beforeLoadOrError"
-        fallback={
-          <Flex
-            height={IMAGE_THUMBNAIL_SIZE}
-            minWidth={IMAGE_THUMBNAIL_SIZE}
-            bg="base.650"
-            borderRadius="base"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Icon color="base.500" as={PiImageBold} boxSize={FALLBACK_ICON_SIZE} />
-          </Flex>
-        }
-        objectFit="cover"
-        objectPosition="50% 50%"
-        height={IMAGE_THUMBNAIL_SIZE}
-        width={IMAGE_THUMBNAIL_SIZE}
-        minHeight={IMAGE_THUMBNAIL_SIZE}
-        minWidth={IMAGE_THUMBNAIL_SIZE}
-        borderRadius="base"
-      />
-      <Flex flexDir="column" gap={1} justifyContent="space-between">
-        <Flex flexDir="column" gap={1}>
-          <Flex gap={4} alignItems="center">
+      <Flex p={2} pr={0}>
+        <Image
+          src={workflow.thumbnail_url ?? undefined}
+          fallbackStrategy="beforeLoadOrError"
+          fallback={<ThumbnailFallback />}
+          objectFit="cover"
+          objectPosition="50% 50%"
+          height={IMAGE_THUMBNAIL_SIZE}
+          width={IMAGE_THUMBNAIL_SIZE}
+          minHeight={IMAGE_THUMBNAIL_SIZE}
+          minWidth={IMAGE_THUMBNAIL_SIZE}
+          borderRadius="base"
+        />
+      </Flex>
+      <Flex flexDir="column" gap={1} justifyContent="space-between" w="full">
+        <Flex flexDir="column" gap={1} alignItems="flex-start" pt={2} pe={2} w="full">
+          <Flex gap={2} alignItems="flex-start" justifyContent="space-between" w="full">
             <Text noOfLines={2}>{workflow.name}</Text>
-
-            {isActive && (
-              <Badge
-                color="invokeBlue.400"
-                borderColor="invokeBlue.700"
-                borderWidth={1}
-                bg="transparent"
-                flexShrink={0}
-              >
-                {t('workflows.opened')}
-              </Badge>
-            )}
+            <Flex gap={2} alignItems="center">
+              {isActive && (
+                <Badge
+                  color="invokeBlue.400"
+                  borderColor="invokeBlue.700"
+                  borderWidth={1}
+                  bg="transparent"
+                  flexShrink={0}
+                  variant="subtle"
+                >
+                  {t('workflows.opened')}
+                </Badge>
+              )}
+              {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
+              {workflow.category === 'default' && (
+                <Image
+                  src={InvokeLogo}
+                  alt="invoke-logo"
+                  w="14px"
+                  h="14px"
+                  minW="14px"
+                  minH="14px"
+                  userSelect="none"
+                  opacity={0.5}
+                />
+              )}
+            </Flex>
           </Flex>
-          <Text variant="subtext" fontSize="xs" noOfLines={2}>
+          <Text variant="subtext" fontSize="xs" noOfLines={3}>
             {workflow.description}
           </Text>
         </Flex>
-        {workflow.opened_at && (
-          <Text variant="subtext" fontSize="xs" noOfLines={2} justifySelf="flex-end">
-            {t('workflows.opened')}: {new Date(workflow.opened_at).toLocaleString()}
-          </Text>
-        )}
-      </Flex>
-
-      <Spacer />
-      <Flex flexDir="column" gap={1} justifyContent="space-between" position="relative">
-        <Flex gap={1} justifyContent="flex-end" w="full" p={2}>
-          {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
-          {workflow.category === 'default' && (
-            <Image src={InvokeLogo} alt="invoke-logo" w="14px" h="14px" minW="14px" minH="14px" userSelect="none" />
+        <Flex className={WORKFLOW_ACTION_BUTTONS_CN} alignItems="center" display="none" h={8}>
+          {workflow.opened_at && (
+            <Text variant="subtext" fontSize="xs" noOfLines={1} justifySelf="flex-end" pb={0.5}>
+              {t('workflows.opened')} {new Date(workflow.opened_at).toLocaleString()}
+            </Text>
           )}
-        </Flex>
-
-        <Flex
-          alignItems="center"
-          gap={1}
-          display="none"
-          className={WORKFLOW_ACTION_BUTTONS_CN}
-          position="absolute"
-          right={0}
-          bottom={0}
-        >
+          <Spacer />
           {workflow.category === 'default' && <ViewWorkflow workflowId={workflow.workflow_id} />}
           {workflow.category !== 'default' && (
             <>
@@ -147,3 +134,19 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   );
 });
 WorkflowListItem.displayName = 'WorkflowListItem';
+
+const ThumbnailFallback = memo(() => {
+  return (
+    <Flex
+      height={IMAGE_THUMBNAIL_SIZE}
+      minWidth={IMAGE_THUMBNAIL_SIZE}
+      bg="base.650"
+      borderRadius="base"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Icon color="base.500" as={PiImageBold} boxSize={FALLBACK_ICON_SIZE} />
+    </Flex>
+  );
+});
+ThumbnailFallback.displayName = 'ThumbnailFallback';
