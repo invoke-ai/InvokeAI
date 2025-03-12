@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { SpinnerIcon } from 'features/gallery/components/ImageContextMenu/SpinnerIcon';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
-import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
+import { useLoadWorkflowFromImage } from 'features/workflowLibrary/hooks/useLoadWorkflowFromImage';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFlowArrowBold } from 'react-icons/pi';
@@ -11,7 +11,7 @@ import { PiFlowArrowBold } from 'react-icons/pi';
 export const ImageMenuItemLoadWorkflow = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
-  const [getAndLoadEmbeddedWorkflow, { isLoading }] = useGetAndLoadEmbeddedWorkflow();
+  const [getAndLoadEmbeddedWorkflow, { isLoading }] = useLoadWorkflowFromImage();
   const hasTemplates = useStore($hasTemplates);
 
   const onClick = useCallback(() => {

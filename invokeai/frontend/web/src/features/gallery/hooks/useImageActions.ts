@@ -17,7 +17,7 @@ import {
 } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
+import { useLoadWorkflowFromImage } from 'features/workflowLibrary/hooks/useLoadWorkflowFromImage';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
@@ -147,7 +147,7 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     });
   }, [metadata, imageDTO]);
 
-  const [getAndLoadEmbeddedWorkflow] = useGetAndLoadEmbeddedWorkflow();
+  const [getAndLoadEmbeddedWorkflow] = useLoadWorkflowFromImage();
 
   const loadWorkflow = useCallback(() => {
     if (!imageDTO.has_workflow || !hasTemplates) {
