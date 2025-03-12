@@ -649,7 +649,7 @@ class ModelInstallService(ModelInstallServiceBase):
         fields = config.model_dump()
 
         try:
-            return ModelConfigBase.classify(model_path, **fields)
+            return ModelConfigBase.classify(model_path=model_path, hash_algo=hash_algo, **fields)
         except InvalidModelConfigException:
             return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
 
