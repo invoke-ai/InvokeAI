@@ -65,15 +65,6 @@ export const workflowsApi = api.injectEndpoints({
         'WorkflowCategoryCounts',
       ],
     }),
-    listWorkflows: build.query<
-      paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
-      NonNullable<paths['/api/v1/workflows/']['get']['parameters']['query']>
-    >({
-      query: (params) => ({
-        url: `${buildWorkflowsUrl()}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
-      }),
-      providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
-    }),
     getCountsByTag: build.query<
       paths['/api/v1/workflows/counts_by_tag']['get']['responses']['200']['content']['application/json'],
       NonNullable<paths['/api/v1/workflows/counts_by_tag']['get']['parameters']['query']>
@@ -169,7 +160,6 @@ export const {
   useCreateWorkflowMutation,
   useDeleteWorkflowMutation,
   useUpdateWorkflowMutation,
-  useListWorkflowsQuery,
   useListWorkflowsInfiniteInfiniteQuery,
   useSetWorkflowThumbnailMutation,
   useDeleteWorkflowThumbnailMutation,
