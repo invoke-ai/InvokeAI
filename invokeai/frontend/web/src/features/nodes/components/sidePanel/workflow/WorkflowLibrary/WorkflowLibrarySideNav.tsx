@@ -1,5 +1,5 @@
 import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
-import { Button, Checkbox, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
+import { Button, Checkbox, Collapse, Flex, Spacer, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { WorkflowLibraryView, WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
@@ -13,8 +13,6 @@ import {
   workflowLibraryTagToggled,
   workflowLibraryViewChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
-import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { memo, useCallback, useMemo } from 'react';
@@ -22,7 +20,6 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
 import { useGetCountsByTagQuery } from 'services/api/endpoints/workflows';
-import type { S } from 'services/api/types';
 
 export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
@@ -154,38 +151,6 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
 
   return count;
 };
-
-const RecentWorkflowButton = memo(({ workflow }: { workflow: S['WorkflowRecordListItemWithThumbnailDTO'] }) => {
-  const dispatch = useAppDispatch();
-  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
-  const load = useCallback(() => {
-    loadWorkflowWithDialog({
-      type: 'library',
-      data: workflow.workflow_id,
-      onSuccess: () => {
-        dispatch(workflowModeChanged('view'));
-      },
-    });
-  }, [dispatch, loadWorkflowWithDialog, workflow.workflow_id]);
-
-  return (
-    <Flex
-      role="button"
-      key={workflow.workflow_id}
-      gap={2}
-      alignItems="center"
-      _hover={{ textDecoration: 'underline' }}
-      color="base.300"
-      onClick={load}
-    >
-      <Text as="span" noOfLines={1} w="full" fontWeight="semibold">
-        {workflow.name}
-      </Text>
-      {workflow.category === 'project' && <Icon as={PiUsersBold} boxSize="12px" />}
-    </Flex>
-  );
-});
-RecentWorkflowButton.displayName = 'RecentWorkflowButton';
 
 const WorkflowLibraryViewButton = memo(({ view, ...rest }: ButtonProps & { view: WorkflowLibraryView }) => {
   const dispatch = useDispatch();
