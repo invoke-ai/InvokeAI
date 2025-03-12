@@ -21,7 +21,8 @@ export const DownloadWorkflow = ({ workflowId }: { workflowId: string }) => {
     <Tooltip label={t('workflows.download')} closeOnScroll>
       <IconButton
         size="sm"
-        variant="ghost"
+        variant="link"
+        alignSelf="stretch"
         aria-label={t('workflows.download')}
         onClick={handleClickDownload}
         icon={<PiDownloadSimpleBold />}

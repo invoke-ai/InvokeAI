@@ -20,7 +20,8 @@ export const DeleteWorkflow = ({ workflowId }: { workflowId: string }) => {
     <Tooltip label={t('workflows.delete')} closeOnScroll>
       <IconButton
         size="sm"
-        variant="ghost"
+        variant="link"
+        alignSelf="stretch"
         aria-label={t('workflows.delete')}
         onClick={handleClickDelete}
         colorScheme="error"
