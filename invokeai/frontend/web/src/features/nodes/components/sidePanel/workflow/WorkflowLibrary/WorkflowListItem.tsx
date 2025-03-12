@@ -7,7 +7,7 @@ import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/L
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImageBold, PiUsersBold } from 'react-icons/pi';
+import { PiImage, PiUsersBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 import { DeleteWorkflow } from './WorkflowLibraryListItemActions/DeleteWorkflow';
@@ -66,7 +66,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
         <Image
           src={workflow.thumbnail_url ?? undefined}
           fallbackStrategy="beforeLoadOrError"
-          fallback={<ThumbnailFallback />}
+          fallback={workflow.category === 'default' ? <DefaultThumbnailFallback /> : <UserThumbnailFallback />}
           objectFit="cover"
           objectPosition="50% 50%"
           height={IMAGE_THUMBNAIL_SIZE}
@@ -135,18 +135,36 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
 });
 WorkflowListItem.displayName = 'WorkflowListItem';
 
-const ThumbnailFallback = memo(() => {
+const UserThumbnailFallback = memo(() => {
   return (
     <Flex
       height={IMAGE_THUMBNAIL_SIZE}
       minWidth={IMAGE_THUMBNAIL_SIZE}
-      bg="base.650"
+      bg="base.600"
       borderRadius="base"
       alignItems="center"
       justifyContent="center"
+      opacity={0.3}
     >
-      <Icon color="base.500" as={PiImageBold} boxSize={FALLBACK_ICON_SIZE} />
+      <Icon as={PiImage} boxSize={FALLBACK_ICON_SIZE} />
     </Flex>
   );
 });
-ThumbnailFallback.displayName = 'ThumbnailFallback';
+UserThumbnailFallback.displayName = 'UserThumbnailFallback';
+
+const DefaultThumbnailFallback = memo(() => {
+  return (
+    <Flex
+      height={IMAGE_THUMBNAIL_SIZE}
+      minWidth={IMAGE_THUMBNAIL_SIZE}
+      bg="base.600"
+      borderRadius="base"
+      alignItems="center"
+      justifyContent="center"
+      opacity={0.3}
+    >
+      <Image src={InvokeLogo} alt="invoke-logo" userSelect="none" boxSize={FALLBACK_ICON_SIZE} p={1} />
+    </Flex>
+  );
+});
+DefaultThumbnailFallback.displayName = 'DefaultThumbnailFallback';
