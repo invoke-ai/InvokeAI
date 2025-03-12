@@ -88,6 +88,7 @@ export const LoadWorkflowConfirmationAlertDialog = memo(() => {
       title={t('nodes.loadWorkflow')}
       acceptCallback={loadWorkflow.loadImmediate}
       useInert={false}
+      acceptButtonText={t('common.load')}
     >
       <Flex flexDir="column" gap={2}>
         <Text>{t('nodes.loadWorkflowDesc')}</Text>
