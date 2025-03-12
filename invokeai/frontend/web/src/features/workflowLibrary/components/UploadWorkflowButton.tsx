@@ -1,5 +1,5 @@
 import { Button } from '@invoke-ai/ui-library';
-import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { memo, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
@@ -7,20 +7,19 @@ import { PiUploadSimpleBold } from 'react-icons/pi';
 
 export const UploadWorkflowButton = memo(() => {
   const { t } = useTranslation();
-  const loadWorkflow = useLoadWorkflow();
+  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
   const onDropAccepted = useCallback(
     ([file]: File[]) => {
       if (!file) {
         return;
       }
-      loadWorkflow.loadWithDialog({
+      loadWorkflowWithDialog({
         type: 'file',
-        file,
-        mode: 'edit',
+        data: file,
       });
     },
-    [loadWorkflow]
+    [loadWorkflowWithDialog]
   );
 
   const { getInputProps, getRootProps } = useDropzone({

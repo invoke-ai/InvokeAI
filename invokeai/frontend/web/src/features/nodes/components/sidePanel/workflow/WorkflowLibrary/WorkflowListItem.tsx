@@ -1,9 +1,9 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ShareWorkflowButton } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/ShareWorkflow';
-import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
-import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,17 +31,23 @@ const sx: SystemStyleObject = {
 
 export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
   const { t } = useTranslation();
-
+  const dispatch = useAppDispatch();
   const workflowId = useAppSelector(selectWorkflowId);
-  const loadWorkflow = useLoadWorkflow();
+  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
   const isActive = useMemo(() => {
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
 
   const handleClickLoad = useCallback(() => {
-    loadWorkflow.loadWithDialog({ type: 'library', workflowId: workflow.workflow_id, mode: 'view' });
-  }, [loadWorkflow, workflow.workflow_id]);
+    loadWorkflowWithDialog({
+      type: 'library',
+      data: workflow.workflow_id,
+      onSuccess: () => {
+        dispatch(workflowModeChanged('view'));
+      },
+    });
+  }, [dispatch, loadWorkflowWithDialog, workflow.workflow_id]);
 
   return (
     <Flex

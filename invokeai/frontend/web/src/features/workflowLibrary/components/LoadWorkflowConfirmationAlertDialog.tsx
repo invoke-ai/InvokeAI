@@ -1,81 +1,121 @@
 import { ConfirmationAlertDialog, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
-import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowIsTouched } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
+import { useLoadWorkflowFromImage } from 'features/workflowLibrary/hooks/useLoadWorkflowFromImage';
 import { useLoadWorkflowFromLibrary } from 'features/workflowLibrary/hooks/useLoadWorkflowFromLibrary';
-import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
+import { useLoadWorkflowFromObject } from 'features/workflowLibrary/hooks/useLoadWorkflowFromObject';
 import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type LoadLibraryWorkflowData = {
+type Callbacks = {
+  onSuccess?: (workflow: WorkflowV3) => void;
+  onError?: () => void;
+  onCompleted?: () => void;
+};
+
+type LoadLibraryWorkflowData = Callbacks & {
   type: 'library';
-  workflowId: string;
-  mode: 'view' | 'edit';
+  data: string;
 };
 
-type LoadDirectWorkflowData = {
+type LoadWorkflowFromObjectData = Callbacks & {
   type: 'direct';
-  workflow: WorkflowV3;
-  mode: 'view' | 'edit';
+  data: WorkflowV3;
 };
 
-type LoadFileWorkflowData = {
+type LoadWorkflowFromFileData = Callbacks & {
   type: 'file';
-  file: File;
-  mode: 'view' | 'edit';
+  data: File;
+};
+
+type LoadWorkflowFromImageData = Callbacks & {
+  type: 'image';
+  data: string;
+};
+
+type DialogStateExtra = {
+  isOpen: boolean;
 };
 
 const $dialogState = atom<
-  | (LoadLibraryWorkflowData & { isOpen: boolean })
-  | (LoadDirectWorkflowData & { isOpen: boolean })
-  | (LoadFileWorkflowData & { isOpen: boolean })
+  | (LoadLibraryWorkflowData & DialogStateExtra)
+  | (LoadWorkflowFromObjectData & DialogStateExtra)
+  | (LoadWorkflowFromFileData & DialogStateExtra)
+  | (LoadWorkflowFromImageData & DialogStateExtra)
   | null
 >(null);
 const cleanup = () => $dialogState.set(null);
 
-export const useLoadWorkflow = () => {
-  const dispatch = useAppDispatch();
+const useLoadImmediate = () => {
   const workflowLibraryModal = useWorkflowLibraryModal();
   const loadWorkflowFromLibrary = useLoadWorkflowFromLibrary();
   const loadWorkflowFromFile = useLoadWorkflowFromFile();
-  const validatedAndLoadWorkflow = useValidateAndLoadWorkflow();
-
-  const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const loadWorkflowFromImage = useLoadWorkflowFromImage();
+  const loadWorkflowFromObject = useLoadWorkflowFromObject();
 
   const loadImmediate = useCallback(async () => {
-    const data = $dialogState.get();
-    if (!data) {
+    const dialogState = $dialogState.get();
+    if (!dialogState) {
       return;
     }
-    if (data.type === 'direct') {
-      const validatedWorkflow = await validatedAndLoadWorkflow(data.workflow);
-      if (validatedWorkflow) {
-        dispatch(workflowModeChanged(data.mode));
-      }
-    } else if (data.type === 'file') {
-      await loadWorkflowFromFile(data.file, {
-        onSuccess: () => {
-          dispatch(workflowModeChanged(data.mode));
-        },
-      });
-    } else {
-      await loadWorkflowFromLibrary(data.workflowId, {
-        onSuccess: () => {
-          dispatch(workflowModeChanged(data.mode));
-        },
-      });
+    const { type, data, onSuccess, onError, onCompleted } = dialogState;
+    const options = {
+      onSuccess,
+      onError,
+      onCompleted,
+    };
+    if (type === 'direct') {
+      await loadWorkflowFromObject(data, options);
+    } else if (type === 'file') {
+      await loadWorkflowFromFile(data, options);
+    } else if (type === 'library') {
+      await loadWorkflowFromLibrary(data, options);
+    } else if (type === 'image') {
+      await loadWorkflowFromImage(data, options);
     }
     cleanup();
     workflowLibraryModal.close();
-  }, [dispatch, loadWorkflowFromFile, loadWorkflowFromLibrary, validatedAndLoadWorkflow, workflowLibraryModal]);
+  }, [
+    loadWorkflowFromFile,
+    loadWorkflowFromImage,
+    loadWorkflowFromLibrary,
+    loadWorkflowFromObject,
+    workflowLibraryModal,
+  ]);
 
-  const loadWithDialog = useCallback(
-    (data: LoadLibraryWorkflowData | LoadDirectWorkflowData | LoadFileWorkflowData) => {
+  return loadImmediate;
+};
+
+/**
+ * Handles loading workflows from various sources. If there are unsaved changes, the user will be prompted to confirm
+ * before loading the workflow.
+ */
+export const useLoadWorkflowWithDialog = () => {
+  const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const loadImmediate = useLoadImmediate();
+
+  const loadWorkflowWithDialog = useCallback(
+    /**
+     * Loads a workflow from various sources. If there are unsaved changes, the user will be prompted to confirm before
+     * loading the workflow. The workflow will be loaded immediately if there are no unsaved changes. On success, error
+     * or completion, the corresponding callback will be called.
+     *
+     * @param data - The data to load the workflow from.
+     * @param data.type - The type of data to load the workflow from.
+     * @param data.data - The data to load the workflow from. The type of this data depends on the `type` field.
+     * @param data.onSuccess - A callback to call when the workflow is successfully loaded.
+     * @param data.onError - A callback to call when an error occurs while loading the workflow.
+     * @param data.onCompleted - A callback to call when the loading process is completed (both success and error).
+     */
+    (
+      data: LoadLibraryWorkflowData | LoadWorkflowFromObjectData | LoadWorkflowFromFileData | LoadWorkflowFromImageData
+    ) => {
       if (!isTouched) {
         $dialogState.set({ ...data, isOpen: false });
         loadImmediate();
@@ -86,24 +126,21 @@ export const useLoadWorkflow = () => {
     [loadImmediate, isTouched]
   );
 
-  return {
-    loadImmediate,
-    loadWithDialog,
-  } as const;
+  return loadWorkflowWithDialog;
 };
 
 export const LoadWorkflowConfirmationAlertDialog = memo(() => {
   useAssertSingleton('LoadWorkflowConfirmationAlertDialog');
   const { t } = useTranslation();
   const workflow = useStore($dialogState);
-  const loadWorkflow = useLoadWorkflow();
+  const loadImmediate = useLoadImmediate();
 
   return (
     <ConfirmationAlertDialog
       isOpen={!!workflow?.isOpen}
       onClose={cleanup}
       title={t('nodes.loadWorkflow')}
-      acceptCallback={loadWorkflow.loadImmediate}
+      acceptCallback={loadImmediate}
       useInert={false}
       acceptButtonText={t('common.load')}
     >

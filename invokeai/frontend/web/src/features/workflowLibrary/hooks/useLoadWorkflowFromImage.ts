@@ -8,19 +8,26 @@ import { useLazyGetImageWorkflowQuery } from 'services/api/endpoints/images';
 import type { NonNullableGraph } from 'services/api/types';
 import { assert } from 'tsafe';
 
+/**
+ * Loads a workflow from an image.
+ *
+ * You probably should instead use `useLoadWorkflowWithDialog`, which opens a dialog to prevent loss of unsaved changes
+ * and handles the loading process.
+ */
 export const useLoadWorkflowFromImage = () => {
   const { t } = useTranslation();
-  const [getWorkflowAndGraphFromImage, result] = useLazyGetImageWorkflowQuery();
+  const [getWorkflowAndGraphFromImage] = useLazyGetImageWorkflowQuery();
   const validateAndLoadWorkflow = useValidateAndLoadWorkflow();
-  const getAndLoadEmbeddedWorkflow = useCallback(
+  const loadWorkflowFromImage = useCallback(
     async (
       imageName: string,
       options: {
         onSuccess?: (workflow: WorkflowV3) => void;
         onError?: () => void;
+        onCompleted?: () => void;
       } = {}
     ) => {
-      const { onSuccess, onError } = options;
+      const { onSuccess, onError, onCompleted } = options;
       try {
         const { workflow, graph } = await getWorkflowAndGraphFromImage(imageName).unwrap();
 
@@ -52,11 +59,12 @@ export const useLoadWorkflowFromImage = () => {
           status: 'error',
         });
         onError?.();
-        return;
+      } finally {
+        onCompleted?.();
       }
     },
     [getWorkflowAndGraphFromImage, validateAndLoadWorkflow, t]
   );
 
-  return [getAndLoadEmbeddedWorkflow, result] as const;
+  return loadWorkflowFromImage;
 };

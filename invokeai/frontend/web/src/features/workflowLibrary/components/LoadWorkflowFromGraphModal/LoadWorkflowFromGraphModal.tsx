@@ -15,7 +15,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
-import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
+import { useLoadWorkflowFromObject } from 'features/workflowLibrary/hooks/useLoadWorkflowFromObject';
 import { atom } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { useCallback, useState } from 'react';
@@ -37,8 +37,8 @@ export const useLoadWorkflowFromGraphModal = () => {
 
 export const LoadWorkflowFromGraphModal = () => {
   const { t } = useTranslation();
-  const validateAndLoadWorkflow = useValidateAndLoadWorkflow();
   const { isOpen, onClose } = useLoadWorkflowFromGraphModal();
+  const loadWorkflowFromObject = useLoadWorkflowFromObject();
   const [graphRaw, setGraphRaw] = useState<string>('');
   const [unvalidatedWorkflow, setUnvalidatedWorkflow] = useState<string>('');
   const [shouldAutoLayout, setShouldAutoLayout] = useState(true);
@@ -57,9 +57,9 @@ export const LoadWorkflowFromGraphModal = () => {
     setUnvalidatedWorkflow(JSON.stringify(workflow, null, 2));
   }, [graphRaw, shouldAutoLayout]);
   const loadWorkflow = useCallback(async () => {
-    await validateAndLoadWorkflow(unvalidatedWorkflow);
+    await loadWorkflowFromObject(unvalidatedWorkflow);
     onClose();
-  }, [validateAndLoadWorkflow, onClose, unvalidatedWorkflow]);
+  }, [loadWorkflowFromObject, unvalidatedWorkflow, onClose]);
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered useInert={false}>
       <ModalOverlay />
