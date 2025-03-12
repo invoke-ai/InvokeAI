@@ -5,6 +5,7 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
+import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { useLoadWorkflowFromLibrary } from 'features/workflowLibrary/hooks/useLoadWorkflowFromLibrary';
 import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { atom } from 'nanostores';
@@ -23,21 +24,31 @@ type LoadDirectWorkflowData = {
   mode: 'view' | 'edit';
 };
 
-const $workflowToLoad = atom<
-  (LoadLibraryWorkflowData & { isOpen: boolean }) | (LoadDirectWorkflowData & { isOpen: boolean }) | null
+type LoadFileWorkflowData = {
+  type: 'file';
+  file: File;
+  mode: 'view' | 'edit';
+};
+
+const $dialogState = atom<
+  | (LoadLibraryWorkflowData & { isOpen: boolean })
+  | (LoadDirectWorkflowData & { isOpen: boolean })
+  | (LoadFileWorkflowData & { isOpen: boolean })
+  | null
 >(null);
-const cleanup = () => $workflowToLoad.set(null);
+const cleanup = () => $dialogState.set(null);
 
 export const useLoadWorkflow = () => {
   const dispatch = useAppDispatch();
   const workflowLibraryModal = useWorkflowLibraryModal();
   const loadWorkflowFromLibrary = useLoadWorkflowFromLibrary();
+  const loadWorkflowFromFile = useLoadWorkflowFromFile();
   const validatedAndLoadWorkflow = useValidateAndLoadWorkflow();
 
   const isTouched = useAppSelector(selectWorkflowIsTouched);
 
   const loadImmediate = useCallback(async () => {
-    const data = $workflowToLoad.get();
+    const data = $dialogState.get();
     if (!data) {
       return;
     }
@@ -46,6 +57,12 @@ export const useLoadWorkflow = () => {
       if (validatedWorkflow) {
         dispatch(workflowModeChanged(data.mode));
       }
+    } else if (data.type === 'file') {
+      await loadWorkflowFromFile(data.file, {
+        onSuccess: () => {
+          dispatch(workflowModeChanged(data.mode));
+        },
+      });
     } else {
       await loadWorkflowFromLibrary(data.workflowId, {
         onSuccess: () => {
@@ -55,15 +72,15 @@ export const useLoadWorkflow = () => {
     }
     cleanup();
     workflowLibraryModal.close();
-  }, [dispatch, loadWorkflowFromLibrary, validatedAndLoadWorkflow, workflowLibraryModal]);
+  }, [dispatch, loadWorkflowFromFile, loadWorkflowFromLibrary, validatedAndLoadWorkflow, workflowLibraryModal]);
 
   const loadWithDialog = useCallback(
-    (data: LoadLibraryWorkflowData | LoadDirectWorkflowData) => {
+    (data: LoadLibraryWorkflowData | LoadDirectWorkflowData | LoadFileWorkflowData) => {
       if (!isTouched) {
-        $workflowToLoad.set({ ...data, isOpen: false });
+        $dialogState.set({ ...data, isOpen: false });
         loadImmediate();
       } else {
-        $workflowToLoad.set({ ...data, isOpen: true });
+        $dialogState.set({ ...data, isOpen: true });
       }
     },
     [loadImmediate, isTouched]
@@ -78,7 +95,7 @@ export const useLoadWorkflow = () => {
 export const LoadWorkflowConfirmationAlertDialog = memo(() => {
   useAssertSingleton('LoadWorkflowConfirmationAlertDialog');
   const { t } = useTranslation();
-  const workflow = useStore($workflowToLoad);
+  const workflow = useStore($dialogState);
   const loadWorkflow = useLoadWorkflow();
 
   return (
