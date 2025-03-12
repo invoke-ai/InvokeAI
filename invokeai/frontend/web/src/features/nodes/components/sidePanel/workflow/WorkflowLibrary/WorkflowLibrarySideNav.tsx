@@ -157,7 +157,7 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
 const RecentWorkflowButton = memo(({ workflow }: { workflow: S['WorkflowRecordListItemWithThumbnailDTO'] }) => {
   const loadWorkflow = useLoadWorkflow();
   const load = useCallback(() => {
-    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
+    loadWorkflow.loadWithDialog({ type: 'library', workflowId: workflow.workflow_id, mode: 'view' });
   }, [loadWorkflow, workflow.workflow_id]);
 
   return (

@@ -12,7 +12,7 @@ export const EditWorkflow = ({ workflowId }: { workflowId: string }) => {
   const handleClickEdit = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      loadWorkflow.loadWithDialog(workflowId, 'edit');
+      loadWorkflow.loadWithDialog({ type: 'library', workflowId, mode: 'view' });
     },
     [loadWorkflow, workflowId]
   );
