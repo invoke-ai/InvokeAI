@@ -2,13 +2,11 @@ import torch
 from PIL.Image import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.fields import ImageField, InputField, UIComponent
+from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, UIComponent, UIType
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.llava_onevision_model import LlavaOnevisionModel
-from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.invocations.fields import FieldDescriptions, UIType
-from invokeai.backend.model_manager.config import BaseModelType, ModelType
 from invokeai.backend.util.devices import TorchDevice
 
 
