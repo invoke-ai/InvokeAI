@@ -40,7 +40,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   }, [workflowId, workflow.workflow_id]);
 
   const handleClickLoad = useCallback(() => {
-    loadWorkflow.loadWithDialog(workflow.workflow_id, 'view');
+    loadWorkflow.loadWithDialog({ type: 'library', workflowId: workflow.workflow_id, mode: 'view' });
   }, [loadWorkflow, workflow.workflow_id]);
 
   return (

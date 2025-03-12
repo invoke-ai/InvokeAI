@@ -12,7 +12,7 @@ export const ViewWorkflow = ({ workflowId }: { workflowId: string }) => {
   const handleClickLoad = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      loadWorkflow.loadWithDialog(workflowId, 'view');
+      loadWorkflow.loadWithDialog({ type: 'library', workflowId, mode: 'view' });
     },
     [loadWorkflow, workflowId]
   );

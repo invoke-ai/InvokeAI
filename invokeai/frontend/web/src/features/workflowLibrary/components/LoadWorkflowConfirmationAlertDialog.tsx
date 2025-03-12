@@ -4,51 +4,66 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { useLoadWorkflowFromLibrary } from 'features/workflowLibrary/hooks/useLoadWorkflowFromLibrary';
+import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const $workflowToLoad = atom<{ workflowId: string; mode: 'view' | 'edit'; isOpen: boolean } | null>(null);
+type LoadLibraryWorkflowData = {
+  type: 'library';
+  workflowId: string;
+  mode: 'view' | 'edit';
+};
+
+type LoadDirectWorkflowData = {
+  type: 'direct';
+  workflow: WorkflowV3;
+  mode: 'view' | 'edit';
+};
+
+const $workflowToLoad = atom<
+  (LoadLibraryWorkflowData & { isOpen: boolean }) | (LoadDirectWorkflowData & { isOpen: boolean }) | null
+>(null);
 const cleanup = () => $workflowToLoad.set(null);
 
 export const useLoadWorkflow = () => {
   const dispatch = useAppDispatch();
   const workflowLibraryModal = useWorkflowLibraryModal();
   const loadWorkflowFromLibrary = useLoadWorkflowFromLibrary();
+  const validatedAndLoadWorkflow = useValidateAndLoadWorkflow();
 
   const isTouched = useAppSelector(selectWorkflowIsTouched);
 
   const loadImmediate = useCallback(async () => {
-    const workflow = $workflowToLoad.get();
-    if (!workflow) {
+    const data = $workflowToLoad.get();
+    if (!data) {
       return;
     }
-    const { workflowId, mode } = workflow;
-    await loadWorkflowFromLibrary(workflowId, {
-      onSuccess: () => {
-        dispatch(workflowModeChanged(mode));
-      },
-    });
+    if (data.type === 'direct') {
+      const validatedWorkflow = await validatedAndLoadWorkflow(data.workflow);
+      if (validatedWorkflow) {
+        dispatch(workflowModeChanged(data.mode));
+      }
+    } else {
+      await loadWorkflowFromLibrary(data.workflowId, {
+        onSuccess: () => {
+          dispatch(workflowModeChanged(data.mode));
+        },
+      });
+    }
     cleanup();
     workflowLibraryModal.close();
-  }, [dispatch, loadWorkflowFromLibrary, workflowLibraryModal]);
+  }, [dispatch, loadWorkflowFromLibrary, validatedAndLoadWorkflow, workflowLibraryModal]);
 
   const loadWithDialog = useCallback(
-    (workflowId: string, mode: 'view' | 'edit') => {
+    (data: LoadLibraryWorkflowData | LoadDirectWorkflowData) => {
       if (!isTouched) {
-        $workflowToLoad.set({
-          workflowId,
-          mode,
-          isOpen: false,
-        });
+        $workflowToLoad.set({ ...data, isOpen: false });
         loadImmediate();
       } else {
-        $workflowToLoad.set({
-          workflowId,
-          mode,
-          isOpen: true,
-        });
+        $workflowToLoad.set({ ...data, isOpen: true });
       }
     },
     [loadImmediate, isTouched]
