@@ -19,7 +19,7 @@ Typical usage:
 Validation errors will raise an InvalidModelConfigException error.
 
 """
-
+# pyright: reportIncompatibleVariableOverride=false
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -270,8 +270,8 @@ class ModelConfigBase(ABC, BaseModel):
         description="Loadable submodels in this model", default=None
     )
 
-    _USING_LEGACY_PROBE: ClassVar[set] = set()
-    _USING_CLASSIFY_API: ClassVar[set] = set()
+    _USING_LEGACY_PROBE: ClassVar[set["type[ModelConfigBase]"]] = set()
+    _USING_CLASSIFY_API: ClassVar[set["type[ModelConfigBase]"]] = set()
     _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.MED
 
     def __init_subclass__(cls, **kwargs):
