@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
-import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
+import { useLoadWorkflowFromLibrary } from 'features/workflowLibrary/hooks/useLoadWorkflowFromLibrary';
 import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ const cleanup = () => $workflowToLoad.set(null);
 export const useLoadWorkflow = () => {
   const dispatch = useAppDispatch();
   const workflowLibraryModal = useWorkflowLibraryModal();
-  const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
+  const loadWorkflowFromLibrary = useLoadWorkflowFromLibrary();
 
   const isTouched = useAppSelector(selectWorkflowIsTouched);
 
@@ -25,11 +25,14 @@ export const useLoadWorkflow = () => {
       return;
     }
     const { workflowId, mode } = workflow;
-    await getAndLoadWorkflow(workflowId);
-    dispatch(workflowModeChanged(mode));
+    await loadWorkflowFromLibrary(workflowId, {
+      onSuccess: () => {
+        dispatch(workflowModeChanged(mode));
+      },
+    });
     cleanup();
     workflowLibraryModal.close();
-  }, [dispatch, getAndLoadWorkflow, workflowLibraryModal]);
+  }, [dispatch, loadWorkflowFromLibrary, workflowLibraryModal]);
 
   const loadWithDialog = useCallback(
     (workflowId: string, mode: 'view' | 'edit') => {

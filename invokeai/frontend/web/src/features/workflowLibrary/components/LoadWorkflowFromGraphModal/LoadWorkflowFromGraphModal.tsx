@@ -15,7 +15,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
-import { useLoadWorkflow } from 'features/workflowLibrary/hooks/useLoadWorkflow';
+import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { atom } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { useCallback, useState } from 'react';
@@ -37,16 +37,16 @@ export const useLoadWorkflowFromGraphModal = () => {
 
 export const LoadWorkflowFromGraphModal = () => {
   const { t } = useTranslation();
-  const _loadWorkflow = useLoadWorkflow();
+  const validateAndLoadWorkflow = useValidateAndLoadWorkflow();
   const { isOpen, onClose } = useLoadWorkflowFromGraphModal();
   const [graphRaw, setGraphRaw] = useState<string>('');
-  const [workflowRaw, setWorkflowRaw] = useState<string>('');
+  const [unvalidatedWorkflow, setUnvalidatedWorkflow] = useState<string>('');
   const [shouldAutoLayout, setShouldAutoLayout] = useState(true);
   const onChangeGraphRaw = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setGraphRaw(e.target.value);
   }, []);
   const onChangeWorkflowRaw = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
-    setWorkflowRaw(e.target.value);
+    setUnvalidatedWorkflow(e.target.value);
   }, []);
   const onChangeShouldAutoLayout = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setShouldAutoLayout(e.target.checked);
@@ -54,12 +54,12 @@ export const LoadWorkflowFromGraphModal = () => {
   const parse = useCallback(() => {
     const graph = JSON.parse(graphRaw);
     const workflow = graphToWorkflow(graph, shouldAutoLayout);
-    setWorkflowRaw(JSON.stringify(workflow, null, 2));
+    setUnvalidatedWorkflow(JSON.stringify(workflow, null, 2));
   }, [graphRaw, shouldAutoLayout]);
-  const loadWorkflow = useCallback(() => {
-    _loadWorkflow({ workflow: workflowRaw, graph: null });
+  const loadWorkflow = useCallback(async () => {
+    await validateAndLoadWorkflow(unvalidatedWorkflow);
     onClose();
-  }, [_loadWorkflow, onClose, workflowRaw]);
+  }, [validateAndLoadWorkflow, onClose, unvalidatedWorkflow]);
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered useInert={false}>
       <ModalOverlay />
@@ -95,7 +95,7 @@ export const LoadWorkflowFromGraphModal = () => {
             <FormLabel>{t('nodes.workflow')}</FormLabel>
             <Textarea
               h="full"
-              value={workflowRaw}
+              value={unvalidatedWorkflow}
               fontFamily="monospace"
               whiteSpace="pre-wrap"
               overflowWrap="normal"
