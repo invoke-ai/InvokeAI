@@ -40,7 +40,8 @@ export const LoadWorkflowFromGraphModal = () => {
   const { isOpen, onClose } = useLoadWorkflowFromGraphModal();
   const loadWorkflowFromObject = useLoadWorkflowFromObject();
   const [graphRaw, setGraphRaw] = useState<string>('');
-  const [unvalidatedWorkflow, setUnvalidatedWorkflow] = useState<string>('');
+  const [unvalidatedWorkflow, setUnvalidatedWorkflow] = useState<unknown>();
+  const [unvalidatedWorkflowAsString, setUnvalidatedWorkflowAsString] = useState<string>('');
   const [shouldAutoLayout, setShouldAutoLayout] = useState(true);
   const onChangeGraphRaw = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
     setGraphRaw(e.target.value);
@@ -54,7 +55,8 @@ export const LoadWorkflowFromGraphModal = () => {
   const parse = useCallback(() => {
     const graph = JSON.parse(graphRaw);
     const workflow = graphToWorkflow(graph, shouldAutoLayout);
-    setUnvalidatedWorkflow(JSON.stringify(workflow, null, 2));
+    setUnvalidatedWorkflow(workflow);
+    setUnvalidatedWorkflowAsString(JSON.stringify(workflow, null, 2));
   }, [graphRaw, shouldAutoLayout]);
   const loadWorkflow = useCallback(async () => {
     await loadWorkflowFromObject(unvalidatedWorkflow);
@@ -95,7 +97,7 @@ export const LoadWorkflowFromGraphModal = () => {
             <FormLabel>{t('nodes.workflow')}</FormLabel>
             <Textarea
               h="full"
-              value={unvalidatedWorkflow}
+              value={unvalidatedWorkflowAsString}
               fontFamily="monospace"
               whiteSpace="pre-wrap"
               overflowWrap="normal"
