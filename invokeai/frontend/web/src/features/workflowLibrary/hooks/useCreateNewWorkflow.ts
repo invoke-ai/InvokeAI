@@ -67,11 +67,11 @@ export const useCreateLibraryWorkflow = (): CreateLibraryWorkflowReturn => {
         dispatch(workflowIDChanged(id));
         dispatch(workflowNameChanged(name));
         dispatch(workflowCategoryChanged(category));
-        dispatch(workflowSaved());
         dispatch(newWorkflowSaved({ category }));
         // When a workflow is saved, the form field initial values are updated to the current form field values
         dispatch(formFieldInitialValuesChanged({ formFieldInitialValues: getFormFieldInitialValues() }));
         updateOpenedAt({ workflow_id: id });
+        dispatch(workflowSaved());
         onSuccess && onSuccess();
         toast.update(toastRef.current, {
           title: t('workflows.workflowSaved'),
