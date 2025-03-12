@@ -917,7 +917,6 @@ export const isLLaVAModelFieldInputInstance = buildInstanceTypeGuard(zLLaVAModel
 export const isLLaVAModelFieldInputTemplate = buildTemplateTypeGuard<LLaVAModelFieldInputTemplate>('LLaVAModelField');
 // #endregion
 
-
 // #region ControlNetModelField
 export const zControlNetModelFieldValue = zModelIdentifierField.optional();
 const zControlNetModelFieldInputInstance = zFieldInputInstanceBase.extend({

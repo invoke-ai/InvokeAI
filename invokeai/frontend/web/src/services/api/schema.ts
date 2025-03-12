@@ -12978,7 +12978,7 @@ export type components = {
              */
             prompt?: string;
             /**
-             * Image-to-Image Model
+             * LLaVA Model Type
              * @description The VLLM model to use
              * @default null
              */

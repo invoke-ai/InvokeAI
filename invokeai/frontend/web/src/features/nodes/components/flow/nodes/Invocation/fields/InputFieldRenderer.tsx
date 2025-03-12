@@ -32,8 +32,6 @@ import {
   isColorFieldInputTemplate,
   isControlLoRAModelFieldInputInstance,
   isControlLoRAModelFieldInputTemplate,
-  isLLaVAModelFieldInputInstance,
-  isLLaVAModelFieldInputTemplate,
   isControlNetModelFieldInputInstance,
   isControlNetModelFieldInputTemplate,
   isEnumFieldInputInstance,
@@ -64,6 +62,8 @@ import {
   isIntegerGeneratorFieldInputTemplate,
   isIPAdapterModelFieldInputInstance,
   isIPAdapterModelFieldInputTemplate,
+  isLLaVAModelFieldInputInstance,
+  isLLaVAModelFieldInputTemplate,
   isLoRAModelFieldInputInstance,
   isLoRAModelFieldInputTemplate,
   isMainModelFieldInputInstance,
@@ -107,7 +107,6 @@ import CLIPGEmbedModelFieldInputComponent from './inputs/CLIPGEmbedModelFieldInp
 import CLIPLEmbedModelFieldInputComponent from './inputs/CLIPLEmbedModelFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import ControlLoRAModelFieldInputComponent from './inputs/ControlLoraModelFieldInputComponent';
-import LLaVAModelFieldInputComponent from './inputs/LLaVAModelFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import FluxMainModelFieldInputComponent from './inputs/FluxMainModelFieldInputComponent';
@@ -115,6 +114,7 @@ import FluxReduxModelFieldInputComponent from './inputs/FluxReduxModelFieldInput
 import FluxVAEModelFieldInputComponent from './inputs/FluxVAEModelFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
+import LLaVAModelFieldInputComponent from './inputs/LLaVAModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
