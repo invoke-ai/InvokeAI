@@ -132,6 +132,7 @@ export const workflowSlice = createSlice({
         elements: { [rootElement.id]: rootElement },
         rootElementId: rootElement.id,
       };
+      state.isTouched = true;
     },
     formElementAdded: (
       state,
@@ -148,29 +149,36 @@ export const workflowSlice = createSlice({
       if (isNodeFieldElement(element)) {
         state.formFieldInitialValues[element.id] = initialValue;
       }
+      state.isTouched = true;
     },
     formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
       const { form } = state;
       const { id } = action.payload;
       removeElement({ form, id });
       delete state.formFieldInitialValues[id];
+      state.isTouched = true;
     },
     formElementReparented: (state, action: PayloadAction<{ id: string; newParentId: string; index: number }>) => {
       const { form } = state;
       const { id, newParentId, index } = action.payload;
       reparentElement({ form, id, newParentId, index });
+      state.isTouched = true;
     },
     formElementHeadingDataChanged: (state, action: FormElementDataChangedAction<HeadingElement>) => {
       formElementDataChangedReducer(state, action, isHeadingElement);
+      state.isTouched = true;
     },
     formElementTextDataChanged: (state, action: FormElementDataChangedAction<TextElement>) => {
       formElementDataChangedReducer(state, action, isTextElement);
+      state.isTouched = true;
     },
     formElementNodeFieldDataChanged: (state, action: FormElementDataChangedAction<NodeFieldElement>) => {
       formElementDataChangedReducer(state, action, isNodeFieldElement);
+      state.isTouched = true;
     },
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
+      state.isTouched = true;
     },
     formFieldInitialValuesChanged: (
       state,
@@ -178,6 +186,7 @@ export const workflowSlice = createSlice({
     ) => {
       const { formFieldInitialValues } = action.payload;
       state.formFieldInitialValues = formFieldInitialValues;
+      state.isTouched = true;
     },
   },
   extraReducers: (builder) => {
