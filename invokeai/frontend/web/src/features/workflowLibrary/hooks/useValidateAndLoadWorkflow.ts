@@ -17,6 +17,21 @@ import { fromZodError } from 'zod-validation-error';
 
 const log = logger('workflows');
 
+/**
+ * This hook manages the lower-level workflow validation and loading process.
+ *
+ * You probably should instead use `useLoadWorkflowWithDialog`, which opens a dialog to prevent loss of unsaved changes
+ * and handles the loading process.
+ *
+ * Internally, `useLoadWorkflowWithDialog` uses these hooks...
+ *
+ * - `useLoadWorkflowFromFile`
+ * - `useLoadWorkflowFromImage`
+ * - `useLoadWorkflowFromLibrary`
+ * - `useLoadWorkflowFromObject`
+ *
+ * ...each of which internally uses hook.
+ */
 export const useValidateAndLoadWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();

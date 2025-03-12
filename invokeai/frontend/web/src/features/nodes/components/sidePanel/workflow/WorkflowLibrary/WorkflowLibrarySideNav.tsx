@@ -13,7 +13,8 @@ import {
   workflowLibraryTagToggled,
   workflowLibraryViewChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
-import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { memo, useCallback, useMemo } from 'react';
@@ -155,10 +156,17 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
 };
 
 const RecentWorkflowButton = memo(({ workflow }: { workflow: S['WorkflowRecordListItemWithThumbnailDTO'] }) => {
-  const loadWorkflow = useLoadWorkflow();
+  const dispatch = useAppDispatch();
+  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
   const load = useCallback(() => {
-    loadWorkflow.loadWithDialog({ type: 'library', workflowId: workflow.workflow_id, mode: 'view' });
-  }, [loadWorkflow, workflow.workflow_id]);
+    loadWorkflowWithDialog({
+      type: 'library',
+      data: workflow.workflow_id,
+      onSuccess: () => {
+        dispatch(workflowModeChanged('view'));
+      },
+    });
+  }, [dispatch, loadWorkflowWithDialog, workflow.workflow_id]);
 
   return (
     <Flex

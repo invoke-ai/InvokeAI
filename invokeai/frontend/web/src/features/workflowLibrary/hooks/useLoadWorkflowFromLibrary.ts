@@ -5,6 +5,12 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLazyGetWorkflowQuery, useUpdateOpenedAtMutation, workflowsApi } from 'services/api/endpoints/workflows';
 
+/**
+ * Loads a workflow from the library.
+ *
+ * You probably should instead use `useLoadWorkflowWithDialog`, which opens a dialog to prevent loss of unsaved changes
+ * and handles the loading process.
+ */
 export const useLoadWorkflowFromLibrary = () => {
   const toast = useToast();
   const { t } = useTranslation();
@@ -17,9 +23,10 @@ export const useLoadWorkflowFromLibrary = () => {
       options: {
         onSuccess?: (workflow: WorkflowV3) => void;
         onError?: () => void;
+        onCompleted?: () => void;
       } = {}
     ) => {
-      const { onSuccess, onError } = options;
+      const { onSuccess, onError, onCompleted } = options;
       try {
         const res = await getWorkflow(workflowId).unwrap();
 
@@ -39,6 +46,8 @@ export const useLoadWorkflowFromLibrary = () => {
           status: 'error',
         });
         onError?.();
+      } finally {
+        onCompleted?.();
       }
     },
     [getWorkflow, validateAndLoadWorkflow, updateOpenedAt, toast, t]
