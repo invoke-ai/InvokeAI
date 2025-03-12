@@ -85,7 +85,7 @@ export const selectWorkflowLibraryDirection = createWorkflowLibrarySelector(({ d
 export const selectWorkflowLibrarySelectedTags = createWorkflowLibrarySelector(({ selectedTags }) => selectedTags);
 export const selectWorkflowLibraryView = createWorkflowLibrarySelector(({ view }) => view);
 
-export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default', 'project'] satisfies WorkflowCategory[];
+export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default'] satisfies WorkflowCategory[];
 export const $workflowLibraryCategoriesOptions = atom<WorkflowCategory[]>(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);
 
 export type WorkflowTagCategory = { categoryTKey: string; tags: string[] };
