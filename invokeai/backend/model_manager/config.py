@@ -19,6 +19,7 @@ Typical usage:
 Validation errors will raise an InvalidModelConfigException error.
 
 """
+
 # pyright: reportIncompatibleVariableOverride=false
 import logging
 import time
@@ -630,9 +631,36 @@ def get_model_discriminator_value(v: Any) -> str:
     return f"{type_}.{format_}"
 
 
-config_classes = sorted(ModelConfigBase.all_config_classes(), key=lambda c: c.__name__)  # sorted for consistency
+# The types are listed explicitly because IDEs/LSPs can't identify the correct types
+# when AnyModelConfig is constructed dynamically using ModelConfigBase.all_config_classes
 AnyModelConfig = Annotated[
-    Union[tuple(Annotated[cls, cls.get_tag()] for cls in config_classes)],
+    Union[
+        Annotated[MainDiffusersConfig, MainDiffusersConfig.get_tag()],
+        Annotated[MainCheckpointConfig, MainCheckpointConfig.get_tag()],
+        Annotated[MainBnbQuantized4bCheckpointConfig, MainBnbQuantized4bCheckpointConfig.get_tag()],
+        Annotated[MainGGUFCheckpointConfig, MainGGUFCheckpointConfig.get_tag()],
+        Annotated[VAEDiffusersConfig, VAEDiffusersConfig.get_tag()],
+        Annotated[VAECheckpointConfig, VAECheckpointConfig.get_tag()],
+        Annotated[ControlNetDiffusersConfig, ControlNetDiffusersConfig.get_tag()],
+        Annotated[ControlNetCheckpointConfig, ControlNetCheckpointConfig.get_tag()],
+        Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
+        Annotated[ControlLoRALyCORISConfig, ControlLoRALyCORISConfig.get_tag()],
+        Annotated[ControlLoRADiffusersConfig, ControlLoRADiffusersConfig.get_tag()],
+        Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
+        Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
+        Annotated[T5EncoderBnbQuantizedLlmInt8bConfig, T5EncoderBnbQuantizedLlmInt8bConfig.get_tag()],
+        Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
+        Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
+        Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
+        Annotated[IPAdapterCheckpointConfig, IPAdapterCheckpointConfig.get_tag()],
+        Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
+        Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
+        Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
+        Annotated[CLIPLEmbedDiffusersConfig, CLIPLEmbedDiffusersConfig.get_tag()],
+        Annotated[CLIPGEmbedDiffusersConfig, CLIPGEmbedDiffusersConfig.get_tag()],
+        Annotated[SigLIPConfig, SigLIPConfig.get_tag()],
+        Annotated[FluxReduxConfig, FluxReduxConfig.get_tag()],
+    ],
     Discriminator(get_model_discriminator_value),
 ]
 

@@ -1,7 +1,7 @@
 import abc
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import pydantic
 import pytest
@@ -11,6 +11,7 @@ from sympy.testing.pytest import slow
 from torch import tensor
 
 from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
     BaseModelType,
     InvalidModelConfigException,
     MainDiffusersConfig,
@@ -210,3 +211,17 @@ def test_inheritance_order():
         excluded = {abc.ABC, pydantic.BaseModel, object}
         inheritance_list = [cls for cls in config_cls.mro() if cls not in excluded]
         assert inheritance_list[-1] is ModelConfigBase
+
+
+def test_any_model_config_includes_all_config_classes():
+    """Safeguard test to ensure that AnyModelConfig includes all ModelConfigBase subclasses."""
+
+    union_type = get_args(AnyModelConfig)[0]
+
+    extracted = set()
+    for annotated_pair in get_args(union_type):
+        config_class, _ = get_args(annotated_pair)
+        extracted.add(config_class)
+
+    expected = set(ModelConfigBase.all_config_classes()) - {MinimalConfigExample}
+    assert extracted == expected
