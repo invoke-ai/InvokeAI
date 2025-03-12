@@ -1,4 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
+import { saveWorkflowAs } from 'features/workflowLibrary/components/SaveWorkflowAsDialog';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -8,7 +10,14 @@ import { PiUploadSimpleBold } from 'react-icons/pi';
 const UploadWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef });
+  const workflowLibraryModal = useWorkflowLibraryModal();
+  const loadWorkflowFromFile = useLoadWorkflowFromFile({
+    resetRef,
+    onSuccess: (workflow) => {
+      workflowLibraryModal.close();
+      saveWorkflowAs(workflow);
+    },
+  });
 
   const onDropAccepted = useCallback(
     (files: File[]) => {
