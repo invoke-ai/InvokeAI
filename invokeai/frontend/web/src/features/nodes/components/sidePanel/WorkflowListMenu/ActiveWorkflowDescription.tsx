@@ -1,4 +1,4 @@
-import { Text } from '@invoke-ai/ui-library';
+import { Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { linkifyOptions, linkifySx } from 'common/components/linkify';
 import { selectWorkflowDescription } from 'features/nodes/store/workflowSlice';
@@ -13,9 +13,11 @@ export const ActiveWorkflowDescription = memo(() => {
   }
 
   return (
-    <Text color="base.300" fontStyle="italic" pb={2} sx={linkifySx}>
-      <Linkify options={linkifyOptions}>{description}</Linkify>
-    </Text>
+    <Tooltip label={description}>
+      <Text color="base.300" fontStyle="italic" sx={linkifySx} noOfLines={1}>
+        <Linkify options={linkifyOptions}>{description}</Linkify>
+      </Text>
+    </Tooltip>
   );
 });
 
