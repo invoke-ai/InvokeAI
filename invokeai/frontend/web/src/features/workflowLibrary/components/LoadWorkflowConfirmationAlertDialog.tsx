@@ -25,8 +25,8 @@ type LoadLibraryWorkflowData = Callbacks & {
 };
 
 type LoadWorkflowFromObjectData = Callbacks & {
-  type: 'direct';
-  data: WorkflowV3;
+  type: 'object';
+  data: unknown;
 };
 
 type LoadWorkflowFromFileData = Callbacks & {
@@ -70,7 +70,7 @@ const useLoadImmediate = () => {
       onError,
       onCompleted,
     };
-    if (type === 'direct') {
+    if (type === 'object') {
       await loadWorkflowFromObject(data, options);
     } else if (type === 'file') {
       await loadWorkflowFromFile(data, options);
