@@ -2,31 +2,59 @@ import { Button, Flex, Grid, GridItem, Spacer, Spinner } from '@invoke-ai/ui-lib
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import type { WorkflowLibraryView } from 'features/nodes/store/workflowLibrarySlice';
 import {
+  selectWorkflowLibraryDirection,
+  selectWorkflowLibraryHasSearchTerm,
+  selectWorkflowLibraryOrderBy,
+  selectWorkflowLibrarySearchTerm,
   selectWorkflowLibrarySelectedTags,
-  selectWorkflowOrderBy,
-  selectWorkflowOrderDirection,
-  selectWorkflowSearchTerm,
-  selectWorkflowSelectedCategories,
-} from 'features/nodes/store/workflowSlice';
+  selectWorkflowLibraryView,
+} from 'features/nodes/store/workflowLibrarySlice';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
 import type { S } from 'services/api/types';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 import { useDebounce } from 'use-debounce';
 
 import { WorkflowListItem } from './WorkflowListItem';
 
 const PER_PAGE = 30;
 
+const getCategories = (view: WorkflowLibraryView): WorkflowCategory[] => {
+  switch (view) {
+    case 'defaults':
+      return ['default'];
+    case 'recent':
+      return ['user', 'project', 'default'];
+    case 'yours':
+      return ['user', 'project'];
+    case 'private':
+      return ['user'];
+    case 'shared':
+      return ['project'];
+    default:
+      assert<Equals<typeof view, never>>(false);
+  }
+};
+
+const getHasBeenOpened = (view: WorkflowLibraryView): boolean | undefined => {
+  if (view === 'recent') {
+    return true;
+  }
+  return undefined;
+};
+
 const useInfiniteQueryAry = () => {
-  const categories = useAppSelector(selectWorkflowSelectedCategories);
-  const orderBy = useAppSelector(selectWorkflowOrderBy);
-  const direction = useAppSelector(selectWorkflowOrderDirection);
-  const query = useAppSelector(selectWorkflowSearchTerm);
-  const tags = useAppSelector(selectWorkflowLibrarySelectedTags);
-  const [debouncedQuery] = useDebounce(query, 500);
+  const orderBy = useAppSelector(selectWorkflowLibraryOrderBy);
+  const direction = useAppSelector(selectWorkflowLibraryDirection);
+  const searchTerm = useAppSelector(selectWorkflowLibrarySearchTerm);
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const view = useAppSelector(selectWorkflowLibraryView);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
   const queryArg = useMemo(() => {
     return {
@@ -34,11 +62,12 @@ const useInfiniteQueryAry = () => {
       per_page: PER_PAGE,
       order_by: orderBy ?? 'opened_at',
       direction,
-      categories,
-      query: debouncedQuery,
-      tags: categories.length === 1 && categories.includes('default') ? tags : [],
-    } satisfies Parameters<typeof useListWorkflowsQuery>[0];
-  }, [orderBy, direction, categories, debouncedQuery, tags]);
+      categories: getCategories(view),
+      query: debouncedSearchTerm,
+      tags: view === 'defaults' ? selectedTags : [],
+      has_been_opened: getHasBeenOpened(view),
+    } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
+  }, [orderBy, direction, view, debouncedSearchTerm, selectedTags]);
 
   return queryArg;
 };
@@ -52,9 +81,7 @@ const queryOptions = {
   },
 } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[1];
 
-export const WorkflowList = () => {
-  const searchTerm = useAppSelector(selectWorkflowSearchTerm);
-  const { t } = useTranslation();
+export const WorkflowList = memo(() => {
   const queryArg = useInfiniteQueryAry();
   const { items, isFetching, isLoading, fetchNextPage, hasNextPage } = useListWorkflowsInfiniteInfiniteQuery(
     queryArg,
@@ -70,14 +97,7 @@ export const WorkflowList = () => {
   }
 
   if (items.length === 0) {
-    return (
-      <IAINoContentFallback
-        fontSize="sm"
-        py={4}
-        label={searchTerm ? t('nodes.noMatchingWorkflows') : t('nodes.noWorkflows')}
-        icon={null}
-      />
-    );
+    return <NoItems />;
   }
 
   return (
@@ -88,8 +108,23 @@ export const WorkflowList = () => {
       isFetching={isFetching}
     />
   );
-};
+});
+WorkflowList.displayName = 'WorkflowList';
 
+const NoItems = memo(() => {
+  const { t } = useTranslation();
+  const hasSearchTerm = useAppSelector(selectWorkflowLibraryHasSearchTerm);
+
+  return (
+    <IAINoContentFallback
+      fontSize="sm"
+      py={4}
+      label={hasSearchTerm ? t('nodes.noMatchingWorkflows') : t('nodes.noWorkflows')}
+      icon={null}
+    />
+  );
+});
+NoItems.displayName = 'NoItems';
 const WorkflowListContent = memo(
   ({
     items,
@@ -153,7 +188,7 @@ const WorkflowListContent = memo(
       <Flex flexDir="column" gap={4} flex={1} minH={0}>
         <Grid
           ref={ref}
-          templateColumns="repeat(auto-fill, minmax(340px, 1fr))"
+          templateColumns="repeat(auto-fill, minmax(360px, 1fr))"
           gridAutoFlow="dense"
           gap={4}
           overflow="scroll"

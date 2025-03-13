@@ -610,6 +610,7 @@ flux_redux = StarterModel(
     source="black-forest-labs/FLUX.1-Redux-dev::flux1-redux-dev.safetensors",
     description="FLUX Redux model (for image variation).",
     type=ModelType.FluxRedux,
+    dependencies=[siglip],
 )
 # endregion
 
@@ -717,7 +718,6 @@ sdxl_bundle: list[StarterModel] = [
     scribble_sdxl,
     tile_sdxl,
     swinir,
-    flux_redux,
 ]
 
 flux_bundle: list[StarterModel] = [
@@ -730,7 +730,7 @@ flux_bundle: list[StarterModel] = [
     ip_adapter_flux,
     flux_canny_control_lora,
     flux_depth_control_lora,
-    siglip,
+    flux_redux,
 ]
 
 STARTER_BUNDLES: dict[str, list[StarterModel]] = {

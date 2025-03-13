@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 const textSx: SystemStyleObject = {
   fontSize: 'md',
+  whiteSpace: 'pre-wrap',
   overflowWrap: 'anywhere',
   '&[data-is-empty="true"]': {
     opacity: 0.3,

@@ -4,51 +4,55 @@ import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';
-import type { Templates } from 'features/nodes/store/types';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
 import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
-import type { GraphAndWorkflowResponse, NonNullableGraph } from 'services/api/types';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
 const log = logger('workflows');
 
-const getWorkflowFromStringifiedWorkflowOrGraph = async (data: GraphAndWorkflowResponse, templates: Templates) => {
-  if (data.workflow) {
-    // Prefer to load the workflow if it's available - it has more information
-    const parsed = JSON.parse(data.workflow);
-    return await validateWorkflow({
-      workflow: parsed,
-      templates,
-      checkImageAccess,
-      checkBoardAccess,
-      checkModelAccess,
-    });
-  } else if (data.graph) {
-    // Else we fall back on the graph, using the graphToWorkflow function to convert and do layout
-    const parsed = JSON.parse(data.graph);
-    const workflow = graphToWorkflow(parsed as NonNullableGraph, true);
-    return await validateWorkflow({ workflow, templates, checkImageAccess, checkBoardAccess, checkModelAccess });
-  } else {
-    throw new Error('No workflow or graph provided');
-  }
-};
-
-export const useLoadWorkflow = () => {
+/**
+ * This hook manages the lower-level workflow validation and loading process.
+ *
+ * You probably should instead use `useLoadWorkflowWithDialog`, which opens a dialog to prevent loss of unsaved changes
+ * and handles the loading process.
+ *
+ * Internally, `useLoadWorkflowWithDialog` uses these hooks...
+ *
+ * - `useLoadWorkflowFromFile`
+ * - `useLoadWorkflowFromImage`
+ * - `useLoadWorkflowFromLibrary`
+ * - `useLoadWorkflowFromObject`
+ *
+ * ...each of which internally uses hook.
+ */
+export const useValidateAndLoadWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const loadWorkflow = useCallback(
-    async (data: GraphAndWorkflowResponse): Promise<WorkflowV3 | null> => {
+  const validateAndLoadWorkflow = useCallback(
+    /**
+     * Validate and load a workflow into the editor.
+     *
+     * The unvalidated workflow should be a JS object. Do not pass a raw JSON string.
+     *
+     * This function catches all errors. It toasts and logs on success and error.
+     */
+    async (unvalidatedWorkflow: unknown): Promise<WorkflowV3 | null> => {
       try {
         const templates = $templates.get();
-        const { workflow, warnings } = await getWorkflowFromStringifiedWorkflowOrGraph(data, templates);
+        const { workflow, warnings } = await validateWorkflow({
+          workflow: unvalidatedWorkflow,
+          templates,
+          checkImageAccess,
+          checkBoardAccess,
+          checkModelAccess,
+        });
 
         $nodeExecutionStates.set({});
         dispatch(workflowLoaded(workflow));
@@ -119,5 +123,5 @@ export const useLoadWorkflow = () => {
     [dispatch, t]
   );
 
-  return loadWorkflow;
+  return validateAndLoadWorkflow;
 };

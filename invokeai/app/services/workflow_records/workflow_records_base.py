@@ -46,17 +46,28 @@ class WorkflowRecordsStorageBase(ABC):
         per_page: Optional[int],
         query: Optional[str],
         tags: Optional[list[str]],
+        has_been_opened: Optional[bool],
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass
 
     @abstractmethod
-    def get_counts(
+    def counts_by_category(
         self,
-        tags: Optional[list[str]],
-        categories: Optional[list[WorkflowCategory]],
-    ) -> int:
-        """Gets the count of workflows for the given tags and categories."""
+        categories: list[WorkflowCategory],
+        has_been_opened: Optional[bool] = None,
+    ) -> dict[str, int]:
+        """Gets a dictionary of counts for each of the provided categories."""
+        pass
+
+    @abstractmethod
+    def counts_by_tag(
+        self,
+        tags: list[str],
+        categories: Optional[list[WorkflowCategory]] = None,
+        has_been_opened: Optional[bool] = None,
+    ) -> dict[str, int]:
+        """Gets a dictionary of counts for each of the provided tags."""
         pass
 
     @abstractmethod

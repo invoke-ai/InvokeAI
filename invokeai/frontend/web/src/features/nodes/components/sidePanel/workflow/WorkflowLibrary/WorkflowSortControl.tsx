@@ -1,11 +1,11 @@
 import { Flex, FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  selectWorkflowOrderBy,
-  selectWorkflowOrderDirection,
-  workflowOrderByChanged,
-  workflowOrderDirectionChanged,
-} from 'features/nodes/store/workflowSlice';
+  selectWorkflowLibraryDirection,
+  selectWorkflowLibraryOrderBy,
+  workflowLibraryDirectionChanged,
+  workflowLibraryOrderByChanged,
+} from 'features/nodes/store/workflowLibrarySlice';
 import type { ChangeEvent } from 'react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,8 +22,8 @@ const isDirection = (v: unknown): v is Direction => zDirection.safeParse(v).succ
 export const WorkflowSortControl = () => {
   const { t } = useTranslation();
 
-  const orderBy = useAppSelector(selectWorkflowOrderBy);
-  const direction = useAppSelector(selectWorkflowOrderDirection);
+  const orderBy = useAppSelector(selectWorkflowLibraryOrderBy);
+  const direction = useAppSelector(selectWorkflowLibraryDirection);
 
   const ORDER_BY_LABELS = useMemo(
     () => ({
@@ -50,7 +50,7 @@ export const WorkflowSortControl = () => {
       if (!isOrderBy(e.target.value)) {
         return;
       }
-      dispatch(workflowOrderByChanged(e.target.value));
+      dispatch(workflowLibraryOrderByChanged(e.target.value));
     },
     [dispatch]
   );
@@ -60,7 +60,7 @@ export const WorkflowSortControl = () => {
       if (!isDirection(e.target.value)) {
         return;
       }
-      dispatch(workflowOrderDirectionChanged(e.target.value));
+      dispatch(workflowLibraryDirectionChanged(e.target.value));
     },
     [dispatch]
   );

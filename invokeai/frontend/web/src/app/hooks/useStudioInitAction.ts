@@ -15,7 +15,7 @@ import { $isWorkflowLibraryModalOpen } from 'features/nodes/store/workflowLibrar
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
-import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
+import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { atom } from 'nanostores';
 import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -57,7 +57,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   const { t } = useTranslation();
   const didParseOpenAPISchema = useStore($hasTemplates);
   const store = useAppStore();
-  const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
+  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
   const handleSendToCanvas = useCallback(
     async (imageName: string) => {
@@ -113,10 +113,15 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   const handleLoadWorkflow = useCallback(
     async (workflowId: string) => {
       // This shows a toast
-      await getAndLoadWorkflow(workflowId);
-      store.dispatch(setActiveTab('workflows'));
+      await loadWorkflowWithDialog({
+        type: 'library',
+        data: workflowId,
+        onSuccess: () => {
+          store.dispatch(setActiveTab('workflows'));
+        },
+      });
     },
-    [getAndLoadWorkflow, store]
+    [loadWorkflowWithDialog, store]
   );
 
   const handleSelectStylePreset = useCallback(

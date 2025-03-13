@@ -11,12 +11,7 @@ import {
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
-import type {
-  NodesState,
-  WorkflowMode,
-  WorkflowsState as WorkflowState,
-  WorkflowTag,
-} from 'features/nodes/store/types';
+import type { NodesState, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type {
@@ -40,7 +35,6 @@ import {
 } from 'features/nodes/types/workflow';
 import { isEqual } from 'lodash-es';
 import { useMemo } from 'react';
-import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
 
 import { selectNodesSlice } from './selectors';
 
@@ -83,11 +77,6 @@ const initialWorkflowState: WorkflowState = {
   isTouched: false,
   mode: 'view',
   formFieldInitialValues: {},
-  searchTerm: '',
-  orderBy: 'opened_at', // initial value is decided in component
-  orderDirection: 'DESC',
-  selectedTags: [],
-  selectedCategories: ['user'],
   ...getBlankWorkflow(),
 };
 
@@ -97,19 +86,6 @@ export const workflowSlice = createSlice({
   reducers: {
     workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
       state.mode = action.payload;
-    },
-    workflowSearchTermChanged: (state, action: PayloadAction<string>) => {
-      state.searchTerm = action.payload;
-    },
-    workflowOrderByChanged: (state, action: PayloadAction<WorkflowRecordOrderBy>) => {
-      state.orderBy = action.payload;
-    },
-    workflowOrderDirectionChanged: (state, action: PayloadAction<SQLiteDirection>) => {
-      state.orderDirection = action.payload;
-    },
-    workflowSelectedCategoriesChanged: (state, action: PayloadAction<WorkflowCategory[]>) => {
-      state.selectedCategories = action.payload;
-      state.searchTerm = '';
     },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
       state.name = action.payload;
@@ -150,24 +126,13 @@ export const workflowSlice = createSlice({
     workflowSaved: (state) => {
       state.isTouched = false;
     },
-    workflowSelectedTagToggled: (state, action: PayloadAction<WorkflowTag>) => {
-      const tag = action.payload;
-      const tags = state.selectedTags;
-      if (tags.includes(tag)) {
-        state.selectedTags = tags.filter((t) => t !== tag);
-      } else {
-        state.selectedTags = [...tags, tag];
-      }
-    },
-    workflowSelectedTagsRese: (state) => {
-      state.selectedTags = [];
-    },
     formReset: (state) => {
       const rootElement = buildContainer('column', []);
       state.form = {
         elements: { [rootElement.id]: rootElement },
         rootElementId: rootElement.id,
       };
+      state.isTouched = true;
     },
     formElementAdded: (
       state,
@@ -184,29 +149,36 @@ export const workflowSlice = createSlice({
       if (isNodeFieldElement(element)) {
         state.formFieldInitialValues[element.id] = initialValue;
       }
+      state.isTouched = true;
     },
     formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
       const { form } = state;
       const { id } = action.payload;
       removeElement({ form, id });
       delete state.formFieldInitialValues[id];
+      state.isTouched = true;
     },
     formElementReparented: (state, action: PayloadAction<{ id: string; newParentId: string; index: number }>) => {
       const { form } = state;
       const { id, newParentId, index } = action.payload;
       reparentElement({ form, id, newParentId, index });
+      state.isTouched = true;
     },
     formElementHeadingDataChanged: (state, action: FormElementDataChangedAction<HeadingElement>) => {
       formElementDataChangedReducer(state, action, isHeadingElement);
+      state.isTouched = true;
     },
     formElementTextDataChanged: (state, action: FormElementDataChangedAction<TextElement>) => {
       formElementDataChangedReducer(state, action, isTextElement);
+      state.isTouched = true;
     },
     formElementNodeFieldDataChanged: (state, action: FormElementDataChangedAction<NodeFieldElement>) => {
       formElementDataChangedReducer(state, action, isNodeFieldElement);
+      state.isTouched = true;
     },
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
+      state.isTouched = true;
     },
     formFieldInitialValuesChanged: (
       state,
@@ -214,6 +186,7 @@ export const workflowSlice = createSlice({
     ) => {
       const { formFieldInitialValues } = action.payload;
       state.formFieldInitialValues = formFieldInitialValues;
+      state.isTouched = true;
     },
   },
   extraReducers: (builder) => {
@@ -314,12 +287,6 @@ export const {
   workflowContactChanged,
   workflowIDChanged,
   workflowSaved,
-  workflowSearchTermChanged,
-  workflowOrderByChanged,
-  workflowOrderDirectionChanged,
-  workflowSelectedCategoriesChanged,
-  workflowSelectedTagToggled,
-  workflowSelectedTagsRese,
   formReset,
   formElementAdded,
   formElementRemoved,
@@ -382,12 +349,7 @@ export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.
 export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
-export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => workflow.searchTerm);
-export const selectWorkflowOrderBy = createWorkflowSelector((workflow) => workflow.orderBy);
-export const selectWorkflowOrderDirection = createWorkflowSelector((workflow) => workflow.orderDirection);
-export const selectWorkflowSelectedCategories = createWorkflowSelector((workflow) => workflow.selectedCategories);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
-export const selectWorkflowLibrarySelectedTags = createWorkflowSelector((workflow) => workflow.selectedTags);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
 
 export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {

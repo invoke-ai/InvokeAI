@@ -1,6 +1,7 @@
 import queryString from 'query-string';
 import type { paths } from 'services/api/schema';
 
+import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
 
 /**
@@ -19,15 +20,6 @@ export const workflowsApi = api.injectEndpoints({
     >({
       query: (workflow_id) => buildWorkflowsUrl(`i/${workflow_id}`),
       providesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }, 'FetchOnReconnect'],
-      onQueryStarted: async (arg, api) => {
-        const { dispatch, queryFulfilled } = api;
-        try {
-          await queryFulfilled;
-          dispatch(workflowsApi.util.invalidateTags([{ type: 'WorkflowsRecent', id: LIST_TAG }]));
-        } catch {
-          // no-op
-        }
-      },
     }),
     deleteWorkflow: build.mutation<void, string>({
       query: (workflow_id) => ({
@@ -35,9 +27,11 @@ export const workflowsApi = api.injectEndpoints({
         method: 'DELETE',
       }),
       invalidatesTags: (result, error, workflow_id) => [
+        // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow_id },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
       ],
     }),
     createWorkflow: build.mutation<
@@ -50,8 +44,10 @@ export const workflowsApi = api.injectEndpoints({
         body: { workflow },
       }),
       invalidatesTags: [
+        // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
       ],
     }),
     updateWorkflow: build.mutation<
@@ -64,27 +60,28 @@ export const workflowsApi = api.injectEndpoints({
         body: { workflow },
       }),
       invalidatesTags: (response, error, workflow) => [
-        { type: 'WorkflowsRecent', id: LIST_TAG },
-        { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow.id },
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
       ],
     }),
-    listWorkflows: build.query<
-      paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
-      NonNullable<paths['/api/v1/workflows/']['get']['parameters']['query']>
+    getCountsByTag: build.query<
+      paths['/api/v1/workflows/counts_by_tag']['get']['responses']['200']['content']['application/json'],
+      NonNullable<paths['/api/v1/workflows/counts_by_tag']['get']['parameters']['query']>
     >({
       query: (params) => ({
-        url: `${buildWorkflowsUrl()}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
+        url: `${buildWorkflowsUrl('counts_by_tag')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
       }),
-      providesTags: ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }],
+      providesTags: ['WorkflowTagCounts'],
     }),
-    getCounts: build.query<
-      paths['/api/v1/workflows/counts']['get']['responses']['200']['content']['application/json'],
-      NonNullable<paths['/api/v1/workflows/counts']['get']['parameters']['query']>
+    getCountsByCategory: build.query<
+      paths['/api/v1/workflows/counts_by_category']['get']['responses']['200']['content']['application/json'],
+      NonNullable<paths['/api/v1/workflows/counts_by_category']['get']['parameters']['query']>
     >({
       query: (params) => ({
-        url: `${buildWorkflowsUrl('counts')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
+        url: `${buildWorkflowsUrl('counts_by_category')}?${queryString.stringify(params, { arrayFormat: 'none' })}`,
       }),
+      providesTags: ['WorkflowCategoryCounts'],
     }),
     listWorkflowsInfinite: build.infiniteQuery<
       paths['/api/v1/workflows/']['get']['responses']['200']['content']['application/json'],
@@ -108,13 +105,29 @@ export const workflowsApi = api.injectEndpoints({
           return firstPageParam > -1 ? firstPageParam - 1 : undefined;
         },
       },
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = ['FetchOnReconnect', { type: 'Workflow', id: LIST_TAG }];
+        if (result) {
+          tags.push(
+            ...result.pages
+              .map(({ items }) => items)
+              .flat()
+              .map((workflow) => ({ type: 'Workflow', id: workflow.workflow_id }) as const)
+          );
+        }
+        return tags;
+      },
     }),
     updateOpenedAt: build.mutation<void, { workflow_id: string }>({
       query: ({ workflow_id }) => ({
         url: buildWorkflowsUrl(`i/${workflow_id}/opened_at`),
         method: 'PUT',
       }),
-      invalidatesTags: (result, error, { workflow_id }) => [{ type: 'Workflow', id: workflow_id }],
+      invalidatesTags: (result, error, { workflow_id }) => [
+        { type: 'Workflow', id: workflow_id },
+        // Because this may change the order of the list, we need to invalidate the whole list
+        { type: 'Workflow', id: LIST_TAG },
+      ],
     }),
     setWorkflowThumbnail: build.mutation<void, { workflow_id: string; image: File }>({
       query: ({ workflow_id, image }) => {
@@ -126,33 +139,27 @@ export const workflowsApi = api.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: (result, error, { workflow_id }) => [
-        { type: 'Workflow', id: workflow_id },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
-      ],
+      invalidatesTags: (result, error, { workflow_id }) => [{ type: 'Workflow', id: workflow_id }],
     }),
     deleteWorkflowThumbnail: build.mutation<void, string>({
       query: (workflow_id) => ({
         url: buildWorkflowsUrl(`i/${workflow_id}/thumbnail`),
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, workflow_id) => [
-        { type: 'Workflow', id: workflow_id },
-        { type: 'WorkflowsRecent', id: LIST_TAG },
-      ],
+      invalidatesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }],
     }),
   }),
 });
 
 export const {
   useUpdateOpenedAtMutation,
-  useGetCountsQuery,
+  useGetCountsByTagQuery,
+  useGetCountsByCategoryQuery,
   useLazyGetWorkflowQuery,
   useGetWorkflowQuery,
   useCreateWorkflowMutation,
   useDeleteWorkflowMutation,
   useUpdateWorkflowMutation,
-  useListWorkflowsQuery,
   useListWorkflowsInfiniteInfiniteQuery,
   useSetWorkflowThumbnailMutation,
   useDeleteWorkflowThumbnailMutation,

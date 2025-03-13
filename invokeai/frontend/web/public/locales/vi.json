@@ -235,7 +235,8 @@
         "column": "Cột",
         "layout": "Bố Cục",
         "row": "Hàng",
-        "board": "Bảng"
+        "board": "Bảng",
+        "saveChanges": "Lưu Thay Đổi"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -766,7 +767,9 @@
         "urlUnauthorizedErrorMessage2": "Tìm hiểu thêm.",
         "urlForbidden": "Bạn không có quyền truy cập vào model này",
         "urlForbiddenErrorMessage": "Bạn có thể cần yêu cầu quyền truy cập từ trang web đang cung cấp model.",
-        "urlUnauthorizedErrorMessage": "Bạn có thể cần thiếp lập một token API để dùng được model này."
+        "urlUnauthorizedErrorMessage": "Bạn có thể cần thiếp lập một token API để dùng được model này.",
+        "fluxRedux": "FLUX Redux",
+        "sigLip": "SigLIP"
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -979,7 +982,7 @@
         "unknownInput": "Đầu Vào Không Rõ: {{name}}",
         "validateConnections": "Xác Thực Kết Nối Và Đồ Thị",
         "workflowNotes": "Ghi Chú",
-        "workflowTags": "Thẻ Tên",
+        "workflowTags": "Nhãn",
         "editMode": "Chỉnh sửa trong Trình Biên Tập Workflow",
         "edit": "Chỉnh Sửa",
         "executionStateInProgress": "Đang Xử Lý",
@@ -2021,7 +2024,7 @@
         },
         "mergingLayers": "Đang gộp layer",
         "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, hoặc vẽ trên canvas để bắt đầu.",
-        "referenceImageEmptyState": "<UploadButton>Tải lên ảnh</UploadButton> hoặc kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này để bắt đầu.",
+        "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào layer này, hoặc <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton> để bắt đầu.",
         "useImage": "Dùng Hình Ảnh",
         "resetCanvasLayers": "Khởi Động Lại Layer Canvas",
         "asRasterLayer": "Như $t(controlLayers.rasterLayer)",
@@ -2137,7 +2140,7 @@
     "toast": {
         "imageUploadFailed": "Tải Lên Ảnh Thất Bại",
         "layerCopiedToClipboard": "Sao Chép Layer Vào Clipboard",
-        "uploadFailedInvalidUploadDesc_withCount_other": "Tối đa là {{count}} ảnh PNG hoặc JPEG.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Tối đa là {{count}} ảnh PNG, JPEG hoặc WEBP.",
         "imageCopied": "Ảnh Đã Được Sao Chép",
         "sentToUpscale": "Chuyển Vào Upscale",
         "unableToLoadImage": "Không Thể Tải Hình Ảnh",
@@ -2149,7 +2152,7 @@
         "unableToLoadImageMetadata": "Không Thể Tải Metadata Của Ảnh",
         "workflowLoaded": "Workflow Đã Tải",
         "uploadFailed": "Tải Lên Thất Bại",
-        "uploadFailedInvalidUploadDesc": "Phải là ảnh PNG hoặc JPEG.",
+        "uploadFailedInvalidUploadDesc": "Phải là ảnh PNG, JPEG hoặc WEBP.",
         "serverError": "Lỗi Server",
         "addedToBoard": "Thêm vào tài nguyên của bảng {{name}}",
         "sessionRef": "Phiên: {{sessionId}}",
@@ -2252,11 +2255,10 @@
         "convertGraph": "Chuyển Đổi Đồ Thị",
         "saveWorkflowToProject": "Lưu Workflow Vào Dự Án",
         "workflowName": "Tên Workflow",
-        "workflowLibrary": "Thư Viện",
+        "workflowLibrary": "Thư Viện Workflow",
         "opened": "Ngày Mở",
         "deleteWorkflow": "Xoá Workflow",
         "workflowEditorMenu": "Menu Biên Tập Workflow",
-        "uploadAndSaveWorkflow": "Tải Lên Thư Viện",
         "openLibrary": "Mở Thư Viện",
         "builder": {
             "resetAllNodeFields": "Tải Lại Các Vùng Node",
@@ -2287,7 +2289,19 @@
             "heading": "Đầu Dòng",
             "text": "Văn Bản",
             "divider": "Gạch Chia"
-        }
+        },
+        "yourWorkflows": "Workflow Của Bạn",
+        "browseWorkflows": "Khám Phá Workflow",
+        "workflowThumbnail": "Ảnh Minh Họa Workflow",
+        "saveChanges": "Lưu Thay Đổi",
+        "allLoaded": "Đã Tải Tất Cả Workflow",
+        "shared": "Nhóm",
+        "searchPlaceholder": "Tìm theo tên, mô tả, hoặc nhãn",
+        "filterByTags": "Lọc Theo Nhãn",
+        "recentlyOpened": "Mở Gần Đây",
+        "private": "Cá Nhân",
+        "resetTags": "Khởi Động Lại Nhãn",
+        "loadMore": "Tải Thêm"
     },
     "upscaling": {
         "missingUpscaleInitialImage": "Thiếu ảnh dùng để upscale",
@@ -2322,8 +2336,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Trình Biên Tập Workflow: trình tạo vùng nhập dưới dạng kéo thả nhằm tạo dựng workflow dễ dàng hơn.",
-            "Các nâng cấp khác: Xếp hàng tạo sinh theo nhóm nhanh hơn, upscale tốt hơn, trình chọn màu được cải thiện, và node chứa metadata."
+            "Trình Quản Lý Bộ Nhớ: Thiết lập mới cho người dùng với GPU Nvidia để giảm lượng VRAM sử dụng.",
+            "Hiệu suất: Các cải thiện tiếp theo nhằm gói gọn hiệu suất và khả năng phản hồi của ứng dụng."
         ]
     },
     "upsell": {

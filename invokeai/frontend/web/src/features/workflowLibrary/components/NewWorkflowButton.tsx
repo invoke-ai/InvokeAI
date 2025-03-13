@@ -20,7 +20,7 @@ export const NewWorkflowButton = memo(() => {
   );
 
   return (
-    <Button onClick={onClickNewWorkflow} variant="ghost" leftIcon={<PiFilePlusBold />}>
+    <Button onClick={onClickNewWorkflow} variant="ghost" leftIcon={<PiFilePlusBold />} justifyContent="flex-start">
       {t('nodes.newWorkflow')}
     </Button>
   );
