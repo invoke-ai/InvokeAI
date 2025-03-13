@@ -39,6 +39,10 @@ export const workflowLibrarySlice = createSlice({
     workflowLibraryViewChanged: (state, action: PayloadAction<WorkflowLibraryState['view']>) => {
       state.view = action.payload;
       state.searchTerm = '';
+      if (action.payload === 'recent') {
+        state.orderBy = 'opened_at';
+        state.direction = 'DESC';
+      }
     },
     workflowLibraryTagToggled: (state, action: PayloadAction<string>) => {
       const tag = action.payload;
