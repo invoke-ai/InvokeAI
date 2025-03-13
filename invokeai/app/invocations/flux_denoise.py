@@ -291,7 +291,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
         inpaint_mask = pack(inpaint_mask) if inpaint_mask is not None else None
-        img_cond = pack(img_cond) if img_cond is not None else None
         noise = pack(noise)
         x = pack(x)
 
@@ -663,12 +662,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return controlnet_extensions
 
-    def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor | None:
-        if self.control_lora is None:
-            return None
-
+    def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor:
         if not self.controlnet_vae:
             raise ValueError("controlnet_vae must be set when using a FLUX Control LoRA.")
+
+        assert self.control_lora is not None
 
         # Load the conditioning image and resize it to the target image size.
         cond_img = context.images.get_pil(self.control_lora.img.image_name)
@@ -684,22 +682,23 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         img_cond = einops.rearrange(img_cond, "h w c -> 1 c h w")
 
         vae_info = context.models.load(self.controlnet_vae.vae)
-        return FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=img_cond)
+        img_cond = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=img_cond)
+
+        return pack(img_cond)
 
     def _prep_flux_fill_img_cond(
         self, context: InvocationContext, device: torch.device, dtype: torch.dtype
-    ) -> torch.Tensor | None:
+    ) -> torch.Tensor:
         """Prepare the FLUX Fill conditioning.
 
         This logic is based on:
         https://github.com/black-forest-labs/flux/blob/716724eb276d94397be99710a0a54d352664e23b/src/flux/sampling.py#L107-L157
         """
-        if self.fill_conditioning is None:
-            return None
-
         # TODO(ryand): We should probable rename controlnet_vae. It's used for more than just ControlNets.
         if not self.controlnet_vae:
             raise ValueError("controlnet_vae must be set when using a FLUX Fill conditioning.")
+
+        assert self.fill_conditioning is not None
 
         # Load the conditioning image and resize it to the target image size.
         cond_img = context.images.get_pil(self.fill_conditioning.image.image_name, mode="RGB")
@@ -711,9 +710,13 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Load the mask and resize it to the target image size.
         mask = context.tensors.load(self.fill_conditioning.mask.tensor_name)
+        # We expect mask to be a bool tensor with shape [1, H, W].
         assert mask.dtype == torch.bool
+        assert mask.dim() == 3
+        assert mask.shape[0] == 1
+        mask = tv_resize(mask, size=[self.height, self.width], interpolation=tv_transforms.InterpolationMode.NEAREST)
         mask = mask.to(device=device, dtype=dtype)
-        mask = einops.rearrange(mask, "h w -> 1 1 h w")
+        mask = einops.rearrange(mask, "1 h w -> 1 1 h w")
 
         # Prepare image conditioning.
         cond_img = cond_img * (1 - mask)
@@ -724,12 +727,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Prepare mask conditioning.
         mask = mask[:, 0, :, :]
         # Rearrange mask to a 16-channel representation that matches the shape of the VAE-encoded latent space.
-        mask = einops.rearrange(
-            mask,
-            "b (h ph) (w pw) -> b (ph pw) h w",
-            ph=8,
-            pw=8,
-        )
+        mask = einops.rearrange(mask, "b (h ph) (w pw) -> b (ph pw) h w", ph=8, pw=8)
         mask = pack(mask)
 
         # Merge image and mask conditioning.
