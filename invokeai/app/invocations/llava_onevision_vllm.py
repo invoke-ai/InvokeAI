@@ -14,7 +14,7 @@ from invokeai.backend.util.devices import TorchDevice
 class LlavaOnevisionVllmInvocation(BaseInvocation):
     """Run a LLaVA OneVision VLLM model."""
 
-    images: list[ImageField] | ImageField | None = InputField(default=None, description="Input image.")
+    images: list[ImageField] | ImageField | None = InputField(default=None, max_length=3, description="Input image.")
     prompt: str = InputField(
         default="",
         description="Input text prompt.",
