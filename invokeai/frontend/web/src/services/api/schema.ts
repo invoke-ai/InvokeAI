@@ -21177,7 +21177,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string | null;
+            opened_at?: string | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -21207,7 +21207,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string | null;
+            opened_at?: string | null;
             /**
              * Description
              * @description The description of the workflow.
@@ -21258,7 +21258,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string | null;
+            opened_at?: string | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
