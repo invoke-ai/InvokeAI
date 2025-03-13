@@ -49,7 +49,7 @@ from invokeai.backend.flux.sampling_utils import (
     unpack,
 )
 from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
-from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.model_manager.config import ModelFormat, ModelVariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -267,22 +267,19 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         if is_schnell and self.control_lora:
             raise ValueError("Control LoRAs cannot be used with FLUX Schnell")
 
-        # TODO(ryand): It's a bit confusing that we support inpainting via both FLUX Fill and masked image-to-image.
-        # Think about ways to tidy this interface, or at least add clear error messages when incompatible inputs are
-        # provided.
-
-        # Prepare the extra image conditioning tensor if either of the following are provided:
-        # - FLUX structural control image
-        # - FLUX Fill conditioning
+        # Prepare the extra image conditioning tensor (img_cond) for either FLUX structural control or FLUX Fill.
         img_cond: torch.Tensor | None = None
-        if self.control_lora is not None and self.fill_conditioning is not None:
-            raise ValueError("Control LoRA and Fill conditioning cannot be used together.")
-        elif self.control_lora is not None:
-            img_cond = self._prep_structural_control_img_cond(context)
-        elif self.fill_conditioning is not None:
+        is_flux_fill = transformer_config.variant == ModelVariantType.Inpaint  # type: ignore
+        if is_flux_fill:
             img_cond = self._prep_flux_fill_img_cond(
                 context, device=TorchDevice.choose_torch_device(), dtype=inference_dtype
             )
+        else:
+            if self.fill_conditioning is not None:
+                raise ValueError("fill_conditioning was provided, but the model is not a FLUX Fill model.")
+
+            if self.control_lora is not None:
+                img_cond = self._prep_structural_control_img_cond(context)
 
         inpaint_mask = self._prep_inpaint_mask(context, x)
 
@@ -662,11 +659,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return controlnet_extensions
 
-    def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor:
+    def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor | None:
+        if self.control_lora is None:
+            return None
+
         if not self.controlnet_vae:
             raise ValueError("controlnet_vae must be set when using a FLUX Control LoRA.")
-
-        assert self.control_lora is not None
 
         # Load the conditioning image and resize it to the target image size.
         cond_img = context.images.get_pil(self.control_lora.img.image_name)
@@ -689,16 +687,29 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _prep_flux_fill_img_cond(
         self, context: InvocationContext, device: torch.device, dtype: torch.dtype
     ) -> torch.Tensor:
-        """Prepare the FLUX Fill conditioning.
+        """Prepare the FLUX Fill conditioning. This method should be called iff the model is a FLUX Fill model.
 
         This logic is based on:
         https://github.com/black-forest-labs/flux/blob/716724eb276d94397be99710a0a54d352664e23b/src/flux/sampling.py#L107-L157
         """
+        # Validate inputs.
+        if self.fill_conditioning is None:
+            raise ValueError("A FLUX Fill model is being used without fill_conditioning.")
         # TODO(ryand): We should probable rename controlnet_vae. It's used for more than just ControlNets.
-        if not self.controlnet_vae:
-            raise ValueError("controlnet_vae must be set when using a FLUX Fill conditioning.")
+        if self.controlnet_vae is None:
+            raise ValueError("A FLUX Fill model is being used without controlnet_vae.")
+        if self.control_lora is not None:
+            raise ValueError(
+                "A FLUX Fill model is being used, but a control_lora was provided. Control LoRAs are not compatible with FLUX Fill models."
+            )
 
-        assert self.fill_conditioning is not None
+        # Log input warnings related to FLUX Fill usage.
+        if self.denoise_mask is not None:
+            context.logger.warning(
+                "Both fill_conditioning and a denoise_mask were provided. You probably meant to use one or the other."
+            )
+        if self.guidance < 25.0:
+            context.logger.warning("A guidance value of ~30.0 is recommended for FLUX Fill models.")
 
         # Load the conditioning image and resize it to the target image size.
         cond_img = context.images.get_pil(self.fill_conditioning.image.image_name, mode="RGB")
