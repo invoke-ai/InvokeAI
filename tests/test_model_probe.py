@@ -22,7 +22,7 @@ from invokeai.backend.model_manager.config import (
     ModelRepoVariant,
     ModelType,
     ModelVariantType,
-    get_model_discriminator_value
+    get_model_discriminator_value,
 )
 from invokeai.backend.model_manager.legacy_probe import (
     CkptType,
@@ -189,7 +189,6 @@ def test_serialisation_roundtrip():
     """
     excluded = {MinimalConfigExample}
     for config_cls in ModelConfigBase.all_config_classes() - excluded:
-
         trials_per_class = 50
         configs_with_random_data = create_fake_configs(config_cls, trials_per_class)
 
