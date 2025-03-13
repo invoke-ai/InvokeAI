@@ -101,3 +101,12 @@ export const $workflowLibraryTagCategoriesOptions = atom<WorkflowTagCategory[]>(
 export const $workflowLibraryTagOptions = computed($workflowLibraryTagCategoriesOptions, (tagCategories) =>
   tagCategories.flatMap(({ tags }) => tags)
 );
+
+export type WorkflowSortOption = 'opened_at' | 'created_at' | 'updated_at' | 'name';
+export const DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS: WorkflowSortOption[] = [
+  'opened_at',
+  'created_at',
+  'updated_at',
+  'name',
+];
+export const $workflowLibrarySortOptions = atom<WorkflowSortOption[]>(DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS);
