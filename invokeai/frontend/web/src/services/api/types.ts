@@ -63,7 +63,7 @@ type DiffusersModelConfig = S['MainDiffusersConfig'];
 export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type SigLipModelConfig = S['SigLIPConfig'];
-export type FluxReduxModelConfig = S['FluxReduxConfig'];
+export type FLUXReduxModelConfig = S['FluxReduxConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
@@ -80,7 +80,7 @@ export type AnyModelConfig =
   | MainModelConfig
   | CLIPVisionDiffusersConfig
   | SigLipModelConfig
-  | FluxReduxModelConfig;
+  | FLUXReduxModelConfig;
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
@@ -217,7 +217,7 @@ export const isSigLipModelConfig = (config: AnyModelConfig): config is SigLipMod
   return config.type === 'siglip';
 };
 
-export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FluxReduxModelConfig => {
+export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXReduxModelConfig => {
   return config.type === 'flux_redux';
 };
 

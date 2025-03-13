@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import semver
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, field_validator
@@ -98,7 +98,9 @@ class WorkflowRecordDTOBase(BaseModel):
     name: str = Field(description="The name of the workflow.")
     created_at: Union[datetime.datetime, str] = Field(description="The created timestamp of the workflow.")
     updated_at: Union[datetime.datetime, str] = Field(description="The updated timestamp of the workflow.")
-    opened_at: Union[datetime.datetime, str] = Field(description="The opened timestamp of the workflow.")
+    opened_at: Optional[Union[datetime.datetime, str]] = Field(
+        default=None, description="The opened timestamp of the workflow."
+    )
 
 
 class WorkflowRecordDTO(WorkflowRecordDTOBase):

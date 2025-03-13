@@ -1,8 +1,9 @@
-import { Box, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
+import { CLIPVisionModel } from 'features/controlLayers/components/IPAdapter/CLIPVisionModel';
 import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapter/IPAdapterImagePreview';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
@@ -26,7 +27,7 @@ import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiXBold } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
+import type { FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type Props = {
@@ -73,7 +74,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
   );
 
   const onChangeModel = useCallback(
-    (modelConfig: IPAdapterModelConfig) => {
+    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig) => {
       dispatch(rgIPAdapterModelChanged({ entityIdentifier, referenceImageId, modelConfig }));
     },
     [dispatch, entityIdentifier, referenceImageId]
@@ -125,14 +126,14 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
       </Flex>
       <Flex flexDir="column" gap={2} position="relative" w="full">
         <Flex gap={2} alignItems="center" w="full">
-          <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-            <IPAdapterModel
-              modelKey={ipAdapter.model?.key ?? null}
-              onChangeModel={onChangeModel}
-              clipVisionModel={ipAdapter.clipVisionModel}
-              onChangeCLIPVisionModel={onChangeCLIPVisionModel}
-            />
-          </Box>
+          <IPAdapterModel
+            isRegionalGuidance={true}
+            modelKey={ipAdapter.model?.key ?? null}
+            onChangeModel={onChangeModel}
+          />
+          {ipAdapter.type === 'ip_adapter' && (
+            <CLIPVisionModel model={ipAdapter.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+          )}
           <IconButton
             onClick={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
@@ -143,12 +144,14 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
           />
         </Flex>
         <Flex gap={2} w="full">
-          <Flex flexDir="column" gap={2} w="full">
-            <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
-            <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
-            <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
-          </Flex>
-          <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
+          {ipAdapter.type === 'ip_adapter' && (
+            <Flex flexDir="column" gap={2} w="full">
+              <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
+              <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
+              <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+            </Flex>
+          )}
+          <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
             <IPAdapterImagePreview
               image={ipAdapter.image}
               onChangeImage={onChangeImage}

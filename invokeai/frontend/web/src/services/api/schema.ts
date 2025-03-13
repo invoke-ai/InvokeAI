@@ -1438,7 +1438,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/workflows/counts": {
+    "/api/v1/workflows/counts_by_tag": {
         parameters: {
             query?: never;
             header?: never;
@@ -1446,10 +1446,30 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Get Counts
-         * @description Gets a the count of workflows that include the specified tags and categories
+         * Get Counts By Tag
+         * @description Counts workflows by tag
          */
-        get: operations["get_counts"];
+        get: operations["get_counts_by_tag"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/counts_by_category": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts By Category
+         * @description Counts workflows by category
+         */
+        get: operations["counts_by_category"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7970,12 +7990,6 @@ export type components = {
              * @default null
              */
             redux_model?: components["schemas"]["ModelIdentifierField"];
-            /**
-             * SigLIP Model
-             * @description The SigLIP model to use.
-             * @default null
-             */
-            siglip_model?: components["schemas"]["ModelIdentifierField"];
             /**
              * type
              * @default flux_redux
@@ -21100,7 +21114,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string;
+            opened_at: string | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -21130,7 +21144,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string;
+            opened_at: string | null;
             /**
              * Description
              * @description The description of the workflow.
@@ -21181,7 +21195,7 @@ export type components = {
              * Opened At
              * @description The opened timestamp of the workflow.
              */
-            opened_at: string;
+            opened_at: string | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -24243,6 +24257,8 @@ export interface operations {
                 tags?: string[] | null;
                 /** @description The text to query by (matches name and description) */
                 query?: string | null;
+                /** @description Whether to include/exclude recent workflows */
+                has_been_opened?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -24417,13 +24433,15 @@ export interface operations {
             };
         };
     };
-    get_counts: {
+    get_counts_by_tag: {
         parameters: {
-            query?: {
-                /** @description The tags to include */
-                tags?: string[] | null;
+            query: {
+                /** @description The tags to get counts for */
+                tags: string[];
                 /** @description The categories to include */
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
+                /** @description Whether to include/exclude recent workflows */
+                has_been_opened?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -24437,7 +24455,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": number;
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    counts_by_category: {
+        parameters: {
+            query: {
+                /** @description The categories to include */
+                categories: components["schemas"]["WorkflowCategory"][];
+                /** @description Whether to include/exclude recent workflows */
+                has_been_opened?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
             /** @description Validation Error */

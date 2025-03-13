@@ -16,10 +16,16 @@ import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
-import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
+import type { WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
+import {
+  $workflowLibraryCategoriesOptions,
+  $workflowLibraryTagCategoriesOptions,
+  DEFAULT_WORKFLOW_LIBRARY_CATEGORIES,
+  DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES,
+} from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useLayoutEffect, useMemo } from 'react';
@@ -48,6 +54,7 @@ interface Props extends PropsWithChildren {
   isDebugging?: boolean;
   logo?: ReactNode;
   workflowCategories?: WorkflowCategory[];
+  workflowTagCategories?: WorkflowTagCategory[];
   loggingOverrides?: LoggingOverrides;
 }
 
@@ -68,6 +75,7 @@ const InvokeAIUI = ({
   isDebugging = false,
   logo,
   workflowCategories,
+  workflowTagCategories,
   loggingOverrides,
 }: Props) => {
   useLayoutEffect(() => {
@@ -195,13 +203,23 @@ const InvokeAIUI = ({
 
   useEffect(() => {
     if (workflowCategories) {
-      $workflowCategories.set(workflowCategories);
+      $workflowLibraryCategoriesOptions.set(workflowCategories);
     }
 
     return () => {
-      $workflowCategories.set([]);
+      $workflowLibraryCategoriesOptions.set(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);
     };
   }, [workflowCategories]);
+
+  useEffect(() => {
+    if (workflowTagCategories) {
+      $workflowLibraryTagCategoriesOptions.set(workflowTagCategories);
+    }
+
+    return () => {
+      $workflowLibraryTagCategoriesOptions.set(DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES);
+    };
+  }, [workflowTagCategories]);
 
   useEffect(() => {
     if (socketOptions) {

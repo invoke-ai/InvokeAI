@@ -1,4 +1,8 @@
-import type { CanvasReferenceImageState } from 'features/controlLayers/store/types';
+import {
+  type CanvasReferenceImageState,
+  type IPAdapterConfig,
+  isIPAdapterConfig,
+} from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
@@ -19,23 +23,24 @@ type AddIPAdaptersArg = {
 export const addIPAdapters = ({ entities, g, collector, model }: AddIPAdaptersArg): AddIPAdaptersResult => {
   const validIPAdapters = entities
     .filter((entity) => entity.isEnabled)
+    .filter((entity) => isIPAdapterConfig(entity.ipAdapter))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
   const result: AddIPAdaptersResult = {
     addedIPAdapters: 0,
   };
 
-  for (const ipa of validIPAdapters) {
+  for (const { id, ipAdapter } of validIPAdapters) {
+    assert(isIPAdapterConfig(ipAdapter), 'This should have been filtered out');
     result.addedIPAdapters++;
 
-    addIPAdapter(ipa, g, collector);
+    addIPAdapter(id, ipAdapter, g, collector);
   }
 
   return result;
 };
 
-const addIPAdapter = (entity: CanvasReferenceImageState, g: Graph, collector: Invocation<'collect'>) => {
-  const { id, ipAdapter } = entity;
+const addIPAdapter = (id: string, ipAdapter: IPAdapterConfig, g: Graph, collector: Invocation<'collect'>) => {
   const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
   assert(image, 'IP Adapter image is required');
   assert(model, 'IP Adapter model is required');

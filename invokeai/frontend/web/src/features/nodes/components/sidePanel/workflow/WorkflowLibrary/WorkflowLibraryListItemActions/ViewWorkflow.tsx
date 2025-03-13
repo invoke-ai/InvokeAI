@@ -1,28 +1,38 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { useLoadWorkflow } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold } from 'react-icons/pi';
 
 export const ViewWorkflow = ({ workflowId }: { workflowId: string }) => {
-  const loadWorkflow = useLoadWorkflow();
+  const dispatch = useAppDispatch();
+  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
   const { t } = useTranslation();
 
   const handleClickLoad = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      loadWorkflow.loadWithDialog(workflowId, 'view');
+      loadWorkflowWithDialog({
+        type: 'library',
+        data: workflowId,
+        onSuccess: () => {
+          dispatch(workflowModeChanged('view'));
+        },
+      });
     },
-    [loadWorkflow, workflowId]
+    [dispatch, loadWorkflowWithDialog, workflowId]
   );
 
   return (
-    <Tooltip label={t('workflows.edit')} closeOnScroll>
+    <Tooltip label={t('workflows.view')} closeOnScroll>
       <IconButton
         size="sm"
-        variant="ghost"
-        aria-label={t('workflows.edit')}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('workflows.view')}
         onClick={handleClickLoad}
         icon={<PiEyeBold />}
       />

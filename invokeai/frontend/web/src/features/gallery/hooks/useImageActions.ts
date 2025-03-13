@@ -17,7 +17,7 @@ import {
 } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
+import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
@@ -147,14 +147,15 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     });
   }, [metadata, imageDTO]);
 
-  const [getAndLoadEmbeddedWorkflow] = useGetAndLoadEmbeddedWorkflow();
+  const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
-  const loadWorkflow = useCallback(() => {
+  const loadWorkflowFromImage = useCallback(() => {
     if (!imageDTO.has_workflow || !hasTemplates) {
       return;
     }
-    getAndLoadEmbeddedWorkflow(imageDTO.image_name);
-  }, [getAndLoadEmbeddedWorkflow, hasTemplates, imageDTO.has_workflow, imageDTO.image_name]);
+
+    loadWorkflowWithDialog({ type: 'image', data: imageDTO.image_name });
+  }, [hasTemplates, imageDTO.has_workflow, imageDTO.image_name, loadWorkflowWithDialog]);
 
   const recallSize = useCallback(() => {
     if (isStaging) {
@@ -180,7 +181,7 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     recallSeed,
     recallPrompts,
     createAsPreset,
-    loadWorkflow,
+    loadWorkflow: loadWorkflowFromImage,
     hasWorkflow: imageDTO.has_workflow,
     recallSize,
     upscale,

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 const headingSx: SystemStyleObject = {
   fontWeight: 'bold',
   fontSize: '2xl',
+  whiteSpace: 'pre-wrap',
   '&[data-is-empty="true"]': {
     opacity: 0.3,
   },

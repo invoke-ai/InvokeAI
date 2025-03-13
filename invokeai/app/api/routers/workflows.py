@@ -105,6 +105,7 @@ async def list_workflows(
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories of workflow to get"),
     tags: Optional[list[str]] = Query(default=None, description="The tags of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
+    has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""
     workflows_with_thumbnails: list[WorkflowRecordListItemWithThumbnailDTO] = []
@@ -116,6 +117,7 @@ async def list_workflows(
         query=query,
         categories=categories,
         tags=tags,
+        has_been_opened=has_been_opened,
     )
     for workflow in workflows.items:
         workflows_with_thumbnails.append(
@@ -221,14 +223,29 @@ async def get_workflow_thumbnail(
         raise HTTPException(status_code=404)
 
 
-@workflows_router.get("/counts", operation_id="get_counts")
-async def get_counts(
-    tags: Optional[list[str]] = Query(default=None, description="The tags to include"),
+@workflows_router.get("/counts_by_tag", operation_id="get_counts_by_tag")
+async def get_counts_by_tag(
+    tags: list[str] = Query(description="The tags to get counts for"),
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
-) -> int:
-    """Gets a the count of workflows that include the specified tags and categories"""
+    has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+) -> dict[str, int]:
+    """Counts workflows by tag"""
 
-    return ApiDependencies.invoker.services.workflow_records.get_counts(tags=tags, categories=categories)
+    return ApiDependencies.invoker.services.workflow_records.counts_by_tag(
+        tags=tags, categories=categories, has_been_opened=has_been_opened
+    )
+
+
+@workflows_router.get("/counts_by_category", operation_id="counts_by_category")
+async def counts_by_category(
+    categories: list[WorkflowCategory] = Query(description="The categories to include"),
+    has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+) -> dict[str, int]:
+    """Counts workflows by category"""
+
+    return ApiDependencies.invoker.services.workflow_records.counts_by_category(
+        categories=categories, has_been_opened=has_been_opened
+    )
 
 
 @workflows_router.put(

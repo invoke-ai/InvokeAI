@@ -109,7 +109,8 @@
         "board": "Bacheca",
         "layout": "Schema",
         "row": "Riga",
-        "column": "Colonna"
+        "column": "Colonna",
+        "saveChanges": "Salva modifiche"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -784,7 +785,7 @@
         "serverError": "Errore del Server",
         "connected": "Connesso al server",
         "canceled": "Elaborazione annullata",
-        "uploadFailedInvalidUploadDesc": "Devono essere immagini PNG o JPEG.",
+        "uploadFailedInvalidUploadDesc": "Devono essere immagini PNG, JPEG o WEBP.",
         "parameterSet": "Parametro richiamato",
         "parameterNotSet": "Parametro non richiamato",
         "problemCopyingImage": "Impossibile copiare l'immagine",
@@ -835,9 +836,9 @@
         "linkCopied": "Collegamento copiato",
         "addedToUncategorized": "Aggiunto alle risorse della bacheca $t(boards.uncategorized)",
         "imagesWillBeAddedTo": "Le immagini caricate verranno aggiunte alle risorse della bacheca {{boardName}}.",
-        "uploadFailedInvalidUploadDesc_withCount_one": "Devi caricare al massimo 1 immagine PNG o JPEG.",
-        "uploadFailedInvalidUploadDesc_withCount_many": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
-        "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Devi caricare al massimo 1 immagine PNG, JPEG o WEBP.",
+        "uploadFailedInvalidUploadDesc_withCount_many": "Devi caricare al massimo {{count}} immagini PNG, JPEG o WEBP.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG, JPEG o WEBP.",
         "outOfMemoryErrorDescLocal": "Segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent> per ridurre gli OOM.",
         "pasteFailed": "Incolla non riuscita",
         "pasteSuccess": "Incollato su {{destination}}",
@@ -1704,7 +1705,7 @@
         "saveWorkflow": "Salva flusso di lavoro",
         "openWorkflow": "Apri flusso di lavoro",
         "clearWorkflowSearchFilter": "Cancella il filtro di ricerca del flusso di lavoro",
-        "workflowLibrary": "Libreria",
+        "workflowLibrary": "Libreria flussi di lavoro",
         "workflowSaved": "Flusso di lavoro salvato",
         "unnamedWorkflow": "Flusso di lavoro senza nome",
         "savingWorkflow": "Salvataggio del flusso di lavoro...",
@@ -1734,7 +1735,6 @@
         "userWorkflows": "Flussi di lavoro utente",
         "projectWorkflows": "Flussi di lavoro del progetto",
         "defaultWorkflows": "Flussi di lavoro predefiniti",
-        "uploadAndSaveWorkflow": "Carica nella libreria",
         "chooseWorkflowFromLibrary": "Scegli il flusso di lavoro dalla libreria",
         "deleteWorkflow2": "Vuoi davvero eliminare questo flusso di lavoro? Questa operazione non può essere annullata.",
         "edit": "Modifica",
@@ -1772,7 +1772,19 @@
             "container": "Contenitore",
             "text": "Testo",
             "numberInput": "Ingresso numerico"
-        }
+        },
+        "loadMore": "Carica altro",
+        "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
+        "filterByTags": "Filtra per etichetta",
+        "shared": "Condiviso",
+        "browseWorkflows": "Sfoglia i flussi di lavoro",
+        "resetTags": "Reimposta le etichette",
+        "allLoaded": "Tutti i flussi di lavoro caricati",
+        "saveChanges": "Salva modifiche",
+        "yourWorkflows": "I tuoi flussi di lavoro",
+        "recentlyOpened": "Aperto di recente",
+        "workflowThumbnail": "Miniatura del flusso di lavoro",
+        "private": "Privato"
     },
     "accordions": {
         "compositing": {
@@ -2330,8 +2342,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Editor del flusso di lavoro: nuovo generatore di moduli trascina-e-rilascia per una creazione più facile del flusso di lavoro.",
-            "Altri miglioramenti: messa in coda dei lotti più rapida, migliore ampliamento, selettore colore migliorato e nodi metadati."
+            "Gestione della memoria: nuova impostazione per gli utenti con GPU Nvidia per ridurre l'utilizzo della VRAM.",
+            "Prestazioni: continui miglioramenti alle prestazioni e alla reattività complessive dell'applicazione."
         ]
     },
     "system": {
