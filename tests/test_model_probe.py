@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.config import (
     ModelRepoVariant,
     ModelType,
     ModelVariantType,
+    get_model_discriminator_value
 )
 from invokeai.backend.model_manager.legacy_probe import (
     CkptType,
@@ -171,6 +172,16 @@ def test_regression_against_model_probe(datadir: Path):
             raise ValueError(f"Both probe and classify failed to classify model at path {path}.")
 
 
+def create_fake_configs(config_cls, n):
+    factory_args = {
+        "__use_defaults__": True,
+        "__random_seed__": 1234,
+        "__check_model__": True,
+    }
+    factory = ModelFactory.create_factory(config_cls, **factory_args)
+    return [factory.build() for _ in range(n)]
+
+
 @slow
 def test_serialisation_roundtrip():
     """After classification, models are serialised to json and stored in the database.
@@ -178,16 +189,9 @@ def test_serialisation_roundtrip():
     """
     excluded = {MinimalConfigExample}
     for config_cls in ModelConfigBase.all_config_classes() - excluded:
+
         trials_per_class = 50
-
-        factory_args = {
-            "__use_defaults__": True,
-            "__random_seed__": 1234,
-            "__check_model__": True,
-        }
-        factory = ModelFactory.create_factory(config_cls, **factory_args)
-
-        configs_with_random_data = [factory.build() for _ in range(trials_per_class)]
+        configs_with_random_data = create_fake_configs(config_cls, trials_per_class)
 
         for config in configs_with_random_data:
             as_json = config.model_dump_json()
@@ -195,6 +199,24 @@ def test_serialisation_roundtrip():
             reconstructed = ModelConfigFactory.make_config(as_dict)
             assert isinstance(reconstructed, config_cls)
             assert config.model_dump_json() == reconstructed.model_dump_json()
+
+
+def test_discriminator_tagging_for_config_instances():
+    """Verify that each ModelConfig instance is assigned the correct, unique Pydantic discriminator tag."""
+    excluded = {MinimalConfigExample}
+    config_classes = ModelConfigBase.all_config_classes() - excluded
+
+    tags = {c.get_tag() for c in config_classes}
+    assert len(tags) == len(config_classes), "Each config should have its own unique tag"
+
+    for config_cls in config_classes:
+        expected_tag = config_cls.get_tag().tag
+
+        trials_per_class = 3
+        configs_with_random_data = create_fake_configs(config_cls, trials_per_class)
+
+        for config in configs_with_random_data:
+            assert get_model_discriminator_value(config) == expected_tag
 
 
 def test_inheritance_order():
