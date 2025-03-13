@@ -7,6 +7,7 @@ import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImage
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsLocal } from 'features/system/store/configSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -19,6 +20,7 @@ export const NoContentForViewer = memo(() => {
   const [mainModels, { data }] = useMainModels();
   const isLocal = useAppSelector(selectIsLocal);
   const isEnabled = useFeatureStatus('starterModels');
+  const activeTab = useAppSelector(selectActiveTab);
   const { t } = useTranslation();
 
   const showStarterBundles = useMemo(() => {
@@ -38,10 +40,10 @@ export const NoContentForViewer = memo(() => {
   }
 
   return (
-    <Flex flexDir="column" gap={8} alignItems="center" textAlign="center" maxW="600px">
+    <Flex flexDir="column" gap={8} alignItems="center" textAlign="center" maxW="400px">
       <InvokeLogoIcon w={32} h={32} />
       <Flex flexDir="column" gap={4} alignItems="center" textAlign="center">
-        {isLocal ? <GetStartedLocal /> : <GetStartedCommercial />}
+        {isLocal ? <GetStartedLocal /> : activeTab === 'workflows' ? <GetStartedWorkflows /> : <GetStartedCommercial />}
         {showStarterBundles && <StarterBundlesCallout />}
         <Divider />
         <GettingStartedVideosCallout />
@@ -99,6 +101,14 @@ const GetStartedCommercial = () => {
   return (
     <Text fontSize="md" color="base.200">
       <Trans i18nKey="newUserExperience.toGetStarted" components={{ StrongComponent }} />
+    </Text>
+  );
+};
+
+const GetStartedWorkflows = () => {
+  return (
+    <Text fontSize="md" color="base.200">
+      <Trans i18nKey="newUserExperience.toGetStartedWorkflow" components={{ StrongComponent }} />
     </Text>
   );
 };
