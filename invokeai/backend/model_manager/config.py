@@ -619,6 +619,8 @@ def get_model_discriminator_value(v: Any) -> str:
         format_ = v.format.value
         type_ = v.type.value
         variant_ = getattr(v, "variant", None)
+        if variant_:
+            variant_ = variant_.value
 
     # Ideally, each config would be uniquely identified with a combination of fields
     # i.e. (type, format, variant) without any special cases. Alas...
