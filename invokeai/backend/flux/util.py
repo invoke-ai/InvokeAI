@@ -20,6 +20,7 @@ class ModelSpec:
 
 max_seq_lengths: Dict[str, Literal[256, 512]] = {
     "flux-dev": 512,
+    "flux-dev-fill": 512,
     "flux-schnell": 256,
 }
 
@@ -67,5 +68,20 @@ params = {
         theta=10_000,
         qkv_bias=True,
         guidance_embed=False,
+    ),
+    "flux-dev-fill": FluxParams(
+        in_channels=384,
+        out_channels=64,
+        vec_in_dim=768,
+        context_in_dim=4096,
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=True,
     ),
 }
