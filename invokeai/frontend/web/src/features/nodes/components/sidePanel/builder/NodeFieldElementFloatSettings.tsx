@@ -1,5 +1,6 @@
 import { CompositeNumberInput, Flex, FormControl, FormLabel, Select, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
 import { useFloatField } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/useFloatField';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
 import { fieldFloatValueChanged } from 'features/nodes/store/nodesSlice';
@@ -8,7 +9,7 @@ import type { FloatFieldInputInstance, FloatFieldInputTemplate } from 'features/
 import { type NodeFieldFloatSettings, zNumberComponent } from 'features/nodes/types/workflow';
 import { constrainNumber } from 'features/nodes/util/constrainNumber';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -71,23 +72,33 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
       min: config.min !== undefined ? undefined : floatField.min,
     };
     dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-  }, [config, dispatch, floatField.min, id]);
+  }, [config, dispatch, floatField, id]);
 
   const onChange = useCallback(
-    (v: number) => {
+    (min: number) => {
       const newConfig: NodeFieldFloatSettings = {
         ...config,
-        min: v,
+        min,
       };
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
 
       // We may need to update the value if it is outside the new min/max range
       const constrained = constrainNumber(field.value, floatField, newConfig);
       if (field.value !== constrained) {
-        dispatch(fieldFloatValueChanged({ nodeId, fieldName, value: v }));
+        dispatch(fieldFloatValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
     [config, dispatch, field.value, fieldName, floatField, id, nodeId]
+  );
+
+  const constraintMin = useMemo(
+    () => roundUpToMultiple(floatField.min, floatField.step),
+    [floatField.min, floatField.step]
+  );
+
+  const constraintMax = useMemo(
+    () => (config.max ?? floatField.max) - floatField.step,
+    [config.max, floatField.max, floatField.step]
   );
 
   return (
@@ -101,8 +112,9 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         isDisabled={config.min === undefined}
         value={config.min === undefined ? (`${floatField.min} (inherited)` as unknown as number) : config.min}
         onChange={onChange}
-        min={floatField.min}
-        max={(config.max ?? floatField.max) - 0.1}
+        min={constraintMin}
+        max={constraintMax}
+        step={floatField.step}
       />
     </FormControl>
   );
@@ -122,13 +134,13 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
       max: config.max !== undefined ? undefined : floatField.max,
     };
     dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-  }, [config, dispatch, floatField.max, id]);
+  }, [config, dispatch, floatField, id]);
 
   const onChange = useCallback(
-    (v: number) => {
+    (max: number) => {
       const newConfig: NodeFieldFloatSettings = {
         ...config,
-        max: v,
+        max,
       };
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
 
@@ -139,6 +151,16 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
       }
     },
     [config, dispatch, field.value, fieldName, floatField, id, nodeId]
+  );
+
+  const constraintMin = useMemo(
+    () => (config.min ?? floatField.min) + floatField.step,
+    [config.min, floatField.min, floatField.step]
+  );
+
+  const constraintMax = useMemo(
+    () => roundDownToMultiple(floatField.max, floatField.step),
+    [floatField.max, floatField.step]
   );
 
   return (
@@ -152,8 +174,9 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         isDisabled={config.max === undefined}
         value={config.max === undefined ? (`${floatField.max} (inherited)` as unknown as number) : config.max}
         onChange={onChange}
-        min={(config.min ?? floatField.min) + 0.1}
-        max={floatField.max}
+        min={constraintMin}
+        max={constraintMax}
+        step={floatField.step}
       />
     </FormControl>
   );

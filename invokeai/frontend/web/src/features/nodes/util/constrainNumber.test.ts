@@ -29,6 +29,27 @@ describe('constrainNumber', () => {
     expect(constrainNumber(11, constraints)).toEqual(10);
   });
 
+  it('should always prefer to round to a multiple rather than the nearest value within the min and max', () => {
+    const constraints = { min: 0, max: 10, step: 3 };
+    expect(constrainNumber(1, constraints)).toEqual(0);
+    expect(constrainNumber(2, constraints)).toEqual(3);
+    expect(constrainNumber(3, constraints)).toEqual(3);
+    expect(constrainNumber(4, constraints)).toEqual(3);
+    expect(constrainNumber(7, constraints)).toEqual(6);
+    expect(constrainNumber(8, constraints)).toEqual(9);
+    expect(constrainNumber(9, constraints)).toEqual(9);
+
+    expect(constrainNumber(12, { min: 7, max: 12, step: 5 })).toEqual(10);
+    expect(constrainNumber(13, { min: 7, max: 12, step: 5 })).toEqual(10);
+    expect(constrainNumber(14, { min: 7, max: 12, step: 5 })).toEqual(10);
+
+    expect(constrainNumber(3, { min: 7, max: 12, step: 5 })).toEqual(10);
+    expect(constrainNumber(4, { min: 7, max: 12, step: 5 })).toEqual(10);
+    expect(constrainNumber(5, { min: 7, max: 12, step: 5 })).toEqual(10);
+
+    expect(constrainNumber(42, { min: 43, max: 81, step: 8 })).toEqual(48);
+  });
+
   it('should handle negative multiples', () => {
     const constraints = { min: -10, max: 10, step: 3 };
     expect(constrainNumber(-9, constraints)).toEqual(-9);
@@ -52,7 +73,7 @@ describe('constrainNumber', () => {
     // Value at 9 would normally round to 8
     expect(constrainNumber(9, constraints)).toEqual(8);
     // Value at 11 would normally round to 12, but max is 10
-    expect(constrainNumber(11, constraints)).toEqual(10);
+    expect(constrainNumber(11, constraints)).toEqual(8);
   });
 
   it('should handle decimal multiples', () => {

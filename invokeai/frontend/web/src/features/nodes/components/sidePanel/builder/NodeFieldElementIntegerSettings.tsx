@@ -1,5 +1,6 @@
 import { CompositeNumberInput, Flex, FormControl, FormLabel, Select, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { roundDownToMultiple, roundUpToMultiple } from 'common/util/roundDownToMultiple';
 import { useIntegerField } from 'features/nodes/components/flow/nodes/Invocation/fields/IntegerField/useIntegerField';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
 import { fieldIntegerValueChanged } from 'features/nodes/store/nodesSlice';
@@ -9,7 +10,7 @@ import type { NodeFieldIntegerSettings } from 'features/nodes/types/workflow';
 import { zNumberComponent } from 'features/nodes/types/workflow';
 import { constrainNumber } from 'features/nodes/util/constrainNumber';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -64,32 +65,42 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
   const dispatch = useAppDispatch();
   const field = useInputFieldInstance<IntegerFieldInputInstance>(nodeId, fieldName);
 
-  const floatField = useIntegerField(nodeId, fieldName, fieldTemplate);
+  const integerField = useIntegerField(nodeId, fieldName, fieldTemplate);
 
   const onToggleSetting = useCallback(() => {
     const newConfig: NodeFieldIntegerSettings = {
       ...config,
-      min: config.min !== undefined ? undefined : floatField.min,
+      min: config.min !== undefined ? undefined : integerField.min,
     };
+
     dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-  }, [config, dispatch, floatField.min, id]);
+  }, [config, dispatch, integerField.min, id]);
 
   const onChange = useCallback(
-    (v: number) => {
+    (min: number) => {
       const newConfig: NodeFieldIntegerSettings = {
         ...config,
-        min: v,
+        min,
       };
-
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
 
       // We may need to update the value if it is outside the new min/max range
-      const constrained = constrainNumber(field.value, { ...floatField }, newConfig);
+      const constrained = constrainNumber(field.value, integerField, newConfig);
       if (field.value !== constrained) {
         dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
-    [config, dispatch, field.value, fieldName, floatField, id, nodeId]
+    [config, dispatch, id, field, integerField, nodeId, fieldName]
+  );
+
+  const constraintMin = useMemo(
+    () => roundUpToMultiple(integerField.min, integerField.step),
+    [integerField.min, integerField.step]
+  );
+
+  const constraintMax = useMemo(
+    () => (config.max ?? integerField.max) - integerField.step,
+    [config.max, integerField.max, integerField.step]
   );
 
   return (
@@ -101,10 +112,11 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
       <CompositeNumberInput
         w="full"
         isDisabled={config.min === undefined}
-        value={config.min === undefined ? (`${floatField.min} (inherited)` as unknown as number) : config.min}
+        value={config.min ?? (`${integerField.min} (inherited)` as unknown as number)}
         onChange={onChange}
-        min={floatField.min}
-        max={(config.max ?? floatField.max) - 1}
+        min={constraintMin}
+        max={constraintMax}
+        step={integerField.step}
       />
     </FormControl>
   );
@@ -116,32 +128,42 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
   const dispatch = useAppDispatch();
   const field = useInputFieldInstance<IntegerFieldInputInstance>(nodeId, fieldName);
 
-  const floatField = useIntegerField(nodeId, fieldName, fieldTemplate);
+  const integerField = useIntegerField(nodeId, fieldName, fieldTemplate);
 
   const onToggleSetting = useCallback(() => {
     const newConfig: NodeFieldIntegerSettings = {
       ...config,
-      max: config.max !== undefined ? undefined : floatField.max,
+      max: config.max !== undefined ? undefined : integerField.max,
     };
     dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-  }, [config, dispatch, floatField.max, id]);
+  }, [config, dispatch, integerField.max, id]);
 
   const onChange = useCallback(
-    (v: number) => {
+    (max: number) => {
       const newConfig: NodeFieldIntegerSettings = {
         ...config,
-        max: v,
+        max,
       };
 
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
 
       // We may need to update the value if it is outside the new min/max range
-      const constrained = constrainNumber(field.value, floatField, newConfig);
+      const constrained = constrainNumber(field.value, integerField, newConfig);
       if (field.value !== constrained) {
         dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
-    [config, dispatch, field.value, fieldName, floatField, id, nodeId]
+    [config, dispatch, field.value, fieldName, integerField, id, nodeId]
+  );
+
+  const constraintMin = useMemo(
+    () => (config.min ?? integerField.min) + integerField.step,
+    [config.min, integerField.min, integerField.step]
+  );
+
+  const constraintMax = useMemo(
+    () => roundDownToMultiple(integerField.max, integerField.step),
+    [integerField.max, integerField.step]
   );
 
   return (
@@ -153,10 +175,11 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
       <CompositeNumberInput
         w="full"
         isDisabled={config.max === undefined}
-        value={config.max === undefined ? (`${floatField.max} (inherited)` as unknown as number) : config.max}
+        value={config.max ?? (`${integerField.max} (inherited)` as unknown as number)}
         onChange={onChange}
-        min={(config.min ?? floatField.min) + 1}
-        max={floatField.max}
+        min={constraintMin}
+        max={constraintMax}
+        step={integerField.step}
       />
     </FormControl>
   );
