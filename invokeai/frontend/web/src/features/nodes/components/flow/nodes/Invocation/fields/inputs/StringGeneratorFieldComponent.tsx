@@ -74,7 +74,7 @@ export const StringGeneratorFieldInputComponent = memo(
     }, [field, resolveAndSetValuesAsString]);
 
     return (
-      <Flex flexDir="column" gap={2}>
+      <Flex flexDir="column" gap={2} flexGrow={1}>
         <Select
           className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
           onChange={onChangeGeneratorType}
