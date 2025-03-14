@@ -3,20 +3,20 @@ from typing import Optional
 
 import torch
 
-from invokeai.backend.model_manager import (
-    AnyModel,
-    AnyModelConfig,
-    BaseModelType,
-    ModelFormat,
-    ModelType,
-    SubModelType,
-)
 from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
     CheckpointConfigBase,
     DiffusersConfigBase,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.taxonomy import (
+    AnyModel,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+)
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.CogView4, type=ModelType.Main, format=ModelFormat.Diffusers)
