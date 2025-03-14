@@ -12970,7 +12970,7 @@ export type components = {
              * @description Input image.
              * @default null
              */
-            images?: components["schemas"]["ImageField"][] | components["schemas"]["ImageField"] | null;
+            images?: (components["schemas"]["ImageField"][] | components["schemas"]["ImageField"]) | null;
             /**
              * Prompt
              * @description Input text prompt.
