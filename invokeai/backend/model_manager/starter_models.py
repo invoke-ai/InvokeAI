@@ -614,6 +614,16 @@ flux_redux = StarterModel(
 )
 # endregion
 
+# region FLUX Fill
+flux_fill = StarterModel(
+    name="FLUX Fill",
+    base=BaseModelType.Flux,
+    source="black-forest-labs/FLUX.1-Fill-dev::flux1-fill-dev.safetensors",
+    description="FLUX Fill model (for inpainting).",
+    type=ModelType.Main,
+)
+# endregion
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
@@ -683,6 +693,7 @@ STARTER_MODELS: list[StarterModel] = [
     clip_l_encoder,
     siglip,
     flux_redux,
+    flux_fill,
 ]
 
 sd1_bundle: list[StarterModel] = [
