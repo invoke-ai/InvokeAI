@@ -77,7 +77,6 @@ const zNodeFieldFloatSettings = z.object({
   component: zNumberComponent.default('number-input'),
   min: z.number().optional(),
   max: z.number().optional(),
-  step: z.number().optional(),
 });
 export const getFloatFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
 export type NodeFieldFloatSettings = z.infer<typeof zNodeFieldFloatSettings>;
@@ -88,7 +87,6 @@ const zNodeFieldIntegerSettings = z.object({
   component: zNumberComponent.default('number-input'),
   min: z.number().optional(),
   max: z.number().optional(),
-  step: z.number().optional(),
 });
 export type NodeFieldIntegerSettings = z.infer<typeof zNodeFieldIntegerSettings>;
 export const getIntegerFieldSettingsDefaults = (): NodeFieldIntegerSettings => zNodeFieldIntegerSettings.parse({});
