@@ -252,7 +252,7 @@ export const Flow = memo(() => {
     id: 'pasteSelection',
     category: 'workflows',
     callback: pasteSelection,
-    options: { preventDefault: true },
+    options: { enabled: isWorkflowsFocused, preventDefault: true },
     dependencies: [pasteSelection],
   });
 
@@ -260,7 +260,7 @@ export const Flow = memo(() => {
     id: 'pasteSelectionWithEdges',
     category: 'workflows',
     callback: pasteSelectionWithEdges,
-    options: { preventDefault: true },
+    options: { enabled: isWorkflowsFocused, preventDefault: true },
     dependencies: [pasteSelectionWithEdges],
   });
 
@@ -270,7 +270,7 @@ export const Flow = memo(() => {
     callback: () => {
       dispatch(undo());
     },
-    options: { enabled: mayUndo, preventDefault: true },
+    options: { enabled: isWorkflowsFocused && mayUndo, preventDefault: true },
     dependencies: [mayUndo],
   });
 
@@ -280,7 +280,7 @@ export const Flow = memo(() => {
     callback: () => {
       dispatch(redo());
     },
-    options: { enabled: mayRedo, preventDefault: true },
+    options: { enabled: isWorkflowsFocused && mayRedo, preventDefault: true },
     dependencies: [mayRedo],
   });
 
