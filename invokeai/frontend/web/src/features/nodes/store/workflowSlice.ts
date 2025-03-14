@@ -186,7 +186,6 @@ export const workflowSlice = createSlice({
     ) => {
       const { formFieldInitialValues } = action.payload;
       state.formFieldInitialValues = formFieldInitialValues;
-      state.isTouched = true;
     },
   },
   extraReducers: (builder) => {
