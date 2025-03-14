@@ -116,6 +116,8 @@
         "dontShowMeThese": "Don't show me these",
         "editor": "Editor",
         "error": "Error",
+        "error_withCount_one": "{{count}} error",
+        "error_withCount_other": "{{count}} errors",
         "file": "File",
         "folder": "Folder",
         "format": "format",
