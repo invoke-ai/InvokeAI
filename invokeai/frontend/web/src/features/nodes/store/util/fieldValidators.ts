@@ -4,20 +4,29 @@ import type {
   FieldInputTemplate,
   FloatFieldCollectionInputTemplate,
   FloatFieldCollectionValue,
+  FloatFieldInputTemplate,
+  FloatFieldValue,
   ImageFieldCollectionInputTemplate,
   ImageFieldCollectionValue,
   IntegerFieldCollectionInputTemplate,
   IntegerFieldCollectionValue,
+  IntegerFieldInputTemplate,
+  IntegerFieldValue,
+  StatefulFieldValue,
   StringFieldCollectionInputTemplate,
   StringFieldCollectionValue,
 } from 'features/nodes/types/field';
 import {
   isFloatFieldCollectionInputInstance,
   isFloatFieldCollectionInputTemplate,
+  isFloatFieldInputInstance,
+  isFloatFieldInputTemplate,
   isImageFieldCollectionInputInstance,
   isImageFieldCollectionInputTemplate,
   isIntegerFieldCollectionInputInstance,
   isIntegerFieldCollectionInputTemplate,
+  isIntegerFieldInputInstance,
+  isIntegerFieldInputTemplate,
   isStringFieldCollectionInputInstance,
   isStringFieldCollectionInputTemplate,
 } from 'features/nodes/types/field';
@@ -25,10 +34,15 @@ import { type InvocationNode, type InvocationTemplate, isInvocationNode } from '
 import { t } from 'i18next';
 import { assert } from 'tsafe';
 
-const validateImageFieldCollectionValue = (
-  value: NonNullable<ImageFieldCollectionValue>,
-  template: ImageFieldCollectionInputTemplate
-): string[] => {
+type FieldValidationFunc<TValue extends StatefulFieldValue, TTemplate extends FieldInputTemplate> = (
+  value: TValue,
+  template: TTemplate
+) => string[];
+
+const validateImageFieldCollectionValue: FieldValidationFunc<
+  NonNullable<ImageFieldCollectionValue>,
+  ImageFieldCollectionInputTemplate
+> = (value, template) => {
   const reasons: string[] = [];
   const { minItems, maxItems } = template;
   const count = value.length;
@@ -49,10 +63,10 @@ const validateImageFieldCollectionValue = (
   return reasons;
 };
 
-const validateStringFieldCollectionValue = (
-  value: NonNullable<StringFieldCollectionValue>,
-  template: StringFieldCollectionInputTemplate
-): string[] => {
+const validateStringFieldCollectionValue: FieldValidationFunc<
+  NonNullable<StringFieldCollectionValue>,
+  StringFieldCollectionInputTemplate
+> = (value, template) => {
   const reasons: string[] = [];
   const { minItems, maxItems, minLength, maxLength } = template;
   const count = value.length;
@@ -82,10 +96,10 @@ const validateStringFieldCollectionValue = (
   return reasons;
 };
 
-const validateNumberFieldCollectionValue = (
-  value: NonNullable<IntegerFieldCollectionValue> | NonNullable<FloatFieldCollectionValue>,
-  template: IntegerFieldCollectionInputTemplate | FloatFieldCollectionInputTemplate
-): string[] => {
+const validateNumberFieldCollectionValue: FieldValidationFunc<
+  NonNullable<IntegerFieldCollectionValue> | NonNullable<FloatFieldCollectionValue>,
+  IntegerFieldCollectionInputTemplate | FloatFieldCollectionInputTemplate
+> = (value, template) => {
   const reasons: string[] = [];
   const { minItems, maxItems, minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf } = template;
   const count = value.length;
@@ -124,6 +138,32 @@ const validateNumberFieldCollectionValue = (
   return reasons;
 };
 
+const validateNumberFieldValue: FieldValidationFunc<
+  FloatFieldValue | IntegerFieldValue,
+  FloatFieldInputTemplate | IntegerFieldInputTemplate
+> = (value, template) => {
+  const reasons: string[] = [];
+  const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf } = template;
+
+  if (maximum !== undefined && value > maximum) {
+    reasons.push(t('parameters.invoke.collectionNumberGTMax', { value, maximum }));
+  }
+  if (minimum !== undefined && value < minimum) {
+    reasons.push(t('parameters.invoke.collectionNumberLTMin', { value, minimum }));
+  }
+  if (exclusiveMaximum !== undefined && value >= exclusiveMaximum) {
+    reasons.push(t('parameters.invoke.collectionNumberGTExclusiveMax', { value, exclusiveMaximum }));
+  }
+  if (exclusiveMinimum !== undefined && value <= exclusiveMinimum) {
+    reasons.push(t('parameters.invoke.collectionNumberLTExclusiveMin', { value, exclusiveMinimum }));
+  }
+  if (multipleOf !== undefined && value % multipleOf !== 0) {
+    reasons.push(t('parameters.invoke.collectionNumberNotMultipleOf', { value, multipleOf }));
+  }
+
+  return reasons;
+};
+
 type NodeError = {
   type: 'node-error';
   nodeId: string;
@@ -147,6 +187,16 @@ const getFieldErrorPrefix = (
   return `${node.data.label || nodeTemplate.title} -> ${field.label || fieldTemplate.title}`;
 };
 
+const getIssuesToFieldErrorsMapFunc =
+  (nodeId: string, fieldName: string, prefix: string): ((issue: string) => FieldError) =>
+  (issue: string) => ({
+    type: 'field-error',
+    nodeId,
+    fieldName,
+    prefix,
+    issue,
+  });
+
 export const getFieldErrors = (
   node: InvocationNode,
   nodeTemplate: InvocationTemplate,
@@ -156,6 +206,7 @@ export const getFieldErrors = (
 ): FieldError[] => {
   const errors: FieldError[] = [];
   const prefix = getFieldErrorPrefix(node, nodeTemplate, field, fieldTemplate);
+  const issueToFieldError = getIssuesToFieldErrorsMapFunc(node.data.id, field.name, prefix);
 
   const nodeId = node.data.id;
   const fieldName = field.name;
@@ -176,68 +227,21 @@ export const getFieldErrors = (
     });
   } else if (isConnected) {
     // Connected fields have no value to validate - they are OK
-  } else if (
-    field.value &&
-    isImageFieldCollectionInputTemplate(fieldTemplate) &&
-    isImageFieldCollectionInputInstance(field)
-  ) {
-    const issues = validateImageFieldCollectionValue(field.value, fieldTemplate);
-    errors.push(
-      ...issues.map<FieldError>((issue) => ({
-        type: 'field-error',
-        nodeId,
-        fieldName,
-        prefix,
-        issue,
-      }))
-    );
-  } else if (
-    field.value &&
-    isStringFieldCollectionInputTemplate(fieldTemplate) &&
-    isStringFieldCollectionInputInstance(field)
-  ) {
-    const issues = validateStringFieldCollectionValue(field.value, fieldTemplate);
-    errors.push(
-      ...issues.map<FieldError>((issue) => ({
-        type: 'field-error',
-        nodeId,
-        fieldName,
-        prefix,
-        issue,
-      }))
-    );
-  } else if (
-    field.value &&
-    isIntegerFieldCollectionInputTemplate(fieldTemplate) &&
-    isIntegerFieldCollectionInputInstance(field)
-  ) {
-    const issues = validateNumberFieldCollectionValue(field.value, fieldTemplate);
-    errors.push(
-      ...issues.map<FieldError>((issue) => ({
-        type: 'field-error',
-        nodeId,
-        fieldName,
-        prefix,
-        issue,
-      }))
-    );
-  } else if (
-    field.value &&
-    isFloatFieldCollectionInputTemplate(fieldTemplate) &&
-    isFloatFieldCollectionInputInstance(field)
-  ) {
-    const issues = validateNumberFieldCollectionValue(field.value, fieldTemplate);
-    errors.push(
-      ...issues.map<FieldError>((issue) => ({
-        type: 'field-error',
-        nodeId,
-        fieldName,
-        prefix,
-        issue,
-      }))
-    );
+  } else if (field.value !== undefined) {
+    if (isImageFieldCollectionInputTemplate(fieldTemplate) && isImageFieldCollectionInputInstance(field)) {
+      errors.push(...validateImageFieldCollectionValue(field.value, fieldTemplate).map(issueToFieldError));
+    } else if (isStringFieldCollectionInputTemplate(fieldTemplate) && isStringFieldCollectionInputInstance(field)) {
+      errors.push(...validateStringFieldCollectionValue(field.value, fieldTemplate).map(issueToFieldError));
+    } else if (isIntegerFieldCollectionInputTemplate(fieldTemplate) && isIntegerFieldCollectionInputInstance(field)) {
+      errors.push(...validateNumberFieldCollectionValue(field.value, fieldTemplate).map(issueToFieldError));
+    } else if (isFloatFieldCollectionInputTemplate(fieldTemplate) && isFloatFieldCollectionInputInstance(field)) {
+      errors.push(...validateNumberFieldCollectionValue(field.value, fieldTemplate).map(issueToFieldError));
+    } else if (isFloatFieldInputTemplate(fieldTemplate) && isFloatFieldInputInstance(field)) {
+      errors.push(...validateNumberFieldValue(field.value, fieldTemplate).map(issueToFieldError));
+    } else if (isIntegerFieldInputTemplate(fieldTemplate) && isIntegerFieldInputInstance(field)) {
+      errors.push(...validateNumberFieldValue(field.value, fieldTemplate).map(issueToFieldError));
+    }
   }
-
   return errors;
 };
 
