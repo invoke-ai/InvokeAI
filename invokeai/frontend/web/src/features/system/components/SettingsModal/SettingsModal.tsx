@@ -30,6 +30,7 @@ import {
   selectSystemShouldAntialiasProgressImage,
   selectSystemShouldConfirmOnDelete,
   selectSystemShouldConfirmOnNewSession,
+  selectSystemShouldEnableHighlightFocusedRegions,
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
   selectSystemShouldShowInvocationProgressDetail,
@@ -38,6 +39,7 @@ import {
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
   setShouldEnableModelDescriptions,
+  setShouldHighlightFocusedRegions,
   setShouldShowInvocationProgressDetail,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
@@ -106,6 +108,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const shouldUseWatermarker = useAppSelector(selectSystemShouldUseWatermarker);
   const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
   const shouldEnableModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
+  const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
   const onToggleConfirmOnNewSession = useCallback(() => {
@@ -178,6 +181,13 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const handleChangeShouldShowInvocationProgressDetail = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setShouldShowInvocationProgressDetail(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangeShouldHighlightFocusedRegions = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldHighlightFocusedRegions(e.target.checked));
     },
     [dispatch]
   );
@@ -261,6 +271,13 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                       <Switch
                         isChecked={shouldEnableModelDescriptions}
                         onChange={handleChangeShouldEnableModelDescriptions}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.enableHighlightFocusedRegions')}</FormLabel>
+                      <Switch
+                        isChecked={shouldHighlightFocusedRegions}
+                        onChange={handleChangeShouldHighlightFocusedRegions}
                       />
                     </FormControl>
                   </StickyScrollable>
