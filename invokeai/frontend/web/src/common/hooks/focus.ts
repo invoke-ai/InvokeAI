@@ -30,7 +30,7 @@ const log = logger('system');
 /**
  * The names of the focus regions.
  */
-type FocusRegionName = 'gallery' | 'layers' | 'canvas' | 'workflows' | 'viewer';
+export type FocusRegionName = 'gallery' | 'layers' | 'canvas' | 'workflows' | 'viewer';
 
 /**
  * A map of focus regions to the elements that are part of that region.
