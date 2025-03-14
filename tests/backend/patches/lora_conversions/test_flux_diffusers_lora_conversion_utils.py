@@ -1,13 +1,13 @@
-import pytest
-import torch
 from unittest import mock
 
+import pytest
+import torch
 
 from invokeai.backend.patches.layers.utils import swap_shift_scale_for_linear_weight
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
+    approximate_flux_adaLN_lora_layer_from_diffusers_state_dict,
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
-    approximate_flux_adaLN_lora_layer_from_diffusers_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
@@ -103,12 +103,19 @@ def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
         lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
 
 
-@pytest.mark.parametrize("layer_sd_keys",[
-    {}, # no keys
-    {'lora_A.weight': [1024, 8], 'lora_B.weight': [8, 512]}, # wrong keys
-    {'lora_up.weight': [1024, 8],}, # missing key
-    {'lora_down.weight': [8, 512],}, # missing key
-])
+@pytest.mark.parametrize(
+    "layer_sd_keys",
+    [
+        {},  # no keys
+        {"lora_A.weight": [1024, 8], "lora_B.weight": [8, 512]},  # wrong keys
+        {
+            "lora_up.weight": [1024, 8],
+        },  # missing key
+        {
+            "lora_down.weight": [8, 512],
+        },  # missing key
+    ],
+)
 def test_approximate_adaLN_from_state_dict_should_only_accept_vanilla_LoRA_format(layer_sd_keys: dict[str, list[int]]):
     """Should only accept the valid state dict"""
     layer_state_dict = keys_to_mock_state_dict(layer_sd_keys)
@@ -117,10 +124,13 @@ def test_approximate_adaLN_from_state_dict_should_only_accept_vanilla_LoRA_forma
         approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(layer_state_dict)
 
 
-@pytest.mark.parametrize("dtype, rtol", [
-   (torch.float32, 1e-4),
-   (torch.half, 1e-3),
-])
+@pytest.mark.parametrize(
+    "dtype, rtol",
+    [
+        (torch.float32, 1e-4),
+        (torch.half, 1e-3),
+    ],
+)
 def test_approximate_adaLN_from_state_dict_should_work(dtype: torch.dtype, rtol: float, rate: float = 0.99):
     """Test that we should approximate good enough adaLN layer from diffusers state dict.
     This should tolorance some kind of errorness respect to input dtype"""
@@ -132,10 +142,7 @@ def test_approximate_adaLN_from_state_dict_should_work(dtype: torch.dtype, rtol:
     up = torch.randn(input_dim, rank, dtype=dtype)
     down = torch.randn(rank, output_dim, dtype=dtype)
 
-    layer_state_dict = {
-        'lora_up.weight': up,
-        'lora_down.weight': down
-    }
+    layer_state_dict = {"lora_up.weight": up, "lora_down.weight": down}
 
     # XXX Layer patcher cast things to f32
     original = up.float() @ down.float()
@@ -151,15 +158,16 @@ def test_approximate_adaLN_from_state_dict_should_work(dtype: torch.dtype, rtol:
 
     assert close_rate > rate
 
+
 def test_adaLN_should_be_approximated_if_present_while_converting():
     """AdaLN layer should be approximated if existed inside given model"""
     state_dict = keys_to_mock_state_dict(flux_diffusers_with_norm_out_state_dict_keys)
 
-    adaLN_layer_key = 'final_layer.adaLN_modulation.1'
+    adaLN_layer_key = "final_layer.adaLN_modulation.1"
     prefixed_layer_key = FLUX_LORA_TRANSFORMER_PREFIX + adaLN_layer_key
 
     with mock.patch(
-        'invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils.approximate_flux_adaLN_lora_layer_from_diffusers_state_dict'
+        "invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils.approximate_flux_adaLN_lora_layer_from_diffusers_state_dict"
     ) as mock_approximate_func:
         model = lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
 

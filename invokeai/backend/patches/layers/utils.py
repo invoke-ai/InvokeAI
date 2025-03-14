@@ -35,13 +35,13 @@ def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> BaseL
         raise ValueError(f"Unsupported lora format: {state_dict.keys()}")
 
 
-
 def swap_shift_scale_for_linear_weight(weight: torch.Tensor) -> torch.Tensor:
     """Swap shift/scale for given linear layer back and forth"""
     # In SD3 and Flux implementation of AdaLayerNormContinuous, it split linear projection output into shift, scale;
     # while in diffusers it split into scale, shift. This will flip them around
-    chunk1, chunk2 = weight.chunk(2, dim=0) 
+    chunk1, chunk2 = weight.chunk(2, dim=0)
     return torch.cat([chunk2, chunk1], dim=0)
+
 
 def decomposite_weight_matric_with_rank(
     delta: torch.Tensor,
@@ -56,7 +56,7 @@ def decomposite_weight_matric_with_rank(
     S_r = S[:rank]
     V_r = V[:, :rank]
 
-    S_sqrt = torch.sqrt(S_r + epsilon) # regularization
+    S_sqrt = torch.sqrt(S_r + epsilon)  # regularization
 
     up = torch.matmul(U_r, torch.diag(S_sqrt))
     down = torch.matmul(torch.diag(S_sqrt), V_r.T)
