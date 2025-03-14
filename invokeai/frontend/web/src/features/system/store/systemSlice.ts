@@ -22,7 +22,7 @@ const initialSystemState: SystemState = {
   logLevel: 'debug',
   logNamespaces: [...zLogNamespace.options],
   shouldShowInvocationProgressDetail: false,
-  shouldHighlightFocusedRegions: true,
+  shouldHighlightFocusedRegions: false,
 };
 
 export const systemSlice = createSlice({
