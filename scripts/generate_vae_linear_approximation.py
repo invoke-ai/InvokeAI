@@ -89,7 +89,7 @@ def train(
     loss_fn = torch.nn.MSELoss()
 
     epoch_pbar = tqdm(range(num_epochs), desc="Training")
-    for epoch in epoch_pbar:
+    for _ in epoch_pbar:
         total_loss = 0.0
         for latent, target in zip(latents, targets, strict=True):
             latent = latent.to(device=device, dtype=dtype)
