@@ -66,11 +66,7 @@ export const useIntegerField = (
 
   const constrainValue = useCallback(
     (v: number) =>
-      constrainNumber(
-        v,
-        { min, max, step: step },
-        { min: overrideMin, max: overrideMax, step: overrideStep }
-      ),
+      constrainNumber(v, { min, max, step: step }, { min: overrideMin, max: overrideMax, step: overrideStep }),
     [max, min, overrideMax, overrideMin, overrideStep, step]
   );
 
