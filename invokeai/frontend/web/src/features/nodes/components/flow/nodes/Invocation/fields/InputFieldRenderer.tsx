@@ -180,15 +180,15 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
     }
 
     if (settings.component === 'number-input') {
-      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
+      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
     }
 
     if (settings.component === 'slider') {
-      return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+      return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
     }
 
     if (settings.component === 'number-input-and-slider') {
-      return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+      return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
     }
 
     assert<Equals<never, typeof settings.component>>(false, 'Unexpected settings.component');

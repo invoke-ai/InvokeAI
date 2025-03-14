@@ -7,10 +7,10 @@ import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSl
 import type { IntegerFieldInputInstance, IntegerFieldInputTemplate } from 'features/nodes/types/field';
 import type { NodeFieldIntegerSettings } from 'features/nodes/types/workflow';
 import { zNumberComponent } from 'features/nodes/types/workflow';
+import { constrainNumber } from 'features/nodes/util/constrainNumber';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PartialDeep } from 'type-fest';
 
 type Props = {
   id: string;
@@ -80,10 +80,13 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         ...config,
         min: v,
       };
+
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-      const constrained = constrain(v, floatField, newConfig);
+
+      // We may need to update the value if it is outside the new min/max range
+      const constrained = constrainNumber(field.value, { ...floatField }, newConfig);
       if (field.value !== constrained) {
-        dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value: v }));
+        dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
     [config, dispatch, field.value, fieldName, floatField, id, nodeId]
@@ -101,7 +104,7 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         value={config.min === undefined ? (`${floatField.min} (inherited)` as unknown as number) : config.min}
         onChange={onChange}
         min={floatField.min}
-        max={(config.max ?? floatField.max) - 0.1}
+        max={(config.max ?? floatField.max) - 1}
       />
     </FormControl>
   );
@@ -129,10 +132,13 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         ...config,
         max: v,
       };
+
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-      const constrained = constrain(v, floatField, newConfig);
+
+      // We may need to update the value if it is outside the new min/max range
+      const constrained = constrainNumber(field.value, floatField, newConfig);
       if (field.value !== constrained) {
-        dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value: v }));
+        dispatch(fieldIntegerValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
     [config, dispatch, field.value, fieldName, floatField, id, nodeId]
@@ -149,25 +155,10 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         isDisabled={config.max === undefined}
         value={config.max === undefined ? (`${floatField.max} (inherited)` as unknown as number) : config.max}
         onChange={onChange}
-        min={(config.min ?? floatField.min) + 0.1}
+        min={(config.min ?? floatField.min) + 1}
         max={floatField.max}
       />
     </FormControl>
   );
 });
 SettingMax.displayName = 'SettingMax';
-
-type NumberConstraints = { min: number; max: number; step: number };
-
-const constrain = (v: number, constraints: NumberConstraints, overrides: PartialDeep<NumberConstraints>) => {
-  const min = overrides.min ?? constraints.min;
-  const max = overrides.max ?? constraints.max;
-  const step = overrides.step ?? constraints.step;
-
-  console.log({ min, max, step });
-
-  const _v = Math.min(max, Math.max(min, v));
-  const _diff = _v - min;
-  const _steps = Math.round(_diff / step);
-  return min + _steps * step;
-};
