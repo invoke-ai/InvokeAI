@@ -43,4 +43,5 @@ export interface SystemState {
   logLevel: LogLevel;
   logNamespaces: LogNamespace[];
   shouldShowInvocationProgressDetail: boolean;
+  shouldHighlightFocusedRegions: boolean;
 }
