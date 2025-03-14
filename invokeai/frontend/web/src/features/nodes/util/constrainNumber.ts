@@ -1,6 +1,6 @@
 import type { PartialDeep } from 'type-fest';
 
-type NumberConstraints = { min: number; max: number; multipleOf?: number };
+type NumberConstraints = { min: number; max: number; step?: number };
 
 /**
  * Constrain a number to a range and round to the nearest multiple of a given value.
@@ -16,7 +16,7 @@ export const constrainNumber = (
 ) => {
   const min = overrides?.min ?? constraints.min;
   const max = overrides?.max ?? constraints.max;
-  const multipleOf = overrides?.multipleOf ?? constraints.multipleOf;
+  const multipleOf = overrides?.step ?? constraints.step;
 
   if (multipleOf === undefined) {
     return Math.min(Math.max(v, min), max);

@@ -6,6 +6,7 @@ import { fieldFloatValueChanged } from 'features/nodes/store/nodesSlice';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
 import type { FloatFieldInputInstance, FloatFieldInputTemplate } from 'features/nodes/types/field';
 import { type NodeFieldFloatSettings, zNumberComponent } from 'features/nodes/types/workflow';
+import { constrainNumber } from 'features/nodes/util/constrainNumber';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -79,7 +80,9 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         min: v,
       };
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-      const constrained = constrain(v, floatField, newConfig);
+
+      // We may need to update the value if it is outside the new min/max range
+      const constrained = constrainNumber(field.value, floatField, newConfig);
       if (field.value !== constrained) {
         dispatch(fieldFloatValueChanged({ nodeId, fieldName, value: v }));
       }
@@ -128,9 +131,11 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
         max: v,
       };
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-      const constrained = constrain(v, floatField, newConfig);
+
+      // We may need to update the value if it is outside the new min/max range
+      const constrained = constrainNumber(field.value, floatField, newConfig);
       if (field.value !== constrained) {
-        dispatch(fieldFloatValueChanged({ nodeId, fieldName, value: v }));
+        dispatch(fieldFloatValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
     [config, dispatch, field.value, fieldName, floatField, id, nodeId]
@@ -154,14 +159,3 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
   );
 });
 SettingMax.displayName = 'SettingMax';
-
-const constrain = (v: number, fieldSettings: ReturnType<typeof useFloatField>, overrides: NodeFieldFloatSettings) => {
-  const min = overrides.min ?? fieldSettings.min;
-  const max = overrides.max ?? fieldSettings.max;
-  const step = overrides.step ?? fieldSettings.step;
-
-  const _v = Math.min(max, Math.max(min, v));
-  const _diff = _v - min;
-  const _steps = Math.round(_diff / step);
-  return min + _steps * step;
-};

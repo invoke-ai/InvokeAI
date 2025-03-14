@@ -68,8 +68,8 @@ export const useFloatField = (
     (v: number) =>
       constrainNumber(
         v,
-        { min, max, multipleOf: step },
-        { min: overrideMin, max: overrideMax, multipleOf: overrideStep }
+        { min, max, step: step },
+        { min: overrideMin, max: overrideMax, step: overrideStep }
       ),
     [max, min, overrideMax, overrideMin, overrideStep, step]
   );
