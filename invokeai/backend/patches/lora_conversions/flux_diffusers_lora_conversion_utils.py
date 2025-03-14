@@ -2,10 +2,14 @@ from typing import Dict
 
 import torch
 
-from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
-from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict, swap_shift_scale_for_linear_weight, decomposite_weight_matric_with_rank
+from invokeai.backend.patches.layers.utils import (
+    any_lora_layer_from_state_dict,
+    decomposite_weight_matric_with_rank,
+    swap_shift_scale_for_linear_weight,
+)
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
@@ -39,26 +43,27 @@ def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Te
 
     return all_keys_in_peft_format and (transformer_keys_present or base_model_keys_present)
 
+
 def approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRALayer:
-    '''Approximate given diffusers AdaLN loRA layer in our Flux model'''
+    """Approximate given diffusers AdaLN loRA layer in our Flux model"""
 
-    if not "lora_up.weight" in state_dict:
+    if "lora_up.weight" not in state_dict:
         raise ValueError(f"Unsupported lora format: {state_dict.keys()}, missing lora_up")
-    
-    if not "lora_down.weight" in state_dict:
-        raise ValueError(f"Unsupported lora format: {state_dict.keys()}, missing lora_down")
-    
-    up = state_dict.pop('lora_up.weight')
-    down = state_dict.pop('lora_down.weight')
 
-    # layer-patcher upcast things to f32, 
+    if "lora_down.weight" not in state_dict:
+        raise ValueError(f"Unsupported lora format: {state_dict.keys()}, missing lora_down")
+
+    up = state_dict.pop("lora_up.weight")
+    down = state_dict.pop("lora_down.weight")
+
+    # layer-patcher upcast things to f32,
     # we want to maintain a better precison for this one
     dtype = torch.float32
 
     device = up.device
     up_shape = up.shape
     down_shape = down.shape
-    
+
     # desired low rank
     rank = up_shape[1]
 
@@ -66,19 +71,19 @@ def approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(state_dict: Dict
     up = up.to(torch.float32)
     down = down.to(torch.float32)
 
-    weight  = up.reshape(up_shape[0], -1) @ down.reshape(down_shape[0], -1)
+    weight = up.reshape(up_shape[0], -1) @ down.reshape(down_shape[0], -1)
 
     # swap to our linear format
     swapped = swap_shift_scale_for_linear_weight(weight)
 
     _up, _down = decomposite_weight_matric_with_rank(swapped, rank)
 
-    assert(_up.shape == up_shape)
-    assert(_down.shape == down_shape)
+    assert _up.shape == up_shape
+    assert _down.shape == down_shape
 
     # down scaling to original dtype, device
-    state_dict['lora_up.weight'] = _up.to(dtype).to(device=device)
-    state_dict['lora_down.weight'] = _down.to(dtype).to(device=device)
+    state_dict["lora_up.weight"] = _up.to(dtype).to(device=device)
+    state_dict["lora_down.weight"] = _down.to(dtype).to(device=device)
 
     return LoRALayer.from_state_dict_values(state_dict)
 
@@ -148,7 +153,7 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
             src_layer_dict = grouped_state_dict.pop(src_key)
             values = get_lora_layer_values(src_layer_dict)
             layers[dst_key] = approximate_flux_adaLN_lora_layer_from_diffusers_state_dict(values)
-    
+
     def add_qkv_lora_layer_if_present(
         src_keys: list[str],
         src_weight_shapes: list[tuple[int, int]],
@@ -291,8 +296,8 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     # Final layer.
     add_lora_layer_if_present("proj_out", "final_layer.linear")
     add_adaLN_lora_layer_if_present(
-        'norm_out.linear',
-        'final_layer.adaLN_modulation.1',
+        "norm_out.linear",
+        "final_layer.adaLN_modulation.1",
     )
 
     # Assert that all keys were processed.
