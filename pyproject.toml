@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools", "pip", "wheel"]
+requires = ["setuptools>=68.0", "pip", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "InvokeAI"
 description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-requires-python = ">=3.10, <3.12"
+requires-python = ">=3.10, <3.13"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -31,6 +31,7 @@ classifiers = [
   'Topic :: Scientific/Engineering :: Artificial Intelligence',
   'Topic :: Scientific/Engineering :: Image Processing',
 ]
+
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate==1.0.1",
@@ -77,8 +78,7 @@ dependencies = [
   "dynamicprompts",
   "einops",
   "facexlib",
-  # Exclude 3.9.1 which has a problem on windows, see https://github.com/matplotlib/matplotlib/issues/28551
-  "matplotlib!=3.9.1",
+  "matplotlib",
   "npyscreen",
   "omegaconf",
   "picklescan",
@@ -94,6 +94,7 @@ dependencies = [
   "scikit-image",
   "semver~=3.0.1",
   "test-tube",
+  "send2trash",
   "windows-curses; sys_platform=='win32'",
 ]
 

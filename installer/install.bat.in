@@ -27,7 +27,7 @@ set err_msg=An error has occurred and the script could not continue.
 echo This script will install InvokeAI and its dependencies.
 echo.
 echo BEFORE YOU START PLEASE MAKE SURE TO DO THE FOLLOWING
-echo 1. Install python 3.10 or 3.11. Python version 3.9 is no longer supported.
+echo 1. Install python 3.10-3.12. Python version 3.9 is no longer supported.
 echo 2. Double-click on the file WinLongPathsEnabled.reg in order to
 echo    enable long path support on your system.
 echo 3. Install the Visual C++ core libraries.
@@ -44,7 +44,7 @@ echo ***** Checking and Updating Python *****
 
 call python --version >.tmp1 2>.tmp2
 if %errorlevel% == 1 (
-   set err_msg=Please install Python 3.10-11. See %INSTRUCTIONS% for details.
+   set err_msg=Please install Python 3.10.12. See %INSTRUCTIONS% for details.
    goto err_exit
 )
 
