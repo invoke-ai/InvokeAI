@@ -24,6 +24,7 @@ import type {
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
   IPAdapterModelFieldInputTemplate,
+  LLaVAModelFieldInputTemplate,
   LoRAModelFieldInputTemplate,
   MainModelFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
@@ -448,6 +449,19 @@ const buildControlLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<Control
   return template;
 };
 
+const buildLLaVAModelFieldInputTemplate: FieldInputTemplateBuilder<LLaVAModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: LLaVAModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
 const buildFluxVAEModelFieldInputTemplate: FieldInputTemplateBuilder<FluxVAEModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -741,6 +755,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   IntegerField: buildIntegerFieldInputTemplate,
   IPAdapterModelField: buildIPAdapterModelFieldInputTemplate,
   LoRAModelField: buildLoRAModelFieldInputTemplate,
+  LLaVAModelField: buildLLaVAModelFieldInputTemplate,
   ModelIdentifierField: buildModelIdentifierFieldInputTemplate,
   MainModelField: buildMainModelFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,

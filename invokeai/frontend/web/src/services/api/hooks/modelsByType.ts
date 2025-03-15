@@ -18,6 +18,7 @@ import {
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
+  isLLaVAModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isNonSDXLMainModelConfig,
@@ -82,6 +83,7 @@ export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);
 export const useIPAdapterOrFLUXReduxModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
+export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);
 
 // const buildModelsSelector =
 //   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>

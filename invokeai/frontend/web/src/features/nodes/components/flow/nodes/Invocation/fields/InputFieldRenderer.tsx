@@ -62,6 +62,8 @@ import {
   isIntegerGeneratorFieldInputTemplate,
   isIPAdapterModelFieldInputInstance,
   isIPAdapterModelFieldInputTemplate,
+  isLLaVAModelFieldInputInstance,
+  isLLaVAModelFieldInputTemplate,
   isLoRAModelFieldInputInstance,
   isLoRAModelFieldInputTemplate,
   isMainModelFieldInputInstance,
@@ -110,6 +112,7 @@ import FluxReduxModelFieldInputComponent from './inputs/FluxReduxModelFieldInput
 import FluxVAEModelFieldInputComponent from './inputs/FluxVAEModelFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
+import LLaVAModelFieldInputComponent from './inputs/LLaVAModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
 import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
@@ -301,6 +304,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <ControlLoRAModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isLLaVAModelFieldInputTemplate(template)) {
+    if (!isLLaVAModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <LLaVAModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isFluxVAEModelFieldInputTemplate(template)) {
