@@ -1,4 +1,4 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library'
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
@@ -19,18 +19,14 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
   height: 'full',
   alignItems: 'center',
   justifyContent: 'center',
-}
+};
 
 const NodeEditor = () => {
   const { data, isLoading } = useGetOpenAPISchemaQuery();
   const { t } = useTranslation();
 
   return (
-    <FocusRegionWrapper
-      region="workflows"
-      layerStyle="first"
-      sx={FOCUS_REGION_STYLES}
-    >
+    <FocusRegionWrapper region="workflows" layerStyle="first" sx={FOCUS_REGION_STYLES}>
       {data && (
         <>
           <Flow />

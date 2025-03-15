@@ -12,7 +12,7 @@ import { ParamDenoisingStrength } from './ParamDenoisingStrength';
 const FOCUS_REGION_STYLES: SystemStyleObject = {
   width: 'full',
   height: 'full',
-}
+};
 
 export const CanvasLayersPanelContent = memo(() => {
   const hasEntities = useAppSelector(selectHasEntities);

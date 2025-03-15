@@ -24,33 +24,33 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
     borderColor: 'transparent',
     pointerEvents: 'none',
     transition: 'border-color 0.1s ease-in-out',
-  }
+  },
 };
 
-const FocusRegionWrapper = memo(({
-  region, focusOnMount = false, sx, children, ...boxProps
-}: FocusRegionWrapperProps) => {
-  const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
+const FocusRegionWrapper = memo(
+  ({ region, focusOnMount = false, sx, children, ...boxProps }: FocusRegionWrapperProps) => {
+    const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
 
-  const ref = useRef<HTMLDivElement>(null);
+    const ref = useRef<HTMLDivElement>(null);
 
-  const options = useMemo(() => ({ focusOnMount }), [focusOnMount]);
+    const options = useMemo(() => ({ focusOnMount }), [focusOnMount]);
 
-  useFocusRegion(region, ref, options);
-  const isFocused = useIsRegionFocused(region);
-  const isHighlighted = isFocused && shouldHighlightFocusedRegions;
+    useFocusRegion(region, ref, options);
+    const isFocused = useIsRegionFocused(region);
+    const isHighlighted = isFocused && shouldHighlightFocusedRegions;
 
-  return (
-    <Box
-      ref={ref}
-      tabIndex={-1}
-      sx={{ ...FOCUS_REGION_STYLES, ...sx}}
-      data-highlighted={isHighlighted ? true : undefined}
-      {...boxProps}
-    >
-      {children}
-    </Box>
-  );
-});
+    return (
+      <Box
+        ref={ref}
+        tabIndex={-1}
+        sx={{ ...FOCUS_REGION_STYLES, ...sx }}
+        data-highlighted={isHighlighted ? true : undefined}
+        {...boxProps}
+      >
+        {children}
+      </Box>
+    );
+  }
+);
 
 FocusRegionWrapper.displayName = 'FocusRegionWrapper';
