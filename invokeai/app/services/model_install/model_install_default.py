@@ -38,9 +38,11 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     CheckpointConfigBase,
     InvalidModelConfigException,
+    ModelConfigBase,
     ModelRepoVariant,
     ModelSourceType,
 )
+from invokeai.backend.model_manager.legacy_probe import ModelProbe
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
@@ -49,7 +51,6 @@ from invokeai.backend.model_manager.metadata import (
     RemoteModelFile,
 )
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
-from invokeai.backend.model_manager.probe import ModelProbe
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
@@ -182,9 +183,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:  # noqa D102
         model_path = Path(model_path)
         config = config or ModelRecordChanges()
-        info: AnyModelConfig = ModelProbe.probe(
-            Path(model_path), config.model_dump(), hash_algo=self._app_config.hashing_algorithm
-        )  # type: ignore
+        info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
         if preferred_name := config.name:
             preferred_name = Path(preferred_name).with_suffix(model_path.suffix)
@@ -644,12 +643,22 @@ class ModelInstallService(ModelInstallServiceBase):
         move(old_path, new_path)
         return new_path
 
+    def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
+        config = config or ModelRecordChanges()
+        hash_algo = self._app_config.hashing_algorithm
+        fields = config.model_dump()
+
+        try:
+            return ModelConfigBase.classify(model_path=model_path, hash_algo=hash_algo, **fields)
+        except InvalidModelConfigException:
+            return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
+
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None
     ) -> str:
         config = config or ModelRecordChanges()
 
-        info = info or ModelProbe.probe(model_path, config.model_dump(), hash_algo=self._app_config.hashing_algorithm)  # type: ignore
+        info = info or self._probe(model_path, config)
 
         model_path = model_path.resolve()
 

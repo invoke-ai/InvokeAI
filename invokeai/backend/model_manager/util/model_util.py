@@ -1,4 +1,4 @@
-"""Utilities for parsing model files, used mostly by probe.py"""
+"""Utilities for parsing model files, used mostly by legacy_probe.py"""
 
 import json
 from pathlib import Path
