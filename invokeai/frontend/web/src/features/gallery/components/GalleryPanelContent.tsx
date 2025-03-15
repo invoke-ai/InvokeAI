@@ -1,4 +1,4 @@
-import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
+import { Box, Button, Collapse, Divider, Flex, IconButton, type SystemStyleObject,useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
@@ -19,6 +19,14 @@ import BoardsSettingsPopover from './Boards/BoardsSettingsPopover';
 import { Gallery } from './Gallery';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
+
+const FOCUS_REGION_STYLES: SystemStyleObject = {
+  width: 'full',
+  height: 'full',
+  position: 'relative',
+  flexDirection: 'column',
+  display: 'flex',
+}
 
 const GalleryPanelContent = () => {
   const { t } = useTranslation();
@@ -48,7 +56,7 @@ const GalleryPanelContent = () => {
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <FocusRegionWrapper region="gallery" position="relative" flexDirection="column" h="full" w="full">
+    <FocusRegionWrapper region="gallery" sx={FOCUS_REGION_STYLES}>
       <Flex alignItems="center" justifyContent="space-between" w="full">
         <Flex flexGrow={1} flexBasis={0}>
           <Button

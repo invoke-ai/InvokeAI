@@ -1,4 +1,4 @@
-import { Box, IconButton } from '@invoke-ai/ui-library';
+import { Box, IconButton, type SystemStyleObject } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
@@ -25,6 +25,17 @@ const useFocusRegionOptions = {
   focusOnMount: true,
 };
 
+const FOCUS_REGION_STYLES: SystemStyleObject = {
+  width: 'full',
+  height: 'full',
+  position: 'absolute',
+  flexDirection: 'column',
+  inset: 0,
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+}
+
 export const ImageViewer = memo(({ closeButton }: Props) => {
   useAssertSingleton('ImageViewer');
   const hasImageToCompare = useAppSelector(selectHasImageToCompare);
@@ -33,17 +44,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
   return (
     <FocusRegionWrapper
       region="viewer"
-      w="full"
-      h="full"
-      position="absolute"
-      flexDirection="column"
-      top={0}
-      right={0}
-      bottom={0}
-      left={0}
-      alignItems="center"
-      justifyContent="center"
-      overflow="hidden"
+      sx={FOCUS_REGION_STYLES}
       layerStyle="first"
       {...useFocusRegionOptions}
     >

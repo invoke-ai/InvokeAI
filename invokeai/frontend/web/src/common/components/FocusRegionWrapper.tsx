@@ -1,17 +1,34 @@
-import { Box, type BoxProps } from '@invoke-ai/ui-library';
+import { Box, type BoxProps, type SystemStyleObject } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { type FocusRegionName, useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { selectSystemShouldEnableHighlightFocusedRegions } from 'features/system/store/systemSlice';
-import { forwardRef, type RefObject, useMemo, useRef } from 'react';
+import { forwardRef, memo, type RefObject, useMemo, useRef } from 'react';
 
 interface FocusRegionWrapperProps extends BoxProps {
   region: FocusRegionName;
   focusOnMount?: boolean;
-  highlightColor?: string;
 }
 
-export const FocusRegionWrapper = forwardRef<HTMLDivElement, FocusRegionWrapperProps>(function RegionHighlighter(
-  { region, focusOnMount = false, highlightColor = 'blue.700', children, ...boxProps },
+const FOCUS_REGION_STYLES: SystemStyleObject = {
+  position: 'relative',
+  '&[data-highlighted="true"]::after': {
+    borderColor: 'blue.700',
+  },
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    inset: 0,
+    zIndex: 1,
+    borderRadius: 'base',
+    border: '2px solid',
+    borderColor: 'transparent',
+    pointerEvents: 'none',
+    transition: 'border-color 0.1s ease-in-out',
+  }
+};
+
+const FocusRegionWrapperComponent = forwardRef<HTMLDivElement, FocusRegionWrapperProps>(function RegionHighlighter(
+  { region, focusOnMount = false, sx, children, ...boxProps },
   forwardedRef
 ) {
   const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
@@ -23,23 +40,14 @@ export const FocusRegionWrapper = forwardRef<HTMLDivElement, FocusRegionWrapperP
 
   useFocusRegion(region, ref, options);
   const isFocused = useIsRegionFocused(region);
+  const isHighlighted = isFocused && shouldHighlightFocusedRegions;
 
   return (
     <Box
       ref={ref}
-      position="relative"
       tabIndex={-1}
-      _after={{
-        content: '""',
-        position: 'absolute',
-        inset: 0,
-        zIndex: 1,
-        borderRadius: 'base',
-        border: '2px solid',
-        borderColor: isFocused && shouldHighlightFocusedRegions ? highlightColor : 'transparent',
-        pointerEvents: 'none',
-        transition: 'border-color 0.1s ease-in-out',
-      }}
+      sx={{ ...FOCUS_REGION_STYLES, ...sx}}
+      data-highlighted={isHighlighted ? true : undefined}
       {...boxProps}
     >
       {children}
@@ -47,4 +55,6 @@ export const FocusRegionWrapper = forwardRef<HTMLDivElement, FocusRegionWrapperP
   );
 });
 
-FocusRegionWrapper.displayName = 'FocusRegionWrapper';
+FocusRegionWrapperComponent.displayName = 'FocusRegionWrapper';
+
+export const FocusRegionWrapper = memo(FocusRegionWrapperComponent);
