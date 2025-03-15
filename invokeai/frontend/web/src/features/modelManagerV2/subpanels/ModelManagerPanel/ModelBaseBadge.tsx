@@ -15,6 +15,7 @@ const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   sdxl: 'invokeBlue',
   'sdxl-refiner': 'invokeBlue',
   flux: 'gold',
+  cogview4: 'orange',
 };
 
 const ModelBaseBadge = ({ base }: Props) => {

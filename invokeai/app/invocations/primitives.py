@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     BoundingBoxField,
+    CogView4ConditioningField,
     ColorField,
     ConditioningField,
     DenoiseMaskField,
@@ -438,6 +439,17 @@ class SD3ConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "SD3ConditioningOutput":
         return cls(conditioning=SD3ConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("cogview4_conditioning_output")
+class CogView4ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a CogView text conditioning tensor."""
+
+    conditioning: CogView4ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "CogView4ConditioningOutput":
+        return cls(conditioning=CogView4ConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

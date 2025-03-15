@@ -1,8 +1,15 @@
 import torch
 
 
-class InpaintExtension:
-    """A class for managing inpainting with FLUX."""
+def assert_broadcastable(*shapes):
+    try:
+        torch.broadcast_shapes(*shapes)
+    except RuntimeError as e:
+        raise AssertionError(f"Shapes {shapes} are not broadcastable.") from e
+
+
+class RectifiedFlowInpaintExtension:
+    """A class for managing inpainting with rectified flow models (e.g. FLUX, SD3, CogView4)."""
 
     def __init__(self, init_latents: torch.Tensor, inpaint_mask: torch.Tensor, noise: torch.Tensor):
         """Initialize InpaintExtension.
@@ -14,7 +21,8 @@ class InpaintExtension:
                 inpainted region with the background. In 'packed' format.
             noise (torch.Tensor): The noise tensor used to noise the init_latents. In 'packed' format.
         """
-        assert init_latents.shape == inpaint_mask.shape == noise.shape
+        assert_broadcastable(init_latents.shape, inpaint_mask.shape, noise.shape)
+
         self._init_latents = init_latents
         self._inpaint_mask = inpaint_mask
         self._noise = noise

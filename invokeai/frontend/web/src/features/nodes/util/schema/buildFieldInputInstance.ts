@@ -17,6 +17,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   SDXLMainModelField: undefined,
   FluxMainModelField: undefined,
   SD3MainModelField: undefined,
+  CogView4MainModelField: undefined,
   SDXLRefinerModelField: undefined,
   StringField: '',
   T2IAdapterModelField: undefined,
