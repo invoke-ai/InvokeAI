@@ -1,4 +1,4 @@
-import { ContextMenu, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { ContextMenu, Flex, IconButton, Menu, MenuButton, MenuList, type SystemStyleObject } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
@@ -23,6 +23,11 @@ import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
 import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvocationProgress';
 
+const FOCUS_REGION_STYLES: SystemStyleObject = {
+  width: 'full',
+  height: 'full',
+}
+
 const MenuContent = () => {
   return (
     <CanvasManagerProviderGate>
@@ -43,7 +48,7 @@ export const CanvasMainPanelContent = memo(() => {
   }, []);
 
   return (
-    <FocusRegionWrapper region="canvas" w="full" h="full">
+    <FocusRegionWrapper region="canvas" sx={FOCUS_REGION_STYLES}>
       <Flex
         tabIndex={-1}
         borderRadius="base"
