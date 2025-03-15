@@ -1,4 +1,13 @@
-import { Box, Button, Collapse, Divider, Flex, IconButton, type SystemStyleObject,useDisclosure } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Button,
+  Collapse,
+  Divider,
+  Flex,
+  IconButton,
+  type SystemStyleObject,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
@@ -26,7 +35,7 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
   position: 'relative',
   flexDirection: 'column',
   display: 'flex',
-}
+};
 
 const GalleryPanelContent = () => {
   const { t } = useTranslation();

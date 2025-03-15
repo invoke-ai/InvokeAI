@@ -34,7 +34,7 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
-}
+};
 
 export const ImageViewer = memo(({ closeButton }: Props) => {
   useAssertSingleton('ImageViewer');
@@ -42,12 +42,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
 
   return (
-    <FocusRegionWrapper
-      region="viewer"
-      sx={FOCUS_REGION_STYLES}
-      layerStyle="first"
-      {...useFocusRegionOptions}
-    >
+    <FocusRegionWrapper region="viewer" sx={FOCUS_REGION_STYLES} layerStyle="first" {...useFocusRegionOptions}>
       {hasImageToCompare && <CompareToolbar />}
       {!hasImageToCompare && <ViewerToolbar closeButton={closeButton} />}
       <Box ref={containerRef} w="full" h="full" p={2}>

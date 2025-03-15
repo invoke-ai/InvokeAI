@@ -1,4 +1,12 @@
-import { ContextMenu, Flex, IconButton, Menu, MenuButton, MenuList, type SystemStyleObject } from '@invoke-ai/ui-library';
+import {
+  ContextMenu,
+  Flex,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuList,
+  type SystemStyleObject,
+} from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
@@ -26,7 +34,7 @@ import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvoc
 const FOCUS_REGION_STYLES: SystemStyleObject = {
   width: 'full',
   height: 'full',
-}
+};
 
 const MenuContent = () => {
   return (
