@@ -27,7 +27,7 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
   },
 };
 
-const FocusRegionWrapper = memo(
+export const FocusRegionWrapper = memo(
   ({ region, focusOnMount = false, sx, children, ...boxProps }: FocusRegionWrapperProps) => {
     const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
 
