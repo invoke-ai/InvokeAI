@@ -5,7 +5,7 @@ import type { FieldInputInstance } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
-export const useInputFieldInstance = (nodeId: string, fieldName: string): FieldInputInstance => {
+export const useInputFieldInstance = <T extends FieldInputInstance>(nodeId: string, fieldName: string): T => {
   const selector = useMemo(
     () =>
       createSelector(selectNodesSlice, (nodes) => {
@@ -18,5 +18,5 @@ export const useInputFieldInstance = (nodeId: string, fieldName: string): FieldI
 
   const instance = useAppSelector(selector);
 
-  return instance;
+  return instance as T;
 };

@@ -95,6 +95,8 @@ import {
 } from 'features/nodes/types/field';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
@@ -157,6 +159,8 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return <StringFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     } else if (settings.component === 'textarea') {
       return <StringFieldTextarea nodeId={nodeId} field={field} fieldTemplate={template} />;
+    } else {
+      assert<Equals<never, typeof settings.component>>(false, 'Unexpected settings.component');
     }
   }
 
@@ -171,32 +175,47 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
     if (!isIntegerFieldInputInstance(field)) {
       return null;
     }
-    if (settings?.type !== 'integer-field-config') {
+    if (!settings || settings.type !== 'integer-field-config') {
       return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
+
     if (settings.component === 'number-input') {
-      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (settings.component === 'slider') {
-      return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (settings.component === 'number-input-and-slider') {
-      return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+      return <IntegerFieldInput nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
     }
+
+    if (settings.component === 'slider') {
+      return <IntegerFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    if (settings.component === 'number-input-and-slider') {
+      return <IntegerFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    assert<Equals<never, typeof settings.component>>(false, 'Unexpected settings.component');
   }
 
   if (isFloatFieldInputTemplate(template)) {
     if (!isFloatFieldInputInstance(field)) {
       return null;
     }
-    if (settings?.type !== 'float-field-config') {
+
+    if (!settings || settings.type !== 'float-field-config') {
       return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
     }
+
     if (settings.component === 'number-input') {
-      return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (settings.component === 'slider') {
-      return <FloatFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
-    } else if (settings.component === 'number-input-and-slider') {
-      return <FloatFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} />;
+      return <FloatFieldInput nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
     }
+
+    if (settings.component === 'slider') {
+      return <FloatFieldSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    if (settings.component === 'number-input-and-slider') {
+      return <FloatFieldInputAndSlider nodeId={nodeId} field={field} fieldTemplate={template} settings={settings} />;
+    }
+
+    assert<Equals<never, typeof settings.component>>(false, 'Unexpected settings.component');
   }
 
   if (isIntegerFieldCollectionInputTemplate(template)) {
