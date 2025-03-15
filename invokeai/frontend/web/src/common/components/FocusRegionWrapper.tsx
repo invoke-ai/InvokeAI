@@ -2,7 +2,7 @@ import { Box, type BoxProps, type SystemStyleObject } from '@invoke-ai/ui-librar
 import { useAppSelector } from 'app/store/storeHooks';
 import { type FocusRegionName, useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { selectSystemShouldEnableHighlightFocusedRegions } from 'features/system/store/systemSlice';
-import { forwardRef, memo, type RefObject, useMemo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 
 interface FocusRegionWrapperProps extends BoxProps {
   region: FocusRegionName;
@@ -27,14 +27,12 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
   }
 };
 
-const FocusRegionWrapperComponent = forwardRef<HTMLDivElement, FocusRegionWrapperProps>(function RegionHighlighter(
-  { region, focusOnMount = false, sx, children, ...boxProps },
-  forwardedRef
-) {
+const FocusRegionWrapper = memo(({
+  region, focusOnMount = false, sx, children, ...boxProps
+}: FocusRegionWrapperProps) => {
   const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
 
-  const innerRef = useRef<HTMLDivElement>(null);
-  const ref = (forwardedRef as RefObject<HTMLDivElement>) || innerRef;
+  const ref = useRef<HTMLDivElement>(null);
 
   const options = useMemo(() => ({ focusOnMount }), [focusOnMount]);
 
@@ -55,6 +53,4 @@ const FocusRegionWrapperComponent = forwardRef<HTMLDivElement, FocusRegionWrappe
   );
 });
 
-FocusRegionWrapperComponent.displayName = 'FocusRegionWrapper';
-
-export const FocusRegionWrapper = memo(FocusRegionWrapperComponent);
+FocusRegionWrapper.displayName = 'FocusRegionWrapper';
