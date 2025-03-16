@@ -1,11 +1,11 @@
 {
   "id": "default_f96e794f-eb3e-4d01-a960-9b4e43402bcf",
-  "name": "MultiDiffusion SD1.5",
+  "name": "Upscaler - SD1.5, MultiDiffusion",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling, using SD1.5 based models.",
   "version": "1.0.0",
   "contact": "invoke@invoke.ai",
-  "tags": "tiled, upscaling, sdxl",
+  "tags": "sd1.5, upscaling",
   "notes": "",
   "exposedFields": [
     {

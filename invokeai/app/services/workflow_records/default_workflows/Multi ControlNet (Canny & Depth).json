@@ -1,11 +1,11 @@
 {
   "id": "default_2d05e719-a6b9-4e64-9310-b875d3b2f9d2",
-  "name": "Multi ControlNet (Canny & Depth)",
+  "name": "Text to Image -  SD1.5, Control",
   "author": "InvokeAI",
   "description": "A sample workflow using canny & depth ControlNets to guide the generation process. ",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "ControlNet, canny, depth",
+  "tags": "sd1.5, control, text to image",
   "notes": "",
   "exposedFields": [
     {

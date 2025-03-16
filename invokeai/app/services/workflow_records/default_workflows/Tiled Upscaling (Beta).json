@@ -1,11 +1,11 @@
 {
   "id": "default_43b0d7f7-6a12-4dcf-a5a4-50c940cbee29",
-  "name": "Tiled Upscaling (Beta)",
+  "name": "Upscaler - SD1.5, Tiled",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling. ",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "tiled, upscaling, sd1.5",
+  "tags": "sd1.5, upscaling",
   "notes": "",
   "exposedFields": [
     {
@@ -201,7 +201,7 @@
           },
           "control_model": {
             "name": "control_model",
-            "label": "Control Model (select contro_v11f1e_sd15_tile)",
+            "label": "Control Model (select control_v11f1e_sd15_tile)",
             "value": {
               "key": "773843c8-db1f-4502-8f65-59782efa7960",
               "hash": "blake3:f0812e13758f91baf4e54b7dbb707b70642937d3b2098cd2b94cc36d3eba308e",

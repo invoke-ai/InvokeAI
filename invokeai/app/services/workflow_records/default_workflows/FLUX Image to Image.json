@@ -1,11 +1,11 @@
 {
   "id": "default_cbf0e034-7b54-4b2c-b670-3b1e2e4b4a88",
-  "name": "FLUX Image to Image",
+  "name": "Image to Image - FLUX",
   "author": "InvokeAI",
   "description": "A simple image-to-image workflow using a FLUX dev model. ",
   "version": "1.1.0",
   "contact": "",
-  "tags": "image2image, flux, image-to-image, image to image",
+  "tags": "flux, image to image",
   "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend using FLUX dev models for image-to-image workflows. The image-to-image performance with FLUX schnell models is poor.",
   "exposedFields": [
     {

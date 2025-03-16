@@ -1,11 +1,11 @@
 {
   "id": "default_dec5a2e9-f59c-40d9-8869-a056751d79b8",
-  "name": "Face Detailer with IP-Adapter & Canny (See Note in Details)",
+  "name": "Face Detailer - SD1.5",
   "author": "kosmoskatten",
   "description": "A workflow to add detail to and improve faces. This workflow is most effective when used with a model that creates realistic outputs. ",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "face detailer, IP-Adapter, Canny",
+  "tags": "sd1.5, reference image, control",
   "notes": "Set this image as the blur mask: https://i.imgur.com/Gxi61zP.png",
   "exposedFields": [
     {
