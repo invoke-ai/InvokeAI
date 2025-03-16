@@ -21,12 +21,8 @@ import json
 import humanize
 import argparse
 
-from invokeai.backend.model_manager.config import ModelFormat
+from invokeai.backend.model_manager.config import ModelFormat, ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
-
-
-
-
 
 
 def strip(v):
