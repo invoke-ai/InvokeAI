@@ -610,10 +610,10 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
 
 @invocation(
     "denoise_latents_meta",
-    title="Denoise Latents + metadata",
+    title=f"{DenoiseLatentsInvocation.UIConfig.title} + Metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.1.0",
+    version="1.1.1",
 )
 class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
@@ -675,10 +675,10 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
 
 @invocation(
     "flux_denoise_meta",
-    title="Flux Denoise + metadata",
+    title=f"{FluxDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["flux", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.0.0",
+    version="1.0.1",
 )
 class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
     """Run denoising process with a FLUX transformer model + metadata."""
