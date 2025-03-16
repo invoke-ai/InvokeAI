@@ -3052,7 +3052,7 @@ export type components = {
             type: "clip_output";
         };
         /**
-         * CLIP Skip
+         * Apply CLIP Skip - SD1.5, SDXL
          * @description Skip layers in clip text_encoder model.
          */
         CLIPSkipInvocation: {
@@ -4152,7 +4152,7 @@ export type components = {
             type: "color_output";
         };
         /**
-         * Prompt
+         * Prompt - SD1.5
          * @description Parse prompt using compel package to conditioning.
          */
         CompelInvocation: {
@@ -4815,7 +4815,7 @@ export type components = {
             type: "controlnet";
         };
         /**
-         * ControlNet
+         * ControlNet - SD1.5, SDXL
          * @description Collects ControlNet info to pass to other nodes
          */
         ControlNetInvocation: {
@@ -5646,7 +5646,7 @@ export type components = {
             deleted_images: string[];
         };
         /**
-         * Denoise Latents
+         * Denoise - SD1.5, SDXL
          * @description Denoises noisy latents to decodable images
          */
         DenoiseLatentsInvocation: {
@@ -5762,7 +5762,7 @@ export type components = {
              */
             type: "denoise_latents";
         };
-        /** Denoise Latents + metadata */
+        /** Denoise - SD1.5, SDXL + Metadata */
         DenoiseLatentsMetaInvocation: {
             /**
              * @description Optional metadata to be saved with the image
@@ -7173,7 +7173,7 @@ export type components = {
             type: "flux_conditioning_output";
         };
         /**
-         * Flux Control LoRA
+         * Control LoRA - FLUX
          * @description LoRA model and Image to use with FLUX transformer generation.
          */
         FluxControlLoRALoaderInvocation: {
@@ -7526,7 +7526,7 @@ export type components = {
             type: "flux_denoise";
         };
         /**
-         * Flux Denoise + metadata
+         * FLUX Denoise + Metadata
          * @description Run denoising process with a FLUX transformer model + metadata.
          */
         FluxDenoiseLatentsMetaInvocation: {
@@ -7847,7 +7847,7 @@ export type components = {
             type: "flux_lora_loader_output";
         };
         /**
-         * Flux Main Model
+         * Main Model - FLUX
          * @description Loads a flux base model, outputting its submodels.
          */
         FluxModelLoaderInvocation: {
@@ -8082,7 +8082,7 @@ export type components = {
             type: "flux_redux_output";
         };
         /**
-         * FLUX Text Encoding
+         * Prompt - FLUX
          * @description Encodes and preps a prompt for a flux image.
          */
         FluxTextEncoderInvocation: {
@@ -8142,7 +8142,7 @@ export type components = {
             type: "flux_text_encoder";
         };
         /**
-         * FLUX Latents to Image
+         * Latents to Image - FLUX
          * @description Generates an image from latents.
          */
         FluxVaeDecodeInvocation: {
@@ -8192,7 +8192,7 @@ export type components = {
             type: "flux_vae_decode";
         };
         /**
-         * FLUX Image to Latents
+         * Image to Latents - FLUX
          * @description Encodes an image into latents.
          */
         FluxVaeEncodeInvocation: {
@@ -8273,7 +8273,7 @@ export type components = {
             b2: number;
         };
         /**
-         * FreeU
+         * Apply FreeU - SD1.5, SDXL
          * @description Applies FreeU to the UNet. Suggested values (b1/b2/s1/s2):
          *
          *     SD1.5: 1.2/1.4/0.9/0.2,
@@ -8890,7 +8890,7 @@ export type components = {
             mask?: components["schemas"]["TensorField"] | null;
         };
         /**
-         * IP-Adapter
+         * IP-Adapter - SD1.5, SDXL
          * @description Collects IP-Adapter info to pass to other nodes.
          */
         IPAdapterInvocation: {
@@ -9093,7 +9093,7 @@ export type components = {
             type: "ip_adapter_output";
         };
         /**
-         * Ideal Size
+         * Ideal Size - SD1.5, SDXL
          * @description Calculates the ideal size for generation to avoid duplication
          */
         IdealSizeInvocation: {
@@ -10548,7 +10548,7 @@ export type components = {
             type: "img_scale";
         };
         /**
-         * Image to Latents
+         * Image to Latents - SD1.5, SDXL
          * @description Encodes an image into latents.
          */
         ImageToLatentsInvocation: {
@@ -12511,7 +12511,7 @@ export type components = {
             type: "latents_output";
         };
         /**
-         * Latents to Image
+         * Latents to Image - SD1.5, SDXL
          * @description Generates an image from latents.
          */
         LatentsToImageInvocation: {
@@ -12870,7 +12870,7 @@ export type components = {
             type: "lineart_image_processor";
         };
         /**
-         * LoRA Collection Loader
+         * LoRA Collection - SD1.5
          * @description Applies a collection of LoRAs to the provided UNet and CLIP models.
          */
         LoRACollectionLoader: {
@@ -13172,7 +13172,7 @@ export type components = {
             weight: number;
         };
         /**
-         * LoRA Selector
+         * LoRA Model - SD1.5
          * @description Selects a LoRA model and weight.
          */
         LoRASelectorInvocation: {
@@ -13790,7 +13790,7 @@ export type components = {
             guidance?: number | null;
         };
         /**
-         * Main Model
+         * Main Model - SD1.5
          * @description Loads a main model, outputting its submodels.
          */
         MainModelLoaderInvocation: {
@@ -15572,7 +15572,7 @@ export type components = {
             submodel_type?: components["schemas"]["SubModelType"] | null;
         };
         /**
-         * Model identifier
+         * Any Model
          * @description Selects any model, outputting it its identifier. Be careful with this one! The identifier will be accepted as
          *     input for any model, even if the model types don't match. If you connect this to a mismatched input, you'll get an
          *     error.
@@ -16157,7 +16157,7 @@ export type components = {
             value: string | number | components["schemas"]["ImageField"];
         };
         /**
-         * Noise
+         * Create Latent Noise
          * @description Generates latent noise.
          */
         NoiseInvocation: {
@@ -17429,7 +17429,7 @@ export type components = {
             type: "sd3_conditioning_output";
         };
         /**
-         * SD3 Denoise
+         * Denoise - SD3
          * @description Run denoising process with a SD3 model.
          */
         SD3DenoiseInvocation: {
@@ -17537,7 +17537,7 @@ export type components = {
             type: "sd3_denoise";
         };
         /**
-         * SD3 Image to Latents
+         * Image to Latents - SD3
          * @description Generates latents from an image.
          */
         SD3ImageToLatentsInvocation: {
@@ -17587,7 +17587,7 @@ export type components = {
             type: "sd3_i2l";
         };
         /**
-         * SD3 Latents to Image
+         * Latents to Image - SD3
          * @description Generates an image from latents.
          */
         SD3LatentsToImageInvocation: {
@@ -17637,7 +17637,7 @@ export type components = {
             type: "sd3_l2i";
         };
         /**
-         * SDXL Prompt
+         * Prompt - SDXL
          * @description Parse prompt using compel package to conditioning.
          */
         SDXLCompelPromptInvocation: {
@@ -17726,7 +17726,7 @@ export type components = {
             type: "sdxl_compel_prompt";
         };
         /**
-         * SDXL LoRA Collection Loader
+         * LoRA Collection - SDXL
          * @description Applies a collection of SDXL LoRAs to the provided UNet and CLIP models.
          */
         SDXLLoRACollectionLoader: {
@@ -17780,7 +17780,7 @@ export type components = {
             type: "sdxl_lora_collection_loader";
         };
         /**
-         * SDXL LoRA
+         * LoRA Model - SDXL
          * @description Apply selected lora to unet and text_encoder.
          */
         SDXLLoRALoaderInvocation: {
@@ -17871,7 +17871,7 @@ export type components = {
             type: "sdxl_lora_loader_output";
         };
         /**
-         * SDXL Main Model
+         * Main Model - SDXL
          * @description Loads an sdxl base model, outputting its submodels.
          */
         SDXLModelLoaderInvocation: {
@@ -17939,7 +17939,7 @@ export type components = {
             type: "sdxl_model_loader_output";
         };
         /**
-         * SDXL Refiner Prompt
+         * Prompt - SDXL Refiner
          * @description Parse prompt using compel package to conditioning.
          */
         SDXLRefinerCompelPromptInvocation: {
@@ -18006,7 +18006,7 @@ export type components = {
             type: "sdxl_refiner_compel_prompt";
         };
         /**
-         * SDXL Refiner Model
+         * Refiner Model - SDXL
          * @description Loads an sdxl refiner model, outputting its submodels.
          */
         SDXLRefinerModelLoaderInvocation: {
@@ -18232,7 +18232,7 @@ export type components = {
          */
         SchedulerPredictionType: "epsilon" | "v_prediction" | "sample";
         /**
-         * SD3 Main Model
+         * Main Model - SD3
          * @description Loads a SD3 base model, outputting its submodels.
          */
         Sd3ModelLoaderInvocation: {
@@ -18326,7 +18326,7 @@ export type components = {
             type: "sd3_model_loader_output";
         };
         /**
-         * SD3 Text Encoding
+         * Prompt - SD3
          * @description Encodes and preps a prompt for a SD3 image.
          */
         Sd3TextEncoderInvocation: {
@@ -18380,7 +18380,7 @@ export type components = {
             type: "sd3_text_encoder";
         };
         /**
-         * Seamless
+         * Apply Seamless - SD1.5, SDXL
          * @description Applies the seamless transformation to the Model UNet and VAE.
          */
         SeamlessModeInvocation: {
@@ -19905,7 +19905,7 @@ export type components = {
             resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
         };
         /**
-         * T2I-Adapter
+         * T2I-Adapter - SD1.5, SDXL
          * @description Collects T2I-Adapter info to pass to other nodes.
          */
         T2IAdapterInvocation: {
@@ -20493,7 +20493,7 @@ export type components = {
             image: components["schemas"]["ImageField"];
         };
         /**
-         * Tiled Multi-Diffusion Denoise Latents
+         * Tiled Multi-Diffusion Denoise - SD1.5, SDXL
          * @description Tiled Multi-Diffusion denoising.
          *
          *     This node handles automatically tiling the input image, and is primarily intended for global refinement of images
@@ -20990,7 +20990,7 @@ export type components = {
             seamless_axes?: string[];
         };
         /**
-         * VAE
+         * VAE Model - SD1.5, SDXL, SD3, FLUX
          * @description Loads a VAE model, outputting a VaeLoaderOutput
          */
         VAELoaderInvocation: {
