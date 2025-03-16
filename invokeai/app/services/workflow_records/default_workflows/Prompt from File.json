@@ -1,11 +1,11 @@
 {
   "id": "default_d7a1c60f-ca2f-4f90-9e33-75a826ca6d8f",
-  "name": "Prompt from File",
+  "name": "Text to Image - SD1.5, Prompt from File",
   "author": "InvokeAI",
   "description": "Sample workflow using Prompt from File node",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "text2image, prompt from file, default, text to image",
+  "tags": "sd1.5, text to image",
   "notes": "",
   "exposedFields": [
     {

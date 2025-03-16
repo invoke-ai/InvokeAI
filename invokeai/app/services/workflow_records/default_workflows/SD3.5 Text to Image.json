@@ -1,11 +1,11 @@
 {
   "id": "default_dbe46d95-22aa-43fb-9c16-94400d0ce2fd",
-  "name": "SD3.5 Text to Image",
+  "name": "Text to Image - SD3.5",
   "author": "InvokeAI",
   "description": "Sample text to image workflow for Stable Diffusion 3.5",
   "version": "1.0.0",
   "contact": "invoke@invoke.ai",
-  "tags": "text2image, SD3.5, text to image",
+  "tags": "SD3.5, text to image",
   "notes": "",
   "exposedFields": [
     {

@@ -1,11 +1,11 @@
 {
   "id": "default_686bb1d0-d086-4c70-9fa3-2f600b922023",
-  "name": "ESRGAN Upscaling with Canny ControlNet",
+  "name": "Upscaler - SD1.5, ESRGAN",
   "author": "InvokeAI",
-  "description": "Sample workflow for using Upscaling with ControlNet with SD1.5",
+  "description": "Sample workflow for using ESRGAN to upscale with ControlNet with SD1.5",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "upscaling, controlnet, default",
+  "tags": "sd1.5, upscaling, control",
   "notes": "",
   "exposedFields": [
     {
