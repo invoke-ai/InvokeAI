@@ -38,14 +38,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
-            "value": {
-              "key": "f7b20be9-92a8-4cfb-bca4-6c3b5535c10b",
-              "hash": "placeholder",
-              "name": "stable-diffusion-3.5-medium",
-              "base": "sd-3",
-              "type": "main"
-            }
+            "label": ""
           },
           "t5_encoder_model": {
             "name": "t5_encoder_model",
