@@ -43,8 +43,8 @@ export const FocusRegionWrapper = memo(
       <Box
         ref={ref}
         tabIndex={-1}
-        sx={{ ...FOCUS_REGION_STYLES, ...sx }}
-        data-highlighted={isHighlighted ? true : undefined}
+        sx={useMemo(() => ({ ...FOCUS_REGION_STYLES, ...sx }), [sx])}
+        data-highlighted={isHighlighted}
         {...boxProps}
       >
         {children}
