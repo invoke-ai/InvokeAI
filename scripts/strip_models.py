@@ -51,7 +51,7 @@ def dress(v):
             return v
 
 
-def load_stripped_model(path: Path):
+def load_stripped_model(path: Path, *args, **kwargs):
     with open(path, "r") as f:
         contents = json.load(f)
     return { "state_dict": dress(contents) }
