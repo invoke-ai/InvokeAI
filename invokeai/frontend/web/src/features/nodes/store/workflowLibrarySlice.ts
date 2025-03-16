@@ -96,7 +96,7 @@ export type WorkflowTagCategory = { categoryTKey: string; tags: string[] };
 export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   { categoryTKey: 'Industry', tags: ['Architecture', 'Fashion', 'Game Dev', 'Food'] },
   { categoryTKey: 'Common Tasks', tags: ['Upscaling', 'Text to Image', 'Image to Image'] },
-  { categoryTKey: 'Model Architecture', tags: ['SD1.5', 'SDXL', 'Bria', 'FLUX'] },
+  { categoryTKey: 'Model Architecture', tags: ['SD1.5', 'SDXL', 'SD3.5', 'FLUX'] },
   { categoryTKey: 'Tech Showcase', tags: ['Control', 'Reference Image'] },
 ];
 export const $workflowLibraryTagCategoriesOptions = atom<WorkflowTagCategory[]>(
