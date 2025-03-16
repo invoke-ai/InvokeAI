@@ -377,10 +377,7 @@
           },
           "image": {
             "name": "image",
-            "label": "Image to Upscale",
-            "value": {
-              "image_name": "ee7009f7-a35d-488b-a2a6-21237ef5ae05.png"
-            }
+            "label": "Image to Upscale"
           },
           "image_to_image_model": {
             "name": "image_to_image_model",
