@@ -25,7 +25,9 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from functools import cached_property
+import safetensors.torch
+from picklescan.scanner import scan_file_path
+
 from inspect import isabstract
 from pathlib import Path
 from typing import ClassVar, Literal, Optional, TypeAlias, Union
@@ -37,6 +39,8 @@ from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
@@ -204,7 +208,6 @@ class ControlAdapterDefaultSettings(BaseModel):
 
 class ModelOnDisk:
     """A utility class representing a model stored on disk."""
-
     def __init__(self, path: Path, hash_algo: HASHING_ALGORITHMS = "blake3_single"):
         self.path = path
         self.format_type = ModelFormat.Diffusers if path.is_dir() else ModelFormat.Checkpoint
@@ -214,12 +217,37 @@ class ModelOnDisk:
             self.name = path.name
         self.hash_algo = hash_algo
 
-    @cached_property
     def hash(self):
         return ModelHash(algorithm=self.hash_algo).hash(self.path)
 
-    def lazy_load_state_dict(self) -> dict[str, torch.Tensor]:
-        raise NotImplementedError()
+    def size(self):
+        if self.format_type == ModelFormat.Checkpoint:
+            return self.path.stat().st_size
+        return sum(file.stat().st_size for file in self.path.rglob('*'))
+
+    def component_paths(self):
+        if self.format_type == ModelFormat.Checkpoint:
+            return { self.path }
+        extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
+        return { f for f in self.path.rglob('*') if f.suffix in extensions }
+
+    @staticmethod
+    def load_state_dict(path: Path):
+        with SilenceWarnings():
+            if path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
+                scan_result = scan_file_path(path)
+                if scan_result.infected_files != 0 or scan_result.scan_err:
+                    raise RuntimeError(f"The model {path.stem} is potentially infected by malware. Aborting import.")
+                checkpoint = torch.load(path, map_location="cpu")
+            elif path.suffix.endswith(".gguf"):
+                checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32)
+            elif path.suffix.endswith(".safetensors"):
+                checkpoint = safetensors.torch.load_file(path)
+            else:
+                raise ValueError(f"Unrecognized model extension: {path.suffix}")
+
+        state_dict = checkpoint.get("state_dict", checkpoint)
+        return state_dict
 
 
 class MatchSpeed(int, Enum):
@@ -342,7 +370,7 @@ class ModelConfigBase(ABC, BaseModel):
         fields["source"] = fields.get("source") or fields["path"]
         fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
         fields["name"] = mod.name
-        fields["hash"] = fields.get("hash") or mod.hash
+        fields["hash"] = fields.get("hash") or mod.hash()
 
         fields.update(overrides)
         return cls(**fields)
