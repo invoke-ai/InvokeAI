@@ -23,6 +23,7 @@ import {
   getPresetModifiedPrompts,
   getSizes,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -167,16 +168,7 @@ export const buildSD1Graph = async (
 
   const denoising_start = 1 - params.img2imgStrength;
 
-  let canvasOutput: Invocation<
-    | 'l2i'
-    | 'img_nsfw'
-    | 'img_watermark'
-    | 'img_resize'
-    | 'invokeai_img_blend'
-    | 'apply_mask_to_image'
-    | 'flux_vae_decode'
-    | 'sd3_l2i'
-  > = l2i;
+  let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });

@@ -6,6 +6,13 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { isMainModelWithoutUnet } from 'features/nodes/util/graph/graphBuilderUtils';
+import type {
+  DenoiseLatentsNodes,
+  LatentToImageNodes,
+  MainModelLoaderNodes,
+  VaeSourceNodes,
+} from 'features/nodes/util/graph/types';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -13,13 +20,11 @@ type AddInpaintArg = {
   state: RootState;
   g: Graph;
   manager: CanvasManager;
-  l2i: Invocation<'l2i' | 'flux_vae_decode' | 'sd3_l2i'>;
-  i2lNodeType: 'i2l' | 'flux_vae_encode' | 'sd3_i2l';
-  denoise: Invocation<'denoise_latents' | 'flux_denoise' | 'sd3_denoise'>;
-  vaeSource: Invocation<
-    'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader' | 'sd3_model_loader'
-  >;
-  modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'sd3_model_loader'>;
+  l2i: Invocation<LatentToImageNodes>;
+  i2lNodeType: 'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l';
+  denoise: Invocation<DenoiseLatentsNodes>;
+  vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
+  modelLoader: Invocation<MainModelLoaderNodes>;
   originalSize: Dimensions;
   scaledSize: Dimensions;
   denoising_start: number;
@@ -119,7 +124,7 @@ export const addInpaint = async ({
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
 
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-    if (modelLoader.type !== 'flux_model_loader' && modelLoader.type !== 'sd3_model_loader') {
+    if (!isMainModelWithoutUnet(modelLoader)) {
       g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     }
     g.addEdge(resizeImageToScaledSize, 'image', createGradientMask, 'image');
@@ -184,7 +189,7 @@ export const addInpaint = async ({
     g.addEdge(i2l, 'latents', denoise, 'latents');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-    if (modelLoader.type !== 'flux_model_loader' && modelLoader.type !== 'sd3_model_loader') {
+    if (!isMainModelWithoutUnet(modelLoader)) {
       g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     }
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');

@@ -6,6 +6,7 @@ import { withResult, withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
@@ -45,6 +46,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
             return await buildSD3Graph(state, manager);
           case `flux`:
             return await buildFLUXGraph(state, manager);
+          case 'cogview4':
+            return await buildCogView4Graph(state, manager);
           default:
             assert(false, `No graph builders for base ${base}`);
         }
