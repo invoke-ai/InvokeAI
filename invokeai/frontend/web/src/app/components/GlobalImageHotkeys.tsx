@@ -78,6 +78,33 @@ const GlobalImageHotkeysInternal = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
     options: { enabled: isUpscalingEnabled && isViewerFocused },
     dependencies: [isUpscalingEnabled, imageDTO, isViewerFocused],
   });
+  useRegisteredHotkeys({
+    id: 'changeVoice',
+    category: 'viewer',
+    callback: () => {
+      // Implement the logic to open the Change Voice menu
+    },
+    options: { enabled: isGalleryFocused || isViewerFocused },
+    dependencies: [isGalleryFocused, isViewerFocused],
+  });
+  useRegisteredHotkeys({
+    id: 'changeLLM',
+    category: 'viewer',
+    callback: () => {
+      // Implement the logic to open the Change LLM menu
+    },
+    options: { enabled: isGalleryFocused || isViewerFocused },
+    dependencies: [isGalleryFocused, isViewerFocused],
+  });
+  useRegisteredHotkeys({
+    id: 'setup',
+    category: 'viewer',
+    callback: () => {
+      // Implement the logic to open the Setup menu
+    },
+    options: { enabled: isGalleryFocused || isViewerFocused },
+    dependencies: [isGalleryFocused, isViewerFocused],
+  });
   return null;
 });
 

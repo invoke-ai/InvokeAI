@@ -51,6 +51,8 @@ import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 import { useSocketIO } from 'services/events/useSocketIO';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
+import { Button, Menu, MenuButton, MenuItem, MenuList } from '@chakra-ui/react'; // P852a
+
 const DEFAULT_CONFIG = {};
 
 interface Props {
@@ -73,6 +75,35 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <Box id="invoke-app-wrapper" w="100dvw" h="100dvh" position="relative" overflow="hidden">
         <AppContent />
         {!didStudioInit && <Loading />}
+        <Box position="absolute" top="0" left="0" p="4"> {/* P45eb */}
+          <Menu>
+            <MenuButton as={Button}>Change Voice</MenuButton>
+            <MenuList>
+              {/* Add voice options here */}
+              <MenuItem>Voice 1</MenuItem>
+              <MenuItem>Voice 2</MenuItem>
+            </MenuList>
+          </Menu>
+          <Menu>
+            <MenuButton as={Button}>Change LLM</MenuButton>
+            <MenuList>
+              {/* Add LLM options here */}
+              <MenuItem>LLM 1</MenuItem>
+              <MenuItem>LLM 2</MenuItem>
+            </MenuList>
+          </Menu>
+        </Box>
+        <Box position="absolute" top="0" right="0" p="4"> {/* P45eb */}
+          <Menu>
+            <MenuButton as={Button} style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}>Setup</MenuButton>
+            <MenuList>
+              <MenuItem>Change Voice</MenuItem>
+              <MenuItem>Change LLM Model</MenuItem>
+              <MenuItem>Enable Internet Search</MenuItem>
+              <MenuItem>Enable Safety Protocols</MenuItem>
+            </MenuList>
+          </Menu>
+        </Box>
       </Box>
       <HookIsolator config={config} studioInitAction={studioInitAction} />
       <ModalIsolator />

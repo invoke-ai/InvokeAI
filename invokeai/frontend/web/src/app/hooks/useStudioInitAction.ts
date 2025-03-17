@@ -32,6 +32,9 @@ type StudioDestinationAction = _StudioInitAction<
   'goToDestination',
   { destination: 'generation' | 'canvas' | 'workflows' | 'upscaling' | 'viewAllWorkflows' | 'viewAllStylePresets' }
 >;
+type ChangeVoiceAction = _StudioInitAction<'changeVoice', { voiceId: string }>;
+type ChangeLLMAction = _StudioInitAction<'changeLLM', { llmPath: string }>;
+type SetupAction = _StudioInitAction<'setup', { option: string }>;
 
 // Use global state to show loader until we are ready to render the studio.
 export const $didStudioInit = atom(false);
@@ -41,7 +44,10 @@ export type StudioInitAction =
   | SelectStylePresetAction
   | SendToCanvasAction
   | UseAllParametersAction
-  | StudioDestinationAction;
+  | StudioDestinationAction
+  | ChangeVoiceAction
+  | ChangeLLMAction
+  | SetupAction;
 
 /**
  * A hook that performs an action when the studio is initialized. This is useful for deep linking into the studio.
@@ -183,6 +189,30 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
     [store]
   );
 
+  const handleChangeVoice = useCallback(
+    (voiceId: string) => {
+      // Implement the logic to change the voice of the LLM
+      console.log(`Changing voice to ${voiceId}`);
+    },
+    []
+  );
+
+  const handleChangeLLM = useCallback(
+    (llmPath: string) => {
+      // Implement the logic to change the LLM
+      console.log(`Changing LLM to ${llmPath}`);
+    },
+    []
+  );
+
+  const handleSetup = useCallback(
+    (option: string) => {
+      // Implement the logic for the setup options
+      console.log(`Setup option selected: ${option}`);
+    },
+    []
+  );
+
   const handleStudioInitAction = useCallback(
     async (action: StudioInitAction) => {
       // This cannot be in the useEffect below because we need to await some of the actions before setting didStudioInit.
@@ -206,12 +236,33 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           handleGoToDestination(action.data.destination);
           break;
 
+        case 'changeVoice':
+          handleChangeVoice(action.data.voiceId);
+          break;
+
+        case 'changeLLM':
+          handleChangeLLM(action.data.llmPath);
+          break;
+
+        case 'setup':
+          handleSetup(action.data.option);
+          break;
+
         default:
           break;
       }
       $didStudioInit.set(true);
     },
-    [handleGoToDestination, handleLoadWorkflow, handleSelectStylePreset, handleSendToCanvas, handleUseAllMetadata]
+    [
+      handleGoToDestination,
+      handleLoadWorkflow,
+      handleSelectStylePreset,
+      handleSendToCanvas,
+      handleUseAllMetadata,
+      handleChangeVoice,
+      handleChangeLLM,
+      handleSetup,
+    ]
   );
 
   useEffect(() => {
