@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from typing import Dict, Optional, Union
 
+import picklescan.scanner as pscan
 import safetensors
 import torch
-import picklescan.scanner as pscan
 
 from invokeai.backend.model_manager.config import ClipVariantType
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader

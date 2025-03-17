@@ -12,14 +12,15 @@ Parameters:
 Options:
   -h, --help             Show this help message and exit
 """
+
+import argparse
+import json
+import shutil
+import sys
 from pathlib import Path
 
-import torch
-import sys
-import shutil
-import json
 import humanize
-import argparse
+import torch
 
 from invokeai.backend.model_manager.config import ModelFormat, ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
@@ -38,6 +39,8 @@ def strip(v):
 
 
 STR_TO_DTYPE = {str(dtype): dtype for dtype in torch.__dict__.values() if isinstance(dtype, torch.dtype)}
+
+
 def dress(v):
     match v:
         case {"shape": shape, "dtype": dtype_str, "fakeTensor": True}:
@@ -68,7 +71,7 @@ def create_stripped_model(original_model_path: Path, stripped_model_path: Path) 
 
     for component_path in stripped.component_paths():
         original_state_dict = ModelOnDisk.load_state_dict(component_path)
-        stripped_state_dict = strip(original_state_dict) # type: ignore
+        stripped_state_dict = strip(original_state_dict)  # type: ignore
         with open(component_path, "w") as f:
             json.dump(stripped_state_dict, f, indent=4)
 

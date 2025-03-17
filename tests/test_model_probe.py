@@ -24,7 +24,6 @@ from invokeai.backend.model_manager.config import (
     ModelVariantType,
     get_model_discriminator_value,
 )
-
 from invokeai.backend.model_manager.legacy_probe import (
     CkptType,
     ModelProbe,

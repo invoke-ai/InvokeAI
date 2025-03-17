@@ -3,10 +3,10 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
+import picklescan.scanner as pscan
 import safetensors.torch
 import spandrel
 import torch
-import picklescan.scanner as pscan
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string

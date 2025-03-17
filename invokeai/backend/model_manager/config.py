@@ -25,27 +25,26 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-import safetensors.torch
-from picklescan.scanner import scan_file_path
-
 from inspect import isabstract
 from pathlib import Path
 from typing import ClassVar, Literal, Optional, TypeAlias, Union
 
 import diffusers
 import onnxruntime as ort
+import safetensors.torch
 import torch
 from diffusers.models.modeling_utils import ModelMixin
+from picklescan.scanner import scan_file_path
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
 from typing_extensions import Annotated, Any, Dict
 
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
-from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.hash_validator import validate_hash
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.raw_model import RawModel
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +207,7 @@ class ControlAdapterDefaultSettings(BaseModel):
 
 class ModelOnDisk:
     """A utility class representing a model stored on disk."""
+
     def __init__(self, path: Path, hash_algo: HASHING_ALGORITHMS = "blake3_single"):
         self.path = path
         self.format_type = ModelFormat.Diffusers if path.is_dir() else ModelFormat.Checkpoint
@@ -223,13 +223,13 @@ class ModelOnDisk:
     def size(self):
         if self.format_type == ModelFormat.Checkpoint:
             return self.path.stat().st_size
-        return sum(file.stat().st_size for file in self.path.rglob('*'))
+        return sum(file.stat().st_size for file in self.path.rglob("*"))
 
     def component_paths(self):
         if self.format_type == ModelFormat.Checkpoint:
-            return { self.path }
+            return {self.path}
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
-        return { f for f in self.path.rglob('*') if f.suffix in extensions }
+        return {f for f in self.path.rglob("*") if f.suffix in extensions}
 
     @staticmethod
     def load_state_dict(path: Path):
