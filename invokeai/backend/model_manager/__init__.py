@@ -5,6 +5,7 @@ from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
     InvalidModelConfigException,
+    ModelConfigBase,
     ModelConfigFactory,
     ModelFormat,
     ModelRepoVariant,
@@ -12,7 +13,6 @@ from invokeai.backend.model_manager.config import (
     ModelVariantType,
     SchedulerPredictionType,
     SubModelType,
-    ModelConfigBase
 )
 from invokeai.backend.model_manager.legacy_probe import ModelProbe
 from invokeai.backend.model_manager.load import LoadedModel
@@ -33,5 +33,5 @@ __all__ = [
     "ModelVariantType",
     "SchedulerPredictionType",
     "SubModelType",
-    "ModelConfigBase"
+    "ModelConfigBase",
 ]
