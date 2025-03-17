@@ -1,12 +1,13 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { LatentToImageNodes } from 'features/nodes/util/graph/types';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 type AddTextToImageArg = {
   g: Graph;
-  l2i: Invocation<'l2i' | 'flux_vae_decode' | 'sd3_l2i'>;
+  l2i: Invocation<LatentToImageNodes>;
   originalSize: Dimensions;
   scaledSize: Dimensions;
 };
@@ -16,7 +17,7 @@ export const addTextToImage = ({
   l2i,
   originalSize,
   scaledSize,
-}: AddTextToImageArg): Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i'> => {
+}: AddTextToImageArg): Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i'> => {
   if (!isEqual(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
     const resizeImageToOriginalSize = g.addNode({

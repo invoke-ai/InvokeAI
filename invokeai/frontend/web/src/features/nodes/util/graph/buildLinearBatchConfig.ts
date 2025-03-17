@@ -5,12 +5,14 @@ import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
 import type { Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
 
+import type { ConditioningNodes, NoiseNodes } from './types';
+
 export const prepareLinearUIBatch = (
   state: RootState,
   g: Graph,
   prepend: boolean,
-  noise: Invocation<'noise' | 'flux_denoise' | 'sd3_denoise'>,
-  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'sd3_text_encoder'>,
+  noise: Invocation<NoiseNodes>,
+  posCond: Invocation<ConditioningNodes>,
   origin: 'canvas' | 'workflows' | 'upscaling',
   destination: 'canvas' | 'gallery'
 ): EnqueueBatchArg => {
