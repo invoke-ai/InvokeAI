@@ -9,7 +9,7 @@ import torch
 from polyfactory.factories.pydantic_factory import ModelFactory
 from sympy.testing.pytest import slow
 from torch import tensor
-from invokeai.backend.util.logging import InvokeAILogger
+
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.legacy_probe import (
     get_default_settings_main,
 )
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 @pytest.mark.parametrize(
