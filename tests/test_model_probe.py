@@ -146,18 +146,19 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
     The test paths are gathered from the 'test_model_probe' directory.
     """
     configs_with_tests = set()
+    model_paths = ModelSearch().search(datadir / "stripped_models")
+    fake_hash = "abcdefgh" # skip hashing to make test quicker
 
-    model_paths = ModelSearch().search(datadir)
     for path in model_paths:
         legacy_config = new_config = None
 
         try:
-            legacy_config = ModelProbe.probe(path)
+            legacy_config = ModelProbe.probe(path, { "hash": fake_hash })
         except InvalidModelConfigException:
             pass
 
         try:
-            new_config = ModelConfigBase.classify(path)
+            new_config = ModelConfigBase.classify(path, hash=fake_hash)
         except InvalidModelConfigException:
             pass
 
