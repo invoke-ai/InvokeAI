@@ -1,0 +1,23 @@
+{
+  "eos_token": {
+    "content": "</s>",
+    "lstrip": true,
+    "normalized": false,
+    "rstrip": true,
+    "single_word": false
+  },
+  "pad_token": {
+    "content": "</s>",
+    "lstrip": true,
+    "normalized": false,
+    "rstrip": true,
+    "single_word": false
+  },
+  "unk_token": {
+    "content": "<unk>",
+    "lstrip": true,
+    "normalized": false,
+    "rstrip": true,
+    "single_word": false
+  }
+}
