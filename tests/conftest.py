@@ -8,10 +8,11 @@ import logging
 import shutil
 from pathlib import Path
 import pytest
+from types import SimpleNamespace
 import torch
 import safetensors.torch
 import invokeai.backend.quantization.gguf.loaders as gguf_loaders
-import invokeai.backend.model_manager.util.model_util as model_util
+import picklescan.scanner
 from scripts.strip_models import load_stripped_model
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
@@ -79,12 +80,17 @@ def invokeai_root_dir(tmp_path_factory) -> Path:
 
 @pytest.fixture(scope="function")
 def override_model_loading(monkeypatch):
+    """The legacy model probe directly calls model loading functions (e.g. torch.load) and also performs file scanning
+     via picklescan.scanner.scan_file_path. This fixture replaces these functions with test-friendly versions for
+     model files that have been 'stripped' to reduce their size (see scripts/strip_models.py).
+
+    Ideally, model loading would be injected as a dependency (i.e. ModelOnDisk) - but to avoid modifying the legacy probe,
+    we monkeypatch as a temporary workaround until the legacy probe is fully deprecated.
+    """
     monkeypatch.setattr(torch, "load", load_stripped_model)
     monkeypatch.setattr(safetensors.torch, "load", load_stripped_model)
     monkeypatch.setattr(safetensors.torch, "load_file", load_stripped_model)
     monkeypatch.setattr(gguf_loaders, "gguf_sd_loader", load_stripped_model)
-    monkeypatch.setattr(
-        model_util,
-        "read_checkpoint_meta",
-        lambda path, *args: model_util.read_checkpoint_meta(path, False)
-    )
+
+    fake_scan = lambda *args, **kwargs: SimpleNamespace(infected_files=0, scan_err=None)
+    monkeypatch.setattr(picklescan.scanner, "scan_file_path", fake_scan)

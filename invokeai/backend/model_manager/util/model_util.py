@@ -6,7 +6,7 @@ from typing import Dict, Optional, Union
 
 import safetensors
 import torch
-from picklescan.scanner import scan_file_path
+import picklescan.scanner as pscan
 
 from invokeai.backend.model_manager.config import ClipVariantType
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
@@ -57,7 +57,7 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = True) -> Dict[str,
         checkpoint = gguf_sd_loader(Path(path), compute_dtype=torch.float32)
     else:
         if scan:
-            scan_result = scan_file_path(path)
+            scan_result = pscan.scan_file_path(path)
             if scan_result.infected_files != 0 or scan_result.scan_err:
                 raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
         checkpoint = torch.load(path, map_location=torch.device("meta"))
