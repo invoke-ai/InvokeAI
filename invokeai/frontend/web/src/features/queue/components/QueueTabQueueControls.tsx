@@ -1,5 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
+import { CancelAllExceptCurrentButton } from 'features/queue/components/CancelAllExceptCurrentButton';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
@@ -12,6 +13,8 @@ import ResumeProcessorButton from './ResumeProcessorButton';
 const QueueTabQueueControls = () => {
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
+  const isCancelAndClearAllEnabled = useFeatureStatus('cancelAndClearAll');
+
   return (
     <Flex flexDir="column" layerStyle="first" borderRadius="base" p={2} gap={2}>
       <Flex gap={2}>
@@ -25,7 +28,8 @@ const QueueTabQueueControls = () => {
         )}
         <ButtonGroup w={28} orientation="vertical" size="sm">
           <PruneQueueButton />
-          <ClearQueueButton />
+          {isCancelAndClearAllEnabled && <ClearQueueButton />}
+          {!isCancelAndClearAllEnabled && <CancelAllExceptCurrentButton />}
         </ButtonGroup>
       </Flex>
       <ClearModelCacheButton />

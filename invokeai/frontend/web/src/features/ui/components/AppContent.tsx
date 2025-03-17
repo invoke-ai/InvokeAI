@@ -141,7 +141,7 @@ export const AppContent = memo(() => {
         )}
         <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
           <MainPanelContent />
-          {withLeftPanel && <FloatingParametersPanelButtons panelApi={leftPanel} />}
+          {withLeftPanel && <FloatingParametersPanelButtons togglePanel={leftPanel.toggle} />}
           {withRightPanel && <FloatingGalleryButton panelApi={rightPanel} />}
         </Panel>
         {withRightPanel && (
