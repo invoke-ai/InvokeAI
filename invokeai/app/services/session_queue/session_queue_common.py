@@ -563,7 +563,7 @@ ValueToInsertTuple: TypeAlias = tuple[
     str,  # session (as stringified JSON)
     str,  # session_id
     str,  # batch_id
-    str | None,  # field_values (optional, as stringified JSON)‰
+    str | None,  # field_values (optional, as stringified JSON)
     int,  # priority
     str | None,  # workflow (optional, as stringified JSON)
     str | None,  # origin (optional)
