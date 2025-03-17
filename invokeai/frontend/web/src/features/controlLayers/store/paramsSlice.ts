@@ -379,6 +379,7 @@ export const selectBase = createParamsSelector((params) => params.model?.base);
 export const selectIsSDXL = createParamsSelector((params) => params.model?.base === 'sdxl');
 export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
+export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);

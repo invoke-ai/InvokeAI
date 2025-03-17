@@ -1,9 +1,8 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
-import { useAppSelector } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
+import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { newCanvasFromImage } from 'features/imageActions/actions';
@@ -20,7 +19,7 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusySafe();
-  const isSD3 = useAppSelector(selectIsSD3);
+  const { isControlLayerEnabled } = useIsEntityTypeEnabled();
 
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
     const { dispatch, getState } = store;
@@ -90,14 +89,14 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
           <MenuItem
             icon={<PiFileBold />}
             onClickCapture={onClickNewCanvasWithControlLayerFromImage}
-            isDisabled={isBusy || isSD3}
+            isDisabled={isBusy || !isControlLayerEnabled}
           >
             {t('controlLayers.asControlLayer')}
           </MenuItem>
           <MenuItem
             icon={<PiFileBold />}
             onClickCapture={onClickNewCanvasWithControlLayerFromImageWithResize}
-            isDisabled={isBusy || isSD3}
+            isDisabled={isBusy || !isControlLayerEnabled}
           >
             {t('controlLayers.asControlLayerResize')}
           </MenuItem>

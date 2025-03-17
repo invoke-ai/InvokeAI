@@ -1,5 +1,4 @@
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   useAddControlLayer,
@@ -9,7 +8,7 @@ import {
   useAddRegionalGuidance,
   useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
-import { selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
+import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -22,7 +21,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const addControlLayer = useAddControlLayer();
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
-  const isSD3 = useAppSelector(selectIsSD3);
+  const { isReferenceImageEnabled, isRegionalGuidanceEnabled, isControlLayerEnabled } = useIsEntityTypeEnabled();
 
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
@@ -36,7 +35,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addGlobalReferenceImage}
-              isDisabled={isSD3}
+              isDisabled={!isReferenceImageEnabled}
             >
               {t('controlLayers.globalReferenceImage')}
             </Button>
@@ -62,7 +61,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalGuidance}
-              isDisabled={isSD3}
+              isDisabled={!isRegionalGuidanceEnabled}
             >
               {t('controlLayers.regionalGuidance')}
             </Button>
@@ -74,7 +73,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalReferenceImage}
-              isDisabled={isSD3}
+              isDisabled={!isRegionalGuidanceEnabled}
             >
               {t('controlLayers.regionalReferenceImage')}
             </Button>
@@ -89,7 +88,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addControlLayer}
-              isDisabled={isSD3}
+              isDisabled={!isControlLayerEnabled}
             >
               {t('controlLayers.controlLayer')}
             </Button>
