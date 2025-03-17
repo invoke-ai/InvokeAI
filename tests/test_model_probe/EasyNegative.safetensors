@@ -1,0 +1,10 @@
+{
+    "emb_params": {
+        "shape": [
+            8,
+            768
+        ],
+        "dtype": "torch.float32",
+        "fakeTensor": true
+    }
+}

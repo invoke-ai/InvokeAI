@@ -7,9 +7,12 @@
 import logging
 import shutil
 from pathlib import Path
-
 import pytest
-
+import torch
+import safetensors.torch
+import invokeai.backend.quantization.gguf.loaders as gguf_loaders
+import invokeai.backend.model_manager.util.model_util as model_util
+from scripts.strip_models import load_stripped_model
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
@@ -73,3 +76,15 @@ def invokeai_root_dir(tmp_path_factory) -> Path:
     temp_dir: Path = tmp_path_factory.mktemp("data") / "invokeai_root"
     shutil.copytree(root_template, temp_dir)
     return temp_dir
+
+@pytest.fixture(scope="function")
+def override_model_loading(monkeypatch):
+    monkeypatch.setattr(torch, "load", load_stripped_model)
+    monkeypatch.setattr(safetensors.torch, "load", load_stripped_model)
+    monkeypatch.setattr(safetensors.torch, "load_file", load_stripped_model)
+    monkeypatch.setattr(gguf_loaders, "gguf_sd_loader", load_stripped_model)
+    monkeypatch.setattr(
+        model_util,
+        "read_checkpoint_meta",
+        lambda path, *args: model_util.read_checkpoint_meta(path, False)
+    )

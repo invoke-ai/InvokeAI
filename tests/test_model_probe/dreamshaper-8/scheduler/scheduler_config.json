@@ -1,0 +1,23 @@
+{
+  "_class_name": "DEISMultistepScheduler",
+  "_diffusers_version": "0.21.0.dev0",
+  "algorithm_type": "deis",
+  "beta_end": 0.012,
+  "beta_schedule": "scaled_linear",
+  "beta_start": 0.00085,
+  "clip_sample": false,
+  "dynamic_thresholding_ratio": 0.995,
+  "lower_order_final": true,
+  "num_train_timesteps": 1000,
+  "prediction_type": "epsilon",
+  "sample_max_value": 1.0,
+  "set_alpha_to_one": false,
+  "skip_prk_steps": true,
+  "solver_order": 2,
+  "solver_type": "logrho",
+  "steps_offset": 1,
+  "thresholding": false,
+  "timestep_spacing": "leading",
+  "trained_betas": null,
+  "use_karras_sigmas": false
+}

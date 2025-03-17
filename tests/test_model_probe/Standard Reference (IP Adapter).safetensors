@@ -1,0 +1,287 @@
+{
+    "image_proj.norm.bias": {
+        "shape": [
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "image_proj.norm.weight": {
+        "shape": [
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "image_proj.proj.bias": {
+        "shape": [
+            3072
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "image_proj.proj.weight": {
+        "shape": [
+            3072,
+            1024
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.1.to_k_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.1.to_v_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.11.to_k_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.11.to_v_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.13.to_k_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.13.to_v_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.15.to_k_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.15.to_v_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.17.to_k_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.17.to_v_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.19.to_k_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.19.to_v_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.21.to_k_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.21.to_v_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.23.to_k_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.23.to_v_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.25.to_k_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.25.to_v_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.27.to_k_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.27.to_v_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.29.to_k_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.29.to_v_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.3.to_k_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.3.to_v_ip.weight": {
+        "shape": [
+            320,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.31.to_k_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.31.to_v_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.5.to_k_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.5.to_v_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.7.to_k_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.7.to_v_ip.weight": {
+        "shape": [
+            640,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.9.to_k_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    },
+    "ip_adapter.9.to_v_ip.weight": {
+        "shape": [
+            1280,
+            768
+        ],
+        "dtype": "torch.float16",
+        "fakeTensor": true
+    }
+}
