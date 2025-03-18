@@ -1,5 +1,8 @@
+from typing import Any
+
 import torch
 from PIL.Image import Image
+from pydantic import field_validator
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, UIComponent, UIType
@@ -25,6 +28,14 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
         description=FieldDescriptions.vllm_model,
         ui_type=UIType.LlavaOnevisionModel,
     )
+
+    @field_validator("images", mode="before")
+    def listify_images(cls, v: Any) -> list:
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            return [v]
+        return v
 
     def _get_images(self, context: InvocationContext) -> list[Image]:
         if self.images is None:
