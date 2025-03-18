@@ -27,7 +27,7 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "cogview4_l2i",
-    title="CogView4 Latents to Image",
+    title="Latents to Image - CogView4",
     tags=["latents", "image", "vae", "l2i", "cogview4"],
     category="latents",
     version="1.0.0",

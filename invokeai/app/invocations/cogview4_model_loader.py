@@ -27,7 +27,7 @@ class CogView4ModelLoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "cogview4_model_loader",
-    title="CogView4 Main Model",
+    title="Main Model - CogView4",
     tags=["model", "cogview4"],
     category="model",
     version="1.0.0",
