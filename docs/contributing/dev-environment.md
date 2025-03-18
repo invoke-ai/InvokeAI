@@ -24,7 +24,10 @@ If you just want to use Invoke, you should use the [launcher][launcher link].
         ```shell
         git config lfs.fetchinclude "*"
         ```
-
+        - Fetch files from LFS (only needs to be done once; subsequent `git pull` will fetch changes automatically):
+        ```
+        git lfs pull
+        ```
 4. Create an directory for user data (images, models, db, etc). This is typically at `~/invokeai`, but if you already have a non-dev install, you may want to create a separate directory for the dev install.
 
 5. Follow the [manual install][manual install link] guide, with some modifications to the install command:
