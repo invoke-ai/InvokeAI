@@ -147,13 +147,13 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
     """
     configs_with_tests = set()
     model_paths = ModelSearch().search(datadir / "stripped_models")
-    fake_hash = "abcdefgh" # skip hashing to make test quicker
+    fake_hash = "abcdefgh"  # skip hashing to make test quicker
 
     for path in model_paths:
         legacy_config = new_config = None
 
         try:
-            legacy_config = ModelProbe.probe(path, { "hash": fake_hash })
+            legacy_config = ModelProbe.probe(path, {"hash": fake_hash})
         except InvalidModelConfigException:
             pass
 
@@ -177,7 +177,7 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
         config_type = type(legacy_config or new_config)
         configs_with_tests.add(config_type)
 
-    untested_configs = ModelConfigBase.all_config_classes() - configs_with_tests - { MinimalConfigExample }
+    untested_configs = ModelConfigBase.all_config_classes() - configs_with_tests - {MinimalConfigExample}
     logger = InvokeAILogger.get_logger(__file__)
     logger.warning(f"Function test_regression_against_model_probe missing test case for: {untested_configs}")
 
