@@ -3,10 +3,10 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Dict, Literal, Optional, Union
 
+import picklescan.scanner as pscan
 import safetensors.torch
 import spandrel
 import torch
-from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
@@ -483,7 +483,7 @@ class ModelProbe(object):
         and option to exit if an infected file is identified.
         """
         # scan model
-        scan_result = scan_file_path(checkpoint)
+        scan_result = pscan.scan_file_path(checkpoint)
         if scan_result.infected_files != 0:
             raise Exception(f"The model {model_name} is potentially infected by malware. Aborting import.")
         if scan_result.scan_err:

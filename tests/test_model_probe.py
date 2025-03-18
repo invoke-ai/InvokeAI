@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.legacy_probe import (
     get_default_settings_main,
 )
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 @pytest.mark.parametrize(
@@ -140,36 +141,44 @@ def test_minimal_working_example(datadir: Path):
     assert config.fun_quote == "Minimal working example of a ModelConfigBase subclass"
 
 
-def test_regression_against_model_probe(datadir: Path):
+def test_regression_against_model_probe(datadir: Path, override_model_loading):
     """Verifies results from ModelConfigBase.classify are consistent with those from ModelProbe.probe.
     The test paths are gathered from the 'test_model_probe' directory.
     """
+    configs_with_tests = set()
+
     model_paths = ModelSearch().search(datadir)
     for path in model_paths:
         legacy_config = new_config = None
-        probe_success = classify_success = True
 
         try:
             legacy_config = ModelProbe.probe(path)
         except InvalidModelConfigException:
-            probe_success = False
+            pass
 
         try:
             new_config = ModelConfigBase.classify(path)
         except InvalidModelConfigException:
-            classify_success = False
+            pass
 
-        if probe_success and classify_success:
+        if legacy_config and new_config:
             assert legacy_config == new_config
 
-        elif probe_success:
+        elif legacy_config:
             assert type(legacy_config) in ModelConfigBase._USING_LEGACY_PROBE
 
-        elif classify_success:
+        elif new_config:
             assert type(new_config) in ModelConfigBase._USING_CLASSIFY_API
 
         else:
             raise ValueError(f"Both probe and classify failed to classify model at path {path}.")
+
+        config_type = type(legacy_config or new_config)
+        configs_with_tests.add(config_type)
+
+    untested_configs = ModelConfigBase.all_config_classes() - configs_with_tests
+    logger = InvokeAILogger.get_logger(__file__)
+    logger.warning(f"Function test_regression_against_model_probe missing test case for: {untested_configs}")
 
 
 def create_fake_configs(config_cls, n):
