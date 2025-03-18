@@ -2,7 +2,7 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
+import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
@@ -23,6 +23,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 
 const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
+  const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   return (
@@ -44,7 +45,7 @@ const ParametersPanelTextToImage = () => {
               <GenerationSettingsAccordion />
               <CompositingSettingsAccordion />
               {isSDXL && <RefinerSettingsAccordion />}
-              <AdvancedSettingsAccordion />
+              {!isCogview4 && <AdvancedSettingsAccordion />}
             </Flex>
           </OverlayScrollbarsComponent>
         </Box>

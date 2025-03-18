@@ -1,45 +1,44 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
-from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
+from diffusers import CogView4Transformer2DModel
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    CogView4ConditioningField,
     DenoiseMaskField,
     FieldDescriptions,
     Input,
     InputField,
     LatentsField,
-    SD3ConditioningField,
     WithBoard,
     WithMetadata,
 )
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
-from invokeai.app.invocations.sd3_text_encoder import SD3_T5_MAX_SEQ_LEN
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.config import BaseModelType
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import CogView4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
-    "sd3_denoise",
-    title="Denoise - SD3",
-    tags=["image", "sd3"],
+    "cogview4_denoise",
+    title="Denoise - CogView4",
+    tags=["image", "cogview4"],
     category="image",
-    version="1.1.1",
+    version="1.0.0",
     classification=Classification.Prototype,
 )
-class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Run denoising process with a SD3 model."""
+class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Run the denoising process with a CogView4 model."""
 
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
@@ -52,18 +51,18 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     transformer: TransformerField = InputField(
-        description=FieldDescriptions.sd3_model, input=Input.Connection, title="Transformer"
+        description=FieldDescriptions.cogview4_model, input=Input.Connection, title="Transformer"
     )
-    positive_conditioning: SD3ConditioningField = InputField(
+    positive_conditioning: CogView4ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: SD3ConditioningField = InputField(
+    negative_conditioning: CogView4ConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     cfg_scale: float | list[float] = InputField(default=3.5, description=FieldDescriptions.cfg_scale, title="CFG Scale")
-    width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
-    height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
-    steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
+    width: int = InputField(default=1024, multiple_of=32, description="Width of the generated image.")
+    height: int = InputField(default=1024, multiple_of=32, description="Height of the generated image.")
+    steps: int = InputField(default=25, gt=0, description=FieldDescriptions.steps)
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
     @torch.no_grad()
@@ -113,40 +112,21 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self,
         context: InvocationContext,
         conditioning_name: str,
-        joint_attention_dim: int,
         dtype: torch.dtype,
         device: torch.device,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         # Load the conditioning data.
         cond_data = context.conditioning.load(conditioning_name)
         assert len(cond_data.conditionings) == 1
-        sd3_conditioning = cond_data.conditionings[0]
-        assert isinstance(sd3_conditioning, SD3ConditioningInfo)
-        sd3_conditioning = sd3_conditioning.to(dtype=dtype, device=device)
+        cogview4_conditioning = cond_data.conditionings[0]
+        assert isinstance(cogview4_conditioning, CogView4ConditioningInfo)
+        cogview4_conditioning = cogview4_conditioning.to(dtype=dtype, device=device)
 
-        t5_embeds = sd3_conditioning.t5_embeds
-        if t5_embeds is None:
-            t5_embeds = torch.zeros(
-                (1, SD3_T5_MAX_SEQ_LEN, joint_attention_dim),
-                device=device,
-                dtype=dtype,
-            )
-
-        clip_prompt_embeds = torch.cat([sd3_conditioning.clip_l_embeds, sd3_conditioning.clip_g_embeds], dim=-1)
-        clip_prompt_embeds = torch.nn.functional.pad(
-            clip_prompt_embeds, (0, t5_embeds.shape[-1] - clip_prompt_embeds.shape[-1])
-        )
-
-        prompt_embeds = torch.cat([clip_prompt_embeds, t5_embeds], dim=-2)
-        pooled_prompt_embeds = torch.cat(
-            [sd3_conditioning.clip_l_pooled_embeds, sd3_conditioning.clip_g_pooled_embeds], dim=-1
-        )
-
-        return prompt_embeds, pooled_prompt_embeds
+        return cogview4_conditioning.glm_embeds
 
     def _get_noise(
         self,
-        num_samples: int,
+        batch_size: int,
         num_channels_latents: int,
         height: int,
         width: int,
@@ -159,7 +139,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         rand_dtype = torch.float16
 
         return torch.randn(
-            num_samples,
+            batch_size,
             num_channels_latents,
             int(height) // LATENT_SCALE_FACTOR,
             int(width) // LATENT_SCALE_FACTOR,
@@ -188,41 +168,70 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         return cfg_scale
 
+    def _convert_timesteps_to_sigmas(self, image_seq_len: int, timesteps: torch.Tensor) -> list[float]:
+        # The logic to prepare the timestep / sigma schedule is based on:
+        # https://github.com/huggingface/diffusers/blob/b38450d5d2e5b87d5ff7088ee5798c85587b9635/src/diffusers/pipelines/cogview4/pipeline_cogview4.py#L575-L595
+        # The default FlowMatchEulerDiscreteScheduler configs are based on:
+        # https://huggingface.co/THUDM/CogView4-6B/blob/fb6f57289c73ac6d139e8d81bd5a4602d1877847/scheduler/scheduler_config.json
+        # This implementation differs slightly from the original for the sake of simplicity (differs in terminal value
+        # handling, not quantizing timesteps to integers, etc.).
+
+        def calculate_timestep_shift(
+            image_seq_len: int, base_seq_len: int = 256, base_shift: float = 0.25, max_shift: float = 0.75
+        ) -> float:
+            m = (image_seq_len / base_seq_len) ** 0.5
+            mu = m * max_shift + base_shift
+            return mu
+
+        def time_shift_linear(mu: float, sigma: float, t: torch.Tensor) -> torch.Tensor:
+            return mu / (mu + (1 / t - 1) ** sigma)
+
+        mu = calculate_timestep_shift(image_seq_len)
+        sigmas = time_shift_linear(mu, 1.0, timesteps)
+        return sigmas.tolist()
+
     def _run_diffusion(
         self,
         context: InvocationContext,
     ):
-        inference_dtype = TorchDevice.choose_torch_dtype()
+        inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
 
         transformer_info = context.models.load(self.transformer.transformer)
+        assert isinstance(transformer_info.model, CogView4Transformer2DModel)
 
         # Load/process the conditioning data.
         # TODO(ryand): Make CFG optional.
         do_classifier_free_guidance = True
-        pos_prompt_embeds, pos_pooled_prompt_embeds = self._load_text_conditioning(
+        pos_prompt_embeds = self._load_text_conditioning(
             context=context,
             conditioning_name=self.positive_conditioning.conditioning_name,
-            joint_attention_dim=transformer_info.model.config.joint_attention_dim,
             dtype=inference_dtype,
             device=device,
         )
-        neg_prompt_embeds, neg_pooled_prompt_embeds = self._load_text_conditioning(
+        neg_prompt_embeds = self._load_text_conditioning(
             context=context,
             conditioning_name=self.negative_conditioning.conditioning_name,
-            joint_attention_dim=transformer_info.model.config.joint_attention_dim,
             dtype=inference_dtype,
             device=device,
         )
-        # TODO(ryand): Support both sequential and batched CFG inference.
-        prompt_embeds = torch.cat([neg_prompt_embeds, pos_prompt_embeds], dim=0)
-        pooled_prompt_embeds = torch.cat([neg_pooled_prompt_embeds, pos_pooled_prompt_embeds], dim=0)
 
-        # Prepare the timestep schedule.
+        # Prepare misc. conditioning variables.
+        # TODO(ryand): We could expose these as params (like with SDXL). But, we should experiment to see if they are
+        # useful first.
+        original_size = torch.tensor([(self.height, self.width)], dtype=pos_prompt_embeds.dtype, device=device)
+        target_size = torch.tensor([(self.height, self.width)], dtype=pos_prompt_embeds.dtype, device=device)
+        crops_coords_top_left = torch.tensor([(0, 0)], dtype=pos_prompt_embeds.dtype, device=device)
+
+        # Prepare the timestep / sigma schedule.
+        patch_size = transformer_info.model.config.patch_size  # type: ignore
+        assert isinstance(patch_size, int)
+        image_seq_len = ((self.height // LATENT_SCALE_FACTOR) * (self.width // LATENT_SCALE_FACTOR)) // (patch_size**2)
         # We add an extra step to the end to account for the final timestep of 0.0.
         timesteps: list[float] = torch.linspace(1, 0, self.steps + 1).tolist()
         # Clip the timesteps schedule based on denoising_start and denoising_end.
         timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+        sigmas = self._convert_timesteps_to_sigmas(image_seq_len, torch.tensor(timesteps))
         total_steps = len(timesteps) - 1
 
         # Prepare the CFG scale list.
@@ -234,10 +243,10 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Generate initial latent noise.
-        num_channels_latents = transformer_info.model.config.in_channels
+        num_channels_latents = transformer_info.model.config.in_channels  # type: ignore
         assert isinstance(num_channels_latents, int)
         noise = self._get_noise(
-            num_samples=1,
+            batch_size=1,
             num_channels_latents=num_channels_latents,
             height=self.height,
             width=self.width,
@@ -249,8 +258,8 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Prepare input latent image.
         if init_latents is not None:
             # Noise the init_latents by the appropriate amount for the first timestep.
-            t_0 = timesteps[0]
-            latents = t_0 * noise + (1.0 - t_0) * init_latents
+            s_0 = sigmas[0]
+            latents = s_0 * noise + (1.0 - s_0) * init_latents
         else:
             # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
             if self.denoising_start > 1e-5:
@@ -285,39 +294,55 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        with transformer_info.model_on_device() as (cached_weights, transformer):
-            assert isinstance(transformer, SD3Transformer2DModel)
+        with transformer_info.model_on_device() as (_, transformer):
+            assert isinstance(transformer, CogView4Transformer2DModel)
 
-            # 6. Denoising loop
-            for step_idx, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
-                # Expand the latents if we are doing CFG.
-                latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
+            # Denoising loop
+            for step_idx in tqdm(range(total_steps)):
+                t_curr = timesteps[step_idx]
+                sigma_curr = sigmas[step_idx]
+                sigma_prev = sigmas[step_idx + 1]
+
                 # Expand the timestep to match the latent model input.
                 # Multiply by 1000 to match the default FlowMatchEulerDiscreteScheduler num_train_timesteps.
-                timestep = torch.tensor([t_curr * 1000], device=device).expand(latent_model_input.shape[0])
+                timestep = torch.tensor([t_curr * 1000], device=device).expand(latents.shape[0])
 
-                noise_pred = transformer(
-                    hidden_states=latent_model_input,
+                # TODO(ryand): Support both sequential and batched CFG inference.
+                noise_pred_cond = transformer(
+                    hidden_states=latents,
+                    encoder_hidden_states=pos_prompt_embeds,
                     timestep=timestep,
-                    encoder_hidden_states=prompt_embeds,
-                    pooled_projections=pooled_prompt_embeds,
-                    joint_attention_kwargs=None,
+                    original_size=original_size,
+                    target_size=target_size,
+                    crop_coords=crops_coords_top_left,
                     return_dict=False,
                 )[0]
 
                 # Apply CFG.
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+                    noise_pred_uncond = transformer(
+                        hidden_states=latents,
+                        encoder_hidden_states=neg_prompt_embeds,
+                        timestep=timestep,
+                        original_size=original_size,
+                        target_size=target_size,
+                        crop_coords=crops_coords_top_left,
+                        return_dict=False,
+                    )[0]
+
                     noise_pred = noise_pred_uncond + cfg_scale[step_idx] * (noise_pred_cond - noise_pred_uncond)
+                else:
+                    noise_pred = noise_pred_cond
 
                 # Compute the previous noisy sample x_t -> x_t-1.
                 latents_dtype = latents.dtype
+                # TODO(ryand): Is casting to float32 necessary for precision/stability? I copied this from SD3.
                 latents = latents.to(dtype=torch.float32)
-                latents = latents + (t_prev - t_curr) * noise_pred
+                latents = latents + (sigma_prev - sigma_curr) * noise_pred
                 latents = latents.to(dtype=latents_dtype)
 
                 if inpaint_extension is not None:
-                    latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, t_prev)
+                    latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, sigma_prev)
 
                 step_callback(
                     PipelineIntermediateState(
@@ -333,6 +358,6 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, BaseModelType.StableDiffusion3)
+            context.util.sd_step_callback(state, BaseModelType.CogView4)
 
         return step_callback

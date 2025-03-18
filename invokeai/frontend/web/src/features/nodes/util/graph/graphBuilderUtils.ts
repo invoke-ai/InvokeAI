@@ -9,6 +9,8 @@ import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
+import type { MainModelLoaderNodes } from './types';
+
 /**
  * Gets the board field, based on the autoAddBoardId setting.
  */
@@ -119,3 +121,11 @@ export const getInfill = (
 };
 
 export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
+
+export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNodes>) => {
+  return (
+    modelLoader.type === 'flux_model_loader' ||
+    modelLoader.type === 'sd3_model_loader' ||
+    modelLoader.type === 'cogview4_model_loader'
+  );
+};

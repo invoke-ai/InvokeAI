@@ -593,6 +593,16 @@ swinir = StarterModel(
 
 # endregion
 
+# region CogView4
+cogview4 = StarterModel(
+    name="CogView4",
+    base=BaseModelType.CogView4,
+    source="THUDM/CogView4-6B",
+    description="The base CogView4 model (~29GB).",
+    type=ModelType.Main,
+)
+# endregion
+
 # region SigLIP
 siglip = StarterModel(
     name="SigLIP - google/siglip-so400m-patch14-384",
@@ -694,6 +704,7 @@ STARTER_MODELS: list[StarterModel] = [
     siglip,
     flux_redux,
     llava_onevision,
+    cogview4,
 ]
 
 sd1_bundle: list[StarterModel] = [

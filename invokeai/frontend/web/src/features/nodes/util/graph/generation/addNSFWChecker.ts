@@ -1,5 +1,6 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
 import type { Invocation } from 'services/api/types';
 
 /**
@@ -8,12 +9,7 @@ import type { Invocation } from 'services/api/types';
  * @param imageOutput The current image output node
  * @returns The nsfw checker node
  */
-export const addNSFWChecker = (
-  g: Graph,
-  imageOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
-  >
-): Invocation<'img_nsfw'> => {
+export const addNSFWChecker = (g: Graph, imageOutput: Invocation<ImageOutputNodes>): Invocation<'img_nsfw'> => {
   const nsfw = g.addNode({
     type: 'img_nsfw',
     id: getPrefixedId('nsfw_checker'),

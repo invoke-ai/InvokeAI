@@ -68,12 +68,22 @@ class SD3ConditioningInfo:
 
 
 @dataclass
+class CogView4ConditioningInfo:
+    glm_embeds: torch.Tensor
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.glm_embeds = self.glm_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     conditionings: (
         List[BasicConditioningInfo]
         | List[SDXLConditioningInfo]
         | List[FLUXConditioningInfo]
         | List[SD3ConditioningInfo]
+        | List[CogView4ConditioningInfo]
     )
 
 

@@ -24,6 +24,7 @@ import {
   getPresetModifiedPrompts,
   getSizes,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -174,9 +175,7 @@ export const buildSDXLGraph = async (
     ? Math.min(refinerStart, 1 - params.img2imgStrength)
     : 1 - params.img2imgStrength;
 
-  let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
-  > = l2i;
+  let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });

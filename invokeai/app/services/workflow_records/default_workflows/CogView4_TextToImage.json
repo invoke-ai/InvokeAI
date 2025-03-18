@@ -1,0 +1,343 @@
+{
+  "name": "Text to Image - CogView4",
+  "author": "",
+  "description": "Generate an image from a prompt with CogView4.",
+  "version": "",
+  "contact": "",
+  "tags": "CogView4, Text to Image",
+  "notes": "",
+  "exposedFields": [],
+  "meta": { "category": "default", "version": "3.0.0" },
+  "id": "default_0e405a8e-ab5e-4e6c-bd99-b59deabd5591",
+  "form": {
+    "elements": {
+      "container-XSINSu999B": {
+        "id": "container-XSINSu999B",
+        "data": {
+          "layout": "column",
+          "children": [
+            "heading-N0TXlsboP5",
+            "text-PVw8AvXCTz",
+            "divider-5wmCOm9mqG",
+            "node-field-gPil4XSw8L",
+            "node-field-T2oYYNrAzH",
+            "node-field-SRj6Dn28lm"
+          ]
+        },
+        "type": "container"
+      },
+      "node-field-gPil4XSw8L": {
+        "id": "node-field-gPil4XSw8L",
+        "type": "node-field",
+        "parentId": "container-XSINSu999B",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "a4569d8b-6a43-44b9-8919-4ceec6682904",
+            "fieldName": "prompt"
+          },
+          "settings": {
+            "type": "string-field-config",
+            "component": "textarea"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-T2oYYNrAzH": {
+        "id": "node-field-T2oYYNrAzH",
+        "type": "node-field",
+        "parentId": "container-XSINSu999B",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "acb26944-1208-4016-9929-ab8dd0860573",
+            "fieldName": "prompt"
+          },
+          "settings": {
+            "type": "string-field-config",
+            "component": "textarea"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-SRj6Dn28lm": {
+        "id": "node-field-SRj6Dn28lm",
+        "type": "node-field",
+        "parentId": "container-XSINSu999B",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "7890507c-d346-4d13-bcb4-bc6d4850b2e3",
+            "fieldName": "model"
+          },
+          "showDescription": false
+        }
+      },
+      "heading-N0TXlsboP5": {
+        "id": "heading-N0TXlsboP5",
+        "parentId": "container-XSINSu999B",
+        "type": "heading",
+        "data": { "content": "Text to Image - CogView4" }
+      },
+      "text-PVw8AvXCTz": {
+        "id": "text-PVw8AvXCTz",
+        "parentId": "container-XSINSu999B",
+        "type": "text",
+        "data": { "content": "Generate an image from a prompt with CogView4." }
+      },
+      "divider-5wmCOm9mqG": {
+        "id": "divider-5wmCOm9mqG",
+        "parentId": "container-XSINSu999B",
+        "type": "divider"
+      }
+    },
+    "rootElementId": "container-XSINSu999B"
+  },
+  "nodes": [
+    {
+      "id": "7890507c-d346-4d13-bcb4-bc6d4850b2e3",
+      "type": "invocation",
+      "data": {
+        "id": "7890507c-d346-4d13-bcb4-bc6d4850b2e3",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "cogview4_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": { "x": -52.193850056888095, "y": 282.4721422789611 }
+    },
+    {
+      "id": "a4569d8b-6a43-44b9-8919-4ceec6682904",
+      "type": "invocation",
+      "data": {
+        "id": "a4569d8b-6a43-44b9-8919-4ceec6682904",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "cogview4_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Positive Prompt",
+            "description": "",
+            "value": "A whimsical stuffed gnome sits on a golden sandy beach, its plush fabric slightly textured and well-worn. The gnome has a round, cheerful face with a fluffy white beard, a bulbous nose, and a tall, slightly floppy red hat with a few decorative stitching details. It wears a tiny blue vest over a soft, earthy-toned tunic, and its stubby arms grasp a ripe yellow banana with a few brown speckles. The ocean waves gently roll onto the shore in the background, with turquoise water reflecting the warm glow of the late afternoon sun. A few scattered seashells and driftwood pieces are near the gnome, while a colorful beach umbrella and footprints in the sand hint at a lively beach scene. The sky is a soft pastel blend of pink, orange, and light blue, with wispy clouds stretching across the horizon.\n"
+          },
+          "glm_encoder": {
+            "name": "glm_encoder",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": { "x": 328.9380683664592, "y": 305.11768986950995 }
+    },
+    {
+      "id": "acb26944-1208-4016-9929-ab8dd0860573",
+      "type": "invocation",
+      "data": {
+        "id": "acb26944-1208-4016-9929-ab8dd0860573",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "cogview4_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Negative Prompt",
+            "description": "",
+            "value": ""
+          },
+          "glm_encoder": {
+            "name": "glm_encoder",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": { "x": 334.6799782744916, "y": 496.5882067536601 }
+    },
+    {
+      "id": "cdd72700-463d-4e10-8d76-3e842e4c0b49",
+      "type": "invocation",
+      "data": {
+        "id": "cdd72700-463d-4e10-8d76-3e842e4c0b49",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "cogview4_l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "metadata": { "name": "metadata", "label": "", "description": "" },
+          "latents": { "name": "latents", "label": "", "description": "" },
+          "vae": { "name": "vae", "label": "", "description": "" }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": { "x": 1112.027247217991, "y": 294.1351498145327 }
+    },
+    {
+      "id": "e75e2ced-284e-4135-81dc-cdf06c7a409d",
+      "type": "invocation",
+      "data": {
+        "id": "e75e2ced-284e-4135-81dc-cdf06c7a409d",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "cogview4_denoise",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "metadata": { "name": "metadata", "label": "", "description": "" },
+          "latents": { "name": "latents", "label": "", "description": "" },
+          "denoise_mask": {
+            "name": "denoise_mask",
+            "label": "",
+            "description": ""
+          },
+          "denoising_start": {
+            "name": "denoising_start",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "denoising_end": {
+            "name": "denoising_end",
+            "label": "",
+            "description": "",
+            "value": 1
+          },
+          "transformer": {
+            "name": "transformer",
+            "label": "",
+            "description": ""
+          },
+          "positive_conditioning": {
+            "name": "positive_conditioning",
+            "label": "",
+            "description": ""
+          },
+          "negative_conditioning": {
+            "name": "negative_conditioning",
+            "label": "",
+            "description": ""
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "description": "",
+            "value": 3.5
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 1024
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 30
+          },
+          "seed": { "name": "seed", "label": "", "description": "", "value": 0 }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": { "x": 720.8830004638692, "y": 332.66609681908415 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "reactflow__edge-7890507c-d346-4d13-bcb4-bc6d4850b2e3vae-cdd72700-463d-4e10-8d76-3e842e4c0b49vae",
+      "type": "default",
+      "source": "7890507c-d346-4d13-bcb4-bc6d4850b2e3",
+      "target": "cdd72700-463d-4e10-8d76-3e842e4c0b49",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-7890507c-d346-4d13-bcb4-bc6d4850b2e3glm_encoder-a4569d8b-6a43-44b9-8919-4ceec6682904glm_encoder",
+      "type": "default",
+      "source": "7890507c-d346-4d13-bcb4-bc6d4850b2e3",
+      "target": "a4569d8b-6a43-44b9-8919-4ceec6682904",
+      "sourceHandle": "glm_encoder",
+      "targetHandle": "glm_encoder"
+    },
+    {
+      "id": "reactflow__edge-7890507c-d346-4d13-bcb4-bc6d4850b2e3glm_encoder-acb26944-1208-4016-9929-ab8dd0860573glm_encoder",
+      "type": "default",
+      "source": "7890507c-d346-4d13-bcb4-bc6d4850b2e3",
+      "target": "acb26944-1208-4016-9929-ab8dd0860573",
+      "sourceHandle": "glm_encoder",
+      "targetHandle": "glm_encoder"
+    },
+    {
+      "id": "reactflow__edge-a4569d8b-6a43-44b9-8919-4ceec6682904conditioning-e75e2ced-284e-4135-81dc-cdf06c7a409dpositive_conditioning",
+      "type": "default",
+      "source": "a4569d8b-6a43-44b9-8919-4ceec6682904",
+      "target": "e75e2ced-284e-4135-81dc-cdf06c7a409d",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "reactflow__edge-acb26944-1208-4016-9929-ab8dd0860573conditioning-e75e2ced-284e-4135-81dc-cdf06c7a409dnegative_conditioning",
+      "type": "default",
+      "source": "acb26944-1208-4016-9929-ab8dd0860573",
+      "target": "e75e2ced-284e-4135-81dc-cdf06c7a409d",
+      "sourceHandle": "conditioning",
+      "targetHandle": "negative_conditioning"
+    },
+    {
+      "id": "reactflow__edge-e75e2ced-284e-4135-81dc-cdf06c7a409dlatents-cdd72700-463d-4e10-8d76-3e842e4c0b49latents",
+      "type": "default",
+      "source": "e75e2ced-284e-4135-81dc-cdf06c7a409d",
+      "target": "cdd72700-463d-4e10-8d76-3e842e4c0b49",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-7890507c-d346-4d13-bcb4-bc6d4850b2e3transformer-e75e2ced-284e-4135-81dc-cdf06c7a409dtransformer",
+      "type": "default",
+      "source": "7890507c-d346-4d13-bcb4-bc6d4850b2e3",
+      "target": "e75e2ced-284e-4135-81dc-cdf06c7a409d",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    }
+  ]
+}

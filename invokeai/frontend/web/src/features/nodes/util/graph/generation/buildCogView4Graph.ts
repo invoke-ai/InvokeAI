@@ -27,12 +27,12 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildSD3Graph = async (
+export const buildCogView4Graph = async (
   state: RootState,
   manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'sd3_denoise'>; posCond: Invocation<'sd3_text_encoder'> }> => {
+): Promise<{ g: Graph; noise: Invocation<'cogview4_denoise'>; posCond: Invocation<'cogview4_text_encoder'> }> => {
   const generationMode = await manager.compositor.getGenerationMode();
-  log.debug({ generationMode }, 'Building SD3 graph');
+  log.debug({ generationMode }, 'Building CogView4 graph');
 
   const params = selectParamsSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
@@ -40,68 +40,50 @@ export const buildSD3Graph = async (
 
   const { bbox } = canvas;
 
-  const {
-    model,
-    cfgScale: cfg_scale,
-    seed,
-    steps,
-    vae,
-    t5EncoderModel,
-    clipLEmbedModel,
-    clipGEmbedModel,
-    optimizedDenoisingEnabled,
-    img2imgStrength,
-  } = params;
+  const { model, cfgScale: cfg_scale, seed, steps } = params;
 
   assert(model, 'No model found in state');
 
   const { originalSize, scaledSize } = getSizes(bbox);
   const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
 
-  const g = new Graph(getPrefixedId('sd3_graph'));
+  const g = new Graph(getPrefixedId('cogview4_graph'));
   const modelLoader = g.addNode({
-    type: 'sd3_model_loader',
-    id: getPrefixedId('sd3_model_loader'),
+    type: 'cogview4_model_loader',
+    id: getPrefixedId('cogview4_model_loader'),
     model,
-    t5_encoder_model: t5EncoderModel,
-    clip_l_model: clipLEmbedModel,
-    clip_g_model: clipGEmbedModel,
-    vae_model: vae,
   });
   const posCond = g.addNode({
-    type: 'sd3_text_encoder',
-    id: getPrefixedId('pos_cond'),
+    type: 'cogview4_text_encoder',
+    id: getPrefixedId('pos_prompt'),
     prompt: positivePrompt,
   });
 
   const negCond = g.addNode({
-    type: 'sd3_text_encoder',
-    id: getPrefixedId('neg_cond'),
+    type: 'cogview4_text_encoder',
+    id: getPrefixedId('neg_prompt'),
     prompt: negativePrompt,
   });
 
   const denoise = g.addNode({
-    type: 'sd3_denoise',
-    id: getPrefixedId('sd3_denoise'),
+    type: 'cogview4_denoise',
+    id: getPrefixedId('denoise_latents'),
     cfg_scale,
+    width: scaledSize.width,
+    height: scaledSize.height,
     steps,
     denoising_start: 0,
     denoising_end: 1,
-    width: scaledSize.width,
-    height: scaledSize.height,
   });
   const l2i = g.addNode({
-    type: 'sd3_l2i',
+    type: 'cogview4_l2i',
     id: getPrefixedId('l2i'),
   });
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
-  g.addEdge(modelLoader, 'clip_l', posCond, 'clip_l');
-  g.addEdge(modelLoader, 'clip_l', negCond, 'clip_l');
-  g.addEdge(modelLoader, 'clip_g', posCond, 'clip_g');
-  g.addEdge(modelLoader, 'clip_g', negCond, 'clip_g');
-  g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
-  g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
+  g.addEdge(modelLoader, 'glm_encoder', posCond, 'glm_encoder');
+  g.addEdge(modelLoader, 'glm_encoder', negCond, 'glm_encoder');
+  g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
   g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
@@ -109,10 +91,10 @@ export const buildSD3Graph = async (
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-  assert(modelConfig.base === 'sd-3');
+  assert(modelConfig.base === 'cogview4');
 
   g.upsertMetadata({
-    generation_mode: 'sd3_txt2img',
+    generation_mode: 'cogview4_txt2img',
     cfg_scale,
     width: originalSize.width,
     height: originalSize.height,
@@ -121,19 +103,9 @@ export const buildSD3Graph = async (
     model: Graph.getModelMetadataField(modelConfig),
     seed,
     steps,
-    vae: vae ?? undefined,
   });
-  g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
-  let denoising_start: number;
-  if (optimizedDenoisingEnabled) {
-    // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
-    // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
-    // range (>0.9).
-    denoising_start = 1 - img2imgStrength ** 0.2;
-  } else {
-    denoising_start = 1 - img2imgStrength;
-  }
+  const denoising_start = 1 - params.img2imgStrength;
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 

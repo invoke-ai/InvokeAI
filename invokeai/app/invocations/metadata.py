@@ -152,6 +152,10 @@ GENERATION_MODES = Literal[
     "sd3_img2img",
     "sd3_inpaint",
     "sd3_outpaint",
+    "cogview4_txt2img",
+    "cogview4_img2img",
+    "cogview4_inpaint",
+    "cogview4_outpaint",
 ]
 
 
