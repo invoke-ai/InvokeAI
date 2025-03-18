@@ -18,7 +18,7 @@ COGVIEW4_GLM_MAX_SEQ_LEN = 1024
 
 @invocation(
     "cogview4_text_encoder",
-    title="CogView4 Text Encoding",
+    title="Prompt - CogView4",
     tags=["prompt", "conditioning", "cogview4"],
     category="conditioning",
     version="1.0.0",

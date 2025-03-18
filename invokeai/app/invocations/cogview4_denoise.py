@@ -31,7 +31,7 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "cogview4_denoise",
-    title="CogView4 Denoise",
+    title="Denoise - CogView4",
     tags=["image", "cogview4"],
     category="image",
     version="1.0.0",
