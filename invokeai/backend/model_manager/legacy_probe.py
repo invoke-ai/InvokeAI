@@ -484,8 +484,10 @@ class ModelProbe(object):
         """
         # scan model
         scan_result = pscan.scan_file_path(checkpoint)
-        if scan_result.infected_files != 0 or scan_result.scan_err:
-            raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
+        if scan_result.infected_files != 0:
+            raise Exception(f"The model {model_name} is potentially infected by malware. Aborting import.")
+        if scan_result.scan_err:
+            raise Exception(f"Error scanning model {model_name} for malware. Aborting import.")
 
 
 # Probing utilities
