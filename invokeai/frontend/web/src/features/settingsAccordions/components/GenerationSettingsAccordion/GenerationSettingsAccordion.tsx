@@ -34,7 +34,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const activeTabName = useAppSelector(selectActiveTab);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
-  const isCogView4 = useAppSelector(selectIsCogView4)
+  const isCogView4 = useAppSelector(selectIsCogView4);
 
   const isUpscaling = useMemo(() => {
     return activeTabName === 'upscaling';
