@@ -32,10 +32,10 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "sd3_denoise",
-    title="SD3 Denoise",
+    title="Denoise - SD3",
     tags=["image", "sd3"],
     category="image",
-    version="1.1.0",
+    version="1.1.1",
     classification=Classification.Prototype,
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):

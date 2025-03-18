@@ -1,11 +1,11 @@
 {
   "id": "default_2d05e719-a6b9-4e64-9310-b875d3b2f9d2",
-  "name": "Multi ControlNet (Canny & Depth)",
+  "name": "Text to Image -  SD1.5, Control",
   "author": "InvokeAI",
   "description": "A sample workflow using canny & depth ControlNets to guide the generation process. ",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "ControlNet, canny, depth",
+  "tags": "sd1.5, control, text to image",
   "notes": "",
   "exposedFields": [
     {
@@ -217,14 +217,7 @@
           },
           "control_model": {
             "name": "control_model",
-            "label": "Control Model (select canny)",
-            "value": {
-              "key": "5bdaacf7-a7a3-4fb8-b394-cc0ffbb8941d",
-              "hash": "blake3:260c7f8e10aefea9868cfc68d89970e91033bd37132b14b903e70ee05ebf530e",
-              "name": "sd-controlnet-canny",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
+            "label": "Control Model (select canny)"
           },
           "control_weight": {
             "name": "control_weight",
@@ -371,14 +364,7 @@
           },
           "control_model": {
             "name": "control_model",
-            "label": "Control Model (select depth)",
-            "value": {
-              "key": "87e8855c-671f-4c9e-bbbb-8ed47ccb4aac",
-              "hash": "blake3:2550bf22a53942dfa28ab2fed9d10d80851112531f44d977168992edf9d0534c",
-              "name": "control_v11f1p_sd15_depth",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
+            "label": "Control Model (select depth)"
           },
           "control_weight": {
             "name": "control_weight",

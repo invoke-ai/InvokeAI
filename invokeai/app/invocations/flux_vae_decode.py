@@ -22,10 +22,10 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "flux_vae_decode",
-    title="FLUX Latents to Image",
+    title="Latents to Image - FLUX",
     tags=["latents", "image", "vae", "l2i", "flux"],
     category="latents",
-    version="1.0.1",
+    version="1.0.2",
 )
 class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""

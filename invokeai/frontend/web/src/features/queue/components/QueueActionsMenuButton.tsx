@@ -27,6 +27,7 @@ export const QueueActionsMenuButton = memo(() => {
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
+  const isCancelAndClearAllEnabled = useFeatureStatus('cancelAndClearAll');
   const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
   const cancelCurrent = useCancelCurrentQueueItem();
   const clearQueue = useClearQueueDialog();
@@ -71,15 +72,17 @@ export const QueueActionsMenuButton = memo(() => {
             >
               {t('queue.cancelAllExceptCurrentTooltip')}
             </MenuItem>
-            <MenuItem
-              isDestructive
-              icon={<PiTrashSimpleBold />}
-              onClick={clearQueue.openDialog}
-              isLoading={clearQueue.isLoading}
-              isDisabled={clearQueue.isDisabled}
-            >
-              {t('queue.clearTooltip')}
-            </MenuItem>
+            {isCancelAndClearAllEnabled && (
+              <MenuItem
+                isDestructive
+                icon={<PiTrashSimpleBold />}
+                onClick={clearQueue.openDialog}
+                isLoading={clearQueue.isLoading}
+                isDisabled={clearQueue.isDisabled}
+              >
+                {t('queue.clearTooltip')}
+              </MenuItem>
+            )}
             {isResumeEnabled && (
               <MenuItem
                 icon={<PiPlayFill />}

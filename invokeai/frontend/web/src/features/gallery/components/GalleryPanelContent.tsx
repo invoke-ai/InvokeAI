@@ -1,6 +1,15 @@
-import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Button,
+  Collapse,
+  Divider,
+  Flex,
+  IconButton,
+  type SystemStyleObject,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/focus';
+import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
@@ -20,14 +29,20 @@ import { Gallery } from './Gallery';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
+const FOCUS_REGION_STYLES: SystemStyleObject = {
+  width: 'full',
+  height: 'full',
+  position: 'relative',
+  flexDirection: 'column',
+  display: 'flex',
+};
+
 const GalleryPanelContent = () => {
   const { t } = useTranslation();
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const dispatch = useAppDispatch();
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const galleryPanelFocusRef = useRef<HTMLDivElement>(null);
-  useFocusRegion('gallery', galleryPanelFocusRef);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
@@ -50,7 +65,7 @@ const GalleryPanelContent = () => {
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <Flex ref={galleryPanelFocusRef} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
+    <FocusRegionWrapper region="gallery" sx={FOCUS_REGION_STYLES}>
       <Flex alignItems="center" justifyContent="space-between" w="full">
         <Flex flexGrow={1} flexBasis={0}>
           <Button
@@ -99,7 +114,7 @@ const GalleryPanelContent = () => {
           <Gallery />
         </Panel>
       </PanelGroup>
-    </Flex>
+    </FocusRegionWrapper>
   );
 };
 

@@ -21,10 +21,10 @@ class FluxControlLoRALoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "flux_control_lora_loader",
-    title="Flux Control LoRA",
+    title="Control LoRA - FLUX",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.1.0",
+    version="1.1.1",
     classification=Classification.Prototype,
 )
 class FluxControlLoRALoaderInvocation(BaseInvocation):

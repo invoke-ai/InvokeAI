@@ -19,9 +19,9 @@ class IdealSizeOutput(BaseInvocationOutput):
 
 @invocation(
     "ideal_size",
-    title="Ideal Size",
+    title="Ideal Size - SD1.5, SDXL",
     tags=["latents", "math", "ideal_size"],
-    version="1.0.4",
+    version="1.0.5",
 )
 class IdealSizeInvocation(BaseInvocation):
     """Calculates the ideal size for generation to avoid duplication"""

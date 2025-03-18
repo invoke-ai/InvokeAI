@@ -11,6 +11,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   IntegerField: 0,
   IPAdapterModelField: undefined,
   LoRAModelField: undefined,
+  LLaVAModelField: undefined,
   ModelIdentifierField: undefined,
   MainModelField: undefined,
   SchedulerField: 'dpmpp_3m_k',

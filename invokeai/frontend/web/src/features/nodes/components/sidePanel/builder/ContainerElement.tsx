@@ -61,6 +61,7 @@ const containerViewModeSx: SystemStyleObject = {
     overflowX: 'auto',
     overflowY: 'visible',
     h: 'min-content',
+    flexShrink: 0,
   },
   '&[data-parent-layout="column"]': {
     w: 'full',

@@ -122,10 +122,10 @@ class ModelIdentifierOutput(BaseInvocationOutput):
 
 @invocation(
     "model_identifier",
-    title="Model identifier",
+    title="Any Model",
     tags=["model"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class ModelIdentifierInvocation(BaseInvocation):
@@ -144,10 +144,10 @@ class ModelIdentifierInvocation(BaseInvocation):
 
 @invocation(
     "main_model_loader",
-    title="Main Model",
+    title="Main Model - SD1.5",
     tags=["model"],
     category="model",
-    version="1.0.3",
+    version="1.0.4",
 )
 class MainModelLoaderInvocation(BaseInvocation):
     """Loads a main model, outputting its submodels."""
@@ -244,7 +244,7 @@ class LoRASelectorOutput(BaseInvocationOutput):
     lora: LoRAField = OutputField(description="LoRA model and weight", title="LoRA")
 
 
-@invocation("lora_selector", title="LoRA Selector", tags=["model"], category="model", version="1.0.1")
+@invocation("lora_selector", title="LoRA Model - SD1.5", tags=["model"], category="model", version="1.0.2")
 class LoRASelectorInvocation(BaseInvocation):
     """Selects a LoRA model and weight."""
 
@@ -257,7 +257,9 @@ class LoRASelectorInvocation(BaseInvocation):
         return LoRASelectorOutput(lora=LoRAField(lora=self.lora, weight=self.weight))
 
 
-@invocation("lora_collection_loader", title="LoRA Collection Loader", tags=["model"], category="model", version="1.1.0")
+@invocation(
+    "lora_collection_loader", title="LoRA Collection - SD1.5", tags=["model"], category="model", version="1.1.1"
+)
 class LoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to the provided UNet and CLIP models."""
 
@@ -320,10 +322,10 @@ class SDXLLoRALoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "sdxl_lora_loader",
-    title="SDXL LoRA",
+    title="LoRA Model - SDXL",
     tags=["lora", "model"],
     category="model",
-    version="1.0.3",
+    version="1.0.4",
 )
 class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
@@ -400,10 +402,10 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
 
 @invocation(
     "sdxl_lora_collection_loader",
-    title="SDXL LoRA Collection Loader",
+    title="LoRA Collection - SDXL",
     tags=["model"],
     category="model",
-    version="1.1.0",
+    version="1.1.1",
 )
 class SDXLLoRACollectionLoader(BaseInvocation):
     """Applies a collection of SDXL LoRAs to the provided UNet and CLIP models."""
@@ -469,7 +471,9 @@ class SDXLLoRACollectionLoader(BaseInvocation):
         return output
 
 
-@invocation("vae_loader", title="VAE", tags=["vae", "model"], category="model", version="1.0.3")
+@invocation(
+    "vae_loader", title="VAE Model - SD1.5, SDXL, SD3, FLUX", tags=["vae", "model"], category="model", version="1.0.4"
+)
 class VAELoaderInvocation(BaseInvocation):
     """Loads a VAE model, outputting a VaeLoaderOutput"""
 
@@ -496,10 +500,10 @@ class SeamlessModeOutput(BaseInvocationOutput):
 
 @invocation(
     "seamless",
-    title="Seamless",
+    title="Apply Seamless - SD1.5, SDXL",
     tags=["seamless", "model"],
     category="model",
-    version="1.0.1",
+    version="1.0.2",
 )
 class SeamlessModeInvocation(BaseInvocation):
     """Applies the seamless transformation to the Model UNet and VAE."""
@@ -539,7 +543,7 @@ class SeamlessModeInvocation(BaseInvocation):
         return SeamlessModeOutput(unet=unet, vae=vae)
 
 
-@invocation("freeu", title="FreeU", tags=["freeu"], category="unet", version="1.0.1")
+@invocation("freeu", title="Apply FreeU - SD1.5, SDXL", tags=["freeu"], category="unet", version="1.0.2")
 class FreeUInvocation(BaseInvocation):
     """
     Applies FreeU to the UNet. Suggested values (b1/b2/s1/s2):

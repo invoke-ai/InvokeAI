@@ -189,6 +189,10 @@ const zLoRAModelFieldType = zFieldTypeBase.extend({
   name: z.literal('LoRAModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zLLaVAModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('LLaVAModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zControlNetModelFieldType = zFieldTypeBase.extend({
   name: z.literal('ControlNetModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -273,6 +277,7 @@ const zStatefulFieldType = z.union([
   zSDXLRefinerModelFieldType,
   zVAEModelFieldType,
   zLoRAModelFieldType,
+  zLLaVAModelFieldType,
   zControlNetModelFieldType,
   zIPAdapterModelFieldType,
   zT2IAdapterModelFieldType,
@@ -309,6 +314,7 @@ const modelFieldTypeNames = [
   zSDXLRefinerModelFieldType.shape.name.value,
   zVAEModelFieldType.shape.name.value,
   zLoRAModelFieldType.shape.name.value,
+  zLLaVAModelFieldType.shape.name.value,
   zControlNetModelFieldType.shape.name.value,
   zIPAdapterModelFieldType.shape.name.value,
   zT2IAdapterModelFieldType.shape.name.value,
@@ -889,6 +895,26 @@ export type LoRAModelFieldInputInstance = z.infer<typeof zLoRAModelFieldInputIns
 export type LoRAModelFieldInputTemplate = z.infer<typeof zLoRAModelFieldInputTemplate>;
 export const isLoRAModelFieldInputInstance = buildInstanceTypeGuard(zLoRAModelFieldInputInstance);
 export const isLoRAModelFieldInputTemplate = buildTemplateTypeGuard<LoRAModelFieldInputTemplate>('LoRAModelField');
+// #endregion
+
+// #region LLaVAModelField
+export const zLLaVAModelFieldValue = zModelIdentifierField.optional();
+const zLLaVAModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zLLaVAModelFieldValue,
+});
+const zLLaVAModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zLLaVAModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zLLaVAModelFieldValue,
+});
+const zLLaVAModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zLLaVAModelFieldType,
+});
+export type LLaVAModelFieldValue = z.infer<typeof zLLaVAModelFieldValue>;
+export type LLaVAModelFieldInputInstance = z.infer<typeof zLLaVAModelFieldInputInstance>;
+export type LLaVAModelFieldInputTemplate = z.infer<typeof zLLaVAModelFieldInputTemplate>;
+export const isLLaVAModelFieldInputInstance = buildInstanceTypeGuard(zLLaVAModelFieldInputInstance);
+export const isLLaVAModelFieldInputTemplate = buildTemplateTypeGuard<LLaVAModelFieldInputTemplate>('LLaVAModelField');
 // #endregion
 
 // #region ControlNetModelField
@@ -1739,6 +1765,7 @@ export const zStatefulFieldValue = z.union([
   zSDXLRefinerModelFieldValue,
   zVAEModelFieldValue,
   zLoRAModelFieldValue,
+  zLLaVAModelFieldValue,
   zControlNetModelFieldValue,
   zIPAdapterModelFieldValue,
   zT2IAdapterModelFieldValue,
@@ -1785,6 +1812,7 @@ const zStatefulFieldInputInstance = z.union([
   zSDXLRefinerModelFieldInputInstance,
   zVAEModelFieldInputInstance,
   zLoRAModelFieldInputInstance,
+  zLLaVAModelFieldInputInstance,
   zControlNetModelFieldInputInstance,
   zIPAdapterModelFieldInputInstance,
   zT2IAdapterModelFieldInputInstance,
@@ -1825,6 +1853,7 @@ const zStatefulFieldInputTemplate = z.union([
   zSDXLRefinerModelFieldInputTemplate,
   zVAEModelFieldInputTemplate,
   zLoRAModelFieldInputTemplate,
+  zLLaVAModelFieldInputTemplate,
   zControlNetModelFieldInputTemplate,
   zIPAdapterModelFieldInputTemplate,
   zT2IAdapterModelFieldInputTemplate,
@@ -1871,6 +1900,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zSDXLRefinerModelFieldOutputTemplate,
   zVAEModelFieldOutputTemplate,
   zLoRAModelFieldOutputTemplate,
+  zLLaVAModelFieldOutputTemplate,
   zControlNetModelFieldOutputTemplate,
   zIPAdapterModelFieldOutputTemplate,
   zT2IAdapterModelFieldOutputTemplate,
