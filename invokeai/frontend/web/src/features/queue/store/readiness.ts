@@ -33,6 +33,7 @@ import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -379,8 +380,6 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'flux') {
-    const { bbox } = canvas;
-
     if (!params.t5EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
     }
@@ -390,29 +389,90 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     if (!params.fluxVAE) {
       reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
     }
+
+    const { bbox } = canvas;
+    const gridSize = getGridSize('flux');
+
     if (bbox.scaleMethod === 'none') {
-      if (bbox.rect.width % 16 !== 0) {
+      if (bbox.rect.width % gridSize !== 0) {
         reasons.push({
-          content: i18n.t('parameters.invoke.fluxModelIncompatibleBboxWidth', { width: bbox.rect.width }),
-        });
-      }
-      if (bbox.rect.height % 16 !== 0) {
-        reasons.push({
-          content: i18n.t('parameters.invoke.fluxModelIncompatibleBboxHeight', { height: bbox.rect.height }),
-        });
-      }
-    } else {
-      if (bbox.scaledSize.width % 16 !== 0) {
-        reasons.push({
-          content: i18n.t('parameters.invoke.fluxModelIncompatibleScaledBboxWidth', {
-            width: bbox.scaledSize.width,
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'FLUX',
+            width: bbox.rect.width,
+            multiple: gridSize,
           }),
         });
       }
-      if (bbox.scaledSize.height % 16 !== 0) {
+      if (bbox.rect.height % gridSize !== 0) {
         reasons.push({
-          content: i18n.t('parameters.invoke.fluxModelIncompatibleScaledBboxHeight', {
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'FLUX',
+            height: bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxWidth', {
+            model: 'FLUX',
+            width: bbox.scaledSize.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.scaledSize.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
+            model: 'FLUX',
             height: bbox.scaledSize.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
+  if (model?.base === 'cogview4') {
+    const { bbox } = canvas;
+    const gridSize = getGridSize('cogview4');
+
+    if (bbox.scaleMethod === 'none') {
+      if (bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'CogView4',
+            width: bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'CogView4',
+            height: bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxWidth', {
+            model: 'CogView4',
+            width: bbox.scaledSize.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.scaledSize.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
+            model: 'CogView4',
+            height: bbox.scaledSize.height,
+            multiple: gridSize,
           }),
         });
       }

@@ -4,10 +4,10 @@ import type { BaseModelType } from 'services/api/types';
 /**
  * Gets the optimal dimension for a given base model:
  * - sd-1, sd-2: 512
- * - sdxl, flux: 1024
+ * - sdxl, flux, sd-3, cogview4: 1024
  * - default: 1024
  * @param base The base model
- * @returns The optimal dimension for the model, defaulting to 512
+ * @returns The optimal dimension for the model, defaulting to 1024
  */
 export const getOptimalDimension = (base?: BaseModelType | null): number => {
   switch (base) {
@@ -16,6 +16,8 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
       return 512;
     case 'sdxl':
     case 'flux':
+    case 'sd-3':
+    case 'cogview4':
     default:
       return 1024;
   }
@@ -25,12 +27,15 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
  * Gets the grid size for a given base model. For Flux, the grid size is 16, otherwise it is 8.
  * - sd-1, sd-2, sdxl: 8
  * - flux, sd-3: 16
+ * - cogview4: 32
  * - default: 8
  * @param base The base model
  * @returns The grid size for the model, defaulting to 8
  */
 export const getGridSize = (base?: BaseModelType | null): number => {
   switch (base) {
+    case 'cogview4':
+      return 32;
     case 'flux':
     case 'sd-3':
       return 16;
