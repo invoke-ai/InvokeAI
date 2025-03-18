@@ -127,10 +127,10 @@ def get_scheduler(
 
 @invocation(
     "denoise_latents",
-    title="Denoise Latents",
+    title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.5.3",
+    version="1.5.4",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""

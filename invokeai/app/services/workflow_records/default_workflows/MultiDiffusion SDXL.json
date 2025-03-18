@@ -1,11 +1,11 @@
 {
   "id": "default_35658541-6d41-4a20-8ec5-4bf2561faed0",
-  "name": "MultiDiffusion SDXL",
+  "name": "Upscaler - SDXL, MultiDiffusion",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling, using SDXL based models.",
   "version": "1.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "tiled, upscaling, sdxl",
+  "tags": "sdxl, upscaling",
   "notes": "",
   "exposedFields": [
     {
@@ -341,14 +341,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "ControlNet Model - Choose a Tile ControlNet",
-            "value": {
-              "key": "74f4651f-0ace-4b7b-b616-e98360257797",
-              "hash": "blake3:167a5b84583aaed3e5c8d660b45830e82e1c602743c689d3c27773c6c8b85b4a",
-              "name": "controlnet-tile-sdxl-1.0",
-              "base": "sdxl",
-              "type": "controlnet"
-            }
+            "label": "ControlNet Model - Choose a Tile ControlNet"
           }
         }
       },
@@ -801,14 +794,7 @@
         "inputs": {
           "vae_model": {
             "name": "vae_model",
-            "label": "",
-            "value": {
-              "key": "ff926845-090e-4d46-b81e-30289ee47474",
-              "hash": "9705ab1c31fa96b308734214fb7571a958621c7a9247eed82b7d277145f8d9fa",
-              "name": "VAEFix",
-              "base": "sdxl",
-              "type": "vae"
-            }
+            "label": ""
           }
         }
       },
@@ -832,14 +818,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "SDXL Model",
-            "value": {
-              "key": "ab191f73-68d2-492c-8aec-b438a8cf0f45",
-              "hash": "blake3:2d50e940627e3bf555f015280ec0976d5c1fa100f7bc94e95ffbfc770e98b6fe",
-              "name": "CustomXLv7",
-              "base": "sdxl",
-              "type": "main"
-            }
+            "label": "SDXL Model"
           }
         }
       },

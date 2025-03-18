@@ -116,6 +116,8 @@
         "dontShowMeThese": "Don't show me these",
         "editor": "Editor",
         "error": "Error",
+        "error_withCount_one": "{{count}} error",
+        "error_withCount_other": "{{count}} errors",
         "file": "File",
         "folder": "Folder",
         "format": "format",
@@ -844,6 +846,7 @@
         "starterModels": "Starter Models",
         "starterModelsInModelManager": "Starter Models can be found in Model Manager",
         "controlLora": "Control LoRA",
+        "llavaOnevision": "LLaVA OneVision",
         "syncModels": "Sync Models",
         "textualInversions": "Textual Inversions",
         "triggerPhrases": "Trigger Phrases",
@@ -1205,6 +1208,7 @@
         "informationalPopoversDisabled": "Informational Popovers Disabled",
         "informationalPopoversDisabledDesc": "Informational popovers have been disabled. Enable them in Settings.",
         "enableModelDescriptions": "Enable Model Descriptions in Dropdowns",
+        "enableHighlightFocusedRegions": "Highlight Focused Regions",
         "modelDescriptionsDisabled": "Model Descriptions in Dropdowns Disabled",
         "modelDescriptionsDisabledDesc": "Model descriptions in dropdowns have been disabled. Enable them in Settings.",
         "enableInvisibleWatermark": "Enable Invisible Watermark",
@@ -1765,7 +1769,9 @@
             "containerPlaceholder": "Empty Container",
             "headingPlaceholder": "Empty Heading",
             "textPlaceholder": "Empty Text",
-            "workflowBuilderAlphaWarning": "The workflow builder is currently in alpha. There may be breaking changes before the stable release."
+            "workflowBuilderAlphaWarning": "The workflow builder is currently in alpha. There may be breaking changes before the stable release.",
+            "minimum": "Minimum",
+            "maximum": "Maximum"
         }
     },
     "controlLayers": {
@@ -2317,6 +2323,7 @@
     "newUserExperience": {
         "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStartedWorkflow": "To get started, fill in the fields on the left and press <StrongComponent>Invoke</StrongComponent> to generate your image. Want to explore more workflows? Click the <StrongComponent>folder icon</StrongComponent> next to the workflow title to see a list of other templates you can try.",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio.",
         "lowVRAMMode": "For best performance, follow our <LinkComponent>Low VRAM guide</LinkComponent>.",
         "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>."
@@ -2324,8 +2331,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Memory Management: New setting for users with Nvidia GPUs to reduce VRAM usage.",
-            "Performance: Continued improvements to overall application performance and responsiveness."
+            "Workflows: New and improved Workflow Library.",
+            "FLUX: Support for FLUX Redux in Workflows and Canvas."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",

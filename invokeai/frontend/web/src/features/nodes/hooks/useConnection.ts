@@ -64,9 +64,9 @@ export const useConnection = () => {
     const edgePendingUpdate = $edgePendingUpdate.get();
     const mouseOverNodeId = $mouseOverNode.get();
 
-    // If we are in the middle of an edge update, and the mouse isn't over a node, we should just bail so the edge
-    // update logic can finish up
-    if (edgePendingUpdate && !mouseOverNodeId) {
+    // If we are in the middle of an edge update, and the mouse isn't over a node, OR we have just updated the edge,
+    // we should just bail and let the edge update (i.e. reconnect) logic handle the connection
+    if ((edgePendingUpdate && !mouseOverNodeId) || $didUpdateEdge.get()) {
       $pendingConnection.set(null);
       return;
     }

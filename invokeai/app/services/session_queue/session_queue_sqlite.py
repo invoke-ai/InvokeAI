@@ -27,6 +27,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemDTO,
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
+    ValueToInsertTuple,
     calc_session_count,
     prepare_values_to_insert,
 )
@@ -689,7 +690,7 @@ class SqliteSessionQueue(SessionQueueBase):
         """Retries the given queue items"""
         try:
             cursor = self._conn.cursor()
-            values_to_insert: list[tuple] = []
+            values_to_insert: list[ValueToInsertTuple] = []
             retried_item_ids: list[int] = []
 
             for item_id in item_ids:
@@ -715,16 +716,16 @@ class SqliteSessionQueue(SessionQueueBase):
                     else queue_item.item_id
                 )
 
-                value_to_insert = (
+                value_to_insert: ValueToInsertTuple = (
                     queue_item.queue_id,
-                    queue_item.batch_id,
-                    queue_item.destination,
-                    field_values_json,
-                    queue_item.origin,
-                    queue_item.priority,
-                    workflow_json,
                     cloned_session_json,
                     cloned_session.id,
+                    queue_item.batch_id,
+                    field_values_json,
+                    queue_item.priority,
+                    workflow_json,
+                    queue_item.origin,
+                    queue_item.destination,
                     retried_from_item_id,
                 )
                 values_to_insert.append(value_to_insert)

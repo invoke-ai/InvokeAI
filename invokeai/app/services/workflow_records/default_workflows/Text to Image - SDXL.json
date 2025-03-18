@@ -5,7 +5,7 @@
   "description": "Sample text to image workflow for SDXL",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "text2image, SDXL, text to image",
+  "tags": "SDXL, text to image",
   "notes": "",
   "exposedFields": [
     {
@@ -46,14 +46,7 @@
         "inputs": {
           "vae_model": {
             "name": "vae_model",
-            "label": "VAE (use the FP16 model)",
-            "value": {
-              "key": "f20f9e5c-1bce-4c46-a84d-34ebfa7df069",
-              "hash": "blake3:9705ab1c31fa96b308734214fb7571a958621c7a9247eed82b7d277145f8d9fa",
-              "name": "sdxl-vae-fp16-fix",
-              "base": "sdxl",
-              "type": "vae"
-            }
+            "label": "VAE (use the FP16 model)"
           }
         },
         "isOpen": true,
@@ -203,14 +196,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
-            "value": {
-              "key": "4a63b226-e8ff-4da4-854e-0b9f04b562ba",
-              "hash": "blake3:d279309ea6e5ee6e8fd52504275865cc280dac71cbf528c5b07c98b888bddaba",
-              "name": "dreamshaper-xl-v2-turbo",
-              "base": "sdxl",
-              "type": "main"
-            }
+            "label": ""
           }
         },
         "isOpen": true,

@@ -87,6 +87,7 @@ class ModelType(str, Enum):
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
+    LlavaOnevision = "llava_onevision"
 
 
 class SubModelType(str, Enum):
@@ -596,6 +597,13 @@ class FluxReduxConfig(LegacyProbeMixin, ModelConfigBase):
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
 
+class LlavaOnevisionConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
+    """Model config for Llava Onevision models."""
+
+    type: Literal[ModelType.LlavaOnevision] = ModelType.LlavaOnevision
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+
 def get_model_discriminator_value(v: Any) -> str:
     """
     Computes the discriminator value for a model config.
@@ -662,6 +670,7 @@ AnyModelConfig = Annotated[
         Annotated[CLIPGEmbedDiffusersConfig, CLIPGEmbedDiffusersConfig.get_tag()],
         Annotated[SigLIPConfig, SigLIPConfig.get_tag()],
         Annotated[FluxReduxConfig, FluxReduxConfig.get_tag()],
+        Annotated[LlavaOnevisionConfig, LlavaOnevisionConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]

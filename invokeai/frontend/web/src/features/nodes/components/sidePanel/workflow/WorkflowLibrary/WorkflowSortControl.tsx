@@ -1,13 +1,15 @@
 import { Flex, FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
+  $workflowLibrarySortOptions,
   selectWorkflowLibraryDirection,
   selectWorkflowLibraryOrderBy,
   workflowLibraryDirectionChanged,
   workflowLibraryOrderByChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
 import type { ChangeEvent } from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
@@ -24,6 +26,7 @@ export const WorkflowSortControl = () => {
 
   const orderBy = useAppSelector(selectWorkflowLibraryOrderBy);
   const direction = useAppSelector(selectWorkflowLibraryDirection);
+  const sortOptions = useStore($workflowLibrarySortOptions);
 
   const ORDER_BY_LABELS = useMemo(
     () => ({
@@ -65,15 +68,23 @@ export const WorkflowSortControl = () => {
     [dispatch]
   );
 
+  useEffect(() => {
+    if (!sortOptions.includes('opened_at')) {
+      dispatch(workflowLibraryOrderByChanged('name'));
+      dispatch(workflowLibraryDirectionChanged('ASC'));
+    }
+  }, [sortOptions, dispatch]);
+
   return (
     <Flex flexDir="row" gap={6}>
       <FormControl orientation="horizontal" gap={0} w="auto">
         <FormLabel>{t('common.orderBy')}</FormLabel>
-        <Select value={orderBy ?? 'opened_at'} onChange={onChangeOrderBy} size="sm">
-          <option value="opened_at">{ORDER_BY_LABELS['opened_at']}</option>
-          <option value="created_at">{ORDER_BY_LABELS['created_at']}</option>
-          <option value="updated_at">{ORDER_BY_LABELS['updated_at']}</option>
-          <option value="name">{ORDER_BY_LABELS['name']}</option>
+        <Select value={orderBy ?? sortOptions[0]} onChange={onChangeOrderBy} size="sm">
+          {sortOptions.map((option) => (
+            <option key={option} value={option}>
+              {ORDER_BY_LABELS[option]}
+            </option>
+          ))}
         </Select>
       </FormControl>
       <FormControl orientation="horizontal" gap={0} w="auto">

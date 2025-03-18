@@ -40,10 +40,10 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "compel",
-    title="Prompt",
+    title="Prompt - SD1.5",
     tags=["prompt", "compel"],
     category="conditioning",
-    version="1.2.0",
+    version="1.2.1",
 )
 class CompelInvocation(BaseInvocation):
     """Parse prompt using compel package to conditioning."""
@@ -233,10 +233,10 @@ class SDXLPromptInvocationBase:
 
 @invocation(
     "sdxl_compel_prompt",
-    title="SDXL Prompt",
+    title="Prompt - SDXL",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.2.0",
+    version="1.2.1",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -327,10 +327,10 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
 @invocation(
     "sdxl_refiner_compel_prompt",
-    title="SDXL Refiner Prompt",
+    title="Prompt - SDXL Refiner",
     tags=["sdxl", "compel", "prompt"],
     category="conditioning",
-    version="1.1.1",
+    version="1.1.2",
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     """Parse prompt using compel package to conditioning."""
@@ -376,10 +376,10 @@ class CLIPSkipInvocationOutput(BaseInvocationOutput):
 
 @invocation(
     "clip_skip",
-    title="CLIP Skip",
+    title="Apply CLIP Skip - SD1.5, SDXL",
     tags=["clipskip", "clip", "skip"],
     category="conditioning",
-    version="1.1.0",
+    version="1.1.1",
 )
 class CLIPSkipInvocation(BaseInvocation):
     """Skip layers in clip text_encoder model."""

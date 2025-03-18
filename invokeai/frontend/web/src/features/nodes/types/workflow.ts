@@ -75,6 +75,8 @@ const FLOAT_FIELD_SETTINGS_TYPE = 'float-field-config';
 const zNodeFieldFloatSettings = z.object({
   type: z.literal(FLOAT_FIELD_SETTINGS_TYPE).default(FLOAT_FIELD_SETTINGS_TYPE),
   component: zNumberComponent.default('number-input'),
+  min: z.number().optional(),
+  max: z.number().optional(),
 });
 export const getFloatFieldSettingsDefaults = (): NodeFieldFloatSettings => zNodeFieldFloatSettings.parse({});
 export type NodeFieldFloatSettings = z.infer<typeof zNodeFieldFloatSettings>;
@@ -83,6 +85,8 @@ const INTEGER_FIELD_CONFIG_TYPE = 'integer-field-config';
 const zNodeFieldIntegerSettings = z.object({
   type: z.literal(INTEGER_FIELD_CONFIG_TYPE).default(INTEGER_FIELD_CONFIG_TYPE),
   component: zNumberComponent.default('number-input'),
+  min: z.number().optional(),
+  max: z.number().optional(),
 });
 export type NodeFieldIntegerSettings = z.infer<typeof zNodeFieldIntegerSettings>;
 export const getIntegerFieldSettingsDefaults = (): NodeFieldIntegerSettings => zNodeFieldIntegerSettings.parse({});

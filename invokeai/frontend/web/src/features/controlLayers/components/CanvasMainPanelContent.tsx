@@ -1,6 +1,14 @@
-import { ContextMenu, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import {
+  ContextMenu,
+  Flex,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuList,
+  type SystemStyleObject,
+} from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/focus';
+import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
 import { CanvasAlertsSendingToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
@@ -18,10 +26,15 @@ import { Transform } from 'features/controlLayers/components/Transform/Transform
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { GatedImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
 import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvocationProgress';
+
+const FOCUS_REGION_STYLES: SystemStyleObject = {
+  width: 'full',
+  height: 'full',
+};
 
 const MenuContent = () => {
   return (
@@ -35,7 +48,6 @@ const MenuContent = () => {
 };
 
 export const CanvasMainPanelContent = memo(() => {
-  const ref = useRef<HTMLDivElement>(null);
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
 
@@ -43,82 +55,81 @@ export const CanvasMainPanelContent = memo(() => {
     return <MenuContent />;
   }, []);
 
-  useFocusRegion('canvas', ref);
-
   return (
-    <Flex
-      tabIndex={-1}
-      ref={ref}
-      borderRadius="base"
-      position="relative"
-      flexDirection="column"
-      height="full"
-      width="full"
-      gap={2}
-      alignItems="center"
-      justifyContent="center"
-      overflow="hidden"
-    >
-      <CanvasManagerProviderGate>
-        <CanvasToolbar />
-      </CanvasManagerProviderGate>
-      <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
-        {(ref) => (
-          <Flex
-            ref={ref}
-            position="relative"
-            w="full"
-            h="full"
-            bg={dynamicGrid ? 'base.850' : 'base.900'}
-            borderRadius="base"
-            overflow="hidden"
-          >
-            <InvokeCanvasComponent />
-            <CanvasManagerProviderGate>
-              <Flex
-                position="absolute"
-                flexDir="column"
-                top={1}
-                insetInlineStart={1}
-                pointerEvents="none"
-                gap={2}
-                alignItems="flex-start"
-              >
-                {showHUD && <CanvasHUD />}
-                <CanvasAlertsSelectedEntityStatus />
-                <CanvasAlertsPreserveMask />
-                <CanvasAlertsSendingToGallery />
-                <CanvasAlertsInvocationProgress />
-              </Flex>
-              <Flex position="absolute" top={1} insetInlineEnd={1}>
-                <Menu>
-                  <MenuButton as={IconButton} icon={<PiDotsThreeOutlineVerticalFill />} colorScheme="base" />
-                  <MenuContent />
-                </Menu>
-              </Flex>
-            </CanvasManagerProviderGate>
-          </Flex>
-        )}
-      </ContextMenu>
-      <Flex position="absolute" bottom={4} gap={2} align="center" justify="center">
+    <FocusRegionWrapper region="canvas" sx={FOCUS_REGION_STYLES}>
+      <Flex
+        tabIndex={-1}
+        borderRadius="base"
+        position="relative"
+        flexDirection="column"
+        height="full"
+        width="full"
+        gap={2}
+        alignItems="center"
+        justifyContent="center"
+        overflow="hidden"
+      >
         <CanvasManagerProviderGate>
-          <StagingAreaIsStagingGate>
-            <StagingAreaToolbar />
-          </StagingAreaIsStagingGate>
+          <CanvasToolbar />
         </CanvasManagerProviderGate>
-      </Flex>
-      <Flex position="absolute" bottom={4}>
+        <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
+          {(ref) => (
+            <Flex
+              ref={ref}
+              position="relative"
+              w="full"
+              h="full"
+              bg={dynamicGrid ? 'base.850' : 'base.900'}
+              borderRadius="base"
+              overflow="hidden"
+            >
+              <InvokeCanvasComponent />
+              <CanvasManagerProviderGate>
+                <Flex
+                  position="absolute"
+                  flexDir="column"
+                  top={1}
+                  insetInlineStart={1}
+                  pointerEvents="none"
+                  gap={2}
+                  alignItems="flex-start"
+                >
+                  {showHUD && <CanvasHUD />}
+                  <CanvasAlertsSelectedEntityStatus />
+                  <CanvasAlertsPreserveMask />
+                  <CanvasAlertsSendingToGallery />
+                  <CanvasAlertsInvocationProgress />
+                </Flex>
+                <Flex position="absolute" top={1} insetInlineEnd={1}>
+                  <Menu>
+                    <MenuButton as={IconButton} icon={<PiDotsThreeOutlineVerticalFill />} colorScheme="base" />
+                    <MenuContent />
+                  </Menu>
+                </Flex>
+              </CanvasManagerProviderGate>
+            </Flex>
+          )}
+        </ContextMenu>
+        <Flex position="absolute" bottom={4} gap={2} align="center" justify="center">
+          <CanvasManagerProviderGate>
+            <StagingAreaIsStagingGate>
+              <StagingAreaToolbar />
+            </StagingAreaIsStagingGate>
+          </CanvasManagerProviderGate>
+        </Flex>
+        <Flex position="absolute" bottom={4}>
+          <CanvasManagerProviderGate>
+            <Filter />
+            <Transform />
+            <SelectObject />
+          </CanvasManagerProviderGate>
+        </Flex>
         <CanvasManagerProviderGate>
-          <Filter />
-          <Transform />
-          <SelectObject />
+          <CanvasDropArea />
         </CanvasManagerProviderGate>
+        <GatedImageViewer />
       </Flex>
-      <CanvasManagerProviderGate>
-        <CanvasDropArea />
-      </CanvasManagerProviderGate>
-      <GatedImageViewer />
-    </Flex>
+    </FocusRegionWrapper>
   );
 });
 

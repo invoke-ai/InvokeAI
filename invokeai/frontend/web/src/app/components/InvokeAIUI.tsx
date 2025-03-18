@@ -19,11 +19,13 @@ import { $store } from 'app/store/nanostores/store';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
-import type { WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
+import type { WorkflowSortOption, WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
 import {
   $workflowLibraryCategoriesOptions,
+  $workflowLibrarySortOptions,
   $workflowLibraryTagCategoriesOptions,
   DEFAULT_WORKFLOW_LIBRARY_CATEGORIES,
+  DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS,
   DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES,
 } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
@@ -55,6 +57,7 @@ interface Props extends PropsWithChildren {
   logo?: ReactNode;
   workflowCategories?: WorkflowCategory[];
   workflowTagCategories?: WorkflowTagCategory[];
+  workflowSortOptions?: WorkflowSortOption[];
   loggingOverrides?: LoggingOverrides;
 }
 
@@ -76,6 +79,7 @@ const InvokeAIUI = ({
   logo,
   workflowCategories,
   workflowTagCategories,
+  workflowSortOptions,
   loggingOverrides,
 }: Props) => {
   useLayoutEffect(() => {
@@ -220,6 +224,16 @@ const InvokeAIUI = ({
       $workflowLibraryTagCategoriesOptions.set(DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES);
     };
   }, [workflowTagCategories]);
+
+  useEffect(() => {
+    if (workflowSortOptions) {
+      $workflowLibrarySortOptions.set(workflowSortOptions);
+    }
+
+    return () => {
+      $workflowLibrarySortOptions.set(DEFAULT_WORKFLOW_LIBRARY_SORT_OPTIONS);
+    };
+  }, [workflowSortOptions]);
 
   useEffect(() => {
     if (socketOptions) {

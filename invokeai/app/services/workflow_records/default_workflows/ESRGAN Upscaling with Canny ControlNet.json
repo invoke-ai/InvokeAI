@@ -1,11 +1,11 @@
 {
   "id": "default_686bb1d0-d086-4c70-9fa3-2f600b922023",
-  "name": "ESRGAN Upscaling with Canny ControlNet",
+  "name": "Upscaler - SD1.5, ESRGAN",
   "author": "InvokeAI",
-  "description": "Sample workflow for using Upscaling with ControlNet with SD1.5",
+  "description": "Sample workflow for using ESRGAN to upscale with ControlNet with SD1.5",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "upscaling, controlnet, default",
+  "tags": "sd1.5, upscaling, control",
   "notes": "",
   "exposedFields": [
     {
@@ -185,14 +185,7 @@
           },
           "control_model": {
             "name": "control_model",
-            "label": "Control Model (select Canny)",
-            "value": {
-              "key": "a7b9c76f-4bc5-42aa-b918-c1c458a5bb24",
-              "hash": "blake3:260c7f8e10aefea9868cfc68d89970e91033bd37132b14b903e70ee05ebf530e",
-              "name": "sd-controlnet-canny",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
+            "label": "Control Model (select Canny)"
           },
           "control_weight": {
             "name": "control_weight",
@@ -295,14 +288,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
-            "value": {
-              "key": "5cd43ca0-dd0a-418d-9f7e-35b2b9d5e106",
-              "hash": "blake3:6987f323017f597213cc3264250edf57056d21a40a0a85d83a1a33a7d44dc41a",
-              "name": "Deliberate_v5",
-              "base": "sd-1",
-              "type": "main"
-            }
+            "label": ""
           }
         },
         "isOpen": true,

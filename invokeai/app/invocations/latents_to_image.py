@@ -31,10 +31,10 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "l2i",
-    title="Latents to Image",
+    title="Latents to Image - SD1.5, SDXL",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.3.1",
+    version="1.3.2",
 )
 class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""

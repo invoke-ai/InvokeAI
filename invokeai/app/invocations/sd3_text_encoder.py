@@ -29,10 +29,10 @@ SD3_T5_MAX_SEQ_LEN = 256
 
 @invocation(
     "sd3_text_encoder",
-    title="SD3 Text Encoding",
+    title="Prompt - SD3",
     tags=["prompt", "conditioning", "sd3"],
     category="conditioning",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class Sd3TextEncoderInvocation(BaseInvocation):

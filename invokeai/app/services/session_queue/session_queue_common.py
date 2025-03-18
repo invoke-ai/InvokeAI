@@ -570,7 +570,10 @@ ValueToInsertTuple: TypeAlias = tuple[
     str | None,  # destination (optional)
     int | None,  # retried_from_item_id (optional, this is always None for new items)
 ]
-"""A type alias for the tuple of values to insert into the session queue table."""
+"""A type alias for the tuple of values to insert into the session queue table.
+
+**If you change this, be sure to update the `enqueue_batch` and `retry_items_by_id` methods in the session queue service!**
+"""
 
 
 def prepare_values_to_insert(

@@ -72,10 +72,10 @@ class NoiseOutput(BaseInvocationOutput):
 
 @invocation(
     "noise",
-    title="Noise",
+    title="Create Latent Noise",
     tags=["latents", "noise"],
     category="latents",
-    version="1.0.2",
+    version="1.0.3",
 )
 class NoiseInvocation(BaseInvocation):
     """Generates latent noise."""

@@ -53,11 +53,11 @@ def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> C
 
 @invocation(
     "tiled_multi_diffusion_denoise_latents",
-    title="Tiled Multi-Diffusion Denoise Latents",
+    title="Tiled Multi-Diffusion Denoise - SD1.5, SDXL",
     tags=["upscale", "denoise"],
     category="latents",
     classification=Classification.Beta,
-    version="1.0.0",
+    version="1.0.1",
 )
 class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
     """Tiled Multi-Diffusion denoising.

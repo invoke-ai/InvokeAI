@@ -41,7 +41,7 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
         except Exception as e:
             raise WorkflowThumbnailFileSaveException from e
 
-    def get_path(self, workflow_id: str) -> Path:
+    def get_path(self, workflow_id: str, with_hash: bool = True) -> Path:
         workflow = self._invoker.services.workflow_records.get(workflow_id).workflow
         if workflow.meta.category is WorkflowCategory.Default:
             default_thumbnails_dir = Path(__file__).parent / Path("default_workflow_thumbnails")
@@ -51,7 +51,7 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
 
         return path
 
-    def get_url(self, workflow_id: str) -> str | None:
+    def get_url(self, workflow_id: str, with_hash: bool = True) -> str | None:
         path = self.get_path(workflow_id)
         if not self._validate_path(path):
             return
@@ -59,7 +59,8 @@ class WorkflowThumbnailFileStorageDisk(WorkflowThumbnailServiceBase):
         url = self._invoker.services.urls.get_workflow_thumbnail_url(workflow_id)
 
         # The image URL never changes, so we must add random query string to it to prevent caching
-        url += f"?{uuid_string()}"
+        if with_hash:
+            url += f"?{uuid_string()}"
 
         return url
 

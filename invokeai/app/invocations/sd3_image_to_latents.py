@@ -21,10 +21,10 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "sd3_i2l",
-    title="SD3 Image to Latents",
+    title="Image to Latents - SD3",
     tags=["image", "latents", "vae", "i2l", "sd3"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class SD3ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):

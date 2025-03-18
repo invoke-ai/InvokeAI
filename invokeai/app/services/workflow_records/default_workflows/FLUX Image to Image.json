@@ -1,11 +1,11 @@
 {
   "id": "default_cbf0e034-7b54-4b2c-b670-3b1e2e4b4a88",
-  "name": "FLUX Image to Image",
+  "name": "Image to Image - FLUX",
   "author": "InvokeAI",
   "description": "A simple image-to-image workflow using a FLUX dev model. ",
   "version": "1.1.0",
   "contact": "",
-  "tags": "image2image, flux, image-to-image, image to image",
+  "tags": "flux, image to image",
   "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend using FLUX dev models for image-to-image workflows. The image-to-image performance with FLUX schnell models is poor.",
   "exposedFields": [
     {
@@ -201,36 +201,15 @@
           },
           "t5_encoder_model": {
             "name": "t5_encoder_model",
-            "label": "",
-            "value": {
-              "key": "d18d5575-96b6-4da3-b3d8-eb58308d6705",
-              "hash": "random:f2f9ed74acdfb4bf6fec200e780f6c25f8dd8764a35e65d425d606912fdf573a",
-              "name": "t5_bnb_int8_quantized_encoder",
-              "base": "any",
-              "type": "t5_encoder"
-            }
+            "label": ""
           },
           "clip_embed_model": {
             "name": "clip_embed_model",
-            "label": "",
-            "value": {
-              "key": "5a19d7e5-8d98-43cd-8a81-87515e4b3b4e",
-              "hash": "random:4bd08514c08fb6ff04088db9aeb45def3c488e8b5fd09a35f2cc4f2dc346f99f",
-              "name": "clip-vit-large-patch14",
-              "base": "any",
-              "type": "clip_embed"
-            }
+            "label": ""
           },
           "vae_model": {
             "name": "vae_model",
-            "label": "",
-            "value": {
-              "key": "9172beab-5c1d-43f0-b2f0-6e0b956710d9",
-              "hash": "random:c54dde288e5fa2e6137f1c92e9d611f598049e6f16e360207b6d96c9f5a67ba0",
-              "name": "FLUX.1-schnell_ae",
-              "base": "flux",
-              "type": "vae"
-            }
+            "label": ""
           }
         }
       },
