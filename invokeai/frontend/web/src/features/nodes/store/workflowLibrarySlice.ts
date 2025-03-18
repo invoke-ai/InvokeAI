@@ -112,7 +112,7 @@ export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   },
   {
     categoryTKey: 'Model Architecture',
-    tags: [{ label: 'SD1.5' }, { label: 'SDXL' }, { label: 'SD3.5' }, { label: 'FLUX' }],
+    tags: [{ label: 'SD1.5' }, { label: 'SDXL' }, { label: 'SD3.5' }, { label: 'FLUX' }, { label: 'CogView4' }],
   },
   { categoryTKey: 'Tech Showcase', tags: [{ label: 'Control' }, { label: 'Reference Image' }] },
 ];
