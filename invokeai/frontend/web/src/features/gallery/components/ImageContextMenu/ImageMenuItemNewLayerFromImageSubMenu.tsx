@@ -21,7 +21,9 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusySafe();
-  const { isRegionalGuidanceEnabled, isControlLayerEnabled, isReferenceImageEnabled } = useIsEntityTypeEnabled();
+  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
+  const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
+  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
 
   const onClickNewRasterLayerFromImage = useCallback(() => {
     const { dispatch, getState } = store;
