@@ -72,7 +72,8 @@ jobs:
       PIP_USE_PEP517: '1'
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        # https://github.com/nschloe/action-cached-lfs-checkout
+        uses: nschloe/action-cached-lfs-checkout@f46300cd8952454b9f0a21a3d133d4bd5684cfc2
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}

@@ -18,9 +18,19 @@ If you just want to use Invoke, you should use the [launcher][launcher link].
 
 2. [Fork and clone][forking link] the [InvokeAI repo][repo link].
 
-3. Create an directory for user data (images, models, db, etc). This is typically at `~/invokeai`, but if you already have a non-dev install, you may want to create a separate directory for the dev install.
+3. This repository uses Git LFS to manage large files. To ensure all assets are downloaded:
+      - Install git-lfs → [Download here](https://git-lfs.com/)
+      - Enable automatic LFS fetching for this repository:
+        ```shell
+        git config lfs.fetchinclude "*"
+        ```
+        - Fetch files from LFS (only needs to be done once; subsequent `git pull` will fetch changes automatically):
+        ```
+        git lfs pull
+        ```
+4. Create an directory for user data (images, models, db, etc). This is typically at `~/invokeai`, but if you already have a non-dev install, you may want to create a separate directory for the dev install.
 
-4. Follow the [manual install][manual install link] guide, with some modifications to the install command:
+5. Follow the [manual install][manual install link] guide, with some modifications to the install command:
 
       - Use `.` instead of `invokeai` to install from the current directory. You don't need to specify the version.
 
@@ -34,19 +44,19 @@ If you just want to use Invoke, you should use the [launcher][launcher link].
       uv pip install -e ".[dev,test,docs,xformers]" --python 3.11 --python-preference only-managed --index=https://download.pytorch.org/whl/cu124 --reinstall
       ```
 
-5. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
+6. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
 
       This is because the UI build is not distributed with the source code. You need to build it manually. End the running server instance.
 
       If you only want to edit the docs, you can stop here and skip to the **Documentation** section below.
 
-6. Install the frontend dev toolchain:
+7. Install the frontend dev toolchain:
 
       - [`nodejs`](https://nodejs.org/) (v20+)
 
       - [`pnpm`](https://pnpm.io/8.x/installation) (must be v8 - not v9!)
 
-7. Do a production build of the frontend:
+8. Do a production build of the frontend:
 
       ```sh
       cd <PATH_TO_INVOKEAI_REPO>/invokeai/frontend/web
@@ -54,7 +64,7 @@ If you just want to use Invoke, you should use the [launcher][launcher link].
       pnpm build
       ```
 
-8. Restart the server and navigate to the URL. You should get a UI. After making changes to the python code, restart the server to see those changes.
+9. Restart the server and navigate to the URL. You should get a UI. After making changes to the python code, restart the server to see those changes.
 
 ## Updating the UI
 

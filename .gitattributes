@@ -3,3 +3,4 @@
 # For more info see: https://www.aleksandrhovhannisyan.com/blog/crlf-vs-lf-normalizing-line-endings-in-git/
 * text=auto
 docker/** text eol=lf
+tests/test_model_probe/stripped_models/** filter=lfs diff=lfs merge=lfs -text
