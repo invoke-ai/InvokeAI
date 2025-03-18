@@ -23,7 +23,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 
 const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
-  const isCogview4 = useAppSelector(selectIsCogView4)
+  const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   return (
