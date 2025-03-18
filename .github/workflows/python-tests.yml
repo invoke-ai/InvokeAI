@@ -73,6 +73,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
