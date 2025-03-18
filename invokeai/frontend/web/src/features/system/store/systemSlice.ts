@@ -22,6 +22,7 @@ const initialSystemState: SystemState = {
   logLevel: 'debug',
   logNamespaces: [...zLogNamespace.options],
   shouldShowInvocationProgressDetail: false,
+  shouldHighlightFocusedRegions: false,
 };
 
 export const systemSlice = createSlice({
@@ -68,6 +69,9 @@ export const systemSlice = createSlice({
     setShouldShowInvocationProgressDetail(state, action: PayloadAction<boolean>) {
       state.shouldShowInvocationProgressDetail = action.payload;
     },
+    setShouldHighlightFocusedRegions(state, action: PayloadAction<boolean>) {
+      state.shouldHighlightFocusedRegions = action.payload;
+    },
   },
 });
 
@@ -84,6 +88,7 @@ export const {
   setShouldEnableModelDescriptions,
   shouldConfirmOnNewSessionToggled,
   setShouldShowInvocationProgressDetail,
+  setShouldHighlightFocusedRegions,
 } = systemSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -120,6 +125,9 @@ export const selectSystemShouldEnableInformationalPopovers = createSystemSelecto
 );
 export const selectSystemShouldEnableModelDescriptions = createSystemSelector(
   (system) => system.shouldEnableModelDescriptions
+);
+export const selectSystemShouldEnableHighlightFocusedRegions = createSystemSelector(
+  (system) => system.shouldHighlightFocusedRegions
 );
 export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);
 export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(

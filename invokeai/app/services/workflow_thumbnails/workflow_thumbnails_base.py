@@ -8,12 +8,12 @@ class WorkflowThumbnailServiceBase(ABC):
     """Base class for workflow thumbnail services"""
 
     @abstractmethod
-    def get_path(self, workflow_id: str) -> Path:
+    def get_path(self, workflow_id: str, with_hash: bool = True) -> Path:
         """Gets the path to a workflow thumbnail"""
         pass
 
     @abstractmethod
-    def get_url(self, workflow_id: str) -> str | None:
+    def get_url(self, workflow_id: str, with_hash: bool = True) -> str | None:
         """Gets the URL of a workflow thumbnail"""
         pass
 

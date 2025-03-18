@@ -1,11 +1,11 @@
 {
   "id": "default_e71d153c-2089-43c7-bd2c-f61f37d4c1c1",
-  "name": "Text to Image with LoRA",
+  "name": "Text to Image - SD1.5, LoRA",
   "author": "InvokeAI",
   "description": "Simple text to image workflow with a LoRA",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "text to image, lora, text to image",
+  "tags": "sd1.5, text to image, lora",
   "notes": "",
   "exposedFields": [
     {

@@ -27,6 +27,7 @@ export const ModelTypeFilter = memo(() => {
       control_lora: t('modelManager.controlLora'),
       siglip: t('modelManager.siglip'),
       flux_redux: t('modelManager.fluxRedux'),
+      llava_onevision: t('modelManager.llavaOnevision'),
     }),
     [t]
   );

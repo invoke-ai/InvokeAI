@@ -30,10 +30,10 @@ class Sd3ModelLoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "sd3_model_loader",
-    title="SD3 Main Model",
+    title="Main Model - SD3",
     tags=["model", "sd3"],
     category="model",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class Sd3ModelLoaderInvocation(BaseInvocation):

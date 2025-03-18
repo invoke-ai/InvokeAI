@@ -31,10 +31,10 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "i2l",
-    title="Image to Latents",
+    title="Image to Latents - SD1.5, SDXL",
     tags=["latents", "image", "vae", "i2l"],
     category="latents",
-    version="1.1.0",
+    version="1.1.1",
 )
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""

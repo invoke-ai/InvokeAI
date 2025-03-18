@@ -1,11 +1,11 @@
 {
   "id": "default_f96e794f-eb3e-4d01-a960-9b4e43402bcf",
-  "name": "MultiDiffusion SD1.5",
+  "name": "Upscaler - SD1.5, MultiDiffusion",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling, using SD1.5 based models.",
   "version": "1.0.0",
   "contact": "invoke@invoke.ai",
-  "tags": "tiled, upscaling, sdxl",
+  "tags": "sd1.5, upscaling",
   "notes": "",
   "exposedFields": [
     {
@@ -135,14 +135,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
-            "value": {
-              "key": "e7b402e5-62e5-4acb-8c39-bee6bdb758ab",
-              "hash": "c8659e796168d076368256b57edbc1b48d6dafc1712f1bb37cc57c7c06889a6b",
-              "name": "526mix",
-              "base": "sd-1",
-              "type": "main"
-            }
+            "label": ""
           }
         }
       },
@@ -384,21 +377,11 @@
           },
           "image": {
             "name": "image",
-            "label": "Image to Upscale",
-            "value": {
-              "image_name": "ee7009f7-a35d-488b-a2a6-21237ef5ae05.png"
-            }
+            "label": "Image to Upscale"
           },
           "image_to_image_model": {
             "name": "image_to_image_model",
-            "label": "",
-            "value": {
-              "key": "38bb1a29-8ede-42ba-b77f-64b3478896eb",
-              "hash": "blake3:e52fdbee46a484ebe9b3b20ea0aac0a35a453ab6d0d353da00acfd35ce7a91ed",
-              "name": "4xNomosWebPhoto_esrgan",
-              "base": "sdxl",
-              "type": "spandrel_image_to_image"
-            }
+            "label": ""
           },
           "tile_size": {
             "name": "tile_size",
@@ -437,14 +420,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "ControlNet Model - Choose a Tile ControlNet",
-            "value": {
-              "key": "20645e4d-ef97-4c5a-9243-b834a3483925",
-              "hash": "f0812e13758f91baf4e54b7dbb707b70642937d3b2098cd2b94cc36d3eba308e",
-              "name": "tile",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
+            "label": "ControlNet Model - Choose a Tile ControlNet"
           }
         }
       },

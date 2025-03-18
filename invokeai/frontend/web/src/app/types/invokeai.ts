@@ -27,7 +27,8 @@ export type AppFeature =
   | 'bulkDownload'
   | 'starterModels'
   | 'hfToken'
-  | 'retryQueueItem';
+  | 'retryQueueItem'
+  | 'cancelAndClearAll';
 /**
  * A disable-able Stable Diffusion feature
  */

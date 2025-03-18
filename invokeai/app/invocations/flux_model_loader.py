@@ -37,10 +37,10 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "flux_model_loader",
-    title="Flux Main Model",
+    title="Main Model - FLUX",
     tags=["model", "flux"],
     category="model",
-    version="1.0.5",
+    version="1.0.6",
     classification=Classification.Prototype,
 )
 class FluxModelLoaderInvocation(BaseInvocation):

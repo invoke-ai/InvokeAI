@@ -110,7 +110,10 @@
         "layout": "Schema",
         "row": "Riga",
         "column": "Colonna",
-        "saveChanges": "Salva modifiche"
+        "saveChanges": "Salva modifiche",
+        "error_withCount_one": "{{count}} errore",
+        "error_withCount_many": "{{count}} errori",
+        "error_withCount_other": "{{count}} errori"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -1771,20 +1774,24 @@
             "divider": "Divisore",
             "container": "Contenitore",
             "text": "Testo",
-            "numberInput": "Ingresso numerico"
+            "numberInput": "Ingresso numerico",
+            "containerRowLayout": "Contenitore (disposizione riga)",
+            "containerColumnLayout": "Contenitore (disposizione colonna)"
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
         "filterByTags": "Filtra per etichetta",
         "shared": "Condiviso",
         "browseWorkflows": "Sfoglia i flussi di lavoro",
-        "resetTags": "Reimposta le etichette",
         "allLoaded": "Tutti i flussi di lavoro caricati",
         "saveChanges": "Salva modifiche",
         "yourWorkflows": "I tuoi flussi di lavoro",
         "recentlyOpened": "Aperto di recente",
         "workflowThumbnail": "Miniatura del flusso di lavoro",
-        "private": "Privato"
+        "private": "Privato",
+        "deselectAll": "Deseleziona tutto",
+        "noRecentWorkflows": "Nessun flusso di lavoro recente",
+        "view": "Visualizza"
     },
     "accordions": {
         "compositing": {
@@ -2334,7 +2341,8 @@
         "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
         "noModelsInstalled": "Sembra che non hai installato alcun modello! Puoi <DownloadStarterModelsButton>scaricare un pacchetto di modelli di avvio</DownloadStarterModelsButton> o <ImportModelsButton>importare modelli</ImportModelsButton>.",
         "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
-        "lowVRAMMode": "Per prestazioni ottimali, segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent>."
+        "lowVRAMMode": "Per prestazioni ottimali, segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent>.",
+        "toGetStartedWorkflow": "Per iniziare, compila i campi a sinistra e premi <StrongComponent>Invoke</StrongComponent> per generare la tua immagine. Vuoi esplorare altri flussi di lavoro? Fai clic sull'<StrongComponent>icona della cartella</StrongComponent> accanto al titolo del flusso di lavoro per visualizzare un elenco di altri modelli che puoi provare."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Novità in Invoke",

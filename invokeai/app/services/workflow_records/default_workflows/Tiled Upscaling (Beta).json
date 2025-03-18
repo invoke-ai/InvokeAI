@@ -1,11 +1,11 @@
 {
   "id": "default_43b0d7f7-6a12-4dcf-a5a4-50c940cbee29",
-  "name": "Tiled Upscaling (Beta)",
+  "name": "Upscaler - SD1.5, Tiled",
   "author": "Invoke",
   "description": "A workflow to upscale an input image with tiled upscaling. ",
   "version": "2.1.0",
   "contact": "invoke@invoke.ai",
-  "tags": "tiled, upscaling, sd1.5",
+  "tags": "sd1.5, upscaling",
   "notes": "",
   "exposedFields": [
     {
@@ -86,14 +86,7 @@
           },
           "ip_adapter_model": {
             "name": "ip_adapter_model",
-            "label": "IP-Adapter Model (select ip_adapter_sd15)",
-            "value": {
-              "key": "1cc210bb-4d0a-4312-b36c-b5d46c43768e",
-              "hash": "blake3:3d669dffa7471b357b4df088b99ffb6bf4d4383d5e0ef1de5ec1c89728a3d5a5",
-              "name": "ip_adapter_sd15",
-              "base": "sd-1",
-              "type": "ip_adapter"
-            }
+            "label": "IP-Adapter Model (select ip_adapter_sd15)"
           },
           "clip_vision_model": {
             "name": "clip_vision_model",
@@ -201,14 +194,7 @@
           },
           "control_model": {
             "name": "control_model",
-            "label": "Control Model (select contro_v11f1e_sd15_tile)",
-            "value": {
-              "key": "773843c8-db1f-4502-8f65-59782efa7960",
-              "hash": "blake3:f0812e13758f91baf4e54b7dbb707b70642937d3b2098cd2b94cc36d3eba308e",
-              "name": "control_v11f1e_sd15_tile",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
+            "label": "Control Model (select control_v11f1e_sd15_tile)"
           },
           "control_weight": {
             "name": "control_weight",
