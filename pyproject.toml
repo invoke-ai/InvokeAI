@@ -125,6 +125,7 @@ dependencies = [
   "pytest-datadir",
   "requests_testadapter",
   "httpx",
+  "polyfactory==2.19.0"
 ]
 
 [project.scripts]
