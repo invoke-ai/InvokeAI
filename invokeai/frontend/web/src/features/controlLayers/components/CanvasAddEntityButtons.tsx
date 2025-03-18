@@ -21,7 +21,9 @@ export const CanvasAddEntityButtons = memo(() => {
   const addControlLayer = useAddControlLayer();
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
-  const { isReferenceImageEnabled, isRegionalGuidanceEnabled, isControlLayerEnabled } = useIsEntityTypeEnabled();
+  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
+  const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
+  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
 
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
