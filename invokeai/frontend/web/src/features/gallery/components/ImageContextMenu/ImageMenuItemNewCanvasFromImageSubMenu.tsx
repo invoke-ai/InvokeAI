@@ -19,7 +19,7 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusySafe();
-  const { isControlLayerEnabled } = useIsEntityTypeEnabled();
+  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
 
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
     const { dispatch, getState } = store;

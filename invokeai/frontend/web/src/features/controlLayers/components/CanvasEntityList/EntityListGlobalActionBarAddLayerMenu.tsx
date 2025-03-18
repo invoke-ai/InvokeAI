@@ -22,7 +22,9 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const { isReferenceImageEnabled, isRegionalGuidanceEnabled, isControlLayerEnabled } = useIsEntityTypeEnabled();
+  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
+  const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
+  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
 
   return (
     <Menu>
