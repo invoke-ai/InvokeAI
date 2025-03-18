@@ -58,8 +58,11 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = True) -> Dict[str,
     else:
         if scan:
             scan_result = pscan.scan_file_path(path)
-            if scan_result.infected_files != 0 or scan_result.scan_err:
-                raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
+            if scan_result.infected_files != 0:
+                raise Exception(f"The model at {path} is potentially infected by malware. Aborting import.")
+            if scan_result.scan_err:
+                raise Exception(f"Error scanning model at {path} for malware. Aborting import.")
+
         checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
 
