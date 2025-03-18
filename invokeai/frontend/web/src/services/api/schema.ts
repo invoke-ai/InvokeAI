@@ -3803,7 +3803,7 @@ export type components = {
             type: "cogview4_conditioning_output";
         };
         /**
-         * CogView4 Denoise
+         * Denoise - CogView4
          * @description Run the denoising process with a CogView4 model.
          */
         CogView4DenoiseInvocation: {
@@ -3910,7 +3910,7 @@ export type components = {
             type: "cogview4_denoise";
         };
         /**
-         * CogView4 Image to Latents
+         * Image to Latents - CogView4
          * @description Generates latents from an image.
          */
         CogView4ImageToLatentsInvocation: {
@@ -3959,7 +3959,7 @@ export type components = {
             type: "cogview4_i2l";
         };
         /**
-         * CogView4 Latents to Image
+         * Latents to Image - CogView4
          * @description Generates an image from latents.
          */
         CogView4LatentsToImageInvocation: {
@@ -4008,7 +4008,7 @@ export type components = {
             type: "cogview4_l2i";
         };
         /**
-         * CogView4 Main Model
+         * Main Model - CogView4
          * @description Loads a CogView4 base model, outputting its submodels.
          */
         CogView4ModelLoaderInvocation: {
@@ -4066,7 +4066,7 @@ export type components = {
             type: "cogview4_model_loader_output";
         };
         /**
-         * CogView4 Text Encoding
+         * Prompt - CogView4
          * @description Encodes and preps a prompt for a cogview4 image.
          */
         CogView4TextEncoderInvocation: {
