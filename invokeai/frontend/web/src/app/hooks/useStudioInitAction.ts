@@ -16,6 +16,7 @@ import {
   $workflowLibraryTagOptions,
   workflowLibraryTagsReset,
   workflowLibraryTagToggled,
+  workflowLibraryViewChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
@@ -191,6 +192,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           // Go to the workflows tab and open the workflow library modal with the recommended workflows view
           store.dispatch(setActiveTab('workflows'));
           $isWorkflowLibraryModalOpen.set(true);
+          store.dispatch(workflowLibraryViewChanged('defaults'));
           store.dispatch(workflowLibraryTagsReset());
           for (const tag of workflowLibraryTagOptions) {
             if (tag.recommended) {
