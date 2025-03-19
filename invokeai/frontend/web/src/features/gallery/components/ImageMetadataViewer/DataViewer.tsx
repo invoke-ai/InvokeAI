@@ -21,7 +21,10 @@ type Props = {
   extraCopyActions?: { label: string; getData: (data: unknown) => unknown }[];
 } & FlexProps;
 
-const overlayscrollbarsOptions = getOverlayScrollbarsParams('scroll', 'scroll').options;
+const overlayscrollbarsOptions = getOverlayScrollbarsParams({
+  overflowX: 'scroll',
+  overflowY: 'scroll',
+}).options;
 
 const DataViewer = (props: Props) => {
   const { label, data, fileName, withDownload = true, withCopy = true, extraCopyActions, ...rest } = props;

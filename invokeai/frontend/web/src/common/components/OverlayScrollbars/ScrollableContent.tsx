@@ -19,7 +19,7 @@ const styles: CSSProperties = { position: 'absolute', top: 0, left: 0, right: 0,
 
 const ScrollableContent = ({ children, maxHeight, overflowX = 'hidden', overflowY = 'scroll' }: Props) => {
   const overlayscrollbarsOptions = useMemo(
-    () => getOverlayScrollbarsParams(overflowX, overflowY).options,
+    () => getOverlayScrollbarsParams({ overflowX, overflowY }).options,
     [overflowX, overflowY]
   );
   const [os, osRef] = useState<OverlayScrollbarsComponentRef | null>(null);
