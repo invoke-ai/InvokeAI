@@ -92,7 +92,7 @@ export const selectWorkflowLibraryView = createWorkflowLibrarySelector(({ view }
 export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default'] satisfies WorkflowCategory[];
 export const $workflowLibraryCategoriesOptions = atom<WorkflowCategory[]>(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);
 
-export type WorkflowTagCategory = { categoryTKey: string; tags: Array<{ label: string; selected?: boolean }> };
+export type WorkflowTagCategory = { categoryTKey: string; tags: Array<{ label: string; recommended?: boolean }> };
 export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   {
     categoryTKey: 'Industry',
@@ -100,7 +100,7 @@ export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   },
   {
     categoryTKey: 'Common Tasks',
-    tags: [{ label: 'Upscaling' }, { label: 'Text to Image' }, { label: 'Image to Image' }],
+    tags: [{ label: 'Upscaling' }, { label: 'Text to Image' }, { label: 'Image to Image', recommended: true }],
   },
   {
     categoryTKey: 'Model Architecture',
