@@ -20,12 +20,22 @@ export const overlayScrollbarsParams: UseOverlayScrollbarsParams = {
   },
 };
 
-export const getOverlayScrollbarsParams = (
-  overflowX: 'hidden' | 'scroll' = 'hidden',
-  overflowY: 'hidden' | 'scroll' = 'scroll'
-) => {
+export const getOverlayScrollbarsParams = ({
+  overflowX = 'hidden',
+  overflowY = 'scroll',
+  visibility = 'auto',
+}: {
+  overflowX?: 'hidden' | 'scroll';
+  overflowY?: 'hidden' | 'scroll';
+  visibility?: 'auto' | 'hidden' | 'visible';
+}) => {
   const params = deepClone(overlayScrollbarsParams);
-  merge(params, { options: { overflow: { y: overflowY, x: overflowX } } });
+  merge(params, {
+    options: {
+      overflow: { y: overflowY, x: overflowX },
+      scrollbars: { visibility, autoHide: visibility === 'visible' ? 'never' : 'scroll' },
+    },
+  });
   return params;
 };
 

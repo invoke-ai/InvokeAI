@@ -1,7 +1,18 @@
 import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
-import { Button, Checkbox, Collapse, Flex, Spacer, Text } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  Checkbox,
+  Collapse,
+  Flex,
+  IconButton,
+  Spacer,
+  Text,
+  Tooltip,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import type { WorkflowLibraryView, WorkflowTagCategory } from 'features/nodes/store/workflowLibrarySlice';
 import {
   $workflowLibraryCategoriesOptions,
@@ -15,6 +26,7 @@ import {
 } from 'features/nodes/store/workflowLibrarySlice';
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
@@ -25,9 +37,14 @@ export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
   const categoryOptions = useStore($workflowLibraryCategoriesOptions);
   const view = useAppSelector(selectWorkflowLibraryView);
+  const dispatch = useAppDispatch();
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const resetTags = useCallback(() => {
+    dispatch(workflowLibraryTagsReset());
+  }, [dispatch]);
 
   return (
-    <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={1}>
+    <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
       <Flex flexDir="column" w="full" pb={2}>
         <WorkflowLibraryViewButton view="recent">{t('workflows.recentlyOpened')}</WorkflowLibraryViewButton>
       </Flex>
@@ -48,7 +65,26 @@ export const WorkflowLibrarySideNav = () => {
         )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
-        <WorkflowLibraryViewButton view="defaults">{t('workflows.browseWorkflows')}</WorkflowLibraryViewButton>
+        {view === 'defaults' && selectedTags.length > 0 ? (
+          <ButtonGroup>
+            <WorkflowLibraryViewButton view="defaults" w="auto">
+              {t('workflows.browseWorkflows')}
+            </WorkflowLibraryViewButton>
+            <Tooltip label={t('workflows.deselectAll')}>
+              <IconButton
+                onClick={resetTags}
+                size="md"
+                aria-label={t('workflows.deselectAll')}
+                icon={<PiArrowCounterClockwiseBold size={12} />}
+                variant="ghost"
+                bg="base.700"
+                color="base.50"
+              />
+            </Tooltip>
+          </ButtonGroup>
+        ) : (
+          <WorkflowLibraryViewButton view="defaults">{t('workflows.browseWorkflows')}</WorkflowLibraryViewButton>
+        )}
         <DefaultsViewCheckboxesCollapsible />
       </Flex>
       <Spacer />
@@ -58,39 +94,22 @@ export const WorkflowLibrarySideNav = () => {
   );
 };
 
+const overlayscrollbarsOptions = getOverlayScrollbarsParams({ visibility: 'visible' }).options;
+
 const DefaultsViewCheckboxesCollapsible = memo(() => {
-  const { t } = useTranslation();
-  const dispatch = useDispatch();
-  const tags = useAppSelector(selectWorkflowLibrarySelectedTags);
   const tagCategoryOptions = useStore($workflowLibraryTagCategoriesOptions);
   const view = useAppSelector(selectWorkflowLibraryView);
-
-  const resetTags = useCallback(() => {
-    dispatch(workflowLibraryTagsReset());
-  }, [dispatch]);
 
   return (
     <Collapse in={view === 'defaults'}>
       <Flex flexDir="column" gap={2} pl={4} py={2} overflow="hidden" h="100%" minH={0}>
-        <Button
-          isDisabled={tags.length === 0}
-          onClick={resetTags}
-          size="sm"
-          variant="link"
-          fontWeight="bold"
-          justifyContent="flex-start"
-          flexGrow={0}
-          flexShrink={0}
-          leftIcon={<PiArrowCounterClockwiseBold />}
-          h={8}
-        >
-          {t('workflows.deselectAll')}
-        </Button>
-        <Flex flexDir="column" gap={2} overflow="auto">
-          {tagCategoryOptions.map((tagCategory) => (
-            <TagCategory key={tagCategory.categoryTKey} tagCategory={tagCategory} />
-          ))}
-        </Flex>
+        <OverlayScrollbarsComponent style={overlayScrollbarsStyles} options={overlayscrollbarsOptions}>
+          <Flex flexDir="column" gap={2} overflow="auto">
+            {tagCategoryOptions.map((tagCategory) => (
+              <TagCategory key={tagCategory.categoryTKey} tagCategory={tagCategory} />
+            ))}
+          </Flex>
+        </OverlayScrollbarsComponent>
       </Flex>
     </Collapse>
   );

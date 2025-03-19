@@ -24,7 +24,7 @@ import type { ImageDTO } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
-const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
+const overlayscrollbarsOptions = getOverlayScrollbarsParams({}).options;
 
 const sx = {
   borderWidth: 1,
