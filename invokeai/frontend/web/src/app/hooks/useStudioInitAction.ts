@@ -12,6 +12,11 @@ import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
 import { $isWorkflowLibraryModalOpen } from 'features/nodes/store/workflowLibraryModal';
+import {
+  $workflowLibraryTagOptions,
+  workflowLibraryTagsReset,
+  workflowLibraryTagToggled,
+} from 'features/nodes/store/workflowLibrarySlice';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
@@ -30,9 +35,17 @@ type SendToCanvasAction = _StudioInitAction<'sendToCanvas', { imageName: string 
 type UseAllParametersAction = _StudioInitAction<'useAllParameters', { imageName: string }>;
 type StudioDestinationAction = _StudioInitAction<
   'goToDestination',
-  { destination: 'generation' | 'canvas' | 'workflows' | 'upscaling' | 'viewAllWorkflows' | 'viewAllStylePresets' }
+  {
+    destination:
+      | 'generation'
+      | 'canvas'
+      | 'workflows'
+      | 'upscaling'
+      | 'viewAllWorkflows'
+      | 'viewAllWorkflowsRecommended'
+      | 'viewAllStylePresets';
+  }
 >;
-
 // Use global state to show loader until we are ready to render the studio.
 export const $didStudioInit = atom(false);
 
@@ -58,6 +71,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   const didParseOpenAPISchema = useStore($hasTemplates);
   const store = useAppStore();
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
+  const workflowLibraryTagOptions = useStore($workflowLibraryTagOptions);
 
   const handleSendToCanvas = useCallback(
     async (imageName: string) => {
@@ -173,6 +187,17 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           store.dispatch(setActiveTab('workflows'));
           $isWorkflowLibraryModalOpen.set(true);
           break;
+        case 'viewAllWorkflowsRecommended':
+          // Go to the workflows tab and open the workflow library modal with the recommended workflows view
+          store.dispatch(setActiveTab('workflows'));
+          $isWorkflowLibraryModalOpen.set(true);
+          store.dispatch(workflowLibraryTagsReset());
+          for (const tag of workflowLibraryTagOptions) {
+            if (tag.recommended) {
+              store.dispatch(workflowLibraryTagToggled(tag.label));
+            }
+          }
+          break;
         case 'viewAllStylePresets':
           // Go to the canvas tab and open the style presets menu
           store.dispatch(setActiveTab('canvas'));
@@ -180,7 +205,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
           break;
       }
     },
-    [store]
+    [store, workflowLibraryTagOptions]
   );
 
   const handleStudioInitAction = useCallback(
