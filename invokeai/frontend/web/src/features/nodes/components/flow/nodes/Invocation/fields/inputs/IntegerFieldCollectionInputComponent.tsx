@@ -27,7 +27,7 @@ import { PiXBold } from 'react-icons/pi';
 
 import type { FieldComponentProps } from './types';
 
-const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
+const overlayscrollbarsOptions = getOverlayScrollbarsParams({}).options;
 
 const sx = {
   borderWidth: 1,

@@ -17,7 +17,7 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const overlayscrollbarsOptions = getOverlayScrollbarsParams().options;
+const overlayscrollbarsOptions = getOverlayScrollbarsParams({}).options;
 
 export const ImageGeneratorFieldInputComponent = memo(
   (props: FieldComponentProps<ImageGeneratorFieldInputInstance, ImageGeneratorFieldInputTemplate>) => {
