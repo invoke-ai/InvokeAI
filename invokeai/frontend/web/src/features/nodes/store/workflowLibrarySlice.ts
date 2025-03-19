@@ -92,12 +92,21 @@ export const selectWorkflowLibraryView = createWorkflowLibrarySelector(({ view }
 export const DEFAULT_WORKFLOW_LIBRARY_CATEGORIES = ['user', 'default'] satisfies WorkflowCategory[];
 export const $workflowLibraryCategoriesOptions = atom<WorkflowCategory[]>(DEFAULT_WORKFLOW_LIBRARY_CATEGORIES);
 
-export type WorkflowTagCategory = { categoryTKey: string; tags: string[] };
+export type WorkflowTagCategory = { categoryTKey: string; tags: Array<{ label: string; selected?: boolean }> };
 export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
-  { categoryTKey: 'Industry', tags: ['Architecture', 'Fashion', 'Game Dev', 'Food'] },
-  { categoryTKey: 'Common Tasks', tags: ['Upscaling', 'Text to Image', 'Image to Image'] },
-  { categoryTKey: 'Model Architecture', tags: ['SD1.5', 'SDXL', 'SD3.5', 'FLUX'] },
-  { categoryTKey: 'Tech Showcase', tags: ['Control', 'Reference Image'] },
+  {
+    categoryTKey: 'Industry',
+    tags: [{ label: 'Architecture' }, { label: 'Fashion' }, { label: 'Game Dev' }, { label: 'Food' }],
+  },
+  {
+    categoryTKey: 'Common Tasks',
+    tags: [{ label: 'Upscaling' }, { label: 'Text to Image' }, { label: 'Image to Image' }],
+  },
+  {
+    categoryTKey: 'Model Architecture',
+    tags: [{ label: 'SD1.5' }, { label: 'SDXL' }, { label: 'SD3.5' }, { label: 'FLUX' }],
+  },
+  { categoryTKey: 'Tech Showcase', tags: [{ label: 'Control' }, { label: 'Reference Image' }] },
 ];
 export const $workflowLibraryTagCategoriesOptions = atom<WorkflowTagCategory[]>(
   DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES

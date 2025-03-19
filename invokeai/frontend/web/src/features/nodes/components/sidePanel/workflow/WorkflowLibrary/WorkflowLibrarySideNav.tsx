@@ -27,7 +27,7 @@ import {
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
@@ -42,6 +42,8 @@ export const WorkflowLibrarySideNav = () => {
   const resetTags = useCallback(() => {
     dispatch(workflowLibraryTagsReset());
   }, [dispatch]);
+
+  useEffect(() => {}, [selectedTags, dispatch]);
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
@@ -121,7 +123,7 @@ const useCountForIndividualTag = (tag: string) => {
   const queryArg = useMemo(
     () =>
       ({
-        tags: allTags,
+        tags: allTags.map((tag) => tag.label),
         categories: ['default'],
       }) satisfies Parameters<typeof useGetCountsByTagQuery>[0],
     [allTags]
@@ -146,7 +148,7 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
   const queryArg = useMemo(
     () =>
       ({
-        tags: allTags,
+        tags: allTags.map((tag) => tag.label),
         categories: ['default'], // We only allow filtering by tag for default workflows
       }) satisfies Parameters<typeof useGetCountsByTagQuery>[0],
     [allTags]
@@ -159,7 +161,7 @@ const useCountForTagCategory = (tagCategory: WorkflowTagCategory) => {
             return { count: 0 };
           }
           return {
-            count: tagCategory.tags.reduce((acc, tag) => acc + (data[tag] ?? 0), 0),
+            count: tagCategory.tags.reduce((acc, tag) => acc + (data[tag.label] ?? 0), 0),
           };
         },
       }) satisfies Parameters<typeof useGetCountsByTagQuery>[1],
@@ -197,6 +199,15 @@ WorkflowLibraryViewButton.displayName = 'NavButton';
 const TagCategory = memo(({ tagCategory }: { tagCategory: WorkflowTagCategory }) => {
   const { t } = useTranslation();
   const count = useCountForTagCategory(tagCategory);
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    for (const tag of tagCategory.tags) {
+      if (tag.selected) {
+        dispatch(workflowLibraryTagToggled(tag.label));
+      }
+    }
+  }, [count, tagCategory.tags, dispatch]);
 
   if (count === 0) {
     return null;
@@ -209,7 +220,7 @@ const TagCategory = memo(({ tagCategory }: { tagCategory: WorkflowTagCategory })
       </Text>
       <Flex flexDir="column" gap={2} pl={4}>
         {tagCategory.tags.map((tag) => (
-          <TagCheckbox key={tag} tag={tag} />
+          <TagCheckbox key={tag.label} tag={tag.label} />
         ))}
       </Flex>
     </Flex>
