@@ -1,10 +1,12 @@
 import type { ButtonProps, CheckboxProps } from '@invoke-ai/ui-library';
 import {
+  Box,
   Button,
   ButtonGroup,
   Checkbox,
   Collapse,
   Flex,
+  Icon,
   IconButton,
   Spacer,
   Text,
@@ -29,7 +31,7 @@ import { UploadWorkflowButton } from 'features/workflowLibrary/components/Upload
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiUsersBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiStarFill, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
 import { useGetCountsByTagQuery } from 'services/api/endpoints/workflows';
 
@@ -199,15 +201,6 @@ WorkflowLibraryViewButton.displayName = 'NavButton';
 const TagCategory = memo(({ tagCategory }: { tagCategory: WorkflowTagCategory }) => {
   const { t } = useTranslation();
   const count = useCountForTagCategory(tagCategory);
-  const dispatch = useAppDispatch();
-
-  useEffect(() => {
-    for (const tag of tagCategory.tags) {
-      if (tag.selected) {
-        dispatch(workflowLibraryTagToggled(tag.label));
-      }
-    }
-  }, [count, tagCategory.tags, dispatch]);
 
   if (count === 0) {
     return null;
@@ -220,7 +213,7 @@ const TagCategory = memo(({ tagCategory }: { tagCategory: WorkflowTagCategory })
       </Text>
       <Flex flexDir="column" gap={2} pl={4}>
         {tagCategory.tags.map((tag) => (
-          <TagCheckbox key={tag.label} tag={tag.label} />
+          <TagCheckbox key={tag.label} tag={tag} />
         ))}
       </Flex>
     </Flex>
@@ -228,14 +221,15 @@ const TagCategory = memo(({ tagCategory }: { tagCategory: WorkflowTagCategory })
 });
 TagCategory.displayName = 'TagCategory';
 
-const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: string }) => {
+const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: { label: string; recommended?: boolean } }) => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
-  const isChecked = selectedTags.includes(tag);
-  const count = useCountForIndividualTag(tag);
+  const isChecked = selectedTags.includes(tag.label);
+  const count = useCountForIndividualTag(tag.label);
 
   const onChange = useCallback(() => {
-    dispatch(workflowLibraryTagToggled(tag));
+    dispatch(workflowLibraryTagToggled(tag.label));
   }, [dispatch, tag]);
 
   if (count === 0) {
@@ -244,7 +238,16 @@ const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: string }) => 
 
   return (
     <Checkbox isChecked={isChecked} onChange={onChange} {...rest} flexShrink={0}>
-      <Text>{`${tag} (${count})`}</Text>
+      <Flex alignItems="center" gap={2}>
+        <Text>{`${tag.label} (${count})`}</Text>
+        {tag.recommended && (
+          <Tooltip label={t('workflows.recommended')}>
+            <Box>
+              <Icon as={PiStarFill} boxSize={4} fill="invokeYellow.500" />
+            </Box>
+          </Tooltip>
+        )}
+      </Flex>
     </Checkbox>
   );
 });
