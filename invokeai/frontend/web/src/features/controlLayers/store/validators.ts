@@ -20,6 +20,7 @@ const WARNINGS = {
   CONTROL_ADAPTER_NO_MODEL_SELECTED: 'controlLayers.warnings.controlAdapterNoModelSelected',
   CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL: 'controlLayers.warnings.controlAdapterIncompatibleBaseModel',
   CONTROL_ADAPTER_NO_CONTROL: 'controlLayers.warnings.controlAdapterNoControl',
+  FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA: 'controlLayers.warnings.fluxFillIncompatibleWithControlLoRA',
 } as const;
 
 type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
@@ -135,7 +136,7 @@ export const getControlLayerWarnings = (
       entity.controlAdapter.model.type === 'control_lora'
     ) {
       // FLUX inpaint variants are FLUX Fill models - not compatible w/ Control LoRA
-      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
+      warnings.push(WARNINGS.FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA);
     }
   }
 
