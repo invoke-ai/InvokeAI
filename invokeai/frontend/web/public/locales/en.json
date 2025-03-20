@@ -1299,7 +1299,8 @@
         "problemDeletingWorkflow": "Problem Deleting Workflow",
         "unableToCopy": "Unable to Copy",
         "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
-        "unableToCopyDesc_theseSteps": "these steps"
+        "unableToCopyDesc_theseSteps": "these steps",
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks."
     },
     "popovers": {
         "clipSkip": {

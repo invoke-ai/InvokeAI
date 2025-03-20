@@ -22,6 +22,7 @@ import {
   getPresetModifiedPrompts,
   getSizes,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import { t } from 'i18next';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -69,11 +70,19 @@ export const buildFLUXGraph = async (
   const isFLUXFill = model.variant === 'inpaint';
   let guidance = baseGuidance;
   if (isFLUXFill) {
-    // TODO(psyche): Better error message - this appears in a toast
-    assert(
-      generationMode === 'inpaint' || generationMode === 'outpaint',
-      'FLUX Fill is not compatible with Text to Image or Image to Image.'
-    );
+    // FLUX Fill doesn't work with Text to Image or Image to Image generation modes. Well, technically, it does, but
+    // the outputs are garbagio.
+    //
+    // Unfortunately, we do not know the generation mode until the user clicks Invoke, so this is the first place we
+    // can check for this incompatibility.
+    //
+    // We are opting to fail loudly instead of produce garbage images, hence this being an assert.
+    //
+    // The message in this assert will be shown in a toast to the user, so we are using the translation system for it.
+    //
+    // The other asserts above are just for sanity & type check and should never be hit, so they do not have
+    // translations.
+    assert(generationMode === 'inpaint' || generationMode === 'outpaint', t('toast.fluxFillIncompatibleWithT2IAndI2I'));
 
     // FLUX Fill wants much higher guidance values than normal FLUX - silently "fix" the value for the user if it is
     // way too low.
