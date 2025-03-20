@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { linkifyOptions, linkifySx } from 'common/components/linkify';
 import { useEditable } from 'common/hooks/useEditable';
 import { useInputFieldDescriptionSafe } from 'features/nodes/hooks/useInputFieldDescriptionSafe';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import { fieldDescriptionChanged } from 'features/nodes/store/nodesSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import Linkify from 'linkify-react';

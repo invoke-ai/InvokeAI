@@ -16,7 +16,7 @@ import { IntegerFieldSlider } from 'features/nodes/components/flow/nodes/Invocat
 import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
 import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import {
   isBoardFieldInputInstance,
   isBoardFieldInputTemplate,
