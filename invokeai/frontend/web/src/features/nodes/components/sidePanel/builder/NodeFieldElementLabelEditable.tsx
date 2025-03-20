@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { NodeFieldElementResetToInitialValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/NodeFieldElementResetToInitialValueIconButton';
 import { useInputFieldLabelSafe } from 'features/nodes/hooks/useInputFieldLabelSafe';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo, useCallback, useRef } from 'react';

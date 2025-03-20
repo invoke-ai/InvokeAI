@@ -1,7 +1,7 @@
 import { Flex, FormLabel, Spacer } from '@invoke-ai/ui-library';
 import { NodeFieldElementResetToInitialValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/NodeFieldElementResetToInitialValueIconButton';
 import { useInputFieldLabelSafe } from 'features/nodes/hooks/useInputFieldLabelSafe';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo, useMemo } from 'react';
 
