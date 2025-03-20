@@ -301,8 +301,9 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         points,
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
-        // When shift is held, the line may extend beyond the clip region. No clip for these lines.
-        clip: isShiftDraw ? null : this.parent.getClip(selectedEntity.state),
+        // When shift is held, the line may extend beyond the clip region. Clip only if we are clipping to bbox. If we
+        // are clipping to stage, we don't need to clip at all.
+        clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntity.state),
       });
     } else {
       const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
@@ -325,8 +326,9 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
         points,
         strokeWidth: settings.brushWidth,
         color: this.manager.stateApi.getCurrentColor(),
-        // When shift is held, the line may extend beyond the clip region. No clip for these lines.
-        clip: isShiftDraw ? null : this.parent.getClip(selectedEntity.state),
+        // When shift is held, the line may extend beyond the clip region. Clip only if we are clipping to bbox. If we
+        // are clipping to stage, we don't need to clip at all.
+        clip: isShiftDraw && !settings.clipToBbox ? null : this.parent.getClip(selectedEntity.state),
       });
     }
   };
