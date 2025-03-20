@@ -39,7 +39,7 @@ export const addInpaint = async ({
   scaledSize,
   denoising_start,
   fp32,
-}: AddInpaintArg): Promise<Invocation<'canvas_v2_mask_and_crop' | 'img_resize'>> => {
+}: AddInpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
   denoise.denoising_start = denoising_start;
 
   const params = selectParamsSlice(state);
@@ -104,10 +104,10 @@ export const addInpaint = async ({
       edge_radius: params.canvasCoherenceEdgeSize,
       fp32,
     });
-    const canvasPasteBack = g.addNode({
-      id: getPrefixedId('canvas_v2_mask_and_crop'),
-      type: 'canvas_v2_mask_and_crop',
-      mask_blur: params.maskBlur,
+    const expandMask = g.addNode({
+      type: 'expand_mask_with_fade',
+      id: getPrefixedId('expand_mask_with_fade'),
+      fade_size_px: params.maskBlur,
     });
 
     // Resize initial image and mask to scaled size, feed into to gradient mask
@@ -128,18 +128,31 @@ export const addInpaint = async ({
     // After denoising, resize the image and mask back to original size
     g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
     g.addEdge(createGradientMask, 'expanded_mask_area', resizeMaskToOriginalSize, 'image');
+    g.addEdge(createGradientMask, 'expanded_mask_area', expandMask, 'mask');
 
-    // Finally, paste the generated masked image back onto the original image
-    g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
-    g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
-
+    // After denoising, resize the image and mask back to original size
     // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
     // to canvas but not outputting only masked regions
     if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
-      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+      const imageLayerBlend = g.addNode({
+        type: 'invokeai_img_blend',
+        id: getPrefixedId('image_layer_blend'),
+        layer_base: { image_name: initialImage.image_name },
+      });
+      g.addEdge(resizeImageToOriginalSize, 'image', imageLayerBlend, 'layer_upper');
+      g.addEdge(resizeMaskToOriginalSize, 'image', imageLayerBlend, 'mask');
+      return imageLayerBlend;
+    } else {
+      // Otherwise, just apply the mask
+      const applyMaskToImage = g.addNode({
+        type: 'apply_mask_to_image',
+        id: getPrefixedId('apply_mask_to_image'),
+        invert_mask: true,
+      });
+      g.addEdge(resizeMaskToOriginalSize, 'image', applyMaskToImage, 'mask');
+      g.addEdge(resizeImageToOriginalSize, 'image', applyMaskToImage, 'image');
+      return applyMaskToImage;
     }
-
-    return canvasPasteBack;
   } else {
     // No scale before processing, much simpler
     const i2l = g.addNode({
@@ -164,11 +177,6 @@ export const addInpaint = async ({
       fp32,
       image: { image_name: initialImage.image_name },
     });
-    const canvasPasteBack = g.addNode({
-      id: getPrefixedId('canvas_v2_mask_and_crop'),
-      type: 'canvas_v2_mask_and_crop',
-      mask_blur: params.maskBlur,
-    });
 
     g.addEdge(alphaToMask, 'image', createGradientMask, 'mask');
     g.addEdge(i2l, 'latents', denoise, 'latents');
@@ -178,16 +186,35 @@ export const addInpaint = async ({
       g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     }
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
-    g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
 
-    g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
+    const expandMask = g.addNode({
+      type: 'expand_mask_with_fade',
+      id: getPrefixedId('expand_mask_with_fade'),
+      fade_size_px: params.maskBlur,
+    });
+    g.addEdge(createGradientMask, 'expanded_mask_area', expandMask, 'mask');
 
     // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
     // to canvas but not outputting only masked regions
     if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
-      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+      const imageLayerBlend = g.addNode({
+        type: 'invokeai_img_blend',
+        id: getPrefixedId('image_layer_blend'),
+        layer_base: { image_name: initialImage.image_name },
+      });
+      g.addEdge(l2i, 'image', imageLayerBlend, 'layer_upper');
+      g.addEdge(expandMask, 'image', imageLayerBlend, 'mask');
+      return imageLayerBlend;
+    } else {
+      // Otherwise, just apply the mask
+      const applyMaskToImage = g.addNode({
+        type: 'apply_mask_to_image',
+        id: getPrefixedId('apply_mask_to_image'),
+        invert_mask: true,
+      });
+      g.addEdge(expandMask, 'image', applyMaskToImage, 'mask');
+      g.addEdge(l2i, 'image', applyMaskToImage, 'image');
+      return applyMaskToImage;
     }
-
-    return canvasPasteBack;
   }
 };
