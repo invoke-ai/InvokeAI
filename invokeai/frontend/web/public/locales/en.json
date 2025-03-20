@@ -2338,7 +2338,7 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "Workflows: New and improved Workflow Library.",
-            "FLUX: Support for FLUX Redux in Workflows and Canvas."
+            "FLUX: Support for FLUX Redux & FLUX Fill in Workflows and Canvas."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
