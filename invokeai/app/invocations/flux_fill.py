@@ -27,7 +27,7 @@ class FluxFillOutput(BaseInvocationOutput):
 
 @invocation(
     "flux_fill",
-    title="FLUX Fill",
+    title="FLUX Fill Conditioning",
     tags=["inpaint"],
     category="inpaint",
     version="1.0.0",
