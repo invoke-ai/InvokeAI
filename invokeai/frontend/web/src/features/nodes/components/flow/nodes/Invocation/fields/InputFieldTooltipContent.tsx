@@ -1,7 +1,7 @@
 import { Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useInputFieldErrors } from 'features/nodes/hooks/useInputFieldErrors';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';
@@ -16,7 +16,7 @@ export const InputFieldTooltipContent = memo(({ nodeId, fieldName }: Props) => {
   const { t } = useTranslation();
 
   const fieldInstance = useInputFieldInstance(nodeId, fieldName);
-  const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const fieldErrors = useInputFieldErrors(nodeId, fieldName);
 
