@@ -129,6 +129,13 @@ export const getControlLayerWarnings = (
     } else if (entity.controlAdapter.model.base !== model.base) {
       // Supported model architecture but doesn't match
       warnings.push(WARNINGS.CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+    } else if (
+      model.base === 'flux' &&
+      model.variant === 'inpaint' &&
+      entity.controlAdapter.model.type === 'control_lora'
+    ) {
+      // FLUX inpaint variants are FLUX Fill models - not compatible w/ Control LoRA
+      warnings.push(WARNINGS.UNSUPPORTED_MODEL);
     }
   }
 
