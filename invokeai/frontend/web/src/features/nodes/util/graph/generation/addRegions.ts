@@ -6,9 +6,8 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
 import { getRegionalGuidanceWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { serializeError } from 'serialize-error';
-import type { Invocation } from 'services/api/types';
+import type { Invocation, MainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -26,7 +25,7 @@ type AddRegionsArg = {
   regions: CanvasRegionalGuidanceState[];
   g: Graph;
   bbox: Rect;
-  model: ParameterModel;
+  model: MainModelConfig;
   posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
   negCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> | null;
   posCondCollect: Invocation<'collect'>;

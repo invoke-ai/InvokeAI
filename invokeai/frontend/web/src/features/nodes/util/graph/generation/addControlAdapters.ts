@@ -4,7 +4,6 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasControlLayerState, Rect } from 'features/controlLayers/store/types';
 import { getControlLayerWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { serializeError } from 'serialize-error';
 import type { ImageDTO, Invocation, MainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -17,7 +16,7 @@ type AddControlNetsArg = {
   g: Graph;
   rect: Rect;
   collector: Invocation<'collect'>;
-  model: ParameterModel;
+  model: MainModelConfig;
 };
 
 type AddControlNetsResult = {
@@ -66,7 +65,7 @@ type AddT2IAdaptersArg = {
   g: Graph;
   rect: Rect;
   collector: Invocation<'collect'>;
-  model: ParameterModel;
+  model: MainModelConfig;
 };
 
 type AddT2IAdaptersResult = {

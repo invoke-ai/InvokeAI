@@ -5,7 +5,7 @@ import type {
   CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
-import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
+import type { MainModelConfig } from 'services/api/types';
 
 const WARNINGS = {
   UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
@@ -26,7 +26,7 @@ type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
 
 export const getRegionalGuidanceWarnings = (
   entity: CanvasRegionalGuidanceState,
-  model: ParameterModel | null
+  model: MainModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -78,7 +78,7 @@ export const getRegionalGuidanceWarnings = (
 
 export const getGlobalReferenceImageWarnings = (
   entity: CanvasReferenceImageState,
-  model: ParameterModel | null
+  model: MainModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -110,7 +110,7 @@ export const getGlobalReferenceImageWarnings = (
 
 export const getControlLayerWarnings = (
   entity: CanvasControlLayerState,
-  model: ParameterModel | null
+  model: MainModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -137,7 +137,7 @@ export const getControlLayerWarnings = (
 
 export const getRasterLayerWarnings = (
   _entity: CanvasRasterLayerState,
-  _model: ParameterModel | null
+  _model: MainModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -148,7 +148,7 @@ export const getRasterLayerWarnings = (
 
 export const getInpaintMaskWarnings = (
   _entity: CanvasInpaintMaskState,
-  _model: ParameterModel | null
+  _model: MainModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 

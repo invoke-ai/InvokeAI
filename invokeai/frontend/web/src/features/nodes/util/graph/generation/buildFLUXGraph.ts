@@ -5,7 +5,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -23,8 +22,8 @@ import {
   getPresetModifiedPrompts,
   getSizes,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -48,27 +47,18 @@ export const buildFLUXGraph = async (
 
   const { originalSize, scaledSize } = getSizes(bbox);
 
-  const {
-    model,
-    guidance,
-    seed,
-    steps,
-    fluxVAE,
-    t5EncoderModel,
-    clipEmbedModel,
-    img2imgStrength,
-    optimizedDenoisingEnabled,
-  } = params;
+  const model = selectMainModelConfig(state);
+
+  const { guidance, seed, steps, fluxVAE, t5EncoderModel, clipEmbedModel, img2imgStrength, optimizedDenoisingEnabled } =
+    params;
 
   assert(model, 'No model found in state');
+  assert(model.base === 'flux', 'Model is not a FLUX model');
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
   assert(fluxVAE, 'No FLUX VAE model found in state');
 
-  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-  assert(modelConfig.base === 'flux');
-
-  const isFLUXFill = modelConfig.variant === 'inpaint';
+  const isFLUXFill = model.variant === 'inpaint';
 
   if (isFLUXFill) {
     // TODO(psyche): Better error message - this appears in a toast
@@ -135,7 +125,7 @@ export const buildFLUXGraph = async (
     width: originalSize.width,
     height: originalSize.height,
     positive_prompt: positivePrompt,
-    model: Graph.getModelMetadataField(modelConfig),
+    model: Graph.getModelMetadataField(model),
     seed,
     steps,
     vae: fluxVAE,
@@ -234,7 +224,7 @@ export const buildFLUXGraph = async (
     g,
     rect: canvas.bbox.rect,
     collector: controlNetCollector,
-    model: modelConfig,
+    model,
   });
   if (controlNetResult.addedControlNets > 0) {
     g.addEdge(controlNetCollector, 'collection', denoise, 'control');
@@ -248,7 +238,7 @@ export const buildFLUXGraph = async (
     g,
     rect: canvas.bbox.rect,
     denoise,
-    model: modelConfig,
+    model,
   });
 
   const ipAdapterCollect = g.addNode({
@@ -259,7 +249,7 @@ export const buildFLUXGraph = async (
     entities: canvas.referenceImages.entities,
     g,
     collector: ipAdapterCollect,
-    model: modelConfig,
+    model,
   });
 
   const fluxReduxCollect = g.addNode({
@@ -270,7 +260,7 @@ export const buildFLUXGraph = async (
     entities: canvas.referenceImages.entities,
     g,
     collector: fluxReduxCollect,
-    model: modelConfig,
+    model,
   });
 
   const regionsResult = await addRegions({
@@ -278,7 +268,7 @@ export const buildFLUXGraph = async (
     regions: canvas.regionalGuidance.entities,
     g,
     bbox: canvas.bbox.rect,
-    model: modelConfig,
+    model,
     posCond,
     negCond: null,
     posCondCollect,
