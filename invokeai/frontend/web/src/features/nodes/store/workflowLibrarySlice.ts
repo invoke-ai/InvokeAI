@@ -100,7 +100,7 @@ export const DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
   },
   {
     categoryTKey: 'Common Tasks',
-    tags: [{ label: 'Upscaling' }, { label: 'Text to Image' }, { label: 'Image to Image', recommended: true }],
+    tags: [{ label: 'Upscaling' }, { label: 'Text to Image' }, { label: 'Image to Image' }],
   },
   {
     categoryTKey: 'Model Architecture',
