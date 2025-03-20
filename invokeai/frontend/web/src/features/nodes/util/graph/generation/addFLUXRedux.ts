@@ -2,8 +2,7 @@ import type { CanvasReferenceImageState, FLUXReduxConfig } from 'features/contro
 import { isFLUXReduxConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
-import type { Invocation } from 'services/api/types';
+import type { Invocation, MainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type AddFLUXReduxResult = {
@@ -14,7 +13,7 @@ type AddFLUXReduxArg = {
   entities: CanvasReferenceImageState[];
   g: Graph;
   collector: Invocation<'collect'>;
-  model: ParameterModel;
+  model: MainModelConfig;
 };
 
 export const addFLUXReduxes = ({ entities, g, collector, model }: AddFLUXReduxArg): AddFLUXReduxResult => {
