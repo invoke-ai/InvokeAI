@@ -245,18 +245,17 @@ const TagCheckbox = memo(({ tag, ...rest }: CheckboxProps & { tag: { label: stri
   }
 
   return (
-    <Checkbox isChecked={isChecked} onChange={onChange} {...rest} flexShrink={0}>
-      <Flex alignItems="center" gap={2}>
-        <Text>{`${tag.label} (${count})`}</Text>
-        {tag.recommended && (
-          <Tooltip label={t('workflows.recommended')}>
-            <Box>
-              <Icon as={PiStarFill} boxSize={4} fill="invokeYellow.500" />
-            </Box>
-          </Tooltip>
-        )}
-      </Flex>
-    </Checkbox>
+    <Flex alignItems="center" gap={2}>
+      <Checkbox isChecked={isChecked} onChange={onChange} {...rest} flexShrink={0} />
+      <Text>{`${tag.label} (${count})`}</Text>
+      {tag.recommended && (
+        <Tooltip label={t('workflows.recommended')}>
+          <Box as="span" lineHeight={0}>
+            <Icon as={PiStarFill} boxSize={4} fill="invokeYellow.500" />
+          </Box>
+        </Tooltip>
+      )}
+    </Flex>
   );
 });
 TagCheckbox.displayName = 'TagCheckbox';
