@@ -49,8 +49,16 @@ export const buildFLUXGraph = async (
 
   const model = selectMainModelConfig(state);
 
-  const { guidance, seed, steps, fluxVAE, t5EncoderModel, clipEmbedModel, img2imgStrength, optimizedDenoisingEnabled } =
-    params;
+  const {
+    guidance: baseGuidance,
+    seed,
+    steps,
+    fluxVAE,
+    t5EncoderModel,
+    clipEmbedModel,
+    img2imgStrength,
+    optimizedDenoisingEnabled,
+  } = params;
 
   assert(model, 'No model found in state');
   assert(model.base === 'flux', 'Model is not a FLUX model');
@@ -59,13 +67,21 @@ export const buildFLUXGraph = async (
   assert(fluxVAE, 'No FLUX VAE model found in state');
 
   const isFLUXFill = model.variant === 'inpaint';
-
+  let guidance = baseGuidance;
   if (isFLUXFill) {
     // TODO(psyche): Better error message - this appears in a toast
     assert(
       generationMode === 'inpaint' || generationMode === 'outpaint',
       'FLUX Fill is not compatible with Text to Image or Image to Image.'
     );
+
+    // FLUX Fill wants much higher guidance values than normal FLUX - silently "fix" the value for the user if it is
+    // way too low.
+    // TODO(psyche): Figure out a way to alert the user that this is happening - maybe return warnings from the graph
+    // builder and toast them?
+    if (guidance < 25) {
+      guidance = 30;
+    }
   }
 
   const { positivePrompt } = getPresetModifiedPrompts(state);
