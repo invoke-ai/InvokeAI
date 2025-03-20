@@ -84,13 +84,10 @@ export const buildFLUXGraph = async (
     // translations.
     assert(generationMode === 'inpaint' || generationMode === 'outpaint', t('toast.fluxFillIncompatibleWithT2IAndI2I'));
 
-    // FLUX Fill wants much higher guidance values than normal FLUX - silently "fix" the value for the user if it is
-    // way too low.
+    // FLUX Fill wants much higher guidance values than normal FLUX - silently "fix" the value for the user.
     // TODO(psyche): Figure out a way to alert the user that this is happening - maybe return warnings from the graph
     // builder and toast them?
-    if (guidance < 25) {
-      guidance = 30;
-    }
+    guidance = 30;
   }
 
   const { positivePrompt } = getPresetModifiedPrompts(state);
