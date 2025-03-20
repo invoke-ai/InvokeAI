@@ -39,11 +39,6 @@ export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
   const categoryOptions = useStore($workflowLibraryCategoriesOptions);
   const view = useAppSelector(selectWorkflowLibraryView);
-  const dispatch = useAppDispatch();
-  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
-  const resetTags = useCallback(() => {
-    dispatch(workflowLibraryTagsReset());
-  }, [dispatch]);
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
@@ -67,26 +62,7 @@ export const WorkflowLibrarySideNav = () => {
         )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
-        {view === 'defaults' && selectedTags.length > 0 ? (
-          <ButtonGroup>
-            <WorkflowLibraryViewButton view="defaults" w="auto">
-              {t('workflows.browseWorkflows')}
-            </WorkflowLibraryViewButton>
-            <Tooltip label={t('workflows.deselectAll')}>
-              <IconButton
-                onClick={resetTags}
-                size="md"
-                aria-label={t('workflows.deselectAll')}
-                icon={<PiArrowCounterClockwiseBold size={12} />}
-                variant="ghost"
-                bg="base.700"
-                color="base.50"
-              />
-            </Tooltip>
-          </ButtonGroup>
-        ) : (
-          <WorkflowLibraryViewButton view="defaults">{t('workflows.browseWorkflows')}</WorkflowLibraryViewButton>
-        )}
+        <BrowseWorkflowsButton />
         <DefaultsViewCheckboxesCollapsible />
       </Flex>
       <Spacer />
@@ -95,6 +71,40 @@ export const WorkflowLibrarySideNav = () => {
     </Flex>
   );
 };
+
+const BrowseWorkflowsButton = memo(() => {
+  const { t } = useTranslation();
+  const view = useAppSelector(selectWorkflowLibraryView);
+  const dispatch = useAppDispatch();
+  const selectedTags = useAppSelector(selectWorkflowLibrarySelectedTags);
+  const resetTags = useCallback(() => {
+    dispatch(workflowLibraryTagsReset());
+  }, [dispatch]);
+
+  if (view === 'defaults' && selectedTags.length > 0) {
+    return (
+      <ButtonGroup>
+        <WorkflowLibraryViewButton view="defaults" w="auto">
+          {t('workflows.browseWorkflows')}
+        </WorkflowLibraryViewButton>
+        <Tooltip label={t('workflows.deselectAll')}>
+          <IconButton
+            onClick={resetTags}
+            size="md"
+            aria-label={t('workflows.deselectAll')}
+            icon={<PiArrowCounterClockwiseBold size={12} />}
+            variant="ghost"
+            bg="base.700"
+            color="base.50"
+          />
+        </Tooltip>
+      </ButtonGroup>
+    );
+  }
+
+  return <WorkflowLibraryViewButton view="defaults">{t('workflows.browseWorkflows')}</WorkflowLibraryViewButton>;
+});
+BrowseWorkflowsButton.displayName = 'BrowseWorkflowsButton';
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams({ visibility: 'visible' }).options;
 
