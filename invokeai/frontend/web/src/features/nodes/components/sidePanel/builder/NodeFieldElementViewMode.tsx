@@ -4,7 +4,7 @@ import { linkifyOptions, linkifySx } from 'common/components/linkify';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementLabel } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabel';
-import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
+import { useInputFieldDescriptionSafe } from 'features/nodes/hooks/useInputFieldDescriptionSafe';
 import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
@@ -28,7 +28,7 @@ const sx: SystemStyleObject = {
 export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
   const { fieldIdentifier, showDescription } = data;
-  const description = useInputFieldDescription(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const containerCtx = useContainerContext();
 
