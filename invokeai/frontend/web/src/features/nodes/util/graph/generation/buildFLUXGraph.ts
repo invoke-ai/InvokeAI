@@ -6,6 +6,7 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
@@ -64,6 +65,19 @@ export const buildFLUXGraph = async (
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
   assert(fluxVAE, 'No FLUX VAE model found in state');
 
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+  assert(modelConfig.base === 'flux');
+
+  const isFLUXFill = modelConfig.variant === 'inpaint';
+
+  if (isFLUXFill) {
+    // TODO(psyche): Better error message - this appears in a toast
+    assert(
+      generationMode === 'inpaint' || generationMode === 'outpaint',
+      'FLUX Fill is not compatible with Text to Image or Image to Image.'
+    );
+  }
+
   const { positivePrompt } = getPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('flux_graph'));
@@ -115,9 +129,6 @@ export const buildFLUXGraph = async (
 
   addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
 
-  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-  assert(modelConfig.base === 'flux');
-
   g.upsertMetadata({
     generation_mode: 'flux_txt2img',
     guidance,
@@ -143,10 +154,27 @@ export const buildFLUXGraph = async (
   }
 
   let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
+    | 'l2i'
+    | 'img_nsfw'
+    | 'img_watermark'
+    | 'img_resize'
+    | 'invokeai_img_blend'
+    | 'apply_mask_to_image'
+    | 'flux_vae_decode'
+    | 'sd3_l2i'
   > = l2i;
 
-  if (generationMode === 'txt2img') {
+  if (isFLUXFill) {
+    canvasOutput = await addFLUXFill({
+      state,
+      g,
+      manager,
+      l2i,
+      denoise,
+      originalSize,
+      scaledSize,
+    });
+  } else if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
     canvasOutput = await addImageToImage({
