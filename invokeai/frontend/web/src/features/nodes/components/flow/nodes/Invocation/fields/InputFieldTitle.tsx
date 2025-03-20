@@ -9,7 +9,7 @@ import {
   useIsConnectionStartField,
 } from 'features/nodes/hooks/useFieldConnectionState';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
-import { useInputFieldLabel } from 'features/nodes/hooks/useInputFieldLabel';
+import { useInputFieldLabelSafe } from 'features/nodes/hooks/useInputFieldLabelSafe';
 import { useInputFieldTemplateTitle } from 'features/nodes/hooks/useInputFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY, NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
@@ -43,7 +43,7 @@ interface Props {
 export const InputFieldTitle = memo((props: Props) => {
   const { nodeId, fieldName, isInvalid, isDragging } = props;
   const inputRef = useRef<HTMLInputElement>(null);
-  const label = useInputFieldLabel(nodeId, fieldName);
+  const label = useInputFieldLabelSafe(nodeId, fieldName);
   const fieldTemplateTitle = useInputFieldTemplateTitle(nodeId, fieldName);
   const { t } = useTranslation();
   const isConnected = useInputFieldIsConnected(nodeId, fieldName);
