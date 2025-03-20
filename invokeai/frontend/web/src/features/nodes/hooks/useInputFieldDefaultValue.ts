@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -10,7 +10,7 @@ import { useCallback, useMemo } from 'react';
 export const useInputFieldDefaultValue = (nodeId: string, fieldName: string) => {
   const dispatch = useAppDispatch();
 
-  const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
   const selectIsChanged = useMemo(
     () =>
       createSelector(selectNodesSlice, (nodes) => {

@@ -5,7 +5,7 @@ import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocat
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementLabel } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabel';
 import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
 import Linkify from 'linkify-react';
@@ -29,7 +29,7 @@ export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) 
   const { id, data } = el;
   const { fieldIdentifier, showDescription } = data;
   const description = useInputFieldDescription(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const fieldTemplate = useInputFieldTemplate(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const containerCtx = useContainerContext();
 
   const _description = useMemo(

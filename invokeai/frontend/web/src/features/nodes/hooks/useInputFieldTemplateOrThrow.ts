@@ -12,7 +12,7 @@ import { assert } from 'tsafe';
  * @param fieldName - The name of the input field.
  * @throws Will throw an error if the template for the input field is not found.
  */
-export const useInputFieldTemplate = (nodeId: string, fieldName: string): FieldInputTemplate => {
+export const useInputFieldTemplateOrThrow = (nodeId: string, fieldName: string): FieldInputTemplate => {
   const template = useNodeTemplate(nodeId);
   const fieldTemplate = useMemo(() => {
     const _fieldTemplate = template.inputs[fieldName];

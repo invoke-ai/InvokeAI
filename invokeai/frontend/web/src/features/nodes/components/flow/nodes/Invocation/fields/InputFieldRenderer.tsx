@@ -16,7 +16,7 @@ import { IntegerFieldSlider } from 'features/nodes/components/flow/nodes/Invocat
 import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
 import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import {
   isBoardFieldInputInstance,
   isBoardFieldInputTemplate,
@@ -135,7 +135,7 @@ type Props = {
 
 export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) => {
   const field = useInputFieldInstance(nodeId, fieldName);
-  const template = useInputFieldTemplate(nodeId, fieldName);
+  const template = useInputFieldTemplateOrThrow(nodeId, fieldName);
 
   // When deciding which component to render, first we check the type of the template, which is more efficient than the
   // instance type check. The instance type check uses zod and is slower.
