@@ -1090,6 +1090,45 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
+    "apply_mask_to_image",
+    title="Apply Mask to Image",
+    tags=["image", "mask", "blend"],
+    category="image",
+    version="1.0.0",
+)
+class ApplyMaskToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """
+    Extracts a region from a generated image using a mask and blends it seamlessly onto a source image.
+    The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
+    """
+
+    image: ImageField = InputField(description="The image from which to extract the masked region")
+    mask: ImageField = InputField(description="The mask defining the region (black=keep, white=discard)")
+    invert_mask: bool = InputField(
+        default=False,
+        description="Whether to invert the mask before applying it",
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        # Load images
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+        mask = context.images.get_pil(self.mask.image_name, mode="L")
+
+        if self.invert_mask:
+            # Invert the mask if requested
+            mask = ImageOps.invert(mask.copy())
+
+        # Combine the mask as the alpha channel of the image
+        r, g, b, _ = image.split()  # Split the image into RGB and alpha channels
+        result_image = Image.merge("RGBA", (r, g, b, mask))  # Use the mask as the new alpha channel
+
+        # Save the resulting image
+        image_dto = context.images.save(image=result_image)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
     "img_noise",
     title="Add Image Noise",
     tags=["image", "noise"],
