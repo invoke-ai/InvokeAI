@@ -29,7 +29,7 @@ import {
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiStarFill, PiUsersBold } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
@@ -44,8 +44,6 @@ export const WorkflowLibrarySideNav = () => {
   const resetTags = useCallback(() => {
     dispatch(workflowLibraryTagsReset());
   }, [dispatch]);
-
-  useEffect(() => {}, [selectedTags, dispatch]);
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
