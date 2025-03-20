@@ -251,6 +251,10 @@ export const isFluxMainModelModelConfig = (config: AnyModelConfig): config is Ma
   return config.type === 'main' && config.base === 'flux';
 };
 
+export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux' && config.variant === 'inpaint';
+};
+
 export const isNonSDXLMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && (config.base === 'sd-1' || config.base === 'sd-2');
 };
