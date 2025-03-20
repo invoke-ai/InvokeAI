@@ -22,6 +22,7 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import { isFluxFillMainModelModelConfig } from 'services/api/types';
 
 const formLabelProps: FormLabelProps = {
   minW: '4rem',
@@ -83,7 +84,7 @@ export const GenerationSettingsAccordion = memo(() => {
               {!isFLUX && !isSD3 && !isUpscaling && <ParamScheduler />}
               {isUpscaling && <ParamUpscaleScheduler />}
               <ParamSteps />
-              {isFLUX && <ParamGuidance />}
+              {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {isUpscaling && <ParamUpscaleCFGScale />}
               {!isFLUX && !isUpscaling && <ParamCFGScale />}
             </FormControlGroup>
