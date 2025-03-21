@@ -148,22 +148,24 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
     configs_with_tests = set()
     model_paths = ModelSearch().search(datadir / "stripped_models")
     fake_hash = "abcdefgh"  # skip hashing to make test quicker
+    fake_key = "123"  # fixed uuid for comparison
 
     for path in model_paths:
         legacy_config = new_config = None
 
         try:
-            legacy_config = ModelProbe.probe(path, {"hash": fake_hash})
+            legacy_config = ModelProbe.probe(path, {"hash": fake_hash, "key": fake_key})
         except InvalidModelConfigException:
             pass
 
         try:
-            new_config = ModelConfigBase.classify(path, hash=fake_hash)
+            new_config = ModelConfigBase.classify(path, hash=fake_hash, key=fake_key)
         except InvalidModelConfigException:
             pass
 
         if legacy_config and new_config:
-            assert legacy_config == new_config
+            assert type(legacy_config) is type(new_config)
+            assert legacy_config.model_dump_json() == new_config.model_dump_json()
 
         elif legacy_config:
             assert type(legacy_config) in ModelConfigBase._USING_LEGACY_PROBE
