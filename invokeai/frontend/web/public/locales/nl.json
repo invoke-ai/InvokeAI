@@ -425,7 +425,6 @@
         "newWorkflow": "Nieuwe werkstroom",
         "unknownErrorValidatingWorkflow": "Onbekende fout bij valideren werkstroom",
         "unsupportedAnyOfLength": "te veel union-leden ({{count}})",
-        "unknownOutput": "Onbekende uitvoer: {{name}}",
         "viewMode": "Gebruik in lineaire weergave",
         "unableToExtractSchemaNameFromRef": "fout bij het extraheren van de schemanaam via de ref",
         "unsupportedMismatchedUnion": "niet-overeenkomende soort CollectionOrScalar met basissoorten {{firstType}} en {{secondType}}",
