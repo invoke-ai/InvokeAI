@@ -2,6 +2,7 @@ import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
 import { type NodeFieldStringSettings, zStringComponent } from 'features/nodes/types/workflow';
+import { omit } from 'lodash-es';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,10 +14,23 @@ export const NodeFieldElementStringSettings = memo(
 
     const onChangeComponent = useCallback(
       (e: ChangeEvent<HTMLSelectElement>) => {
-        const newConfig: NodeFieldStringSettings = {
-          ...config,
-          component: zStringComponent.parse(e.target.value),
-        };
+        const component = zStringComponent.parse(e.target.value);
+        if (component === config.component) {
+          // no change
+          return;
+        }
+        if (component === 'dropdown') {
+          // if the component is changing to dropdown, we need to set the choices
+          const newConfig: NodeFieldStringSettings = {
+            ...config,
+            component,
+            options: [{ value: 'my_value', label: 'My Label' }],
+          };
+          dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
+          return;
+        }
+        // if the component is changing from dropdown, we need to remove the choices
+        const newConfig: NodeFieldStringSettings = omit({ ...config, component }, 'choices');
         dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
       },
       [config, dispatch, id]
@@ -28,6 +42,7 @@ export const NodeFieldElementStringSettings = memo(
         <Select value={config.component} onChange={onChangeComponent} size="sm">
           <option value="input">{t('workflows.builder.singleLine')}</option>
           <option value="textarea">{t('workflows.builder.multiLine')}</option>
+          <option value="dropdown">{t('workflows.builder.dropdown')}</option>
         </Select>
       </FormControl>
     );

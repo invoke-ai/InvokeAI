@@ -194,7 +194,9 @@
         "combinatorial": "Combinatorial",
         "layout": "Layout",
         "row": "Row",
-        "column": "Column"
+        "column": "Column",
+        "value": "Value",
+        "label": "Label"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -1769,6 +1771,7 @@
             "singleLine": "Single Line",
             "multiLine": "Multi Line",
             "slider": "Slider",
+            "dropdown": "Dropdown",
             "both": "Both",
             "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
             "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",

@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, FormControl } from '@invoke-ai/ui-library';
+import { Box, Divider, Flex, FormControl } from '@invoke-ai/ui-library';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
@@ -9,6 +9,7 @@ import { FormElementEditModeContent } from 'features/nodes/components/sidePanel/
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { NodeFieldElementDescriptionEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementDescriptionEditable';
 import { NodeFieldElementLabelEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabelEditable';
+import { NodeFieldElementStringDropdownConfig } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringDropdownConfig';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
@@ -55,7 +56,7 @@ const NodeFieldElementEditModeContent = memo(
     dragHandleRef: RefObject<HTMLDivElement>;
     isDragging: boolean;
   }) => {
-    const { data } = el;
+    const { id, data } = el;
     const { fieldIdentifier, showDescription } = data;
     return (
       <>
@@ -72,6 +73,12 @@ const NodeFieldElementEditModeContent = memo(
                 />
               </Flex>
               {showDescription && <NodeFieldElementDescriptionEditable el={el} />}
+              {data.settings?.type === 'string-field-config' && data.settings.component === 'dropdown' && (
+                <>
+                  <Divider />
+                  <NodeFieldElementStringDropdownConfig id={id} settings={data.settings} />
+                </>
+              )}
             </FormControl>
           </InputFieldGate>
         </FormElementEditModeContent>
