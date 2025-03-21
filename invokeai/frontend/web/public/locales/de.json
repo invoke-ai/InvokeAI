@@ -1261,7 +1261,6 @@
         "nodePack": "Knoten-Pack",
         "loadWorkflow": "Lade Workflow",
         "snapToGrid": "Am Gitternetz einrasten",
-        "unknownOutput": "Unbekannte Ausgabe: {{name}}",
         "updateNode": "Knoten updaten",
         "edge": "Rand / Kante",
         "sourceNodeDoesNotExist": "Ungültiger Rand: Quell- / Ausgabe-Knoten {{node}} existiert nicht",

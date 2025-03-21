@@ -908,7 +908,6 @@
         "unableToGetWorkflowVersion": "无法获取工作流架构版本",
         "nodePack": "节点包",
         "unableToExtractSchemaNameFromRef": "无法从参考中提取架构名",
-        "unknownOutput": "未知输出：{{name}}",
         "unknownErrorValidatingWorkflow": "验证工作流时出现未知错误",
         "collectionFieldType": "{{name}}(合集)",
         "unknownNodeType": "未知节点类型",

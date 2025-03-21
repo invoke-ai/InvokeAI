@@ -1653,7 +1653,6 @@
         "collectionFieldType": "{{name}} (Collection)",
         "newWorkflow": "Nouveau Workflow",
         "reorderLinearView": "Réorganiser la vue linéaire",
-        "unknownOutput": "Sortie inconnue : {{name}}",
         "outputFieldTypeParseError": "Impossible d'analyser le type du champ de sortie {{node}}.{{field}} ({{message}})",
         "unsupportedMismatchedUnion": "type CollectionOrScalar non concordant avec les types de base {{firstType}} et {{secondType}}",
         "unableToParseFieldType": "impossible d'analyser le type de champ",

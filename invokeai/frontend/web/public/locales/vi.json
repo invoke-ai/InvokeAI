@@ -894,7 +894,6 @@
         "targetNodeFieldDoesNotExist": "Kết nối không phù hợp: đích đến/đầu vào của vùng {{node}}.{{field}} không tồn tại",
         "missingTemplate": "Node không hợp lệ: node {{node}} thuộc loại {{type}} bị thiếu mẫu trình bày (chưa tải?)",
         "unsupportedMismatchedUnion": "Dạng số lượng dữ liệu không khớp với {{firstType}} và {{secondType}}",
-        "unknownOutput": "Đầu Ra Không Rõ: {{name}}",
         "betaDesc": "Trình kích hoạt này vẫn trong giai đoạn beta. Cho đến khi ổn định, nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng. Chúng tôi dự định hỗ trợ trình kích hoạt này về lâu dài.",
         "cannotConnectInputToInput": "Không thế kết nối đầu vào với đầu vào",
         "showEdgeLabelsHelp": "Hiển thị tên trên kết nối, chỉ ra những node được kết nối",

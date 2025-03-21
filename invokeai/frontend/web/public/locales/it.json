@@ -969,7 +969,6 @@
         "unableToGetWorkflowVersion": "Impossibile ottenere la versione dello schema del flusso di lavoro",
         "nodePack": "Pacchetto di nodi",
         "unableToExtractSchemaNameFromRef": "Impossibile estrarre il nome dello schema dal riferimento",
-        "unknownOutput": "Output sconosciuto: {{name}}",
         "unknownNodeType": "Tipo di nodo sconosciuto",
         "targetNodeDoesNotExist": "Connessione non valida: il nodo di destinazione/input {{node}} non esiste",
         "unknownFieldType": "$t(nodes.unknownField) tipo: {{type}}",

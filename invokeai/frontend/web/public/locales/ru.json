@@ -879,7 +879,6 @@
         "unableToExtractSchemaNameFromRef": "невозможно извлечь имя схемы из ссылки",
         "executionStateError": "Ошибка",
         "prototypeDesc": "Этот вызов является прототипом. Он может претерпевать изменения при обновлении приложения и может быть удален в любой момент.",
-        "unknownOutput": "Неизвестный вывод: {{name}}",
         "executionStateCompleted": "Выполнено",
         "node": "Узел",
         "workflowAuthor": "Автор",
