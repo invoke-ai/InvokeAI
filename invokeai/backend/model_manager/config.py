@@ -23,6 +23,7 @@ Validation errors will raise an InvalidModelConfigException error.
 # pyright: reportIncompatibleVariableOverride=false
 import logging
 import time
+import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import isabstract
@@ -642,11 +643,35 @@ class FluxReduxConfig(LegacyProbeMixin, ModelConfigBase):
     format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
 
-class LlavaOnevisionConfig(DiffusersConfigBase, LegacyProbeMixin, ModelConfigBase):
+class LlavaOnevisionConfig(DiffusersConfigBase, ModelConfigBase):
     """Model config for Llava Onevision models."""
-
     type: Literal[ModelType.LlavaOnevision] = ModelType.LlavaOnevision
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.format_type == ModelFormat.Checkpoint:
+            return False
+
+        config_path = mod.path / "config.json"
+        try:
+            with open(config_path, "r") as file:
+                config = json.load(file)
+        except FileNotFoundError:
+            return False
+
+        architectures = config.get("architectures")
+        return (
+            architectures and
+            architectures[0] == "LlavaOnevisionForConditionalGeneration"
+        )
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {
+            "base": BaseModelType.Any,
+            "variant": ModelVariantType.Normal,
+        }
 
 
 def get_model_discriminator_value(v: Any) -> str:
