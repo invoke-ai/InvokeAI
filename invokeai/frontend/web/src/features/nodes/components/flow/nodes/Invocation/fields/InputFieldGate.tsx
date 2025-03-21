@@ -1,4 +1,4 @@
-import { FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { InputFieldWrapper } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldWrapper';
 import { useInputFieldInstanceExists } from 'features/nodes/hooks/useInputFieldInstanceExists';
 import { useInputFieldNameSafe } from 'features/nodes/hooks/useInputFieldNameSafe';
@@ -70,11 +70,11 @@ const Fallback = memo(
 
     return (
       <InputFieldWrapper>
-        <FormControl isInvalid={true} alignItems="stretch" justifyContent="center" gap={2} h="full" w="full">
-          <FormLabel display="flex" mb={0} px={1} py={2} gap={2}>
+        <Flex w="full" px={1} py={1} justifyContent="center">
+          <Text fontWeight="semibold" color="error.300" whiteSpace="pre" textAlign="center">
             {label}
-          </FormLabel>
-        </FormControl>
+          </Text>
+        </Flex>
       </InputFieldWrapper>
     );
   }
