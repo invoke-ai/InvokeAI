@@ -1,7 +1,7 @@
 import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
-import { type NodeFieldStringSettings, zStringComponent } from 'features/nodes/types/workflow';
+import { getDefaultStringOption, type NodeFieldStringSettings, zStringComponent } from 'features/nodes/types/workflow';
 import { omit } from 'lodash-es';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -24,7 +24,7 @@ export const NodeFieldElementStringSettings = memo(
           const newConfig: NodeFieldStringSettings = {
             ...config,
             component,
-            options: [{ value: 'my_value', label: 'My Label' }],
+            options: [getDefaultStringOption()],
           };
           dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
           return;

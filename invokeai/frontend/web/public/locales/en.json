@@ -1772,6 +1772,8 @@
             "multiLine": "Multi Line",
             "slider": "Slider",
             "dropdown": "Dropdown",
+            "addOption": "Add Option",
+            "resetOptions": "Reset Options",
             "both": "Both",
             "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
             "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",

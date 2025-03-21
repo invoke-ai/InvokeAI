@@ -1,14 +1,17 @@
-import { Button, Divider, Flex, Grid, GridItem, IconButton, Input, Text } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Divider, Flex, Grid, GridItem, IconButton, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
-import type { NodeFieldStringDropdownSettings } from 'features/nodes/types/workflow';
+import {
+  getDefaultStringOption,
+  type NodeFieldStringDropdownSettings,
+} from 'features/nodes/types/workflow';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiPlusBold, PiXBold } from 'react-icons/pi';
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams({}).options;
 
@@ -53,7 +56,12 @@ export const NodeFieldElementStringDropdownConfig = memo(
     );
 
     const onAddOption = useCallback(() => {
-      const options = [...settings.options, { label: '', value: '' }];
+      const options = [...settings.options, getDefaultStringOption()];
+      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: { ...settings, options } } }));
+    }, [dispatch, id, settings]);
+
+    const onResetOptions = useCallback(() => {
+      const options = [getDefaultStringOption()];
       dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: { ...settings, options } } }));
     }, [dispatch, id, settings]);
 
@@ -68,11 +76,16 @@ export const NodeFieldElementStringDropdownConfig = memo(
         justifyContent="center"
         borderRadius="base"
         flexDir="column"
-        gap={1}
+        gap={2}
       >
-        <Button onClick={onAddOption} variant="ghost">
-          {t('nodes.addItem')}
-        </Button>
+        <ButtonGroup isAttached={false} w="full">
+          <Button onClick={onAddOption} variant="ghost" flex={1} leftIcon={<PiPlusBold />}>
+            {t('workflows.builder.addOption')}
+          </Button>
+          <Button onClick={onResetOptions} variant="ghost" flex={1} leftIcon={<PiArrowCounterClockwiseBold />}>
+            {t('workflows.builder.resetOptions')}
+          </Button>
+        </ButtonGroup>
         {settings.options.length > 0 && (
           <>
             <Divider />
@@ -108,6 +121,7 @@ export const NodeFieldElementStringDropdownConfig = memo(
                     onRemoveOption={onRemoveOption}
                     onChangeOptionValue={onChangeOptionValue}
                     onChangeOptionLabel={onChangeOptionLabel}
+                    isRemoveDisabled={settings.options.length <= 1}
                   />
                 ))}
               </Grid>
@@ -128,10 +142,19 @@ type ListItemContentProps = {
   onRemoveOption: (index: number) => void;
   onChangeOptionValue: (index: number, value: string) => void;
   onChangeOptionLabel: (index: number, label: string) => void;
+  isRemoveDisabled: boolean;
 };
 
 const ListItemContent = memo(
-  ({ value, label, index, onRemoveOption, onChangeOptionValue, onChangeOptionLabel }: ListItemContentProps) => {
+  ({
+    value,
+    label,
+    index,
+    onRemoveOption,
+    onChangeOptionValue,
+    onChangeOptionLabel,
+    isRemoveDisabled,
+  }: ListItemContentProps) => {
     const { t } = useTranslation();
 
     const onClickRemove = useCallback(() => {
@@ -173,6 +196,7 @@ const ListItemContent = memo(
             minW={8}
             minH={8}
             onClick={onClickRemove}
+            isDisabled={isRemoveDisabled}
             icon={<PiXBold />}
             aria-label={t('common.delete')}
           />
