@@ -1744,6 +1744,7 @@
         "openLibrary": "Open Library",
         "workflowThumbnail": "Workflow Thumbnail",
         "saveChanges": "Save Changes",
+        "emptyStringPlaceholder": "<empty string>",
         "builder": {
             "deleteAllElements": "Delete All Form Elements",
             "resetAllNodeFields": "Reset All Node Fields",
