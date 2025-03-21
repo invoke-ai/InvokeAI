@@ -171,7 +171,13 @@ const ListItemContent = memo(({ value, index, onRemoveString, onChangeString }: 
         </FormLabel>
       </GridItem>
       <GridItem>
-        <Input size="sm" resize="none" value={value} onChange={onChange} />
+        <Input
+          placeholder={t('workflows.emptyStringPlaceholder')}
+          size="sm"
+          resize="none"
+          value={value}
+          onChange={onChange}
+        />
       </GridItem>
       <GridItem>
         <IconButton
