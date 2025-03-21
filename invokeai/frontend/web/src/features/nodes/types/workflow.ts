@@ -98,6 +98,7 @@ export const zStringOption = z
   })
   .default({ label: '', value: '' });
 export type StringChoice = z.infer<typeof zStringOption>;
+export const getDefaultStringOption = (): StringChoice => ({ label: '', value: '' });
 export const zStringComponent = z.enum(['input', 'textarea', 'dropdown']);
 const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
 const zNodeFieldStringInputSettings = z.object({
