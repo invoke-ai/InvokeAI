@@ -377,6 +377,22 @@ class ModelConfigBase(ABC, BaseModel):
         This doesn't need to be a perfect test - the aim is to eliminate unlikely matches quickly before parsing."""
         pass
 
+    @staticmethod
+    def cast_overrides(overrides: dict[str, Any]):
+        """Casts user overrides from str to Enum"""
+        if "type" in overrides:
+            overrides["type"] = ModelType(overrides["type"])
+
+        if "format" in overrides:
+            overrides["format"] = ModelFormat(overrides["format"])
+
+        if "base" in overrides:
+            overrides["base"] = BaseModelType(overrides["base"])
+
+        if "source_type" in overrides:
+            overrides["source_type"] = ModelSourceType(overrides["source_type"])
+
+
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, **overrides):
         """Creates an instance of this config or raises InvalidModelConfigException."""
@@ -384,14 +400,21 @@ class ModelConfigBase(ABC, BaseModel):
             raise InvalidModelConfigException(f"Path {mod.path} does not match {cls.__name__} format")
 
         fields = cls.parse(mod)
+        cls.cast_overrides(overrides)
+        fields.update(overrides)
+
+        type = fields.get("base") or cls.model_fields["type"].default
+        base = fields.get("base") or cls.model_fields["base"].default
 
         fields["path"] = mod.path.as_posix()
         fields["source"] = fields.get("source") or fields["path"]
         fields["source_type"] = fields.get("source_type") or ModelSourceType.Path
-        fields["name"] = mod.name
+        fields["name"] = name = fields.get("name") or mod.name
         fields["hash"] = fields.get("hash") or mod.hash()
+        fields["key"] = fields.get("key") or uuid_string()
+        fields["description"] = fields.get("description") or f"{base.value} {type.value} model {name}"
+        fields["repo_variant"] = fields.get("repo_variant") or mod.repo_variant()
 
-        fields.update(overrides)
         return cls(**fields)
 
 
