@@ -232,6 +232,23 @@ class ModelOnDisk:
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
         return {f for f in self.path.rglob("*") if f.suffix in extensions}
 
+    def repo_variant(self):
+        if self.format_type == ModelFormat.Checkpoint:
+            return None
+
+        weight_files = list(self.path.glob("**/*.safetensors"))
+        weight_files.extend(list(self.path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OpenVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.Flax
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.Default
+
     @staticmethod
     def load_state_dict(path: Path):
         with SilenceWarnings():
