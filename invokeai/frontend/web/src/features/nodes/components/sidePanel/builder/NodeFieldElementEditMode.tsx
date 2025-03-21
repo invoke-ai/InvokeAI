@@ -39,6 +39,7 @@ export const NodeFieldElementEditMode = memo(({ el }: { el: NodeFieldElement }) 
   return (
     <Flex ref={draggableRef} id={id} className={NODE_FIELD_CLASS_NAME} sx={sx} data-parent-layout={containerCtx.layout}>
       <NodeFieldElementEditModeContent dragHandleRef={dragHandleRef} el={el} isDragging={isDragging} />
+      <NodeFieldElementOverlay element={el} />
       <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
     </Flex>
   );
