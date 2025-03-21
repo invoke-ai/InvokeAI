@@ -1017,7 +1017,7 @@
         "missingField_withName": "Missing field \"{{name}}\"",
         "unexpectedField_withName": "Unexpected field \"{{name}}\"",
         "unknownField_withName": "Unknown field \"{{name}}\"",
-        "unknownFieldEditWorkflowToFix_withName": "Unknown field \"{{name}}\" (edit workflow to fix)",
+        "unknownFieldEditWorkflowToFix_withName": "Workflow contains an unknown field \"{{name}}\".\nEdit the workflow to fix the issue.",
         "updateNode": "Update Node",
         "updateApp": "Update App",
         "loadingTemplates": "Loading {{name}}",
