@@ -49,8 +49,6 @@ def run_app() -> None:
     # Miscellaneous startup tasks.
     apply_monkeypatches()
     register_mime_types()
-    if app_config.dev_reload:
-        enable_dev_reload()
     check_cudnn(logger)
 
     # Initialize the app and event loop.
@@ -60,6 +58,11 @@ def run_app() -> None:
     # invocations module. The ordering here is implicit, but important - we want to load custom nodes after all the
     # core nodes have been imported so that we can catch when a custom node clobbers a core node.
     load_custom_nodes(custom_nodes_path=app_config.custom_nodes_path, logger=logger)
+
+    if app_config.dev_reload:
+        # load_custom_nodes seems to bypass jurrigged's import sniffer, so be sure to call it *after* they're already
+        # imported.
+        enable_dev_reload(custom_nodes_path=app_config.custom_nodes_path)
 
     # Start the server.
     config = uvicorn.Config(
