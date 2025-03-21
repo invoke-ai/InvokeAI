@@ -194,7 +194,9 @@
         "combinatorial": "Combinatorial",
         "layout": "Layout",
         "row": "Row",
-        "column": "Column"
+        "column": "Column",
+        "value": "Value",
+        "label": "Label"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -1744,6 +1746,7 @@
         "openLibrary": "Open Library",
         "workflowThumbnail": "Workflow Thumbnail",
         "saveChanges": "Save Changes",
+        "emptyStringPlaceholder": "<empty string>",
         "builder": {
             "deleteAllElements": "Delete All Form Elements",
             "resetAllNodeFields": "Reset All Node Fields",
@@ -1768,6 +1771,9 @@
             "singleLine": "Single Line",
             "multiLine": "Multi Line",
             "slider": "Slider",
+            "dropdown": "Dropdown",
+            "addOption": "Add Option",
+            "resetOptions": "Reset Options",
             "both": "Both",
             "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
             "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",

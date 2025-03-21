@@ -10,7 +10,7 @@ export const useStringField = (props: FieldComponentProps<StringFieldInputInstan
   const dispatch = useAppDispatch();
 
   const onChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
       dispatch(
         fieldStringValueChanged({
           nodeId,

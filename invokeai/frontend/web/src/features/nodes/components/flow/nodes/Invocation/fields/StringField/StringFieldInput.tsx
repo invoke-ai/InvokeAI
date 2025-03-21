@@ -4,12 +4,21 @@ import { useStringField } from 'features/nodes/components/flow/nodes/Invocation/
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { StringFieldInputInstance, StringFieldInputTemplate } from 'features/nodes/types/field';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const StringFieldInput = memo(
   (props: FieldComponentProps<StringFieldInputInstance, StringFieldInputTemplate>) => {
     const { value, onChange } = useStringField(props);
+    const { t } = useTranslation();
 
-    return <Input className={`${NO_DRAG_CLASS} ${NO_PAN_CLASS} ${NO_WHEEL_CLASS}`} value={value} onChange={onChange} />;
+    return (
+      <Input
+        className={`${NO_DRAG_CLASS} ${NO_PAN_CLASS} ${NO_WHEEL_CLASS}`}
+        placeholder={t('workflows.emptyStringPlaceholder')}
+        value={value}
+        onChange={onChange}
+      />
+    );
   }
 );
 
