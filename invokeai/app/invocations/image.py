@@ -21,7 +21,7 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
@@ -580,6 +580,25 @@ class ImageWatermarkInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_dto = context.images.save(image=new_image)
 
         return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "retrieve_watermark",
+    title="Retrieve Invisible Watermark",
+    tags=["image", "watermark"],
+    category="image",
+    version="1.2.2",
+)
+class RetrieveWatermarkInvocation(BaseInvocation):
+    """Read an invisible watermark from an image"""
+
+    image: ImageField = InputField(description="The image to read the watermark from")
+    watermark_len: int = InputField(default=8, description="length of watermark, in characters")
+
+    def invoke(self, context: InvocationContext) -> StringOutput:
+        image = context.images.get_pil(self.image.image_name)
+        watermark_text = InvisibleWatermark.read_watermark(image, self.watermark_len * 8)
+        return StringOutput(value=watermark_text)
 
 
 @invocation(
