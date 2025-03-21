@@ -21,9 +21,9 @@ Validation errors will raise an InvalidModelConfigException error.
 """
 
 # pyright: reportIncompatibleVariableOverride=false
+import json
 import logging
 import time
-import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import isabstract
@@ -392,7 +392,6 @@ class ModelConfigBase(ABC, BaseModel):
         if "source_type" in overrides:
             overrides["source_type"] = ModelSourceType(overrides["source_type"])
 
-
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, **overrides):
         """Creates an instance of this config or raises InvalidModelConfigException."""
@@ -668,6 +667,7 @@ class FluxReduxConfig(LegacyProbeMixin, ModelConfigBase):
 
 class LlavaOnevisionConfig(DiffusersConfigBase, ModelConfigBase):
     """Model config for Llava Onevision models."""
+
     type: Literal[ModelType.LlavaOnevision] = ModelType.LlavaOnevision
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
@@ -684,10 +684,7 @@ class LlavaOnevisionConfig(DiffusersConfigBase, ModelConfigBase):
             return False
 
         architectures = config.get("architectures")
-        return (
-            architectures and
-            architectures[0] == "LlavaOnevisionForConditionalGeneration"
-        )
+        return architectures and architectures[0] == "LlavaOnevisionForConditionalGeneration"
 
     @classmethod
     def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:

@@ -148,7 +148,7 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
     configs_with_tests = set()
     model_paths = ModelSearch().search(datadir / "stripped_models")
     fake_hash = "abcdefgh"  # skip hashing to make test quicker
-    fake_key = "123" # fixed uuid for comparison
+    fake_key = "123"  # fixed uuid for comparison
 
     for path in model_paths:
         legacy_config = new_config = None
