@@ -402,7 +402,7 @@ class ModelConfigBase(ABC, BaseModel):
         cls.cast_overrides(overrides)
         fields.update(overrides)
 
-        type = fields.get("base") or cls.model_fields["type"].default
+        type = fields.get("type") or cls.model_fields["type"].default
         base = fields.get("base") or cls.model_fields["base"].default
 
         fields["path"] = mod.path.as_posix()

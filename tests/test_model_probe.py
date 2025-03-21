@@ -164,7 +164,8 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
             pass
 
         if legacy_config and new_config:
-            assert legacy_config == new_config
+            assert type(legacy_config) is type(new_config)
+            assert legacy_config.model_dump_json() == new_config.model_dump_json()
 
         elif legacy_config:
             assert type(legacy_config) in ModelConfigBase._USING_LEGACY_PROBE
