@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, FormControl, FormHelperText } from '@invoke-ai/ui-library';
 import { linkifyOptions, linkifySx } from 'common/components/linkify';
+import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementLabel } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabel';
@@ -9,7 +10,8 @@ import { useInputFieldTemplateOrThrow, useInputFieldTemplateSafe } from 'feature
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
 import Linkify from 'linkify-react';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const sx: SystemStyleObject = {
   '&[data-parent-layout="column"]': {
@@ -25,12 +27,19 @@ const sx: SystemStyleObject = {
   },
 };
 
+const useFormatFallbackLabel = () => {
+  const { t } = useTranslation();
+  const formatLabel = useCallback((name: string) => t('nodes.unknownFieldEditWorkflowToFix_withName', { name }), [t]);
+  return formatLabel;
+};
+
 export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
   const { fieldIdentifier, showDescription } = data;
   const description = useInputFieldDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplateSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const containerCtx = useContainerContext();
+  const formatFallbackLabel = useFormatFallbackLabel();
 
   const _description = useMemo(
     () => description || fieldTemplate?.description || '',
@@ -45,7 +54,13 @@ export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) 
       data-parent-layout={containerCtx.layout}
       data-with-description={showDescription && !!_description}
     >
-      <NodeFieldElementViewModeContent el={el} />
+      <InputFieldGate
+        nodeId={el.data.fieldIdentifier.nodeId}
+        fieldName={el.data.fieldIdentifier.fieldName}
+        formatLabel={formatFallbackLabel}
+      >
+        <NodeFieldElementViewModeContent el={el} />
+      </InputFieldGate>
     </Flex>
   );
 });

@@ -5,7 +5,7 @@ import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectInvocationNodeSafe, selectNodesSlice } from 'features/nodes/store/selectors';
 import { useMemo } from 'react';
 
-export const useInputFieldName = (nodeId: string, fieldName: string) => {
+export const useInputFieldNameSafe = (nodeId: string, fieldName: string) => {
   const templates = useStore($templates);
 
   const selector = useMemo(
