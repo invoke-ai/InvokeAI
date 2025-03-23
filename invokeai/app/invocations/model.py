@@ -181,7 +181,7 @@ class LoRALoaderOutput(BaseInvocationOutput):
     clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
-@invocation("lora_loader", title="LoRA", tags=["model"], category="model", version="1.0.3")
+@invocation("lora_loader", title="Apply LoRA - SD1.5", tags=["model"], category="model", version="1.0.4")
 class LoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
 
@@ -244,7 +244,7 @@ class LoRASelectorOutput(BaseInvocationOutput):
     lora: LoRAField = OutputField(description="LoRA model and weight", title="LoRA")
 
 
-@invocation("lora_selector", title="LoRA Model - SD1.5", tags=["model"], category="model", version="1.0.2")
+@invocation("lora_selector", title="Select LoRA", tags=["model"], category="model", version="1.0.3")
 class LoRASelectorInvocation(BaseInvocation):
     """Selects a LoRA model and weight."""
 
@@ -258,7 +258,7 @@ class LoRASelectorInvocation(BaseInvocation):
 
 
 @invocation(
-    "lora_collection_loader", title="LoRA Collection - SD1.5", tags=["model"], category="model", version="1.1.1"
+    "lora_collection_loader", title="Apply LoRA Collection - SD1.5", tags=["model"], category="model", version="1.1.2"
 )
 class LoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to the provided UNet and CLIP models."""
@@ -322,10 +322,10 @@ class SDXLLoRALoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "sdxl_lora_loader",
-    title="LoRA Model - SDXL",
+    title="Apply LoRA - SDXL",
     tags=["lora", "model"],
     category="model",
-    version="1.0.4",
+    version="1.0.5",
 )
 class SDXLLoRALoaderInvocation(BaseInvocation):
     """Apply selected lora to unet and text_encoder."""
@@ -402,10 +402,10 @@ class SDXLLoRALoaderInvocation(BaseInvocation):
 
 @invocation(
     "sdxl_lora_collection_loader",
-    title="LoRA Collection - SDXL",
+    title="Apply LoRA Collection - SDXL",
     tags=["model"],
     category="model",
-    version="1.1.1",
+    version="1.1.2",
 )
 class SDXLLoRACollectionLoader(BaseInvocation):
     """Applies a collection of SDXL LoRAs to the provided UNet and CLIP models."""
