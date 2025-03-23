@@ -6496,7 +6496,7 @@ export type components = {
             fieldName: string;
         };
         /**
-         * FLUX LoRA Collection Loader
+         * Apply LoRA Collection - FLUX
          * @description Applies a collection of LoRAs to a FLUX transformer.
          */
         FLUXLoRACollectionLoader: {
@@ -7885,7 +7885,7 @@ export type components = {
             type: "flux_ip_adapter";
         };
         /**
-         * FLUX LoRA
+         * Apply LoRA - FLUX
          * @description Apply a LoRA model to a FLUX transformer and/or text encoder.
          */
         FluxLoRALoaderInvocation: {
@@ -13126,7 +13126,7 @@ export type components = {
             type: "llava_onevision_vllm";
         };
         /**
-         * LoRA Collection - SD1.5
+         * Apply LoRA Collection - SD1.5
          * @description Applies a collection of LoRAs to the provided UNet and CLIP models.
          */
         LoRACollectionLoader: {
@@ -13260,7 +13260,7 @@ export type components = {
             weight: number;
         };
         /**
-         * LoRA
+         * Apply LoRA - SD1.5
          * @description Apply selected lora to unet and text_encoder.
          */
         LoRALoaderInvocation: {
@@ -13428,7 +13428,7 @@ export type components = {
             weight: number;
         };
         /**
-         * LoRA Model - SD1.5
+         * Select LoRA
          * @description Selects a LoRA model and weight.
          */
         LoRASelectorInvocation: {
@@ -17982,7 +17982,7 @@ export type components = {
             type: "sdxl_compel_prompt";
         };
         /**
-         * LoRA Collection - SDXL
+         * Apply LoRA Collection - SDXL
          * @description Applies a collection of SDXL LoRAs to the provided UNet and CLIP models.
          */
         SDXLLoRACollectionLoader: {
@@ -18036,7 +18036,7 @@ export type components = {
             type: "sdxl_lora_collection_loader";
         };
         /**
-         * LoRA Model - SDXL
+         * Apply LoRA - SDXL
          * @description Apply selected lora to unet and text_encoder.
          */
         SDXLLoRALoaderInvocation: {
