@@ -113,7 +113,9 @@
         "saveChanges": "Salva modifiche",
         "error_withCount_one": "{{count}} errore",
         "error_withCount_many": "{{count}} errori",
-        "error_withCount_other": "{{count}} errori"
+        "error_withCount_other": "{{count}} errori",
+        "value": "Valore",
+        "label": "Etichetta"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -848,7 +850,8 @@
         "pasteSuccess": "Incollato su {{destination}}",
         "unableToCopy": "Impossibile copiare",
         "unableToCopyDesc": "Il tuo browser non supporta l'accesso agli appunti. Gli utenti di Firefox potrebbero risolvere il problema seguendo ",
-        "unableToCopyDesc_theseSteps": "questi passaggi"
+        "unableToCopyDesc_theseSteps": "questi passaggi",
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill non è compatibile con Testo a Immagine o Immagine a Immagine. Per queste attività, utilizzare altri modelli FLUX."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1038,7 +1041,11 @@
         "generatorImages_many": "{{count}} immagini",
         "generatorImages_other": "{{count}} immagini",
         "generatorImagesFromBoard": "Immagini dalla Bacheca",
-        "missingSourceOrTargetNode": "Nodo sorgente o di destinazione mancante"
+        "missingSourceOrTargetNode": "Nodo sorgente o di destinazione mancante",
+        "unknownField_withName": "Campo \"{{name}}\" sconosciuto",
+        "missingField_withName": "Campo \"{{name}}\" mancante",
+        "unknownFieldEditWorkflowToFix_withName": "Il flusso di lavoro contiene un campo \"{{name}}\" sconosciuto .\nModifica il flusso di lavoro per risolvere il problema.",
+        "unexpectedField_withName": "Campo \"{{name}}\" inaspettato"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1778,7 +1785,10 @@
             "containerRowLayout": "Contenitore (disposizione riga)",
             "containerColumnLayout": "Contenitore (disposizione colonna)",
             "minimum": "Minimo",
-            "maximum": "Massimo"
+            "maximum": "Massimo",
+            "dropdown": "Elenco a discesa",
+            "addOption": "Aggiungi opzione",
+            "resetOptions": "Reimposta opzioni"
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
@@ -1794,7 +1804,8 @@
         "deselectAll": "Deseleziona tutto",
         "noRecentWorkflows": "Nessun flusso di lavoro recente",
         "view": "Visualizza",
-        "recommended": "Consigliato per te"
+        "recommended": "Consigliato per te",
+        "emptyStringPlaceholder": "<stringa vuota>"
     },
     "accordions": {
         "compositing": {
@@ -2238,7 +2249,8 @@
             "rgNegativePromptNotSupported": "Prompt negativo non supportato per il modello base selezionato",
             "ipAdapterIncompatibleBaseModel": "modello base dell'immagine di riferimento incompatibile",
             "ipAdapterNoImageSelected": "nessuna immagine di riferimento selezionata",
-            "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato"
+            "rgAutoNegativeNotSupported": "Auto-Negativo non supportato per il modello base selezionato",
+            "fluxFillIncompatibleWithControlLoRA": "Il controllo LoRA non è compatibile con FLUX Fill"
         },
         "pasteTo": "Incolla su",
         "pasteToBboxDesc": "Nuovo livello (nel riquadro di delimitazione)",
@@ -2354,7 +2366,7 @@
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
             "Flussi di lavoro: nuova e migliorata libreria dei flussi di lavoro.",
-            "FLUX: supporto per FLUX Redux in Flussi di lavoro e Tela."
+            "FLUX: supporto per FLUX Redux e FLUX Fill in Flussi di lavoro e Tela."
         ]
     },
     "system": {
