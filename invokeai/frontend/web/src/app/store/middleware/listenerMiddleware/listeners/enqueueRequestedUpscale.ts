@@ -1,5 +1,5 @@
+import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -9,10 +9,11 @@ import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endp
 
 const log = logger('generation');
 
+export const enqueueRequestedUpscaling = createAction<{ prepend: boolean }>('app/enqueueRequestedUpscaling');
+
 export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening) => {
   startAppListening({
-    predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'upscaling',
+    actionCreator: enqueueRequestedUpscaling,
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const { prepend } = action.payload;

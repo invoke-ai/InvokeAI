@@ -1,5 +1,5 @@
+import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import { $templates } from 'features/nodes/store/nodesSlice';
@@ -15,11 +15,15 @@ import type { Batch, EnqueueBatchArg } from 'services/api/types';
 
 const log = logger('generation');
 
+export const enqueueRequestedWorkflows = createAction<{ prepend: boolean; isApiValidationRun: boolean }>(
+  'app/enqueueRequestedWorkflows'
+);
+
 export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
   startAppListening({
-    predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'workflows',
+    actionCreator: enqueueRequestedWorkflows,
     effect: async (action, { getState, dispatch }) => {
+      const { prepend, isApiValidationRun } = action.payload;
       const state = getState();
       const nodesState = selectNodesSlice(state);
       const workflow = state.workflow;
@@ -99,8 +103,9 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           origin: 'workflows',
           destination: 'gallery',
           data,
+          is_api_validation_run: isApiValidationRun,
         },
-        prepend: action.payload.prepend,
+        prepend,
       };
 
       const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));

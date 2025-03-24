@@ -14,7 +14,7 @@ export const useGlobalHotkeys = () => {
   useRegisteredHotkeys({
     id: 'invoke',
     category: 'app',
-    callback: queue.queueBack,
+    callback: queue.enqueueBack,
     options: {
       enabled: !queue.isDisabled && !queue.isLoading,
       preventDefault: true,
@@ -26,7 +26,7 @@ export const useGlobalHotkeys = () => {
   useRegisteredHotkeys({
     id: 'invokeFront',
     category: 'app',
-    callback: queue.queueFront,
+    callback: queue.enqueueFront,
     options: {
       enabled: !queue.isDisabled && !queue.isLoading,
       preventDefault: true,

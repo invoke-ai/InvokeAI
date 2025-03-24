@@ -82,7 +82,7 @@ const InvokeIconButton = memo(() => {
     <InvokeButtonTooltip prepend={shift} placement="end">
       <IconButton
         aria-label={t('queue.queueBack')}
-        onClick={shift ? queue.queueFront : queue.queueBack}
+        onClick={shift ? queue.enqueueFront : queue.enqueueBack}
         isLoading={queue.isLoading}
         isDisabled={queue.isDisabled}
         icon={queueButtonIcon}
