@@ -16,6 +16,16 @@ export type XYPosition = z.infer<typeof zXYPosition>;
 
 const zWorkflowCategory = z.enum(['user', 'default', 'project']);
 export type WorkflowCategory = z.infer<typeof zWorkflowCategory>;
+
+const zWorkflowApiFieldIdentifier = z.object({
+  node_id: z.string().trim().min(1),
+  field_name: z.string().trim().min(1),
+  field_name_override: z.string().trim().min(1).optional(),
+  field_title_override: z.string().trim().min(1).optional(),
+  field_description_override: z.string().trim().min(1).optional(),
+});
+export type WorkflowApiFieldIdentifier = z.infer<typeof zWorkflowApiFieldIdentifier>;
+
 // #endregion
 
 // #region Workflow Nodes
@@ -371,6 +381,7 @@ export const zWorkflowV3 = z.object({
   nodes: z.array(zWorkflowNode),
   edges: z.array(zWorkflowEdge),
   exposedFields: z.array(zFieldIdentifier),
+  api_fields: z.array(zWorkflowApiFieldIdentifier).optional(),
   meta: z.object({
     category: zWorkflowCategory.default('user'),
     version: z.literal('3.0.0'),
