@@ -91,14 +91,14 @@ const zNodeFieldIntegerSettings = z.object({
 export type NodeFieldIntegerSettings = z.infer<typeof zNodeFieldIntegerSettings>;
 export const getIntegerFieldSettingsDefaults = (): NodeFieldIntegerSettings => zNodeFieldIntegerSettings.parse({});
 
-export const zStringOption = z
+const zStringOption = z
   .object({
     label: z.string(),
     value: z.string(),
   })
   .default({ label: '', value: '' });
-export type StringChoice = z.infer<typeof zStringOption>;
-export const getDefaultStringOption = (): StringChoice => ({ label: '', value: '' });
+type StringOption = z.infer<typeof zStringOption>;
+export const getDefaultStringOption = (): StringOption => ({ label: '', value: '' });
 export const zStringComponent = z.enum(['input', 'textarea', 'dropdown']);
 const STRING_FIELD_CONFIG_TYPE = 'string-field-config';
 const zNodeFieldStringInputSettings = z.object({
