@@ -18,8 +18,8 @@ COPY --from=ghcr.io/astral-sh/uv:0.6.0 /uv /uvx /bin/
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV INVOKEAI_SRC=/opt/invokeai
-ENV PYTHON_VERSION=3.11
-ENV UV_PYTHON=3.11
+ENV PYTHON_VERSION=3.12
+ENV UV_PYTHON=3.12
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="$VIRTUAL_ENV"
@@ -49,20 +49,8 @@ WORKDIR ${INVOKEAI_SRC}
 # x86_64/CUDA is the default
 RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=invokeai/version,target=invokeai/version \
-    if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
-      UV_INDEX="https://download.pytorch.org/whl/cpu"; \
-    elif [ "$GPU_DRIVER" = "rocm" ]; then \
-      UV_INDEX="https://download.pytorch.org/whl/rocm6.1"; \
-    fi && \
-    uv sync --no-install-project
-
-# Now that the bulk of the dependencies have been installed, copy in the project files that change more frequently.
-COPY invokeai invokeai
-COPY pyproject.toml .
-
-RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
       UV_INDEX="https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
@@ -70,6 +58,9 @@ RUN --mount=type=cache,target=/home/ubuntu/.cache/uv,uid=1000,gid=1000 \
     fi && \
     uv sync
 
+# Now that the bulk of the dependencies have been installed, copy in the project files that change more frequently.
+COPY pyproject.toml uv.lock ./
+COPY invokeai invokeai
 
 #### Build the Web UI ------------------------------------
 
@@ -114,7 +105,7 @@ RUN apt update && apt install -y --no-install-recommends \
 ENV INVOKEAI_SRC=/opt/invokeai
 ENV VIRTUAL_ENV=/opt/venv
 ENV UV_PROJECT_ENVIRONMENT="$VIRTUAL_ENV"
-ENV PYTHON_VERSION=3.11
+ENV PYTHON_VERSION=3.12
 ENV INVOKEAI_ROOT=/invokeai
 ENV INVOKEAI_HOST=0.0.0.0
 ENV INVOKEAI_PORT=9090
