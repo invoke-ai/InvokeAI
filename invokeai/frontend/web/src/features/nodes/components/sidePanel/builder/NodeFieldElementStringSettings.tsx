@@ -20,18 +20,18 @@ export const NodeFieldElementStringSettings = memo(
           return;
         }
         if (component === 'dropdown') {
-          // if the component is changing to dropdown, we need to set the choices
-          const newConfig: NodeFieldStringSettings = {
+          // if the component is changing to dropdown, we need to set the options
+          const settings: NodeFieldStringSettings = {
             ...config,
             component,
             options: [getDefaultStringOption()],
           };
-          dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
+          dispatch(formElementNodeFieldDataChanged({ id, changes: { settings } }));
           return;
         }
-        // if the component is changing from dropdown, we need to remove the choices
-        const newConfig: NodeFieldStringSettings = omit({ ...config, component }, 'choices');
-        dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
+        // if the component is changing from dropdown, we need to remove the options
+        const settings: NodeFieldStringSettings = omit({ ...config, component }, 'options');
+        dispatch(formElementNodeFieldDataChanged({ id, changes: { settings } }));
       },
       [config, dispatch, id]
     );
