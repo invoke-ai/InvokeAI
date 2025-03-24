@@ -8,6 +8,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    PrivateAttr,
     StrictStr,
     TypeAdapter,
     field_validator,
@@ -90,6 +91,13 @@ class Batch(BaseModel):
     runs: int = Field(
         default=1, ge=1, description="Int stating how many times to iterate through all possible batch indices"
     )
+    is_api_validation_run: bool = Field(
+        default=False,
+        description="Whether this batch is an API validation run.",
+    )
+
+    _session_count: int | None = PrivateAttr(default=None)
+    """The number of sessions that would be created by the batch. Cached result of self.get_session_count() - use that method instead."""
 
     @field_validator("data")
     def validate_lengths(cls, v: Optional[BatchDataCollection]):
@@ -156,6 +164,48 @@ class Batch(BaseModel):
     def validate_graph(cls, v: Graph):
         v.validate_self()
         return v
+
+    @model_validator(mode="after")
+    def validation_run_has_exactly_1_session(self):
+        if not self.is_api_validation_run:
+            return self
+
+        session_count = self.get_session_count()
+
+        if session_count != 1:
+            raise ValueError(f"Validation runs must have a single session count, got {session_count}")
+
+        return self
+
+    def get_session_count(self) -> int:
+        """
+        Calculates the number of sessions that would be created by the batch, without incurring the overhead of actually
+        creating them, as is done in `create_session_nfv_tuples()`.
+
+        The count is used to communicate to the user how many sessions were _requested_ to be created, as opposed to how
+        many were _actually_ created (which may be less due to the maximum number of sessions).
+
+        If the session count has already been calculated, return the cached value.
+        """
+        if self._session_count is not None:
+            return self._session_count
+
+        self._session_count = self._get_session_count()
+        return self._session_count
+
+    def _get_session_count(self) -> int:
+        """Does the actual calculation of the session count."""
+        if not self.data:
+            return self.runs
+        data = []
+        for batch_datum_list in self.data:
+            to_zip = []
+            for batch_datum in batch_datum_list:
+                batch_data_items = range(len(batch_datum.items))
+                to_zip.append(batch_data_items)
+            data.append(list(zip(*to_zip, strict=True)))
+        data_product = list(product(*data))
+        return len(data_product) * self.runs
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -236,6 +286,10 @@ class SessionQueueItemWithoutGraph(BaseModel):
     )
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
+    )
+    is_api_validation_run: bool = Field(
+        default=False,
+        description="Whether this queue item is an API validation run.",
     )
 
     @classmethod
@@ -534,28 +588,6 @@ def create_session_nfv_tuples(batch: Batch, maximum: int) -> Generator[tuple[str
 
             # Increment the count so we know when to stop
             count += 1
-
-
-def calc_session_count(batch: Batch) -> int:
-    """
-    Calculates the number of sessions that would be created by the batch, without incurring the overhead of actually
-    creating them, as is done in `create_session_nfv_tuples()`.
-
-    The count is used to communicate to the user how many sessions were _requested_ to be created, as opposed to how
-    many were _actually_ created (which may be less due to the maximum number of sessions).
-    """
-    # TODO: Should this be a class method on Batch?
-    if not batch.data:
-        return batch.runs
-    data = []
-    for batch_datum_list in batch.data:
-        to_zip = []
-        for batch_datum in batch_datum_list:
-            batch_data_items = range(len(batch_datum.items))
-            to_zip.append(batch_data_items)
-        data.append(list(zip(*to_zip, strict=True)))
-    data_product = list(product(*data))
-    return len(data_product) * batch.runs
 
 
 ValueToInsertTuple: TypeAlias = tuple[
