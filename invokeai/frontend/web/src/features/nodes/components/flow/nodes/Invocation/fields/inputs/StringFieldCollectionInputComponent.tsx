@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Button, Divider, Flex, FormLabel, Grid, GridItem, IconButton, Input } from '@invoke-ai/ui-library';
+import { Button, Divider, Flex, Grid, GridItem, IconButton, Input, Text } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
@@ -130,9 +130,9 @@ const ListItemContent = memo(({ value, index, onRemoveString, onChangeString }: 
   return (
     <>
       <GridItem>
-        <FormLabel ps={1} m={0}>
+        <Text variant="subtext" textAlign="center" minW={8}>
           {index + 1}.
-        </FormLabel>
+        </Text>
       </GridItem>
       <GridItem>
         <Input
@@ -148,7 +148,8 @@ const ListItemContent = memo(({ value, index, onRemoveString, onChangeString }: 
           tabIndex={-1}
           size="sm"
           variant="link"
-          alignSelf="stretch"
+          minW={8}
+          minH={8}
           onClick={onClickRemove}
           icon={<PiXBold />}
           aria-label={t('common.delete')}
