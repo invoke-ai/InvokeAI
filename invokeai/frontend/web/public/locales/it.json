@@ -779,7 +779,8 @@
         "enableModelDescriptions": "Abilita le descrizioni dei modelli nei menu a discesa",
         "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
         "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disabilitate. Abilitale nelle Impostazioni.",
-        "showDetailedInvocationProgress": "Mostra dettagli avanzamento"
+        "showDetailedInvocationProgress": "Mostra dettagli avanzamento",
+        "enableHighlightFocusedRegions": "Evidenzia le regioni interessate"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -968,7 +969,6 @@
         "unableToGetWorkflowVersion": "Impossibile ottenere la versione dello schema del flusso di lavoro",
         "nodePack": "Pacchetto di nodi",
         "unableToExtractSchemaNameFromRef": "Impossibile estrarre il nome dello schema dal riferimento",
-        "unknownOutput": "Output sconosciuto: {{name}}",
         "unknownNodeType": "Tipo di nodo sconosciuto",
         "targetNodeDoesNotExist": "Connessione non valida: il nodo di destinazione/input {{node}} non esiste",
         "unknownFieldType": "$t(nodes.unknownField) tipo: {{type}}",
@@ -1776,7 +1776,9 @@
             "text": "Testo",
             "numberInput": "Ingresso numerico",
             "containerRowLayout": "Contenitore (disposizione riga)",
-            "containerColumnLayout": "Contenitore (disposizione colonna)"
+            "containerColumnLayout": "Contenitore (disposizione colonna)",
+            "minimum": "Minimo",
+            "maximum": "Massimo"
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
@@ -1791,7 +1793,8 @@
         "private": "Privato",
         "deselectAll": "Deseleziona tutto",
         "noRecentWorkflows": "Nessun flusso di lavoro recente",
-        "view": "Visualizza"
+        "view": "Visualizza",
+        "recommended": "Consigliato per te"
     },
     "accordions": {
         "compositing": {
@@ -2350,8 +2353,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Gestione della memoria: nuova impostazione per gli utenti con GPU Nvidia per ridurre l'utilizzo della VRAM.",
-            "Prestazioni: continui miglioramenti alle prestazioni e alla reattività complessive dell'applicazione."
+            "Flussi di lavoro: nuova e migliorata libreria dei flussi di lavoro.",
+            "FLUX: supporto per FLUX Redux in Flussi di lavoro e Tela."
         ]
     },
     "system": {

@@ -28,10 +28,10 @@ class FluxLoRALoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "flux_lora_loader",
-    title="FLUX LoRA",
+    title="Apply LoRA - FLUX",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.2.0",
+    version="1.2.1",
     classification=Classification.Prototype,
 )
 class FluxLoRALoaderInvocation(BaseInvocation):
@@ -107,10 +107,10 @@ class FluxLoRALoaderInvocation(BaseInvocation):
 
 @invocation(
     "flux_lora_collection_loader",
-    title="FLUX LoRA Collection Loader",
+    title="Apply LoRA Collection - FLUX",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.3.0",
+    version="1.3.1",
     classification=Classification.Prototype,
 )
 class FLUXLoRACollectionLoader(BaseInvocation):

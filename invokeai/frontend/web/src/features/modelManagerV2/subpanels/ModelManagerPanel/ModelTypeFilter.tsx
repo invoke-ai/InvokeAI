@@ -25,7 +25,7 @@ export const ModelTypeFilter = memo(() => {
       clip_vision: 'CLIP Vision',
       spandrel_image_to_image: t('modelManager.spandrelImageToImage'),
       control_lora: t('modelManager.controlLora'),
-      siglip: t('modelManager.siglip'),
+      siglip: t('modelManager.sigLip'),
       flux_redux: t('modelManager.fluxRedux'),
       llava_onevision: t('modelManager.llavaOnevision'),
     }),

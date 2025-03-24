@@ -4,9 +4,8 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasControlLayerState, Rect } from 'features/controlLayers/store/types';
 import { getControlLayerWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { serializeError } from 'serialize-error';
-import type { ImageDTO, Invocation } from 'services/api/types';
+import type { ImageDTO, Invocation, MainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -17,7 +16,7 @@ type AddControlNetsArg = {
   g: Graph;
   rect: Rect;
   collector: Invocation<'collect'>;
-  model: ParameterModel;
+  model: MainModelConfig;
 };
 
 type AddControlNetsResult = {
@@ -66,7 +65,7 @@ type AddT2IAdaptersArg = {
   g: Graph;
   rect: Rect;
   collector: Invocation<'collect'>;
-  model: ParameterModel;
+  model: MainModelConfig;
 };
 
 type AddT2IAdaptersResult = {
@@ -114,7 +113,7 @@ type AddControlLoRAArg = {
   entities: CanvasControlLayerState[];
   g: Graph;
   rect: Rect;
-  model: ParameterModel;
+  model: MainModelConfig;
   denoise: Invocation<'flux_denoise'>;
 };
 
@@ -129,9 +128,9 @@ export const addControlLoRA = async ({ manager, entities, g, rect, model, denois
     // No valid control LoRA found
     return;
   }
-  if (validControlLayers.length > 1) {
-    throw new Error('Cannot add more than one FLUX control LoRA.');
-  }
+
+  assert(model.variant !== 'inpaint', 'FLUX Control LoRA is not compatible with FLUX Fill.');
+  assert(validControlLayers.length <= 1, 'Cannot add more than one FLUX control LoRA.');
 
   const getImageDTOResult = await withResultAsync(() => {
     const adapter = manager.adapters.controlLayers.get(validControlLayer.id);

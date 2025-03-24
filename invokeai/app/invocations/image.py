@@ -1051,7 +1051,7 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     tags=["image", "mask", "id"],
     category="image",
     version="1.0.0",
-    classification=Classification.Internal,
+    classification=Classification.Deprecated,
 )
 class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Handles Canvas V2 image output masking and cropping"""
@@ -1085,6 +1085,112 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             generated_image = context.images.get_pil(self.generated_image.image_name)
             generated_image.putalpha(mask)
             image_dto = context.images.save(image=generated_image)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "expand_mask_with_fade", title="Expand Mask with Fade", tags=["image", "mask"], category="image", version="1.0.0"
+)
+class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Expands a mask with a fade effect. The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
+    The mask is thresholded to create a binary mask, and then a distance transform is applied to create a fade effect.
+    The fade size is specified in pixels, and the mask is expanded by that amount. The result is a mask with a smooth transition from black to white.
+    """
+
+    mask: ImageField = InputField(description="The mask to expand")
+    threshold: int = InputField(default=0, ge=0, le=255, description="The threshold for the binary mask (0-255)")
+    fade_size_px: int = InputField(default=32, ge=0, description="The size of the fade in pixels")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pil_mask = context.images.get_pil(self.mask.image_name, mode="L")
+
+        np_mask = numpy.array(pil_mask)
+
+        # Threshold the mask to create a binary mask - 0 for black, 255 for white
+        # If we don't threshold we can get some weird artifacts
+        np_mask = numpy.where(np_mask > self.threshold, 255, 0).astype(numpy.uint8)
+
+        # Create a mask for the black region (1 where black, 0 otherwise)
+        black_mask = (np_mask == 0).astype(numpy.uint8)
+
+        # Invert the black region
+        bg_mask = 1 - black_mask
+
+        # Create a distance transform of the inverted mask
+        dist = cv2.distanceTransform(bg_mask, cv2.DIST_L2, 5)
+
+        # Normalize distances so that pixels <fade_size_px become a linear gradient (0 to 1)
+        d_norm = numpy.clip(dist / self.fade_size_px, 0, 1)
+
+        # Control points: x values (normalized distance) and corresponding fade pct y values.
+
+        # There are some magic numbers here that are used to create a smooth transition:
+        # - The first point is at 0% of fade size from edge of mask (meaning the edge of the mask), and is 0% fade (black)
+        # - The second point is 1px from the edge of the mask and also has 0% fade, effectively expanding the mask
+        #   by 1px. This fixes an issue where artifacts can occur at the edge of the mask
+        # - The third point is at 20% of the fade size from the edge of the mask and has 20% fade
+        # - The fourth point is at 80% of the fade size from the edge of the mask and has 90% fade
+        # - The last point is at 100% of the fade size from the edge of the mask and has 100% fade (white)
+
+        # x values: 0 = mask edge, 1 = fade_size_px from edge
+        x_control = numpy.array([0.0, 1.0 / self.fade_size_px, 0.2, 0.8, 1.0])
+        # y values: 0 = black, 1 = white
+        y_control = numpy.array([0.0, 0.0, 0.2, 0.9, 1.0])
+
+        # Fit a cubic polynomial that smoothly passes through the control points
+        coeffs = numpy.polyfit(x_control, y_control, 3)
+        poly = numpy.poly1d(coeffs)
+
+        # Evaluate and clip the smooth mapping
+        feather = numpy.clip(poly(d_norm), 0, 1)
+
+        # Build final image.
+        np_result = numpy.where(black_mask == 1, 0, (feather * 255).astype(numpy.uint8))
+
+        # Convert back to PIL, grayscale
+        pil_result = Image.fromarray(np_result.astype(numpy.uint8), mode="L")
+
+        image_dto = context.images.save(image=pil_result, image_category=ImageCategory.MASK)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "apply_mask_to_image",
+    title="Apply Mask to Image",
+    tags=["image", "mask", "blend"],
+    category="image",
+    version="1.0.0",
+)
+class ApplyMaskToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """
+    Extracts a region from a generated image using a mask and blends it seamlessly onto a source image.
+    The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
+    """
+
+    image: ImageField = InputField(description="The image from which to extract the masked region")
+    mask: ImageField = InputField(description="The mask defining the region (black=keep, white=discard)")
+    invert_mask: bool = InputField(
+        default=False,
+        description="Whether to invert the mask before applying it",
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        # Load images
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+        mask = context.images.get_pil(self.mask.image_name, mode="L")
+
+        if self.invert_mask:
+            # Invert the mask if requested
+            mask = ImageOps.invert(mask.copy())
+
+        # Combine the mask as the alpha channel of the image
+        r, g, b, _ = image.split()  # Split the image into RGB and alpha channels
+        result_image = Image.merge("RGBA", (r, g, b, mask))  # Use the mask as the new alpha channel
+
+        # Save the resulting image
+        image_dto = context.images.save(image=result_image)
 
         return ImageOutput.build(image_dto)
 

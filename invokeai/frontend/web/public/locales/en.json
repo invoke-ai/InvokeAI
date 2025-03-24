@@ -194,7 +194,9 @@
         "combinatorial": "Combinatorial",
         "layout": "Layout",
         "row": "Row",
-        "column": "Column"
+        "column": "Column",
+        "value": "Value",
+        "label": "Label"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -1014,7 +1016,10 @@
         "unknownNodeType": "Unknown node type",
         "unknownTemplate": "Unknown Template",
         "unknownInput": "Unknown input: {{name}}",
-        "unknownOutput": "Unknown output: {{name}}",
+        "missingField_withName": "Missing field \"{{name}}\"",
+        "unexpectedField_withName": "Unexpected field \"{{name}}\"",
+        "unknownField_withName": "Unknown field \"{{name}}\"",
+        "unknownFieldEditWorkflowToFix_withName": "Workflow contains an unknown field \"{{name}}\".\nEdit the workflow to fix the issue.",
         "updateNode": "Update Node",
         "updateApp": "Update App",
         "loadingTemplates": "Loading {{name}}",
@@ -1299,7 +1304,8 @@
         "problemDeletingWorkflow": "Problem Deleting Workflow",
         "unableToCopy": "Unable to Copy",
         "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
-        "unableToCopyDesc_theseSteps": "these steps"
+        "unableToCopyDesc_theseSteps": "these steps",
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks."
     },
     "popovers": {
         "clipSkip": {
@@ -1740,6 +1746,7 @@
         "openLibrary": "Open Library",
         "workflowThumbnail": "Workflow Thumbnail",
         "saveChanges": "Save Changes",
+        "emptyStringPlaceholder": "<empty string>",
         "builder": {
             "deleteAllElements": "Delete All Form Elements",
             "resetAllNodeFields": "Reset All Node Fields",
@@ -1764,6 +1771,9 @@
             "singleLine": "Single Line",
             "multiLine": "Multi Line",
             "slider": "Slider",
+            "dropdown": "Dropdown",
+            "addOption": "Add Option",
+            "resetOptions": "Reset Options",
             "both": "Both",
             "emptyRootPlaceholderViewMode": "Click Edit to start building a form for this workflow.",
             "emptyRootPlaceholderEditMode": "Drag a form element or node field here to get started.",
@@ -1950,7 +1960,8 @@
             "rgNegativePromptNotSupported": "Negative Prompt not supported for selected base model",
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
-            "rgNoRegion": "no region drawn"
+            "rgNoRegion": "no region drawn",
+            "fluxFillIncompatibleWithControlLoRA": "Control LoRA is not compatible with FLUX Fill"
         },
         "errors": {
             "unableToFindImage": "Unable to find image",
@@ -2333,7 +2344,7 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "Workflows: New and improved Workflow Library.",
-            "FLUX: Support for FLUX Redux in Workflows and Canvas."
+            "FLUX: Support for FLUX Redux & FLUX Fill in Workflows and Canvas."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",

@@ -42,8 +42,7 @@ export class InvalidModelConfigError extends Error {
 export const fetchModelConfig = async (key: string): Promise<AnyModelConfig> => {
   const { dispatch } = getStore();
   try {
-    const req = dispatch(modelsApi.endpoints.getModelConfig.initiate(key));
-    req.unsubscribe();
+    const req = dispatch(modelsApi.endpoints.getModelConfig.initiate(key, { subscribe: false }));
     return await req.unwrap();
   } catch {
     throw new ModelConfigNotFoundError(`Unable to retrieve model config for key ${key}`);
@@ -62,8 +61,9 @@ export const fetchModelConfig = async (key: string): Promise<AnyModelConfig> => 
 const fetchModelConfigByAttrs = async (name: string, base: BaseModelType, type: ModelType): Promise<AnyModelConfig> => {
   const { dispatch } = getStore();
   try {
-    const req = dispatch(modelsApi.endpoints.getModelConfigByAttrs.initiate({ name, base, type }));
-    req.unsubscribe();
+    const req = dispatch(
+      modelsApi.endpoints.getModelConfigByAttrs.initiate({ name, base, type }, { subscribe: false })
+    );
     return await req.unwrap();
   } catch {
     throw new ModelConfigNotFoundError(`Unable to retrieve model config for name/base/type ${name}/${base}/${type}`);

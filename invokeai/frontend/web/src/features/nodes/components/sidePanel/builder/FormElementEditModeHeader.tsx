@@ -1,6 +1,7 @@
 import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { ContainerElementSettings } from 'features/nodes/components/sidePanel/builder/ContainerElementSettings';
 import { useDepthContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
@@ -47,8 +48,16 @@ export const FormElementEditModeHeader = memo(({ element, dragHandleRef, ...rest
       <Label element={element} />
       <Spacer />
       {isContainerElement(element) && <ContainerElementSettings element={element} />}
-      {isNodeFieldElement(element) && <ZoomToNodeButton element={element} />}
-      {isNodeFieldElement(element) && <NodeFieldElementSettings element={element} />}
+      {isNodeFieldElement(element) && (
+        <InputFieldGate
+          nodeId={element.data.fieldIdentifier.nodeId}
+          fieldName={element.data.fieldIdentifier.fieldName}
+          fallback={null} // Do not render these buttons if the field is not found
+        >
+          <ZoomToNodeButton element={element} />
+          <NodeFieldElementSettings element={element} />
+        </InputFieldGate>
+      )}
       <RemoveElementButton element={element} />
     </Flex>
   );

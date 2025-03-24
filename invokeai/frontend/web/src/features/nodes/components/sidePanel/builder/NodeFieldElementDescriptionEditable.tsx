@@ -2,8 +2,8 @@ import { FormHelperText, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { linkifyOptions, linkifySx } from 'common/components/linkify';
 import { useEditable } from 'common/hooks/useEditable';
-import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldDescriptionSafe } from 'features/nodes/hooks/useInputFieldDescriptionSafe';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import { fieldDescriptionChanged } from 'features/nodes/store/nodesSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import Linkify from 'linkify-react';
@@ -13,8 +13,8 @@ export const NodeFieldElementDescriptionEditable = memo(({ el }: { el: NodeField
   const { data } = el;
   const { fieldIdentifier } = data;
   const dispatch = useAppDispatch();
-  const description = useInputFieldDescription(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
-  const fieldTemplate = useInputFieldTemplate(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const onChange = useCallback(

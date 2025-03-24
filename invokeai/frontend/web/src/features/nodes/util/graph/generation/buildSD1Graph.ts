@@ -5,7 +5,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -24,8 +23,8 @@ import {
   getPresetModifiedPrompts,
   getSizes,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -45,9 +44,9 @@ export const buildSD1Graph = async (
   const canvas = selectCanvasSlice(state);
 
   const { bbox } = canvas;
+  const model = selectMainModelConfig(state);
 
   const {
-    model,
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
     scheduler,
@@ -137,8 +136,7 @@ export const buildSD1Graph = async (
   g.addEdge(noise, 'noise', denoise, 'noise');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
-  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-  assert(modelConfig.base === 'sd-1' || modelConfig.base === 'sd-2');
+  assert(model.base === 'sd-1' || model.base === 'sd-2');
 
   g.upsertMetadata({
     generation_mode: 'txt2img',
@@ -148,7 +146,7 @@ export const buildSD1Graph = async (
     height: originalSize.height,
     positive_prompt: positivePrompt,
     negative_prompt: negativePrompt,
-    model: Graph.getModelMetadataField(modelConfig),
+    model: Graph.getModelMetadataField(model),
     seed,
     steps,
     rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
@@ -170,7 +168,14 @@ export const buildSD1Graph = async (
   const denoising_start = 1 - params.img2imgStrength;
 
   let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode' | 'sd3_l2i'
+    | 'l2i'
+    | 'img_nsfw'
+    | 'img_watermark'
+    | 'img_resize'
+    | 'invokeai_img_blend'
+    | 'apply_mask_to_image'
+    | 'flux_vae_decode'
+    | 'sd3_l2i'
   > = l2i;
 
   if (generationMode === 'txt2img') {
@@ -233,7 +238,7 @@ export const buildSD1Graph = async (
     g,
     rect: canvas.bbox.rect,
     collector: controlNetCollector,
-    model: modelConfig,
+    model,
   });
   if (controlNetResult.addedControlNets > 0) {
     g.addEdge(controlNetCollector, 'collection', denoise, 'control');
@@ -251,7 +256,7 @@ export const buildSD1Graph = async (
     g,
     rect: canvas.bbox.rect,
     collector: t2iAdapterCollector,
-    model: modelConfig,
+    model,
   });
   if (t2iAdapterResult.addedT2IAdapters > 0) {
     g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
@@ -267,7 +272,7 @@ export const buildSD1Graph = async (
     entities: canvas.referenceImages.entities,
     g,
     collector: ipAdapterCollect,
-    model: modelConfig,
+    model,
   });
 
   const regionsResult = await addRegions({
@@ -275,7 +280,7 @@ export const buildSD1Graph = async (
     regions: canvas.regionalGuidance.entities,
     g,
     bbox: canvas.bbox.rect,
-    model: modelConfig,
+    model,
     posCond,
     negCond,
     posCondCollect,

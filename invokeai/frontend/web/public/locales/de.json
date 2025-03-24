@@ -114,7 +114,9 @@
         "layout": "Layout",
         "board": "Ordner",
         "combinatorial": "Kombinatorisch",
-        "saveChanges": "Änderungen speichern"
+        "saveChanges": "Änderungen speichern",
+        "error_withCount_one": "{{count}} Fehler",
+        "error_withCount_other": "{{count}} Fehler"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -764,10 +766,10 @@
         "layerCopiedToClipboard": "Ebene in die Zwischenablage kopiert",
         "sentToCanvas": "An Leinwand gesendet",
         "problemDeletingWorkflow": "Problem beim Löschen des Arbeitsablaufs",
-        "uploadFailedInvalidUploadDesc_withCount_one": "Es darf maximal 1 PNG- oder JPEG-Bild sein.",
-        "uploadFailedInvalidUploadDesc_withCount_other": "Es dürfen maximal {{count}} PNG- oder JPEG-Bilder sein.",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Darf maximal 1 PNG-, JPEG- oder WEBP-Bild sein.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Dürfen maximal {{count}} PNG-, JPEG- oder WEBP-Bild sein.",
         "problemRetrievingWorkflow": "Problem beim Abrufen des Arbeitsablaufs",
-        "uploadFailedInvalidUploadDesc": "Müssen PNG- oder JPEG-Bilder sein.",
+        "uploadFailedInvalidUploadDesc": "Müssen PNG-, JPEG- oder WEBP-Bilder sein.",
         "pasteSuccess": "Eingefügt in {{destination}}",
         "pasteFailed": "Einfügen fehlgeschlagen",
         "unableToCopy": "Kopieren nicht möglich",
@@ -1259,7 +1261,6 @@
         "nodePack": "Knoten-Pack",
         "loadWorkflow": "Lade Workflow",
         "snapToGrid": "Am Gitternetz einrasten",
-        "unknownOutput": "Unbekannte Ausgabe: {{name}}",
         "updateNode": "Knoten updaten",
         "edge": "Rand / Kante",
         "sourceNodeDoesNotExist": "Ungültiger Rand: Quell- / Ausgabe-Knoten {{node}} existiert nicht",
@@ -1325,7 +1326,9 @@
         "description": "Beschreibung",
         "loadWorkflowDesc": "Arbeitsablauf laden?",
         "loadWorkflowDesc2": "Ihr aktueller Arbeitsablauf enthält nicht gespeicherte Änderungen.",
-        "loadingTemplates": "Lade {{name}}"
+        "loadingTemplates": "Lade {{name}}",
+        "missingSourceOrTargetHandle": "Fehlender Quell- oder Zielgriff",
+        "missingSourceOrTargetNode": "Fehlender Quell- oder Zielknoten"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",

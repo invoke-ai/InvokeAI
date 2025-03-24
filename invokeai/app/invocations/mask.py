@@ -67,7 +67,7 @@ class AlphaMaskToTensorInvocation(BaseInvocation):
     invert: bool = InputField(default=False, description="Whether to invert the mask.")
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
-        image = context.images.get_pil(self.image.image_name)
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
         mask = torch.zeros((1, image.height, image.width), dtype=torch.bool)
         if self.invert:
             mask[0] = torch.tensor(np.array(image)[:, :, 3] == 0, dtype=torch.bool)

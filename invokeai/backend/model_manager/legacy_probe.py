@@ -563,14 +563,20 @@ class CheckpointProbeBase(ProbeBase):
 
         if base_type == BaseModelType.Flux:
             in_channels = state_dict["img_in.weight"].shape[1]
-            if in_channels == 64:
-                return ModelVariantType.Normal
-            elif in_channels == 384:
+
+            # FLUX Model variant types are distinguished by input channels:
+            # - Unquantized Dev and Schnell have in_channels=64
+            # - BNB-NF4 Dev and Schnell have in_channels=1
+            # - FLUX Fill has in_channels=384
+            # - Unsure of quantized FLUX Fill models
+            # - Unsure of GGUF-quantized models
+            if in_channels == 384:
+                # This is a FLUX Fill model. FLUX Fill needs special handling throughout the application. The variant
+                # type is used to determine whether to use the fill model or the base model.
                 return ModelVariantType.Inpaint
             else:
-                raise InvalidModelConfigException(
-                    f"Unexpected in_channels (in_channels={in_channels}) for FLUX model at {self.model_path}."
-                )
+                # Fall back on "normal" variant type for all other FLUX models.
+                return ModelVariantType.Normal
 
         in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
         if in_channels == 9:

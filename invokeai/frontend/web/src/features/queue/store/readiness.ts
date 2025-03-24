@@ -39,6 +39,8 @@ import i18n from 'i18next';
 import { debounce, groupBy, upperFirst } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
+import { selectMainModelConfig } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 /**
@@ -85,8 +87,10 @@ const debouncedUpdateReasons = debounce(
     store: AppStore
   ) => {
     if (tab === 'canvas') {
+      const model = selectMainModelConfig(store.getState());
       const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
         isConnected,
+        model,
         canvas,
         params,
         dynamicPrompts,
@@ -314,6 +318,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
 
 const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
+  model: MainModelConfig | null | undefined;
   canvas: CanvasState;
   params: ParamsState;
   dynamicPrompts: DynamicPromptsState;
@@ -325,6 +330,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 }) => {
   const {
     isConnected,
+    model,
     canvas,
     params,
     dynamicPrompts,
@@ -334,7 +340,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsCompositing,
     canvasIsSelectingObject,
   } = arg;
-  const { model, positivePrompt } = params;
+  const { positivePrompt } = params;
   const reasons: Reason[] = [];
 
   if (!isConnected) {

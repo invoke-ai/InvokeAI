@@ -236,7 +236,8 @@
         "layout": "Bố Cục",
         "row": "Hàng",
         "board": "Bảng",
-        "saveChanges": "Lưu Thay Đổi"
+        "saveChanges": "Lưu Thay Đổi",
+        "error_withCount_other": "{{count}} lỗi"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -769,7 +770,8 @@
         "urlForbiddenErrorMessage": "Bạn có thể cần yêu cầu quyền truy cập từ trang web đang cung cấp model.",
         "urlUnauthorizedErrorMessage": "Bạn có thể cần thiếp lập một token API để dùng được model này.",
         "fluxRedux": "FLUX Redux",
-        "sigLip": "SigLIP"
+        "sigLip": "SigLIP",
+        "llavaOnevision": "LLaVA OneVision"
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -892,7 +894,6 @@
         "targetNodeFieldDoesNotExist": "Kết nối không phù hợp: đích đến/đầu vào của vùng {{node}}.{{field}} không tồn tại",
         "missingTemplate": "Node không hợp lệ: node {{node}} thuộc loại {{type}} bị thiếu mẫu trình bày (chưa tải?)",
         "unsupportedMismatchedUnion": "Dạng số lượng dữ liệu không khớp với {{firstType}} và {{secondType}}",
-        "unknownOutput": "Đầu Ra Không Rõ: {{name}}",
         "betaDesc": "Trình kích hoạt này vẫn trong giai đoạn beta. Cho đến khi ổn định, nó có thể phá hỏng thay đổi trong khi cập nhật ứng dụng. Chúng tôi dự định hỗ trợ trình kích hoạt này về lâu dài.",
         "cannotConnectInputToInput": "Không thế kết nối đầu vào với đầu vào",
         "showEdgeLabelsHelp": "Hiển thị tên trên kết nối, chỉ ra những node được kết nối",
@@ -1618,7 +1619,8 @@
         "displayInProgress": "Hiển Thị Hình Ảnh Đang Xử Lý",
         "intermediatesClearedFailed": "Có Vấn Đề Khi Dọn Sạch Sản Phẩm Trung Gian",
         "enableInvisibleWatermark": "Bật Chế Độ Ẩn Watermark",
-        "showDetailedInvocationProgress": "Hiện Dữ Liệu Xử Lý"
+        "showDetailedInvocationProgress": "Hiện Dữ Liệu Xử Lý",
+        "enableHighlightFocusedRegions": "Nhấn Mạnh Khu Vực Chỉ Định"
     },
     "sdxl": {
         "loading": "Đang Tải...",
@@ -2288,7 +2290,11 @@
             "container": "Hộp Chứa",
             "heading": "Đầu Dòng",
             "text": "Văn Bản",
-            "divider": "Gạch Chia"
+            "divider": "Gạch Chia",
+            "minimum": "Tối Thiểu",
+            "maximum": "Tối Đa",
+            "containerRowLayout": "Hộp Chứa (bố cục hàng)",
+            "containerColumnLayout": "Hộp Chứa (bố cục cột)"
         },
         "yourWorkflows": "Workflow Của Bạn",
         "browseWorkflows": "Khám Phá Workflow",
@@ -2300,7 +2306,11 @@
         "filterByTags": "Lọc Theo Nhãn",
         "recentlyOpened": "Mở Gần Đây",
         "private": "Cá Nhân",
-        "loadMore": "Tải Thêm"
+        "loadMore": "Tải Thêm",
+        "view": "Xem",
+        "deselectAll": "Huỷ Chọn Tất Cả",
+        "noRecentWorkflows": "Không Có Workflows Gần Đây",
+        "recommended": "Có Thể Bạn Sẽ Cần"
     },
     "upscaling": {
         "missingUpscaleInitialImage": "Thiếu ảnh dùng để upscale",
@@ -2327,7 +2337,8 @@
         "gettingStartedSeries": "Cần thêm hướng dẫn? Xem thử <LinkComponent>Bắt Đầu Làm Quen</LinkComponent> để biết thêm mẹo khai thác toàn bộ tiềm năng của Invoke Studio.",
         "toGetStarted": "Để bắt đầu, hãy nhập lệnh vào hộp và nhấp chuột vào <StrongComponent>Kích Hoạt</StrongComponent> để tạo ra bức ảnh đầu tiên. Chọn một mẫu trình bày cho lệnh để cải thiện kết quả. Bạn có thể chọn để lưu ảnh trực tiếp vào <StrongComponent>Thư Viện Ảnh</StrongComponent> hoặc chỉnh sửa chúng ở <StrongComponent>Canvas</StrongComponent>.",
         "noModelsInstalled": "Dường như bạn chưa tải model nào cả! Bạn có thể <DownloadStarterModelsButton>tải xuống các model khởi đầu</DownloadStarterModelsButton> hoặc <ImportModelsButton>nhập vào thêm model</ImportModelsButton>.",
-        "lowVRAMMode": "Cho hiệu suất tốt nhất, hãy làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi."
+        "lowVRAMMode": "Cho hiệu suất tốt nhất, hãy làm theo <LinkComponent>hướng dẫn VRAM Thấp</LinkComponent> của chúng tôi.",
+        "toGetStartedWorkflow": "Để bắt đầu, hãy điền vào khu vực bên trái và bấm <StrongComponent>Kích Hoạt</StrongComponent> nhằm tạo sinh ảnh. Muốn khám phá thêm workflow? Nhấp vào <StrongComponent>icon thư mục</StrongComponent> nằm cạnh tiêu đề workflow để xem một dãy các mẫu trình bày khác."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Có Gì Mới Ở Invoke",
@@ -2335,8 +2346,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Trình Quản Lý Bộ Nhớ: Thiết lập mới cho người dùng với GPU Nvidia để giảm lượng VRAM sử dụng.",
-            "Hiệu suất: Các cải thiện tiếp theo nhằm gói gọn hiệu suất và khả năng phản hồi của ứng dụng."
+            "Workflow: Thư Viện Workflow mới và đã được cải tiến.",
+            "FLUX: Hỗ trợ FLUX Redux trong Workflow và Canvas."
         ]
     },
     "upsell": {

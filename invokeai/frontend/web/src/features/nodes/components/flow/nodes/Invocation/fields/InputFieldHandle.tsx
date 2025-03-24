@@ -7,7 +7,7 @@ import {
   useIsConnectionInProgress,
   useIsConnectionStartField,
 } from 'features/nodes/hooks/useFieldConnectionState';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
@@ -62,7 +62,7 @@ const handleStyles = {
 } satisfies CSSProperties;
 
 export const InputFieldHandle = memo(({ nodeId, fieldName }: Props) => {
-  const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
   const fieldTypeName = useFieldTypeName(fieldTemplate.type);
   const fieldColor = useMemo(() => getFieldColor(fieldTemplate.type), [fieldTemplate.type]);
   const isModelField = useMemo(() => isModelFieldType(fieldTemplate.type), [fieldTemplate.type]);

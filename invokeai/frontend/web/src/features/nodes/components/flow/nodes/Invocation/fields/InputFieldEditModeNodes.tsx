@@ -7,7 +7,7 @@ import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/componen
 import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useRef } from 'react';
@@ -22,7 +22,7 @@ interface Props {
 }
 
 export const InputFieldEditModeNodes = memo(({ nodeId, fieldName }: Props) => {
-  const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
   const isInvalid = useInputFieldIsInvalid(nodeId, fieldName);
   const isConnected = useInputFieldIsConnected(nodeId, fieldName);
 

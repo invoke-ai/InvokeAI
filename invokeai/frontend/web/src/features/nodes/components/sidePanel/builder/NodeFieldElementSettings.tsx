@@ -15,7 +15,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { NodeFieldElementFloatSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementFloatSettings';
 import { NodeFieldElementIntegerSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementIntegerSettings';
 import { NodeFieldElementStringSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringSettings';
-import { useInputFieldTemplate } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
 import {
   isFloatFieldInputTemplate,
@@ -36,7 +36,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
   const { id, data } = element;
   const { showDescription, fieldIdentifier } = data;
   const { nodeId, fieldName } = fieldIdentifier;
-  const fieldTemplate = useInputFieldTemplate(nodeId, fieldName);
+  const fieldTemplate = useInputFieldTemplateOrThrow(nodeId, fieldName);
 
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -79,7 +79,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
               {settings?.type === 'integer-field-config' && isIntegerFieldInputTemplate(fieldTemplate) && (
                 <NodeFieldElementIntegerSettings
                   id={id}
-                  config={settings}
+                  settings={settings}
                   nodeId={nodeId}
                   fieldName={fieldName}
                   fieldTemplate={fieldTemplate}
@@ -88,13 +88,15 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
               {settings?.type === 'float-field-config' && isFloatFieldInputTemplate(fieldTemplate) && (
                 <NodeFieldElementFloatSettings
                   id={id}
-                  config={settings}
+                  settings={settings}
                   nodeId={nodeId}
                   fieldName={fieldName}
                   fieldTemplate={fieldTemplate}
                 />
               )}
-              {settings?.type === 'string-field-config' && <NodeFieldElementStringSettings id={id} config={settings} />}
+              {settings?.type === 'string-field-config' && (
+                <NodeFieldElementStringSettings id={id} settings={settings} />
+              )}
             </Flex>
           </PopoverBody>
         </PopoverContent>

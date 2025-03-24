@@ -8,7 +8,7 @@ import {
   Textarea,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useInputFieldDescription } from 'features/nodes/hooks/useInputFieldDescription';
+import { useInputFieldDescriptionSafe } from 'features/nodes/hooks/useInputFieldDescriptionSafe';
 import { fieldDescriptionChanged } from 'features/nodes/store/nodesSlice';
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { ChangeEvent } from 'react';
@@ -48,7 +48,7 @@ InputFieldDescriptionPopover.displayName = 'InputFieldDescriptionPopover';
 const Content = memo(({ nodeId, fieldName }: Props) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const description = useInputFieldDescription(nodeId, fieldName);
+  const description = useInputFieldDescriptionSafe(nodeId, fieldName);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       dispatch(fieldDescriptionChanged({ nodeId, fieldName, val: e.target.value }));
