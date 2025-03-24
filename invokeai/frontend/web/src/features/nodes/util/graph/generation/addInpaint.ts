@@ -60,7 +60,9 @@ export const addInpaint = async ({
     silent: true,
   });
 
-  if (!isEqual(scaledSize, originalSize)) {
+  const needsScaleBeforeProcessing = !isEqual(scaledSize, originalSize);
+
+  if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
     const i2l = g.addNode({
       id: i2lNodeType,

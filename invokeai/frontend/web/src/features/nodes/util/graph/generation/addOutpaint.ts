@@ -63,7 +63,9 @@ export const addOutpaint = async ({
 
   const infill = getInfill(g, params);
 
-  if (!isEqual(scaledSize, originalSize)) {
+  const needsScaleBeforeProcessing = !isEqual(scaledSize, originalSize);
+
+  if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
 
     // Combine the inpaint mask and the initial image's alpha channel into a single mask
