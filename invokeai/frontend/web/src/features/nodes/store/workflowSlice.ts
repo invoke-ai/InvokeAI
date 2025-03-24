@@ -22,6 +22,7 @@ import type {
   HeadingElement,
   NodeFieldElement,
   TextElement,
+  WorkflowApiFieldIdentifier,
   WorkflowCategory,
   WorkflowV3,
 } from 'features/nodes/types/workflow';
@@ -125,6 +126,32 @@ export const workflowSlice = createSlice({
     },
     workflowSaved: (state) => {
       state.isTouched = false;
+    },
+    workflowApiFieldAdded: (state, action: PayloadAction<WorkflowApiFieldIdentifier>) => {
+      const data = action.payload;
+      state.api_fields = state.api_fields ? [...state.api_fields, data] : [data];
+      state.isTouched = true;
+    },
+    workflowApiFieldRemoved: (
+      state,
+      action: PayloadAction<{
+        node_id: WorkflowApiFieldIdentifier['node_id'];
+        field_name: WorkflowApiFieldIdentifier['field_name'];
+      }>
+    ) => {
+      const { node_id, field_name } = action.payload;
+      state.api_fields = state.api_fields
+        ? state.api_fields.filter((f) => f.node_id !== node_id || f.field_name !== field_name)
+        : [];
+      state.isTouched = true;
+    },
+    workflowApiFieldChanged: (state, action: PayloadAction<WorkflowApiFieldIdentifier>) => {
+      const { node_id, field_name } = action.payload;
+      const field = state.api_fields?.find((f) => f.node_id === node_id && f.field_name === field_name);
+      if (field) {
+        Object.assign(field, action.payload);
+        state.isTouched = true;
+      }
     },
     formReset: (state) => {
       const rootElement = buildContainer('column', []);
@@ -286,6 +313,9 @@ export const {
   workflowContactChanged,
   workflowIDChanged,
   workflowSaved,
+  workflowApiFieldAdded,
+  workflowApiFieldRemoved,
+  workflowApiFieldChanged,
   formReset,
   formElementAdded,
   formElementRemoved,
