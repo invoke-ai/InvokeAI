@@ -2035,6 +2035,12 @@ export type components = {
              * @default 1
              */
             runs: number;
+            /**
+             * Is Api Validation Run
+             * @description Whether this batch is an API validation run.
+             * @default false
+             */
+            is_api_validation_run?: boolean;
         };
         /** BatchDatum */
         BatchDatum: {
@@ -19495,6 +19501,12 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
+            /**
+             * Is Api Validation Run
+             * @description Whether this queue item is an API validation run.
+             * @default false
+             */
+            is_api_validation_run?: boolean;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
@@ -19590,6 +19602,12 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
+            /**
+             * Is Api Validation Run
+             * @description Whether this queue item is an API validation run.
+             * @default false
+             */
+            is_api_validation_run?: boolean;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
