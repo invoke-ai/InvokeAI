@@ -1020,7 +1020,11 @@
         "downloadWorkflowError": "Lỗi tải xuống workflow",
         "generatorImagesFromBoard": "Ảnh Từ Bảng",
         "generatorImagesCategory": "Phân Loại",
-        "generatorImages_other": "{{count}} ảnh"
+        "generatorImages_other": "{{count}} ảnh",
+        "unknownField_withName": "Vùng Dữ Liệu Không Rõ \"{{name}}\"",
+        "unexpectedField_withName": "Sai Vùng Dữ Liệu \"{{name}}\"",
+        "unknownFieldEditWorkflowToFix_withName": "Workflow chứa vùng dữ liệu không rõ \"{{name}}\".\nHãy biên tập workflow để sửa lỗi.",
+        "missingField_withName": "Thiếu Vùng Dữ Liệu \"{{name}}\""
     },
     "popovers": {
         "paramCFGRescaleMultiplier": {
@@ -2050,7 +2054,8 @@
             "rgNegativePromptNotSupported": "Lệnh Tiêu Cực không được hỗ trợ cho model cơ sở được chọn",
             "rgReferenceImagesNotSupported": "Ảnh Mẫu Khu Vực không được hỗ trợ cho model cơ sở được chọn",
             "rgAutoNegativeNotSupported": "Tự Động Đảo Chiều không được hỗ trợ cho model cơ sở được chọn",
-            "rgNoRegion": "không có khu vực được vẽ"
+            "rgNoRegion": "không có khu vực được vẽ",
+            "fluxFillIncompatibleWithControlLoRA": "LoRA Điều Khiển Được không tương tích với FLUX Fill"
         },
         "pasteTo": "Dán Vào",
         "pasteToAssets": "Tài Nguyên",
@@ -2201,7 +2206,8 @@
         "unableToCopyDesc_theseSteps": "các bước sau",
         "unableToCopyDesc": "Trình duyệt của bạn không hỗ trợ tính năng clipboard. Người dùng Firefox có thể khắc phục theo ",
         "pasteSuccess": "Dán Vào {{destination}}",
-        "pasteFailed": "Dán Thất Bại"
+        "pasteFailed": "Dán Thất Bại",
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill không tương tích với Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Dùng model FLUX khác cho các tính năng này."
     },
     "ui": {
         "tabs": {
@@ -2347,7 +2353,7 @@
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
             "Workflow: Thư Viện Workflow mới và đã được cải tiến.",
-            "FLUX: Hỗ trợ FLUX Redux trong Workflow và Canvas."
+            "FLUX: Hỗ trợ FLUX Redux & FLUX Fill trong Workflow và Canvas."
         ]
     },
     "upsell": {
