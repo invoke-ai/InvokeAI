@@ -1725,6 +1725,34 @@ export type components = {
              */
             type: "alpha_mask_to_tensor";
         };
+        /** ApiFieldIdentifier */
+        ApiFieldIdentifier: {
+            /**
+             * Node Id
+             * @description The node ID of the node that contains the field.
+             */
+            node_id: string;
+            /**
+             * Field Name
+             * @description The name of the field to include in the composed model.
+             */
+            field_name: string;
+            /**
+             * Field Name Override
+             * @description The name to use for the field in the composed model. If not provided, a unique name will be generated.
+             */
+            field_name_override?: string | null;
+            /**
+             * Field Title Override
+             * @description The title to use for the field in the composed model. If not provided, the field name will be used.
+             */
+            field_title_override?: string | null;
+            /**
+             * Field Description Override
+             * @description The description to use for the field in the composed model. If not provided, the field description will be used.
+             */
+            field_description_override?: string | null;
+        };
         /**
          * AppConfig
          * @description App Config Response
@@ -21862,6 +21890,11 @@ export type components = {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
             /**
+             * Api Fields
+             * @description The API fields of the workflow. This is a list of node IDs and field names that should be included in the composed model.
+             */
+            api_fields?: components["schemas"]["ApiFieldIdentifier"][] | null;
+            /**
              * Id
              * @description The id of the workflow.
              */
@@ -22076,6 +22109,11 @@ export type components = {
             form?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
+            /**
+             * Api Fields
+             * @description The API fields of the workflow. This is a list of node IDs and field names that should be included in the composed model.
+             */
+            api_fields?: components["schemas"]["ApiFieldIdentifier"][] | null;
         };
         /**
          * Zoe (Depth) Processor
