@@ -107,42 +107,6 @@ export const StringFieldCollectionInputComponent = memo(
 
 StringFieldCollectionInputComponent.displayName = 'StringFieldCollectionInputComponent';
 
-type StringListItemContentProps = {
-  value: string;
-  index: number;
-  onRemoveString: (index: number) => void;
-  onChangeString: (index: number, value: string) => void;
-};
-
-const StringListItemContent = memo(({ value, index, onRemoveString, onChangeString }: StringListItemContentProps) => {
-  const { t } = useTranslation();
-
-  const onClickRemove = useCallback(() => {
-    onRemoveString(index);
-  }, [index, onRemoveString]);
-  const onChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      onChangeString(index, e.target.value);
-    },
-    [index, onChangeString]
-  );
-  return (
-    <Flex alignItems="center" gap={1}>
-      <Input size="xs" resize="none" value={value} onChange={onChange} />
-      <IconButton
-        size="sm"
-        variant="link"
-        alignSelf="stretch"
-        onClick={onClickRemove}
-        icon={<PiXBold />}
-        aria-label={t('common.remove')}
-        tooltip={t('common.remove')}
-      />
-    </Flex>
-  );
-});
-StringListItemContent.displayName = 'StringListItemContent';
-
 type ListItemContentProps = {
   value: string;
   index: number;
