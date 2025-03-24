@@ -26,6 +26,7 @@ const useFocusRegionOptions = {
 };
 
 const FOCUS_REGION_STYLES: SystemStyleObject = {
+  display: 'flex',
   width: 'full',
   height: 'full',
   position: 'absolute',
@@ -45,7 +46,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
     <FocusRegionWrapper region="viewer" sx={FOCUS_REGION_STYLES} layerStyle="first" {...useFocusRegionOptions}>
       {hasImageToCompare && <CompareToolbar />}
       {!hasImageToCompare && <ViewerToolbar closeButton={closeButton} />}
-      <Box ref={containerRef} w="full" h="full" p={2}>
+      <Box ref={containerRef} w="full" h="full" p={2} overflow="hidden">
         {!hasImageToCompare && <CurrentImagePreview />}
         {hasImageToCompare && <ImageComparison containerDims={containerDims} />}
       </Box>

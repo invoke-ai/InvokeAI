@@ -14,6 +14,7 @@ import BottomLeftPanel from './flow/panels/BottomLeftPanel/BottomLeftPanel';
 import MinimapPanel from './flow/panels/MinimapPanel/MinimapPanel';
 
 const FOCUS_REGION_STYLES: SystemStyleObject = {
+  display: 'flex',
   position: 'relative',
   width: 'full',
   height: 'full',
