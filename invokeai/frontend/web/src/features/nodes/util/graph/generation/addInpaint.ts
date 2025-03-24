@@ -129,8 +129,8 @@ export const addInpaint = async ({
 
     // After denoising, resize the image and mask back to original size
     g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
-    g.addEdge(createGradientMask, 'expanded_mask_area', resizeMaskToOriginalSize, 'image');
     g.addEdge(createGradientMask, 'expanded_mask_area', expandMask, 'mask');
+    g.addEdge(expandMask, 'image', resizeMaskToOriginalSize, 'image');
 
     // After denoising, resize the image and mask back to original size
     // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
