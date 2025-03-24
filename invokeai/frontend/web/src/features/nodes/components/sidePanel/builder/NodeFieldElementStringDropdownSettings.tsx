@@ -12,7 +12,7 @@ import { PiArrowCounterClockwiseBold, PiPlusBold, PiXBold } from 'react-icons/pi
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams({}).options;
 
-export const NodeFieldElementStringDropdownConfig = memo(
+export const NodeFieldElementStringDropdownSettings = memo(
   ({ id, settings }: { id: string; settings: NodeFieldStringDropdownSettings }) => {
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
@@ -130,7 +130,7 @@ export const NodeFieldElementStringDropdownConfig = memo(
   }
 );
 
-NodeFieldElementStringDropdownConfig.displayName = 'NodeFieldElementStringDropdownConfig';
+NodeFieldElementStringDropdownSettings.displayName = 'NodeFieldElementStringDropdownSettings';
 
 type ListItemContentProps = {
   value: string;

@@ -9,7 +9,7 @@ import { FormElementEditModeContent } from 'features/nodes/components/sidePanel/
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { NodeFieldElementDescriptionEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementDescriptionEditable';
 import { NodeFieldElementLabelEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabelEditable';
-import { NodeFieldElementStringDropdownConfig } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringDropdownConfig';
+import { NodeFieldElementStringDropdownSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringDropdownSettings';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
@@ -77,7 +77,7 @@ const NodeFieldElementEditModeContent = memo(
               {data.settings?.type === 'string-field-config' && data.settings.component === 'dropdown' && (
                 <>
                   <Divider />
-                  <NodeFieldElementStringDropdownConfig id={id} settings={data.settings} />
+                  <NodeFieldElementStringDropdownSettings id={id} settings={data.settings} />
                 </>
               )}
             </FormControl>

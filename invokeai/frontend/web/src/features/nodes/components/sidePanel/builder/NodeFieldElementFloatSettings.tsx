@@ -14,42 +14,48 @@ import { useTranslation } from 'react-i18next';
 
 type Props = {
   id: string;
-  config: NodeFieldFloatSettings;
+  settings: NodeFieldFloatSettings;
   nodeId: string;
   fieldName: string;
   fieldTemplate: FloatFieldInputTemplate;
 };
 
-export const NodeFieldElementFloatSettings = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props) => {
+export const NodeFieldElementFloatSettings = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   return (
     <>
-      <SettingComponent id={id} config={config} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
-      <SettingMin id={id} config={config} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
-      <SettingMax id={id} config={config} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
+      <SettingComponent
+        id={id}
+        settings={settings}
+        nodeId={nodeId}
+        fieldName={fieldName}
+        fieldTemplate={fieldTemplate}
+      />
+      <SettingMin id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
+      <SettingMax id={id} settings={settings} nodeId={nodeId} fieldName={fieldName} fieldTemplate={fieldTemplate} />
     </>
   );
 });
 NodeFieldElementFloatSettings.displayName = 'NodeFieldElementFloatSettings';
 
-const SettingComponent = memo(({ id, config }: Props) => {
+const SettingComponent = memo(({ id, settings }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const onChangeComponent = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
-      const newConfig: NodeFieldFloatSettings = {
-        ...config,
+      const newSettings: NodeFieldFloatSettings = {
+        ...settings,
         component: zNumberComponent.parse(e.target.value),
       };
-      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
+      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newSettings } }));
     },
-    [config, dispatch, id]
+    [settings, dispatch, id]
   );
 
   return (
     <FormControl orientation="vertical">
       <FormLabel flex={1}>{t('workflows.builder.component')}</FormLabel>
-      <Select value={config.component} onChange={onChangeComponent} size="sm">
+      <Select value={settings.component} onChange={onChangeComponent} size="sm">
         <option value="number-input">{t('workflows.builder.numberInput')}</option>
         <option value="slider">{t('workflows.builder.slider')}</option>
         <option value="number-input-and-slider">{t('workflows.builder.both')}</option>
@@ -59,36 +65,36 @@ const SettingComponent = memo(({ id, config }: Props) => {
 });
 SettingComponent.displayName = 'SettingComponent';
 
-const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props) => {
+const SettingMin = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const field = useInputFieldInstance<FloatFieldInputInstance>(nodeId, fieldName);
 
   const floatField = useFloatField(nodeId, fieldName, fieldTemplate);
 
-  const onToggleSetting = useCallback(() => {
-    const newConfig: NodeFieldFloatSettings = {
-      ...config,
-      min: config.min !== undefined ? undefined : floatField.min,
+  const onToggleOverride = useCallback(() => {
+    const newSettings: NodeFieldFloatSettings = {
+      ...settings,
+      min: settings.min !== undefined ? undefined : floatField.min,
     };
-    dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-  }, [config, dispatch, floatField, id]);
+    dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newSettings } }));
+  }, [settings, dispatch, floatField, id]);
 
   const onChange = useCallback(
     (min: number) => {
-      const newConfig: NodeFieldFloatSettings = {
-        ...config,
+      const newSettings: NodeFieldFloatSettings = {
+        ...settings,
         min,
       };
-      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
+      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newSettings } }));
 
       // We may need to update the value if it is outside the new min/max range
-      const constrained = constrainNumber(field.value, floatField, newConfig);
+      const constrained = constrainNumber(field.value, floatField, newSettings);
       if (field.value !== constrained) {
         dispatch(fieldFloatValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
-    [config, dispatch, field.value, fieldName, floatField, id, nodeId]
+    [settings, dispatch, field.value, fieldName, floatField, id, nodeId]
   );
 
   const constraintMin = useMemo(
@@ -97,20 +103,20 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
   );
 
   const constraintMax = useMemo(
-    () => (config.max ?? floatField.max) - floatField.step,
-    [config.max, floatField.max, floatField.step]
+    () => (settings.max ?? floatField.max) - floatField.step,
+    [settings.max, floatField.max, floatField.step]
   );
 
   return (
     <FormControl orientation="vertical">
       <Flex justifyContent="space-between" w="full" alignItems="center">
         <FormLabel m={0}>{t('workflows.builder.minimum')}</FormLabel>
-        <Switch isChecked={config.min !== undefined} onChange={onToggleSetting} size="sm" />
+        <Switch isChecked={settings.min !== undefined} onChange={onToggleOverride} size="sm" />
       </Flex>
       <CompositeNumberInput
         w="full"
-        isDisabled={config.min === undefined}
-        value={config.min === undefined ? (`${floatField.min} (inherited)` as unknown as number) : config.min}
+        isDisabled={settings.min === undefined}
+        value={settings.min === undefined ? (`${floatField.min} (inherited)` as unknown as number) : settings.min}
         onChange={onChange}
         min={constraintMin}
         max={constraintMax}
@@ -121,41 +127,41 @@ const SettingMin = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
 });
 SettingMin.displayName = 'SettingMin';
 
-const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props) => {
+const SettingMax = memo(({ id, settings, nodeId, fieldName, fieldTemplate }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const field = useInputFieldInstance<FloatFieldInputInstance>(nodeId, fieldName);
 
   const floatField = useFloatField(nodeId, fieldName, fieldTemplate);
 
-  const onToggleSetting = useCallback(() => {
-    const newConfig: NodeFieldFloatSettings = {
-      ...config,
-      max: config.max !== undefined ? undefined : floatField.max,
+  const onToggleOverride = useCallback(() => {
+    const newSettings: NodeFieldFloatSettings = {
+      ...settings,
+      max: settings.max !== undefined ? undefined : floatField.max,
     };
-    dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
-  }, [config, dispatch, floatField, id]);
+    dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newSettings } }));
+  }, [settings, dispatch, floatField, id]);
 
   const onChange = useCallback(
     (max: number) => {
-      const newConfig: NodeFieldFloatSettings = {
-        ...config,
+      const newSettings: NodeFieldFloatSettings = {
+        ...settings,
         max,
       };
-      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newConfig } }));
+      dispatch(formElementNodeFieldDataChanged({ id, changes: { settings: newSettings } }));
 
       // We may need to update the value if it is outside the new min/max range
-      const constrained = constrainNumber(field.value, floatField, newConfig);
+      const constrained = constrainNumber(field.value, floatField, newSettings);
       if (field.value !== constrained) {
         dispatch(fieldFloatValueChanged({ nodeId, fieldName, value: constrained }));
       }
     },
-    [config, dispatch, field.value, fieldName, floatField, id, nodeId]
+    [settings, dispatch, field.value, fieldName, floatField, id, nodeId]
   );
 
   const constraintMin = useMemo(
-    () => (config.min ?? floatField.min) + floatField.step,
-    [config.min, floatField.min, floatField.step]
+    () => (settings.min ?? floatField.min) + floatField.step,
+    [settings.min, floatField.min, floatField.step]
   );
 
   const constraintMax = useMemo(
@@ -167,12 +173,12 @@ const SettingMax = memo(({ id, config, nodeId, fieldName, fieldTemplate }: Props
     <FormControl orientation="vertical">
       <Flex justifyContent="space-between" w="full" alignItems="center">
         <FormLabel m={0}>{t('workflows.builder.maximum')}</FormLabel>
-        <Switch isChecked={config.max !== undefined} onChange={onToggleSetting} size="sm" />
+        <Switch isChecked={settings.max !== undefined} onChange={onToggleOverride} size="sm" />
       </Flex>
       <CompositeNumberInput
         w="full"
-        isDisabled={config.max === undefined}
-        value={config.max === undefined ? (`${floatField.max} (inherited)` as unknown as number) : config.max}
+        isDisabled={settings.max === undefined}
+        value={settings.max === undefined ? (`${floatField.max} (inherited)` as unknown as number) : settings.max}
         onChange={onChange}
         min={constraintMin}
         max={constraintMax}

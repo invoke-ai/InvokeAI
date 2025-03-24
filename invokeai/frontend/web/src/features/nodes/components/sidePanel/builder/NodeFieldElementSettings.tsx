@@ -79,7 +79,7 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
               {settings?.type === 'integer-field-config' && isIntegerFieldInputTemplate(fieldTemplate) && (
                 <NodeFieldElementIntegerSettings
                   id={id}
-                  config={settings}
+                  settings={settings}
                   nodeId={nodeId}
                   fieldName={fieldName}
                   fieldTemplate={fieldTemplate}
@@ -88,13 +88,15 @@ export const NodeFieldElementSettings = memo(({ element }: { element: NodeFieldE
               {settings?.type === 'float-field-config' && isFloatFieldInputTemplate(fieldTemplate) && (
                 <NodeFieldElementFloatSettings
                   id={id}
-                  config={settings}
+                  settings={settings}
                   nodeId={nodeId}
                   fieldName={fieldName}
                   fieldTemplate={fieldTemplate}
                 />
               )}
-              {settings?.type === 'string-field-config' && <NodeFieldElementStringSettings id={id} config={settings} />}
+              {settings?.type === 'string-field-config' && (
+                <NodeFieldElementStringSettings id={id} settings={settings} />
+              )}
             </Flex>
           </PopoverBody>
         </PopoverContent>
