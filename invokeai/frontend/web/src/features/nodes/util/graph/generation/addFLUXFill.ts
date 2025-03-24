@@ -52,7 +52,9 @@ export const addFLUXFill = async ({
 
   const fluxFill = g.addNode({ type: 'flux_fill', id: getPrefixedId('flux_fill') });
 
-  if (!isEqual(scaledSize, originalSize)) {
+  const needsScaleBeforeProcessing = !isEqual(scaledSize, originalSize);
+
+  if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
 
     // Combine the inpaint mask and the initial image's alpha channel into a single mask
