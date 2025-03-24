@@ -50,6 +50,23 @@ class WorkflowMeta(BaseModel):
         return semver.Version.parse(self.version)
 
 
+class ApiFieldIdentifier(BaseModel):
+    node_id: str = Field(..., description="The node ID of the node that contains the field.")
+    field_name: str = Field(..., description="The name of the field to include in the composed model.")
+    field_name_override: str | None = Field(
+        default=None,
+        description="The name to use for the field in the composed model. If not provided, a unique name will be generated.",
+    )
+    field_title_override: str | None = Field(
+        default=None,
+        description="The title to use for the field in the composed model. If not provided, the field name will be used.",
+    )
+    field_description_override: str | None = Field(
+        default=None,
+        description="The description to use for the field in the composed model. If not provided, the field description will be used.",
+    )
+
+
 class WorkflowWithoutID(BaseModel):
     name: str = Field(description="The name of the workflow.")
     author: str = Field(description="The author of the workflow.")
@@ -67,6 +84,10 @@ class WorkflowWithoutID(BaseModel):
     # This is typed as optional to prevent errors when pulling workflows from the DB. The frontend adds a default form if
     # it is None.
     form: dict[str, JsonValue] | None = Field(default=None, description="The form of the workflow.")
+    api_fields: list[ApiFieldIdentifier] | None = Field(
+        default=None,
+        description="The API fields of the workflow. This is a list of node IDs and field names that should be included in the composed model.",
+    )
 
     model_config = ConfigDict(extra="ignore")
 
