@@ -28,7 +28,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
     ValueToInsertTuple,
-    calc_session_count,
     prepare_values_to_insert,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
@@ -118,7 +117,7 @@ class SqliteSessionQueue(SessionQueueBase):
             if prepend:
                 priority = self._get_highest_priority(queue_id) + 1
 
-            requested_count = calc_session_count(batch)
+            requested_count = batch.get_session_count()
             values_to_insert = prepare_values_to_insert(
                 queue_id=queue_id,
                 batch=batch,
