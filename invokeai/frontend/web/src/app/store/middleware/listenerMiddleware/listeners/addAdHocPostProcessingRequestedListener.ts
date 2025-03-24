@@ -5,7 +5,7 @@ import { buildAdHocPostProcessingGraph } from 'features/nodes/util/graph/buildAd
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
-import type { BatchConfig, ImageDTO } from 'services/api/types';
+import type { EnqueueBatchArg, ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('queue');
@@ -19,7 +19,7 @@ export const addAdHocPostProcessingRequestedListener = (startAppListening: AppSt
       const { imageDTO } = action.payload;
       const state = getState();
 
-      const enqueueBatchArg: BatchConfig = {
+      const enqueueBatchArg: EnqueueBatchArg = {
         prepend: true,
         batch: {
           graph: await buildAdHocPostProcessingGraph({

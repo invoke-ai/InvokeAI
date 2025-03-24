@@ -3,7 +3,7 @@ import { generateSeeds } from 'common/util/generateSeeds';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
-import type { Batch, BatchConfig, Invocation } from 'services/api/types';
+import type { Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
 
 export const prepareLinearUIBatch = (
   state: RootState,
@@ -13,7 +13,7 @@ export const prepareLinearUIBatch = (
   posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'sd3_text_encoder'>,
   origin: 'canvas' | 'workflows' | 'upscaling',
   destination: 'canvas' | 'gallery'
-): BatchConfig => {
+): EnqueueBatchArg => {
   const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
@@ -99,7 +99,7 @@ export const prepareLinearUIBatch = (
 
   data.push(firstBatchDatumList);
 
-  const enqueueBatchArg: BatchConfig = {
+  const enqueueBatchArg: EnqueueBatchArg = {
     prepend,
     batch: {
       graph: g.getGraph(),

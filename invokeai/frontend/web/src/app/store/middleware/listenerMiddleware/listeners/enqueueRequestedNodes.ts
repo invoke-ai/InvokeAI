@@ -11,7 +11,7 @@ import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildW
 import { groupBy } from 'lodash-es';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
-import type { Batch, BatchConfig } from 'services/api/types';
+import type { Batch, EnqueueBatchArg } from 'services/api/types';
 
 const log = logger('generation');
 
@@ -91,7 +91,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         }
       }
 
-      const batchConfig: BatchConfig = {
+      const batchConfig: EnqueueBatchArg = {
         batch: {
           graph,
           workflow: builtWorkflow,
