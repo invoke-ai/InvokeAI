@@ -196,7 +196,8 @@
         "row": "Row",
         "column": "Column",
         "value": "Value",
-        "label": "Label"
+        "label": "Label",
+        "systemInformation": "System Information"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
