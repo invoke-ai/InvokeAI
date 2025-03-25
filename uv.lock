@@ -261,8 +261,8 @@ name = "bitsandbytes"
 version = "0.45.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy" },
-    { name = "torch" },
+    { name = "numpy", marker = "sys_platform != 'darwin'" },
+    { name = "torch", marker = "sys_platform != 'darwin'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/c7/36f41619278a67a51e00d7890c3542195295467453ec74ec23dc5940b265/bitsandbytes-0.45.4-py3-none-manylinux_2_24_x86_64.whl", hash = "sha256:96a48aa669048b99a6b98d57fc755dc4d7a77c90c33b98a15abe2c5c0616734b", size = 76049223 },
@@ -1404,7 +1404,7 @@ requires-dist = [
     { name = "click" },
     { name = "clip-anytorch", specifier = "==2.6.0" },
     { name = "compel", specifier = "==2.0.2" },
-    { name = "controlnet-aux", specifier = "==0.0.7" },
+    { name = "controlnet-aux" },
     { name = "datasets" },
     { name = "deprecated" },
     { name = "diffusers", extras = ["torch"] },
@@ -1469,7 +1469,7 @@ requires-dist = [
     { name = "sentencepiece", specifier = "==0.2.0" },
     { name = "snakeviz", marker = "extra == 'dev'" },
     { name = "spandrel", specifier = "==0.3.4" },
-    { name = "timm", specifier = "==0.6.13" },
+    { name = "timm" },
     { name = "torch", specifier = "~=2.6.0" },
     { name = "torchmetrics" },
     { name = "torchsde" },
@@ -4550,8 +4550,8 @@ name = "xformers"
 version = "0.0.29.post3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy" },
-    { name = "torch" },
+    { name = "numpy", marker = "sys_platform != 'darwin'" },
+    { name = "torch", marker = "sys_platform != 'darwin'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c1/fd/e9201fbee6a1a6d7a9c67c24a256ad4c2377bc67a634f7dbeaea23bd668a/xformers-0.0.29.post3.tar.gz", hash = "sha256:0b77c67ecc3c9fdd8a0e4399e675adf12e2ff40285e00974cca2d09108157f60", size = 8461348 }
 wheels = [
