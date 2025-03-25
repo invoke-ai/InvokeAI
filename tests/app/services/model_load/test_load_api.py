@@ -12,7 +12,8 @@ from invokeai.app.services.shared.invocation_context import (
     build_invocation_context,
 )
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
-from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
+
+# noqa F403
 
 
 @pytest.fixture()
