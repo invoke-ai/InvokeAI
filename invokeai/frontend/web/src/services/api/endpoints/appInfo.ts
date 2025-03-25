@@ -36,6 +36,15 @@ export const appInfoApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect'],
     }),
+    getRuntimeConfig: build.query<
+      paths['/api/v1/app/runtime_config']['get']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: buildAppInfoUrl('runtime_config'),
+        method: 'GET',
+      }),
+    }),
     getInvocationCacheStatus: build.query<
       paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
       void
@@ -82,6 +91,7 @@ export const {
   useGetAppVersionQuery,
   useGetAppDepsQuery,
   useGetAppConfigQuery,
+  useGetRuntimeConfigQuery,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,
   useEnableInvocationCacheMutation,
