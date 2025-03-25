@@ -12,12 +12,12 @@ KNOWN_IMPORT_ERRORS = {
     "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.onnx_validate",
     "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.onnx_to_caffe",
     "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.geffnet",
+    "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.onnx_export",
     "invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_nf4",
-    "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.hubconf",
     "invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_8_bit_lt",
+    "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.hubconf",
     "invokeai.backend.quantization.bnb_nf4",
     "invokeai.backend.quantization.bnb_llm_int8",
-    "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.onnx_export",
 }
 
 
