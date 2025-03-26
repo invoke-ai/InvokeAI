@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Classification,
     invocation,
     invocation_output,
 )
@@ -40,7 +39,6 @@ class CalculateImageTilesOutput(BaseInvocationOutput):
     tags=["tiles"],
     category="tiles",
     version="1.0.1",
-    classification=Classification.Beta,
 )
 class CalculateImageTilesInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
@@ -74,7 +72,6 @@ class CalculateImageTilesInvocation(BaseInvocation):
     tags=["tiles"],
     category="tiles",
     version="1.1.1",
-    classification=Classification.Beta,
 )
 class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
@@ -117,7 +114,6 @@ class CalculateImageTilesEvenSplitInvocation(BaseInvocation):
     tags=["tiles"],
     category="tiles",
     version="1.0.1",
-    classification=Classification.Beta,
 )
 class CalculateImageTilesMinimumOverlapInvocation(BaseInvocation):
     """Calculate the coordinates and overlaps of tiles that cover a target image shape."""
@@ -168,7 +164,6 @@ class TileToPropertiesOutput(BaseInvocationOutput):
     tags=["tiles"],
     category="tiles",
     version="1.0.1",
-    classification=Classification.Beta,
 )
 class TileToPropertiesInvocation(BaseInvocation):
     """Split a Tile into its individual properties."""
@@ -201,7 +196,6 @@ class PairTileImageOutput(BaseInvocationOutput):
     tags=["tiles"],
     category="tiles",
     version="1.0.1",
-    classification=Classification.Beta,
 )
 class PairTileImageInvocation(BaseInvocation):
     """Pair an image with its tile properties."""
@@ -230,7 +224,6 @@ BLEND_MODES = Literal["Linear", "Seam"]
     tags=["tiles"],
     category="tiles",
     version="1.1.1",
-    classification=Classification.Beta,
 )
 class MergeTilesToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Merge multiple tile images into a single image."""

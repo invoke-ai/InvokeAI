@@ -10,7 +10,7 @@ from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
@@ -64,7 +64,6 @@ from invokeai.backend.util.devices import TorchDevice
     tags=["image", "flux"],
     category="image",
     version="3.3.0",
-    classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run denoising process with a FLUX transformer model."""

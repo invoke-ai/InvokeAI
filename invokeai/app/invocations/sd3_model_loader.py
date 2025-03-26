@@ -3,7 +3,6 @@ from typing import Optional
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Classification,
     invocation,
     invocation_output,
 )
@@ -34,7 +33,6 @@ class Sd3ModelLoaderOutput(BaseInvocationOutput):
     tags=["model", "sd3"],
     category="model",
     version="1.0.1",
-    classification=Classification.Prototype,
 )
 class Sd3ModelLoaderInvocation(BaseInvocation):
     """Loads a SD3 base model, outputting its submodels."""

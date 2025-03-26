@@ -4,7 +4,7 @@ from typing import Iterator, Literal, Optional, Tuple
 import torch
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer, T5TokenizerFast
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     FluxConditioningField,
@@ -30,7 +30,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     tags=["prompt", "conditioning", "flux"],
     category="conditioning",
     version="1.1.2",
-    classification=Classification.Prototype,
 )
 class FluxTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a flux image."""
