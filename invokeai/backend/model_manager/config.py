@@ -259,10 +259,6 @@ class ModelConfigBase(ABC, BaseModel):
             try:
                 if config_cls.matches(mod):
                     return config_cls.from_model_on_disk(mod, **overrides)
-
-                logger.debug(f"Path {mod.path} does not match {config_cls.__name__} format")
-                continue
-
             except Exception as e:
                 logger.error(f"Unexpected exception while parsing '{config_cls.__name__}': {e}")
                 raise InvalidModelConfigException from e
