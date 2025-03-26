@@ -69,6 +69,9 @@ class SD3ConditioningInfo:
 
 @dataclass
 class ConditioningFieldData:
+    # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
+    # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
+    # unable to deserialize the object and will raise an error.
     conditionings: (
         List[BasicConditioningInfo]
         | List[SDXLConditioningInfo]
