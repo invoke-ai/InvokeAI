@@ -39,7 +39,6 @@ from invokeai.backend.model_manager.config import (
     ModelRepoVariant,
     ModelType,
 )
-
 from tests.test_nodes import TestEventService
 
 OS = platform.uname().system

@@ -49,8 +49,10 @@ from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 logger = logging.getLogger(__name__)
 
+
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognize this combination of model type and format."""
+
     pass
 
 
@@ -59,7 +61,6 @@ class InvalidModelConfigException(Exception):
 AnyModel = Union[
     ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline, ort.InferenceSession
 ]
-
 
 
 class BaseModelType(str, Enum):

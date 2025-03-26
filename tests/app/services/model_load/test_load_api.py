@@ -14,7 +14,6 @@ from invokeai.app.services.shared.invocation_context import (
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 
 
-
 @pytest.fixture()
 def mock_context(
     mock_services: InvocationServices,

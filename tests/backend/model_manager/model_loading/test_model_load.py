@@ -8,7 +8,6 @@ from invokeai.app.services.model_manager import ModelManagerServiceBase
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 
 
-
 def test_loading(mm2_model_manager: ModelManagerServiceBase, embedding_file: Path):
     store = mm2_model_manager.store
     matches = store.search_by_attr(model_name="test_embedding")
