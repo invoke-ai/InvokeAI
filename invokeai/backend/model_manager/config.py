@@ -258,11 +258,14 @@ class ModelConfigBase(ABC, BaseModel):
         for config_cls in sorted_by_match_speed:
             try:
                 if config_cls.matches(mod):
-                    logger.debug(f"Path {mod.path} does not match {config_cls.__name__} format")
                     return config_cls.from_model_on_disk(mod, **overrides)
+
+                logger.debug(f"Path {mod.path} does not match {config_cls.__name__} format")
+                continue
+
             except Exception as e:
                 logger.error(f"Unexpected exception while parsing '{config_cls.__name__}': {e}")
-                raise
+                raise InvalidModelConfigException from e
 
         raise InvalidModelConfigException("No valid config found")
 
