@@ -260,8 +260,8 @@ class ModelConfigBase(ABC, BaseModel):
                 if config_cls.matches(mod):
                     return config_cls.from_model_on_disk(mod, **overrides)
             except Exception as e:
-                logger.error(f"Unexpected exception while parsing '{config_cls.__name__}': {e}")
-                raise InvalidModelConfigException from e
+                logger.error(f"Unexpected exception while matching/parsing '{config_cls.__name__}': {e}")
+                raise InvalidModelConfigException(str(e)) from e
 
         raise InvalidModelConfigException("No valid config found")
 
