@@ -28,7 +28,6 @@ from invokeai.backend.model_manager.config import (
     VAEDiffusersConfig,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 

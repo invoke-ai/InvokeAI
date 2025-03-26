@@ -49,15 +49,17 @@ from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 logger = logging.getLogger(__name__)
 
+class InvalidModelConfigException(Exception):
+    """Exception for when config parser doesn't recognize this combination of model type and format."""
+    pass
+
+
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
 AnyModel = Union[
     ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline, ort.InferenceSession
 ]
 
-
-class InvalidModelConfigException(Exception):
-    """Exception for when config parser doesn't recognize this combination of model type and format."""
 
 
 class BaseModelType(str, Enum):

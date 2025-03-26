@@ -39,7 +39,7 @@ from invokeai.backend.model_manager.config import (
     ModelRepoVariant,
     ModelType,
 )
-from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
+
 from tests.test_nodes import TestEventService
 
 OS = platform.uname().system

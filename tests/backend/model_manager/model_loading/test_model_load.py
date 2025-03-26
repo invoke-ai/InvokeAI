@@ -6,7 +6,7 @@ from pathlib import Path
 
 from invokeai.app.services.model_manager import ModelManagerServiceBase
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
-from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
+
 
 
 def test_loading(mm2_model_manager: ModelManagerServiceBase, embedding_file: Path):
