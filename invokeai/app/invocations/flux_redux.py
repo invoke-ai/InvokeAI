@@ -45,7 +45,7 @@ class FluxReduxOutput(BaseInvocationOutput):
     tags=["ip_adapter", "control"],
     category="ip_adapter",
     version="2.0.0",
-    classification=Classification.Prototype,
+    classification=Classification.Beta,
 )
 class FluxReduxInvocation(BaseInvocation):
     """Runs a FLUX Redux model to generate a conditioning tensor."""

@@ -31,7 +31,7 @@ class FluxFillOutput(BaseInvocationOutput):
     tags=["inpaint"],
     category="inpaint",
     version="1.0.0",
-    classification=Classification.Prototype,
+    classification=Classification.Beta,
 )
 class FluxFillInvocation(BaseInvocation):
     """Prepare the FLUX Fill conditioning data."""

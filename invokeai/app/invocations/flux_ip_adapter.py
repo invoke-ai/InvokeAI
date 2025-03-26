@@ -4,7 +4,7 @@ from typing import List, Literal, Union
 from pydantic import field_validator, model_validator
 from typing_extensions import Self
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import InputField, UIType
 from invokeai.app.invocations.ip_adapter import (
     CLIP_VISION_MODEL_MAP,
@@ -28,7 +28,6 @@ from invokeai.backend.model_manager.config import (
     tags=["ip_adapter", "control"],
     category="ip_adapter",
     version="1.0.0",
-    classification=Classification.Prototype,
 )
 class FluxIPAdapterInvocation(BaseInvocation):
     """Collects FLUX IP-Adapter info to pass to other nodes."""

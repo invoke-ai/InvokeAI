@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Classification,
     invocation,
     invocation_output,
 )
@@ -52,7 +51,6 @@ class FluxControlNetOutput(BaseInvocationOutput):
     tags=["controlnet", "flux"],
     category="controlnet",
     version="1.0.0",
-    classification=Classification.Prototype,
 )
 class FluxControlNetInvocation(BaseInvocation):
     """Collect FLUX ControlNet info to pass to other nodes."""

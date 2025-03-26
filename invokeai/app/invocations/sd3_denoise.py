@@ -6,7 +6,7 @@ from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
@@ -36,7 +36,6 @@ from invokeai.backend.util.devices import TorchDevice
     tags=["image", "sd3"],
     category="image",
     version="1.1.1",
-    classification=Classification.Prototype,
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run denoising process with a SD3 model."""
