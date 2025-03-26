@@ -56,6 +56,7 @@ dependencies = [
   "torchmetrics",
   "torchsde",
   "torchvision",
+  "timm~=1.0.0",                 # controlnet-aux depends on a version of timm that breaks LLaVA. explicitly pinning `timm` here, which results in a downgrade of `controlnet-aux`. https://github.com/huggingface/controlnet_aux/pull/101. If this poses a problem, we need to decide between newer `controlnet_aux` and LLaVA, OR we can fork `controlnet_aux` and update the pin.
   "transformers",
 
   # Core application dependencies, pinned for reproducible builds.
