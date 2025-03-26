@@ -2,7 +2,7 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocati
 from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField, UIType
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, UNetField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager import SubModelType
+from invokeai.backend.model_manager.taxonomy import SubModelType
 
 
 @invocation_output("sdxl_model_loader_output")

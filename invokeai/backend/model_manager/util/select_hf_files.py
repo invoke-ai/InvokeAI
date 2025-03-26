@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from invokeai.backend.model_manager.config import ModelRepoVariant
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 
 
 def filter_files(

@@ -15,7 +15,7 @@ from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import D
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.model_manager.config import AnyModel
+from invokeai.backend.model_manager.taxonomy import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.sig_lip.sig_lip_pipeline import SigLipPipeline

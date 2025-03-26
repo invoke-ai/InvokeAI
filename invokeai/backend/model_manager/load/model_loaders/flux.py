@@ -27,15 +27,8 @@ from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
 from invokeai.backend.flux.util import ae_params, params
-from invokeai.backend.model_manager import (
-    AnyModel,
-    AnyModelConfig,
-    BaseModelType,
-    ModelFormat,
-    ModelType,
-    SubModelType,
-)
 from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
     CheckpointConfigBase,
     CLIPEmbedDiffusersConfig,
     ControlNetCheckpointConfig,
@@ -51,6 +44,13 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import (
+    AnyModel,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+)
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )

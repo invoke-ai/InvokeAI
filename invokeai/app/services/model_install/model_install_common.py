@@ -10,9 +10,9 @@ from typing_extensions import Annotated
 
 from invokeai.app.services.download import DownloadJob, MultiFileDownloadJob
 from invokeai.app.services.model_records import ModelRecordChanges
-from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
-from invokeai.backend.model_manager.config import ModelSourceType
+from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 
 
 class InstallStatus(str, Enum):

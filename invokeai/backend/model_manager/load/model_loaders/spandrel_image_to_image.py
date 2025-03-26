@@ -4,15 +4,11 @@ from typing import Optional
 import torch
 
 from invokeai.backend.model_manager.config import (
-    AnyModel,
     AnyModelConfig,
-    BaseModelType,
-    ModelFormat,
-    ModelType,
-    SubModelType,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 
 

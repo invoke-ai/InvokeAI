@@ -6,18 +6,16 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import (
-    AnyModel,
-    AnyModelConfig,
-    InvalidModelConfigException,
-    SubModelType,
-)
-from invokeai.backend.model_manager.config import DiffusersConfigBase
+from invokeai.backend.model_manager.config import AnyModelConfig, DiffusersConfigBase, InvalidModelConfigException
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, get_model_cache_key
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
+from invokeai.backend.model_manager.taxonomy import (
+    AnyModel,
+    SubModelType,
+)
 from invokeai.backend.util.devices import TorchDevice
 
 

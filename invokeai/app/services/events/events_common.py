@@ -16,7 +16,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
-from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
+from invokeai.backend.model_manager import SubModelType
+from invokeai.backend.model_manager.config import AnyModelConfig
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob

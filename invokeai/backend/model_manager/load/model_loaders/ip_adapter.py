@@ -7,8 +7,9 @@ from typing import Optional
 import torch
 
 from invokeai.backend.ip_adapter.ip_adapter import build_ip_adapter
-from invokeai.backend.model_manager import AnyModel, AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.load import ModelLoader, ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.raw_model import RawModel
 
 

@@ -13,12 +13,11 @@ import torch
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.config import (
-    AnyModel,
     AnyModelConfig,
-    SubModelType,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 
 
 class LoadedModelWithoutConfig:

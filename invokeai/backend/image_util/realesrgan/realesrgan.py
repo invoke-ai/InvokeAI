@@ -10,7 +10,7 @@ from cv2.typing import MatLike
 from tqdm import tqdm
 
 from invokeai.backend.image_util.basicsr.rrdbnet_arch import RRDBNet
-from invokeai.backend.model_manager.config import AnyModel
+from invokeai.backend.model_manager.taxonomy import AnyModel
 from invokeai.backend.util.devices import TorchDevice
 
 """

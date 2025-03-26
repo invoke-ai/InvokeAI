@@ -11,16 +11,8 @@ from diffusers import (
     StableDiffusionXLPipeline,
 )
 
-from invokeai.backend.model_manager import (
-    AnyModel,
-    AnyModelConfig,
-    BaseModelType,
-    ModelFormat,
-    ModelType,
-    ModelVariantType,
-    SubModelType,
-)
 from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
     CheckpointConfigBase,
     DiffusersConfigBase,
     MainCheckpointConfig,
@@ -28,6 +20,14 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.taxonomy import (
+    AnyModel,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    ModelVariantType,
+    SubModelType,
+)
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 VARIANT_TO_IN_CHANNEL_MAP = {

@@ -32,12 +32,9 @@ from invokeai.app.services.model_install.model_install_common import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
+from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelRepoVariant, ModelType
 from invokeai.backend.model_manager.config import (
-    BaseModelType,
     InvalidModelConfigException,
-    ModelFormat,
-    ModelRepoVariant,
-    ModelType,
 )
 from tests.test_nodes import TestEventService
 

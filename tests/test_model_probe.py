@@ -10,18 +10,14 @@ from polyfactory.factories.pydantic_factory import ModelFactory
 from sympy.testing.pytest import slow
 from torch import tensor
 
+from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelRepoVariant, ModelType, ModelVariantType
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    BaseModelType,
     InvalidModelConfigException,
     MainDiffusersConfig,
     ModelConfigBase,
     ModelConfigFactory,
-    ModelFormat,
     ModelOnDisk,
-    ModelRepoVariant,
-    ModelType,
-    ModelVariantType,
     get_model_discriminator_value,
 )
 from invokeai.backend.model_manager.legacy_probe import (

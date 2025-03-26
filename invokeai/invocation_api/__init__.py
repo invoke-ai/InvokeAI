@@ -71,7 +71,6 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
-from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -164,9 +163,6 @@ __all__ = [
     # invokeai.backend.model_management.model_manager
     "LoadedModel",
     # invokeai.backend.model_management.models.base
-    "BaseModelType",
-    "ModelType",
-    "SubModelType",
     # invokeai.backend.stable_diffusion.schedulers.schedulers
     "SCHEDULER_NAME_VALUES",
     # invokeai.version

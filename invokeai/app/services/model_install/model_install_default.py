@@ -39,8 +39,6 @@ from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     InvalidModelConfigException,
     ModelConfigBase,
-    ModelRepoVariant,
-    ModelSourceType,
 )
 from invokeai.backend.model_manager.legacy_probe import ModelProbe
 from invokeai.backend.model_manager.metadata import (
@@ -52,6 +50,7 @@ from invokeai.backend.model_manager.metadata import (
 )
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
 from invokeai.backend.util.devices import TorchDevice

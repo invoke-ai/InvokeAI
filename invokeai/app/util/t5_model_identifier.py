@@ -1,5 +1,5 @@
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.backend.model_manager.config import BaseModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, SubModelType
 
 
 def preprocess_t5_encoder_model_identifier(model_identifier: ModelIdentifierField) -> ModelIdentifierField:

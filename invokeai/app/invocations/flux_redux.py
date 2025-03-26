@@ -23,7 +23,8 @@ from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType
+from invokeai.backend.model_manager import BaseModelType, ModelType
+from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.starter_models import siglip
 from invokeai.backend.sig_lip.sig_lip_pipeline import SigLipPipeline
 from invokeai.backend.util.devices import TorchDevice

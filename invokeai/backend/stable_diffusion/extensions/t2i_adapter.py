@@ -8,7 +8,7 @@ from diffusers import T2IAdapter
 from PIL.Image import Image
 
 from invokeai.app.util.controlnet_utils import prepare_control_image
-from invokeai.backend.model_manager import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
