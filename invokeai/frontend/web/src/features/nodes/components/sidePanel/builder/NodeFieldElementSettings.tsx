@@ -15,7 +15,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { NodeFieldElementFloatSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementFloatSettings';
 import { NodeFieldElementIntegerSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementIntegerSettings';
 import { NodeFieldElementStringSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringSettings';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
 import {
   isFloatFieldInputTemplate,

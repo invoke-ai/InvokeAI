@@ -1,7 +1,7 @@
 import { Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useInputFieldErrors } from 'features/nodes/hooks/useInputFieldErrors';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { startCase } from 'lodash-es';
 import { memo, useMemo } from 'react';

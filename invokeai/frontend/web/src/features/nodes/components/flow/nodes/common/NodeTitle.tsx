@@ -3,8 +3,8 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { useBatchGroupColorToken } from 'features/nodes/hooks/useBatchGroupColorToken';
 import { useBatchGroupId } from 'features/nodes/hooks/useBatchGroupId';
-import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
-import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
+import { useNodeTemplateTitleSafe } from 'features/nodes/hooks/useNodeTemplateTitleSafe';
+import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
 import { NO_FIT_ON_DOUBLE_CLICK_CLASS } from 'features/nodes/types/constants';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -17,10 +17,10 @@ type Props = {
 
 const NodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
-  const label = useNodeLabel(nodeId);
+  const label = useNodeUserTitleSafe(nodeId);
   const batchGroupId = useBatchGroupId(nodeId);
   const batchGroupColorToken = useBatchGroupColorToken(batchGroupId);
-  const templateTitle = useNodeTemplateTitle(nodeId);
+  const templateTitle = useNodeTemplateTitleSafe(nodeId);
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
