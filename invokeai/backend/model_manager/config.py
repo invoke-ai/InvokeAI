@@ -102,6 +102,7 @@ class ModelOnDisk:
 
     def __init__(self, path: Path, hash_algo: HASHING_ALGORITHMS = "blake3_single"):
         self.path = path
+        # TODO: Revisit checkpoint vs diffusers terminology
         self.format_type = ModelFormat.Diffusers if path.is_dir() else ModelFormat.Checkpoint
         if self.path.suffix in {".safetensors", ".bin", ".pt", ".ckpt"}:
             self.name = path.stem
