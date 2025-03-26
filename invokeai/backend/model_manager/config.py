@@ -257,11 +257,13 @@ class ModelConfigBase(ABC, BaseModel):
 
         for config_cls in sorted_by_match_speed:
             try:
-                if config_cls.matches(mod):
-                    return config_cls.from_model_on_disk(mod, **overrides)
+                if not config_cls.matches(mod):
+                    continue
             except Exception as e:
-                logger.error(f"Unexpected exception while matching/parsing '{config_cls.__name__}': {e}")
-                raise InvalidModelConfigException(str(e)) from e
+                logger.error(f"Unexpected exception while matching {mod.name} to '{config_cls.__name__}': {e}")
+                continue
+            else:
+                return config_cls.from_model_on_disk(mod, **overrides)
 
         raise InvalidModelConfigException("No valid config found")
 
