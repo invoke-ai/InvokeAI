@@ -41,7 +41,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 
     You don't need to do this if you are installing with the [Invoke Launcher](./quick_start.md).
 
-Invoke requires python 3.10 or 3.11. If you don't already have one of these versions installed, we suggest installing 3.11, as it will be supported for longer.
+Invoke requires python 3.10 through 3.12. If you don't already have one of these versions installed, we suggest installing 3.12, as it will be supported for longer.
 
 Check that your system has an up-to-date Python installed by running `python3 --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
 
@@ -49,19 +49,19 @@ Check that your system has an up-to-date Python installed by running `python3 --
 
     === "Windows"
 
-        - Install python 3.11 with [an official installer].
+        - Install python with [an official installer].
         - The installer includes an option to add python to your PATH. Be sure to enable this. If you missed it, re-run the installer, choose to modify an existing installation, and tick that checkbox.
         - You may need to install [Microsoft Visual C++ Redistributable].
 
     === "macOS"
 
-        - Install python 3.11 with [an official installer].
+        - Install python with [an official installer].
         - If model installs fail with a certificate error, you may need to run this command (changing the python version to match what you have installed): `/Applications/Python\ 3.10/Install\ Certificates.command`
         - If you haven't already, you will need to install the XCode CLI Tools by running `xcode-select --install` in a terminal.
 
     === "Linux"
 
-        - Installing python varies depending on your system. On Ubuntu, you can use the [deadsnakes PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa).
+        - Installing python varies depending on your system. We recommend [using `uv` to manage your python installation](https://docs.astral.sh/uv/concepts/python-versions/#installing-a-python-version).
         - You'll need to install `libglib2.0-0` and `libgl1-mesa-glx` for OpenCV to work. For example, on a Debian system: `sudo apt update && sudo apt install -y libglib2.0-0 libgl1-mesa-glx`
 
 ## Drivers
