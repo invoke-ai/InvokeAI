@@ -109,6 +109,7 @@ export const StringGeneratorFieldInputComponent = memo(
                 fontFamily="monospace"
                 userSelect="text"
                 cursor="text"
+                whiteSpace="pre"
               >
                 {resolvedValuesAsString}
               </Text>

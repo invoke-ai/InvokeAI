@@ -904,8 +904,25 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get Config */
+        /** Get Config  */
         get: operations["get_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/runtime_config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Runtime Config */
+        get: operations["get_runtime_config"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11851,6 +11868,431 @@ export type components = {
             invocation_source_id: string;
         };
         /**
+         * InvokeAIAppConfig
+         * @description Invoke's global app configuration.
+         *
+         *     Typically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.
+         *
+         *     Attributes:
+         *         host: IP address to bind to. Use `0.0.0.0` to serve to your local network.
+         *         port: Port to bind to.
+         *         allow_origins: Allowed CORS origins.
+         *         allow_credentials: Allow CORS credentials.
+         *         allow_methods: Methods allowed for CORS.
+         *         allow_headers: Headers allowed for CORS.
+         *         ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.
+         *         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
+         *         log_tokenization: Enable logging of parsed prompt tokens.
+         *         patchmatch: Enable patchmatch inpaint code.
+         *         models_dir: Path to the models directory.
+         *         convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
+         *         download_cache_dir: Path to the directory that contains dynamically downloaded models.
+         *         legacy_conf_dir: Path to directory of legacy checkpoint config files.
+         *         db_dir: Path to InvokeAI databases directory.
+         *         outputs_dir: Path to directory for outputs.
+         *         custom_nodes_dir: Path to directory for custom nodes.
+         *         style_presets_dir: Path to directory for style presets.
+         *         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
+         *         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
+         *         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
+         *         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
+         *         log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
+         *         log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
+         *         use_memory_db: Use in-memory database. Useful for development.
+         *         dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.
+         *         profile_graphs: Enable graph profiling using `cProfile`.
+         *         profile_prefix: An optional prefix for profile output files.
+         *         profiles_dir: Path to profiles output directory.
+         *         max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+         *         max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
+         *         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
+         *         device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
+         *         enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
+         *         keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.
+         *         ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+         *         vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+         *         lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
+         *         pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to "backend:cudaMallocAsync" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.
+         *         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
+         *         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
+         *         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+         *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
+         *         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
+         *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
+         *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
+         *         max_queue_size: Maximum number of items in the session queue.
+         *         clear_queue_on_startup: Empties session queue on startup.
+         *         allow_nodes: List of nodes to allow. Omit to allow all.
+         *         deny_nodes: List of nodes to deny. Omit to deny none.
+         *         node_cache_size: How many cached nodes to keep in memory.
+         *         hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`
+         *         remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
+         *         scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
+         */
+        InvokeAIAppConfig: {
+            /**
+             * Schema Version
+             * @description Schema version of the config file. This is not a user-configurable setting.
+             * @default 4.0.2
+             */
+            schema_version?: string;
+            /**
+             * Legacy Models Yaml Path
+             * @description Path to the legacy models.yaml file. This is not a user-configurable setting.
+             */
+            legacy_models_yaml_path?: string | null;
+            /**
+             * Host
+             * @description IP address to bind to. Use `0.0.0.0` to serve to your local network.
+             * @default 127.0.0.1
+             */
+            host?: string;
+            /**
+             * Port
+             * @description Port to bind to.
+             * @default 9090
+             */
+            port?: number;
+            /**
+             * Allow Origins
+             * @description Allowed CORS origins.
+             * @default []
+             */
+            allow_origins?: string[];
+            /**
+             * Allow Credentials
+             * @description Allow CORS credentials.
+             * @default true
+             */
+            allow_credentials?: boolean;
+            /**
+             * Allow Methods
+             * @description Methods allowed for CORS.
+             * @default [
+             *       "*"
+             *     ]
+             */
+            allow_methods?: string[];
+            /**
+             * Allow Headers
+             * @description Headers allowed for CORS.
+             * @default [
+             *       "*"
+             *     ]
+             */
+            allow_headers?: string[];
+            /**
+             * Ssl Certfile
+             * @description SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.
+             */
+            ssl_certfile?: string | null;
+            /**
+             * Ssl Keyfile
+             * @description SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.
+             */
+            ssl_keyfile?: string | null;
+            /**
+             * Log Tokenization
+             * @description Enable logging of parsed prompt tokens.
+             * @default false
+             */
+            log_tokenization?: boolean;
+            /**
+             * Patchmatch
+             * @description Enable patchmatch inpaint code.
+             * @default true
+             */
+            patchmatch?: boolean;
+            /**
+             * Models Dir
+             * Format: path
+             * @description Path to the models directory.
+             * @default models
+             */
+            models_dir?: string;
+            /**
+             * Convert Cache Dir
+             * Format: path
+             * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
+             * @default models/.convert_cache
+             */
+            convert_cache_dir?: string;
+            /**
+             * Download Cache Dir
+             * Format: path
+             * @description Path to the directory that contains dynamically downloaded models.
+             * @default models/.download_cache
+             */
+            download_cache_dir?: string;
+            /**
+             * Legacy Conf Dir
+             * Format: path
+             * @description Path to directory of legacy checkpoint config files.
+             * @default configs
+             */
+            legacy_conf_dir?: string;
+            /**
+             * Db Dir
+             * Format: path
+             * @description Path to InvokeAI databases directory.
+             * @default databases
+             */
+            db_dir?: string;
+            /**
+             * Outputs Dir
+             * Format: path
+             * @description Path to directory for outputs.
+             * @default outputs
+             */
+            outputs_dir?: string;
+            /**
+             * Custom Nodes Dir
+             * Format: path
+             * @description Path to directory for custom nodes.
+             * @default nodes
+             */
+            custom_nodes_dir?: string;
+            /**
+             * Style Presets Dir
+             * Format: path
+             * @description Path to directory for style presets.
+             * @default style_presets
+             */
+            style_presets_dir?: string;
+            /**
+             * Workflow Thumbnails Dir
+             * Format: path
+             * @description Path to directory for workflow thumbnails.
+             * @default workflow_thumbnails
+             */
+            workflow_thumbnails_dir?: string;
+            /**
+             * Log Handlers
+             * @description Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
+             * @default [
+             *       "console"
+             *     ]
+             */
+            log_handlers?: string[];
+            /**
+             * Log Format
+             * @description Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.
+             * @default color
+             * @enum {string}
+             */
+            log_format?: "plain" | "color" | "syslog" | "legacy";
+            /**
+             * Log Level
+             * @description Emit logging messages at this level or higher.
+             * @default info
+             * @enum {string}
+             */
+            log_level?: "debug" | "info" | "warning" | "error" | "critical";
+            /**
+             * Log Sql
+             * @description Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
+             * @default false
+             */
+            log_sql?: boolean;
+            /**
+             * Log Level Network
+             * @description Log level for network-related messages. 'info' and 'debug' are very verbose.
+             * @default warning
+             * @enum {string}
+             */
+            log_level_network?: "debug" | "info" | "warning" | "error" | "critical";
+            /**
+             * Use Memory Db
+             * @description Use in-memory database. Useful for development.
+             * @default false
+             */
+            use_memory_db?: boolean;
+            /**
+             * Dev Reload
+             * @description Automatically reload when Python sources are changed. Does not reload node definitions.
+             * @default false
+             */
+            dev_reload?: boolean;
+            /**
+             * Profile Graphs
+             * @description Enable graph profiling using `cProfile`.
+             * @default false
+             */
+            profile_graphs?: boolean;
+            /**
+             * Profile Prefix
+             * @description An optional prefix for profile output files.
+             */
+            profile_prefix?: string | null;
+            /**
+             * Profiles Dir
+             * Format: path
+             * @description Path to profiles output directory.
+             * @default profiles
+             */
+            profiles_dir?: string;
+            /**
+             * Max Cache Ram Gb
+             * @description The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
+             */
+            max_cache_ram_gb?: number | null;
+            /**
+             * Max Cache Vram Gb
+             * @description The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
+             */
+            max_cache_vram_gb?: number | null;
+            /**
+             * Log Memory Usage
+             * @description If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
+             * @default false
+             */
+            log_memory_usage?: boolean;
+            /**
+             * Device Working Mem Gb
+             * @description The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
+             * @default 3
+             */
+            device_working_mem_gb?: number;
+            /**
+             * Enable Partial Loading
+             * @description Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
+             * @default false
+             */
+            enable_partial_loading?: boolean;
+            /**
+             * Keep Ram Copy Of Weights
+             * @description Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.
+             * @default true
+             */
+            keep_ram_copy_of_weights?: boolean;
+            /**
+             * Ram
+             * @description DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+             */
+            ram?: number | null;
+            /**
+             * Vram
+             * @description DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
+             */
+            vram?: number | null;
+            /**
+             * Lazy Offload
+             * @description DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.
+             * @default true
+             */
+            lazy_offload?: boolean;
+            /**
+             * Pytorch Cuda Alloc Conf
+             * @description Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to "backend:cudaMallocAsync" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.
+             */
+            pytorch_cuda_alloc_conf?: string | null;
+            /**
+             * Device
+             * @description Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.
+             * @default auto
+             * @enum {string}
+             */
+            device?: "auto" | "cpu" | "cuda" | "cuda:1" | "mps";
+            /**
+             * Precision
+             * @description Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
+             * @default auto
+             * @enum {string}
+             */
+            precision?: "auto" | "float16" | "bfloat16" | "float32";
+            /**
+             * Sequential Guidance
+             * @description Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+             * @default false
+             */
+            sequential_guidance?: boolean;
+            /**
+             * Attention Type
+             * @description Attention type.
+             * @default auto
+             * @enum {string}
+             */
+            attention_type?: "auto" | "normal" | "xformers" | "sliced" | "torch-sdp";
+            /**
+             * Attention Slice Size
+             * @description Slice size, valid when attention_type=="sliced".
+             * @default auto
+             * @enum {unknown}
+             */
+            attention_slice_size?: "auto" | "balanced" | "max" | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+            /**
+             * Force Tiled Decode
+             * @description Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
+             * @default false
+             */
+            force_tiled_decode?: boolean;
+            /**
+             * Pil Compress Level
+             * @description The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
+             * @default 1
+             */
+            pil_compress_level?: number;
+            /**
+             * Max Queue Size
+             * @description Maximum number of items in the session queue.
+             * @default 10000
+             */
+            max_queue_size?: number;
+            /**
+             * Clear Queue On Startup
+             * @description Empties session queue on startup.
+             * @default false
+             */
+            clear_queue_on_startup?: boolean;
+            /**
+             * Allow Nodes
+             * @description List of nodes to allow. Omit to allow all.
+             */
+            allow_nodes?: string[] | null;
+            /**
+             * Deny Nodes
+             * @description List of nodes to deny. Omit to deny none.
+             */
+            deny_nodes?: string[] | null;
+            /**
+             * Node Cache Size
+             * @description How many cached nodes to keep in memory.
+             * @default 512
+             */
+            node_cache_size?: number;
+            /**
+             * Hashing Algorithm
+             * @description Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.
+             * @default blake3_single
+             * @enum {string}
+             */
+            hashing_algorithm?: "blake3_multi" | "blake3_single" | "random" | "md5" | "sha1" | "sha224" | "sha256" | "sha384" | "sha512" | "blake2b" | "blake2s" | "sha3_224" | "sha3_256" | "sha3_384" | "sha3_512" | "shake_128" | "shake_256";
+            /**
+             * Remote Api Tokens
+             * @description List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
+             */
+            remote_api_tokens?: components["schemas"]["URLRegexTokenPair"][] | null;
+            /**
+             * Scan Models On Startup
+             * @description Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
+             * @default false
+             */
+            scan_models_on_startup?: boolean;
+        };
+        /**
+         * InvokeAIAppConfigWithSetFields
+         * @description InvokeAI App Config with model fields set
+         */
+        InvokeAIAppConfigWithSetFields: {
+            /**
+             * Set Fields
+             * @description The set fields
+             */
+            set_fields: string[];
+            /** @description The InvokeAI App Config */
+            config: components["schemas"]["InvokeAIAppConfig"];
+        };
+        /**
          * Adjust Image Hue Plus
          * @description Adjusts the Hue of an image by rotating it in the selected color space. Originally created by @dwringer
          */
@@ -21013,6 +21455,19 @@ export type components = {
              */
             type: "url";
         };
+        /** URLRegexTokenPair */
+        URLRegexTokenPair: {
+            /**
+             * Url Regex
+             * @description Regular expression to match against the URL
+             */
+            url_regex: string;
+            /**
+             * Token
+             * @description Token to use when the URL matches the regex
+             */
+            token: string;
+        };
         /**
          * Unsharp Mask
          * @description Applies an unsharp mask filter to an image
@@ -23739,6 +24194,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AppConfig"];
+                };
+            };
+        };
+    };
+    get_runtime_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvokeAIAppConfigWithSetFields"];
                 };
             };
         };

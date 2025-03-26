@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.upscale import ESRGAN_MODELS
+from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.util.logging import logging
@@ -99,7 +100,7 @@ async def get_app_deps() -> AppDependencyVersions:
 
 
 @app_router.get("/config", operation_id="get_config", status_code=200, response_model=AppConfig)
-async def get_config() -> AppConfig:
+async def get_config_() -> AppConfig:
     infill_methods = ["lama", "tile", "cv2", "color"]  # TODO: add mosaic back
     if PatchMatch.patchmatch_available():
         infill_methods.append("patchmatch")
@@ -119,6 +120,21 @@ async def get_config() -> AppConfig:
         nsfw_methods=nsfw_methods,
         watermarking_methods=watermarking_methods,
     )
+
+
+class InvokeAIAppConfigWithSetFields(BaseModel):
+    """InvokeAI App Config with model fields set"""
+
+    set_fields: set[str] = Field(description="The set fields")
+    config: InvokeAIAppConfig = Field(description="The InvokeAI App Config")
+
+
+@app_router.get(
+    "/runtime_config", operation_id="get_runtime_config", status_code=200, response_model=InvokeAIAppConfigWithSetFields
+)
+async def get_runtime_config() -> InvokeAIAppConfigWithSetFields:
+    config = get_config()
+    return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
 
 
 @app_router.get(
