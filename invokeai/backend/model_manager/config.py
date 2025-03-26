@@ -60,6 +60,7 @@ logger = logging.getLogger(__name__)
 
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognize this combination of model type and format."""
+
     pass
 
 
