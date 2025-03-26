@@ -28,7 +28,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import isabstract
 from pathlib import Path
-from typing import ClassVar, Literal, Optional, Set, TypeAlias, Union
+from typing import ClassVar, Literal, Optional, TypeAlias, Union
 
 import safetensors.torch
 import torch
@@ -119,7 +119,7 @@ class ModelOnDisk:
             return self.path.stat().st_size
         return sum(file.stat().st_size for file in self.path.rglob("*"))
 
-    def component_paths(self) -> Set[Path]:
+    def component_paths(self) -> set[Path]:
         if self.format_type == ModelFormat.Checkpoint:
             return {self.path}
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
@@ -142,7 +142,7 @@ class ModelOnDisk:
                 return ModelRepoVariant.ONNX
         return ModelRepoVariant.Default
 
-    def load_state_dict(self, path: Path = None) -> Dict[str | int, Any]:
+    def load_state_dict(self, path: Optional[Path] = None) -> Dict[str | int, Any]:
         if path in self._state_dict_cache:
             return self._state_dict_cache[path]
 
