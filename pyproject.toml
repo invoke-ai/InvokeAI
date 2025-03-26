@@ -90,10 +90,8 @@ dependencies = [
   "pyreadline3",
   "python-multipart",
   "requests",
-  "rich~=13.3",
   "scikit-image",
   "semver~=3.0.1",
-  "windows-curses; sys_platform=='win32'",
   "humanize==4.12.1",
 ]
 
