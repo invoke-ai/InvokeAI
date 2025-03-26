@@ -97,6 +97,8 @@ jobs:
           context: .
           file: docker/Dockerfile
           platforms: ${{ env.PLATFORMS }}
+          build-args: |
+            GPU_DRIVER=${{ matrix.gpu-driver }}
           push: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' || github.event.inputs.push-to-registry }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
