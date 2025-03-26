@@ -41,9 +41,10 @@ def run_app() -> None:
     )
 
     # Find an open port, and modify the config accordingly.
-    orig_config_port = app_config.port
-    app_config.port = find_open_port(app_config.port)
-    if orig_config_port != app_config.port:
+    first_open_port = find_open_port(app_config.port)
+    if app_config.port != first_open_port:
+        orig_config_port = app_config.port
+        app_config.port = first_open_port
         logger.warning(f"Port {orig_config_port} is already in use. Using port {app_config.port}.")
 
     # Miscellaneous startup tasks.
