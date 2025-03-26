@@ -5,8 +5,9 @@ import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import { NodeFieldElementLabel } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabel';
-import { useInputFieldDescriptionSafe } from 'features/nodes/hooks/useInputFieldDescriptionSafe';
-import { useInputFieldTemplateOrThrow, useInputFieldTemplateSafe } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useInputFieldTemplateSafe } from 'features/nodes/hooks/useInputFieldTemplateSafe';
+import { useInputFieldUserDescriptionSafe } from 'features/nodes/hooks/useInputFieldUserDescriptionSafe';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
 import Linkify from 'linkify-react';
@@ -36,7 +37,7 @@ const useFormatFallbackLabel = () => {
 export const NodeFieldElementViewMode = memo(({ el }: { el: NodeFieldElement }) => {
   const { id, data } = el;
   const { fieldIdentifier, showDescription } = data;
-  const description = useInputFieldDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplateSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const containerCtx = useContainerContext();
   const formatFallbackLabel = useFormatFallbackLabel();
@@ -69,7 +70,7 @@ NodeFieldElementViewMode.displayName = 'NodeFieldElementViewMode';
 const NodeFieldElementViewModeContent = memo(({ el }: { el: NodeFieldElement }) => {
   const { data } = el;
   const { fieldIdentifier, showDescription } = data;
-  const description = useInputFieldDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const description = useInputFieldUserDescriptionSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
 
   const _description = useMemo(
