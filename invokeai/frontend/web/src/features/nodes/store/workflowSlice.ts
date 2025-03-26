@@ -33,7 +33,7 @@ import {
   isNodeFieldElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
-import { isEqual } from 'lodash-es';
+import { isEqual, uniqBy } from 'lodash-es';
 import { useMemo } from 'react';
 
 import { selectNodesSlice } from './selectors';
@@ -350,6 +350,9 @@ export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
+export const selectIsWorkflowSaved = createSelector(selectWorkflowId, selectWorkflowIsTouched, (id, isTouched) => {
+  return id !== undefined && !isTouched;
+});
 
 export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
   const noNodes = !nodes.nodes.length;
@@ -374,6 +377,9 @@ export const selectIsFormEmpty = createWorkflowSelector((workflow) => {
 export const selectFormInitialValues = createWorkflowSelector((workflow) => workflow.formFieldInitialValues);
 export const selectNodeFieldElements = createWorkflowSelector((workflow) =>
   Object.values(workflow.form.elements).filter(isNodeFieldElement)
+);
+export const selectNodeFieldElementsDeduped = createSelector(selectNodeFieldElements, (nodeFieldElements) =>
+  uniqBy(nodeFieldElements, (el) => `${el.data.fieldIdentifier.nodeId}-${el.data.fieldIdentifier.fieldName}`)
 );
 const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
 export const useElement = (id: string): FormElement | undefined => {
