@@ -47,3 +47,10 @@ class LlavaOnevisionModel(RawModel):
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         self._vllm_model.to(device=device, dtype=dtype)
+
+    def calc_size(self) -> int:
+        """Get size of the model in memory in bytes."""
+        # HACK(ryand): Fix this issue with circular imports.
+        from invokeai.backend.model_manager.load.model_util import calc_module_size
+
+        return calc_module_size(self._vllm_model)
