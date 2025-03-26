@@ -56,6 +56,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
           fontWeight="semibold"
           color={batchGroupColorToken}
           onDoubleClick={editable.startEditing}
+          noOfLines={1}
         >
           {titleWithBatchGroupId}
         </Text>

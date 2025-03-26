@@ -4,7 +4,6 @@ import {
   Grid,
   GridItem,
   Heading,
-  IconButton,
   Image,
   Modal,
   ModalBody,
@@ -13,21 +12,17 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
-  Spacer,
   Text,
-  Tooltip,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { useClipboard } from 'common/hooks/useClipboard';
+import { deepClone } from 'common/util/deepClone';
+import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { discordLink, githubLink, websiteLink } from 'features/system/store/constants';
-import { map } from 'lodash-es';
 import InvokeLogoYellow from 'public/assets/images/invoke-tag-lrg.svg';
 import type { ReactElement } from 'react';
-import { cloneElement, memo, useCallback } from 'react';
+import { cloneElement, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCopyBold } from 'react-icons/pi';
-import { useGetAppDepsQuery, useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
+import { useGetAppDepsQuery, useGetAppVersionQuery, useGetRuntimeConfigQuery } from 'services/api/endpoints/appInfo';
 
 type AboutModalProps = {
   /* The button to open the Settings Modal */
@@ -37,18 +32,26 @@ type AboutModalProps = {
 const AboutModal = ({ children }: AboutModalProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
-  const clipboard = useClipboard();
-  const { depsArray, depsObject } = useGetAppDepsQuery(undefined, {
-    selectFromResult: ({ data }) => ({
-      depsObject: data,
-      depsArray: data ? map(data, (version, name) => ({ name, version })) : [],
-    }),
-  });
+  const { data: runtimeConfig } = useGetRuntimeConfigQuery();
+  const { data: dependencies } = useGetAppDepsQuery();
   const { data: appVersion } = useGetAppVersionQuery();
 
-  const handleCopy = useCallback(() => {
-    clipboard.writeText(JSON.stringify(depsObject, null, 2));
-  }, [clipboard, depsObject]);
+  const localData = useMemo(() => {
+    const clonedRuntimeConfig = deepClone(runtimeConfig);
+
+    if (clonedRuntimeConfig && clonedRuntimeConfig.config.remote_api_tokens) {
+      clonedRuntimeConfig.config.remote_api_tokens.forEach((remote_api_token) => {
+        remote_api_token.token = 'REDACTED';
+      });
+    }
+
+    return {
+      version: appVersion?.version,
+      dependencies,
+      config: clonedRuntimeConfig?.config,
+      set_config_fields: clonedRuntimeConfig?.set_fields,
+    };
+  }, [appVersion, dependencies, runtimeConfig]);
 
   return (
     <>
@@ -63,27 +66,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
           <ModalBody display="flex" flexDir="column" gap={4}>
             <Grid templateColumns="repeat(2, 1fr)" h="full">
               <GridItem backgroundColor="base.750" borderRadius="base" p="4" h="full">
-                <ScrollableContent>
-                  <Flex position="sticky" top="0" backgroundColor="base.750" p={1} alignItems="center">
-                    <Heading size="md">{t('common.localSystem')}</Heading>
-                    <Spacer />
-                    <Tooltip label={t('common.copy')}>
-                      <IconButton
-                        onClick={handleCopy}
-                        isDisabled={!depsObject}
-                        aria-label={t('common.copy')}
-                        icon={<PiCopyBold />}
-                        variant="ghost"
-                      />
-                    </Tooltip>
-                  </Flex>
-                  {depsArray.map(({ name, version }, i) => (
-                    <Grid key={i} py="2" px="1" w="full" templateColumns="repeat(2, 1fr)">
-                      <Text>{name}</Text>
-                      <Text>{version ? version : t('common.notInstalled')}</Text>
-                    </Grid>
-                  ))}
-                </ScrollableContent>
+                <DataViewer label={t('common.systemInformation')} data={localData} />
               </GridItem>
               <GridItem>
                 <Flex flexDir="column" gap={3} justifyContent="center" alignItems="center" h="full">
