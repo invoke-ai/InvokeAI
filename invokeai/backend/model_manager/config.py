@@ -28,7 +28,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from inspect import isabstract
 from pathlib import Path
-from typing import ClassVar, Literal, Optional, TypeAlias, Union
+from typing import ClassVar, Literal, Optional, Set, TypeAlias, Union
 
 import safetensors.torch
 import torch
@@ -108,22 +108,23 @@ class ModelOnDisk:
         else:
             self.name = path.name
         self.hash_algo = hash_algo
+        self._state_dict_cache = {}
 
-    def hash(self):
+    def hash(self) -> str:
         return ModelHash(algorithm=self.hash_algo).hash(self.path)
 
-    def size(self):
+    def size(self) -> int:
         if self.format_type == ModelFormat.Checkpoint:
             return self.path.stat().st_size
         return sum(file.stat().st_size for file in self.path.rglob("*"))
 
-    def component_paths(self):
+    def component_paths(self) -> Set[Path]:
         if self.format_type == ModelFormat.Checkpoint:
             return {self.path}
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
         return {f for f in self.path.rglob("*") if f.suffix in extensions}
 
-    def repo_variant(self):
+    def repo_variant(self) -> Optional[ModelRepoVariant]:
         if self.format_type == ModelFormat.Checkpoint:
             return None
 
@@ -140,14 +141,30 @@ class ModelOnDisk:
                 return ModelRepoVariant.ONNX
         return ModelRepoVariant.Default
 
-    @staticmethod
-    def load_state_dict(path: Path):
+    def load_state_dict(self, path: Path = None) -> Dict[str | int, Any]:
+        if path in self._state_dict_cache:
+            return self._state_dict_cache[path]
+
+        if not path:
+            components = list(self.component_paths())
+            match components:
+                case []:
+                    raise ValueError("No weight files found for this model")
+                case [p]:
+                    path = p
+                case ps if len(ps) >= 2:
+                    raise ValueError(
+                        f"Multiple weight files found for this model: {ps}. "
+                        f"Please specify the intended file using the 'path' argument"
+                    )
+
         with SilenceWarnings():
             if path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
                 scan_result = scan_file_path(path)
                 if scan_result.infected_files != 0 or scan_result.scan_err:
                     raise RuntimeError(f"The model {path.stem} is potentially infected by malware. Aborting import.")
                 checkpoint = torch.load(path, map_location="cpu")
+                assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
                 checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
@@ -156,6 +173,7 @@ class ModelOnDisk:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
         state_dict = checkpoint.get("state_dict", checkpoint)
+        self._state_dict_cache[path] = state_dict
         return state_dict
 
 
