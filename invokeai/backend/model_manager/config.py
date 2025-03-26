@@ -256,11 +256,12 @@ class ModelConfigBase(ABC, BaseModel):
 
         for config_cls in sorted_by_match_speed:
             try:
-                return config_cls.from_model_on_disk(mod, **overrides)
-            except InvalidModelConfigException:
-                logger.debug(f"ModelConfig '{config_cls.__name__}' failed to parse '{mod.path}', trying next config")
+                if config_cls.matches(mod):
+                    logger.debug(f"Path {mod.path} does not match {config_cls.__name__} format")
+                    return config_cls.from_model_on_disk(mod, **overrides)
             except Exception as e:
-                logger.error(f"Unexpected exception while parsing '{config_cls.__name__}': {e}, trying next config")
+                logger.error(f"Unexpected exception while parsing '{config_cls.__name__}': {e}")
+                raise
 
         raise InvalidModelConfigException("No valid config found")
 
@@ -303,9 +304,6 @@ class ModelConfigBase(ABC, BaseModel):
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, **overrides):
         """Creates an instance of this config or raises InvalidModelConfigException."""
-        if not cls.matches(mod):
-            raise InvalidModelConfigException(f"Path {mod.path} does not match {cls.__name__} format")
-
         fields = cls.parse(mod)
         cls.cast_overrides(overrides)
         fields.update(overrides)
