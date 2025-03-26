@@ -260,7 +260,7 @@ class ModelConfigBase(ABC, BaseModel):
                 if not config_cls.matches(mod):
                     continue
             except Exception as e:
-                logger.error(f"Unexpected exception while matching {mod.name} to '{config_cls.__name__}': {e}")
+                logger.warning(f"Unexpected exception while matching {mod.name} to '{config_cls.__name__}': {e}")
                 continue
             else:
                 return config_cls.from_model_on_disk(mod, **overrides)
