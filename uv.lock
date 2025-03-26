@@ -588,7 +588,7 @@ wheels = [
 
 [[package]]
 name = "controlnet-aux"
-version = "0.0.9"
+version = "0.0.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "einops" },
@@ -596,7 +596,7 @@ dependencies = [
     { name = "huggingface-hub" },
     { name = "importlib-metadata" },
     { name = "numpy" },
-    { name = "opencv-python-headless" },
+    { name = "opencv-python" },
     { name = "pillow" },
     { name = "scikit-image" },
     { name = "scipy" },
@@ -604,10 +604,7 @@ dependencies = [
     { name = "torch" },
     { name = "torchvision" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/20/b6/bc4c5dcab45233e07452c8a9d30cd1d30b7c92b5ea96f7ceca8816cd6078/controlnet_aux-0.0.9.tar.gz", hash = "sha256:6c28352e6fe9b3324d6b1288d94d1c2586c6e2fc9f58df9e47297ea6a86fd560", size = 208610 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9a/2e/3688dea6d9f22ec152fb931c15329c45df4f87078862fadc1fff0064abd4/controlnet_aux-0.0.9-py3-none-any.whl", hash = "sha256:c0401e0f1992562889f15865ede34c0e9b7fbc432aed2d19f7de461a524cc9d8", size = 282354 },
-]
+sdist = { url = "https://files.pythonhosted.org/packages/4f/e5/81caa2ce9c0352a4a22e2551ead878e9d095470df306be9c509c6bc14972/controlnet_aux-0.0.7.tar.gz", hash = "sha256:db7299323ba6d389e2fe6b7d8131a05a271af3a4ac2a574775448c4d0778be8c", size = 202441 }
 
 [[package]]
 name = "coverage"
@@ -1335,7 +1332,6 @@ dependencies = [
     { name = "python-socketio" },
     { name = "pytorch-lightning" },
     { name = "requests" },
-    { name = "rich" },
     { name = "safetensors" },
     { name = "scikit-image" },
     { name = "semver" },
@@ -1348,7 +1344,6 @@ dependencies = [
     { name = "torchvision" },
     { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
-    { name = "windows-curses", marker = "sys_platform == 'win32'" },
 ]
 
 [package.optional-dependencies]
@@ -1460,7 +1455,6 @@ requires-dist = [
     { name = "pytorch-lightning" },
     { name = "requests" },
     { name = "requests-testadapter", marker = "extra == 'test'" },
-    { name = "rich", specifier = "~=13.3" },
     { name = "ruff", marker = "extra == 'test'", specifier = "~=0.9.9" },
     { name = "ruff-lsp", marker = "extra == 'test'", specifier = "~=0.0.62" },
     { name = "safetensors" },
@@ -1469,7 +1463,7 @@ requires-dist = [
     { name = "sentencepiece", specifier = "==0.2.0" },
     { name = "snakeviz", marker = "extra == 'dev'" },
     { name = "spandrel", specifier = "==0.3.4" },
-    { name = "timm" },
+    { name = "timm", specifier = "~=1.0.0" },
     { name = "torch", specifier = "~=2.6.0" },
     { name = "torchmetrics" },
     { name = "torchsde" },
@@ -1477,7 +1471,6 @@ requires-dist = [
     { name = "transformers" },
     { name = "twine", marker = "extra == 'dist'" },
     { name = "uvicorn", extras = ["standard"] },
-    { name = "windows-curses", marker = "sys_platform == 'win32'" },
     { name = "xformers", marker = "sys_platform != 'darwin' and extra == 'xformers'", specifier = ">=0.0.28.post1" },
 ]
 provides-extras = ["xformers", "onnx", "onnx-cuda", "onnx-directml", "dist", "docs", "dev", "test"]
@@ -3963,15 +3956,18 @@ wheels = [
 
 [[package]]
 name = "timm"
-version = "0.6.7"
+version = "1.0.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "huggingface-hub" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
     { name = "torch" },
     { name = "torchvision" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8d/a1/6abc7eaba8afea0b5fe8835e19599fd1c865890c52d2abdf0cccd372fc25/timm-0.6.7.tar.gz", hash = "sha256:340f907906695092cf53fe01a476aa14ad15763545b654bc122ea0daef23071f", size = 423037 }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/0c/66b0f9b4a4cb9ffdac7b52b17b37c7d3c4f75623b469e388b0c6d89b4e88/timm-1.0.15.tar.gz", hash = "sha256:756a3bc30c96565f056e608a9b559daed904617eaadb6be536f96874879b1055", size = 2230258 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/ed/358a8bc5685c31c0fe7765351b202cf6a8c087893b5d2d64f63c950f8beb/timm-0.6.7-py3-none-any.whl", hash = "sha256:4bbd7a5c9ae462ec7fec3d99ffc62ac2012010d755248e3de778d50bce5f6186", size = 509963 },
+    { url = "https://files.pythonhosted.org/packages/6c/d0/179abca8b984b3deefd996f362b612c39da73b60f685921e6cd58b6125b4/timm-1.0.15-py3-none-any.whl", hash = "sha256:5a3dc460c24e322ecc7fd1f3e3eb112423ddee320cb059cc1956fbc9731748ef", size = 2361373 },
 ]
 
 [[package]]
@@ -4476,19 +4472,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8a/98/2d9906746cdc6a6ef809ae6338005b3f21bb568bea3165cfc6a243fdc25c/wheel-0.45.1.tar.gz", hash = "sha256:661e1abd9198507b1409a20c02106d9670b2576e916d58f520316666abca6729", size = 107545 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl", hash = "sha256:708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248", size = 72494 },
-]
-
-[[package]]
-name = "windows-curses"
-version = "2.4.1"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/34/e70815e7ae6f157c00121180a607dbcdc82acfd949c70bba28c45d206dec/windows_curses-2.4.1-cp310-cp310-win32.whl", hash = "sha256:53d711e07194d0d3ff7ceff29e0955b35479bc01465d46c3041de67b8141db2f", size = 71136 },
-    { url = "https://files.pythonhosted.org/packages/a6/1d/1bb512c445af24fb0a3dccf9537c8727bba5920e69539227b87f5351f608/windows_curses-2.4.1-cp310-cp310-win_amd64.whl", hash = "sha256:325439cd4f37897a1de8a9c068a5b4c432f9244bf9c855ee2fbeb3fa721a770c", size = 81418 },
-    { url = "https://files.pythonhosted.org/packages/74/b3/46a2508fff83b5affb5a311797c584c494b4b0c4c8796a1afa2c1b1e03ac/windows_curses-2.4.1-cp311-cp311-win32.whl", hash = "sha256:4fa1a176bfcf098d0c9bb7bc03dce6e83a4257fc0c66ad721f5745ebf0c00746", size = 71129 },
-    { url = "https://files.pythonhosted.org/packages/50/29/fd7c0c80177d8df55f841504a5f332b95b0002c80f82055913b6caac94e6/windows_curses-2.4.1-cp311-cp311-win_amd64.whl", hash = "sha256:fd7d7a9cf6c1758f46ed76b8c67f608bc5fcd5f0ca91f1580fd2d84cf41c7f4f", size = 81431 },
-    { url = "https://files.pythonhosted.org/packages/f4/99/60f34e51514c82631aa5c6d21eab88ce1701562de9844608411e39462a46/windows_curses-2.4.1-cp312-cp312-win32.whl", hash = "sha256:bdbe7d58747408aef8a9128b2654acf6fbd11c821b91224b9a046faba8c6b6ca", size = 71489 },
-    { url = "https://files.pythonhosted.org/packages/62/8f/d908bcab1954375b156a9300fa86ceccb110f39457cd6fd59c72777626ab/windows_curses-2.4.1-cp312-cp312-win_amd64.whl", hash = "sha256:5c9c2635faf171a229caca80e1dd760ab00db078e2a285ba2f667bbfcc31777c", size = 81777 },
 ]
 
 [[package]]
