@@ -3,7 +3,7 @@ from typing import List
 
 import pytest
 
-from invokeai.backend.model_manager.config import ModelRepoVariant
+from invokeai.backend.model_manager import ModelRepoVariant
 from invokeai.backend.model_manager.util.select_hf_files import filter_files
 
 

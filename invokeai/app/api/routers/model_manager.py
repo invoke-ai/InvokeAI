@@ -28,12 +28,10 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.util.suppress_output import SuppressOutput
+from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    BaseModelType,
     MainCheckpointConfig,
-    ModelFormat,
-    ModelType,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch

@@ -22,8 +22,9 @@ from pathlib import Path
 import humanize
 import torch
 
-from invokeai.backend.model_manager.config import ModelFormat, ModelOnDisk
+from invokeai.backend.model_manager.config import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.taxonomy import ModelFormat
 
 
 def strip(v):

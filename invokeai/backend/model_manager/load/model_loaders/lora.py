@@ -9,17 +9,17 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
-    AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.load_default import ModelLoader
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
-from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import (
     is_state_dict_likely_flux_control,
     lora_model_from_flux_control_state_dict,

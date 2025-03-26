@@ -14,10 +14,12 @@ from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    BaseModelType,
-    ClipVariantType,
     ControlAdapterDefaultSettings,
     MainModelDefaultSettings,
+)
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ClipVariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,

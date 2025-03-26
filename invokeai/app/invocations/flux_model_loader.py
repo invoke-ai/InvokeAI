@@ -17,8 +17,8 @@ from invokeai.app.util.t5_model_identifier import (
 from invokeai.backend.flux.util import max_seq_lengths
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
-    SubModelType,
 )
+from invokeai.backend.model_manager.taxonomy import SubModelType
 
 
 @invocation_output("flux_model_loader_output")

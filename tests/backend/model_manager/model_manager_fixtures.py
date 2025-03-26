@@ -14,18 +14,15 @@ from invokeai.app.services.model_install import ModelInstallService, ModelInstal
 from invokeai.app.services.model_load import ModelLoadService, ModelLoadServiceBase
 from invokeai.app.services.model_manager import ModelManagerService, ModelManagerServiceBase
 from invokeai.app.services.model_records import ModelRecordServiceBase, ModelRecordServiceSQL
+from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType, ModelVariantType
 from invokeai.backend.model_manager.config import (
-    BaseModelType,
     LoRADiffusersConfig,
     MainCheckpointConfig,
     MainDiffusersConfig,
-    ModelFormat,
-    ModelSourceType,
-    ModelType,
-    ModelVariantType,
     VAEDiffusersConfig,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.taxonomy import ModelSourceType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (

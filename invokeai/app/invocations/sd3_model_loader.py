@@ -14,7 +14,7 @@ from invokeai.app.util.t5_model_identifier import (
     preprocess_t5_encoder_model_identifier,
     preprocess_t5_tokenizer_model_identifier,
 )
-from invokeai.backend.model_manager.config import SubModelType
+from invokeai.backend.model_manager.taxonomy import SubModelType
 
 
 @invocation_output("sd3_model_loader_output")

@@ -19,22 +19,24 @@ from invokeai.backend.flux.redux.flux_redux_state_dict_utils import is_state_dic
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    AnyVariant,
-    BaseModelType,
     ControlAdapterDefaultSettings,
     InvalidModelConfigException,
     MainModelDefaultSettings,
     ModelConfigFactory,
+    SubmodelDefinition,
+)
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import ConfigLoader
+from invokeai.backend.model_manager.taxonomy import (
+    AnyVariant,
+    BaseModelType,
     ModelFormat,
     ModelRepoVariant,
     ModelSourceType,
     ModelType,
     ModelVariantType,
     SchedulerPredictionType,
-    SubmodelDefinition,
     SubModelType,
 )
-from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import ConfigLoader
 from invokeai.backend.model_manager.util.model_util import (
     get_clip_variant_type,
     lora_token_vector_length,

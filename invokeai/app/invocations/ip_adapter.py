@@ -13,10 +13,8 @@ from invokeai.app.services.model_records.model_records_base import ModelRecordCh
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    BaseModelType,
     IPAdapterCheckpointConfig,
     IPAdapterInvokeAIConfig,
-    ModelType,
 )
 from invokeai.backend.model_manager.starter_models import (
     StarterModel,
@@ -24,6 +22,7 @@ from invokeai.backend.model_manager.starter_models import (
     ip_adapter_sd_image_encoder,
     ip_adapter_sdxl_image_encoder,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 
 class IPAdapterField(BaseModel):

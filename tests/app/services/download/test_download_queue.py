@@ -22,7 +22,6 @@ from invokeai.app.services.events.events_common import (
     DownloadStartedEvent,
 )
 from invokeai.backend.model_manager.metadata import HuggingFaceMetadataFetch, ModelMetadataWithFiles, RemoteModelFile
-from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.test_nodes import TestEventService
 
 # Prevent pytest deprecation warnings

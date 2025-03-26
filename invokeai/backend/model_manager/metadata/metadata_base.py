@@ -23,7 +23,7 @@ from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 from typing_extensions import Annotated
 
-from invokeai.backend.model_manager import ModelRepoVariant
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 from invokeai.backend.model_manager.util.select_hf_files import filter_files
 
 

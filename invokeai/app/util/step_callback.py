@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
-from invokeai.backend.model_manager.config import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 # fast latents preview matrix for sdxl

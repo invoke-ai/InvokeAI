@@ -20,14 +20,10 @@ from invokeai.app.services.session_processor.session_processor_common import Pro
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.step_callback import flux_step_callback, stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
-    AnyModel,
     AnyModelConfig,
-    BaseModelType,
-    ModelFormat,
-    ModelType,
-    SubModelType,
 )
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
+from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 

@@ -15,10 +15,8 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    BaseModelType,
-    ModelType,
-    SubModelType,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
 class ModelIdentifierField(BaseModel):

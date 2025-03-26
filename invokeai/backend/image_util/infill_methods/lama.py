@@ -6,8 +6,8 @@ import torch
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
+from invokeai.backend.model_manager.taxonomy import AnyModel
 
 
 def norm_img(np_img):

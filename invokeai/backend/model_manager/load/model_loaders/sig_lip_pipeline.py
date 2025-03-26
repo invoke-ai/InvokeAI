@@ -2,15 +2,11 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.backend.model_manager.config import (
-    AnyModel,
     AnyModelConfig,
-    BaseModelType,
-    ModelFormat,
-    ModelType,
-    SubModelType,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.sig_lip.sig_lip_pipeline import SigLipPipeline
 
 

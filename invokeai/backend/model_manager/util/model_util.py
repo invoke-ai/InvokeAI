@@ -8,7 +8,7 @@ import picklescan.scanner as pscan
 import safetensors
 import torch
 
-from invokeai.backend.model_manager.config import ClipVariantType
+from invokeai.backend.model_manager.taxonomy import ClipVariantType
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 
 

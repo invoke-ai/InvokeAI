@@ -49,7 +49,7 @@ from invokeai.backend.flux.sampling_utils import (
     unpack,
 )
 from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
-from invokeai.backend.model_manager.config import ModelFormat, ModelVariantType
+from invokeai.backend.model_manager.taxonomy import ModelFormat, ModelVariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw

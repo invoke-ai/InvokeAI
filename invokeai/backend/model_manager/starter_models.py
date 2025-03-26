@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 
 class StarterModelWithoutDependencies(BaseModel):

@@ -60,11 +60,9 @@ from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
-    BaseModelType,
     ModelConfigFactory,
-    ModelFormat,
-    ModelType,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 
 class ModelRecordServiceSQL(ModelRecordServiceBase):

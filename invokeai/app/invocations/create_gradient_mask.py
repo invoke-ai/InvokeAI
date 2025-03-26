@@ -19,7 +19,8 @@ from invokeai.app.invocations.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.model import UNetField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager import LoadedModel
-from invokeai.backend.model_manager.config import MainConfigBase, ModelVariantType
+from invokeai.backend.model_manager.config import MainConfigBase
+from invokeai.backend.model_manager.taxonomy import ModelVariantType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 
 

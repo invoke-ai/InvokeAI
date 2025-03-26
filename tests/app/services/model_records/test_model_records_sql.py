@@ -16,19 +16,16 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.model_manager.config import (
-    BaseModelType,
     ControlAdapterDefaultSettings,
     MainDiffusersConfig,
     MainModelDefaultSettings,
-    ModelFormat,
-    ModelSourceType,
-    ModelType,
     TextualInversionFileConfig,
     VAEDiffusersConfig,
 )
+from invokeai.backend.model_manager.taxonomy import ModelSourceType
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 

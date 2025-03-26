@@ -44,7 +44,8 @@ if TYPE_CHECKING:
         SessionQueueItem,
         SessionQueueStatus,
     )
-    from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
+    from invokeai.backend.model_manager import SubModelType
+    from invokeai.backend.model_manager.config import AnyModelConfig
 
 
 class EventServiceBase:
