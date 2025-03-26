@@ -4,7 +4,7 @@ import torch
 from PIL.Image import Image
 from pydantic import field_validator
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, UIComponent, UIType
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
@@ -13,7 +13,14 @@ from invokeai.backend.llava_onevision_model import LlavaOnevisionModel
 from invokeai.backend.util.devices import TorchDevice
 
 
-@invocation("llava_onevision_vllm", title="LLaVA OneVision VLLM", tags=["vllm"], category="vllm", version="1.0.0")
+@invocation(
+    "llava_onevision_vllm",
+    title="LLaVA OneVision VLLM",
+    tags=["vllm"],
+    category="vllm",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
 class LlavaOnevisionVllmInvocation(BaseInvocation):
     """Run a LLaVA OneVision VLLM model."""
 

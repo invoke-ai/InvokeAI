@@ -11,7 +11,7 @@ from transformers import (
     T5TokenizerFast,
 )
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import SD3ConditioningOutput
@@ -33,7 +33,6 @@ SD3_T5_MAX_SEQ_LEN = 256
     tags=["prompt", "conditioning", "sd3"],
     category="conditioning",
     version="1.0.1",
-    classification=Classification.Prototype,
 )
 class Sd3TextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a SD3 image."""

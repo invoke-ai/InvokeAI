@@ -3,7 +3,6 @@ from typing import Optional
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Classification,
     invocation,
     invocation_output,
 )
@@ -32,7 +31,6 @@ class FluxLoRALoaderOutput(BaseInvocationOutput):
     tags=["lora", "model", "flux"],
     category="model",
     version="1.2.1",
-    classification=Classification.Prototype,
 )
 class FluxLoRALoaderInvocation(BaseInvocation):
     """Apply a LoRA model to a FLUX transformer and/or text encoder."""
@@ -111,7 +109,6 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     tags=["lora", "model", "flux"],
     category="model",
     version="1.3.1",
-    classification=Classification.Prototype,
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to a FLUX transformer."""
