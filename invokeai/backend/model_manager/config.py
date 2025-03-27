@@ -377,11 +377,11 @@ class LoRAConfigBase(ABC, BaseModel):
 
     @classmethod
     def flux_lora_format(cls, mod: ModelOnDisk):
-        from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
-
         key = "FLUX_LORA_FORMAT"
         if key in mod.cache:
             return mod.cache[key]
+
+        from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
 
         sd = mod.load_state_dict(mod.path)
         value = flux_format_from_state_dict(sd)
