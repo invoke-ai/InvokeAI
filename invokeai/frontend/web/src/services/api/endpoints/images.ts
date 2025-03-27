@@ -318,37 +318,11 @@ export const imagesApi = api.injectEndpoints({
       },
     }),
     createImageUploadEntry: build.mutation<ImageUploadEntryResponse, ImageUploadEntryRequest>({
-      query: ({ width, height }) => ({
+      query: ({ width, height, board_id }) => ({
         url: buildImagesUrl(),
         method: 'POST',
-        body: { width, height },
+        body: { width, height, board_id },
       }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          // Don't add it to anything
-          return [];
-        }
-        const categories = getCategories(result.image_dto);
-        const boardId = result.image_dto.board_id ?? 'none';
-
-        return [
-          {
-            type: 'ImageList',
-            id: getListImagesUrl({
-              board_id: boardId,
-              categories,
-            }),
-          },
-          {
-            type: 'Board',
-            id: boardId,
-          },
-          {
-            type: 'BoardImagesTotal',
-            id: boardId,
-          },
-        ];
-      },
     }),
     deleteBoard: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),

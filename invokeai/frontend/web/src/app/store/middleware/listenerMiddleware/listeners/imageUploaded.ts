@@ -11,6 +11,7 @@ import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { getCategories, getListImagesUrl } from 'services/api/util';
 const log = logger('gallery');
 
 /**
@@ -59,6 +60,29 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
+      if (imageUploadedClientSide.match(action)) {
+        const categories = getCategories(imageDTO);
+        const boardId = imageDTO.board_id ?? 'none';
+        dispatch(
+          imagesApi.util.invalidateTags([
+            {
+              type: 'ImageList',
+              id: getListImagesUrl({
+                board_id: boardId,
+                categories,
+              }),
+            },
+            {
+              type: 'Board',
+              id: boardId,
+            },
+            {
+              type: 'BoardImagesTotal',
+              id: boardId,
+            },
+          ])
+        );
+      }
       const state = getState();
 
       log.debug({ imageDTO }, 'Image uploaded');
