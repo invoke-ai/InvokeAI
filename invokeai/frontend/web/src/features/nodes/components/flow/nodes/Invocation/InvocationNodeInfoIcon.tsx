@@ -1,9 +1,9 @@
 import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { compare } from 'compare-versions';
-import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
 import { useInvocationNodeNotes } from 'features/nodes/hooks/useNodeNotes';
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
+import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
 import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +29,7 @@ const TooltipContent = memo(({ nodeId }: { nodeId: string }) => {
   const notes = useInvocationNodeNotes(nodeId);
   const label = useNodeUserTitleSafe(nodeId);
   const version = useNodeVersion(nodeId);
-  const nodeTemplate = useNodeTemplate(nodeId);
+  const nodeTemplate = useNodeTemplateOrThrow(nodeId);
   const { t } = useTranslation();
 
   const title = useMemo(() => {

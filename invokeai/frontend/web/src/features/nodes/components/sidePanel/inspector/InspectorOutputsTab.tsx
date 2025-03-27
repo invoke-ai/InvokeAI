@@ -5,7 +5,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { TemplateGate } from 'features/nodes/components/sidePanel/inspector/NodeTemplateGate';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
 import { selectLastSelectedNodeId } from 'features/nodes/store/selectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,7 +37,7 @@ const getKey = (result: AnyInvocationOutput, i: number) => `${result.type}-${i}`
 
 const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const nes = useNodeExecutionState(nodeId);
 
   if (!nes || nes.outputs.length === 0) {

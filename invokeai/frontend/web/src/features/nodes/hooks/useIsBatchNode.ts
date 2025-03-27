@@ -1,9 +1,9 @@
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import { isBatchNodeType, isGeneratorNodeType } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
 export const useIsExecutableNode = (nodeId: string) => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const isExecutableNode = useMemo(
     () => !isBatchNodeType(template.type) && !isGeneratorNodeType(template.type),
     [template]
