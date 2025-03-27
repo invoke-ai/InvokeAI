@@ -2,8 +2,10 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
+import { $outputNodeId } from 'features/nodes/components/sidePanel/builder/deploy';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectNodeFieldElementsDeduped } from 'features/nodes/store/workflowSlice';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
@@ -12,6 +14,7 @@ import { groupBy } from 'lodash-es';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import type { Batch, EnqueueBatchArg } from 'services/api/types';
+import { assert } from 'tsafe';
 
 const log = logger('generation');
 
@@ -95,6 +98,29 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         }
       }
 
+      const nodeFieldElements = selectNodeFieldElementsDeduped(state);
+      const outputNodeId = $outputNodeId.get();
+      assert(outputNodeId !== null, 'Output node not selected');
+      const outputNodeType = selectNodeData(selectNodesSlice(state), outputNodeId).type;
+      const outputNodeTemplate = templates[outputNodeType];
+      assert(outputNodeTemplate, `Template for node type ${outputNodeType} not found`);
+      const outputFieldNames = Object.keys(outputNodeTemplate.outputs);
+      const api_output_fields = outputFieldNames.map((fieldName) => {
+        return {
+          kind: 'output',
+          node_id: outputNodeId,
+          field_name: fieldName,
+        } as const;
+      });
+      const api_input_fields = nodeFieldElements.map((el) => {
+        const { nodeId, fieldName } = el.data.fieldIdentifier;
+        return {
+          kind: 'input',
+          node_id: nodeId,
+          field_name: fieldName,
+        } as const;
+      });
+
       const batchConfig: EnqueueBatchArg = {
         batch: {
           graph,
@@ -103,9 +129,12 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           origin: 'workflows',
           destination: 'gallery',
           data,
-          is_api_validation_run: isApiValidationRun,
         },
         prepend,
+        is_api_validation_run: true,
+        // is_api_validation_run: isApiValidationRun,
+        api_input_fields,
+        api_output_fields,
       };
 
       const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));

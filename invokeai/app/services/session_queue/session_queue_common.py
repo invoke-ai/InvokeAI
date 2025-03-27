@@ -8,7 +8,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    PrivateAttr,
     StrictStr,
     TypeAdapter,
     field_validator,
@@ -91,13 +90,6 @@ class Batch(BaseModel):
     runs: int = Field(
         default=1, ge=1, description="Int stating how many times to iterate through all possible batch indices"
     )
-    is_api_validation_run: bool = Field(
-        default=False,
-        description="Whether this batch is an API validation run.",
-    )
-
-    _session_count: int | None = PrivateAttr(default=None)
-    """The number of sessions that would be created by the batch. Cached result of self.get_session_count() - use that method instead."""
 
     @field_validator("data")
     def validate_lengths(cls, v: Optional[BatchDataCollection]):
@@ -165,18 +157,6 @@ class Batch(BaseModel):
         v.validate_self()
         return v
 
-    @model_validator(mode="after")
-    def validation_run_has_exactly_1_session(self):
-        if not self.is_api_validation_run:
-            return self
-
-        session_count = self.get_session_count()
-
-        if session_count != 1:
-            raise ValueError(f"Validation runs must have a single session count, got {session_count}")
-
-        return self
-
     def get_session_count(self) -> int:
         """
         Calculates the number of sessions that would be created by the batch, without incurring the overhead of actually
@@ -187,14 +167,6 @@ class Batch(BaseModel):
 
         If the session count has already been calculated, return the cached value.
         """
-        if self._session_count is not None:
-            return self._session_count
-
-        self._session_count = self._get_session_count()
-        return self._session_count
-
-    def _get_session_count(self) -> int:
-        """Does the actual calculation of the session count."""
         if not self.data:
             return self.runs
         data = []
@@ -251,6 +223,12 @@ def get_workflow(queue_item_dict: dict) -> Optional[WorkflowWithoutID]:
     return None
 
 
+class FieldIdentifier(BaseModel):
+    kind: Literal["input", "output"] = Field(description="The kind of field")
+    node_id: str = Field(description="The ID of the node")
+    field_name: str = Field(description="The name of the field")
+
+
 class SessionQueueItemWithoutGraph(BaseModel):
     """Session queue item without the full graph. Used for serialization."""
 
@@ -290,6 +268,12 @@ class SessionQueueItemWithoutGraph(BaseModel):
     is_api_validation_run: bool = Field(
         default=False,
         description="Whether this queue item is an API validation run.",
+    )
+    api_input_fields: Optional[list[FieldIdentifier]] = Field(
+        default=None, description="The fields that were used as input to the API"
+    )
+    api_output_fields: Optional[list[FieldIdentifier]] = Field(
+        default=None, description="The nodes that were used as output from the API"
     )
 
     @classmethod

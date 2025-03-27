@@ -33,7 +33,12 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> Coroutine[Any, Any, EnqueueBatchResult]:
+    def enqueue_batch(
+        self,
+        queue_id: str,
+        batch: Batch,
+        prepend: bool,
+    ) -> Coroutine[Any, Any, EnqueueBatchResult]:
         """Enqueues all permutations of a batch for execution."""
         pass
 

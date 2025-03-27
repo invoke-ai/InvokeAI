@@ -118,6 +118,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 priority = self._get_highest_priority(queue_id) + 1
 
             requested_count = batch.get_session_count()
+
             values_to_insert = prepare_values_to_insert(
                 queue_id=queue_id,
                 batch=batch,
