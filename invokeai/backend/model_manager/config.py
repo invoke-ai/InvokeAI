@@ -43,6 +43,7 @@ from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
     ClipVariantType,
+    FluxLoRAFormat,
     ModelFormat,
     ModelRepoVariant,
     ModelSourceType,
@@ -50,19 +51,18 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelVariantType,
     SchedulerPredictionType,
     SubModelType,
-    FluxLoRAFormat
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
-
 logger = logging.getLogger(__name__)
 
 
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognize this combination of model type and format."""
+
     pass
 
 
@@ -371,6 +371,7 @@ class DiffusersConfigBase(ABC, BaseModel):
 
 class LoRAConfigBase(ABC, BaseModel):
     """Base class for LoRA models."""
+
     type: Literal[ModelType.LoRA] = ModelType.LoRA
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
 
@@ -423,6 +424,7 @@ class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase, LegacyProbeMixin,
 
 class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
     """Model config for LoRA/Lycoris models."""
+
     format: Literal[ModelFormat.LyCORIS] = ModelFormat.LyCORIS
 
     @classmethod
@@ -476,6 +478,7 @@ class ControlLoRADiffusersConfig(ControlAdapterConfigBase, LegacyProbeMixin, Mod
 
 class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
     """Model config for LoRA/Diffusers models."""
+
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
     @classmethod

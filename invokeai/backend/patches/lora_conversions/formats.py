@@ -1,10 +1,14 @@
-from enum import Enum
-
 from invokeai.backend.model_manager.taxonomy import FluxLoRAFormat
-from .flux_control_lora_utils import is_state_dict_likely_flux_control
-from .flux_diffusers_lora_conversion_utils import is_state_dict_likely_in_flux_diffusers_format
-from .flux_onetrainer_lora_conversion_utils import is_state_dict_likely_in_flux_onetrainer_format
-from .flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
+from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_diffusers_format,
+)
+from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_kohya_format,
+)
+from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_onetrainer_format,
+)
 
 
 def flux_format_from_state_dict(state_dict):

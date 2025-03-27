@@ -128,6 +128,7 @@ class ModelSourceType(str, Enum):
 
 class FluxLoRAFormat(str, Enum):
     """Flux LoRA formats."""
+
     Diffusers = "flux.diffusers"
     Kohya = "flux.kohya"
     OneTrainer = "flux.onetrainer"
