@@ -7,6 +7,8 @@ import type {
   DeleteBoardResult,
   GraphAndWorkflowResponse,
   ImageDTO,
+  ImageUploadEntryRequest,
+  ImageUploadEntryResponse,
   ListImagesArgs,
   ListImagesResponse,
   UploadImageArg,
@@ -287,6 +289,7 @@ export const imagesApi = api.injectEndpoints({
           },
         };
       },
+
       invalidatesTags: (result) => {
         if (!result || result.is_intermediate) {
           // Don't add it to anything
@@ -314,7 +317,39 @@ export const imagesApi = api.injectEndpoints({
         ];
       },
     }),
+    createImageUploadEntry: build.mutation<ImageUploadEntryResponse, ImageUploadEntryRequest>({
+      query: ({ width, height }) => ({
+        url: buildImagesUrl(),
+        method: 'POST',
+        body: { width, height },
+      }),
+      invalidatesTags: (result) => {
+        if (!result) {
+          // Don't add it to anything
+          return [];
+        }
+        const categories = getCategories(result.image_dto);
+        const boardId = result.image_dto.board_id ?? 'none';
 
+        return [
+          {
+            type: 'ImageList',
+            id: getListImagesUrl({
+              board_id: boardId,
+              categories,
+            }),
+          },
+          {
+            type: 'Board',
+            id: boardId,
+          },
+          {
+            type: 'BoardImagesTotal',
+            id: boardId,
+          },
+        ];
+      },
+    }),
     deleteBoard: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),
       invalidatesTags: () => [
@@ -549,6 +584,7 @@ export const {
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
   useUploadImageMutation,
+  useCreateImageUploadEntryMutation,
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
