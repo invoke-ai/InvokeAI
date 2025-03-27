@@ -1,4 +1,4 @@
-import { useNodeTemplateSafe } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateSafe } from 'features/nodes/hooks/useNodeTemplateSafe';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { memo } from 'react';
 

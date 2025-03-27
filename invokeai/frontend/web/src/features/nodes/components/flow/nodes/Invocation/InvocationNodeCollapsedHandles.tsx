@@ -1,5 +1,5 @@
 import { Handle, Position } from '@xyflow/react';
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
 import { map } from 'lodash-es';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
@@ -19,7 +19,7 @@ const collapsedHandleStyles: CSSProperties = {
 };
 
 const InvocationNodeCollapsedHandles = ({ nodeId }: Props) => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
 
   if (!template) {
     return null;

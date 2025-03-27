@@ -2,7 +2,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
 import { TemplateGate } from 'features/nodes/components/sidePanel/inspector/NodeTemplateGate';
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
 import { selectLastSelectedNodeId } from 'features/nodes/store/selectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +29,7 @@ export default memo(NodeTemplateInspector);
 
 const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
 
   return <DataViewer data={template} label={t('nodes.nodeTemplate')} bg="base.850" color="base.200" />;
 });

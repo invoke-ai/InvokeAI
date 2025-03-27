@@ -1,9 +1,9 @@
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import { some } from 'lodash-es';
 import { useMemo } from 'react';
 
 export const useNodeHasImageOutput = (nodeId: string): boolean => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const hasImageOutput = useMemo(
     () =>
       some(

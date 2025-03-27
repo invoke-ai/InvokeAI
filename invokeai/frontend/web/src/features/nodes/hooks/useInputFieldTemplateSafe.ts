@@ -1,4 +1,4 @@
-import { useNodeTemplateSafe } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateSafe } from 'features/nodes/hooks/useNodeTemplateSafe';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 

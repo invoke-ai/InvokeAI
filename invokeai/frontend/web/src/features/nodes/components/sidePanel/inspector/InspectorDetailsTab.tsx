@@ -5,7 +5,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { InvocationNodeNotesTextarea } from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeNotesTextarea';
 import { TemplateGate } from 'features/nodes/components/sidePanel/inspector/NodeTemplateGate';
 import { useNodeNeedsUpdate } from 'features/nodes/hooks/useNodeNeedsUpdate';
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
 import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
 import { selectLastSelectedNodeId } from 'features/nodes/store/selectors';
 import { memo } from 'react';
@@ -36,7 +36,7 @@ export default memo(InspectorDetailsTab);
 const Content = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
   const version = useNodeVersion(nodeId);
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const needsUpdate = useNodeNeedsUpdate(nodeId);
 
   return (

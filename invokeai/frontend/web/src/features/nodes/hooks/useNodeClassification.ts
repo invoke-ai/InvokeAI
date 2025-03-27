@@ -1,9 +1,9 @@
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import type { Classification } from 'features/nodes/types/common';
 import { useMemo } from 'react';
 
 export const useNodeClassification = (nodeId: string): Classification => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const classification = useMemo(() => template.classification, [template]);
   return classification;
 };

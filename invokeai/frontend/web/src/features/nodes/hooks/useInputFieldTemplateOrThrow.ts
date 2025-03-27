@@ -1,4 +1,4 @@
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
@@ -13,7 +13,7 @@ import { assert } from 'tsafe';
  * @throws Will throw an error if the template for the input field is not found.
  */
 export const useInputFieldTemplateOrThrow = (nodeId: string, fieldName: string): FieldInputTemplate => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const fieldTemplate = useMemo(() => {
     const _fieldTemplate = template.inputs[fieldName];
     assert(_fieldTemplate, `Template for input field ${fieldName} not found.`);
