@@ -2007,12 +2007,6 @@ export type components = {
              * @default 1
              */
             runs: number;
-            /**
-             * Is Api Validation Run
-             * @description Whether this batch is an API validation run.
-             * @default false
-             */
-            is_api_validation_run?: boolean;
         };
         /** BatchDatum */
         BatchDatum: {
@@ -2468,6 +2462,22 @@ export type components = {
              * @default false
              */
             prepend?: boolean;
+            /**
+             * Is Api Validation Run
+             * @description Whether or not this is a validation run.
+             * @default false
+             */
+            is_api_validation_run?: boolean;
+            /**
+             * Api Input Fields
+             * @description The fields that were used as input to the API
+             */
+            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
+            /**
+             * Api Output Fields
+             * @description The nodes that were used as output from the API
+             */
+            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -6867,6 +6877,25 @@ export type components = {
              * @description The y coordinate of the bounding box's top side
              */
             y: number;
+        };
+        /** FieldIdentifier */
+        FieldIdentifier: {
+            /**
+             * Kind
+             * @description The kind of field
+             * @enum {string}
+             */
+            kind: "input" | "output";
+            /**
+             * Node Id
+             * @description The ID of the node
+             */
+            node_id: string;
+            /**
+             * Field Name
+             * @description The name of the field
+             */
+            field_name: string;
         };
         /**
          * FieldKind
@@ -19479,6 +19508,16 @@ export type components = {
              * @default false
              */
             is_api_validation_run?: boolean;
+            /**
+             * Api Input Fields
+             * @description The fields that were used as input to the API
+             */
+            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
+            /**
+             * Api Output Fields
+             * @description The nodes that were used as output from the API
+             */
+            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
@@ -19580,6 +19619,16 @@ export type components = {
              * @default false
              */
             is_api_validation_run?: boolean;
+            /**
+             * Api Input Fields
+             * @description The fields that were used as input to the API
+             */
+            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
+            /**
+             * Api Output Fields
+             * @description The nodes that were used as output from the API
+             */
+            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {

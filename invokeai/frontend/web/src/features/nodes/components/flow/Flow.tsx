@@ -4,6 +4,7 @@ import type {
   EdgeChange,
   HandleType,
   NodeChange,
+  NodeMouseHandler,
   OnEdgesChange,
   OnInit,
   OnMoveEnd,
@@ -16,6 +17,7 @@ import type {
 import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { $isSelectingOutputNode, $outputNodeId } from 'features/nodes/components/sidePanel/builder/deploy';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useNodeCopyPaste } from 'features/nodes/hooks/useNodeCopyPaste';
@@ -44,7 +46,7 @@ import {
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/store/workflowSettingsSlice';
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
-import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
+import { type AnyEdge, type AnyNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -322,6 +324,18 @@ export const Flow = memo(() => {
     dependencies: [deleteSelection, isWorkflowsFocused],
   });
 
+  const onNodeClick = useCallback<NodeMouseHandler<AnyNode>>((e, node) => {
+    if (!$isSelectingOutputNode.get()) {
+      return;
+    }
+    if (!isInvocationNode(node)) {
+      return;
+    }
+    const { id } = node.data;
+    $outputNodeId.set(id);
+    $isSelectingOutputNode.set(false);
+  }, []);
+
   return (
     <ReactFlow<AnyNode, AnyEdge>
       id="workflow-editor"
@@ -332,6 +346,7 @@ export const Flow = memo(() => {
       nodes={nodes}
       edges={edges}
       onInit={onInit}
+      onNodeClick={onNodeClick}
       onMouseMove={onMouseMove}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}

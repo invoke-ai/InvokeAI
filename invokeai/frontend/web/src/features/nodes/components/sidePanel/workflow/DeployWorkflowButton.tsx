@@ -1,6 +1,6 @@
 import { Button } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $isDeploying } from 'features/nodes/components/sidePanel/builder/deploy';
+import { $isInDeployFlow } from 'features/nodes/components/sidePanel/builder/deploy';
 import { selectIsWorkflowSaved } from 'features/nodes/store/workflowSlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback } from 'react';
@@ -13,7 +13,7 @@ export const DeployWorkflowButton = memo(() => {
   const isWorkflowSaved = useAppSelector(selectIsWorkflowSaved);
 
   const onClick = useCallback(() => {
-    $isDeploying.set(true);
+    $isInDeployFlow.set(true);
   }, []);
 
   return (

@@ -1,7 +1,4 @@
 import { Box } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $isDeploying } from 'features/nodes/components/sidePanel/builder/deploy';
-import { DeployWorkflowPanelContent } from 'features/nodes/components/sidePanel/workflow/DeployWorkflowPanelContent';
 import { HorizontalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef } from 'react';
@@ -23,8 +20,6 @@ export const EditModeLeftPanelContent = memo(() => {
     panelGroupRef.current.setLayout([50, 50]);
   }, []);
 
-  const isDeploying = useStore($isDeploying);
-
   return (
     <Box position="relative" w="full" h="full">
       <PanelGroup
@@ -35,8 +30,7 @@ export const EditModeLeftPanelContent = memo(() => {
         style={panelGroupStyles}
       >
         <Panel id="workflow" collapsible minSize={25}>
-          {!isDeploying && <WorkflowFieldsLinearViewPanel />}
-          {isDeploying && <DeployWorkflowPanelContent />}
+          <WorkflowFieldsLinearViewPanel />
         </Panel>
         <HorizontalResizeHandle onDoubleClick={handleDoubleClickHandle} />
         <Panel id="inspector" collapsible minSize={25}>

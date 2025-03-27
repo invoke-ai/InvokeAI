@@ -1,10 +1,13 @@
-from typing import Optional
+import json
+from typing import Any, Optional
 
 from fastapi import Body, Path, Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.invocations.fields import BoardField
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
@@ -15,6 +18,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByDestinationResult,
     ClearResult,
     EnqueueBatchResult,
+    FieldIdentifier,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -22,6 +26,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemDTO,
     SessionQueueStatus,
 )
+from invokeai.app.services.shared.compose_pydantic_model import compose_model_from_fields
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
@@ -32,6 +37,17 @@ class SessionQueueAndProcessorStatus(BaseModel):
 
     queue: SessionQueueStatus
     processor: SessionProcessorStatus
+
+
+class SimpleModelIdentifer(BaseModel):
+    id: str = Field(description="The model id")
+
+
+model_field_overrides = {ModelIdentifierField: (SimpleModelIdentifer, Field(description="The model identifier"))}
+
+
+def model_field_filter(field_type: type[Any]) -> bool:
+    return field_type not in {BoardField, Optional[BoardField]}
 
 
 @session_queue_router.post(
@@ -45,8 +61,44 @@ async def enqueue_batch(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
+    is_api_validation_run: bool = Body(
+        default=False,
+        description="Whether or not this is a validation run.",
+    ),
+    api_input_fields: Optional[list[FieldIdentifier]] = Body(
+        default=None, description="The fields that were used as input to the API"
+    ),
+    api_output_fields: Optional[list[FieldIdentifier]] = Body(
+        default=None, description="The fields that were used as output from the API"
+    ),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution."""
+
+    if is_api_validation_run:
+        session_count = batch.get_session_count()
+        assert session_count == 1, "API validation run only supports single session batches"
+
+        if api_input_fields:
+            composed_model = compose_model_from_fields(
+                g=batch.graph,
+                field_identifiers=api_input_fields,
+                composed_model_class_name="APIInputModel",
+                model_field_overrides=model_field_overrides,
+                model_field_filter=model_field_filter,
+            )
+            json_schema = composed_model.model_json_schema(mode="validation")
+            print("API Input Model")
+            print(json.dumps(json_schema))
+
+        if api_output_fields:
+            composed_model = compose_model_from_fields(
+                g=batch.graph,
+                field_identifiers=api_output_fields,
+                composed_model_class_name="APIOutputModel",
+            )
+            json_schema = composed_model.model_json_schema(mode="validation")
+            print("API Output Model")
+            print(json.dumps(json_schema))
 
     return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
         queue_id=queue_id, batch=batch, prepend=prepend
