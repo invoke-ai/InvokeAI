@@ -141,6 +141,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
     onDropRejected,
     disabled: isDisabled,
     noDrag: true,
+    multiple: allowMultiple,
   });
 
   return { getUploadButtonProps, getUploadInputProps, openUploader, request };
