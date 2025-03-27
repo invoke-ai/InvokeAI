@@ -1095,6 +1095,7 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Expands a mask with a fade effect. The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
     The mask is thresholded to create a binary mask, and then a distance transform is applied to create a fade effect.
     The fade size is specified in pixels, and the mask is expanded by that amount. The result is a mask with a smooth transition from black to white.
+    If the fade size is 0, the mask is returned as-is.
     """
 
     mask: ImageField = InputField(description="The mask to expand")
@@ -1103,6 +1104,11 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_mask = context.images.get_pil(self.mask.image_name, mode="L")
+
+        if self.fade_size_px == 0:
+            # If the fade size is 0, just return the mask as-is.
+            image_dto = context.images.save(image=pil_mask, image_category=ImageCategory.MASK)
+            return ImageOutput.build(image_dto)
 
         np_mask = numpy.array(pil_mask)
 
