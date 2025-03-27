@@ -23,8 +23,9 @@ class ModelOnDisk:
         else:
             self.name = path.name
         self.hash_algo = hash_algo
-        self.cache = {}
-        self._state_dict_cache = {}
+        # Having a cache helps users of ModelOnDisk (i.e. configs) to save state
+        # This prevents redundant computations during matching and parsing
+        self.cache = {"_CACHED_STATE_DICTS": {}}
 
     def hash(self) -> str:
         return ModelHash(algorithm=self.hash_algo).hash(self.path)
@@ -58,8 +59,10 @@ class ModelOnDisk:
         return ModelRepoVariant.Default
 
     def load_state_dict(self, path: Optional[Path] = None) -> StateDict:
-        if path in self._state_dict_cache:
-            return self._state_dict_cache[path]
+        sd_cache = self.cache["_CACHED_STATE_DICTS"]
+
+        if path in sd_cache:
+            return sd_cache[path]
 
         if not path:
             components = list(self.component_paths())
@@ -89,5 +92,5 @@ class ModelOnDisk:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
         state_dict = checkpoint.get("state_dict", checkpoint)
-        self._state_dict_cache[path] = state_dict
+        sd_cache[path] = state_dict
         return state_dict
