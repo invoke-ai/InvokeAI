@@ -50,17 +50,19 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelVariantType,
     SchedulerPredictionType,
     SubModelType,
+    FluxLoRAFormat
 )
+from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.silence_warnings import SilenceWarnings
+
 
 logger = logging.getLogger(__name__)
 
 
 class InvalidModelConfigException(Exception):
     """Exception for when config parser doesn't recognize this combination of model type and format."""
-
     pass
 
 
@@ -102,18 +104,21 @@ class ControlAdapterDefaultSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+StateDict: TypeAlias = dict[str | int, Any]
+
+
 class ModelOnDisk:
     """A utility class representing a model stored on disk."""
 
     def __init__(self, path: Path, hash_algo: HASHING_ALGORITHMS = "blake3_single"):
         self.path = path
-        # TODO: Revisit checkpoint vs diffusers terminology
         self.layout = FSLayout.DIRECTORY if path.is_dir() else FSLayout.FILE
         if self.path.suffix in {".safetensors", ".bin", ".pt", ".ckpt"}:
             self.name = path.stem
         else:
             self.name = path.name
         self.hash_algo = hash_algo
+        self.cache = {}
         self._state_dict_cache = {}
 
     def hash(self) -> str:
@@ -147,7 +152,7 @@ class ModelOnDisk:
                 return ModelRepoVariant.ONNX
         return ModelRepoVariant.Default
 
-    def load_state_dict(self, path: Optional[Path] = None) -> Dict[str | int, Any]:
+    def load_state_dict(self, path: Optional[Path] = None) -> StateDict:
         if path in self._state_dict_cache:
             return self._state_dict_cache[path]
 
@@ -257,7 +262,7 @@ class ModelConfigBase(ABC, BaseModel):
         Created to deprecate ModelProbe.probe
         """
         candidates = ModelConfigBase._USING_CLASSIFY_API
-        sorted_by_match_speed = sorted(candidates, key=lambda cls: cls._MATCH_SPEED)
+        sorted_by_match_speed = sorted(candidates, key=lambda cls: (cls._MATCH_SPEED, cls.__name__))
         mod = ModelOnDisk(model_path, hash_algo)
 
         for config_cls in sorted_by_match_speed:
@@ -307,6 +312,9 @@ class ModelConfigBase(ABC, BaseModel):
 
         if "source_type" in overrides:
             overrides["source_type"] = ModelSourceType(overrides["source_type"])
+
+        if "variant" in overrides:
+            overrides["variant"] = ModelVariantType(overrides["variant"])
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, **overrides):
@@ -363,9 +371,40 @@ class DiffusersConfigBase(ABC, BaseModel):
 
 class LoRAConfigBase(ABC, BaseModel):
     """Base class for LoRA models."""
-
     type: Literal[ModelType.LoRA] = ModelType.LoRA
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+
+    @classmethod
+    def flux_lora_format(cls, mod: ModelOnDisk):
+        from invokeai.backend.patches.lora_conversions.formats import flux_format_from_state_dict
+
+        key = "FLUX_LORA_FORMAT"
+        if key in mod.cache:
+            return mod.cache[key]
+
+        sd = mod.load_state_dict(mod.path)
+        value = flux_format_from_state_dict(sd)
+        mod.cache[key] = value
+        return value
+
+    @classmethod
+    def base_model(cls, mod: ModelOnDisk) -> BaseModelType:
+        if cls.flux_lora_format(mod):
+            return BaseModelType.Flux
+
+        state_dict = mod.load_state_dict()
+        # If we've gotten here, we assume that the model is a Stable Diffusion model
+        token_vector_length = lora_token_vector_length(state_dict)
+        if token_vector_length == 768:
+            return BaseModelType.StableDiffusion1
+        elif token_vector_length == 1024:
+            return BaseModelType.StableDiffusion2
+        elif token_vector_length == 1280:
+            return BaseModelType.StableDiffusionXL  # recognizes format at https://civitai.com/models/224641
+        elif token_vector_length == 2048:
+            return BaseModelType.StableDiffusionXL
+        else:
+            raise InvalidModelConfigException("Unknown LoRA type")
 
 
 class T5EncoderConfigBase(ABC, BaseModel):
@@ -382,10 +421,35 @@ class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase, LegacyProbeMixin,
     format: Literal[ModelFormat.BnbQuantizedLlmInt8b] = ModelFormat.BnbQuantizedLlmInt8b
 
 
-class LoRALyCORISConfig(LoRAConfigBase, LegacyProbeMixin, ModelConfigBase):
+class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
     """Model config for LoRA/Lycoris models."""
-
     format: Literal[ModelFormat.LyCORIS] = ModelFormat.LyCORIS
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.layout == FSLayout.DIRECTORY:
+            return False
+
+        # Avoid false positive match against ControlLoRA and Diffusers
+        if cls.flux_lora_format(mod) in [FluxLoRAFormat.Control, FluxLoRAFormat.Diffusers]:
+            return False
+
+        state_dict = mod.load_state_dict()
+        for key in state_dict.keys():
+            if key.startswith(("lora_te_", "lora_unet_", "lora_te1_", "lora_te2_", "lora_transformer_")):
+                return True
+            # "lora_A.weight" and "lora_B.weight" are associated with models in PEFT format. We don't support all PEFT
+            # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
+            if key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight", "lora_A.weight", "lora_B.weight")):
+                return True
+
+        return False
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {
+            "base": cls.base_model(mod),
+        }
 
 
 class ControlAdapterConfigBase(ABC, BaseModel):
@@ -410,10 +474,24 @@ class ControlLoRADiffusersConfig(ControlAdapterConfigBase, LegacyProbeMixin, Mod
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
 
-class LoRADiffusersConfig(LoRAConfigBase, LegacyProbeMixin, ModelConfigBase):
+class LoRADiffusersConfig(LoRAConfigBase, ModelConfigBase):
     """Model config for LoRA/Diffusers models."""
-
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @classmethod
+    def matches(cls, mod: ModelOnDisk) -> bool:
+        if mod.layout == FSLayout.FILE:
+            return cls.flux_lora_format(mod) == FluxLoRAFormat.Diffusers
+
+        suffixes = ["bin", "safetensors"]
+        weight_files = [mod.path / f"pytorch_lora_weights.{sfx}" for sfx in suffixes]
+        return any(wf.exists() for wf in weight_files)
+
+    @classmethod
+    def parse(cls, mod: ModelOnDisk) -> dict[str, Any]:
+        return {
+            "base": cls.base_model(mod),
+        }
 
 
 class VAECheckpointConfig(CheckpointConfigBase, LegacyProbeMixin, ModelConfigBase):
