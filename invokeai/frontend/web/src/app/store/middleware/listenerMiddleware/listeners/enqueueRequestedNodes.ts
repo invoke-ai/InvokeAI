@@ -98,29 +98,6 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         }
       }
 
-      const nodeFieldElements = selectNodeFieldElementsDeduped(state);
-      const outputNodeId = $outputNodeId.get();
-      assert(outputNodeId !== null, 'Output node not selected');
-      const outputNodeType = selectNodeData(selectNodesSlice(state), outputNodeId).type;
-      const outputNodeTemplate = templates[outputNodeType];
-      assert(outputNodeTemplate, `Template for node type ${outputNodeType} not found`);
-      const outputFieldNames = Object.keys(outputNodeTemplate.outputs);
-      const api_output_fields = outputFieldNames.map((fieldName) => {
-        return {
-          kind: 'output',
-          node_id: outputNodeId,
-          field_name: fieldName,
-        } as const;
-      });
-      const api_input_fields = nodeFieldElements.map((el) => {
-        const { nodeId, fieldName } = el.data.fieldIdentifier;
-        return {
-          kind: 'input',
-          node_id: nodeId,
-          field_name: fieldName,
-        } as const;
-      });
-
       const batchConfig: EnqueueBatchArg = {
         batch: {
           graph,
@@ -131,11 +108,35 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           data,
         },
         prepend,
-        is_api_validation_run: true,
-        // is_api_validation_run: isApiValidationRun,
-        api_input_fields,
-        api_output_fields,
       };
+
+      if (isApiValidationRun) {
+        const nodeFieldElements = selectNodeFieldElementsDeduped(state);
+        const outputNodeId = $outputNodeId.get();
+        assert(outputNodeId !== null, 'Output node not selected');
+        const outputNodeType = selectNodeData(selectNodesSlice(state), outputNodeId).type;
+        const outputNodeTemplate = templates[outputNodeType];
+        assert(outputNodeTemplate, `Template for node type ${outputNodeType} not found`);
+        const outputFieldNames = Object.keys(outputNodeTemplate.outputs);
+        const api_output_fields = outputFieldNames.map((fieldName) => {
+          return {
+            kind: 'output',
+            node_id: outputNodeId,
+            field_name: fieldName,
+          } as const;
+        });
+        const api_input_fields = nodeFieldElements.map((el) => {
+          const { nodeId, fieldName } = el.data.fieldIdentifier;
+          return {
+            kind: 'input',
+            node_id: nodeId,
+            field_name: fieldName,
+          } as const;
+        });
+        batchConfig.is_api_validation_run = true;
+        batchConfig.api_input_fields = api_input_fields;
+        batchConfig.api_output_fields = api_output_fields;
+      }
 
       const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));
       try {
