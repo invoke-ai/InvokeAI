@@ -302,7 +302,10 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 # We catch this error so that the app can still run if there are invalid model configs in the database.
                 # One reason that an invalid model config might be in the database is if someone had to rollback from a
                 # newer version of the app that added a new model type.
-                self._logger.warning(f"Found an invalid model config in the database. Ignoring this model. ({row[0]})")
+                row_data = f"{row[0][:64]}..." if len(row[0]) > 64 else row[0]
+                self._logger.warning(
+                    f"Found an invalid model config in the database. Ignoring this model. ({row_data})"
+                )
             else:
                 results.append(model_config)
 
