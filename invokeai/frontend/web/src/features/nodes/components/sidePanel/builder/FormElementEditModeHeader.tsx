@@ -67,11 +67,8 @@ FormElementEditModeHeader.displayName = 'FormElementEditModeHeader';
 const ZoomToNodeButton = memo(({ element }: { element: NodeFieldElement }) => {
   const { t } = useTranslation();
   const { nodeId } = element.data.fieldIdentifier;
-  const zoomToNode = useZoomToNode();
+  const zoomToNode = useZoomToNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
-  const onClick = useCallback(() => {
-    zoomToNode(nodeId);
-  }, [nodeId, zoomToNode]);
 
   return (
     <IconButton
@@ -79,7 +76,7 @@ const ZoomToNodeButton = memo(({ element }: { element: NodeFieldElement }) => {
       onMouseOut={mouseOverFormField.handleMouseOut}
       tooltip={t('workflows.builder.zoomToNode')}
       aria-label={t('workflows.builder.zoomToNode')}
-      onClick={onClick}
+      onClick={zoomToNode}
       icon={<PiGpsFixBold />}
       variant="link"
       size="sm"

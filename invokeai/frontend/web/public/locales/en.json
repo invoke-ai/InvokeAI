@@ -1785,7 +1785,16 @@
             "minimum": "Minimum",
             "maximum": "Maximum",
             "publish": "Publish",
-            "selectOutputNode": "Select Output Node"
+            "selectOutputNode": "Select Output Node",
+            "cannotPublish": "Cannot publish workflow",
+            "cannotPublishUnsavedWorkflow": "Workflow has unsaved changes",
+            "cannotPublishWorkflowWithBatchOrGeneratorNodes": "Workflow contains batch and/or generator nodes",
+            "cannotPublishInvalidWorkflow": "Workflow graph invalid (hover Invoke button for details)",
+            "cannotPublishWorkflowWithoutOutputNode": "No output node selected",
+            "publishFailed": "Publish failed",
+            "publishFailedDesc": "There was a problem publishing the workflow. Please try again.",
+            "publishSuccess": "Workflow publish started",
+            "publishSuccessDesc": "Your workflow is being published. Check your Project Dashboard to see its progress."
         }
     },
     "controlLayers": {

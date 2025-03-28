@@ -1,6 +1,6 @@
 import { Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { WorkflowBuilder } from 'features/nodes/components/sidePanel/builder/WorkflowBuilder';
-import { DeployWorkflowButton } from 'features/nodes/components/sidePanel/workflow/DeployWorkflowButton';
+import { StartPublishFlowButton } from 'features/nodes/components/sidePanel/workflow/DeployWorkflowPanelContent';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +18,7 @@ const WorkflowFieldsLinearViewPanel = () => {
         <Tab>{t('common.details')}</Tab>
         <Tab>JSON</Tab>
         <Spacer />
-        {deployWorkflowIsEnabled && <DeployWorkflowButton />}
+        {deployWorkflowIsEnabled && <StartPublishFlowButton />}
       </TabList>
 
       <TabPanels h="full" pt={2}>
