@@ -7,7 +7,7 @@ from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from pydantic import field_validator
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.denoise_latents import DenoiseLatentsInvocation, get_scheduler
@@ -56,7 +56,6 @@ def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> C
     title="Tiled Multi-Diffusion Denoise - SD1.5, SDXL",
     tags=["upscale", "denoise"],
     category="latents",
-    classification=Classification.Beta,
     version="1.0.1",
 )
 class TiledMultiDiffusionDenoiseLatents(BaseInvocation):

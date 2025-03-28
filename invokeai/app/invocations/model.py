@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Classification,
     invocation,
     invocation_output,
 )
@@ -124,7 +123,6 @@ class ModelIdentifierOutput(BaseInvocationOutput):
     tags=["model"],
     category="model",
     version="1.0.1",
-    classification=Classification.Prototype,
 )
 class ModelIdentifierInvocation(BaseInvocation):
     """Selects any model, outputting it its identifier. Be careful with this one! The identifier will be accepted as
