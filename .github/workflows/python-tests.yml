@@ -39,26 +39,25 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '3.10'
           - '3.11'
         platform:
-          - linux-cuda-11_7
-          - linux-rocm-5_2
+          # - linux-cuda-12_6
+          # - linux-rocm-6_2
           - linux-cpu
           - macos-default
           - windows-cpu
         include:
-          - platform: linux-cuda-11_7
-            os: ubuntu-22.04
-            github-env: $GITHUB_ENV
-          - platform: linux-rocm-5_2
-            os: ubuntu-22.04
-            extra-index-url: 'https://download.pytorch.org/whl/rocm5.2'
-            github-env: $GITHUB_ENV
+          # - platform: linux-cuda-12_6
+          #   os: ubuntu-24.04
+          #   github-env: $GITHUB_ENV
+          # - platform: linux-rocm-6_2
+          #   os: ubuntu-24.04
+          #   extra-index-url: 'https://download.pytorch.org/whl/rocm6.2'
+          #   github-env: $GITHUB_ENV
           - platform: linux-cpu
-            os: ubuntu-22.04
-            extra-index-url: 'https://download.pytorch.org/whl/cpu'
+            os: ubuntu-24.04
             github-env: $GITHUB_ENV
+            extra-index-url: 'https://download.pytorch.org/whl/cpu'
           - platform: macos-default
             os: macOS-14
             github-env: $GITHUB_ENV
