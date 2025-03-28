@@ -64,7 +64,7 @@ jobs:
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         uses: astral-sh/setup-uv@v5
         with:
-          version: '0.6.4'
+          version: '0.6.10'
           enable-cache: true
 
       - name: ruff check
