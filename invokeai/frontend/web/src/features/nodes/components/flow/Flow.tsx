@@ -17,7 +17,7 @@ import type {
 import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
-import { $isSelectingOutputNode, $outputNodeId } from 'features/nodes/components/sidePanel/builder/deploy';
+import { $isInDeployFlow, $isSelectingOutputNode, $outputNodeId } from 'features/nodes/components/sidePanel/builder/deploy';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useNodeCopyPaste } from 'features/nodes/hooks/useNodeCopyPaste';
@@ -94,6 +94,8 @@ export const Flow = memo(() => {
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
   const isWorkflowsFocused = useIsRegionFocused('workflows');
+  const isInDeployFlow = useStore($isInDeployFlow);
+
   useFocusRegion('workflows', flowWrapper);
 
   useSyncExecutionState();
@@ -359,6 +361,12 @@ export const Flow = memo(() => {
       onMoveEnd={handleMoveEnd}
       connectionLineComponent={CustomConnectionLine}
       isValidConnection={isValidConnection}
+      edgesFocusable={!isInDeployFlow}
+      edgesReconnectable={!isInDeployFlow}
+      nodesDraggable={!isInDeployFlow}
+      nodesConnectable={!isInDeployFlow}
+      nodesFocusable={!isInDeployFlow}
+      elementsSelectable={!isInDeployFlow}
       minZoom={0.1}
       snapToGrid={shouldSnapToGrid}
       snapGrid={snapGrid}
