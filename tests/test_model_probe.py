@@ -17,7 +17,6 @@ from invokeai.backend.model_manager.config import (
     MainDiffusersConfig,
     ModelConfigBase,
     ModelConfigFactory,
-    ModelOnDisk,
     get_model_discriminator_value,
 )
 from invokeai.backend.model_manager.legacy_probe import (
@@ -27,6 +26,7 @@ from invokeai.backend.model_manager.legacy_probe import (
     get_default_settings_control_adapters,
     get_default_settings_main,
 )
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util.logging import InvokeAILogger
 
