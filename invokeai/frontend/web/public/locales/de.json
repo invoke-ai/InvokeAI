@@ -116,7 +116,10 @@
         "combinatorial": "Kombinatorisch",
         "saveChanges": "Änderungen speichern",
         "error_withCount_one": "{{count}} Fehler",
-        "error_withCount_other": "{{count}} Fehler"
+        "error_withCount_other": "{{count}} Fehler",
+        "value": "Wert",
+        "label": "Label",
+        "systemInformation": "Systeminformationen"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -695,7 +698,10 @@
         "guidance": "Führung",
         "coherenceMode": "Modus",
         "recallMetadata": "Metadaten abrufen",
-        "gaussianBlur": "Gaußsche Unschärfe"
+        "gaussianBlur": "Gaußsche Unschärfe",
+        "sendToUpscale": "An Hochskalieren senden",
+        "useCpuNoise": "CPU-Rauschen verwenden",
+        "sendToCanvas": "An Leinwand senden"
     },
     "settings": {
         "displayInProgress": "Zwischenbilder anzeigen",
@@ -1328,7 +1334,8 @@
         "loadWorkflowDesc2": "Ihr aktueller Arbeitsablauf enthält nicht gespeicherte Änderungen.",
         "loadingTemplates": "Lade {{name}}",
         "missingSourceOrTargetHandle": "Fehlender Quell- oder Zielgriff",
-        "missingSourceOrTargetNode": "Fehlender Quell- oder Zielknoten"
+        "missingSourceOrTargetNode": "Fehlender Quell- oder Zielknoten",
+        "showEdgeLabelsHelp": "Beschriftungen an Kanten anzeigen, um die verknüpften Knoten zu kennzeichnen"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
