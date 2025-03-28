@@ -14,7 +14,9 @@ import { useNodeUserTitleOrThrow } from 'features/nodes/hooks/useNodeUserTitleOr
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { selectNodeFieldElementsDeduped } from 'features/nodes/store/workflowSlice';
+import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const DeployWorkflowPanelContent = memo(() => {
   const nodeFieldElements = useAppSelector(selectNodeFieldElementsDeduped);
@@ -59,41 +61,41 @@ const OutputNode = memo(({ outputNodeId }: { outputNodeId: string }) => {
 OutputNode.displayName = 'OutputNode';
 
 const SelectOutputNodeButton = memo(() => {
+  const { t } = useTranslation();
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
+  const onClick = useCallback(() => {
+    $outputNodeId.set(null);
+    $isSelectingOutputNode.set(true);
+  }, []);
   return (
-    <Button
-      isDisabled={isSelectingOutputNode}
-      onClick={() => {
-        $outputNodeId.set(null);
-        $isSelectingOutputNode.set(true);
-      }}
-    >
-      Select output node
+    <Button isDisabled={isSelectingOutputNode} onClick={onClick}>
+      {t('workflows.builder.selectOutputNode')}
     </Button>
   );
 });
 SelectOutputNodeButton.displayName = 'SelectOutputNodeButton';
 
 const CancelDeployButton = memo(() => {
-  return (
-    <Button
-      onClick={() => {
-        $isInDeployFlow.set(false);
-        $isSelectingOutputNode.set(false);
-        $outputNodeId.set(null);
-      }}
-    >
-      Cancel
-    </Button>
-  );
+  const { t } = useTranslation();
+  const onClick = useCallback(() => {
+    $isInDeployFlow.set(false);
+    $isSelectingOutputNode.set(false);
+    $outputNodeId.set(null);
+  }, []);
+  return <Button onClick={onClick}>{t('common.cancel')}</Button>;
 });
 CancelDeployButton.displayName = 'CancelDeployButton';
 
 const DoValidationRunButton = memo(() => {
+  const { t } = useTranslation();
   const isReadyToDoValidationRun = useStore($isReadyToDoValidationRun);
+  const invoke = useInvoke();
+  const onClick = useCallback(() => {
+    invoke.enqueue(true, true);
+  }, [invoke]);
   return (
-    <Button isDisabled={!isReadyToDoValidationRun} onClick={() => {}}>
-      Do Validation Run
+    <Button isDisabled={!isReadyToDoValidationRun || invoke.isDisabled} onClick={onClick}>
+      {t('workflows.builder.publish')}
     </Button>
   );
 });

@@ -49,5 +49,5 @@ export const useInvoke = () => {
     enqueue(true, false);
   }, [enqueue]);
 
-  return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady };
+  return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady, enqueue };
 };
