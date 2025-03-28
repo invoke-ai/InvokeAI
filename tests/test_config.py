@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation
+from invokeai.app.invocations.baseinvocation import InvocationRegistry
 from invokeai.app.services.config.config_default import (
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
@@ -274,7 +274,7 @@ def test_deny_nodes(patch_rootdir):
 
     # We've changed the config, we need to invalidate the typeadapter cache so that the new config is used for
     # subsequent graph validations
-    BaseInvocation.invalidate_typeadapter()
+    InvocationRegistry.invalidate_invocation_typeadapter()
 
     # confirm graph validation fails when using denied node
     Graph.model_validate({"nodes": {"1": {"id": "1", "type": "integer"}}})
@@ -284,7 +284,7 @@ def test_deny_nodes(patch_rootdir):
         Graph.model_validate({"nodes": {"1": {"id": "1", "type": "float"}}})
 
     # confirm invocations union will not have denied nodes
-    all_invocations = BaseInvocation.get_invocations()
+    all_invocations = InvocationRegistry.get_invocation_classes()
 
     has_integer = len([i for i in all_invocations if i.get_type() == "integer"]) == 1
     has_string = len([i for i in all_invocations if i.get_type() == "string"]) == 1
@@ -296,4 +296,4 @@ def test_deny_nodes(patch_rootdir):
 
     # Reset the config so that it doesn't affect other tests
     get_config.cache_clear()
-    BaseInvocation.invalidate_typeadapter()
+    InvocationRegistry.invalidate_invocation_typeadapter()
