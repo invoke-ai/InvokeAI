@@ -37,7 +37,7 @@ dependencies = [
   "bitsandbytes==0.45.0; sys_platform!='darwin'",
   "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
-  "controlnet-aux==0.0.7",
+  "controlnet-aux",
   "diffusers[torch]==0.31.0",
   "gguf==0.10.0",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
@@ -51,7 +51,7 @@ dependencies = [
   # sentencepiece is required to load T5TokenizerFast (used by FLUX).
   "sentencepiece==0.2.0",
   "spandrel==0.3.4",
-  "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
+  "timm~=1.0.0",
   "torch<2.5.0",                # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchmetrics",
   "torchsde",
