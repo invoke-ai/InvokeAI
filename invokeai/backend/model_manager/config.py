@@ -345,6 +345,9 @@ class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):
 
         state_dict = mod.load_state_dict()
         for key in state_dict.keys():
+            if type(key) is int:
+                continue
+
             if key.startswith(("lora_te_", "lora_unet_", "lora_te1_", "lora_te2_", "lora_transformer_")):
                 return True
             # "lora_A.weight" and "lora_B.weight" are associated with models in PEFT format. We don't support all PEFT
