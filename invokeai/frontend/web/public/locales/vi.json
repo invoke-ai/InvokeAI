@@ -237,7 +237,10 @@
         "row": "Hàng",
         "board": "Bảng",
         "saveChanges": "Lưu Thay Đổi",
-        "error_withCount_other": "{{count}} lỗi"
+        "error_withCount_other": "{{count}} lỗi",
+        "value": "Giá Trị",
+        "label": "Nhãn Tên",
+        "systemInformation": "Thông Tin Hệ Thống"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
@@ -2300,7 +2303,10 @@
             "minimum": "Tối Thiểu",
             "maximum": "Tối Đa",
             "containerRowLayout": "Hộp Chứa (bố cục hàng)",
-            "containerColumnLayout": "Hộp Chứa (bố cục cột)"
+            "containerColumnLayout": "Hộp Chứa (bố cục cột)",
+            "resetOptions": "Tải Lại Lựa Chọn",
+            "addOption": "Thêm Lựa Chọn",
+            "dropdown": "Danh Sách Thả Xuống"
         },
         "yourWorkflows": "Workflow Của Bạn",
         "browseWorkflows": "Khám Phá Workflow",
@@ -2316,7 +2322,8 @@
         "view": "Xem",
         "deselectAll": "Huỷ Chọn Tất Cả",
         "noRecentWorkflows": "Không Có Workflows Gần Đây",
-        "recommended": "Có Thể Bạn Sẽ Cần"
+        "recommended": "Có Thể Bạn Sẽ Cần",
+        "emptyStringPlaceholder": "<xâu ký tự trống>"
     },
     "upscaling": {
         "missingUpscaleInitialImage": "Thiếu ảnh dùng để upscale",
@@ -2352,8 +2359,9 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "Workflow: Thư Viện Workflow mới và đã được cải tiến.",
-            "FLUX: Hỗ trợ FLUX Redux & FLUX Fill trong Workflow và Canvas."
+            "Workflow: Hỗ trợ xâu ký tự thả xuống tùy chỉnh trong Trình Tạo Vùng Nhập.",
+            "FLUX: Hỗ trợ FLUX Fill trong Workflow và Canvas.",
+            "LLaVA OneVision VLLM: Hỗ trợ phiên bản Beta trong Workflow."
         ]
     },
     "upsell": {
