@@ -1,6 +1,8 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
+import { $isInDeployFlow } from 'features/nodes/components/sidePanel/builder/deploy';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
@@ -62,6 +64,14 @@ const containerSx: SystemStyleObject = {
     display: 'block',
     shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
   },
+  '&[data-is-in-deploy-flow="true"]': {
+    cursor: 'not-allowed',
+    pointerEvents: 'none',
+    '& *': {
+      cursor: 'not-allowed',
+      pointerEvents: 'none',
+    },
+  },
 };
 
 const shadowsSx: SystemStyleObject = {
@@ -99,6 +109,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode();
+  const isInDeployFlow = useStore($isInDeployFlow);
 
   const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
@@ -141,6 +152,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       sx={containerSx}
       width={width || NODE_WIDTH}
       opacity={opacity}
+      data-is-in-deploy-flow={isInDeployFlow}
       data-is-selected={selected}
       data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
     >

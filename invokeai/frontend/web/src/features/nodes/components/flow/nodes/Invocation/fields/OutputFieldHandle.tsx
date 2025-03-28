@@ -1,7 +1,9 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Tooltip } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { Handle, Position } from '@xyflow/react';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
+import { $isInDeployFlow } from 'features/nodes/components/sidePanel/builder/deploy';
 import {
   useConnectionErrorTKey,
   useIsConnectionInProgress,
@@ -105,9 +107,16 @@ type HandleCommonProps = {
 };
 
 const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelField }: HandleCommonProps) => {
+  const isInDeployFlow = useStore($isInDeployFlow);
   return (
     <Tooltip label={fieldTypeName} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
-      <Handle type="source" id={fieldTemplate.name} position={Position.Right} style={handleStyles}>
+      <Handle
+        type="source"
+        id={fieldTemplate.name}
+        position={Position.Right}
+        style={handleStyles}
+        isConnectable={!isInDeployFlow}
+      >
         <Box
           sx={sx}
           data-cardinality={fieldTemplate.type.cardinality}
@@ -130,6 +139,7 @@ const ConnectionInProgressHandle = memo(
     const { t } = useTranslation();
     const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
     const connectionErrorTKey = useConnectionErrorTKey(nodeId, fieldName, 'target');
+    const isInDeployFlow = useStore($isInDeployFlow);
 
     const tooltip = useMemo(() => {
       if (connectionErrorTKey !== null) {
@@ -140,7 +150,13 @@ const ConnectionInProgressHandle = memo(
 
     return (
       <Tooltip label={tooltip} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
-        <Handle type="source" id={fieldTemplate.name} position={Position.Right} style={handleStyles}>
+        <Handle
+          type="source"
+          id={fieldTemplate.name}
+          position={Position.Right}
+          style={handleStyles}
+          isConnectable={!isInDeployFlow}
+        >
           <Box
             sx={sx}
             data-cardinality={fieldTemplate.type.cardinality}
