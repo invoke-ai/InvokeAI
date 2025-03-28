@@ -47,7 +47,7 @@ jobs:
           - windows-cpu
         include:
           - platform: linux-cpu
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             extra-index-url: 'https://download.pytorch.org/whl/cpu'
             github-env: $GITHUB_ENV
           - platform: macos-default
