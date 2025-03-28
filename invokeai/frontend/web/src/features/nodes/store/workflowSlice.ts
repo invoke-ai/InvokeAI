@@ -378,9 +378,14 @@ export const selectFormInitialValues = createWorkflowSelector((workflow) => work
 export const selectNodeFieldElements = createWorkflowSelector((workflow) =>
   Object.values(workflow.form.elements).filter(isNodeFieldElement)
 );
-export const selectNodeFieldElementsDeduped = createSelector(selectNodeFieldElements, (nodeFieldElements) =>
-  uniqBy(nodeFieldElements, (el) => `${el.data.fieldIdentifier.nodeId}-${el.data.fieldIdentifier.fieldName}`)
+export const selectWorkflowFormNodeFieldFieldIdentifiersDeduped = createSelector(
+  selectNodeFieldElements,
+  (nodeFieldElements) =>
+    uniqBy(nodeFieldElements, (el) => `${el.data.fieldIdentifier.nodeId}-${el.data.fieldIdentifier.fieldName}`).map(
+      (el) => el.data.fieldIdentifier
+    )
 );
+
 const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
 export const useElement = (id: string): FormElement | undefined => {
   const selector = useMemo(() => buildSelectElement(id), [id]);

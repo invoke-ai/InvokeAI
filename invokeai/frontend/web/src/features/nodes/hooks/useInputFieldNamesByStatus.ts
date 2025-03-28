@@ -1,9 +1,10 @@
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
-import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { isSingleOrCollection } from 'features/nodes/types/field';
 import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 import { useMemo } from 'react';
+
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
 const isConnectionInputField = (field: FieldInputTemplate) => {
   return (

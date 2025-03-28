@@ -1,7 +1,8 @@
-import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
+
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
 /**
  * Returns the template for a specific input field of a node.

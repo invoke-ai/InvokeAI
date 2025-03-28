@@ -1,17 +1,29 @@
-import { Button, ButtonGroup, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  Divider,
+  Flex,
+  ListItem,
+  Spacer,
+  Text,
+  Tooltip,
+  UnorderedList,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
+import { NodeFieldElementOverlay } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
 import {
   $isInDeployFlow,
   $isReadyToDoValidationRun,
   $isSelectingOutputNode,
   $outputNodeId,
   resetPublishState,
-} from 'features/nodes/components/sidePanel/builder/deploy';
-import { NodeFieldElementOverlay } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
+  usePublishInputs,
+} from 'features/nodes/components/sidePanel/workflow/publish';
 import { useInputFieldTemplateTitleOrThrow } from 'features/nodes/hooks/useInputFieldTemplateTitleOrThrow';
 import { useInputFieldUserTitleOrThrow } from 'features/nodes/hooks/useInputFieldUserTitleOrThrow';
 import { useMouseOverFormField } from 'features/nodes/hooks/useMouseOverNode';
@@ -21,7 +33,7 @@ import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { selectHasBatchOrGeneratorNodes } from 'features/nodes/store/selectors';
-import { selectIsWorkflowSaved, selectNodeFieldElementsDeduped } from 'features/nodes/store/workflowSlice';
+import { selectIsWorkflowSaved } from 'features/nodes/store/workflowSlice';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -29,63 +41,125 @@ import { toast } from 'features/toast/toast';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiLightningFill } from 'react-icons/pi';
+import { PiLightningFill, PiSignOutBold, PiXBold } from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
 
 const log = logger('generation');
 
 export const PublishWorkflowPanelContent = memo(() => {
-  const nodeFieldElements = useAppSelector(selectNodeFieldElementsDeduped);
-  const outputNodeId = useStore($outputNodeId);
   return (
-    <Flex flexDir="column">
-      <ButtonGroup isAttached={false}>
+    <Flex flexDir="column" gap={2} h="full">
+      <ButtonGroup isAttached={false} size="sm" variant="ghost">
         <SelectOutputNodeButton />
-        <PublishWorkflowButton />
+        <Spacer />
         <CancelPublishButton />
+        <PublishWorkflowButton />
       </ButtonGroup>
-      {outputNodeId !== null && <OutputNode outputNodeId={outputNodeId} />}
-      <Flex flexDir="column" borderWidth={1}>
-        {nodeFieldElements.length !== 0 && <Text fontWeight="semibold">Input Fields</Text>}
-        {nodeFieldElements.map((el) => {
-          const { nodeId, fieldName } = el.data.fieldIdentifier;
-          return <NodeInputFieldPreview key={`${nodeId}-${fieldName}`} nodeId={nodeId} fieldName={fieldName} />;
-        })}
-      </Flex>
+      <ScrollableContent>
+        <Flex flexDir="column" gap={2} w="full" h="full">
+          <OutputFields />
+          <PublishableInputFields />
+          <UnpublishableInputFields />
+        </Flex>
+      </ScrollableContent>
     </Flex>
   );
 });
 PublishWorkflowPanelContent.displayName = 'DeployWorkflowPanelContent';
 
-const OutputNode = memo(({ outputNodeId }: { outputNodeId: string }) => {
-  const resetOutputNode = useCallback(() => {
-    $outputNodeId.set(null);
-  }, []);
-  const nodeUserTitle = useNodeUserTitleOrThrow(outputNodeId);
-  const nodeTemplateTitle = useNodeTemplateTitleOrThrow(outputNodeId);
+const OutputFields = memo(() => {
+  const { t } = useTranslation();
+  const outputNodeId = useStore($outputNodeId);
+
+  if (!outputNodeId) {
+    return (
+      <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
+        <Text fontWeight="semibold" color="error.300">
+          {t('workflows.builder.noOutputNodeSelected')}
+        </Text>
+      </Flex>
+    );
+  }
+
+  return <OutputFieldsContent outputNodeId={outputNodeId} />;
+});
+OutputFields.displayName = 'OutputFields';
+
+const OutputFieldsContent = memo(({ outputNodeId }: { outputNodeId: string }) => {
+  const { t } = useTranslation();
   const outputFieldNames = useOutputFieldNames(outputNodeId);
 
   return (
-    <Flex flexDir="column" borderWidth={1}>
-      <Text fontWeight="semibold">Output fields on selected output node</Text>
+    <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
+      <Text fontWeight="semibold">{t('workflows.builder.publishedWorkflowOutputs')}</Text>
+      <Divider />
       {outputFieldNames.map((fieldName) => (
         <NodeOutputFieldPreview key={`${outputNodeId}-${fieldName}`} nodeId={outputNodeId} fieldName={fieldName} />
       ))}
     </Flex>
   );
 });
-OutputNode.displayName = 'OutputNode';
+OutputFieldsContent.displayName = 'OutputFieldsContent';
+
+const PublishableInputFields = memo(() => {
+  const { t } = useTranslation();
+  const inputs = usePublishInputs();
+
+  if (inputs.publishable.length === 0) {
+    return (
+      <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
+        <Text fontWeight="semibold" color="warning.300">
+          {t('workflows.builder.noPublishableInputs')}
+        </Text>
+      </Flex>
+    );
+  }
+
+  return (
+    <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
+      <Text fontWeight="semibold">{t('workflows.builder.publishedWorkflowInputs')}</Text>
+      <Divider />
+      {inputs.publishable.map(({ nodeId, fieldName }) => {
+        return <NodeInputFieldPreview key={`${nodeId}-${fieldName}`} nodeId={nodeId} fieldName={fieldName} />;
+      })}
+    </Flex>
+  );
+});
+PublishableInputFields.displayName = 'PublishableInputFields';
+
+const UnpublishableInputFields = memo(() => {
+  const { t } = useTranslation();
+  const inputs = usePublishInputs();
+
+  if (inputs.unpublishable.length === 0) {
+    return null;
+  }
+
+  return (
+    <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
+      <Text fontWeight="semibold" color="warning.300">
+        {t('workflows.builder.unpublishableInputs')}
+      </Text>
+      <Divider />
+      {inputs.unpublishable.map(({ nodeId, fieldName }) => {
+        return <NodeInputFieldPreview key={`${nodeId}-${fieldName}`} nodeId={nodeId} fieldName={fieldName} />;
+      })}
+    </Flex>
+  );
+});
+UnpublishableInputFields.displayName = 'UnpublishableInputFields';
 
 const SelectOutputNodeButton = memo(() => {
   const { t } = useTranslation();
+  const outputNodeId = useStore($outputNodeId);
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
   const onClick = useCallback(() => {
     $outputNodeId.set(null);
     $isSelectingOutputNode.set(true);
   }, []);
   return (
-    <Button isDisabled={isSelectingOutputNode} onClick={onClick}>
-      {t('workflows.builder.selectOutputNode')}
+    <Button leftIcon={<PiSignOutBold />} isDisabled={isSelectingOutputNode} onClick={onClick}>
+      {outputNodeId ? t('workflows.builder.changeOutputNode') : t('workflows.builder.selectOutputNode')}
     </Button>
   );
 });
@@ -98,7 +172,11 @@ const CancelPublishButton = memo(() => {
     $isSelectingOutputNode.set(false);
     $outputNodeId.set(null);
   }, []);
-  return <Button onClick={onClick}>{t('common.cancel')}</Button>;
+  return (
+    <Button leftIcon={<PiXBold />} onClick={onClick}>
+      {t('common.cancel')}
+    </Button>
+  );
 });
 CancelPublishButton.displayName = 'CancelDeployButton';
 
@@ -110,6 +188,7 @@ const PublishWorkflowButton = memo(() => {
   const hasBatchOrGeneratorNodes = useAppSelector(selectHasBatchOrGeneratorNodes);
   const outputNodeId = useStore($outputNodeId);
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
+  const inputs = usePublishInputs();
 
   const enqueue = useEnqueueWorkflows();
   const onClick = useCallback(async () => {
@@ -138,8 +217,19 @@ const PublishWorkflowButton = memo(() => {
       hasBatchOrGeneratorNodes={hasBatchOrGeneratorNodes}
       isReadyToEnqueue={isReadyToEnqueue}
       hasOutputNode={outputNodeId !== null && !isSelectingOutputNode}
+      hasPublishableInputs={inputs.publishable.length > 0}
+      hasUnpublishableInputs={inputs.unpublishable.length > 0}
     >
-      <Button isDisabled={!isReadyToDoValidationRun || !isReadyToEnqueue} onClick={onClick}>
+      <Button
+        leftIcon={<PiLightningFill />}
+        isDisabled={
+          !isReadyToDoValidationRun ||
+          !isReadyToEnqueue ||
+          hasBatchOrGeneratorNodes ||
+          !(outputNodeId !== null && !isSelectingOutputNode)
+        }
+        onClick={onClick}
+      >
         {t('workflows.builder.publish')}
       </Button>
     </PublishTooltip>
@@ -204,6 +294,7 @@ export const StartPublishFlowButton = memo(() => {
   const isReadyToEnqueue = useStore($isReadyToEnqueue);
   const isWorkflowSaved = useAppSelector(selectIsWorkflowSaved);
   const hasBatchOrGeneratorNodes = useAppSelector(selectHasBatchOrGeneratorNodes);
+  const inputs = usePublishInputs();
 
   const onClick = useCallback(() => {
     $isInDeployFlow.set(true);
@@ -215,6 +306,8 @@ export const StartPublishFlowButton = memo(() => {
       hasBatchOrGeneratorNodes={hasBatchOrGeneratorNodes}
       isReadyToEnqueue={isReadyToEnqueue}
       hasOutputNode={true}
+      hasPublishableInputs={inputs.publishable.length > 0}
+      hasUnpublishableInputs={inputs.unpublishable.length > 0}
     >
       <Button
         onClick={onClick}
@@ -237,46 +330,77 @@ const PublishTooltip = memo(
     hasBatchOrGeneratorNodes,
     isReadyToEnqueue,
     hasOutputNode,
+    hasPublishableInputs,
+    hasUnpublishableInputs,
     children,
   }: PropsWithChildren<{
     isWorkflowSaved: boolean;
     hasBatchOrGeneratorNodes: boolean;
     isReadyToEnqueue: boolean;
     hasOutputNode: boolean;
+    hasPublishableInputs: boolean;
+    hasUnpublishableInputs: boolean;
   }>) => {
     const { t } = useTranslation();
-    const problems = useMemo(() => {
-      const _problems: string[] = [];
+    const warnings = useMemo(() => {
+      const _warnings: string[] = [];
+      if (!hasPublishableInputs) {
+        _warnings.push(t('workflows.builder.warningWorkflowHasNoPublishableInputFields'));
+      }
+      if (hasUnpublishableInputs) {
+        _warnings.push(t('workflows.builder.warningWorkflowHasUnpublishableInputFields'));
+      }
+      return _warnings;
+    }, [hasPublishableInputs, hasUnpublishableInputs, t]);
+    const errors = useMemo(() => {
+      const _errors: string[] = [];
       if (!isWorkflowSaved) {
-        _problems.push(t('workflows.builder.cannotPublishUnsavedWorkflow'));
+        _errors.push(t('workflows.builder.errorWorkflowHasUnsavedChanges'));
       }
       if (hasBatchOrGeneratorNodes) {
-        _problems.push(t('workflows.builder.cannotPublishWorkflowWithBatchOrGeneratorNodes'));
+        _errors.push(t('workflows.builder.errorWorkflowHasBatchOrGeneratorNodes'));
       }
       if (!isReadyToEnqueue) {
-        _problems.push(t('workflows.builder.cannotPublishInvalidWorkflow'));
+        _errors.push(t('workflows.builder.errorWorkflowHasInvalidGraph'));
       }
       if (!hasOutputNode) {
-        _problems.push(t('workflows.builder.cannotPublishWorkflowWithoutOutputNode'));
+        _errors.push(t('workflows.builder.errorWorkflowHasNoOutputNode'));
       }
-      return _problems;
+      return _errors;
     }, [hasBatchOrGeneratorNodes, hasOutputNode, isReadyToEnqueue, isWorkflowSaved, t]);
 
-    if (problems.length === 0) {
+    if (errors.length === 0 && warnings.length === 0) {
       return children;
-      // return t('workflows.builder.publish');
     }
 
     return (
       <Tooltip
         label={
           <Flex flexDir="column">
-            <Text>{t('workflows.builder.cannotPublish')}:</Text>
-            <UnorderedList>
-              {problems.map((problem, index) => (
-                <ListItem key={index}>{problem}</ListItem>
-              ))}
-            </UnorderedList>
+            {errors.length > 0 && (
+              <>
+                <Text color="error.700" fontWeight="semibold">
+                  {t('workflows.builder.cannotPublish')}:
+                </Text>
+                <UnorderedList>
+                  {errors.map((problem, index) => (
+                    <ListItem key={index}>{problem}</ListItem>
+                  ))}
+                </UnorderedList>
+              </>
+            )}
+            {warnings.length > 0 && (
+              <>
+                <Text color="warning.700" fontWeight="semibold">
+                  {t('workflows.builder.publishWarnings')}:
+                </Text>
+                <UnorderedList>
+                  {warnings.map((problem, index) => (
+                    <ListItem key={index}>{problem}</ListItem>
+                  ))}
+                </UnorderedList>
+              </>
+            )}
           </Flex>
         }
       >

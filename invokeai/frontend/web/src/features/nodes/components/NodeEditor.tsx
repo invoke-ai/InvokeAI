@@ -2,7 +2,9 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
-import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
+import { TopCenterPanel } from 'features/nodes/components/flow/panels/TopPanel/TopCenterPanel';
+import { TopLeftPanel } from 'features/nodes/components/flow/panels/TopPanel/TopLeftPanel';
+import { TopRightPanel } from 'features/nodes/components/flow/panels/TopPanel/TopRightPanel';
 import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +34,9 @@ const NodeEditor = () => {
         <>
           <Flow />
           <AddNodeCmdk />
-          <TopPanel />
+          <TopLeftPanel />
+          <TopCenterPanel />
+          <TopRightPanel />
           <BottomLeftPanel />
           <MinimapPanel />
         </>
