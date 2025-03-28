@@ -24,7 +24,7 @@ export const DeployWorkflowButton = memo(() => {
       size="sm"
       isDisabled={!deployWorkflowIsEnabled || !isWorkflowSaved}
     >
-      {t('workflows.builder.deploy')}
+      {t('workflows.builder.publish')}
     </Button>
   );
 });

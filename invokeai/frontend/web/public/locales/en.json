@@ -1784,7 +1784,8 @@
             "workflowBuilderAlphaWarning": "The workflow builder is currently in alpha. There may be breaking changes before the stable release.",
             "minimum": "Minimum",
             "maximum": "Maximum",
-            "deploy": "Deploy"
+            "publish": "Publish",
+            "selectOutputNode": "Select Output Node"
         }
     },
     "controlLayers": {
