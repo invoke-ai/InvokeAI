@@ -6451,6 +6451,7 @@ export type components = {
          * @description Expands a mask with a fade effect. The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
          *     The mask is thresholded to create a binary mask, and then a distance transform is applied to create a fade effect.
          *     The fade size is specified in pixels, and the mask is expanded by that amount. The result is a mask with a smooth transition from black to white.
+         *     If the fade size is 0, the mask is returned as-is.
          */
         ExpandMaskWithFadeInvocation: {
             /**

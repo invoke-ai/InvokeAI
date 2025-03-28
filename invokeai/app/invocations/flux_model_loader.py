@@ -3,7 +3,6 @@ from typing import Literal
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
-    Classification,
     invocation,
     invocation_output,
 )
@@ -41,7 +40,6 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
     tags=["model", "flux"],
     category="model",
     version="1.0.6",
-    classification=Classification.Prototype,
 )
 class FluxModelLoaderInvocation(BaseInvocation):
     """Loads a flux base model, outputting its submodels."""

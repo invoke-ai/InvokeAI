@@ -71,7 +71,7 @@ def create_stripped_model(original_model_path: Path, stripped_model_path: Path) 
     print(f"Created clone of {original.name} at {stripped.path}")
 
     for component_path in stripped.component_paths():
-        original_state_dict = ModelOnDisk.load_state_dict(component_path)
+        original_state_dict = stripped.load_state_dict(component_path)
         stripped_state_dict = strip(original_state_dict)  # type: ignore
         with open(component_path, "w") as f:
             json.dump(stripped_state_dict, f, indent=4)
