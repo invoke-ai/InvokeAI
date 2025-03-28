@@ -153,6 +153,9 @@ const zBoardFieldType = zFieldTypeBase.extend({
   name: z.literal('BoardField'),
   originalType: zStatelessFieldType.optional(),
 });
+export const isBoardFieldType = (fieldType: FieldType): fieldType is z.infer<typeof zBoardFieldType> =>
+  fieldType.name === zBoardFieldType.shape.name.value;
+
 const zColorFieldType = zFieldTypeBase.extend({
   name: z.literal('ColorField'),
   originalType: zStatelessFieldType.optional(),

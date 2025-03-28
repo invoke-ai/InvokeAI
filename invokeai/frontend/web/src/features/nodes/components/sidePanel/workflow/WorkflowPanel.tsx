@@ -1,6 +1,6 @@
 import { Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { WorkflowBuilder } from 'features/nodes/components/sidePanel/builder/WorkflowBuilder';
-import { StartPublishFlowButton } from 'features/nodes/components/sidePanel/workflow/DeployWorkflowPanelContent';
+import { StartPublishFlowButton } from 'features/nodes/components/sidePanel/workflow/PublishWorkflowPanelContent';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';

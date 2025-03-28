@@ -1,7 +1,8 @@
-import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import { useNodeType } from 'features/nodes/hooks/useNodeType';
 import { useNodeVersion } from 'features/nodes/hooks/useNodeVersion';
 import { useMemo } from 'react';
+
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
 export const useNodeNeedsUpdate = (nodeId: string) => {
   const type = useNodeType(nodeId);

@@ -1,7 +1,8 @@
-import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import type { FieldOutputTemplate } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
+
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
 export const useOutputFieldTemplate = (nodeId: string, fieldName: string): FieldOutputTemplate => {
   const template = useNodeTemplateOrThrow(nodeId);

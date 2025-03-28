@@ -1,5 +1,6 @@
-import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 import { useMemo } from 'react';
+
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
 export const useInputFieldTemplateTitleSafe = (nodeId: string, fieldName: string): string => {
   const template = useNodeTemplateOrThrow(nodeId);

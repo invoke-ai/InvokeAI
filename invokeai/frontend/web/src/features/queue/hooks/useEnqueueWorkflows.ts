@@ -1,8 +1,11 @@
 import { useAppStore } from 'app/store/nanostores/store';
-import { $outputNodeId } from 'features/nodes/components/sidePanel/builder/deploy';
+import {
+  $outputNodeId,
+  getPublishInputs,
+  selectFieldIdentifiersWithInvocationTypes,
+} from 'features/nodes/components/sidePanel/workflow/publish';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
-import { selectNodeFieldElementsDeduped } from 'features/nodes/store/workflowSlice';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
@@ -102,9 +105,9 @@ export const useEnqueueWorkflows = () => {
 
       if (isApiValidationRun) {
         // Derive the input fields from the builder's selected node field elements
-        const nodeFieldElements = selectNodeFieldElementsDeduped(state);
-        const api_input_fields = nodeFieldElements.map((el) => {
-          const { nodeId, fieldName } = el.data.fieldIdentifier;
+        const fieldIdentifiers = selectFieldIdentifiersWithInvocationTypes(state);
+        const inputs = getPublishInputs(fieldIdentifiers, templates);
+        const api_input_fields = inputs.publishable.map(({ nodeId, fieldName }) => {
           return {
             kind: 'input',
             node_id: nodeId,

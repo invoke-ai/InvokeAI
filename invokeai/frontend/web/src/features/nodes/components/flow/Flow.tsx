@@ -17,7 +17,11 @@ import type {
 import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
-import { $isInDeployFlow, $isSelectingOutputNode, $outputNodeId } from 'features/nodes/components/sidePanel/builder/deploy';
+import {
+  $isInDeployFlow,
+  $isSelectingOutputNode,
+  $outputNodeId,
+} from 'features/nodes/components/sidePanel/workflow/publish';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useNodeCopyPaste } from 'features/nodes/hooks/useNodeCopyPaste';

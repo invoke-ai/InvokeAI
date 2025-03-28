@@ -3,7 +3,7 @@ import { Box, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { Handle, Position } from '@xyflow/react';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
-import { $isInDeployFlow } from 'features/nodes/components/sidePanel/builder/deploy';
+import { $isInDeployFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import {
   useConnectionErrorTKey,
   useIsConnectionInProgress,

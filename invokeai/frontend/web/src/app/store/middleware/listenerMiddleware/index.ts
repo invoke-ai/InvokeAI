@@ -10,7 +10,6 @@ import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/l
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
 import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
-import { addEnqueueRequestedNodes } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedNodes';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { addGalleryOffsetChangedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryOffsetChanged';
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
@@ -63,7 +62,6 @@ addGalleryImageClickedListener(startAppListening);
 addGalleryOffsetChangedListener(startAppListening);
 
 // User Invoked
-addEnqueueRequestedNodes(startAppListening);
 addEnqueueRequestedLinear(startAppListening);
 addEnqueueRequestedUpscale(startAppListening);
 addAnyEnqueuedListener(startAppListening);

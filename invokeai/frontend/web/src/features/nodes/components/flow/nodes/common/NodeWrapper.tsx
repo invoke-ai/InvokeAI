@@ -2,7 +2,7 @@ import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $isInDeployFlow } from 'features/nodes/components/sidePanel/builder/deploy';
+import { $isInDeployFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
