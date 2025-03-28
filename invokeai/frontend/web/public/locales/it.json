@@ -115,7 +115,8 @@
         "error_withCount_many": "{{count}} errori",
         "error_withCount_other": "{{count}} errori",
         "value": "Valore",
-        "label": "Etichetta"
+        "label": "Etichetta",
+        "systemInformation": "Informazioni di sistema"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -715,7 +716,8 @@
             "collectionNumberLTMin": "{{value}} < {{minimum}} (incr min)",
             "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (excl max)",
             "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (excl min)",
-            "collectionEmpty": "raccolta vuota"
+            "collectionEmpty": "raccolta vuota",
+            "batchNodeCollectionSizeMismatchNoGroupId": "Dimensione della raccolta di gruppo nel Lotto non corrisponde"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -2365,8 +2367,9 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Flussi di lavoro: nuova e migliorata libreria dei flussi di lavoro.",
-            "FLUX: supporto per FLUX Redux e FLUX Fill in Flussi di lavoro e Tela."
+            "Flussi di lavoro: supporto per menu a discesa di stringhe personalizzate nel Generatore di Flussi di lavoro.",
+            "FLUX: supporto per FLUX Fill in Flussi di lavoro e Tela.",
+            "LLaVA OneVision VLLM: supporto beta nei flussi di lavoro."
         ]
     },
     "system": {
