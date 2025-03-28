@@ -9,3 +9,8 @@ export const $isReadyToDoValidationRun = computed(
     return isInDeployFlow && outputNodeId !== null && !isSelectingOutputNode;
   }
 );
+export const resetPublishState = () => {
+  $isInDeployFlow.set(false);
+  $outputNodeId.set(null);
+  $isSelectingOutputNode.set(false);
+};

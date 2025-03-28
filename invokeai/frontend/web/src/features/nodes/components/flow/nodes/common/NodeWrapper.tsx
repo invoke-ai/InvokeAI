@@ -65,8 +65,6 @@ const containerSx: SystemStyleObject = {
     shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
   },
   '&[data-is-in-deploy-flow="true"]': {
-    cursor: 'not-allowed',
-    pointerEvents: 'none',
     '& *': {
       cursor: 'not-allowed',
       pointerEvents: 'none',
@@ -108,7 +106,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const { nodeId, width, children, selected } = props;
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
-  const zoomToNode = useZoomToNode();
+  const zoomToNode = useZoomToNode(nodeId);
   const isInDeployFlow = useStore($isInDeployFlow);
 
   const executionState = useNodeExecutionState(nodeId);
@@ -137,9 +135,9 @@ const NodeWrapper = (props: NodeWrapperProps) => {
         // This target is marked as not fitting the view on double click
         return;
       }
-      zoomToNode(nodeId);
+      zoomToNode();
     },
-    [nodeId, zoomToNode]
+    [zoomToNode]
   );
 
   return (
