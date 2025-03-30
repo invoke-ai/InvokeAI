@@ -14,8 +14,9 @@ import WavyLine from 'common/components/WavyLine';
 import { selectImg2imgStrength, setImg2imgStrength } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveRasterLayerEntities } from 'features/controlLayers/store/selectors';
 import { selectImg2imgStrengthConfig } from 'features/system/store/configSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 
 const selectHasRasterLayersWithContent = createSelector(
   selectActiveRasterLayerEntities,
@@ -26,6 +27,7 @@ export const ParamDenoisingStrength = memo(() => {
   const img2imgStrength = useAppSelector(selectImg2imgStrength);
   const dispatch = useAppDispatch();
   const hasRasterLayersWithContent = useAppSelector(selectHasRasterLayersWithContent);
+  const selectedModelConfig = useSelectedModelConfig();
 
   const onChange = useCallback(
     (v: number) => {
@@ -39,8 +41,24 @@ export const ParamDenoisingStrength = memo(() => {
 
   const [invokeBlue300] = useToken('colors', ['invokeBlue.300']);
 
+  const isDisabled = useMemo(() => {
+    if (!hasRasterLayersWithContent) {
+      // Denoising strength does nothing if there are no raster layers w/ content
+      return true;
+    }
+    if (
+      selectedModelConfig?.type === 'main' &&
+      selectedModelConfig?.base === 'flux' &&
+      selectedModelConfig.variant === 'inpaint'
+    ) {
+      // Denoising strength is ignored by FLUX Fill, which is indicated by the variant being 'inpaint'
+      return true;
+    }
+    return false;
+  }, [hasRasterLayersWithContent, selectedModelConfig]);
+
   return (
-    <FormControl isDisabled={!hasRasterLayersWithContent} p={1} justifyContent="space-between" h={8}>
+    <FormControl isDisabled={isDisabled} p={1} justifyContent="space-between" h={8}>
       <Flex gap={3} alignItems="center">
         <InformationalPopover feature="paramDenoisingStrength">
           <FormLabel mr={0}>{`${t('parameters.denoisingStrength')}`}</FormLabel>
@@ -49,7 +67,7 @@ export const ParamDenoisingStrength = memo(() => {
           <WavyLine amplitude={img2imgStrength * 10} stroke={invokeBlue300} strokeWidth={1} width={40} height={14} />
         )}
       </Flex>
-      {hasRasterLayersWithContent ? (
+      {!isDisabled ? (
         <>
           <CompositeSlider
             step={config.coarseStep}
