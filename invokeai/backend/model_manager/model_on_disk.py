@@ -10,7 +10,7 @@ from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
-StateDict: TypeAlias = dict[str | int, Any] # When are the keys int?
+StateDict: TypeAlias = dict[str | int, Any]  # When are the keys int?
 
 
 class ModelOnDisk:
