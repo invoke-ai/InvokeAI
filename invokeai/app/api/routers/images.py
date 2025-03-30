@@ -96,6 +96,22 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Failed to create image")
 
 
+class ImageUploadEntry(BaseModel):
+    image_dto: ImageDTO = Body(description="The image DTO")
+    presigned_url: str = Body(description="The URL to get the presigned URL for the image upload")
+
+
+@images_router.post("/", operation_id="create_image_upload_entry")
+async def create_image_upload_entry(
+    width: int = Body(description="The width of the image"),
+    height: int = Body(description="The height of the image"),
+    board_id: Optional[str] = Body(default=None, description="The board to add this image to, if any"),
+) -> ImageUploadEntry:
+    """Uploads an image from a URL, not implemented"""
+
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
 @images_router.delete("/i/{image_name}", operation_id="delete_image")
 async def delete_image(
     image_name: str = Path(description="The name of the image to delete"),

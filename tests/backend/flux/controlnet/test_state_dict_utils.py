@@ -24,7 +24,7 @@ from tests.backend.flux.controlnet.xlabs_flux_controlnet_state_dict import xlabs
     ],
 )
 def test_is_state_dict_xlabs_controlnet(sd_shapes: dict[str, list[int]], expected: bool):
-    sd = {k: None for k in sd_shapes}
+    sd = dict.fromkeys(sd_shapes)
     assert is_state_dict_xlabs_controlnet(sd) == expected
 
 
@@ -37,7 +37,7 @@ def test_is_state_dict_xlabs_controlnet(sd_shapes: dict[str, list[int]], expecte
     ],
 )
 def test_is_state_dict_instantx_controlnet(sd_keys: list[str], expected: bool):
-    sd = {k: None for k in sd_keys}
+    sd = dict.fromkeys(sd_keys)
     assert is_state_dict_instantx_controlnet(sd) == expected
 
 

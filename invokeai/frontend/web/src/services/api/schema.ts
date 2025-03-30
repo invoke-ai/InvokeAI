@@ -466,6 +466,30 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Image Dtos
+         * @description Gets a list of image DTOs
+         */
+        get: operations["list_image_dtos"];
+        put?: never;
+        /**
+         * Create Image Upload Entry
+         * @description Uploads an image from a URL, not implemented
+         */
+        post: operations["create_image_upload_entry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/i/{image_name}": {
         parameters: {
             query?: never;
@@ -611,26 +635,6 @@ export type paths = {
          * @description Gets an image and thumbnail URL
          */
         get: operations["get_image_urls"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/images/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Image Dtos
-         * @description Gets a list of image DTOs
-         */
-        get: operations["list_image_dtos"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2357,6 +2361,24 @@ export type components = {
              * @description The list of batch_ids to cancel all queue items for
              */
             batch_ids: string[];
+        };
+        /** Body_create_image_upload_entry */
+        Body_create_image_upload_entry: {
+            /**
+             * Width
+             * @description The width of the image
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the image
+             */
+            height: number;
+            /**
+             * Board Id
+             * @description The board to add this image to, if any
+             */
+            board_id?: string | null;
         };
         /** Body_create_style_preset */
         Body_create_style_preset: {
@@ -10753,6 +10775,16 @@ export type components = {
              * @enum {string}
              */
             type: "i2l";
+        };
+        /** ImageUploadEntry */
+        ImageUploadEntry: {
+            /** @description The image DTO */
+            image_dto: components["schemas"]["ImageDTO"];
+            /**
+             * Presigned Url
+             * @description The URL to get the presigned URL for the image upload
+             */
+            presigned_url: string;
         };
         /**
          * ImageUrlsDTO
@@ -23219,6 +23251,87 @@ export interface operations {
             };
         };
     };
+    list_image_dtos: {
+        parameters: {
+            query?: {
+                /** @description The origin of images to list. */
+                image_origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories of image to include. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate images. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find images without a board. */
+                board_id?: string | null;
+                /** @description The page offset */
+                offset?: number;
+                /** @description The number of images per page */
+                limit?: number;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred images first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_image_upload_entry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_create_image_upload_entry"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUploadEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_image_dto: {
         parameters: {
             query?: never;
@@ -23559,54 +23672,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageUrlsDTO"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_image_dtos: {
-        parameters: {
-            query?: {
-                /** @description The origin of images to list. */
-                image_origin?: components["schemas"]["ResourceOrigin"] | null;
-                /** @description The categories of image to include. */
-                categories?: components["schemas"]["ImageCategory"][] | null;
-                /** @description Whether to list intermediate images. */
-                is_intermediate?: boolean | null;
-                /** @description The board id to filter by. Use 'none' to find images without a board. */
-                board_id?: string | null;
-                /** @description The page offset */
-                offset?: number;
-                /** @description The number of images per page */
-                limit?: number;
-                /** @description The order of sort */
-                order_dir?: components["schemas"]["SQLiteDirection"];
-                /** @description Whether to sort by starred images first */
-                starred_first?: boolean;
-                /** @description The term to search for */
-                search_term?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
                 };
             };
             /** @description Validation Error */

@@ -354,3 +354,6 @@ export type UploadImageArg = {
    */
   isFirstUploadOfBatch?: boolean;
 };
+
+export type ImageUploadEntryResponse = S['ImageUploadEntry'];
+export type ImageUploadEntryRequest = paths['/api/v1/images/']['post']['requestBody']['content']['application/json'];

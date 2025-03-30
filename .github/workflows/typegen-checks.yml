@@ -54,17 +54,25 @@ jobs:
               - 'pyproject.toml'
               - 'invokeai/**'
 
+      - name: setup uv
+        if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.6.10'
+          enable-cache: true
+          python-version: '3.11'
+
       - name: setup python
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          python-version: '3.11'
 
-      - name: install python dependencies
+      - name: install dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: pip3 install --use-pep517 --editable="."
+        env:
+          UV_INDEX: ${{ matrix.extra-index-url }}
+        run: uv pip install --editable .
 
       - name: install frontend dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
@@ -77,7 +85,7 @@ jobs:
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: make frontend-typegen
+        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py | pnpm typegen
         shell: bash
 
       - name: compare files
