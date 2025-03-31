@@ -6,6 +6,16 @@ import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { useCallback } from 'react';
 import { useCreateImageUploadEntryMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+
+type PresignedUrlResponse = {
+  fullUrl: string;
+  thumbnailUrl: string;
+};
+
+const isPresignedUrlResponse = (response: unknown): response is PresignedUrlResponse => {
+  return typeof response === 'object' && response !== null && 'fullUrl' in response && 'thumbnailUrl' in response;
+};
+
 export const useClientSideUpload = () => {
   const dispatch = useAppDispatch();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
@@ -74,24 +84,30 @@ export const useClientSideUpload = () => {
         board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
       }).unwrap();
 
-      await fetch(`${presigned_url}/?type=full`, {
+      const response = await fetch(presigned_url, {
+        method: 'GET',
+        ...(authToken && {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }),
+      }).then((res) => res.json());
+
+      if (isPresignedUrlResponse(response)) {
+        throw new Error('Invalid response');
+      }
+
+      const fullUrl = response.fullUrl;
+      const thumbnailUrl = response.thumbnailUrl;
+
+      await fetch(fullUrl, {
         method: 'PUT',
         body: file,
-        ...(authToken && {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }),
       });
 
-      await fetch(`${presigned_url}/?type=thumbnail`, {
+      await fetch(thumbnailUrl, {
         method: 'PUT',
         body: thumbnail,
-        ...(authToken && {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }),
       });
 
       dispatch(imageUploadedClientSide({ imageDTO: image_dto, silent: false, isFirstUploadOfBatch: i === 0 }));
