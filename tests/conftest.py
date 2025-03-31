@@ -95,6 +95,8 @@ def override_model_loading(monkeypatch):
     monkeypatch.setattr(safetensors.torch, "load_file", load_stripped_model)
     monkeypatch.setattr(gguf_loaders, "gguf_sd_loader", load_stripped_model)
     monkeypatch.setattr("invokeai.backend.model_manager.config.gguf_sd_loader", load_stripped_model)
+    monkeypatch.setattr("invokeai.backend.model_manager.util.model_util.gguf_sd_loader", load_stripped_model)
+    monkeypatch.setattr("invokeai.backend.model_manager.legacy_probe.gguf_sd_loader", load_stripped_model)
 
     def fake_scan(*args, **kwargs):
         return SimpleNamespace(infected_files=0, scan_err=None)
