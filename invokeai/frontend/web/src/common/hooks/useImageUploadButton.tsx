@@ -58,50 +58,58 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
 
   const onDropAccepted = useCallback(
     async (files: File[]) => {
-      if (!allowMultiple) {
-        if (files.length > 1) {
-          log.warn('Multiple files dropped but only one allowed');
-          return;
-        }
-        if (files.length === 0) {
-          // Should never happen
-          log.warn('No files dropped');
-          return;
-        }
-        const file = files[0];
-        assert(file !== undefined); // should never happen
-        const imageDTO = await uploadImage({
-          file,
-          image_category: 'user',
-          is_intermediate: false,
-          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          silent: true,
-        }).unwrap();
-        if (onUpload) {
-          onUpload(imageDTO);
-        }
-      } else {
-        let imageDTOs: ImageDTO[] = [];
-        if (isClientSideUploadEnabled) {
-          imageDTOs = await Promise.all(files.map((file, i) => clientSideUpload(file, i)));
+      try {
+        if (!allowMultiple) {
+          if (files.length > 1) {
+            log.warn('Multiple files dropped but only one allowed');
+            return;
+          }
+          if (files.length === 0) {
+            // Should never happen
+            log.warn('No files dropped');
+            return;
+          }
+          const file = files[0];
+          assert(file !== undefined); // should never happen
+          const imageDTO = await uploadImage({
+            file,
+            image_category: 'user',
+            is_intermediate: false,
+            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+            silent: true,
+          }).unwrap();
+          if (onUpload) {
+            onUpload(imageDTO);
+          }
         } else {
-          imageDTOs = await uploadImages(
-            files.map((file, i) => ({
-              file,
-              image_category: 'user',
-              is_intermediate: false,
-              board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-              silent: false,
-              isFirstUploadOfBatch: i === 0,
-            }))
-          );
+          let imageDTOs: ImageDTO[] = [];
+          if (isClientSideUploadEnabled) {
+            imageDTOs = await Promise.all(files.map((file, i) => clientSideUpload(file, i)));
+          } else {
+            imageDTOs = await uploadImages(
+              files.map((file, i) => ({
+                file,
+                image_category: 'user',
+                is_intermediate: false,
+                board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+                silent: false,
+                isFirstUploadOfBatch: i === 0,
+              }))
+            );
+          }
+          if (onUpload) {
+            onUpload(imageDTOs);
+          }
         }
-        if (onUpload) {
-          onUpload(imageDTOs);
-        }
+      } catch (error) {
+        toast({
+          id: 'UPLOAD_FAILED',
+          title: t('toast.imageUploadFailed'),
+          status: 'error',
+        });
       }
     },
-    [allowMultiple, autoAddBoardId, onUpload, uploadImage, isClientSideUploadEnabled, clientSideUpload]
+    [allowMultiple, autoAddBoardId, onUpload, uploadImage, isClientSideUploadEnabled, clientSideUpload, t]
   );
 
   const onDropRejected = useCallback(
