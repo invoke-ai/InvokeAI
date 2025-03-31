@@ -195,16 +195,20 @@ const PublishWorkflowButton = memo(() => {
     const result = await withResultAsync(() => enqueue(true, true));
     if (result.isErr()) {
       toast({
+        id: 'TOAST_PUBLISH_FAILED',
         status: 'error',
         title: t('workflows.builder.publishFailed'),
         description: t('workflows.builder.publishFailedDesc'),
+        duration: null,
       });
       log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
     } else {
       toast({
+        id: 'TOAST_PUBLISH_SUCCESSFUL',
         status: 'success',
         title: t('workflows.builder.publishSuccess'),
         description: t('workflows.builder.publishSuccessDesc'),
+        duration: null,
       });
       resetPublishState();
       log.debug(parseify(result.value), 'Enqueued batch');
