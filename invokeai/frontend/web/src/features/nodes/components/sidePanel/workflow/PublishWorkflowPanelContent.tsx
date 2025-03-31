@@ -17,7 +17,7 @@ import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { NodeFieldElementOverlay } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
 import {
-  $isInDeployFlow,
+  $isInPublishFlow,
   $isReadyToDoValidationRun,
   $isSelectingOutputNode,
   $outputNodeId,
@@ -168,7 +168,7 @@ SelectOutputNodeButton.displayName = 'SelectOutputNodeButton';
 const CancelPublishButton = memo(() => {
   const { t } = useTranslation();
   const onClick = useCallback(() => {
-    $isInDeployFlow.set(false);
+    $isInPublishFlow.set(false);
     $isSelectingOutputNode.set(false);
     $outputNodeId.set(null);
   }, []);
@@ -297,7 +297,7 @@ export const StartPublishFlowButton = memo(() => {
   const inputs = usePublishInputs();
 
   const onClick = useCallback(() => {
-    $isInDeployFlow.set(true);
+    $isInPublishFlow.set(true);
   }, []);
 
   return (

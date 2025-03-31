@@ -3,7 +3,7 @@ import { Box, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { Handle, Position } from '@xyflow/react';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
-import { $isInDeployFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import {
   useConnectionErrorTKey,
   useIsConnectionInProgress,
@@ -107,7 +107,7 @@ type HandleCommonProps = {
 };
 
 const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelField }: HandleCommonProps) => {
-  const isInDeployFlow = useStore($isInDeployFlow);
+  const isInPublishFlow = useStore($isInPublishFlow);
   return (
     <Tooltip label={fieldTypeName} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
       <Handle
@@ -115,7 +115,7 @@ const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelFiel
         id={fieldTemplate.name}
         position={Position.Left}
         style={handleStyles}
-        isConnectable={!isInDeployFlow}
+        isConnectable={!isInPublishFlow}
       >
         <Box
           sx={sx}
@@ -139,7 +139,7 @@ const ConnectionInProgressHandle = memo(
     const { t } = useTranslation();
     const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
     const connectionError = useConnectionErrorTKey(nodeId, fieldName, 'target');
-    const isInDeployFlow = useStore($isInDeployFlow);
+    const isInPublishFlow = useStore($isInPublishFlow);
 
     const tooltip = useMemo(() => {
       if (connectionError !== null) {
@@ -155,7 +155,7 @@ const ConnectionInProgressHandle = memo(
           id={fieldTemplate.name}
           position={Position.Left}
           style={handleStyles}
-          isConnectable={!isInDeployFlow}
+          isConnectable={!isInPublishFlow}
         >
           <Box
             sx={sx}

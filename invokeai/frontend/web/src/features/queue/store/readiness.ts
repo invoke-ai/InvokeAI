@@ -22,7 +22,7 @@ import {
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { $isInDeployFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
@@ -86,7 +86,7 @@ const debouncedUpdateReasons = debounce(
     upscale: UpscaleState,
     config: AppConfig,
     store: AppStore,
-    isInDeployFlow: boolean
+    isInPublishFlow: boolean
   ) => {
     if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
@@ -110,7 +110,7 @@ const debouncedUpdateReasons = debounce(
         workflowSettingsState: workflowSettings,
         isConnected,
         templates,
-        isInDeployFlow,
+        isInPublishFlow,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'upscaling') {
@@ -147,7 +147,7 @@ export const useReadinessWatcher = () => {
   const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
-  const isInDeployFlow = useStore($isInDeployFlow);
+  const isInPublishFlow = useStore($isInPublishFlow);
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -167,7 +167,7 @@ export const useReadinessWatcher = () => {
       upscale,
       config,
       store,
-      isInDeployFlow
+      isInPublishFlow
     );
   }, [
     store,
@@ -186,7 +186,7 @@ export const useReadinessWatcher = () => {
     templates,
     upscale,
     workflowSettings,
-    isInDeployFlow,
+    isInPublishFlow,
   ]);
 };
 
@@ -198,16 +198,16 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {
   workflowSettingsState: WorkflowSettingsState;
   isConnected: boolean;
   templates: Templates;
-  isInDeployFlow: boolean;
+  isInPublishFlow: boolean;
 }): Promise<Reason[]> => {
-  const { dispatch, nodesState, workflowSettingsState, isConnected, templates, isInDeployFlow } = arg;
+  const { dispatch, nodesState, workflowSettingsState, isConnected, templates, isInPublishFlow } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
     reasons.push(disconnectedReason(i18n.t));
   }
 
-  if (workflowSettingsState.shouldValidateGraph || isInDeployFlow) {
+  if (workflowSettingsState.shouldValidateGraph || isInPublishFlow) {
     const { nodes, edges } = nodesState;
     const invocationNodes = nodes.filter(isInvocationNode);
     const batchNodes = invocationNodes.filter(isBatchNode);

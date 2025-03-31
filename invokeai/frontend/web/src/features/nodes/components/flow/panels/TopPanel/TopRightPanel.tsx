@@ -3,18 +3,18 @@ import { useStore } from '@nanostores/react';
 import ClearFlowButton from 'features/nodes/components/flow/panels/TopPanel/ClearFlowButton';
 import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopPanel/SaveWorkflowButton';
 import { useWorkflowEditorSettingsModal } from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
-import { $isInDeployFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixFill } from 'react-icons/pi';
 
 export const TopRightPanel = memo(() => {
   const modal = useWorkflowEditorSettingsModal();
-  const isInDeployFlow = useStore($isInDeployFlow);
+  const isInPublishFlow = useStore($isInPublishFlow);
 
   const { t } = useTranslation();
 
-  if (isInDeployFlow) {
+  if (isInPublishFlow) {
     return null;
   }
 

@@ -12,17 +12,17 @@ import { atom, computed } from 'nanostores';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
-export const $isInDeployFlow = atom(false);
+export const $isInPublishFlow = atom(false);
 export const $outputNodeId = atom<string | null>(null);
 export const $isSelectingOutputNode = atom(false);
 export const $isReadyToDoValidationRun = computed(
-  [$isInDeployFlow, $outputNodeId, $isSelectingOutputNode],
-  (isInDeployFlow, outputNodeId, isSelectingOutputNode) => {
-    return isInDeployFlow && outputNodeId !== null && !isSelectingOutputNode;
+  [$isInPublishFlow, $outputNodeId, $isSelectingOutputNode],
+  (isInPublishFlow, outputNodeId, isSelectingOutputNode) => {
+    return isInPublishFlow && outputNodeId !== null && !isSelectingOutputNode;
   }
 );
 export const resetPublishState = () => {
-  $isInDeployFlow.set(false);
+  $isInPublishFlow.set(false);
   $outputNodeId.set(null);
   $isSelectingOutputNode.set(false);
 };

@@ -18,7 +18,7 @@ import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInte
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import {
-  $isInDeployFlow,
+  $isInPublishFlow,
   $isSelectingOutputNode,
   $outputNodeId,
 } from 'features/nodes/components/sidePanel/workflow/publish';
@@ -98,7 +98,7 @@ export const Flow = memo(() => {
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
   const isWorkflowsFocused = useIsRegionFocused('workflows');
-  const isInDeployFlow = useStore($isInDeployFlow);
+  const isInPublishFlow = useStore($isInPublishFlow);
 
   useFocusRegion('workflows', flowWrapper);
 
@@ -365,12 +365,12 @@ export const Flow = memo(() => {
       onMoveEnd={handleMoveEnd}
       connectionLineComponent={CustomConnectionLine}
       isValidConnection={isValidConnection}
-      edgesFocusable={!isInDeployFlow}
-      edgesReconnectable={!isInDeployFlow}
-      nodesDraggable={!isInDeployFlow}
-      nodesConnectable={!isInDeployFlow}
-      nodesFocusable={!isInDeployFlow}
-      elementsSelectable={!isInDeployFlow}
+      edgesFocusable={!isInPublishFlow}
+      edgesReconnectable={!isInPublishFlow}
+      nodesDraggable={!isInPublishFlow}
+      nodesConnectable={!isInPublishFlow}
+      nodesFocusable={!isInPublishFlow}
+      elementsSelectable={!isInPublishFlow}
       minZoom={0.1}
       snapToGrid={shouldSnapToGrid}
       snapGrid={snapGrid}
