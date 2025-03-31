@@ -93,7 +93,7 @@ export const useClientSideUpload = () => {
         }),
       }).then((res) => res.json());
 
-      if (isPresignedUrlResponse(response)) {
+      if (!isPresignedUrlResponse(response)) {
         throw new Error('Invalid response');
       }
 
