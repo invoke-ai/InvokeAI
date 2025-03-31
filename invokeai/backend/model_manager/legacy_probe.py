@@ -14,6 +14,7 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_instantx_controlnet,
     is_state_dict_xlabs_controlnet,
 )
+from invokeai.backend.flux.flux_state_dict_utils import get_flux_in_channels_from_state_dict
 from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlabs_ip_adapter
 from invokeai.backend.flux.redux.flux_redux_state_dict_utils import is_state_dict_likely_flux_redux
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
@@ -564,7 +565,14 @@ class CheckpointProbeBase(ProbeBase):
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
 
         if base_type == BaseModelType.Flux:
-            in_channels = state_dict["img_in.weight"].shape[1]
+            in_channels = get_flux_in_channels_from_state_dict(state_dict)
+
+            if in_channels is None:
+                # If we cannot find the in_channels, we assume that this is a normal variant. Log a warning.
+                logger.warning(
+                    f"{self.model_path} does not have img_in.weight or model.diffusion_model.img_in.weight key. Assuming normal variant."
+                )
+                return ModelVariantType.Normal
 
             # FLUX Model variant types are distinguished by input channels:
             # - Unquantized Dev and Schnell have in_channels=64

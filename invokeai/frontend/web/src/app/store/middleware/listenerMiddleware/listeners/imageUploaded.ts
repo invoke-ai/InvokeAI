@@ -1,6 +1,8 @@
+import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { RootState } from 'app/store/store';
+import { imageUploadedClientSide } from 'features/gallery/store/actions';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { toast } from 'features/toast/toast';
@@ -8,7 +10,8 @@ import { t } from 'i18next';
 import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
-
+import type { ImageDTO } from 'services/api/types';
+import { getCategories, getListImagesUrl } from 'services/api/util';
 const log = logger('gallery');
 
 /**
@@ -34,18 +37,55 @@ let lastUploadedToastTimeout: number | null = null;
 
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
+    matcher: isAnyOf(imagesApi.endpoints.uploadImage.matchFulfilled, imageUploadedClientSide),
     effect: (action, { dispatch, getState }) => {
-      const imageDTO = action.payload;
+      let imageDTO: ImageDTO;
+      let silent;
+      let isFirstUploadOfBatch = true;
+
+      if (imageUploadedClientSide.match(action)) {
+        imageDTO = action.payload.imageDTO;
+        silent = action.payload.silent;
+        isFirstUploadOfBatch = action.payload.isFirstUploadOfBatch;
+      } else if (imagesApi.endpoints.uploadImage.matchFulfilled(action)) {
+        imageDTO = action.payload;
+        silent = action.meta.arg.originalArgs.silent;
+        isFirstUploadOfBatch = action.meta.arg.originalArgs.isFirstUploadOfBatch ?? true;
+      } else {
+        return;
+      }
+
+      if (silent || imageDTO.is_intermediate) {
+        // If the image is silent or intermediate, we don't want to show a toast
+        return;
+      }
+
+      if (imageUploadedClientSide.match(action)) {
+        const categories = getCategories(imageDTO);
+        const boardId = imageDTO.board_id ?? 'none';
+        dispatch(
+          imagesApi.util.invalidateTags([
+            {
+              type: 'ImageList',
+              id: getListImagesUrl({
+                board_id: boardId,
+                categories,
+              }),
+            },
+            {
+              type: 'Board',
+              id: boardId,
+            },
+            {
+              type: 'BoardImagesTotal',
+              id: boardId,
+            },
+          ])
+        );
+      }
       const state = getState();
 
       log.debug({ imageDTO }, 'Image uploaded');
-
-      if (action.meta.arg.originalArgs.silent || imageDTO.is_intermediate) {
-        // When a "silent" upload is requested, or the image is intermediate, we can skip all post-upload actions,
-        // like toasts and switching the gallery view
-        return;
-      }
 
       const boardId = imageDTO.board_id ?? 'none';
 
@@ -80,7 +120,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
        *
        * Default to true to not require _all_ image upload handlers to set this value
        */
-      const isFirstUploadOfBatch = action.meta.arg.originalArgs.isFirstUploadOfBatch ?? true;
+
       if (isFirstUploadOfBatch) {
         dispatch(boardIdSelected({ boardId }));
         dispatch(galleryViewChanged('assets'));

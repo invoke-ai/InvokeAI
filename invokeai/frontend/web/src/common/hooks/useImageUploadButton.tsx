@@ -3,7 +3,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
+import { selectIsClientSideUploadEnabled } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import type { FileRejection } from 'react-dropzone';
@@ -15,6 +15,7 @@ import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 import type { SetOptional } from 'type-fest';
 
+import { useClientSideUpload } from './useClientSideUpload';
 type UseImageUploadButtonArgs =
   | {
       isDisabled?: boolean;
@@ -50,8 +51,9 @@ const log = logger('gallery');
  */
 export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
+  const isClientSideUploadEnabled = useAppSelector(selectIsClientSideUploadEnabled);
   const [uploadImage, request] = useUploadImageMutation();
-  const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
+  const clientSideUpload = useClientSideUpload();
   const { t } = useTranslation();
 
   const onDropAccepted = useCallback(
@@ -79,22 +81,27 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
           onUpload(imageDTO);
         }
       } else {
-        const imageDTOs = await uploadImages(
-          files.map((file, i) => ({
-            file,
-            image_category: 'user',
-            is_intermediate: false,
-            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-            silent: false,
-            isFirstUploadOfBatch: i === 0,
-          }))
-        );
+        let imageDTOs: ImageDTO[] = [];
+        if (isClientSideUploadEnabled) {
+          imageDTOs = await Promise.all(files.map((file, i) => clientSideUpload(file, i)));
+        } else {
+          imageDTOs = await uploadImages(
+            files.map((file, i) => ({
+              file,
+              image_category: 'user',
+              is_intermediate: false,
+              board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+              silent: false,
+              isFirstUploadOfBatch: i === 0,
+            }))
+          );
+        }
         if (onUpload) {
           onUpload(imageDTOs);
         }
       }
     },
-    [allowMultiple, autoAddBoardId, onUpload, uploadImage]
+    [allowMultiple, autoAddBoardId, onUpload, uploadImage, isClientSideUploadEnabled, clientSideUpload]
   );
 
   const onDropRejected = useCallback(
@@ -105,10 +112,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
           file: rejection.file.path,
         }));
         log.error({ errors }, 'Invalid upload');
-        const description =
-          maxImageUploadCount === undefined
-            ? t('toast.uploadFailedInvalidUploadDesc')
-            : t('toast.uploadFailedInvalidUploadDesc_withCount', { count: maxImageUploadCount });
+        const description = t('toast.uploadFailedInvalidUploadDesc');
 
         toast({
           id: 'UPLOAD_FAILED',
@@ -120,7 +124,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
         return;
       }
     },
-    [maxImageUploadCount, t]
+    [t]
   );
 
   const {
@@ -137,8 +141,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
     onDropRejected,
     disabled: isDisabled,
     noDrag: true,
-    multiple: allowMultiple && (maxImageUploadCount === undefined || maxImageUploadCount > 1),
-    maxFiles: maxImageUploadCount,
+    multiple: allowMultiple,
   });
 
   return { getUploadButtonProps, getUploadInputProps, openUploader, request };

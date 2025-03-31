@@ -19,7 +19,7 @@ from tests.backend.flux.ip_adapter.xlabs_flux_ip_adapter_v2_state_dict import xl
 @pytest.mark.parametrize("sd_shapes", [xlabs_flux_ip_adapter_sd_shapes, xlabs_flux_ip_adapter_v2_sd_shapes])
 def test_is_state_dict_xlabs_ip_adapter(sd_shapes: dict[str, list[int]]):
     # Construct a dummy state_dict.
-    sd = {k: None for k in sd_shapes}
+    sd = dict.fromkeys(sd_shapes)
 
     assert is_state_dict_xlabs_ip_adapter(sd)
 
