@@ -10,6 +10,12 @@ from invokeai.app.services.shared.graph import Graph
 DictOfFieldsMetadata: TypeAlias = dict[str, tuple[type[Any], FieldInfo]]
 
 
+class ComposedFieldMetadata(BaseModel):
+    node_id: str
+    field_name: str
+    field_type_class_name: str
+
+
 def dedupe_field_name(field_metadata: DictOfFieldsMetadata, field_name: str) -> str:
     """Given a field name, return a name that is not already in the field metadata.
     If the field name is not in the field metadata, return the field name.
@@ -108,37 +114,42 @@ def compose_model_from_fields(
         node_instance = g.nodes[node_id]
 
         if field_identifier.kind == "input":
-            # Get the class of the node - this is a BaseInvocation subclass, e.g. AddInvocation, DenoiseLatentsInvocation, etc.
+            # Get the class of the node. This will be a BaseInvocation subclass, e.g. AddInvocation, DenoiseLatentsInvocation, etc.
             pydantic_model = type(node_instance)
         else:
-            # Otherwise the the type of the node's output class
+            # Otherwise the the type of the node's output class. This will be a BaseInvocationOutput subclass, e.g. IntegerOutput, ImageOutput, etc.
             pydantic_model = type(node_instance).get_output_annotation()
-
-        # Get the type annotation of the field. For example:
-        # a: int = Field(..., description="The first number to add.")
-        #    ^^^ this is the type annotation
-        field_type_annotation = pydantic_model.model_fields[field_name].annotation
-
-        # Apparently pydantic allows fields without type annotations. We don't support that.
-        assert field_type_annotation is not None, (
-            f"{field_identifier.kind.capitalize()} field {field_name} on node {node_id} has no type annotation."
-        )
-
-        # Now that we have the type annotation, we can apply the filter to see if we should include the field in the composed model.
-        if model_field_filter and not model_field_filter(field_type_annotation):
-            continue
-
-        # Ok, we want this type of field. If there's an override, use it.
-        override = model_field_overrides.get(field_type_annotation, None)
-
-        # The override tuple's first element is the new type annotation, if it exists.
-        field_type_annotation = override[0] if override else field_type_annotation
 
         # Get the FieldInfo instance for the field. For example:
         # a: int = Field(..., description="The first number to add.")
         #          ^^^^^ The return value of this Field call is the FieldInfo instance (Field is a function).
-        # The override tuple's second element is the new FieldInfo, if it exists.
-        field_info = override[1] if override else pydantic_model.model_fields[field_name]
+        og_field_info = pydantic_model.model_fields[field_name]
+
+        # Get the type annotation of the field. For example:
+        # a: int = Field(..., description="The first number to add.")
+        #    ^^^ this is the type annotation
+        og_field_type = og_field_info.annotation
+
+        # Apparently pydantic allows fields without type annotations. We don't support that.
+        assert og_field_type is not None, (
+            f"{field_identifier.kind.capitalize()} field {field_name} on node {node_id} has no type annotation."
+        )
+
+        # Now that we have the type annotation, we can apply the filter to see if we should include the field in the composed model.
+        if model_field_filter and not model_field_filter(og_field_type):
+            continue
+
+        # Ok, we want this type of field. Retrieve any overrides for the field type. This is a dictionary mapping
+        # type annotations to tuples of (override_type_annotation, override_field_info).
+        (override_field_type, override_field_info) = model_field_overrides.get(og_field_type, (None, None))
+
+        # The override tuple's first element is the new type annotation, if it exists.
+        composed_field_type = override_field_type if override_field_type is not None else og_field_type
+
+        # Create a deep copy of the FieldInfo instance (or override it if it exists) so we can modify it without
+        # affecting the original. This is important because we are going to modify the FieldInfo instance and
+        # don't want to affect the original model's schema.
+        composed_field_info = deepcopy(override_field_info if override_field_info is not None else og_field_info)
 
         # Invocation fields have some extra metadata, used by the UI to render the field in the frontend. This data is
         # included in the OpenAPI schema for each field. For example, we add a "ui_order" field, which the UI uses to
@@ -147,19 +158,27 @@ def compose_model_from_fields(
         # The composed model's OpenAPI schema should not have this information. It should only have a standard OpenAPI
         # schema for the field. We need to strip out the UI-specific metadata from the FieldInfo instance before adding
         # it to the composed model.
+        #
+        # We will replace this metadata with some custom metadata:
+        # - node_id: The id of the node that this field belongs to.
+        # - field_name: The name of the field on the node.
+        # - original_data_type: The original data type of the field.
 
-        # Make sure to deepcopy the FieldInfo instance so we don't modify the original and cause any side effects.
-        field_info_copy = deepcopy(field_info)
+        composed_field_metadata = ComposedFieldMetadata(
+            node_id=node_id,
+            field_name=field_name,
+            field_type_class_name=og_field_type.__name__,
+        )
 
-        # Strip out the UI-specific schema metadata, which is stored in the json_schema_extra attribute, replacing it with
-        # the node id and field name.
-        field_info_copy.json_schema_extra = {"node_id": node_id, "field_name": field_name}
+        composed_field_info.json_schema_extra = {
+            "composed_field_metadata": composed_field_metadata.model_dump(),
+        }
 
         # Override the name, title and description if overrides are provided. Dedupe the field name if necessary.
         final_field_name = dedupe_field_name(field_metadata, field_name)
 
         # Store the field metadata.
-        field_metadata.update({final_field_name: (field_type_annotation, field_info_copy)})
+        field_metadata.update({final_field_name: (composed_field_type, composed_field_info)})
 
     # Splat in the composed fields to create the new model. There are some type errors here because create_model's kwargs are not typed,
     # but it wants a tuple of (type, FieldInfo) for each field.
