@@ -1440,7 +1440,7 @@ requires-dist = [
     { name = "pre-commit", marker = "extra == 'test'" },
     { name = "prompt-toolkit" },
     { name = "pudb", marker = "extra == 'dev'" },
-    { name = "pydantic", specifier = "<2.9" },
+    { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pympler" },
     { name = "pypatchmatch" },

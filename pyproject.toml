@@ -64,7 +64,7 @@ dependencies = [
   "fastapi",
   "huggingface-hub",
   "pydantic-settings",
-  "pydantic<2.9",
+  "pydantic",
   "python-socketio",
   "uvicorn[standard]",
 
