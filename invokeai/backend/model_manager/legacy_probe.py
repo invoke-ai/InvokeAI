@@ -572,6 +572,8 @@ class CheckpointProbeBase(ProbeBase):
 
             if in_channels is None:
                 # If we cannot find the in_channels, we assume that this is a normal variant. Log a warning.
+                # If this occurs, we should add a test case for the affected model here:
+                # tests/backend/flux/test_flux_state_dict_utils.py
                 logger.warning(
                     f"{self.model_path} does not have img_in.weight or model.diffusion_model.img_in.weight key. Assuming normal variant."
                 )
