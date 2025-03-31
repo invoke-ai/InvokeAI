@@ -49,7 +49,11 @@ export const useGalleryHotkeys = () => {
   useRegisteredHotkeys({
     id: 'galleryNavLeft',
     category: 'gallery',
-    callback: () => {
+    callback: (e) => {
+      // Skip the hotkey if the user is focused on a tab element - the arrow keys are used to navigate between tabs.
+      if (e.target instanceof HTMLElement && e.target.getAttribute('role') === 'tab') {
+        return;
+      }
       if (isOnFirstImageOfView && isPrevEnabled && !queryResult.isFetching) {
         goPrev('arrow');
         return;
@@ -71,7 +75,11 @@ export const useGalleryHotkeys = () => {
   useRegisteredHotkeys({
     id: 'galleryNavRight',
     category: 'gallery',
-    callback: () => {
+    callback: (e) => {
+      // Skip the hotkey if the user is focused on a tab element - the arrow keys are used to navigate between tabs.
+      if (e.target instanceof HTMLElement && e.target.getAttribute('role') === 'tab') {
+        return;
+      }
       if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
         goNext('arrow');
         return;
