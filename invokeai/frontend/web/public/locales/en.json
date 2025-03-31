@@ -1804,8 +1804,8 @@
             "warningWorkflowHasUnpublishableInputFields": "Workflow has some unpublishable inputs - these will be omitted from the published workflow",
             "publishFailed": "Publish failed",
             "publishFailedDesc": "There was a problem publishing the workflow. Please try again.",
-            "publishSuccess": "Workflow publish started",
-            "publishSuccessDesc": "Your workflow is being published. Check your Project Dashboard to see its progress.",
+            "publishSuccess": "Your workflow is being published",
+            "publishSuccessDesc": "Check your <LinkComponent>Project Dashboard</LinkComponent> to see its progress.",
             "publishInProgress": "Publishing in Progress",
             "publishingValidationRun": "Publishing Validation Run"
         }

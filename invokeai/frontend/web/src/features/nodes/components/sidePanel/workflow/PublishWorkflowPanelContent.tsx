@@ -11,10 +11,12 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
+import { $projectUrl } from 'app/store/nanostores/projectId';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
+import { ExternalLink } from 'features/gallery/components/ImageViewer/NoContentForViewer';
 import { NodeFieldElementOverlay } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
 import {
   $isInPublishFlow,
@@ -40,7 +42,7 @@ import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { PiLightningFill, PiSignOutBold, PiXBold } from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
 
@@ -190,6 +192,8 @@ const PublishWorkflowButton = memo(() => {
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
   const inputs = usePublishInputs();
 
+  const projectUrl = useStore($projectUrl);
+
   const enqueue = useEnqueueWorkflows();
   const onClick = useCallback(async () => {
     const result = await withResultAsync(() => enqueue(true, true));
@@ -207,13 +211,20 @@ const PublishWorkflowButton = memo(() => {
         id: 'TOAST_PUBLISH_SUCCESSFUL',
         status: 'success',
         title: t('workflows.builder.publishSuccess'),
-        description: t('workflows.builder.publishSuccessDesc'),
+        description: (
+          <Trans
+            i18nKey="workflows.builder.publishSuccessDesc"
+            components={{
+              LinkComponent: <ExternalLink href={projectUrl ?? ''} />,
+            }}
+          />
+        ),
         duration: null,
       });
       resetPublishState();
       log.debug(parseify(result.value), 'Enqueued batch');
     }
-  }, [enqueue, t]);
+  }, [enqueue, projectUrl, t]);
 
   return (
     <PublishTooltip
