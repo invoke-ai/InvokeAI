@@ -2475,7 +2475,7 @@ export type components = {
             api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /**
              * Api Output Fields
-             * @description The nodes that were used as output from the API
+             * @description The fields that were used as output from the API
              */
             api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
         };
@@ -21929,6 +21929,11 @@ export type components = {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
             /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
+            /**
              * Id
              * @description The id of the workflow.
              */
@@ -22143,6 +22148,11 @@ export type components = {
             form?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
         };
         /**
          * Zoe (Depth) Processor
