@@ -1806,7 +1806,8 @@
             "publishFailedDesc": "There was a problem publishing the workflow. Please try again.",
             "publishSuccess": "Workflow publish started",
             "publishSuccessDesc": "Your workflow is being published. Check your Project Dashboard to see its progress.",
-            "publishInProgress": "Publishing in Progress"
+            "publishInProgress": "Publishing in Progress",
+            "publishingValidationRun": "Publishing Validation Run"
         }
     },
     "controlLayers": {
