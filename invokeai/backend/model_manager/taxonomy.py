@@ -126,4 +126,13 @@ class ModelSourceType(str, Enum):
     HFRepoID = "hf_repo_id"
 
 
+class FluxLoRAFormat(str, Enum):
+    """Flux LoRA formats."""
+
+    Diffusers = "flux.diffusers"
+    Kohya = "flux.kohya"
+    OneTrainer = "flux.onetrainer"
+    Control = "flux.control"
+
+
 AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, None]
