@@ -6,6 +6,7 @@ import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsS
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
 import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue';
@@ -175,6 +176,7 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
   const { t } = useTranslation();
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
   const [_, enqueueMutation] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
+  const isInPublishFlow = useStore($isInPublishFlow);
 
   const text = useMemo(() => {
     if (enqueueMutation.isLoading) {
@@ -183,6 +185,9 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
     if (isLoadingDynamicPrompts) {
       return t('dynamicPrompts.loading');
     }
+    if (isInPublishFlow) {
+      return t('workflows.builder.publishInProgress');
+    }
     if (isReady) {
       if (prepend) {
         return t('queue.queueFront');
@@ -190,7 +195,7 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
       return t('queue.queueBack');
     }
     return t('queue.notReady');
-  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isReady, prepend, t]);
+  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isInPublishFlow, isReady, prepend, t]);
 
   return <Text fontWeight="semibold">{text}</Text>;
 });
