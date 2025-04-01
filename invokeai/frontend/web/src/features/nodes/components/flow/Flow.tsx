@@ -220,7 +220,7 @@ export const Flow = memo(() => {
     id: 'copySelection',
     category: 'workflows',
     callback: copySelection,
-    options: { preventDefault: true },
+    options: { enabled: isWorkflowsFocused && !isLocked, preventDefault: true },
     dependencies: [copySelection],
   });
 
@@ -249,24 +249,24 @@ export const Flow = memo(() => {
     id: 'selectAll',
     category: 'workflows',
     callback: selectAll,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
-    dependencies: [selectAll, isWorkflowsFocused],
+    options: { enabled: isWorkflowsFocused && !isLocked, preventDefault: true },
+    dependencies: [selectAll, isWorkflowsFocused, isLocked],
   });
 
   useRegisteredHotkeys({
     id: 'pasteSelection',
     category: 'workflows',
     callback: pasteSelection,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
-    dependencies: [pasteSelection],
+    options: { enabled: isWorkflowsFocused && !isLocked, preventDefault: true },
+    dependencies: [pasteSelection, isLocked, isWorkflowsFocused],
   });
 
   useRegisteredHotkeys({
     id: 'pasteSelectionWithEdges',
     category: 'workflows',
     callback: pasteSelectionWithEdges,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
-    dependencies: [pasteSelectionWithEdges],
+    options: { enabled: isWorkflowsFocused && !isLocked, preventDefault: true },
+    dependencies: [pasteSelectionWithEdges, isLocked, isWorkflowsFocused],
   });
 
   useRegisteredHotkeys({
@@ -275,8 +275,8 @@ export const Flow = memo(() => {
     callback: () => {
       dispatch(undo());
     },
-    options: { enabled: isWorkflowsFocused && mayUndo, preventDefault: true },
-    dependencies: [mayUndo],
+    options: { enabled: isWorkflowsFocused && !isLocked && mayUndo, preventDefault: true },
+    dependencies: [mayUndo, isLocked, isWorkflowsFocused],
   });
 
   useRegisteredHotkeys({
@@ -285,8 +285,8 @@ export const Flow = memo(() => {
     callback: () => {
       dispatch(redo());
     },
-    options: { enabled: isWorkflowsFocused && mayRedo, preventDefault: true },
-    dependencies: [mayRedo],
+    options: { enabled: isWorkflowsFocused && !isLocked && mayRedo, preventDefault: true },
+    dependencies: [mayRedo, isLocked, isWorkflowsFocused],
   });
 
   const onEscapeHotkey = useCallback(() => {
@@ -323,8 +323,8 @@ export const Flow = memo(() => {
     id: 'deleteSelection',
     category: 'workflows',
     callback: deleteSelection,
-    options: { preventDefault: true, enabled: isWorkflowsFocused },
-    dependencies: [deleteSelection, isWorkflowsFocused],
+    options: { preventDefault: true, enabled: isWorkflowsFocused && !isLocked },
+    dependencies: [deleteSelection, isWorkflowsFocused, isLocked],
   });
 
   const onNodeClick = useCallback<NodeMouseHandler<AnyNode>>((e, node) => {

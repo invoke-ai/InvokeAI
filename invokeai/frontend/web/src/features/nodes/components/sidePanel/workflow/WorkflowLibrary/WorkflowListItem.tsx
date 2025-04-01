@@ -102,7 +102,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   flexShrink={0}
                   variant="subtle"
                 >
-                  {t('workflows.published')}
+                  {t('workflows.builder.published')}
                 </Badge>
               )}
               {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}

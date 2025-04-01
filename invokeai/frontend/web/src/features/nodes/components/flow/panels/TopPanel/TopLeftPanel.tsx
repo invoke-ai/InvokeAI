@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import AddNodeButton from 'features/nodes/components/flow/panels/TopPanel/AddNodeButton';
 import UpdateNodesButton from 'features/nodes/components/flow/panels/TopPanel/UpdateNodesButton';
-import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { $isInPublishFlow, useIsValidationRunInProgress } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { selectWorkflowIsPublished } from 'features/nodes/store/workflowSlice';
 import { memo } from 'react';
@@ -13,6 +13,7 @@ export const TopLeftPanel = memo(() => {
   const isLocked = useIsWorkflowEditorLocked();
   const isInPublishFlow = useStore($isInPublishFlow);
   const isPublished = useAppSelector(selectWorkflowIsPublished);
+  const isValidationRunInProgress = useIsValidationRunInProgress();
 
   const { t } = useTranslation();
   return (
@@ -28,7 +29,12 @@ export const TopLeftPanel = memo(() => {
           <AlertIcon />
           <Box>
             <AlertTitle>{t('workflows.builder.workflowLocked')}</AlertTitle>
-            {isInPublishFlow && (
+            {isValidationRunInProgress && (
+              <AlertDescription whiteSpace="pre-wrap">
+                {t('workflows.builder.publishingValidationRunInProgress')}
+              </AlertDescription>
+            )}
+            {isInPublishFlow && !isValidationRunInProgress && (
               <AlertDescription whiteSpace="pre-wrap">
                 {t('workflows.builder.workflowLockedDuringPublishing')}
               </AlertDescription>

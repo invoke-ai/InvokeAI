@@ -23,7 +23,7 @@ import {
   $isReadyToDoValidationRun,
   $isSelectingOutputNode,
   $outputNodeId,
-  resetPublishState,
+  $validationRunBatchId,
   usePublishInputs,
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useInputFieldTemplateTitleOrThrow } from 'features/nodes/hooks/useInputFieldTemplateTitleOrThrow';
@@ -45,6 +45,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiLightningFill, PiSignOutBold, PiXBold } from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
+import { assert } from 'tsafe';
 
 const log = logger('generation');
 
@@ -221,7 +222,8 @@ const PublishWorkflowButton = memo(() => {
         ),
         duration: null,
       });
-      resetPublishState();
+      assert(result.value.enqueueResult.batch.batch_id);
+      $validationRunBatchId.set(result.value.enqueueResult.batch.batch_id);
       log.debug(parseify(result.value), 'Enqueued batch');
     }
   }, [enqueue, projectUrl, t]);

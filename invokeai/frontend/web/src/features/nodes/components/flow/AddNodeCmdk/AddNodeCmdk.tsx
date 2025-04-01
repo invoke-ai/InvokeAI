@@ -18,6 +18,7 @@ import { CommandEmpty, CommandItem, CommandList, CommandRoot } from 'cmdk';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
+import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import {
   $addNodeCmdk,
   $cursorPos,
@@ -146,6 +147,7 @@ export const AddNodeCmdk = memo(() => {
   const [searchTerm, setSearchTerm] = useState('');
   const addNode = useAddNode();
   const tab = useAppSelector(selectActiveTab);
+  const isLocked = useIsWorkflowEditorLocked();
   // Filtering the list is expensive - debounce the search term to avoid stutters
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
   const isOpen = useStore($addNodeCmdk);
@@ -160,8 +162,8 @@ export const AddNodeCmdk = memo(() => {
     id: 'addNode',
     category: 'workflows',
     callback: open,
-    options: { enabled: tab === 'workflows', preventDefault: true },
-    dependencies: [open, tab],
+    options: { enabled: tab === 'workflows' && !isLocked, preventDefault: true },
+    dependencies: [open, tab, isLocked],
   });
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {

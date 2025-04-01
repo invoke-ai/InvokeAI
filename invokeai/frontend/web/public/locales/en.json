@@ -1785,6 +1785,7 @@
             "minimum": "Minimum",
             "maximum": "Maximum",
             "publish": "Publish",
+            "published": "Published",
             "unpublish": "Unpublish",
             "workflowLocked": "Workflow Locked",
             "workflowLockedPublished": "Published workflows are locked for editing.\nYou can unpublish the workflow to edit it, or make a copy of it.",
@@ -1811,6 +1812,7 @@
             "publishInProgress": "Publishing in progress",
             "publishedWorkflowIsLocked": "Published workflow is locked",
             "publishingValidationRun": "Publishing Validation Run",
+            "publishingValidationRunInProgress": "Publishing validation run in progress.",
             "publishedWorkflowsLocked": "Published workflows are locked and cannot be edited or run. Either unpublish the workflow or save a copy to edit or run this workflow."
         }
     },

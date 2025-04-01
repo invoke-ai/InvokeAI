@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
@@ -10,6 +11,7 @@ import { isBoardFieldType } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { atom, computed } from 'nanostores';
 import { useMemo } from 'react';
+import { useGetBatchStatusQuery } from 'services/api/endpoints/queue';
 import { assert } from 'tsafe';
 
 export const $isInPublishFlow = atom(false);
@@ -21,10 +23,25 @@ export const $isReadyToDoValidationRun = computed(
     return isInPublishFlow && outputNodeId !== null && !isSelectingOutputNode;
   }
 );
-export const resetPublishState = () => {
-  $isInPublishFlow.set(false);
-  $outputNodeId.set(null);
-  $isSelectingOutputNode.set(false);
+export const $validationRunBatchId = atom<string | null>(null);
+
+export const useIsValidationRunInProgress = () => {
+  const validationRunBatchId = useStore($validationRunBatchId);
+  const { isValidationRunInProgress } = useGetBatchStatusQuery(
+    validationRunBatchId ? { batch_id: validationRunBatchId } : skipToken,
+    {
+      selectFromResult: ({ currentData }) => {
+        if (!currentData) {
+          return { isValidationRunInProgress: false };
+        }
+        if (currentData && currentData.in_progress > 0) {
+          return { isValidationRunInProgress: true };
+        }
+        return { isValidationRunInProgress: false };
+      },
+    }
+  );
+  return validationRunBatchId !== null || isValidationRunInProgress;
 };
 
 export const selectFieldIdentifiersWithInvocationTypes = createSelector(
