@@ -13,28 +13,29 @@ import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type Callbacks = {
+type LoadWorkflowOptions = {
+  asCopy?: boolean;
   onSuccess?: (workflow: WorkflowV3) => void;
   onError?: () => void;
   onCompleted?: () => void;
 };
 
-type LoadLibraryWorkflowData = Callbacks & {
+type LoadLibraryWorkflowData = LoadWorkflowOptions & {
   type: 'library';
   data: string;
 };
 
-type LoadWorkflowFromObjectData = Callbacks & {
+type LoadWorkflowFromObjectData = LoadWorkflowOptions & {
   type: 'object';
   data: unknown;
 };
 
-type LoadWorkflowFromFileData = Callbacks & {
+type LoadWorkflowFromFileData = LoadWorkflowOptions & {
   type: 'file';
   data: File;
 };
 
-type LoadWorkflowFromImageData = Callbacks & {
+type LoadWorkflowFromImageData = LoadWorkflowOptions & {
   type: 'image';
   data: string;
 };
@@ -64,11 +65,12 @@ const useLoadImmediate = () => {
     if (!dialogState) {
       return;
     }
-    const { type, data, onSuccess, onError, onCompleted } = dialogState;
+    const { type, data, onSuccess, onError, onCompleted, asCopy } = dialogState;
     const options = {
       onSuccess,
       onError,
       onCompleted,
+      asCopy,
     };
     if (type === 'object') {
       await loadWorkflowFromObject(data, options);

@@ -24,6 +24,7 @@ export const useLoadWorkflowFromLibrary = () => {
         onSuccess?: (workflow: WorkflowV3) => void;
         onError?: () => void;
         onCompleted?: () => void;
+        asCopy?: boolean;
       } = {}
     ) => {
       const { onSuccess, onError, onCompleted } = options;

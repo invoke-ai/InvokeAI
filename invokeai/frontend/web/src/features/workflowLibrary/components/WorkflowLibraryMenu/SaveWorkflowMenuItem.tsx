@@ -1,6 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowIsTouched } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowIsPublished, selectWorkflowIsTouched } from 'features/nodes/store/workflowSlice';
 import { useSaveOrSaveAsWorkflow } from 'features/workflowLibrary/hooks/useSaveOrSaveAsWorkflow';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,9 +10,15 @@ const SaveWorkflowMenuItem = () => {
   const { t } = useTranslation();
   const saveOrSaveAsWorkflow = useSaveOrSaveAsWorkflow();
   const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const isPublished = useAppSelector(selectWorkflowIsPublished);
 
   return (
-    <MenuItem as="button" isDisabled={!isTouched} icon={<PiFloppyDiskBold />} onClick={saveOrSaveAsWorkflow}>
+    <MenuItem
+      as="button"
+      isDisabled={!isTouched || !!isPublished}
+      icon={<PiFloppyDiskBold />}
+      onClick={saveOrSaveAsWorkflow}
+    >
       {t('workflows.saveWorkflow')}
     </MenuItem>
   );

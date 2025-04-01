@@ -26,6 +26,7 @@ import {
   workflowLibraryTagToggled,
   workflowLibraryViewChanged,
 } from 'features/nodes/store/workflowLibrarySlice';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { NewWorkflowButton } from 'features/workflowLibrary/components/NewWorkflowButton';
 import { UploadWorkflowButton } from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -39,13 +40,12 @@ export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
   const categoryOptions = useStore($workflowLibraryCategoriesOptions);
   const view = useAppSelector(selectWorkflowLibraryView);
+  const deployWorkflow = useFeatureStatus('deployWorkflow');
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
-      <Flex flexDir="column" w="full" pb={2}>
+      <Flex flexDir="column" w="full" pb={2} gap={2}>
         <WorkflowLibraryViewButton view="recent">{t('workflows.recentlyOpened')}</WorkflowLibraryViewButton>
-      </Flex>
-      <Flex flexDir="column" w="full" pb={2}>
         <WorkflowLibraryViewButton view="yours">{t('workflows.yourWorkflows')}</WorkflowLibraryViewButton>
         {categoryOptions.includes('project') && (
           <Collapse in={view === 'yours' || view === 'shared' || view === 'private'}>
@@ -59,6 +59,9 @@ export const WorkflowLibrarySideNav = () => {
               </WorkflowLibraryViewButton>
             </Flex>
           </Collapse>
+        )}
+        {deployWorkflow && (
+          <WorkflowLibraryViewButton view="published">{t('workflows.publishedWorkflows')}</WorkflowLibraryViewButton>
         )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">

@@ -78,6 +78,8 @@ const migrateV2toV3 = (workflowToMigrate: WorkflowV2): WorkflowV3 => {
 
 /**
  * Parses a workflow and migrates it to the latest version if necessary.
+ *
+ * This function will return a new workflow object, so the original workflow is not modified.
  */
 export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
   const workflowVersionResult = zWorkflowMetaVersion.safeParse(data);

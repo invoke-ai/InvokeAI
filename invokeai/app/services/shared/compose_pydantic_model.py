@@ -1,7 +1,7 @@
 from copy import deepcopy
-from typing import Any, Callable, TypeAlias
+from typing import Any, Callable, TypeAlias, get_args
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, ConfigDict, create_model
 from pydantic.fields import FieldInfo
 
 from invokeai.app.services.session_queue.session_queue_common import FieldIdentifier
@@ -106,6 +106,9 @@ def compose_model_from_fields(
     field_metadata: DictOfFieldsMetadata = {}
     model_field_overrides = model_field_overrides or {}
 
+    # The list of required fields. This is used to ensure the composed model's fields retain their required state.
+    required: list[str] = []
+
     for field_identifier in field_identifiers:
         node_id = field_identifier.node_id
         field_name = field_identifier.field_name
@@ -151,6 +154,15 @@ def compose_model_from_fields(
         # don't want to affect the original model's schema.
         composed_field_info = deepcopy(override_field_info if override_field_info is not None else og_field_info)
 
+        json_schema_extra = og_field_info.json_schema_extra if isinstance(og_field_info.json_schema_extra, dict) else {}
+
+        # The field's original required state is stored in the json_schema_extra dict. For more information about why,
+        # see the definition of `InputField` in invokeai/app/invocations/fields.py.
+        #
+        # Add the field to the required list if it is required, which we will use when creating the composed model.
+        if json_schema_extra.get("orig_required", False):
+            required.append(field_name)
+
         # Invocation fields have some extra metadata, used by the UI to render the field in the frontend. This data is
         # included in the OpenAPI schema for each field. For example, we add a "ui_order" field, which the UI uses to
         # sort fields when rendering them.
@@ -164,14 +176,17 @@ def compose_model_from_fields(
         # - field_name: The name of the field on the node.
         # - original_data_type: The original data type of the field.
 
+        field_type_class = get_args(og_field_type)[0] if hasattr(og_field_type, "__args__") else og_field_type
+        field_type_class_name = field_type_class.__name__
+
         composed_field_metadata = ComposedFieldMetadata(
             node_id=node_id,
             field_name=field_name,
-            field_type_class_name=og_field_type.__name__,
+            field_type_class_name=field_type_class_name,
         )
 
         composed_field_info.json_schema_extra = {
-            "composed_field_metadata": composed_field_metadata.model_dump(),
+            "composed_field_extra": composed_field_metadata.model_dump(),
         }
 
         # Override the name, title and description if overrides are provided. Dedupe the field name if necessary.
@@ -180,6 +195,10 @@ def compose_model_from_fields(
         # Store the field metadata.
         field_metadata.update({final_field_name: (composed_field_type, composed_field_info)})
 
-    # Splat in the composed fields to create the new model. There are some type errors here because create_model's kwargs are not typed,
-    # but it wants a tuple of (type, FieldInfo) for each field.
-    return create_model(composed_model_class_name, **field_metadata)  # pyright: ignore[reportUnknownVariableType, reportCallIssue, reportArgumentType]
+    # Splat in the composed fields to create the new model. There are type errors here because create_model's kwargs are not typed,
+    # and for some reason pydantic's ConfigDict doesn't like lists in `json_schema_extra`. Anyways, the inputs here are correct.
+    return create_model(
+        composed_model_class_name,
+        **field_metadata,
+        __config__=ConfigDict(json_schema_extra={"required": required}),
+    )

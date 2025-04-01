@@ -29,6 +29,7 @@ import type { NodesState, Templates } from 'features/nodes/store/types';
 import { getInvocationNodeErrors } from 'features/nodes/store/util/fieldValidators';
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
+import { selectWorkflowIsPublished } from 'features/nodes/store/workflowSlice';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
@@ -148,6 +149,7 @@ export const useReadinessWatcher = () => {
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const isInPublishFlow = useStore($isInPublishFlow);
+  const isPublished = useAppSelector(selectWorkflowIsPublished);
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -187,6 +189,7 @@ export const useReadinessWatcher = () => {
     upscale,
     workflowSettings,
     isInPublishFlow,
+    isPublished,
   ]);
 };
 

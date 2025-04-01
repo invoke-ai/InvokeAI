@@ -54,6 +54,10 @@ export const useValidateAndLoadWorkflow = () => {
           checkModelAccess,
         });
 
+        if (workflow.is_published) {
+          //TODO: How to handle this?
+        }
+
         $nodeExecutionStates.set({});
         dispatch(workflowLoaded(workflow));
         if (!warnings.length) {

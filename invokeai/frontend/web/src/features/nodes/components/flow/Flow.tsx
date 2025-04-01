@@ -17,13 +17,10 @@ import type {
 import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
-import {
-  $isInPublishFlow,
-  $isSelectingOutputNode,
-  $outputNodeId,
-} from 'features/nodes/components/sidePanel/workflow/publish';
+import { $isSelectingOutputNode, $outputNodeId } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
+import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useNodeCopyPaste } from 'features/nodes/hooks/useNodeCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import {
@@ -98,7 +95,7 @@ export const Flow = memo(() => {
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
   const isWorkflowsFocused = useIsRegionFocused('workflows');
-  const isInPublishFlow = useStore($isInPublishFlow);
+  const isLocked = useIsWorkflowEditorLocked();
 
   useFocusRegion('workflows', flowWrapper);
 
@@ -365,12 +362,12 @@ export const Flow = memo(() => {
       onMoveEnd={handleMoveEnd}
       connectionLineComponent={CustomConnectionLine}
       isValidConnection={isValidConnection}
-      edgesFocusable={!isInPublishFlow}
-      edgesReconnectable={!isInPublishFlow}
-      nodesDraggable={!isInPublishFlow}
-      nodesConnectable={!isInPublishFlow}
-      nodesFocusable={!isInPublishFlow}
-      elementsSelectable={!isInPublishFlow}
+      edgesFocusable={!isLocked}
+      edgesReconnectable={!isLocked}
+      nodesDraggable={!isLocked}
+      nodesConnectable={!isLocked}
+      nodesFocusable={!isLocked}
+      elementsSelectable={!isLocked}
       minZoom={0.1}
       snapToGrid={shouldSnapToGrid}
       snapGrid={snapGrid}

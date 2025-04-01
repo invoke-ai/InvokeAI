@@ -1,20 +1,19 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import ClearFlowButton from 'features/nodes/components/flow/panels/TopPanel/ClearFlowButton';
 import SaveWorkflowButton from 'features/nodes/components/flow/panels/TopPanel/SaveWorkflowButton';
 import { useWorkflowEditorSettingsModal } from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
-import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixFill } from 'react-icons/pi';
 
 export const TopRightPanel = memo(() => {
   const modal = useWorkflowEditorSettingsModal();
-  const isInPublishFlow = useStore($isInPublishFlow);
+  const isLocked = useIsWorkflowEditorLocked();
 
   const { t } = useTranslation();
 
-  if (isInPublishFlow) {
+  if (isLocked) {
     return null;
   }
 

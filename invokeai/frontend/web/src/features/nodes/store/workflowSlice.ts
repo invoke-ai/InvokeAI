@@ -67,8 +67,11 @@ const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
     notes: '',
     exposedFields: [],
     meta: { version: '3.0.0', category: 'user' },
-    id: undefined,
     form: getDefaultForm(),
+    // Even though these values are `undefined`, the keys _must_ be present for the presistence layer to rehydrate
+    // them correctly. It uses a merge strategy that relies on the keys being present.
+    id: undefined,
+    is_published: undefined,
   };
 };
 
@@ -122,6 +125,9 @@ export const workflowSlice = createSlice({
     },
     workflowIDChanged: (state, action: PayloadAction<string>) => {
       state.id = action.payload;
+    },
+    workflowIsPublishedChanged(state, action: PayloadAction<boolean>) {
+      state.is_published = action.payload;
     },
     workflowSaved: (state) => {
       state.isTouched = false;
@@ -285,6 +291,7 @@ export const {
   workflowVersionChanged,
   workflowContactChanged,
   workflowIDChanged,
+  workflowIsPublishedChanged,
   workflowSaved,
   formReset,
   formElementAdded,
@@ -350,6 +357,7 @@ export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
+export const selectWorkflowIsPublished = createWorkflowSelector((workflow) => workflow.is_published);
 export const selectIsWorkflowSaved = createSelector(selectWorkflowId, selectWorkflowIsTouched, (id, isTouched) => {
   return id !== undefined && !isTouched;
 });

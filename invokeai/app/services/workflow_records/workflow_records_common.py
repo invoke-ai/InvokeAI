@@ -102,6 +102,7 @@ class WorkflowRecordDTOBase(BaseModel):
     opened_at: Optional[Union[datetime.datetime, str]] = Field(
         default=None, description="The opened timestamp of the workflow."
     )
+    is_published: bool | None = Field(default=None, description="Whether the workflow is published or not.")
 
 
 class WorkflowRecordDTO(WorkflowRecordDTOBase):

@@ -100,6 +100,13 @@ async def enqueue_batch(
             print("API Output Model")
             print(json.dumps(json_schema))
 
+        print("graph")
+        print(batch.graph.model_dump_json())
+
+        if batch.workflow is not None:
+            print("workflow")
+            print(batch.workflow.model_dump_json())
+
     return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
         queue_id=queue_id, batch=batch, prepend=prepend
     )

@@ -1,14 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Tooltip } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { Handle, Position } from '@xyflow/react';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
-import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import {
   useConnectionErrorTKey,
   useIsConnectionInProgress,
   useIsConnectionStartField,
 } from 'features/nodes/hooks/useFieldConnectionState';
+import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
@@ -107,7 +106,8 @@ type HandleCommonProps = {
 };
 
 const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelField }: HandleCommonProps) => {
-  const isInPublishFlow = useStore($isInPublishFlow);
+  const isLocked = useIsWorkflowEditorLocked();
+
   return (
     <Tooltip label={fieldTypeName} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
       <Handle
@@ -115,7 +115,7 @@ const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelFiel
         id={fieldTemplate.name}
         position={Position.Right}
         style={handleStyles}
-        isConnectable={!isInPublishFlow}
+        isConnectable={!isLocked}
       >
         <Box
           sx={sx}
@@ -139,7 +139,7 @@ const ConnectionInProgressHandle = memo(
     const { t } = useTranslation();
     const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
     const connectionErrorTKey = useConnectionErrorTKey(nodeId, fieldName, 'target');
-    const isInPublishFlow = useStore($isInPublishFlow);
+    const isLocked = useIsWorkflowEditorLocked();
 
     const tooltip = useMemo(() => {
       if (connectionErrorTKey !== null) {
@@ -155,7 +155,7 @@ const ConnectionInProgressHandle = memo(
           id={fieldTemplate.name}
           position={Position.Right}
           style={handleStyles}
-          isConnectable={!isInPublishFlow}
+          isConnectable={!isLocked}
         >
           <Box
             sx={sx}

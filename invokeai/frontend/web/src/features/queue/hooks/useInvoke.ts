@@ -5,7 +5,7 @@ import { enqueueRequestedUpscaling } from 'app/store/middleware/listenerMiddlewa
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
-import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -19,7 +19,7 @@ export const useInvoke = () => {
   const dispatch = useAppDispatch();
   const tabName = useAppSelector(selectActiveTab);
   const isReady = useStore($isReadyToEnqueue);
-  const isInPublishFlow = useStore($isInPublishFlow);
+  const isLocked = useIsWorkflowEditorLocked();
   const enqueueWorkflows = useEnqueueWorkflows();
 
   const [_, { isLoading }] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
@@ -62,5 +62,5 @@ export const useInvoke = () => {
     enqueue(true, false);
   }, [enqueue]);
 
-  return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady || isInPublishFlow, enqueue };
+  return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady || isLocked, enqueue };
 };

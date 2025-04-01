@@ -1,4 +1,5 @@
 import io
+import random
 import traceback
 from typing import Optional
 
@@ -24,6 +25,37 @@ from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_common import
 IMAGE_MAX_AGE = 31536000
 workflows_router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
 
+ids = {
+    "6614752a-0420-4d81-98fc-e110069d4f38": random.choice([True, False]),
+    "default_5e8b008d-c697-45d0-8883-085a954c6ace": random.choice([True, False]),
+    "4b2b297a-0d47-4f43-8113-ebbf3f403089": random.choice([True, False]),
+    "d0ce602a-049e-4368-97ae-977b49eed042": random.choice([True, False]),
+    "f170a187-fd74-40b8-ba9c-00de173ea4b9": random.choice([True, False]),
+    "default_f96e794f-eb3e-4d01-a960-9b4e43402bcf": random.choice([True, False]),
+    "default_cbf0e034-7b54-4b2c-b670-3b1e2e4b4a88": random.choice([True, False]),
+    "default_dec5a2e9-f59c-40d9-8869-a056751d79b8": random.choice([True, False]),
+    "default_dbe46d95-22aa-43fb-9c16-94400d0ce2fd": random.choice([True, False]),
+    "default_d7a1c60f-ca2f-4f90-9e33-75a826ca6d8f": random.choice([True, False]),
+    "default_e71d153c-2089-43c7-bd2c-f61f37d4c1c1": random.choice([True, False]),
+    "default_7dde3e36-d78f-4152-9eea-00ef9c8124ed": random.choice([True, False]),
+    "default_444fe292-896b-44fd-bfc6-c0b5d220fffc": random.choice([True, False]),
+    "default_2d05e719-a6b9-4e64-9310-b875d3b2f9d2": random.choice([True, False]),
+    "acae7e87-070b-4999-9074-c5b593c86618": random.choice([True, False]),
+    "3008fc77-1521-49c7-ba95-94c5a4508d1d": random.choice([True, False]),
+    "default_686bb1d0-d086-4c70-9fa3-2f600b922023": random.choice([True, False]),
+    "36905c46-e768-4dc3-8ecd-e55fe69bf03c": random.choice([True, False]),
+    "7c3e4951-183b-40ef-a890-28eef4d50097": random.choice([True, False]),
+    "7a053b2f-64e4-4152-80e9-296006e77131": random.choice([True, False]),
+    "27d4f1be-4156-46e9-8d22-d0508cd72d4f": random.choice([True, False]),
+    "e881dc06-70d2-438f-b007-6f3e0c3c0e78": random.choice([True, False]),
+    "265d2244-a1d7-495c-a2eb-88217f5eae37": random.choice([True, False]),
+    "caebcbc7-2bf0-41c4-b553-106b585fddda": random.choice([True, False]),
+    "a7998705-474e-417d-bd37-a2a9480beedf": random.choice([True, False]),
+    "554d94b5-94b3-4d8e-8aed-51ebfc9deea5": random.choice([True, False]),
+    "e6898540-c1bc-408b-b944-c1e242cddbcd": random.choice([True, False]),
+    "363b0960-ab2c-4902-8df3-f592d6194bb3": random.choice([True, False]),
+}
+
 
 @workflows_router.get(
     "/i/{workflow_id}",
@@ -39,6 +71,8 @@ async def get_workflow(
     try:
         thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow_id)
         workflow = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        workflow.is_published = ids.get(workflow_id, False)
+        workflow.workflow.is_published = ids.get(workflow_id, False)
         return WorkflowRecordWithThumbnailDTO(thumbnail_url=thumbnail_url, **workflow.model_dump())
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -106,10 +140,11 @@ async def list_workflows(
     tags: Optional[list[str]] = Query(default=None, description="The tags of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+    is_published: Optional[bool] = Query(default=None, description="Whether to include/exclude published workflows"),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""
     workflows_with_thumbnails: list[WorkflowRecordListItemWithThumbnailDTO] = []
-    workflows = ApiDependencies.invoker.services.workflow_records.get_many(
+    workflow_record_list_items = ApiDependencies.invoker.services.workflow_records.get_many(
         order_by=order_by,
         direction=direction,
         page=page,
@@ -118,20 +153,23 @@ async def list_workflows(
         categories=categories,
         tags=tags,
         has_been_opened=has_been_opened,
+        is_published=is_published,
     )
-    for workflow in workflows.items:
+    for item in workflow_record_list_items.items:
+        data = item.model_dump()
+        data["is_published"] = ids.get(item.workflow_id, False)
         workflows_with_thumbnails.append(
             WorkflowRecordListItemWithThumbnailDTO(
-                thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow.workflow_id),
-                **workflow.model_dump(),
+                thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(item.workflow_id),
+                **data,
             )
         )
     return PaginatedResults[WorkflowRecordListItemWithThumbnailDTO](
         items=workflows_with_thumbnails,
-        total=workflows.total,
-        page=workflows.page,
-        pages=workflows.pages,
-        per_page=workflows.per_page,
+        total=workflow_record_list_items.total,
+        page=workflow_record_list_items.page,
+        pages=workflow_record_list_items.pages,
+        per_page=workflow_record_list_items.per_page,
     )
 
 

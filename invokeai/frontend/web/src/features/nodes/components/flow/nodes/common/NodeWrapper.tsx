@@ -1,8 +1,7 @@
 import type { ChakraProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
@@ -64,7 +63,7 @@ const containerSx: SystemStyleObject = {
     display: 'block',
     shadow: '0 0 0 3px var(--invoke-colors-blue-300)',
   },
-  '&[data-is-in-publish-flow="true"]': {
+  '&[data-is-editor-locked="true"]': {
     '& *': {
       cursor: 'not-allowed',
       pointerEvents: 'none',
@@ -107,7 +106,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
   const mouseOverNode = useMouseOverNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
   const zoomToNode = useZoomToNode(nodeId);
-  const isInPublishFlow = useStore($isInPublishFlow);
+  const isLocked = useIsWorkflowEditorLocked();
 
   const executionState = useNodeExecutionState(nodeId);
   const isInProgress = executionState?.status === zNodeStatus.enum.IN_PROGRESS;
@@ -150,7 +149,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       sx={containerSx}
       width={width || NODE_WIDTH}
       opacity={opacity}
-      data-is-in-publish-flow={isInPublishFlow}
+      data-is-editor-locked={isLocked}
       data-is-selected={selected}
       data-is-mouse-over-form-field={mouseOverFormField.isMouseOverFormField}
     >

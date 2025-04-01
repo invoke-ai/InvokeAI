@@ -1785,8 +1785,10 @@
             "minimum": "Minimum",
             "maximum": "Maximum",
             "publish": "Publish",
-            "configuringWorkflowForPublishing": "Publishing Workflow",
-            "configuringWorkflowForPublishingDesc": "Workflow is locked while configuring for publishing.",
+            "unpublish": "Unpublish",
+            "workflowLocked": "Workflow Locked",
+            "workflowLockedPublished": "Published workflows are locked for editing.\nYou can unpublish the workflow to edit it, or make a copy of it.",
+            "workflowLockedDuringPublishing": "Workflow is locked while configuring for publishing.",
             "selectOutputNode": "Select Output Node",
             "changeOutputNode": "Change Output Node",
             "publishedWorkflowOutputs": "Outputs",
@@ -1806,8 +1808,10 @@
             "publishFailedDesc": "There was a problem publishing the workflow. Please try again.",
             "publishSuccess": "Your workflow is being published",
             "publishSuccessDesc": "Check your <LinkComponent>Project Dashboard</LinkComponent> to see its progress.",
-            "publishInProgress": "Publishing in Progress",
-            "publishingValidationRun": "Publishing Validation Run"
+            "publishInProgress": "Publishing in progress",
+            "publishedWorkflowIsLocked": "Published workflow is locked",
+            "publishingValidationRun": "Publishing Validation Run",
+            "publishedWorkflowsLocked": "Published workflows are locked and cannot be edited or run. Either unpublish the workflow or save a copy to edit or run this workflow."
         }
     },
     "controlLayers": {

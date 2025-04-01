@@ -9,6 +9,7 @@ import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
+import { selectWorkflowIsPublished } from 'features/nodes/store/workflowSlice';
 import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue';
 import { getBatchSize } from 'features/nodes/util/node/resolveBatchValue';
 import type { Reason } from 'features/queue/store/readiness';
@@ -177,6 +178,7 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
   const [_, enqueueMutation] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
   const isInPublishFlow = useStore($isInPublishFlow);
+  const isPublished = useAppSelector(selectWorkflowIsPublished);
 
   const text = useMemo(() => {
     if (enqueueMutation.isLoading) {
@@ -188,6 +190,9 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
     if (isInPublishFlow) {
       return t('workflows.builder.publishInProgress');
     }
+    if (isPublished) {
+      return t('workflows.builder.publishedWorkflowIsLocked');
+    }
     if (isReady) {
       if (prepend) {
         return t('queue.queueFront');
@@ -195,7 +200,7 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
       return t('queue.queueBack');
     }
     return t('queue.notReady');
-  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isInPublishFlow, isReady, prepend, t]);
+  }, [enqueueMutation.isLoading, isLoadingDynamicPrompts, isInPublishFlow, isPublished, isReady, t, prepend]);
 
   return <Text fontWeight="semibold">{text}</Text>;
 });

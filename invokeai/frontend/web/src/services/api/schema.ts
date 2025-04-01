@@ -21994,6 +21994,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -22024,6 +22029,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
             /**
              * Description
              * @description The description of the workflow.
@@ -22075,6 +22085,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -25196,6 +25211,8 @@ export interface operations {
                 query?: string | null;
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Whether to include/exclude published workflows */
+                is_published?: boolean | null;
             };
             header?: never;
             path?: never;
