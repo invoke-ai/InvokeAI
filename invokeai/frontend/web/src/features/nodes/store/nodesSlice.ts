@@ -470,31 +470,8 @@ export const nodesSlice = createSlice({
     builder.addCase(workflowLoaded, (state, action) => {
       const { nodes, edges } = action.payload;
 
-      const changes: NodeChange<AnyNode>[] = [];
-      for (const node of nodes) {
-        if (node.type === 'notes') {
-          changes.push({
-            type: 'add',
-            item: {
-              ...SHARED_NODE_PROPERTIES,
-              ...node,
-            },
-          });
-        } else if (node.type === 'invocation') {
-          changes.push({
-            type: 'add',
-            item: {
-              ...SHARED_NODE_PROPERTIES,
-              ...node,
-            },
-          });
-        }
-      }
-      state.nodes = applyNodeChanges<AnyNode>(changes, []);
-      state.edges = applyEdgeChanges(
-        edges.map((edge) => ({ type: 'add', item: edge })),
-        []
-      );
+      state.nodes = nodes.map((node) => ({ ...SHARED_NODE_PROPERTIES, ...node }));
+      state.edges = edges;
     });
   },
 });
