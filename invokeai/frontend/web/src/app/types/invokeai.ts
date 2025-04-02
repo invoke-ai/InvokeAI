@@ -28,8 +28,7 @@ export type AppFeature =
   | 'starterModels'
   | 'hfToken'
   | 'retryQueueItem'
-  | 'cancelAndClearAll'
-  | 'publishWorkflow';
+  | 'cancelAndClearAll';
 /**
  * A disable-able Stable Diffusion feature
  */
@@ -75,6 +74,7 @@ export type AppConfig = {
   allowPrivateBoards: boolean;
   allowPrivateStylePresets: boolean;
   allowClientSideUpload: boolean;
+  allowPublishWorkflows: boolean;
   disabledTabs: TabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
