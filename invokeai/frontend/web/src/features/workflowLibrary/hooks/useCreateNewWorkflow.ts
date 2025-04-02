@@ -5,6 +5,7 @@ import {
   formFieldInitialValuesChanged,
   workflowCategoryChanged,
   workflowIDChanged,
+  workflowIsPublishedChanged,
   workflowNameChanged,
   workflowSaved,
 } from 'features/nodes/store/workflowSlice';
@@ -65,6 +66,7 @@ export const useCreateLibraryWorkflow = (): CreateLibraryWorkflowReturn => {
           meta: { category },
         } = data.workflow;
         dispatch(workflowIDChanged(id));
+        dispatch(workflowIsPublishedChanged(false));
         dispatch(workflowNameChanged(name));
         dispatch(workflowCategoryChanged(category));
         dispatch(newWorkflowSaved({ category }));

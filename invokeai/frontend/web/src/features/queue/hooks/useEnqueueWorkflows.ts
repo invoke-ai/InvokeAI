@@ -1,25 +1,29 @@
-import { logger } from 'app/logging/logger';
-import { enqueueRequested } from 'app/store/actions';
-import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { parseify } from 'common/util/serialize';
+import { createAction } from '@reduxjs/toolkit';
+import { useAppStore } from 'app/store/nanostores/store';
+import {
+  $outputNodeId,
+  getPublishInputs,
+  selectFieldIdentifiersWithInvocationTypes,
+} from 'features/nodes/components/sidePanel/workflow/publish';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectNodeData, selectNodesSlice } from 'features/nodes/store/selectors';
 import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { groupBy } from 'lodash-es';
-import { serializeError } from 'serialize-error';
+import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
-import type { Batch, BatchConfig } from 'services/api/types';
+import type { Batch, EnqueueBatchArg } from 'services/api/types';
+import { assert } from 'tsafe';
 
-const log = logger('generation');
+const enqueueRequestedWorkflows = createAction('app/enqueueRequestedWorkflows');
 
-export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) => {
-  startAppListening({
-    predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'workflows',
-    effect: async (action, { getState, dispatch }) => {
+export const useEnqueueWorkflows = () => {
+  const { getState, dispatch } = useAppStore();
+  const enqueue = useCallback(
+    async (prepend: boolean, isApiValidationRun: boolean) => {
+      dispatch(enqueueRequestedWorkflows());
       const state = getState();
       const nodesState = selectNodesSlice(state);
       const workflow = state.workflow;
@@ -91,7 +95,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         }
       }
 
-      const batchConfig: BatchConfig = {
+      const batchConfig: EnqueueBatchArg = {
         batch: {
           graph,
           workflow: builtWorkflow,
@@ -100,18 +104,53 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           destination: 'gallery',
           data,
         },
-        prepend: action.payload.prepend,
+        prepend,
       };
 
-      const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));
-      try {
-        await req.unwrap();
-        log.debug(parseify({ batchConfig }), 'Enqueued batch');
-      } catch (error) {
-        log.error({ error: serializeError(error) }, 'Failed to enqueue batch');
-      } finally {
-        req.reset();
+      if (isApiValidationRun) {
+        // Derive the input fields from the builder's selected node field elements
+        const fieldIdentifiers = selectFieldIdentifiersWithInvocationTypes(state);
+        const inputs = getPublishInputs(fieldIdentifiers, templates);
+        const api_input_fields = inputs.publishable.map(({ nodeId, fieldName }) => {
+          return {
+            kind: 'input',
+            node_id: nodeId,
+            field_name: fieldName,
+          } as const;
+        });
+
+        // Derive the output fields from the builder's selected output node
+        const outputNodeId = $outputNodeId.get();
+        assert(outputNodeId !== null, 'Output node not selected');
+        const outputNodeType = selectNodeData(selectNodesSlice(state), outputNodeId).type;
+        const outputNodeTemplate = templates[outputNodeType];
+        assert(outputNodeTemplate, `Template for node type ${outputNodeType} not found`);
+        const outputFieldNames = Object.keys(outputNodeTemplate.outputs);
+        const api_output_fields = outputFieldNames.map((fieldName) => {
+          return {
+            kind: 'output',
+            node_id: outputNodeId,
+            field_name: fieldName,
+          } as const;
+        });
+
+        batchConfig.is_api_validation_run = true;
+        batchConfig.api_input_fields = api_input_fields;
+        batchConfig.api_output_fields = api_output_fields;
+
+        // If the batch is an API validation run, we only want to run it once
+        batchConfig.batch.runs = 1;
       }
+
+      const req = dispatch(
+        queueApi.endpoints.enqueueBatch.initiate(batchConfig, { ...enqueueMutationFixedCacheKeyOptions, track: false })
+      );
+
+      const enqueueResult = await req.unwrap();
+      return { batchConfig, enqueueResult };
     },
-  });
+    [dispatch, getState]
+  );
+
+  return enqueue;
 };

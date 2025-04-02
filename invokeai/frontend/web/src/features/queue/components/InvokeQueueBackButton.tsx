@@ -20,7 +20,7 @@ export const InvokeButton = memo(() => {
       <QueueIterationsNumberInput />
       <InvokeButtonTooltip prepend={shift}>
         <Button
-          onClick={shift ? queue.queueFront : queue.queueBack}
+          onClick={shift ? queue.enqueueFront : queue.enqueueBack}
           isLoading={queue.isLoading || isLoadingDynamicPrompts}
           loadingText={invoke}
           isDisabled={queue.isDisabled}

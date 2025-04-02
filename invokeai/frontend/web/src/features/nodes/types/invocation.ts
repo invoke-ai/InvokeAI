@@ -100,7 +100,7 @@ export const isGeneratorNodeType = (type: string) =>
 
 export const isBatchNode = (node: InvocationNode) => isBatchNodeType(node.data.type);
 
-const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.type);
+export const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.type);
 
 export const isExecutableNode = (node: InvocationNode) => {
   return !isBatchNode(node) && !isGeneratorNode(node);

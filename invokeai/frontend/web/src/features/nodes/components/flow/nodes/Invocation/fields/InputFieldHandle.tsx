@@ -7,7 +7,8 @@ import {
   useIsConnectionInProgress,
   useIsConnectionStartField,
 } from 'features/nodes/hooks/useFieldConnectionState';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
@@ -105,9 +106,16 @@ type HandleCommonProps = {
 };
 
 const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelField }: HandleCommonProps) => {
+  const isLocked = useIsWorkflowEditorLocked();
   return (
     <Tooltip label={fieldTypeName} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
-      <Handle type="target" id={fieldTemplate.name} position={Position.Left} style={handleStyles}>
+      <Handle
+        type="target"
+        id={fieldTemplate.name}
+        position={Position.Left}
+        style={handleStyles}
+        isConnectable={!isLocked}
+      >
         <Box
           sx={sx}
           data-cardinality={fieldTemplate.type.cardinality}
@@ -130,6 +138,7 @@ const ConnectionInProgressHandle = memo(
     const { t } = useTranslation();
     const isConnectionStartField = useIsConnectionStartField(nodeId, fieldName, 'target');
     const connectionError = useConnectionErrorTKey(nodeId, fieldName, 'target');
+    const isLocked = useIsWorkflowEditorLocked();
 
     const tooltip = useMemo(() => {
       if (connectionError !== null) {
@@ -140,7 +149,13 @@ const ConnectionInProgressHandle = memo(
 
     return (
       <Tooltip label={tooltip} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
-        <Handle type="target" id={fieldTemplate.name} position={Position.Left} style={handleStyles}>
+        <Handle
+          type="target"
+          id={fieldTemplate.name}
+          position={Position.Left}
+          style={handleStyles}
+          isConnectable={!isLocked}
+        >
           <Box
             sx={sx}
             data-cardinality={fieldTemplate.type.cardinality}

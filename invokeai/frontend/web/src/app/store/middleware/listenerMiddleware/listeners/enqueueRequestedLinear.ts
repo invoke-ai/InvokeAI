@@ -1,5 +1,5 @@
+import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
@@ -17,10 +17,11 @@ import { assert, AssertionError } from 'tsafe';
 
 const log = logger('generation');
 
+export const enqueueRequestedCanvas = createAction<{ prepend: boolean }>('app/enqueueRequestedCanvas');
+
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
-    predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'canvas',
+    actionCreator: enqueueRequestedCanvas,
     effect: async (action, { getState, dispatch }) => {
       log.debug('Enqueue requested');
       const state = getState();

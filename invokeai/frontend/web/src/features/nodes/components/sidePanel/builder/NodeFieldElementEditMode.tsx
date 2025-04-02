@@ -39,7 +39,7 @@ export const NodeFieldElementEditMode = memo(({ el }: { el: NodeFieldElement }) 
   return (
     <Flex ref={draggableRef} id={id} className={NODE_FIELD_CLASS_NAME} sx={sx} data-parent-layout={containerCtx.layout}>
       <NodeFieldElementEditModeContent dragHandleRef={dragHandleRef} el={el} isDragging={isDragging} />
-      <NodeFieldElementOverlay element={el} />
+      <NodeFieldElementOverlay nodeId={el.data.fieldIdentifier.nodeId} />
       <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
     </Flex>
   );
@@ -105,9 +105,9 @@ const nodeFieldOverlaySx: SystemStyleObject = {
   },
 };
 
-const NodeFieldElementOverlay = memo(({ element }: { element: NodeFieldElement }) => {
-  const mouseOverNode = useMouseOverNode(element.data.fieldIdentifier.nodeId);
-  const mouseOverFormField = useMouseOverFormField(element.data.fieldIdentifier.nodeId);
+export const NodeFieldElementOverlay = memo(({ nodeId }: { nodeId: string }) => {
+  const mouseOverNode = useMouseOverNode(nodeId);
+  const mouseOverFormField = useMouseOverFormField(nodeId);
 
   return (
     <Box

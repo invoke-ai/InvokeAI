@@ -7,5 +7,6 @@ export const COLUMN_WIDTHS = {
   destination: '6rem',
   batchId: '5rem',
   fieldValues: 'auto',
+  validationRun: 'auto',
   actions: 'auto',
 } as const;

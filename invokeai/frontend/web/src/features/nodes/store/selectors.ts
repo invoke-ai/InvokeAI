@@ -4,7 +4,7 @@ import type { RootState } from 'app/store/store';
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
-import { isInvocationNode } from 'features/nodes/types/invocation';
+import { isBatchNode, isGeneratorNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { assert } from 'tsafe';
 
 export const selectNode = (nodesSlice: NodesState, nodeId: string): AnyNode => {
@@ -80,4 +80,8 @@ export const selectMayUndo = createSelector(
 export const selectMayRedo = createSelector(
   (state: RootState) => state.nodes,
   (nodes) => nodes.future.length > 0
+);
+
+export const selectHasBatchOrGeneratorNodes = createSelector(selectNodes, (nodes) =>
+  nodes.filter(isInvocationNode).some((node) => isBatchNode(node) || isGeneratorNode(node))
 );

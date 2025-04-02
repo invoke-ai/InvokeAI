@@ -4,21 +4,23 @@ import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/s
 import { useMemo } from 'react';
 
 /**
- * Gets the user-defined label of an input field for a given node.
+ * Gets the user-defined description of an input field for a given node.
  *
  * If the node doesn't exist or is not an invocation node, an empty string is returned.
  *
  * @param nodeId The ID of the node
  * @param fieldName The name of the field
  */
-export const useInputFieldLabelSafe = (nodeId: string, fieldName: string): string => {
+export const useInputFieldUserDescriptionSafe = (nodeId: string, fieldName: string) => {
   const selector = useMemo(
     () =>
-      createSelector(selectNodesSlice, (nodes) => selectFieldInputInstanceSafe(nodes, nodeId, fieldName)?.label ?? ''),
+      createSelector(
+        selectNodesSlice,
+        (nodes) => selectFieldInputInstanceSafe(nodes, nodeId, fieldName)?.description ?? ''
+      ),
     [fieldName, nodeId]
   );
 
-  const label = useAppSelector(selector);
-
-  return label;
+  const description = useAppSelector(selector);
+  return description;
 };

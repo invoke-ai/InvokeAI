@@ -1,9 +1,10 @@
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
-export const useInputFieldTemplateTitle = (nodeId: string, fieldName: string): string => {
-  const template = useNodeTemplate(nodeId);
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
+
+export const useInputFieldTemplateTitleOrThrow = (nodeId: string, fieldName: string): string => {
+  const template = useNodeTemplateOrThrow(nodeId);
 
   const title = useMemo(() => {
     const fieldTemplate = template.inputs[fieldName];

@@ -6,7 +6,13 @@ import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import {
+  $isInPublishFlow,
+  $outputNodeId,
+  $validationRunBatchId,
+} from 'features/nodes/components/sidePanel/workflow/publish';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { workflowIsPublishedChanged } from 'features/nodes/store/workflowSlice';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
@@ -394,28 +400,39 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         clone.outputs = [];
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
-    } else if (status === 'failed' && error_type) {
-      const isLocal = getState().config.isLocal ?? true;
-      const sessionId = session_id;
-
-      toast({
-        id: `INVOCATION_ERROR_${error_type}`,
-        title: getTitle(error_type),
-        status: 'error',
-        duration: null,
-        updateDescription: isLocal,
-        description: (
-          <ErrorToastDescription
-            errorType={error_type}
-            errorMessage={error_message}
-            sessionId={sessionId}
-            isLocal={isLocal}
-          />
-        ),
-      });
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
+      if (status === 'failed' && error_type) {
+        const isLocal = getState().config.isLocal ?? true;
+        const sessionId = session_id;
+
+        toast({
+          id: `INVOCATION_ERROR_${error_type}`,
+          title: getTitle(error_type),
+          status: 'error',
+          duration: null,
+          updateDescription: isLocal,
+          description: (
+            <ErrorToastDescription
+              errorType={error_type}
+              errorMessage={error_message}
+              sessionId={sessionId}
+              isLocal={isLocal}
+            />
+          ),
+        });
+      }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+
+      // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
+      if (batch_status.batch_id === $validationRunBatchId.get()) {
+        $validationRunBatchId.set(null);
+        if (status === 'completed') {
+          dispatch(workflowIsPublishedChanged(true));
+          $isInPublishFlow.set(false);
+          $outputNodeId.set(null);
+        }
+      }
     }
   });
 

@@ -6,7 +6,7 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useMemo } from 'react';
 
-export const useNodeTemplateTitle = (nodeId: string): string | null => {
+export const useNodeTemplateTitleSafe = (nodeId: string): string | null => {
   const templates = useStore($templates);
   const selector = useMemo(
     () =>

@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { LockedWorkflowIcon } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/LockedWorkflowIcon';
 import { ShareWorkflowButton } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryListItemActions/ShareWorkflow';
 import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
@@ -54,7 +55,6 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
       position="relative"
       role="button"
       onClick={handleClickLoad}
-      cursor="pointer"
       bg="base.750"
       borderRadius="base"
       w="full"
@@ -81,7 +81,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           <Flex gap={2} alignItems="flex-start" justifyContent="space-between" w="full">
             <Text noOfLines={2}>{workflow.name}</Text>
             <Flex gap={2} alignItems="center">
-              {isActive && (
+              {isActive && !workflow.is_published && (
                 <Badge
                   color="invokeBlue.400"
                   borderColor="invokeBlue.700"
@@ -91,6 +91,18 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   variant="subtle"
                 >
                   {t('workflows.opened')}
+                </Badge>
+              )}
+              {workflow.is_published && (
+                <Badge
+                  color="invokeGreen.400"
+                  borderColor="invokeGreen.700"
+                  borderWidth={1}
+                  bg="transparent"
+                  flexShrink={0}
+                  variant="subtle"
+                >
+                  {t('workflows.builder.published')}
                 </Badge>
               )}
               {workflow.category === 'project' && <Icon as={PiUsersBold} color="base.200" />}
@@ -119,8 +131,10 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
             </Text>
           )}
           <Spacer />
-          {workflow.category === 'default' && <ViewWorkflow workflowId={workflow.workflow_id} />}
-          {workflow.category !== 'default' && (
+          {workflow.category === 'default' && !workflow.is_published && (
+            <ViewWorkflow workflowId={workflow.workflow_id} />
+          )}
+          {workflow.category !== 'default' && !workflow.is_published && (
             <>
               <EditWorkflow workflowId={workflow.workflow_id} />
               <DownloadWorkflow workflowId={workflow.workflow_id} />
@@ -128,6 +142,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
             </>
           )}
           {workflow.category === 'project' && <ShareWorkflowButton workflow={workflow} />}
+          {workflow.is_published && <LockedWorkflowIcon />}
         </Flex>
       </Flex>
     </Flex>

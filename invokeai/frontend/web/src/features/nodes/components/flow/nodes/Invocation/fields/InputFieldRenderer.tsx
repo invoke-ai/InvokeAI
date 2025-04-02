@@ -17,7 +17,7 @@ import { StringFieldDropdown } from 'features/nodes/components/flow/nodes/Invoca
 import { StringFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldInput';
 import { StringFieldTextarea } from 'features/nodes/components/flow/nodes/Invocation/fields/StringField/StringFieldTextarea';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import {
   isBoardFieldInputInstance,
   isBoardFieldInputTemplate,

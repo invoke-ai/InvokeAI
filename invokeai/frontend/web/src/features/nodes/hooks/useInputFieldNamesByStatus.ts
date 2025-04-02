@@ -1,9 +1,10 @@
 import { useNodeData } from 'features/nodes/hooks/useNodeData';
-import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { isSingleOrCollection } from 'features/nodes/types/field';
 import { TEMPLATE_BUILDER_MAP } from 'features/nodes/util/schema/buildFieldInputTemplate';
 import { useMemo } from 'react';
+
+import { useNodeTemplateOrThrow } from './useNodeTemplateOrThrow';
 
 const isConnectionInputField = (field: FieldInputTemplate) => {
   return (
@@ -19,7 +20,7 @@ const isAnyOrDirectInputField = (field: FieldInputTemplate) => {
 };
 
 export const useInputFieldNamesMissing = (nodeId: string) => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const node = useNodeData(nodeId);
   const fieldNames = useMemo(() => {
     const instanceFields = new Set(Object.keys(node.inputs));
@@ -30,7 +31,7 @@ export const useInputFieldNamesMissing = (nodeId: string) => {
 };
 
 export const useInputFieldNamesAnyOrDirect = (nodeId: string) => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const fieldNames = useMemo(() => {
     const anyOrDirectFields: string[] = [];
     for (const [fieldName, fieldTemplate] of Object.entries(template.inputs)) {
@@ -44,7 +45,7 @@ export const useInputFieldNamesAnyOrDirect = (nodeId: string) => {
 };
 
 export const useInputFieldNamesConnection = (nodeId: string) => {
-  const template = useNodeTemplate(nodeId);
+  const template = useNodeTemplateOrThrow(nodeId);
   const fieldNames = useMemo(() => {
     const connectionFields: string[] = [];
     for (const [fieldName, fieldTemplate] of Object.entries(template.inputs)) {

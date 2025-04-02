@@ -33,7 +33,7 @@ import {
   isNodeFieldElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
-import { isEqual } from 'lodash-es';
+import { isEqual, uniqBy } from 'lodash-es';
 import { useMemo } from 'react';
 
 import { selectNodesSlice } from './selectors';
@@ -67,8 +67,11 @@ const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
     notes: '',
     exposedFields: [],
     meta: { version: '3.0.0', category: 'user' },
-    id: undefined,
     form: getDefaultForm(),
+    // Even though these values are `undefined`, the keys _must_ be present for the presistence layer to rehydrate
+    // them correctly. It uses a merge strategy that relies on the keys being present.
+    id: undefined,
+    is_published: undefined,
   };
 };
 
@@ -122,6 +125,9 @@ export const workflowSlice = createSlice({
     },
     workflowIDChanged: (state, action: PayloadAction<string>) => {
       state.id = action.payload;
+    },
+    workflowIsPublishedChanged(state, action: PayloadAction<boolean>) {
+      state.is_published = action.payload;
     },
     workflowSaved: (state) => {
       state.isTouched = false;
@@ -285,6 +291,7 @@ export const {
   workflowVersionChanged,
   workflowContactChanged,
   workflowIDChanged,
+  workflowIsPublishedChanged,
   workflowSaved,
   formReset,
   formElementAdded,
@@ -350,6 +357,10 @@ export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
+export const selectWorkflowIsPublished = createWorkflowSelector((workflow) => workflow.is_published);
+export const selectIsWorkflowSaved = createSelector(selectWorkflowId, selectWorkflowIsTouched, (id, isTouched) => {
+  return id !== undefined && !isTouched;
+});
 
 export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
   const noNodes = !nodes.nodes.length;
@@ -375,6 +386,14 @@ export const selectFormInitialValues = createWorkflowSelector((workflow) => work
 export const selectNodeFieldElements = createWorkflowSelector((workflow) =>
   Object.values(workflow.form.elements).filter(isNodeFieldElement)
 );
+export const selectWorkflowFormNodeFieldFieldIdentifiersDeduped = createSelector(
+  selectNodeFieldElements,
+  (nodeFieldElements) =>
+    uniqBy(nodeFieldElements, (el) => `${el.data.fieldIdentifier.nodeId}-${el.data.fieldIdentifier.fieldName}`).map(
+      (el) => el.data.fieldIdentifier
+    )
+);
+
 const buildSelectElement = (id: string) => createWorkflowSelector((workflow) => workflow.form?.elements[id]);
 export const useElement = (id: string): FormElement | undefined => {
   const selector = useMemo(() => buildSelectElement(id), [id]);

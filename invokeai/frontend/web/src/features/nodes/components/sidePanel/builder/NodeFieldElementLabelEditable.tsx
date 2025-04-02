@@ -2,8 +2,8 @@ import { Flex, FormLabel, Input, Spacer } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { NodeFieldElementResetToInitialValueIconButton } from 'features/nodes/components/flow/nodes/Invocation/fields/NodeFieldElementResetToInitialValueIconButton';
-import { useInputFieldLabelSafe } from 'features/nodes/hooks/useInputFieldLabelSafe';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
+import { useInputFieldUserTitleSafe } from 'features/nodes/hooks/useInputFieldUserTitleSafe';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo, useCallback, useRef } from 'react';
@@ -12,7 +12,7 @@ export const NodeFieldElementLabelEditable = memo(({ el }: { el: NodeFieldElemen
   const { data } = el;
   const { fieldIdentifier } = data;
   const dispatch = useAppDispatch();
-  const label = useInputFieldLabelSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const label = useInputFieldUserTitleSafe(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const fieldTemplate = useInputFieldTemplateOrThrow(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
   const inputRef = useRef<HTMLInputElement>(null);
 
