@@ -61,7 +61,7 @@ export const WorkflowLibrarySideNav = () => {
           </Collapse>
         )}
         {allowPublishWorkflows && (
-          <WorkflowLibraryViewButton view="published">{t('workflows.publishedWorkflows')}</WorkflowLibraryViewButton>
+          <WorkflowLibraryViewButton view="published">{t('workflows.published')}</WorkflowLibraryViewButton>
         )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">

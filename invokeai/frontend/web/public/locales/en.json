@@ -1706,6 +1706,7 @@
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
+        "published": "Published",
         "browseWorkflows": "Browse Workflows",
         "deselectAll": "Deselect All",
         "recommended": "Recommended For You",
