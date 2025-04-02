@@ -2462,6 +2462,22 @@ export type components = {
              * @default false
              */
             prepend?: boolean;
+            /**
+             * Is Api Validation Run
+             * @description Whether or not this is a validation run.
+             * @default false
+             */
+            is_api_validation_run?: boolean;
+            /**
+             * Api Input Fields
+             * @description The fields that were used as input to the API
+             */
+            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
+            /**
+             * Api Output Fields
+             * @description The fields that were used as output from the API
+             */
+            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -6861,6 +6877,25 @@ export type components = {
              * @description The y coordinate of the bounding box's top side
              */
             y: number;
+        };
+        /** FieldIdentifier */
+        FieldIdentifier: {
+            /**
+             * Kind
+             * @description The kind of field
+             * @enum {string}
+             */
+            kind: "input" | "output";
+            /**
+             * Node Id
+             * @description The ID of the node
+             */
+            node_id: string;
+            /**
+             * Field Name
+             * @description The name of the field
+             */
+            field_name: string;
         };
         /**
          * FieldKind
@@ -19467,6 +19502,22 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
+            /**
+             * Is Api Validation Run
+             * @description Whether this queue item is an API validation run.
+             * @default false
+             */
+            is_api_validation_run?: boolean;
+            /**
+             * Api Input Fields
+             * @description The fields that were used as input to the API
+             */
+            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
+            /**
+             * Api Output Fields
+             * @description The nodes that were used as output from the API
+             */
+            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
@@ -19562,6 +19613,22 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
+            /**
+             * Is Api Validation Run
+             * @description Whether this queue item is an API validation run.
+             * @default false
+             */
+            is_api_validation_run?: boolean;
+            /**
+             * Api Input Fields
+             * @description The fields that were used as input to the API
+             */
+            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
+            /**
+             * Api Output Fields
+             * @description The nodes that were used as output from the API
+             */
+            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
@@ -21862,6 +21929,11 @@ export type components = {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
             /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
+            /**
              * Id
              * @description The id of the workflow.
              */
@@ -21922,6 +21994,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -21952,6 +22029,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
             /**
              * Description
              * @description The description of the workflow.
@@ -22003,6 +22085,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -22076,6 +22163,11 @@ export type components = {
             form?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
+            /**
+             * Is Published
+             * @description Whether the workflow is published or not.
+             */
+            is_published?: boolean | null;
         };
         /**
          * Zoe (Depth) Processor
@@ -25119,6 +25211,8 @@ export interface operations {
                 query?: string | null;
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Whether to include/exclude published workflows */
+                is_published?: boolean | null;
             };
             header?: never;
             path?: never;
