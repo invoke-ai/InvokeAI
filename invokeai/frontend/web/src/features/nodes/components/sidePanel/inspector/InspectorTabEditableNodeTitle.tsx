@@ -1,8 +1,8 @@
 import { Flex, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
-import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
-import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
+import { useNodeTemplateTitleSafe } from 'features/nodes/hooks/useNodeTemplateTitleSafe';
+import { useNodeUserTitleSafe } from 'features/nodes/hooks/useNodeUserTitleSafe';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,8 +14,8 @@ type Props = {
 
 const InspectorTabEditableNodeTitle = ({ nodeId, title }: Props) => {
   const dispatch = useAppDispatch();
-  const label = useNodeLabel(nodeId);
-  const templateTitle = useNodeTemplateTitle(nodeId);
+  const label = useNodeUserTitleSafe(nodeId);
+  const templateTitle = useNodeTemplateTitleSafe(nodeId);
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const onChange = useCallback(

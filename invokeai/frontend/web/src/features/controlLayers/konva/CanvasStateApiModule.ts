@@ -54,7 +54,7 @@ import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
-import type { BatchConfig, ImageDTO, S } from 'services/api/types';
+import type { EnqueueBatchArg, ImageDTO, S } from 'services/api/types';
 import { QueueError } from 'services/events/errors';
 import type { Param0 } from 'tsafe';
 import { assert } from 'tsafe';
@@ -291,7 +291,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
      */
     const origin = getPrefixedId(graph.id);
 
-    const batch: BatchConfig = {
+    const batch: EnqueueBatchArg = {
       prepend,
       batch: {
         graph: graph.getGraph(),

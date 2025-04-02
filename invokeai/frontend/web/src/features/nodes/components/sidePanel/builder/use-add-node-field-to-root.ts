@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { formElementAdded, selectFormRootElementId } from 'features/nodes/store/workflowSlice';
 import { buildNodeFieldElement } from 'features/nodes/types/workflow';
 import { useCallback } from 'react';

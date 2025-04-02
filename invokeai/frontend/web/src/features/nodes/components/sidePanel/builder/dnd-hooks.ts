@@ -1,4 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import type { DropTargetRecord } from '@atlaskit/pragmatic-drag-and-drop/dist/types/internal-types';
+import type { ElementDragPayload } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import {
   draggable,
   dropTargetForElements,
@@ -33,7 +35,7 @@ import {
   selectFormRootElementId,
   selectWorkflowSlice,
 } from 'features/nodes/store/workflowSlice';
-import type { FieldIdentifier, FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
+import type { FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, isContainerElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
@@ -56,6 +58,27 @@ export const buildFormElementDndData = (element: FormElement): FormElementDndDat
 });
 const isFormElementDndData = (data: Record<string | symbol, unknown>): data is FormElementDndData => {
   return uniqueFormElementDndKey in data;
+};
+
+const uniqueNodeFieldDndKey = Symbol('node-field');
+type NodeFieldDndData = {
+  [uniqueNodeFieldDndKey]: true;
+  nodeId: string;
+  fieldName: string;
+  fieldTemplate: FieldInputTemplate;
+};
+const buildNodeFieldDndData = (
+  nodeId: string,
+  fieldName: string,
+  fieldTemplate: FieldInputTemplate
+): NodeFieldDndData => ({
+  [uniqueNodeFieldDndKey]: true,
+  nodeId,
+  fieldName,
+  fieldTemplate,
+});
+const isNodeFieldDndData = (data: Record<string | symbol, unknown>): data is NodeFieldDndData => {
+  return uniqueNodeFieldDndKey in data;
 };
 
 /**
@@ -133,6 +156,27 @@ const useGetInitialValue = () => {
   return _getInitialValue;
 };
 
+const getSourceElement = (source: ElementDragPayload) => {
+  if (isNodeFieldDndData(source.data)) {
+    const { nodeId, fieldName, fieldTemplate } = source.data;
+    return buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
+  }
+
+  if (isFormElementDndData(source.data)) {
+    return source.data.element;
+  }
+
+  return null;
+};
+
+const getTargetElement = (target: DropTargetRecord) => {
+  if (isFormElementDndData(target.data)) {
+    return target.data.element;
+  }
+
+  return null;
+};
+
 /**
  * Singleton hook that monitors for builder dnd events and dispatches actions accordingly.
  */
@@ -156,19 +200,19 @@ export const useBuilderDndMonitor = () => {
 
   useEffect(() => {
     return monitorForElements({
-      canMonitor: ({ source }) => isFormElementDndData(source.data),
+      canMonitor: ({ source }) => isFormElementDndData(source.data) || isNodeFieldDndData(source.data),
       onDrop: ({ location, source }) => {
         const target = location.current.dropTargets[0];
         if (!target) {
           return;
         }
 
-        if (!isFormElementDndData(source.data) || !isFormElementDndData(target.data)) {
+        const sourceElement = getSourceElement(source);
+        const targetElement = getTargetElement(target);
+
+        if (!sourceElement || !targetElement) {
           return;
         }
-
-        const sourceElement = source.data.element;
-        const targetElement = target.data.element;
 
         if (sourceElement.id === targetElement.id) {
           // Dropping on self is a no-op
@@ -359,8 +403,15 @@ export const useFormElementDnd = (
         element: draggableElement,
         // TODO(psyche): This causes a kinda jittery behaviour - need a better heuristic to determine stickiness
         getIsSticky: () => false,
-        canDrop: ({ source }) =>
-          isFormElementDndData(source.data) && source.data.element.id !== getElement(elementId).parentId,
+        canDrop: ({ source }) => {
+          if (isNodeFieldDndData(source.data)) {
+            return true;
+          }
+          if (isFormElementDndData(source.data)) {
+            return source.data.element.id !== getElement(elementId).parentId;
+          }
+          return false;
+        },
         getData: ({ input }) => {
           const element = getElement(elementId);
 
@@ -423,8 +474,16 @@ export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement>
       dropTargetForElements({
         element: droppableElement,
         getIsSticky: () => false,
-        canDrop: ({ source }) =>
-          getElement(rootElementId, isContainerElement).data.children.length === 0 && isFormElementDndData(source.data),
+        canDrop: ({ source }) => {
+          const rootElement = getElement(rootElementId, isContainerElement);
+          if (rootElement.data.children.length !== 0) {
+            return false;
+          }
+          if (isNodeFieldDndData(source.data) || isFormElementDndData(source.data)) {
+            return true;
+          }
+          return false;
+        },
         getData: ({ input }) => {
           const element = getElement(rootElementId, isContainerElement);
 
@@ -455,7 +514,8 @@ export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement>
 /**
  * Hook that provides dnd functionality for node fields.
  *
- * @param fieldIdentifier The identifier of the node field
+ * @param nodeId: The id of the node
+ * @param fieldName: The name of the field
  * @param fieldTemplate The template of the node field, required to build the form element
  * @param draggableRef The ref of the draggable HTML element
  * @param dragHandleRef The ref of the drag handle HTML element
@@ -463,7 +523,8 @@ export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement>
  * @returns Whether the node field is currently being dragged
  */
 export const useNodeFieldDnd = (
-  fieldIdentifier: FieldIdentifier,
+  nodeId: string,
+  fieldName: string,
   fieldTemplate: FieldInputTemplate,
   draggableRef: RefObject<HTMLElement>,
   dragHandleRef: RefObject<HTMLElement>
@@ -481,12 +542,7 @@ export const useNodeFieldDnd = (
       draggable({
         element: draggableElement,
         dragHandle: dragHandleElement,
-        getInitialData: () => {
-          const { nodeId, fieldName } = fieldIdentifier;
-          const { type } = fieldTemplate;
-          const element = buildNodeFieldElement(nodeId, fieldName, type);
-          return buildFormElementDndData(element);
-        },
+        getInitialData: () => buildNodeFieldDndData(nodeId, fieldName, fieldTemplate),
         onDragStart: () => {
           setIsDragging(true);
         },
@@ -495,7 +551,7 @@ export const useNodeFieldDnd = (
         },
       })
     );
-  }, [dragHandleRef, draggableRef, fieldIdentifier, fieldTemplate]);
+  }, [dragHandleRef, draggableRef, fieldName, fieldTemplate, nodeId]);
 
   return isDragging;
 };

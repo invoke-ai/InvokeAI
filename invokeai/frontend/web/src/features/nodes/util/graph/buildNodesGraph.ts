@@ -37,7 +37,7 @@ const getBoardField = (field: BoardFieldInputInstance, state: RootState): BoardF
 /**
  * Builds a graph from the node editor state.
  */
-export const buildNodesGraph = (state: RootState, templates: Templates): Graph => {
+export const buildNodesGraph = (state: RootState, templates: Templates): Required<Graph> => {
   const { nodes, edges } = selectNodesSlice(state);
 
   // Exclude all batch nodes - we will handle these in the batch setup in a diff function

@@ -22,7 +22,7 @@ const initialConfigState: AppConfig = {
   allowPrivateStylePresets: false,
   allowClientSideUpload: false,
   disabledTabs: [],
-  disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
+  disabledFeatures: ['lightbox', 'faceRestore', 'batches', 'publishWorkflow'],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],
   nodesAllowlist: undefined,
   nodesDenylist: undefined,

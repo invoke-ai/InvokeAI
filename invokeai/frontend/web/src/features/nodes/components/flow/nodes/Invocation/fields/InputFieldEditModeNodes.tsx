@@ -7,7 +7,7 @@ import { InputFieldResetToDefaultValueIconButton } from 'features/nodes/componen
 import { useNodeFieldDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useInputFieldIsInvalid } from 'features/nodes/hooks/useInputFieldIsInvalid';
-import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplate';
+import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
 import { NO_DRAG_CLASS } from 'features/nodes/types/constants';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useRef } from 'react';
@@ -100,7 +100,7 @@ const DirectField = memo(({ nodeId, fieldName, isInvalid, isConnected, fieldTemp
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
 
-  const isDragging = useNodeFieldDnd({ nodeId, fieldName }, fieldTemplate, draggableRef, dragHandleRef);
+  const isDragging = useNodeFieldDnd(nodeId, fieldName, fieldTemplate, draggableRef, dragHandleRef);
 
   return (
     <InputFieldWrapper>
