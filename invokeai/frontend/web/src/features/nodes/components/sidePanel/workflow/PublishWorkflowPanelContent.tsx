@@ -38,7 +38,7 @@ import { selectHasBatchOrGeneratorNodes } from 'features/nodes/store/selectors';
 import { selectIsWorkflowSaved } from 'features/nodes/store/workflowSlice';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { selectAllowPublishWorkflows } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -307,7 +307,7 @@ NodeOutputFieldPreview.displayName = 'NodeOutputFieldPreview';
 
 export const StartPublishFlowButton = memo(() => {
   const { t } = useTranslation();
-  const publishWorkflowIsEnabled = useFeatureStatus('publishWorkflow');
+  const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
   const isReadyToEnqueue = useStore($isReadyToEnqueue);
   const isWorkflowSaved = useAppSelector(selectIsWorkflowSaved);
   const hasBatchOrGeneratorNodes = useAppSelector(selectHasBatchOrGeneratorNodes);
@@ -331,7 +331,7 @@ export const StartPublishFlowButton = memo(() => {
         leftIcon={<PiLightningFill />}
         variant="ghost"
         size="sm"
-        isDisabled={!publishWorkflowIsEnabled || !isWorkflowSaved || hasBatchOrGeneratorNodes}
+        isDisabled={!allowPublishWorkflows || !isWorkflowSaved || hasBatchOrGeneratorNodes}
       >
         {t('workflows.builder.publish')}
       </Button>
