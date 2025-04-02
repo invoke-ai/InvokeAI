@@ -67,6 +67,7 @@ class WorkflowWithoutID(BaseModel):
     # This is typed as optional to prevent errors when pulling workflows from the DB. The frontend adds a default form if
     # it is None.
     form: dict[str, JsonValue] | None = Field(default=None, description="The form of the workflow.")
+    is_published: bool | None = Field(default=None, description="Whether the workflow is published or not.")
 
     model_config = ConfigDict(extra="ignore")
 
@@ -101,6 +102,7 @@ class WorkflowRecordDTOBase(BaseModel):
     opened_at: Optional[Union[datetime.datetime, str]] = Field(
         default=None, description="The opened timestamp of the workflow."
     )
+    is_published: bool | None = Field(default=None, description="Whether the workflow is published or not.")
 
 
 class WorkflowRecordDTO(WorkflowRecordDTOBase):

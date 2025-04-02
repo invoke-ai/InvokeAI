@@ -15,6 +15,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByDestinationResult,
     ClearResult,
     EnqueueBatchResult,
+    FieldIdentifier,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -45,6 +46,16 @@ async def enqueue_batch(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
+    is_api_validation_run: bool = Body(
+        default=False,
+        description="Whether or not this is a validation run.",
+    ),
+    api_input_fields: Optional[list[FieldIdentifier]] = Body(
+        default=None, description="The fields that were used as input to the API"
+    ),
+    api_output_fields: Optional[list[FieldIdentifier]] = Body(
+        default=None, description="The fields that were used as output from the API"
+    ),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution."""
 
