@@ -1,0 +1,14 @@
+{
+  "python": "3.12",
+  "torchIndexUrl": {
+    "win32": {
+      "cuda": "https://download.pytorch.org/whl/cu126"
+    },
+    "linux": {
+      "cpu": "https://download.pytorch.org/whl/cpu",
+      "rocm": "https://download.pytorch.org/whl/rocm6.2.4",
+      "cuda": "https://download.pytorch.org/whl/cu126"
+    },
+    "darwin": {}
+  }
+}
