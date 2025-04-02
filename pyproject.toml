@@ -142,7 +142,19 @@ dependencies = [
 version = { attr = "invokeai.version.__version__" }
 
 [tool.setuptools.packages.find]
-"include" = ["invokeai"]
+"where" = ["."]
+"include" = [
+  "invokeai.assets.fonts*",
+  "invokeai.version*",
+  "invokeai.generator*",
+  "invokeai.backend*",
+  "invokeai.frontend*",
+  "invokeai.frontend.web.dist*",
+  "invokeai.frontend.web.static*",
+  "invokeai.configs*",
+  "invokeai.app*",
+  "invokeai.invocation_api*",
+]
 
 [tool.setuptools.package-data]
 "invokeai.app.assets" = ["**/*.png"]
