@@ -106,6 +106,7 @@ async def list_workflows(
     tags: Optional[list[str]] = Query(default=None, description="The tags of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+    is_published: Optional[bool] = Query(default=None, description="Whether to include/exclude published workflows"),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""
     workflows_with_thumbnails: list[WorkflowRecordListItemWithThumbnailDTO] = []
@@ -118,6 +119,7 @@ async def list_workflows(
         categories=categories,
         tags=tags,
         has_been_opened=has_been_opened,
+        is_published=is_published,
     )
     for workflow in workflows.items:
         workflows_with_thumbnails.append(

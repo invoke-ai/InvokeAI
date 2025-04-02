@@ -201,6 +201,12 @@ def get_workflow(queue_item_dict: dict) -> Optional[WorkflowWithoutID]:
     return None
 
 
+class FieldIdentifier(BaseModel):
+    kind: Literal["input", "output"] = Field(description="The kind of field")
+    node_id: str = Field(description="The ID of the node")
+    field_name: str = Field(description="The name of the field")
+
+
 class SessionQueueItemWithoutGraph(BaseModel):
     """Session queue item without the full graph. Used for serialization."""
 
@@ -236,6 +242,16 @@ class SessionQueueItemWithoutGraph(BaseModel):
     )
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
+    )
+    is_api_validation_run: bool = Field(
+        default=False,
+        description="Whether this queue item is an API validation run.",
+    )
+    api_input_fields: Optional[list[FieldIdentifier]] = Field(
+        default=None, description="The fields that were used as input to the API"
+    )
+    api_output_fields: Optional[list[FieldIdentifier]] = Field(
+        default=None, description="The nodes that were used as output from the API"
     )
 
     @classmethod

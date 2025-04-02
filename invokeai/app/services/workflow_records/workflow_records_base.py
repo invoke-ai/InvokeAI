@@ -47,6 +47,7 @@ class WorkflowRecordsStorageBase(ABC):
         query: Optional[str],
         tags: Optional[list[str]],
         has_been_opened: Optional[bool],
+        is_published: Optional[bool],
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass
@@ -56,6 +57,7 @@ class WorkflowRecordsStorageBase(ABC):
         self,
         categories: list[WorkflowCategory],
         has_been_opened: Optional[bool] = None,
+        is_published: Optional[bool] = None,
     ) -> dict[str, int]:
         """Gets a dictionary of counts for each of the provided categories."""
         pass
@@ -66,6 +68,7 @@ class WorkflowRecordsStorageBase(ABC):
         tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
         has_been_opened: Optional[bool] = None,
+        is_published: Optional[bool] = None,
     ) -> dict[str, int]:
         """Gets a dictionary of counts for each of the provided tags."""
         pass

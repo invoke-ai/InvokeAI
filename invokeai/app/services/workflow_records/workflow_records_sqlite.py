@@ -119,6 +119,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         query: Optional[str] = None,
         tags: Optional[list[str]] = None,
         has_been_opened: Optional[bool] = None,
+        is_published: Optional[bool] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         # sanitize!
         assert order_by in WorkflowRecordOrderBy
@@ -241,6 +242,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
         has_been_opened: Optional[bool] = None,
+        is_published: Optional[bool] = None,
     ) -> dict[str, int]:
         if not tags:
             return {}
@@ -292,6 +294,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self,
         categories: list[WorkflowCategory],
         has_been_opened: Optional[bool] = None,
+        is_published: Optional[bool] = None,
     ) -> dict[str, int]:
         cursor = self._conn.cursor()
         result: dict[str, int] = {}
