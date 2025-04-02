@@ -148,7 +148,11 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       }
     }
   }
-  edges.forEach((edge, i) => {
+
+  // Stash invalid edges here to be deleted later
+  const edgesToDelete = new Set<string>();
+
+  for (const edge of edges) {
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
     const sourceNode = nodes.find(({ id }) => id === edge.source);
     const targetNode = nodes.find(({ id }) => id === edge.target);
@@ -215,8 +219,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     }
 
     if (issues.length) {
-      // This edge has some issues. Remove it.
-      delete edges[i];
+      edgesToDelete.add(edge.id);
       const source = edge.type === 'default' ? `${edge.source}.${edge.sourceHandle}` : edge.source;
       const target = edge.type === 'default' ? `${edge.source}.${edge.targetHandle}` : edge.target;
       warnings.push({
@@ -225,7 +228,10 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
         data: edge,
       });
     }
-  });
+  }
+
+  // Remove invalid edges
+  _workflow.edges = edges.filter(({ id }) => !edgesToDelete.has(id));
 
   // Migrated exposed fields to form elements if they exist and the form does not
   // Note: If the form is invalid per its zod schema, it will be reset to a default, empty form!
