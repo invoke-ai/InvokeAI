@@ -2469,6 +2469,11 @@ export type components = {
              */
             is_api_validation_run?: boolean;
             /**
+             * Published Workflow Id
+             * @description The ID of the published workflow associated with this queue item
+             */
+            published_workflow_id?: string | null;
+            /**
              * Api Input Fields
              * @description The fields that were used as input to the API
              */
@@ -19509,6 +19514,11 @@ export type components = {
              */
             is_api_validation_run?: boolean;
             /**
+             * Published Workflow Id
+             * @description The ID of the published workflow associated with this queue item
+             */
+            published_workflow_id?: string | null;
+            /**
              * Api Input Fields
              * @description The fields that were used as input to the API
              */
@@ -19619,6 +19629,11 @@ export type components = {
              * @default false
              */
             is_api_validation_run?: boolean;
+            /**
+             * Published Workflow Id
+             * @description The ID of the published workflow associated with this queue item
+             */
+            published_workflow_id?: string | null;
             /**
              * Api Input Fields
              * @description The fields that were used as input to the API
