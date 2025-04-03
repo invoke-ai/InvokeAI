@@ -50,6 +50,10 @@ async def enqueue_batch(
         default=False,
         description="Whether or not this is a validation run.",
     ),
+    published_workflow_id: Optional[str] = Body(
+        default=None,
+        description="The ID of the published workflow associated with this queue item",
+    ),
     api_input_fields: Optional[list[FieldIdentifier]] = Body(
         default=None, description="The fields that were used as input to the API"
     ),
