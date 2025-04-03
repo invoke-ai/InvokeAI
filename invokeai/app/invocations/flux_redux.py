@@ -1,4 +1,5 @@
-from typing import Optional
+import math
+from typing import Literal, Optional
 
 import torch
 from PIL import Image
@@ -39,12 +40,15 @@ class FluxReduxOutput(BaseInvocationOutput):
     )
 
 
+DOWNSAMPLING_FUNCTIONS = Literal["nearest", "bilinear", "bicubic", "area", "nearest-exact"]
+
+
 @invocation(
     "flux_redux",
     title="FLUX Redux",
     tags=["ip_adapter", "control"],
     category="ip_adapter",
-    version="2.0.0",
+    version="2.1.0",
     classification=Classification.Beta,
 )
 class FluxReduxInvocation(BaseInvocation):
@@ -61,17 +65,52 @@ class FluxReduxInvocation(BaseInvocation):
         title="FLUX Redux Model",
         ui_type=UIType.FluxReduxModel,
     )
+    downsampling_factor: int = InputField(
+        ge=1,
+        le=9,
+        default=1,
+        description="Redux Downsampling Factor (1-9)",
+    )
+    downsampling_function: DOWNSAMPLING_FUNCTIONS = InputField(
+        default="area",
+        description="Redux Downsampling Function",
+    )
+    weight: float = InputField(
+        ge=0,
+        le=1,
+        default=1.0,
+        description="Redux weight (0.0-1.0)",
+    )
 
     def invoke(self, context: InvocationContext) -> FluxReduxOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
 
         encoded_x = self._siglip_encode(context, image)
         redux_conditioning = self._flux_redux_encode(context, encoded_x)
+        if self.downsampling_factor > 1 and self.weight != 1.0:
+            redux_conditioning = self._downsample_weight(context, redux_conditioning)
 
         tensor_name = context.tensors.save(redux_conditioning)
         return FluxReduxOutput(
             redux_cond=FluxReduxConditioningField(conditioning=TensorField(tensor_name=tensor_name), mask=self.mask)
         )
+
+    @torch.no_grad()
+    def _downsample_weight(self, context: InvocationContext, redux_conditioning: torch.Tensor) -> torch.Tensor:
+        # Downsampling derived from https://github.com/kaibioinfo/ComfyUI_AdvancedRefluxControl
+        (b, t, h) = redux_conditioning.shape
+        m = int(math.sqrt(t))
+        if self.downsampling_factor > 1:
+            redux_conditioning = redux_conditioning.view(b, m, m, h)
+            redux_conditioning = torch.nn.functional.interpolate(
+                redux_conditioning.transpose(1, -1),
+                size=(m // self.downsampling_factor, m // self.downsampling_factor),
+                mode=self.downsampling_function,
+            )
+            redux_conditioning = redux_conditioning.transpose(1, -1).reshape(b, -1, h)
+        if self.weight != 1.0:
+            redux_conditioning = redux_conditioning * self.weight * self.weight
+        return redux_conditioning
 
     @torch.no_grad()
     def _siglip_encode(self, context: InvocationContext, image: Image.Image) -> torch.Tensor:
