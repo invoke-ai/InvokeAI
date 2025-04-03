@@ -30,7 +30,7 @@ export const useLoadWorkflowFromLibrary = () => {
       try {
         const res = await getWorkflow(workflowId).unwrap();
 
-        const validatedWorkflow = await validateAndLoadWorkflow(res.workflow);
+        const validatedWorkflow = await validateAndLoadWorkflow(res.workflow, 'library');
 
         if (!validatedWorkflow) {
           onError?.();

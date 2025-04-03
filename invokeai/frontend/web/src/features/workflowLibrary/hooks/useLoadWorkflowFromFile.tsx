@@ -29,7 +29,7 @@ export const useLoadWorkflowFromFile = () => {
           const { onSuccess, onError, onCompleted } = options;
           try {
             const unvalidatedWorkflow = JSON.parse(rawJSON as string);
-            const validatedWorkflow = await validatedAndLoadWorkflow(unvalidatedWorkflow);
+            const validatedWorkflow = await validatedAndLoadWorkflow(unvalidatedWorkflow, 'file');
 
             if (!validatedWorkflow) {
               reader.abort();

@@ -21,7 +21,7 @@ export const useLoadWorkflowFromObject = () => {
     ) => {
       const { onSuccess, onError, onCompleted } = options;
       try {
-        const validatedWorkflow = await validateAndLoadWorkflow(unvalidatedWorkflow);
+        const validatedWorkflow = await validateAndLoadWorkflow(unvalidatedWorkflow, 'object');
 
         if (!validatedWorkflow) {
           onError?.();
