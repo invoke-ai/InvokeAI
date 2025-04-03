@@ -64,7 +64,7 @@ The following commands vary depending on the version of Invoke being installed a
 
 5. Choose a version to install. Review the [GitHub releases page](https://github.com/invoke-ai/InvokeAI/releases).
 
-6. Determine the package package specifier to use when installing. This is a performance optimization.
+6. Determine the package specifier to use when installing. This is a performance optimization.
 
     - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
     - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
