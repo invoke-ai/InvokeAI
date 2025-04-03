@@ -247,6 +247,10 @@ class SessionQueueItemWithoutGraph(BaseModel):
         default=False,
         description="Whether this queue item is an API validation run.",
     )
+    published_workflow_id: Optional[str] = Field(
+        default=None,
+        description="The ID of the published workflow associated with this queue item",
+    )
     api_input_fields: Optional[list[FieldIdentifier]] = Field(
         default=None, description="The fields that were used as input to the API"
     )
