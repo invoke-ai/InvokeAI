@@ -192,6 +192,7 @@ const PublishWorkflowButton = memo(() => {
   const outputNodeId = useStore($outputNodeId);
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
   const inputs = usePublishInputs();
+  const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
 
   const projectUrl = useStore($projectUrl);
 
@@ -240,9 +241,11 @@ const PublishWorkflowButton = memo(() => {
       <Button
         leftIcon={<PiLightningFill />}
         isDisabled={
-          !isReadyToDoValidationRun ||
+          !allowPublishWorkflows ||
           !isReadyToEnqueue ||
+          !isWorkflowSaved ||
           hasBatchOrGeneratorNodes ||
+          !isReadyToDoValidationRun ||
           !(outputNodeId !== null && !isSelectingOutputNode)
         }
         onClick={onClick}
@@ -331,7 +334,7 @@ export const StartPublishFlowButton = memo(() => {
         leftIcon={<PiLightningFill />}
         variant="ghost"
         size="sm"
-        isDisabled={!allowPublishWorkflows || !isWorkflowSaved || hasBatchOrGeneratorNodes}
+        isDisabled={!allowPublishWorkflows || !isReadyToEnqueue || !isWorkflowSaved || hasBatchOrGeneratorNodes}
       >
         {t('workflows.builder.publish')}
       </Button>
