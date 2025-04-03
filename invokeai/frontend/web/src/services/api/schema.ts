@@ -2462,27 +2462,8 @@ export type components = {
              * @default false
              */
             prepend?: boolean;
-            /**
-             * Is Api Validation Run
-             * @description Whether or not this is a validation run.
-             * @default false
-             */
-            is_api_validation_run?: boolean;
-            /**
-             * Published Workflow Id
-             * @description The ID of the published workflow associated with this queue item
-             */
-            published_workflow_id?: string | null;
-            /**
-             * Api Input Fields
-             * @description The fields that were used as input to the API
-             */
-            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
-             * Api Output Fields
-             * @description The fields that were used as output from the API
-             */
-            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
+            /** @description The validation run data to use for this batch. This is only used if this is a validation run. */
+            validation_run_data?: components["schemas"]["ValidationRunData"] | null;
         };
         /** Body_import_style_presets */
         Body_import_style_presets: {
@@ -21877,6 +21858,24 @@ export type components = {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValidationRunData */
+        ValidationRunData: {
+            /**
+             * Workflow Id
+             * @description The id of the workflow being published.
+             */
+            workflow_id: string;
+            /**
+             * Input Fields
+             * @description The input fields for the published workflow
+             */
+            input_fields: components["schemas"]["FieldIdentifier"][];
+            /**
+             * Output Fields
+             * @description The output fields for the published workflow
+             */
+            output_fields: components["schemas"]["FieldIdentifier"][];
         };
         /** Workflow */
         Workflow: {
