@@ -1814,7 +1814,9 @@
             "publishedWorkflowIsLocked": "Published workflow is locked",
             "publishingValidationRun": "Publishing Validation Run",
             "publishingValidationRunInProgress": "Publishing validation run in progress.",
-            "publishedWorkflowsLocked": "Published workflows are locked and cannot be edited or run. Either unpublish the workflow or save a copy to edit or run this workflow."
+            "publishedWorkflowsLocked": "Published workflows are locked and cannot be edited or run. Either unpublish the workflow or save a copy to edit or run this workflow.",
+            "selectingOutputNode": "Selecting output node",
+            "selectingOutputNodeDesc": "Click a node to select it as the workflow's output node."
         }
     },
     "controlLayers": {
