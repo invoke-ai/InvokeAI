@@ -136,10 +136,11 @@ export const useEnqueueWorkflows = () => {
 
         assert(workflow.id, 'Workflow without ID cannot be used for API validation run');
 
-        batchConfig.published_workflow_id = workflow.id;
-        batchConfig.is_api_validation_run = true;
-        batchConfig.api_input_fields = api_input_fields;
-        batchConfig.api_output_fields = api_output_fields;
+        batchConfig.validation_run_data = {
+          workflow_id: workflow.id,
+          input_fields: api_input_fields,
+          output_fields: api_output_fields,
+        };
 
         // If the batch is an API validation run, we only want to run it once
         batchConfig.batch.runs = 1;
