@@ -85,6 +85,7 @@ example_model_config = {
     "config_path": "string",
     "key": "string",
     "hash": "string",
+    "size": 1,
     "description": "string",
     "source": "string",
     "converted_at": 0,
