@@ -45,7 +45,7 @@ dependencies = [
   "onnxruntime==1.19.2",
   "opencv-python==4.9.0.80",
   "safetensors",
-  "spandrel==0.3.4",
+  "spandrel",
   "torch~=2.6.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
