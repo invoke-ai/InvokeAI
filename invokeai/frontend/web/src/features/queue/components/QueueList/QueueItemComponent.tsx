@@ -120,7 +120,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           )}
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.validationRun} flexShrink={0}>
-          {!isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
+          {isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
         </Flex>
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
