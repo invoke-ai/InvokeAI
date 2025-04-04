@@ -3,7 +3,6 @@
 import math
 
 import cv2
-import matplotlib
 import numpy as np
 import numpy.typing as npt
 
@@ -127,11 +126,13 @@ def draw_handpose(canvas: NDArrayInt, all_hand_peaks: NDArrayInt) -> NDArrayInt:
             x2 = int(x2 * W)
             y2 = int(y2 * H)
             if x1 > eps and y1 > eps and x2 > eps and y2 > eps:
+                hsv_color = np.array([[[ie / float(len(edges)) * 180, 255, 255]]], dtype=np.uint8)
+                rgb_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2RGB)[0, 0]
                 cv2.line(
                     canvas,
                     (x1, y1),
                     (x2, y2),
-                    matplotlib.colors.hsv_to_rgb([ie / float(len(edges)), 1.0, 1.0]) * 255,
+                    rgb_color.tolist(),
                     thickness=2,
                 )
 
