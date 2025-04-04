@@ -18,9 +18,6 @@ class DWOpenposeDetector:
     """
     Code from the original implementation of the DW Openpose Detector.
     Credits: https://github.com/IDEA-Research/DWPose
-
-    This implementation is similar to DWOpenposeDetector, with some alterations to allow the onnx models to be loaded
-    and managed by the model manager.
     """
 
     hf_repo_id = "yzd-v/DWPose"
