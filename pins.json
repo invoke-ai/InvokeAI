@@ -1,5 +1,5 @@
 {
-  "python": "3.11",
+  "python": "3.12",
   "torchIndexUrl": {
     "win32": {
       "cuda": "https://download.pytorch.org/whl/cu126"
