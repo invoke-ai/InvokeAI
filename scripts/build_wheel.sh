@@ -85,7 +85,7 @@ fi
 if [[ ! -z ${CI} ]]; then
     echo
     echo "Setting GitHub action outputs..."
-    echo "DIST_PATH=installer/dist/" >>$GITHUB_OUTPUT
+    echo "DIST_PATH=./dist/" >>$GITHUB_OUTPUT
 fi
 
 exit 0
