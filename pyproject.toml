@@ -74,7 +74,6 @@ dependencies = [
   "dynamicprompts",
   "einops",
   "npyscreen",
-  "omegaconf",
   "picklescan",
   "pillow",
   "prompt-toolkit",
