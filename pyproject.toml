@@ -75,8 +75,6 @@ dependencies = [
   "dynamicprompts",
   "einops",
   "facexlib",
-  # Exclude 3.9.1 which has a problem on windows, see https://github.com/matplotlib/matplotlib/issues/28551
-  "matplotlib!=3.9.1",
   "npyscreen",
   "omegaconf",
   "picklescan",
