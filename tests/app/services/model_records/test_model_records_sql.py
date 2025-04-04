@@ -45,6 +45,7 @@ def example_ti_config(key: Optional[str] = None) -> TextualInversionFileConfig:
         source="test/source/",
         source_type=ModelSourceType.Path,
         path="/tmp/pokemon.bin",
+        size=1024,
         name="old name",
         base=BaseModelType.StableDiffusion1,
         type=ModelType.TextualInversion,
@@ -128,6 +129,7 @@ def test_filter(store: ModelRecordServiceBase):
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG1HASH",
+        size=1001,
         source="test/source",
         source_type=ModelSourceType.Path,
     )
@@ -138,6 +140,7 @@ def test_filter(store: ModelRecordServiceBase):
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG2HASH",
+        size=1002,
         source="test/source",
         source_type=ModelSourceType.Path,
     )
@@ -148,6 +151,7 @@ def test_filter(store: ModelRecordServiceBase):
         base=BaseModelType("sd-2"),
         type=ModelType.VAE,
         hash="CONFIG3HASH",
+        size=1003,
         source="test/source",
         source_type=ModelSourceType.Path,
     )
@@ -178,6 +182,7 @@ def test_unique(store: ModelRecordServiceBase):
         type=ModelType.Main,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        size=1004,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -187,6 +192,7 @@ def test_unique(store: ModelRecordServiceBase):
         type=ModelType.Main,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        size=1005,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -196,6 +202,7 @@ def test_unique(store: ModelRecordServiceBase):
         type=ModelType.VAE,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        size=1006,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -205,6 +212,7 @@ def test_unique(store: ModelRecordServiceBase):
         type=ModelType.Main,
         name="nonuniquename",
         hash="CONFIG1HASH",
+        size=1007,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -227,6 +235,7 @@ def test_filter_2(store: ModelRecordServiceBase):
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG1HASH",
+        size=1008,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -236,6 +245,7 @@ def test_filter_2(store: ModelRecordServiceBase):
         base=BaseModelType.StableDiffusion1,
         type=ModelType.Main,
         hash="CONFIG2HASH",
+        size=1009,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -245,6 +255,7 @@ def test_filter_2(store: ModelRecordServiceBase):
         base=BaseModelType("sd-2"),
         type=ModelType.Main,
         hash="CONFIG3HASH",
+        size=1010,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -254,6 +265,7 @@ def test_filter_2(store: ModelRecordServiceBase):
         base=BaseModelType("sdxl"),
         type=ModelType.Main,
         hash="CONFIG3HASH",
+        size=1011,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
@@ -263,6 +275,7 @@ def test_filter_2(store: ModelRecordServiceBase):
         base=BaseModelType.StableDiffusion1,
         type=ModelType.VAE,
         hash="CONFIG3HASH",
+        size=1012,
         source="test/source/",
         source_type=ModelSourceType.Path,
     )
