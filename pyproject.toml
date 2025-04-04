@@ -45,7 +45,6 @@ dependencies = [
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
   "opencv-python==4.9.0.80",
-  "pytorch-lightning",
   "safetensors",
   # sentencepiece is required to load T5TokenizerFast (used by FLUX).
   "sentencepiece==0.2.0",
