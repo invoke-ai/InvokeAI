@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import onnxruntime as ort
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
@@ -55,6 +56,16 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         ),
     ):
         return model.calc_size()
+    elif isinstance(model, ort.InferenceSession):
+        if model._model_bytes is not None:
+            # If the model is already loaded, return the size of the model bytes
+            return len(model._model_bytes)
+        elif model._model_path is not None:
+            # If the model is not loaded, return the size of the model path
+            return calc_model_size_by_fs(Path(model._model_path))
+        else:
+            # If neither is available, return 0
+            return 0
     elif isinstance(
         model,
         (
