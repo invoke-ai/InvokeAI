@@ -79,7 +79,6 @@ dependencies = [
   "pyreadline3",
   "python-multipart",
   "requests",
-  "scikit-image",
   "semver~=3.0.1",
 ]
 
