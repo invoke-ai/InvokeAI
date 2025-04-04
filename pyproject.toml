@@ -67,7 +67,6 @@ dependencies = [
 
   # Auxiliary dependencies, pinned only if necessary.
   "blake3",
-  "click",
   "datasets",
   "Deprecated",
   "dnspython",
