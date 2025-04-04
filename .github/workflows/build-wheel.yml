@@ -1,6 +1,6 @@
-# Builds and uploads the installer and python build artifacts.
+# Builds and uploads python build artifacts.
 
-name: build installer
+name: build wheel
 
 on:
   workflow_dispatch:
