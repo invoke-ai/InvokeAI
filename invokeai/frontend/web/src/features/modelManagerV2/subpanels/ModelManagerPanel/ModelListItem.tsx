@@ -108,6 +108,9 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           <ModelBaseBadge base={model.base} />
           <ModelFormatBadge format={model.format} />
         </Flex>
+        <Text>
+          {Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(model.size / (1024 ** 3))} GB
+        </Text>
       </Flex>
       <IconButton
         onClick={onClickDeleteButton}

@@ -841,6 +841,7 @@
         "selectModel": "Select Model",
         "settings": "Settings",
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
+      "size": "Size",
         "source": "Source",
         "sigLip": "SigLIP",
         "spandrelImageToImage": "Image to Image (Spandrel)",
