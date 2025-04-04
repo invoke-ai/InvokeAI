@@ -27,19 +27,12 @@ jobs:
       - name: setup frontend
         uses: ./.github/actions/install-frontend-deps
 
-      - name: create installer
-        id: create_installer
-        run: ./create_installer.sh
-        working-directory: installer
+      - name: build wheel
+        id: build_wheel
+        run: ./scripts/build_wheel.sh
 
       - name: upload python distribution artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: ${{ steps.create_installer.outputs.DIST_PATH }}
-
-      - name: upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: installer
-          path: ${{ steps.create_installer.outputs.INSTALLER_PATH }}
+          path: ${{ steps.build_wheel.outputs.DIST_PATH }}
