@@ -65,9 +65,6 @@ def apply_monkeypatches() -> None:
 
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 
-    if torch.backends.mps.is_available():
-        import invokeai.backend.util.mps_fixes  # noqa: F401 (monkeypatching on import)
-
 
 def register_mime_types() -> None:
     """Register additional mime types for windows."""
