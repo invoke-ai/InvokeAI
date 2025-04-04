@@ -37,7 +37,7 @@ dependencies = [
   "bitsandbytes; sys_platform!='darwin'",
   "compel==2.0.2",
   "diffusers[torch]",
-  "gguf==0.10.0",
+  "gguf",
   "invisible-watermark==0.2.0",           # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
@@ -45,10 +45,8 @@ dependencies = [
   "onnxruntime==1.19.2",
   "opencv-python==4.9.0.80",
   "safetensors",
-  # sentencepiece is required to load T5TokenizerFast (used by FLUX).
-  "sentencepiece==0.2.0",
   "spandrel==0.3.4",
-  "torch~=2.6.0",         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torch~=2.6.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",
   "torchvision",
   "transformers",
