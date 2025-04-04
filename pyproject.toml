@@ -73,7 +73,6 @@ dependencies = [
   "picklescan",
   "pillow",
   "prompt-toolkit",
-  "pympler",
   "pypatchmatch",
   "pyperclip",
   "pyreadline3",
