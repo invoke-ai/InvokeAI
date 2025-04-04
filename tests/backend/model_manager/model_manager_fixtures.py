@@ -140,6 +140,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         base=BaseModelType.StableDiffusion2,
         type=ModelType.VAE,
         hash="111222333444",
+        size=4096,
         source="stabilityai/sdxl-vae",
         source_type=ModelSourceType.HFRepoID,
     )
@@ -153,6 +154,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         config_path="/tmp/foo.yaml",
         variant=ModelVariantType.Normal,
         hash="111222333444",
+        size=8192,
         source="https://civitai.com/models/206883/split",
         source_type=ModelSourceType.Url,
     )
@@ -164,6 +166,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         base=BaseModelType.StableDiffusionXL,
         type=ModelType.Main,
         hash="111222333444",
+        size=8193,
         source="author3/model3",
         description="This is test 3",
         source_type=ModelSourceType.HFRepoID,
@@ -176,6 +179,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         base=BaseModelType.StableDiffusionXL,
         type=ModelType.LoRA,
         hash="111222333444",
+        size=5000,
         source="author4/model4",
         source_type=ModelSourceType.HFRepoID,
     )
@@ -187,6 +191,7 @@ def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBas
         base=BaseModelType.StableDiffusion1,
         type=ModelType.LoRA,
         hash="111222333444",
+        size=5001,
         source="author4/model5",
         source_type=ModelSourceType.HFRepoID,
     )
