@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.config import (
     SubmodelDefinition,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import ConfigLoader
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
@@ -207,6 +208,7 @@ class ModelProbe(object):
         )
         fields["format"] = ModelFormat(fields.get("format")) if "format" in fields else probe.get_format()
         fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
+        fields["size"] = fields.get("size") or ModelOnDisk(model_path).size()
 
         fields["default_settings"] = fields.get("default_settings")
 
