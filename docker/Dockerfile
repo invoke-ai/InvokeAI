@@ -100,3 +100,14 @@ COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/web
 
 # add sources last to minimize image changes on code changes
 COPY invokeai ${INVOKEAI_SRC}/invokeai
+
+# this should not increase image size because we've already installed dependencies
+# in a previous layer
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then UV_INDEX="https://download.pytorch.org/whl/cpu"; \
+    elif [ "$GPU_DRIVER" = "rocm" ]; then UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
+    fi && \
+    uv pip install -e .
+
