@@ -70,7 +70,6 @@ dependencies = [
   "dnspython",
   "dynamicprompts",
   "einops",
-  "npyscreen",
   "picklescan",
   "pillow",
   "prompt-toolkit",
