@@ -49,7 +49,7 @@ jobs:
       always_run: true
 
   build:
-    uses: ./.github/workflows/build-installer.yml
+    uses: ./.github/workflows/build-wheel.yml
 
   publish-testpypi:
     runs-on: ubuntu-latest
