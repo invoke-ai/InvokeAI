@@ -51,7 +51,6 @@ dependencies = [
   "sentencepiece==0.2.0",
   "spandrel==0.3.4",
   "torch~=2.6.0",         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
-  "torchmetrics",
   "torchsde",
   "torchvision",
   "transformers",
