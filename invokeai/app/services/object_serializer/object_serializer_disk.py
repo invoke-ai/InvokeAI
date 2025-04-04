@@ -21,10 +21,16 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
     """Disk-backed storage for arbitrary python objects. Serialization is handled by `torch.save` and `torch.load`.
 
     :param output_dir: The folder where the serialized objects will be stored
+    :param safe_globals: A list of types to be added to the safe globals for torch serialization
     :param ephemeral: If True, objects will be stored in a temporary directory inside the given output_dir and cleaned up on exit
     """
 
-    def __init__(self, output_dir: Path, ephemeral: bool = False):
+    def __init__(
+        self,
+        output_dir: Path,
+        safe_globals: list[type],
+        ephemeral: bool = False,
+    ) -> None:
         super().__init__()
         self._ephemeral = ephemeral
         self._base_output_dir = output_dir
@@ -41,6 +47,8 @@ class ObjectSerializerDisk(ObjectSerializerBase[T]):
         )
         self._output_dir = Path(self._tempdir.name) if self._tempdir else self._base_output_dir
         self.__obj_class_name: Optional[str] = None
+
+        torch.serialization.add_safe_globals(safe_globals) if safe_globals else None
 
     def load(self, name: str) -> T:
         file_path = self._get_path(name)

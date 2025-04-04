@@ -43,10 +43,10 @@ The following commands vary depending on the version of Invoke being installed a
 3. Create a virtual environment in that directory:
 
     ```sh
-    uv venv --relocatable --prompt invoke --python 3.11 --python-preference only-managed .venv
+    uv venv --relocatable --prompt invoke --python 3.12 --python-preference only-managed .venv
     ```
 
-    This command creates a portable virtual environment at `.venv` complete with a portable python 3.11. It doesn't matter if your system has no python installed, or has a different version - `uv` will handle everything.
+    This command creates a portable virtual environment at `.venv` complete with a portable python 3.12. It doesn't matter if your system has no python installed, or has a different version - `uv` will handle everything.
 
 4. Activate the virtual environment:
 
@@ -64,7 +64,7 @@ The following commands vary depending on the version of Invoke being installed a
 
 5. Choose a version to install. Review the [GitHub releases page](https://github.com/invoke-ai/InvokeAI/releases).
 
-6. Determine the package package specifier to use when installing. This is a performance optimization.
+6. Determine the package specifier to use when installing. This is a performance optimization.
 
     - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
     - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
@@ -88,13 +88,13 @@ The following commands vary depending on the version of Invoke being installed a
 8. Install the `invokeai` package. Substitute the package specifier and version.
 
     ```sh
-    uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.11 --python-preference only-managed --force-reinstall
+    uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --force-reinstall
     ```
 
     If you determined you needed to use a `PyPI` index URL in the previous step, you'll need to add `--index=<INDEX_URL>` like this:
 
     ```sh
-    uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.11 --python-preference only-managed --index=<INDEX_URL> --force-reinstall
+    uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --index=<INDEX_URL> --force-reinstall
     ```
 
 9. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:

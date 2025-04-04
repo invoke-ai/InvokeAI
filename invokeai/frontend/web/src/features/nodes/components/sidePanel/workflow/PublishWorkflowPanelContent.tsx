@@ -1,3 +1,4 @@
+import type { ButtonProps } from '@invoke-ai/ui-library';
 import {
   Button,
   ButtonGroup,
@@ -43,7 +44,7 @@ import { toast } from 'features/toast/toast';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiLightningFill, PiSignOutBold, PiXBold } from 'react-icons/pi';
+import { PiArrowLineRightBold, PiLightningFill, PiXBold } from 'react-icons/pi';
 import { serializeError } from 'serialize-error';
 import { assert } from 'tsafe';
 
@@ -53,7 +54,6 @@ export const PublishWorkflowPanelContent = memo(() => {
   return (
     <Flex flexDir="column" gap={2} h="full">
       <ButtonGroup isAttached={false} size="sm" variant="ghost">
-        <SelectOutputNodeButton />
         <Spacer />
         <CancelPublishButton />
         <PublishWorkflowButton />
@@ -74,32 +74,35 @@ const OutputFields = memo(() => {
   const { t } = useTranslation();
   const outputNodeId = useStore($outputNodeId);
 
-  if (!outputNodeId) {
-    return (
-      <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
+  return (
+    <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
+      <Flex alignItems="center">
+        <Text fontWeight="semibold">{t('workflows.builder.publishedWorkflowOutputs')}</Text>
+        <Spacer />
+        <SelectOutputNodeButton variant="link" size="sm" />
+      </Flex>
+
+      <Divider />
+      {!outputNodeId && (
         <Text fontWeight="semibold" color="error.300">
           {t('workflows.builder.noOutputNodeSelected')}
         </Text>
-      </Flex>
-    );
-  }
-
-  return <OutputFieldsContent outputNodeId={outputNodeId} />;
+      )}
+      {outputNodeId && <OutputFieldsContent outputNodeId={outputNodeId} />}
+    </Flex>
+  );
 });
 OutputFields.displayName = 'OutputFields';
 
 const OutputFieldsContent = memo(({ outputNodeId }: { outputNodeId: string }) => {
-  const { t } = useTranslation();
   const outputFieldNames = useOutputFieldNames(outputNodeId);
 
   return (
-    <Flex flexDir="column" borderWidth={1} borderRadius="base" gap={2} p={2}>
-      <Text fontWeight="semibold">{t('workflows.builder.publishedWorkflowOutputs')}</Text>
-      <Divider />
+    <>
       {outputFieldNames.map((fieldName) => (
         <NodeOutputFieldPreview key={`${outputNodeId}-${fieldName}`} nodeId={outputNodeId} fieldName={fieldName} />
       ))}
-    </Flex>
+    </>
   );
 });
 OutputFieldsContent.displayName = 'OutputFieldsContent';
@@ -152,7 +155,7 @@ const UnpublishableInputFields = memo(() => {
 });
 UnpublishableInputFields.displayName = 'UnpublishableInputFields';
 
-const SelectOutputNodeButton = memo(() => {
+const SelectOutputNodeButton = memo((props: ButtonProps) => {
   const { t } = useTranslation();
   const outputNodeId = useStore($outputNodeId);
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
@@ -161,8 +164,18 @@ const SelectOutputNodeButton = memo(() => {
     $isSelectingOutputNode.set(true);
   }, []);
   return (
-    <Button leftIcon={<PiSignOutBold />} isDisabled={isSelectingOutputNode} onClick={onClick}>
-      {outputNodeId ? t('workflows.builder.changeOutputNode') : t('workflows.builder.selectOutputNode')}
+    <Button
+      leftIcon={<PiArrowLineRightBold />}
+      isDisabled={isSelectingOutputNode}
+      tooltip={isSelectingOutputNode ? t('workflows.builder.selectingOutputNodeDesc') : undefined}
+      onClick={onClick}
+      {...props}
+    >
+      {isSelectingOutputNode
+        ? t('workflows.builder.selectingOutputNode')
+        : outputNodeId
+          ? t('workflows.builder.changeOutputNode')
+          : t('workflows.builder.selectOutputNode')}
     </Button>
   );
 });
@@ -192,6 +205,7 @@ const PublishWorkflowButton = memo(() => {
   const outputNodeId = useStore($outputNodeId);
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
   const inputs = usePublishInputs();
+  const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
 
   const projectUrl = useStore($projectUrl);
 
@@ -240,9 +254,11 @@ const PublishWorkflowButton = memo(() => {
       <Button
         leftIcon={<PiLightningFill />}
         isDisabled={
-          !isReadyToDoValidationRun ||
+          !allowPublishWorkflows ||
           !isReadyToEnqueue ||
+          !isWorkflowSaved ||
           hasBatchOrGeneratorNodes ||
+          !isReadyToDoValidationRun ||
           !(outputNodeId !== null && !isSelectingOutputNode)
         }
         onClick={onClick}
@@ -331,7 +347,7 @@ export const StartPublishFlowButton = memo(() => {
         leftIcon={<PiLightningFill />}
         variant="ghost"
         size="sm"
-        isDisabled={!allowPublishWorkflows || !isWorkflowSaved || hasBatchOrGeneratorNodes}
+        isDisabled={!allowPublishWorkflows || !isReadyToEnqueue || !isWorkflowSaved || hasBatchOrGeneratorNodes}
       >
         {t('workflows.builder.publish')}
       </Button>

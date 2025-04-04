@@ -60,16 +60,11 @@ Next, these jobs run and must pass. They are the same jobs that are run for ever
 - **`frontend-checks`**: runs `prettier` (format), `eslint` (lint), `dpdm` (circular refs), `tsc` (static type check) and `knip` (unused imports)
 - **`typegen-checks`**: ensures the frontend and backend types are synced
 
-#### `build-installer` Job
+#### `build-wheel` Job
 
-This sets up both python and frontend dependencies and builds the python package. Internally, this runs `installer/create_installer.sh` and uploads two artifacts:
+This sets up both python and frontend dependencies and builds the python package. Internally, this runs `./scripts/build_wheel.sh` and uploads `dist.zip`, which contains the wheel and unarchived build.
 
-- **`dist`**: the python distribution, to be published on PyPI
-- **`InvokeAI-installer-${VERSION}.zip`**: the legacy install scripts
-
-You don't need to download either of these files.
-
-> The legacy install scripts are no longer used, but we haven't updated the workflow to skip building them.
+You don't need to download or test these artifacts.
 
 #### Sanity Check & Smoke Test
 
@@ -79,7 +74,7 @@ It's possible to test the python package before it gets published to PyPI. We've
 
 But, if you want to be extra-super careful, here's how to test it:
 
-- Download the `dist.zip` build artifact from the `build-installer` job
+- Download the `dist.zip` build artifact from the `build-wheel` job
 - Unzip it and find the wheel file
 - Create a fresh Invoke install by following the [manual install guide](https://invoke-ai.github.io/InvokeAI/installation/manual/) - but instead of installing from PyPI, install from the wheel
 - Test the app

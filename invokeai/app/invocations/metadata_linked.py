@@ -14,7 +14,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.controlnet_image_processors import ControlField, ControlNetInvocation
+from invokeai.app.invocations.controlnet import ControlField, ControlNetInvocation
 from invokeai.app.invocations.denoise_latents import DenoiseLatentsInvocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,

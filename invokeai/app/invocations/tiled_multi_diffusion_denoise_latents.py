@@ -9,7 +9,7 @@ from pydantic import field_validator
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.app.invocations.controlnet_image_processors import ControlField
+from invokeai.app.invocations.controlnet import ControlField
 from invokeai.app.invocations.denoise_latents import DenoiseLatentsInvocation, get_scheduler
 from invokeai.app.invocations.fields import (
     ConditioningField,

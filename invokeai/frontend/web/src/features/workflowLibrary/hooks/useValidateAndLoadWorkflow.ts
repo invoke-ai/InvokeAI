@@ -43,7 +43,10 @@ export const useValidateAndLoadWorkflow = () => {
      *
      * This function catches all errors. It toasts and logs on success and error.
      */
-    async (unvalidatedWorkflow: unknown): Promise<WorkflowV3 | null> => {
+    async (
+      unvalidatedWorkflow: unknown,
+      origin: 'file' | 'image' | 'object' | 'library'
+    ): Promise<WorkflowV3 | null> => {
       try {
         const templates = $templates.get();
         const { workflow, warnings } = await validateWorkflow({
@@ -53,6 +56,13 @@ export const useValidateAndLoadWorkflow = () => {
           checkBoardAccess,
           checkModelAccess,
         });
+
+        if (origin !== 'library') {
+          // Workflow IDs should always map directly to the workflow in the library. If the workflow is loaded from
+          // some other source, and has an ID, we should remove it to ensure the app does not treat it as a library workflow.
+          // For example, when saving a workflow, we might accidentally attempt to save instead of save-as.
+          delete workflow.id;
+        }
 
         $nodeExecutionStates.set({});
         dispatch(workflowLoaded(workflow));

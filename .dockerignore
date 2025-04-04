@@ -1,9 +1,11 @@
 *
 !invokeai
 !pyproject.toml
+!uv.lock
 !docker/docker-entrypoint.sh
 !LICENSE
 
+**/dist
 **/node_modules
 **/__pycache__
 **/*.egg-info

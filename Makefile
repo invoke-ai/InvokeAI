@@ -16,7 +16,7 @@ help:
 	@echo "frontend-build           Build the frontend in order to run on localhost:9090"
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
-	@echo "installer-zip            Build the installer .zip file for the current version"
+	@echo "wheel            				Build the wheel for the current version"
 	@echo "tag-release              Tag the GitHub repository with the current version (use at release time only!)"
 	@echo "openapi                  Generate the OpenAPI schema for the app, outputting to stdout"
 	@echo "docs                     Serve the mkdocs site with live reload"
@@ -64,13 +64,13 @@ frontend-dev:
 frontend-typegen:
 	cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
-# Installer zip file
-installer-zip:
-	cd installer && ./create_installer.sh
+# Tag the release
+wheel:
+	cd scripts && ./build_wheel.sh
 
 # Tag the release
 tag-release:
-	cd installer && ./tag_release.sh
+	cd scripts && ./tag_release.sh
 
 # Generate the OpenAPI Schema for the app
 openapi:

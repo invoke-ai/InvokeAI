@@ -2,11 +2,11 @@
 /.github/workflows/  @lstein @blessedcoolant @hipsterusername @ebr @jazzhaiku
 
 # documentation
-/docs/ @lstein @blessedcoolant @hipsterusername @Millu
-/mkdocs.yml @lstein  @blessedcoolant @hipsterusername @Millu
+/docs/ @lstein @blessedcoolant @hipsterusername @psychedelicious
+/mkdocs.yml @lstein @blessedcoolant @hipsterusername @psychedelicious
 
 # nodes
-/invokeai/app/ @Kyle0654 @blessedcoolant @psychedelicious @brandonrising @hipsterusername @jazzhaiku
+/invokeai/app/ @blessedcoolant @psychedelicious @brandonrising @hipsterusername @jazzhaiku
 
 # installation and configuration
 /pyproject.toml  @lstein @blessedcoolant @hipsterusername
@@ -22,7 +22,7 @@
 /invokeai/backend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
 
 # generation, model management, postprocessing
-/invokeai/backend  @damian0815 @lstein @blessedcoolant @gregghelt2 @StAlKeR7779 @brandonrising @ryanjdick @hipsterusername @jazzhaiku
+/invokeai/backend  @lstein @blessedcoolant @brandonrising @hipsterusername @jazzhaiku
 
 # front ends
 /invokeai/frontend/CLI @lstein @hipsterusername

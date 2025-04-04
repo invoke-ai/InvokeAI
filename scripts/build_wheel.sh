@@ -32,12 +32,6 @@ if [[ ! -z ${CI} ]]; then
     echo
     echo -e "${BCYAN}CI environment detected${RESET}"
     echo
-else
-    echo
-    echo -e "${BYELLOW}This script must be run from the installer directory!${RESET}"
-    echo "The current working directory is $(pwd)"
-    read -p "If that looks right, press any key to proceed, or CTRL-C to exit..."
-    echo
 fi
 
 echo -e "${BGREEN}HEAD${RESET}:"
@@ -77,42 +71,8 @@ fi
 
 rm -rf ../build
 
-python3 -m build --outdir dist/ ../.
+python3 -m build --outdir ../dist/ ../.
 
-# ----------------------
-
-echo
-echo "Building installer zip files for InvokeAI ${VERSION}..."
-echo
-
-# get rid of any old ones
-rm -f *.zip
-rm -rf InvokeAI-Installer
-
-# copy content
-mkdir InvokeAI-Installer
-for f in templates *.txt *.reg; do
-    cp -r ${f} InvokeAI-Installer/
-done
-mkdir InvokeAI-Installer/lib
-cp lib/*.py InvokeAI-Installer/lib
-
-# Install scripts
-# Mac/Linux
-cp install.sh.in InvokeAI-Installer/install.sh
-chmod a+x InvokeAI-Installer/install.sh
-
-# Windows
-cp install.bat.in InvokeAI-Installer/install.bat
-cp WinLongPathsEnabled.reg InvokeAI-Installer/
-
-FILENAME=InvokeAI-installer-$VERSION.zip
-
-# Zip everything up
-zip -r ${FILENAME} InvokeAI-Installer
-
-echo
-echo -e "${BGREEN}Built installer: ./${FILENAME}${RESET}"
 echo -e "${BGREEN}Built PyPi distribution: ./dist${RESET}"
 
 # clean up, but only if we are not in a github action
@@ -125,9 +85,7 @@ fi
 if [[ ! -z ${CI} ]]; then
     echo
     echo "Setting GitHub action outputs..."
-    echo "INSTALLER_FILENAME=${FILENAME}" >>$GITHUB_OUTPUT
-    echo "INSTALLER_PATH=installer/${FILENAME}" >>$GITHUB_OUTPUT
-    echo "DIST_PATH=installer/dist/" >>$GITHUB_OUTPUT
+    echo "DIST_PATH=./dist/" >>$GITHUB_OUTPUT
 fi
 
 exit 0

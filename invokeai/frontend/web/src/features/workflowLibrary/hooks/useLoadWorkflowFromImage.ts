@@ -41,7 +41,7 @@ export const useLoadWorkflowFromImage = () => {
 
         assert(unvalidatedWorkflow !== null, 'No workflow or graph provided');
 
-        const validatedWorkflow = await validateAndLoadWorkflow(unvalidatedWorkflow);
+        const validatedWorkflow = await validateAndLoadWorkflow(unvalidatedWorkflow, 'image');
 
         if (!validatedWorkflow) {
           onError?.();

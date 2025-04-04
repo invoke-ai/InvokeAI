@@ -37,7 +37,13 @@ from invokeai.app.services.style_preset_records.style_preset_records_sqlite impo
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    BasicConditioningInfo,
+    ConditioningFieldData,
+    FLUXConditioningInfo,
+    SD3ConditioningInfo,
+    SDXLConditioningInfo,
+)
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -101,10 +107,25 @@ class ApiDependencies:
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
-            ObjectSerializerDisk[torch.Tensor](output_folder / "tensors", ephemeral=True)
+            ObjectSerializerDisk[torch.Tensor](
+                output_folder / "tensors",
+                safe_globals=[torch.Tensor],
+                ephemeral=True,
+            ),
+            max_cache_size=0,
         )
         conditioning = ObjectSerializerForwardCache(
-            ObjectSerializerDisk[ConditioningFieldData](output_folder / "conditioning", ephemeral=True)
+            ObjectSerializerDisk[ConditioningFieldData](
+                output_folder / "conditioning",
+                safe_globals=[
+                    ConditioningFieldData,
+                    BasicConditioningInfo,
+                    SDXLConditioningInfo,
+                    FLUXConditioningInfo,
+                    SD3ConditioningInfo,
+                ],
+                ephemeral=True,
+            ),
         )
         download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
