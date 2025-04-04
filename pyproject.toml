@@ -67,7 +67,6 @@ dependencies = [
   "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
-  "albumentations",
   "blake3",
   "click",
   "datasets",
