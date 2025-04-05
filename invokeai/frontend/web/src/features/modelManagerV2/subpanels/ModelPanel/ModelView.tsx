@@ -50,8 +50,14 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             <ModelAttrView label={t('modelManager.modelType')} value={modelConfig.type} />
             <ModelAttrView label={t('common.format')} value={modelConfig.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelConfig.path} />
-            <ModelAttrView label={t('modelManager.size')}
-                           value={Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(modelConfig.size / (1024 ** 3)) + ' GB'} />
+            <ModelAttrView
+              label={t('modelManager.size')}
+              value={(modelConfig.size / 1024 ** 3).toLocaleString(undefined, {
+                maximumFractionDigits: 2,
+                style: 'unit',
+                unit: 'gigabyte',
+              })}
+            />
             {modelConfig.type === 'main' && (
               <ModelAttrView label={t('modelManager.variant')} value={modelConfig.variant} />
             )}
