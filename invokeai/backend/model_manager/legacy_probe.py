@@ -208,7 +208,7 @@ class ModelProbe(object):
         )
         fields["format"] = ModelFormat(fields.get("format")) if "format" in fields else probe.get_format()
         fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
-        fields["size"] = fields.get("size") or ModelOnDisk(model_path).size()
+        fields["file_size"] = fields.get("file_size") or ModelOnDisk(model_path).size()
 
         fields["default_settings"] = fields.get("default_settings")
 
