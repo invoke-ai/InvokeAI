@@ -128,7 +128,7 @@ class ModelConfigBase(ABC, BaseModel):
     path: str = Field(
         description="Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
     )
-    size: int = Field(description="The size of the model in bytes.")
+    file_size: int = Field(description="The size of the model in bytes.")
     name: str = Field(description="Name of the model.")
     type: ModelType = Field(description="Model type")
     format: ModelFormat = Field(description="Model format")
@@ -242,7 +242,7 @@ class ModelConfigBase(ABC, BaseModel):
         fields["key"] = fields.get("key") or uuid_string()
         fields["description"] = fields.get("description") or f"{base.value} {type.value} model {name}"
         fields["repo_variant"] = fields.get("repo_variant") or mod.repo_variant()
-        fields["size"] = fields.get("size") or mod.size()
+        fields["file_size"] = fields.get("file_size") or mod.size()
 
         return cls(**fields)
 

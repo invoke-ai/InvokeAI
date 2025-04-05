@@ -15,8 +15,8 @@ class Migration19Callback:
 
     def _add_size_column(self, cursor: sqlite3.Cursor) -> None:
         cursor.execute(
-            "ALTER TABLE models ADD COLUMN size INTEGER "
-            "GENERATED ALWAYS as (json_extract(config, '$.size')) VIRTUAL NOT NULL"
+            "ALTER TABLE models ADD COLUMN file_size INTEGER "
+            "GENERATED ALWAYS as (json_extract(config, '$.file_size')) VIRTUAL NOT NULL"
         )
 
     def _populate_size(self, cursor: sqlite3.Cursor) -> None:
@@ -25,7 +25,7 @@ class Migration19Callback:
         for model_id, model_path in all_models:
             mod = ModelOnDisk(self.models_path / model_path)
             cursor.execute(
-                "UPDATE models SET config = json_set(config, '$.size', ?) WHERE id = ?", (mod.size(), model_id)
+                "UPDATE models SET config = json_set(config, '$.file_size', ?) WHERE id = ?", (mod.size(), model_id)
             )
 
 

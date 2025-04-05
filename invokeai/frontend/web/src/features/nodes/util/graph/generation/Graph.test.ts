@@ -627,7 +627,7 @@ describe('Graph', () => {
           key: 'b00ee8df-523d-40d2-9578-597283b07cb2',
           hash: 'random:9adf270422f525715297afa1649c4ff007a55f09937f57ca628278305624d194',
           path: 'sdxl/main/stable-diffusion-xl-1.0-inpainting-0.1',
-          size: 6123456789,
+          file_size: 6123456789,
           name: 'stable-diffusion-xl-1.0-inpainting-0.1',
           base: 'sdxl',
           description: 'sdxl main model stable-diffusion-xl-1.0-inpainting-0.1',

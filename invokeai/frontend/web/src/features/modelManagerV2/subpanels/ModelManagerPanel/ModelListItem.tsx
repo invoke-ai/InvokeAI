@@ -109,7 +109,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           <ModelFormatBadge format={model.format} />
         </Flex>
         <Text>
-          {(model.size / 1024 ** 3).toLocaleString(undefined, {
+          {(model.file_size / 1024 ** 3).toLocaleString(undefined, {
             maximumFractionDigits: 2,
             style: 'unit',
             unit: 'gigabyte',
