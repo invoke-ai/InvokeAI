@@ -108,6 +108,13 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           <ModelBaseBadge base={model.base} />
           <ModelFormatBadge format={model.format} />
         </Flex>
+        <Text>
+          {(model.size / 1024 ** 3).toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+            style: 'unit',
+            unit: 'gigabyte',
+          })}
+        </Text>
       </Flex>
       <IconButton
         onClick={onClickDeleteButton}
