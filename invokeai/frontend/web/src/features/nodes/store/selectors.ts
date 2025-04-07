@@ -73,7 +73,7 @@ export const selectLastSelectedNodeId = createSelector(selectNodesSlice, ({ node
   return null;
 });
 
-export const createNodesSelector = <T>(selector: Selector<NodesState, T>) => createSelector(selectNodesSlice, selector);
+const createNodesSelector = <T>(selector: Selector<NodesState, T>) => createSelector(selectNodesSlice, selector);
 export const selectNodes = createNodesSelector((nodes) => nodes.nodes);
 export const selectEdges = createNodesSelector((nodes) => nodes.edges);
 export const selectMayUndo = createSelector(

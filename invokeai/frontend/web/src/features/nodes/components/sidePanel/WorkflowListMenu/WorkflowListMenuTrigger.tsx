@@ -1,7 +1,7 @@
 import { Button, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { selectWorkflowName } from 'features/nodes/store/selectors';
+import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenFill } from 'react-icons/pi';
 
