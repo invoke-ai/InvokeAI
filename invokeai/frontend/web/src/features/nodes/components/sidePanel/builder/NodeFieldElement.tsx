@@ -1,7 +1,8 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { NodeFieldElementEditMode } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
 import { NodeFieldElementViewMode } from 'features/nodes/components/sidePanel/builder/NodeFieldElementViewMode';
-import { selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
+import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
+import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import { isNodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 

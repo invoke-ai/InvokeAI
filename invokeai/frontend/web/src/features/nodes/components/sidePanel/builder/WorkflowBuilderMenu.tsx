@@ -1,7 +1,7 @@
 import { IconButton, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useResetAllNodeFields } from 'features/nodes/components/sidePanel/builder/use-reset-all-node-fields';
-import { formReset } from 'features/nodes/store/workflowSlice';
+import { formReset } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiDotsThreeBold, PiTrashBold } from 'react-icons/pi';

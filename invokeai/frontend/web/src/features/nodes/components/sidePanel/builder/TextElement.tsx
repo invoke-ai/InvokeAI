@@ -1,7 +1,8 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { TextElementEditMode } from 'features/nodes/components/sidePanel/builder/TextElementEditMode';
 import { TextElementViewMode } from 'features/nodes/components/sidePanel/builder/TextElementViewMode';
-import { selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
+import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
+import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import { isTextElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
 

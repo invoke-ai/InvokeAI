@@ -1,9 +1,24 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { EdgeChange, NodeChange, Viewport, XYPosition } from '@xyflow/react';
+import type {
+  EdgeChange,
+  EdgeSelectionChange,
+  NodeChange,
+  NodeDimensionChange,
+  NodePositionChange,
+  NodeSelectionChange,
+  Viewport,
+  XYPosition,
+} from '@xyflow/react';
 import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from '@xyflow/react';
 import type { PersistConfig } from 'app/store/store';
-import { workflowLoaded } from 'features/nodes/store/actions';
+import { deepClone } from 'common/util/deepClone';
+import {
+  addElement,
+  removeElement,
+  reparentElement,
+} from 'features/nodes/components/sidePanel/builder/form-manipulation';
+import type { NodesState } from 'features/nodes/store/types';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -83,17 +98,55 @@ import {
 } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
+import type {
+  BuilderForm,
+  ContainerElement,
+  ElementId,
+  FormElement,
+  HeadingElement,
+  NodeFieldElement,
+  TextElement,
+  WorkflowCategory,
+  WorkflowV3,
+} from 'features/nodes/types/workflow';
+import {
+  getDefaultForm,
+  isContainerElement,
+  isHeadingElement,
+  isNodeFieldElement,
+  isTextElement,
+} from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { UndoableOptions } from 'redux-undo';
 import type { z } from 'zod';
 
-import type { NodesState, PendingConnection, Templates } from './types';
+import type { PendingConnection, Templates } from './types';
 
-const initialNodesState: NodesState = {
+export const getInitialWorkflow = (): Omit<NodesState, 'mode' | 'formFieldInitialValues' | '_version'> => {
+  return {
+    name: '',
+    author: '',
+    description: '',
+    version: '',
+    contact: '',
+    tags: '',
+    notes: '',
+    exposedFields: [],
+    meta: { version: '3.0.0', category: 'user' },
+    form: getDefaultForm(),
+    nodes: [],
+    edges: [],
+    // Even though this value is `undefined`, the keys _must_ be present for the presistence layer to rehydrate
+    // them correctly. It uses a merge strategy that relies on the keys being present.
+    id: undefined,
+  };
+};
+
+const initialState: NodesState = {
   _version: 1,
-  nodes: [],
-  edges: [],
+  formFieldInitialValues: {},
+  ...getInitialWorkflow(),
 };
 
 type FieldValueAction<T extends FieldValue> = PayloadAction<{
@@ -101,6 +154,24 @@ type FieldValueAction<T extends FieldValue> = PayloadAction<{
   fieldName: string;
   value: T;
 }>;
+
+type FormElementDataChangedAction<T extends FormElement> = PayloadAction<{
+  id: string;
+  changes: Partial<T['data']>;
+}>;
+
+const formElementDataChangedReducer = <T extends FormElement>(
+  state: NodesState,
+  action: FormElementDataChangedAction<T>,
+  guard: (element: FormElement) => element is T
+) => {
+  const { id, changes } = action.payload;
+  const element = state.form?.elements[id];
+  if (!element || !guard(element)) {
+    return;
+  }
+  element.data = { ...element.data, ...changes } as T['data'];
+};
 
 const getField = (nodeId: string, fieldName: string, state: NodesState) => {
   const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -131,7 +202,7 @@ const fieldValueReducer = <T extends FieldValue>(
 
 export const nodesSlice = createSlice({
   name: 'nodes',
-  initialState: initialNodesState,
+  initialState: initialState,
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange<AnyNode>[]>) => {
       state.nodes = applyNodeChanges<AnyNode>(action.payload, state.nodes);
@@ -145,6 +216,23 @@ export const nodesSlice = createSlice({
         }
       });
       state.edges = applyEdgeChanges<AnyEdge>(edgeChanges, state.edges);
+
+      // If a node was removed, we should remove any form fields that were associated with it. However, node changes
+      // may remove and then add the same node back. For example, when updating a workflow, we replace old nodes with
+      // updated nodes. In this case, we should not remove the form fields. To handle this, we find the last remove
+      // and add changes for each exposed field. If the remove change comes after the add change, we remove the exposed
+      // field.
+      for (const el of Object.values(state.form.elements)) {
+        if (!isNodeFieldElement(el)) {
+          continue;
+        }
+        const { nodeId } = el.data.fieldIdentifier;
+        const removeIndex = action.payload.findLastIndex((change) => change.type === 'remove' && change.id === nodeId);
+        const addIndex = action.payload.findLastIndex((change) => change.type === 'add' && change.item.id === nodeId);
+        if (removeIndex > addIndex) {
+          removeElement({ form: state.form, id: el.id });
+        }
+      }
     },
     edgesChanged: (state, action: PayloadAction<EdgeChange<AnyEdge>[]>) => {
       const changes: EdgeChange<AnyEdge>[] = [];
@@ -459,20 +547,100 @@ export const nodesSlice = createSlice({
       }
       node.data.notes = value;
     },
-    nodeEditorReset: (state) => {
-      state.nodes = [];
-      state.edges = [];
+    nodeEditorReset: () => deepClone(initialState),
+    workflowNameChanged: (state, action: PayloadAction<string>) => {
+      state.name = action.payload;
+    },
+    workflowCategoryChanged: (state, action: PayloadAction<WorkflowCategory | undefined>) => {
+      if (action.payload) {
+        state.meta.category = action.payload;
+      }
+    },
+    workflowDescriptionChanged: (state, action: PayloadAction<string>) => {
+      state.description = action.payload;
+    },
+    workflowTagsChanged: (state, action: PayloadAction<string>) => {
+      state.tags = action.payload;
+    },
+    workflowAuthorChanged: (state, action: PayloadAction<string>) => {
+      state.author = action.payload;
+    },
+    workflowNotesChanged: (state, action: PayloadAction<string>) => {
+      state.notes = action.payload;
+    },
+    workflowVersionChanged: (state, action: PayloadAction<string>) => {
+      state.version = action.payload;
+    },
+    workflowContactChanged: (state, action: PayloadAction<string>) => {
+      state.contact = action.payload;
+    },
+    workflowIDChanged: (state, action: PayloadAction<string>) => {
+      state.id = action.payload;
+    },
+    formReset: (state) => {
+      state.form = getDefaultForm();
+    },
+    formElementAdded: (
+      state,
+      action: PayloadAction<{
+        element: FormElement;
+        parentId: ElementId;
+        index?: number;
+        initialValue?: StatefulFieldValue;
+      }>
+    ) => {
+      const { form } = state;
+      const { element, parentId, index, initialValue } = action.payload;
+      addElement({ form, element, parentId, index });
+      if (isNodeFieldElement(element)) {
+        state.formFieldInitialValues[element.id] = initialValue;
+      }
+    },
+    formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
+      const { form } = state;
+      const { id } = action.payload;
+      removeElement({ form, id });
+      delete state.formFieldInitialValues[id];
+    },
+    formElementReparented: (state, action: PayloadAction<{ id: string; newParentId: string; index: number }>) => {
+      const { form } = state;
+      const { id, newParentId, index } = action.payload;
+      reparentElement({ form, id, newParentId, index });
+    },
+    formElementHeadingDataChanged: (state, action: FormElementDataChangedAction<HeadingElement>) => {
+      formElementDataChangedReducer(state, action, isHeadingElement);
+    },
+    formElementTextDataChanged: (state, action: FormElementDataChangedAction<TextElement>) => {
+      formElementDataChangedReducer(state, action, isTextElement);
+    },
+    formElementNodeFieldDataChanged: (state, action: FormElementDataChangedAction<NodeFieldElement>) => {
+      formElementDataChangedReducer(state, action, isNodeFieldElement);
+    },
+    formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
+      formElementDataChangedReducer(state, action, isContainerElement);
+    },
+    formFieldInitialValuesChanged: (
+      state,
+      action: PayloadAction<{ formFieldInitialValues: NodesState['formFieldInitialValues'] }>
+    ) => {
+      const { formFieldInitialValues } = action.payload;
+      state.formFieldInitialValues = formFieldInitialValues;
+    },
+    workflowLoaded: (state, action: PayloadAction<WorkflowV3>) => {
+      const { nodes, edges, is_published: _is_published, ...workflowExtra } = action.payload;
+
+      const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
+
+      return {
+        ...deepClone(initialState),
+        ...deepClone(workflowExtra),
+        formFieldInitialValues,
+        nodes: nodes.map((node) => ({ ...SHARED_NODE_PROPERTIES, ...node })),
+        edges,
+      };
     },
     undo: (state) => state,
     redo: (state) => state,
-  },
-  extraReducers: (builder) => {
-    builder.addCase(workflowLoaded, (state, action) => {
-      const { nodes, edges } = action.payload;
-
-      state.nodes = nodes.map((node) => ({ ...SHARED_NODE_PROPERTIES, ...node }));
-      state.edges = edges;
-    });
   },
 });
 
@@ -524,6 +692,25 @@ export const {
   nodesChanged,
   nodeUseCacheChanged,
   notesNodeValueChanged,
+  workflowNameChanged,
+  workflowCategoryChanged,
+  workflowDescriptionChanged,
+  workflowTagsChanged,
+  workflowAuthorChanged,
+  workflowNotesChanged,
+  workflowVersionChanged,
+  workflowContactChanged,
+  workflowIDChanged,
+  formReset,
+  formElementAdded,
+  formElementRemoved,
+  formElementReparented,
+  formElementHeadingDataChanged,
+  formElementTextDataChanged,
+  formElementNodeFieldDataChanged,
+  formElementContainerDataChanged,
+  formFieldInitialValuesChanged,
+  workflowLoaded,
   undo,
   redo,
 } = nodesSlice.actions;
@@ -553,38 +740,106 @@ const migrateNodesState = (state: any): any => {
 
 export const nodesPersistConfig: PersistConfig<NodesState> = {
   name: nodesSlice.name,
-  initialState: initialNodesState,
+  initialState: initialState,
   migrate: migrateNodesState,
   persistDenylist: [],
 };
 
-const isSelectionAction = (action: UnknownAction) => {
-  if (nodesChanged.match(action)) {
-    if (action.payload.every((change) => change.type === 'select')) {
-      return true;
-    }
+type NodeSelectionAction = {
+  type: ReturnType<typeof nodesChanged>['type'];
+  payload: NodeSelectionChange[];
+};
+
+type EdgeSelectionAction = {
+  type: ReturnType<typeof edgesChanged>['type'];
+  payload: EdgeSelectionChange[];
+};
+
+const isNodeSelectionAction = (action: UnknownAction): action is NodeSelectionAction => {
+  if (!nodesChanged.match(action)) {
+    return false;
   }
-  if (edgesChanged.match(action)) {
-    if (action.payload.every((change) => change.type === 'select')) {
-      return true;
-    }
+  if (action.payload.every((change) => change.type === 'select')) {
+    return true;
   }
   return false;
 };
 
-const individualGroupByMatcher = isAnyOf(nodesChanged);
+const isEdgeSelectionAction = (action: UnknownAction): action is EdgeSelectionAction => {
+  if (!edgesChanged.match(action)) {
+    return false;
+  }
+  if (action.payload.every((change) => change.type === 'select')) {
+    return true;
+  }
+  return false;
+};
+
+type NodePositionOrDimensionAction = {
+  type: ReturnType<typeof nodesChanged>['type'];
+  payload: (NodeDimensionChange | NodePositionChange)[];
+};
+
+const isDimensionsOrPositionAction = (action: UnknownAction): action is NodePositionOrDimensionAction => {
+  if (!nodesChanged.match(action)) {
+    return false;
+  }
+  if (action.payload.every((change) => change.type === 'dimensions' || change.type === 'position')) {
+    return true;
+  }
+  return false;
+};
+
+// Match field mutations that are high frequency and should be grouped together - for example, when a user is
+// typing in a text field, we don't want to create a new undo group for every keystroke.
+const isHighFrequencyFieldChangeAction = isAnyOf(
+  fieldLabelChanged,
+  fieldIntegerValueChanged,
+  fieldFloatValueChanged,
+  fieldFloatCollectionValueChanged,
+  fieldIntegerCollectionValueChanged,
+  fieldStringValueChanged,
+  fieldStringCollectionValueChanged,
+  fieldFloatGeneratorValueChanged,
+  fieldIntegerGeneratorValueChanged,
+  fieldStringGeneratorValueChanged,
+  fieldImageGeneratorValueChanged,
+  fieldDescriptionChanged
+);
+
+// Match form changes that are high frequency and should be grouped together - for example, when a user is
+// typing in a text field, we don't want to create a new undo group for every keystroke.
+const isHighFrequencyFormChangeAction = isAnyOf(
+  formElementHeadingDataChanged,
+  formElementTextDataChanged,
+  formElementNodeFieldDataChanged,
+  formElementContainerDataChanged
+);
 
 export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
   limit: 64,
   undoType: nodesSlice.actions.undo.type,
   redoType: nodesSlice.actions.redo.type,
   groupBy: (action, state, history) => {
-    if (isSelectionAction(action)) {
+    if (isNodeSelectionAction(action) || isEdgeSelectionAction(action)) {
       // Changes to selection should never be recorded on their own
       return history.group;
     }
-    if (individualGroupByMatcher(action)) {
-      return action.type;
+    if (isHighFrequencyFieldChangeAction(action)) {
+      // Group high frequency field changes together when they are of the same type and for the same field
+      const { type, payload } = action;
+      const { nodeId, fieldName } = payload;
+      return `${type}-${nodeId}-${fieldName}`;
+    }
+    if (isDimensionsOrPositionAction(action)) {
+      const ids = action.payload.map((change) => change.id).join(',');
+      return `dimensions-or-position-${ids}`;
+    }
+    if (isHighFrequencyFormChangeAction(action)) {
+      // Group high frequency form changes together when they are of the same type and for the same element
+      const { type, payload } = action;
+      const { id } = payload;
+      return `${type}-${id}`;
     }
     return null;
   },
@@ -595,4 +850,32 @@ export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
     }
     return true;
   },
+};
+
+// The form builder's initial values are based on the current values of the node fields in the workflow.
+export const getFormFieldInitialValues = (form: BuilderForm, nodes: NodesState['nodes']) => {
+  const formFieldInitialValues: Record<string, StatefulFieldValue> = {};
+
+  for (const el of Object.values(form.elements)) {
+    if (!isNodeFieldElement(el)) {
+      continue;
+    }
+    const { nodeId, fieldName } = el.data.fieldIdentifier;
+
+    const node = nodes.find((n) => n.id === nodeId);
+
+    if (!isInvocationNode(node)) {
+      continue;
+    }
+
+    const field = node.data.inputs[fieldName];
+
+    if (!field) {
+      continue;
+    }
+
+    formFieldInitialValues[el.id] = field.value;
+  }
+
+  return formFieldInitialValues;
 };

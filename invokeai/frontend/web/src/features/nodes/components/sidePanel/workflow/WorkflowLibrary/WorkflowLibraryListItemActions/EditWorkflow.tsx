@@ -1,6 +1,6 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';

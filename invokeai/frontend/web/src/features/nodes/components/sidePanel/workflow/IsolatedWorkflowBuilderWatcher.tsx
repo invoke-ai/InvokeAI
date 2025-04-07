@@ -3,9 +3,9 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { EMPTY_OBJECT } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
-import type { NodesState, WorkflowsState } from 'features/nodes/store/types';
-import { getBlankWorkflow, selectWorkflowId, selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
+import { getInitialWorkflow } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice, selectWorkflowId } from 'features/nodes/store/selectors';
+import type { NodesState } from 'features/nodes/store/types';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { buildWorkflowFast } from 'features/nodes/util/workflow/buildWorkflow';
 import { debounce } from 'lodash-es';
@@ -26,21 +26,17 @@ const $previewWorkflowHash = computed($maybePreviewWorkflow, (maybePreviewWorkfl
   return null;
 });
 
-const debouncedBuildPreviewWorkflow = debounce(
-  (nodes: NodesState['nodes'], edges: NodesState['edges'], workflow: WorkflowsState) => {
-    $maybePreviewWorkflow.set(buildWorkflowFast({ nodes, edges, workflow }));
-  },
-  300
-);
+const debouncedBuildPreviewWorkflow = debounce((nodesState: NodesState) => {
+  $maybePreviewWorkflow.set(buildWorkflowFast(nodesState));
+}, 300);
 
 export const useWorkflowBuilderWatcher = () => {
   useAssertSingleton('useWorkflowBuilderWatcher');
-  const { nodes, edges } = useAppSelector(selectNodesSlice);
-  const workflow = useAppSelector(selectWorkflowSlice);
+  const nodesState = useAppSelector(selectNodesSlice);
 
   useEffect(() => {
-    debouncedBuildPreviewWorkflow(nodes, edges, workflow);
-  }, [edges, nodes, workflow]);
+    debouncedBuildPreviewWorkflow(nodesState);
+  }, [nodesState]);
 };
 
 const queryOptions = {
@@ -71,7 +67,7 @@ export const useDoesWorkflowHaveUnsavedChanges = () => {
   return doesWorkflowHaveUnsavedChanges;
 };
 
-const initialWorkflowHash = stableHash({ ...getBlankWorkflow(), nodes: [], edges: [] });
+const initialWorkflowHash = stableHash({ ...getInitialWorkflow(), nodes: [], edges: [] });
 
 export const useIsWorkflowUntouched = () => {
   const previewWorkflowHash = useStore($previewWorkflowHash);

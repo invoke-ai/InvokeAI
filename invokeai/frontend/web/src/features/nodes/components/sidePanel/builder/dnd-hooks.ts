@@ -27,14 +27,12 @@ import {
   getElement,
   getInitialValue,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
 import {
   formElementAdded,
   formElementContainerDataChanged,
   formElementReparented,
-  selectFormRootElementId,
-  selectWorkflowSlice,
-} from 'features/nodes/store/workflowSlice';
+} from 'features/nodes/store/nodesSlice';
+import { selectFormRootElementId, selectNodesSlice, selectWorkflowForm } from 'features/nodes/store/selectors';
 import type { FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
 import type { ElementId, FormElement } from 'features/nodes/types/workflow';
 import { buildNodeFieldElement, isContainerElement } from 'features/nodes/types/workflow';
@@ -100,7 +98,7 @@ const useGetElement = () => {
   const store = useAppStore();
   const _getElement = useCallback(
     <T extends FormElement>(elementId: ElementId, guard?: FormElementTypeGuard<T>): T => {
-      const { form } = selectWorkflowSlice(store.getState());
+      const form = selectWorkflowForm(store.getState());
       return getElement(form, elementId, guard);
     },
     [store]
@@ -116,7 +114,7 @@ const useElementExists = () => {
   const store = useAppStore();
   const _elementExists = useCallback(
     (id: ElementId): boolean => {
-      const { form } = selectWorkflowSlice(store.getState());
+      const form = selectWorkflowForm(store.getState());
       return elementExists(form, id);
     },
     [store]
@@ -132,7 +130,7 @@ const useGetAllowedDropRegions = () => {
   const store = useAppStore();
   const _getAllowedDropRegions = useCallback(
     (element: FormElement): CenterOrEdge[] => {
-      const { form } = selectWorkflowSlice(store.getState());
+      const form = selectWorkflowForm(store.getState());
       return getAllowedDropRegions(form, element);
     },
     [store]

@@ -6,7 +6,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { RootContainerElementViewMode } from 'features/nodes/components/sidePanel/builder/ContainerElement';
 import { EmptyState } from 'features/nodes/components/sidePanel/viewMode/EmptyState';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
-import { selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
+import { selectIsFormEmpty } from 'features/nodes/store/selectors';
 import { t } from 'i18next';
 import { memo } from 'react';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';

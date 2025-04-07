@@ -2,7 +2,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
-import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { isEqual } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
@@ -13,11 +12,11 @@ export const useInputFieldInitialFormValue = (elementId: string, nodeId: string,
   const dispatch = useAppDispatch();
   const selectInitialValue = useMemo(
     () =>
-      createSelector(selectWorkflowSlice, (workflow) => {
-        if (!(elementId in workflow.formFieldInitialValues)) {
+      createSelector(selectNodesSlice, (nodes) => {
+        if (!(elementId in nodes.formFieldInitialValues)) {
           return uniqueNonexistentValue;
         }
-        return workflow.formFieldInitialValues[elementId];
+        return nodes.formFieldInitialValues[elementId];
       }),
     [elementId]
   );

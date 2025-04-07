@@ -1,11 +1,9 @@
 import type { FormControlProps } from '@invoke-ai/ui-library';
 import { Box, Flex, FormControl, FormControlGroup, FormLabel, Image, Input, Textarea } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import {
-  selectWorkflowSlice,
   workflowAuthorChanged,
   workflowContactChanged,
   workflowDescriptionChanged,
@@ -13,7 +11,17 @@ import {
   workflowNotesChanged,
   workflowTagsChanged,
   workflowVersionChanged,
-} from 'features/nodes/store/workflowSlice';
+} from 'features/nodes/store/nodesSlice';
+import {
+  selectWorkflowAuthor,
+  selectWorkflowContact,
+  selectWorkflowDescription,
+  selectWorkflowId,
+  selectWorkflowName,
+  selectWorkflowNotes,
+  selectWorkflowTags,
+  selectWorkflowVersion,
+} from 'features/nodes/store/selectors';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,23 +29,16 @@ import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
 import { WorkflowThumbnailEditor } from './WorkflowThumbnail/WorkflowThumbnailEditor';
 
-const selector = createMemoizedSelector(selectWorkflowSlice, (workflow) => {
-  const { id, author, name, description, tags, version, contact, notes } = workflow;
-
-  return {
-    id,
-    name,
-    author,
-    description,
-    tags,
-    version,
-    contact,
-    notes,
-  };
-});
-
 const WorkflowGeneralTab = () => {
-  const { id, author, name, description, tags, version, contact, notes } = useAppSelector(selector);
+  const id = useAppSelector(selectWorkflowId);
+  const name = useAppSelector(selectWorkflowName);
+  const description = useAppSelector(selectWorkflowDescription);
+  const notes = useAppSelector(selectWorkflowNotes);
+  const author = useAppSelector(selectWorkflowAuthor);
+  const contact = useAppSelector(selectWorkflowContact);
+  const tags = useAppSelector(selectWorkflowTags);
+  const version = useAppSelector(selectWorkflowVersion);
+
   const dispatch = useAppDispatch();
 
   const handleChangeName = useCallback(

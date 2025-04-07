@@ -6,7 +6,7 @@ import {
   workflowCategoryChanged,
   workflowIDChanged,
   workflowNameChanged,
-} from 'features/nodes/store/workflowSlice';
+} from 'features/nodes/store/nodesSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/useGetFormInitialValues';
 import { newWorkflowSaved } from 'features/workflowLibrary/store/actions';

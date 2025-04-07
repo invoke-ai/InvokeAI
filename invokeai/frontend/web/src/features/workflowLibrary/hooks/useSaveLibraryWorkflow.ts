@@ -1,7 +1,7 @@
 import type { ToastId } from '@invoke-ai/ui-library';
 import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { formFieldInitialValuesChanged } from 'features/nodes/store/workflowSlice';
+import { formFieldInitialValuesChanged } from 'features/nodes/store/nodesSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/useGetFormInitialValues';
 import { workflowUpdated } from 'features/workflowLibrary/store/actions';

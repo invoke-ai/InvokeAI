@@ -1,7 +1,7 @@
 import { Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { linkifyOptions, linkifySx } from 'common/components/linkify';
-import { selectWorkflowDescription } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowDescription } from 'features/nodes/store/selectors';
 import Linkify from 'linkify-react';
 import { memo } from 'react';
 

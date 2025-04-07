@@ -1,7 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { WorkflowName } from 'features/nodes/components/sidePanel/WorkflowName';
-import { selectWorkflowName } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowName } from 'features/nodes/store/selectors';
 import { memo } from 'react';
 
 export const TopCenterPanel = memo(() => {

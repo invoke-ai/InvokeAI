@@ -12,7 +12,7 @@ import {
   Portal,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { formElementContainerDataChanged } from 'features/nodes/store/workflowSlice';
+import { formElementContainerDataChanged } from 'features/nodes/store/nodesSlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

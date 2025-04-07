@@ -7,7 +7,7 @@ import { $isInPublishFlow, useIsWorkflowPublished } from 'features/nodes/compone
 import { PublishWorkflowPanelContent } from 'features/nodes/components/sidePanel/workflow/PublishWorkflowPanelContent';
 import { ActiveWorkflowDescription } from 'features/nodes/components/sidePanel/WorkflowListMenu/ActiveWorkflowDescription';
 import { ActiveWorkflowNameAndActions } from 'features/nodes/components/sidePanel/WorkflowListMenu/ActiveWorkflowNameAndActions';
-import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import { memo } from 'react';
 
 import { ViewModeLeftPanelContent } from './viewMode/ViewModeLeftPanelContent';
