@@ -258,8 +258,10 @@ const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElem
 
 export type FormElement = z.infer<typeof zFormElement>;
 
+const ROOT_ELEMENT_ID = 'root';
 export const getDefaultForm = (): BuilderForm => {
   const rootElement = buildContainer('column', []);
+  rootElement.id = ROOT_ELEMENT_ID;
   return {
     elements: {
       [rootElement.id]: rootElement,
