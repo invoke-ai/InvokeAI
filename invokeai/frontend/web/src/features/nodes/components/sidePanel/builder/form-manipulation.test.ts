@@ -22,6 +22,18 @@ import { assert, AssertionError } from 'tsafe';
 import { describe, expect, it } from 'vitest';
 
 describe('workflow builder form manipulation', () => {
+  describe('getDefaultForm', () => {
+    it('should return a form with a root element', () => {
+      const form = getDefaultForm();
+      expect(form).toHaveProperty('rootElementId');
+      expect(form.elements[form.rootElementId]).toBeDefined();
+    });
+    it('should give the id "root" to the root element', () => {
+      const form = getDefaultForm();
+      expect(form.rootElementId).toBe('root');
+    });
+  });
+
   describe('elementExists', () => {
     const form = getDefaultForm();
 
