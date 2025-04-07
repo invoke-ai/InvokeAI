@@ -1,5 +1,4 @@
-import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowIsPublished } from 'features/nodes/store/workflowSlice';
+import { useIsWorkflowPublished } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useBuildWorkflowFast } from 'features/nodes/util/workflow/buildWorkflow';
 import { saveWorkflowAs } from 'features/workflowLibrary/components/SaveWorkflowAsDialog';
 import { isLibraryWorkflow, useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveLibraryWorkflow';
@@ -12,7 +11,7 @@ import { useCallback } from 'react';
  */
 export const useSaveOrSaveAsWorkflow = () => {
   const buildWorkflow = useBuildWorkflowFast();
-  const isPublished = useAppSelector(selectWorkflowIsPublished);
+  const isPublished = useIsWorkflowPublished();
   const { saveWorkflow } = useSaveLibraryWorkflow();
 
   const saveOrSaveAsWorkflow = useCallback(() => {
