@@ -50,7 +50,7 @@ export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
   return (
     <FormControl>
       <InformationalPopover feature="ipAdapterMethod">
-        <FormLabel>{t('controlLayers.ipAdapterMethod.ipAdapterMethod')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.ipAdapterMethod.ipAdapterMethod')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} onChange={_onChange} />
     </FormControl>

@@ -5,6 +5,7 @@ import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginE
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { CLIPVisionModel } from 'features/controlLayers/components/IPAdapter/CLIPVisionModel';
+import { FLUXReduxImageInfluence } from 'features/controlLayers/components/IPAdapter/FLUXReduxImageInfluence';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterSettingsEmptyState } from 'features/controlLayers/components/IPAdapter/IPAdapterSettingsEmptyState';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -13,6 +14,7 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   referenceImageIPAdapterBeginEndStepPctChanged,
   referenceImageIPAdapterCLIPVisionModelChanged,
+  referenceImageIPAdapterFLUXReduxImageInfluenceChanged,
   referenceImageIPAdapterImageChanged,
   referenceImageIPAdapterMethodChanged,
   referenceImageIPAdapterModelChanged,
@@ -20,7 +22,12 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntity, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
-import type { CanvasEntityIdentifier, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  CLIPVisionModelV2,
+  FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
+  IPMethodV2,
+} from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
@@ -61,6 +68,13 @@ const IPAdapterSettingsContent = memo(() => {
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
       dispatch(referenceImageIPAdapterMethodChanged({ entityIdentifier, method }));
+    },
+    [dispatch, entityIdentifier]
+  );
+
+  const onChangeFLUXReduxImageInfluence = useCallback(
+    (imageInfluence: FLUXReduxImageInfluenceType) => {
+      dispatch(referenceImageIPAdapterFLUXReduxImageInfluenceChanged({ entityIdentifier, imageInfluence }));
     },
     [dispatch, entityIdentifier]
   );
@@ -122,6 +136,14 @@ const IPAdapterSettingsContent = memo(() => {
               {!isFLUX && <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />}
               <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
               <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+            </Flex>
+          )}
+          {ipAdapter.type === 'flux_redux' && (
+            <Flex flexDir="column" gap={2} w="full" alignItems="flex-start">
+              <FLUXReduxImageInfluence
+                imageInfluence={ipAdapter.imageInfluence ?? 'lowest'}
+                onChange={onChangeFLUXReduxImageInfluence}
+              />
             </Flex>
           )}
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>

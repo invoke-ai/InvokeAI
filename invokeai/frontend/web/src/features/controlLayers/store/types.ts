@@ -233,10 +233,15 @@ const zIPAdapterConfig = z.object({
 });
 export type IPAdapterConfig = z.infer<typeof zIPAdapterConfig>;
 
+const zFLUXReduxImageInfluence = z.enum(['lowest', 'low', 'medium', 'high', 'highest']);
+export const isFLUXReduxImageInfluence = (v: unknown): v is FLUXReduxImageInfluence =>
+  zFLUXReduxImageInfluence.safeParse(v).success;
+export type FLUXReduxImageInfluence = z.infer<typeof zFLUXReduxImageInfluence>;
 const zFLUXReduxConfig = z.object({
   type: z.literal('flux_redux'),
   image: zImageWithDims.nullable(),
   model: zServerValidatedModelIdentifierField.nullable(),
+  imageInfluence: zFLUXReduxImageInfluence.default('highest'),
 });
 export type FLUXReduxConfig = z.infer<typeof zFLUXReduxConfig>;
 

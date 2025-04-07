@@ -75,6 +75,7 @@ export const initialFLUXRedux: FLUXReduxConfig = {
   type: 'flux_redux',
   image: null,
   model: null,
+  imageInfluence: 'highest',
 };
 export const initialT2IAdapter: T2IAdapterConfig = {
   type: 't2i_adapter',

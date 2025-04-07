@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { CLIPVisionModel } from 'features/controlLayers/components/IPAdapter/CLIPVisionModel';
+import { FLUXReduxImageInfluence } from 'features/controlLayers/components/IPAdapter/FLUXReduxImageInfluence';
 import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapter/IPAdapterImagePreview';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
@@ -15,13 +16,19 @@ import {
   rgIPAdapterBeginEndStepPctChanged,
   rgIPAdapterCLIPVisionModelChanged,
   rgIPAdapterDeleted,
+  rgIPAdapterFLUXReduxImageInfluenceChanged,
   rgIPAdapterImageChanged,
   rgIPAdapterMethodChanged,
   rgIPAdapterModelChanged,
   rgIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
-import type { CanvasEntityIdentifier, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  CLIPVisionModelV2,
+  FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
+  IPMethodV2,
+} from 'features/controlLayers/store/types';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
@@ -69,6 +76,13 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
       dispatch(rgIPAdapterMethodChanged({ entityIdentifier, referenceImageId, method }));
+    },
+    [dispatch, entityIdentifier, referenceImageId]
+  );
+
+  const onChangeFLUXReduxImageInfluence = useCallback(
+    (imageInfluence: FLUXReduxImageInfluenceType) => {
+      dispatch(rgIPAdapterFLUXReduxImageInfluenceChanged({ entityIdentifier, referenceImageId, imageInfluence }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
@@ -149,6 +163,14 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
               <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
               <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
               <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+            </Flex>
+          )}
+          {ipAdapter.type === 'flux_redux' && (
+            <Flex flexDir="column" gap={2} w="full">
+              <FLUXReduxImageInfluence
+                imageInfluence={ipAdapter.imageInfluence ?? 'lowest'}
+                onChange={onChangeFLUXReduxImageInfluence}
+              />
             </Flex>
           )}
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
