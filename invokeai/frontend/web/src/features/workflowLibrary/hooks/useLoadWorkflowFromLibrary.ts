@@ -1,6 +1,4 @@
 import { useToast } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { workflowIsPublishedChanged } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { useValidateAndLoadWorkflow } from 'features/workflowLibrary/hooks/useValidateAndLoadWorkflow';
 import { useCallback } from 'react';
@@ -19,7 +17,6 @@ export const useLoadWorkflowFromLibrary = () => {
   const validateAndLoadWorkflow = useValidateAndLoadWorkflow();
   const [getWorkflow] = useLazyGetWorkflowQuery();
   const [updateOpenedAt] = useUpdateOpenedAtMutation();
-  const dispatch = useAppDispatch();
   const loadWorkflowFromLibrary = useCallback(
     async (
       workflowId: string,
@@ -39,7 +36,6 @@ export const useLoadWorkflowFromLibrary = () => {
           onError?.();
           return;
         }
-        dispatch(workflowIsPublishedChanged(res.is_published ?? false));
         updateOpenedAt({ workflow_id: workflowId });
         onSuccess?.(validatedWorkflow);
       } catch {
@@ -54,7 +50,7 @@ export const useLoadWorkflowFromLibrary = () => {
         onCompleted?.();
       }
     },
-    [getWorkflow, validateAndLoadWorkflow, updateOpenedAt, toast, t, dispatch]
+    [getWorkflow, validateAndLoadWorkflow, updateOpenedAt, toast, t]
   );
 
   return loadWorkflowFromLibrary;
