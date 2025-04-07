@@ -49,7 +49,7 @@ If you have an existing Invoke installation, you can select it and let the launc
 
 !!! warning "Problem running the launcher on macOS"
 
-    macOS may not allow you to run the launcher. We are working to resolve this by signing the launcher executable. Until that is done, you can either use the [legacy scripts](./legacy_scripts.md) to install, or manually flag the launcher as safe:
+    macOS may not allow you to run the launcher. We are working to resolve this by signing the launcher executable. Until that is done, you can manually flag the launcher as safe:
 
     - Open the **Invoke-Installer-mac-arm64.dmg** file.
     - Drag the launcher to **Applications**.
@@ -117,7 +117,6 @@ If you still have problems, ask for help on the Invoke [discord](https://discord
 
 - You can install the Invoke application as a python package. See our [manual install](./manual.md) docs.
 - You can run Invoke with docker. See our [docker install](./docker.md) docs.
-- You can still use our legacy scripts to install and run Invoke. See the [legacy scripts](./legacy_scripts.md) docs.
 
 ## Need Help?
 
