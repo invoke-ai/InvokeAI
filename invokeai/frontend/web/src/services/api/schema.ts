@@ -7824,6 +7824,25 @@ export type components = {
              */
             redux_model?: components["schemas"]["ModelIdentifierField"];
             /**
+             * Downsampling Factor
+             * @description Redux Downsampling Factor (1-9)
+             * @default 1
+             */
+            downsampling_factor?: number;
+            /**
+             * Downsampling Function
+             * @description Redux Downsampling Function
+             * @default area
+             * @enum {string}
+             */
+            downsampling_function?: "nearest" | "bilinear" | "bicubic" | "area" | "nearest-exact";
+            /**
+             * Weight
+             * @description Redux weight (0.0-1.0)
+             * @default 1
+             */
+            weight?: number;
+            /**
              * type
              * @default flux_redux
              * @constant
