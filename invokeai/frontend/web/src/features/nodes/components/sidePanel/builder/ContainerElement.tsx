@@ -16,7 +16,9 @@ import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/b
 import { HeadingElement } from 'features/nodes/components/sidePanel/builder/HeadingElement';
 import { NodeFieldElement } from 'features/nodes/components/sidePanel/builder/NodeFieldElement';
 import { TextElement } from 'features/nodes/components/sidePanel/builder/TextElement';
-import { selectFormRootElement, selectWorkflowMode, useElement } from 'features/nodes/store/workflowSlice';
+import { useElement } from 'features/nodes/components/sidePanel/builder/use-element';
+import { selectFormRootElement } from 'features/nodes/store/selectors';
+import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import type { ContainerElement } from 'features/nodes/types/workflow';
 import {
   CONTAINER_CLASS_NAME,

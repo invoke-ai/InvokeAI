@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

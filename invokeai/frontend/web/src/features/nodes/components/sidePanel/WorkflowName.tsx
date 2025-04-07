@@ -1,7 +1,8 @@
 import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
-import { selectWorkflowMode, selectWorkflowName } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowName } from 'features/nodes/store/selectors';
+import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import { useTranslation } from 'react-i18next';
 import { PiDotOutlineFill } from 'react-icons/pi';
 

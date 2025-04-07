@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { newSessionRequested } from 'features/controlLayers/store/actions';
-import { workflowLoaded } from 'features/nodes/store/actions';
+import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { atom } from 'nanostores';
 
 import type { CanvasRightPanelTabName, TabName, UIState } from './uiTypes';

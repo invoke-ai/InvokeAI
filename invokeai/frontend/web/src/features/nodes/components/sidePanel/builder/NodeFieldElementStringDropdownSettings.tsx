@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, Divider, Flex, Grid, GridItem, IconButton, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getOverlayScrollbarsParams, overlayScrollbarsStyles } from 'common/components/OverlayScrollbars/constants';
-import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
+import { formElementNodeFieldDataChanged } from 'features/nodes/store/nodesSlice';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import { getDefaultStringOption, type NodeFieldStringDropdownSettings } from 'features/nodes/types/workflow';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';

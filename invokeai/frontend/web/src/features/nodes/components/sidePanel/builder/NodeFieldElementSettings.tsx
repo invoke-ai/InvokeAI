@@ -16,7 +16,7 @@ import { NodeFieldElementFloatSettings } from 'features/nodes/components/sidePan
 import { NodeFieldElementIntegerSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementIntegerSettings';
 import { NodeFieldElementStringSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringSettings';
 import { useInputFieldTemplateOrThrow } from 'features/nodes/hooks/useInputFieldTemplateOrThrow';
-import { formElementNodeFieldDataChanged } from 'features/nodes/store/workflowSlice';
+import { formElementNodeFieldDataChanged } from 'features/nodes/store/nodesSlice';
 import {
   isFloatFieldInputTemplate,
   isIntegerFieldInputTemplate,

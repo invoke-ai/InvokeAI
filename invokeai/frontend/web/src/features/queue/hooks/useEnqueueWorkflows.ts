@@ -26,14 +26,9 @@ export const useEnqueueWorkflows = () => {
       dispatch(enqueueRequestedWorkflows());
       const state = getState();
       const nodesState = selectNodesSlice(state);
-      const workflow = state.workflow;
       const templates = $templates.get();
       const graph = buildNodesGraph(state, templates);
-      const builtWorkflow = buildWorkflowWithValidation({
-        nodes: nodesState.nodes,
-        edges: nodesState.edges,
-        workflow,
-      });
+      const builtWorkflow = buildWorkflowWithValidation(nodesState);
 
       if (builtWorkflow) {
         // embedded workflows don't have an id
@@ -134,10 +129,10 @@ export const useEnqueueWorkflows = () => {
           } as const;
         });
 
-        assert(workflow.id, 'Workflow without ID cannot be used for API validation run');
+        assert(nodesState.id, 'Workflow without ID cannot be used for API validation run');
 
         batchConfig.validation_run_data = {
-          workflow_id: workflow.id,
+          workflow_id: nodesState.id,
           input_fields: api_input_fields,
           output_fields: api_output_fields,
         };

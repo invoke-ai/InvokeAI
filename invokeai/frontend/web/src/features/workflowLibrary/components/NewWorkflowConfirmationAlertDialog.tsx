@@ -5,7 +5,7 @@ import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

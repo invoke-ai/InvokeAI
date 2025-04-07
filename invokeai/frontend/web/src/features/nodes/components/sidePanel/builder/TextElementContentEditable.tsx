@@ -2,7 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEditable } from 'common/hooks/useEditable';
 import { AutosizeTextarea } from 'features/nodes/components/sidePanel/builder/AutosizeTextarea';
 import { TextElementContent } from 'features/nodes/components/sidePanel/builder/TextElementContent';
-import { formElementTextDataChanged } from 'features/nodes/store/workflowSlice';
+import { formElementTextDataChanged } from 'features/nodes/store/nodesSlice';
 import type { TextElement } from 'features/nodes/types/workflow';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

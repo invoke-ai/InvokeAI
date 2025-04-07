@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import type { WorkflowMode } from 'features/nodes/store/types';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import { atom, computed } from 'nanostores';
 import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
@@ -8,6 +9,7 @@ import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types'
 export type WorkflowLibraryView = 'recent' | 'yours' | 'private' | 'shared' | 'defaults' | 'published';
 
 type WorkflowLibraryState = {
+  mode: WorkflowMode;
   view: WorkflowLibraryView;
   orderBy: WorkflowRecordOrderBy;
   direction: SQLiteDirection;
@@ -16,6 +18,7 @@ type WorkflowLibraryState = {
 };
 
 const initialWorkflowLibraryState: WorkflowLibraryState = {
+  mode: 'view',
   searchTerm: '',
   orderBy: 'opened_at',
   direction: 'DESC',
@@ -27,6 +30,9 @@ export const workflowLibrarySlice = createSlice({
   name: 'workflowLibrary',
   initialState: initialWorkflowLibraryState,
   reducers: {
+    workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
+      state.mode = action.payload;
+    },
     workflowLibrarySearchTermChanged: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
     },
@@ -60,6 +66,7 @@ export const workflowLibrarySlice = createSlice({
 });
 
 export const {
+  workflowModeChanged,
   workflowLibrarySearchTermChanged,
   workflowLibraryOrderByChanged,
   workflowLibraryDirectionChanged,
@@ -82,6 +89,7 @@ const selectWorkflowLibrarySlice = (state: RootState) => state.workflowLibrary;
 const createWorkflowLibrarySelector = <T>(selector: Selector<WorkflowLibraryState, T>) =>
   createSelector(selectWorkflowLibrarySlice, selector);
 
+export const selectWorkflowMode = createWorkflowLibrarySelector((workflow) => workflow.mode);
 export const selectWorkflowLibrarySearchTerm = createWorkflowLibrarySelector(({ searchTerm }) => searchTerm);
 export const selectWorkflowLibraryHasSearchTerm = createWorkflowLibrarySelector(({ searchTerm }) => !!searchTerm);
 export const selectWorkflowLibraryOrderBy = createWorkflowLibrarySelector(({ orderBy }) => orderBy);

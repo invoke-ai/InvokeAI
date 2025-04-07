@@ -11,7 +11,7 @@ import { RootContainerElementEditMode } from 'features/nodes/components/sidePane
 import { buildFormElementDndData, useBuilderDndMonitor } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { WorkflowBuilderEditMenu } from 'features/nodes/components/sidePanel/builder/WorkflowBuilderMenu';
 import { $hasTemplates } from 'features/nodes/store/nodesSlice';
-import { selectIsFormEmpty } from 'features/nodes/store/workflowSlice';
+import { selectIsFormEmpty } from 'features/nodes/store/selectors';
 import type { FormElement } from 'features/nodes/types/workflow';
 import { buildContainer, buildDivider, buildHeading, buildText } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, RefObject } from 'react';

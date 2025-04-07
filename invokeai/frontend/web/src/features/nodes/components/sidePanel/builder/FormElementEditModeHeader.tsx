@@ -7,7 +7,7 @@ import { useDepthContext } from 'features/nodes/components/sidePanel/builder/con
 import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementSettings';
 import { useMouseOverFormField } from 'features/nodes/hooks/useMouseOverNode';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
-import { formElementRemoved } from 'features/nodes/store/workflowSlice';
+import { formElementRemoved } from 'features/nodes/store/nodesSlice';
 import type { FormElement, NodeFieldElement } from 'features/nodes/types/workflow';
 import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { camelCase } from 'lodash-es';

@@ -1,8 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useNodeExecutionState';
-import { workflowLoaded } from 'features/nodes/store/actions';
-import { $templates } from 'features/nodes/store/nodesSlice';
+import { $templates, workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';
 import { WorkflowMigrationError, WorkflowVersionError } from 'features/nodes/types/error';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';

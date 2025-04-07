@@ -3,12 +3,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
-import type { Templates } from 'features/nodes/store/types';
 import {
+  selectNodesSlice,
   selectWorkflowFormNodeFieldFieldIdentifiersDeduped,
   selectWorkflowId,
-} from 'features/nodes/store/workflowSlice';
+} from 'features/nodes/store/selectors';
+import type { Templates } from 'features/nodes/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isBoardFieldType } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
