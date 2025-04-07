@@ -10,6 +10,7 @@ import type { PartialAppConfig } from 'app/types/invokeai';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
@@ -56,6 +57,7 @@ export const GlobalHookIsolator = memo(
     useStarterModelsToast();
     useSyncQueueStatus();
     useFocusRegionWatcher();
+    useWorkflowBuilderWatcher();
 
     return null;
   }

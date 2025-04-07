@@ -10,7 +10,7 @@ import {
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { workflowLoaded } from 'features/nodes/store/actions';
-import { isAnyNodeOrEdgeMutation, nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
+import { nodeEditorReset, nodesChanged } from 'features/nodes/store/nodesSlice';
 import type { NodesState, WorkflowMode, WorkflowsState as WorkflowState } from 'features/nodes/store/types';
 import type { FieldIdentifier, StatefulFieldValue } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
@@ -36,8 +36,6 @@ import {
 import { isEqual, uniqBy } from 'lodash-es';
 import { useMemo } from 'react';
 
-import { selectNodesSlice } from './selectors';
-
 type FormElementDataChangedAction<T extends FormElement> = PayloadAction<{
   id: string;
   changes: Partial<T['data']>;
@@ -56,7 +54,7 @@ const formElementDataChangedReducer = <T extends FormElement>(
   element.data = { ...element.data, ...changes } as T['data'];
 };
 
-const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
+export const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
   return {
     name: '',
     author: '',
@@ -71,13 +69,12 @@ const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
     // Even though these values are `undefined`, the keys _must_ be present for the presistence layer to rehydrate
     // them correctly. It uses a merge strategy that relies on the keys being present.
     id: undefined,
-    is_published: undefined,
+    is_published: null,
   };
 };
 
 const initialWorkflowState: WorkflowState = {
   _version: 1,
-  isTouched: false,
   mode: 'view',
   formFieldInitialValues: {},
   ...getBlankWorkflow(),
@@ -92,7 +89,6 @@ export const workflowSlice = createSlice({
     },
     workflowNameChanged: (state, action: PayloadAction<string>) => {
       state.name = action.payload;
-      state.isTouched = true;
     },
     workflowCategoryChanged: (state, action: PayloadAction<WorkflowCategory | undefined>) => {
       if (action.payload) {
@@ -101,27 +97,21 @@ export const workflowSlice = createSlice({
     },
     workflowDescriptionChanged: (state, action: PayloadAction<string>) => {
       state.description = action.payload;
-      state.isTouched = true;
     },
     workflowTagsChanged: (state, action: PayloadAction<string>) => {
       state.tags = action.payload;
-      state.isTouched = true;
     },
     workflowAuthorChanged: (state, action: PayloadAction<string>) => {
       state.author = action.payload;
-      state.isTouched = true;
     },
     workflowNotesChanged: (state, action: PayloadAction<string>) => {
       state.notes = action.payload;
-      state.isTouched = true;
     },
     workflowVersionChanged: (state, action: PayloadAction<string>) => {
       state.version = action.payload;
-      state.isTouched = true;
     },
     workflowContactChanged: (state, action: PayloadAction<string>) => {
       state.contact = action.payload;
-      state.isTouched = true;
     },
     workflowIDChanged: (state, action: PayloadAction<string>) => {
       state.id = action.payload;
@@ -129,16 +119,12 @@ export const workflowSlice = createSlice({
     workflowIsPublishedChanged(state, action: PayloadAction<boolean>) {
       state.is_published = action.payload;
     },
-    workflowSaved: (state) => {
-      state.isTouched = false;
-    },
     formReset: (state) => {
       const rootElement = buildContainer('column', []);
       state.form = {
         elements: { [rootElement.id]: rootElement },
         rootElementId: rootElement.id,
       };
-      state.isTouched = true;
     },
     formElementAdded: (
       state,
@@ -155,36 +141,29 @@ export const workflowSlice = createSlice({
       if (isNodeFieldElement(element)) {
         state.formFieldInitialValues[element.id] = initialValue;
       }
-      state.isTouched = true;
     },
     formElementRemoved: (state, action: PayloadAction<{ id: string }>) => {
       const { form } = state;
       const { id } = action.payload;
       removeElement({ form, id });
       delete state.formFieldInitialValues[id];
-      state.isTouched = true;
     },
     formElementReparented: (state, action: PayloadAction<{ id: string; newParentId: string; index: number }>) => {
       const { form } = state;
       const { id, newParentId, index } = action.payload;
       reparentElement({ form, id, newParentId, index });
-      state.isTouched = true;
     },
     formElementHeadingDataChanged: (state, action: FormElementDataChangedAction<HeadingElement>) => {
       formElementDataChangedReducer(state, action, isHeadingElement);
-      state.isTouched = true;
     },
     formElementTextDataChanged: (state, action: FormElementDataChangedAction<TextElement>) => {
       formElementDataChangedReducer(state, action, isTextElement);
-      state.isTouched = true;
     },
     formElementNodeFieldDataChanged: (state, action: FormElementDataChangedAction<NodeFieldElement>) => {
       formElementDataChangedReducer(state, action, isNodeFieldElement);
-      state.isTouched = true;
     },
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
-      state.isTouched = true;
     },
     formFieldInitialValuesChanged: (
       state,
@@ -251,31 +230,6 @@ export const workflowSlice = createSlice({
           }
         }
       }
-
-      // Not all changes to nodes should result in the workflow being marked touched
-      const filteredChanges = action.payload.filter((change) => {
-        // We always want to mark the workflow as touched if a node is added, removed, or reset
-        if (['add', 'remove', 'reset'].includes(change.type)) {
-          return true;
-        }
-
-        // Position changes can change the position and the dragging status of the node - ignore if the change doesn't
-        // affect the position
-        if (change.type === 'position' && (change.position || change.positionAbsolute)) {
-          return true;
-        }
-
-        // This change isn't relevant
-        return false;
-      });
-
-      if (filteredChanges.length > 0 || fieldsToRemove.length > 0) {
-        state.isTouched = true;
-      }
-    });
-
-    builder.addMatcher(isAnyNodeOrEdgeMutation, (state) => {
-      state.isTouched = true;
     });
   },
 });
@@ -292,7 +246,6 @@ export const {
   workflowContactChanged,
   workflowIDChanged,
   workflowIsPublishedChanged,
-  workflowSaved,
   formReset,
   formElementAdded,
   formElementRemoved,
@@ -354,20 +307,9 @@ export const getFormFieldInitialValues = (form: BuilderForm, nodes: NodesState['
 export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.name);
 export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
-export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
 export const selectWorkflowIsPublished = createWorkflowSelector((workflow) => workflow.is_published);
-export const selectIsWorkflowSaved = createSelector(selectWorkflowId, selectWorkflowIsTouched, (id, isTouched) => {
-  return id !== undefined && !isTouched;
-});
-
-export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
-  const noNodes = !nodes.nodes.length;
-  const isTouched = workflow.isTouched;
-  const savedWorkflow = !!workflow.id;
-  return noNodes && !isTouched && !savedWorkflow;
-});
 
 export const selectFormRootElementId = createWorkflowSelector((workflow) => {
   return workflow.form.rootElementId;

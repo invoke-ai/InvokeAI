@@ -23,7 +23,6 @@ export type WorkflowMode = 'edit' | 'view';
 
 export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   _version: 1;
-  isTouched: boolean;
   mode: WorkflowMode;
   formFieldInitialValues: Record<string, StatefulFieldValue>;
 };
