@@ -26,7 +26,6 @@ import type {
   WorkflowV3,
 } from 'features/nodes/types/workflow';
 import {
-  buildContainer,
   getDefaultForm,
   isContainerElement,
   isHeadingElement,
@@ -116,11 +115,7 @@ export const workflowSlice = createSlice({
       state.id = action.payload;
     },
     formReset: (state) => {
-      const rootElement = buildContainer('column', []);
-      state.form = {
-        elements: { [rootElement.id]: rootElement },
-        rootElementId: rootElement.id,
-      };
+      state.form = getDefaultForm();
     },
     formElementAdded: (
       state,
