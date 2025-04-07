@@ -87,7 +87,7 @@ class FluxReduxInvocation(BaseInvocation):
 
         encoded_x = self._siglip_encode(context, image)
         redux_conditioning = self._flux_redux_encode(context, encoded_x)
-        if self.downsampling_factor > 1 and self.weight != 1.0:
+        if self.downsampling_factor > 1 or self.weight != 1.0:
             redux_conditioning = self._downsample_weight(context, redux_conditioning)
 
         tensor_name = context.tensors.save(redux_conditioning)
