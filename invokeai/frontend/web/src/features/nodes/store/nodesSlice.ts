@@ -816,6 +816,23 @@ const isHighFrequencyFormChangeAction = isAnyOf(
   formElementContainerDataChanged
 );
 
+// Match workflow changes that are high frequency and should be grouped together - for example, when a user is
+// updating the workflow description, we don't want to create a new undo group for every keystroke.
+const isHighFrequencyWorkflowDetailsAction = isAnyOf(
+  workflowNameChanged,
+  workflowDescriptionChanged,
+  workflowTagsChanged,
+  workflowAuthorChanged,
+  workflowNotesChanged,
+  workflowVersionChanged,
+  workflowContactChanged
+);
+
+// Match node-scoped actions that are high frequency and should be grouped together - for example, when a user is
+// updating the node label, we don't want to create a new undo group for every keystroke. Or when a user is writing
+// a note in a notes node, we don't want to create a new undo group for every keystroke.
+const isHighFrequencyNodeScopedAction = isAnyOf(nodeLabelChanged, nodeNotesChanged, notesNodeValueChanged);
+
 export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
   limit: 64,
   undoType: nodesSlice.actions.undo.type,
@@ -826,20 +843,30 @@ export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
       return history.group;
     }
     if (isHighFrequencyFieldChangeAction(action)) {
-      // Group high frequency field changes together when they are of the same type and for the same field
+      // Group by type, node id and field name
       const { type, payload } = action;
       const { nodeId, fieldName } = payload;
       return `${type}-${nodeId}-${fieldName}`;
     }
     if (isDimensionsOrPositionAction(action)) {
       const ids = action.payload.map((change) => change.id).join(',');
+      // Group by type and node ids
       return `dimensions-or-position-${ids}`;
     }
     if (isHighFrequencyFormChangeAction(action)) {
-      // Group high frequency form changes together when they are of the same type and for the same element
+      // Group by type and form element id
       const { type, payload } = action;
       const { id } = payload;
       return `${type}-${id}`;
+    }
+    if (isHighFrequencyWorkflowDetailsAction(action)) {
+      return 'workflow-details';
+    }
+    if (isHighFrequencyNodeScopedAction(action)) {
+      const { type, payload } = action;
+      const { nodeId } = payload;
+      // Group by type and node id
+      return `${type}-${nodeId}`;
     }
     return null;
   },
