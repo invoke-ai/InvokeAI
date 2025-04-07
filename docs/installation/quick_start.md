@@ -51,7 +51,7 @@ If you have an existing Invoke installation, you can select it and let the launc
 
     macOS may not allow you to run the launcher. We are working to resolve this by signing the launcher executable. Until that is done, you can manually flag the launcher as safe:
 
-    - Open the **Invoke-Installer-mac-arm64.dmg** file.
+    - Open the **Invoke Community Edition.dmg** file.
     - Drag the launcher to **Applications**.
     - Open a terminal.
     - Run `xattr -d 'com.apple.quarantine' /Applications/Invoke\ Community\ Edition.app`.
