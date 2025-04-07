@@ -1,6 +1,6 @@
 import { Button, Flex, Heading, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowId } from 'features/nodes/store/selectors';
 import { toast } from 'features/toast/toast';
 import { useSaveOrSaveAsWorkflow } from 'features/workflowLibrary/hooks/useSaveOrSaveAsWorkflow';
 import { memo, useCallback } from 'react';
