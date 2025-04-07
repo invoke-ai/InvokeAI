@@ -148,6 +148,13 @@ export const workflowsApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }],
     }),
+    unpublishWorkflow: build.mutation<void, string>({
+      query: (workflow_id) => ({
+        url: buildWorkflowsUrl(`i/${workflow_id}/unpublish`),
+        method: 'POST',
+      }),
+      invalidatesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }],
+    }),
   }),
 });
 
@@ -163,4 +170,5 @@ export const {
   useListWorkflowsInfiniteInfiniteQuery,
   useSetWorkflowThumbnailMutation,
   useDeleteWorkflowThumbnailMutation,
+  useUnpublishWorkflowMutation,
 } = workflowsApi;

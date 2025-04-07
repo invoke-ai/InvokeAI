@@ -1306,7 +1306,10 @@
         "unableToCopy": "Unable to Copy",
         "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
         "unableToCopyDesc_theseSteps": "these steps",
-        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks."
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks.",
+        "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
+        "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
+        "workflowUnpublished": "Workflow Unpublished"
     },
     "popovers": {
         "clipSkip": {
@@ -1786,8 +1789,8 @@
             "minimum": "Minimum",
             "maximum": "Maximum",
             "publish": "Publish",
-            "published": "Published",
             "unpublish": "Unpublish",
+            "published": "Published",
             "workflowLocked": "Workflow Locked",
             "workflowLockedPublished": "Published workflows are locked for editing.\nYou can unpublish the workflow to edit it, or make a copy of it.",
             "workflowLockedDuringPublishing": "Workflow is locked while configuring for publishing.",
