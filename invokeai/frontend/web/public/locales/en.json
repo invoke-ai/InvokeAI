@@ -2020,6 +2020,14 @@
             "composition": "Composition Only",
             "compositionDesc": "Replicates layout & structure while ignoring the reference's style."
         },
+        "fluxReduxImageInfluence": {
+            "imageInfluence": "Image Influence",
+            "lowest": "Lowest",
+            "low": "Low",
+            "medium": "Medium",
+            "high": "High",
+            "highest": "Highest"
+        },
         "fill": {
             "fillColor": "Fill Color",
             "fillStyle": "Fill Style",

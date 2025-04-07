@@ -21,6 +21,7 @@ import type {
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
+  FLUXReduxImageInfluence,
   RegionalGuidanceReferenceImageState,
   RgbColor,
 } from 'features/controlLayers/store/types';
@@ -626,6 +627,20 @@ export const canvasSlice = createSlice({
       }
       entity.ipAdapter.method = method;
     },
+    referenceImageIPAdapterFLUXReduxImageInfluenceChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ imageInfluence: FLUXReduxImageInfluence }, 'reference_image'>>
+    ) => {
+      const { entityIdentifier, imageInfluence } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      if (entity.ipAdapter.type !== 'flux_redux') {
+        return;
+      }
+      entity.ipAdapter.imageInfluence = imageInfluence;
+    },
     referenceImageIPAdapterModelChanged: (
       state,
       action: PayloadAction<
@@ -925,6 +940,26 @@ export const canvasSlice = createSlice({
       }
 
       referenceImage.ipAdapter.method = method;
+    },
+    rgIPAdapterFLUXReduxImageInfluenceChanged: (
+      state,
+      action: PayloadAction<
+        EntityIdentifierPayload<
+          { referenceImageId: string; imageInfluence: FLUXReduxImageInfluence },
+          'regional_guidance'
+        >
+      >
+    ) => {
+      const { entityIdentifier, referenceImageId, imageInfluence } = action.payload;
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
+      if (!referenceImage) {
+        return;
+      }
+      if (referenceImage.ipAdapter.type !== 'flux_redux') {
+        return;
+      }
+
+      referenceImage.ipAdapter.imageInfluence = imageInfluence;
     },
     rgIPAdapterModelChanged: (
       state,
@@ -1731,6 +1766,7 @@ export const {
   referenceImageIPAdapterCLIPVisionModelChanged,
   referenceImageIPAdapterWeightChanged,
   referenceImageIPAdapterBeginEndStepPctChanged,
+  referenceImageIPAdapterFLUXReduxImageInfluenceChanged,
   // Regions
   rgAdded,
   // rgRecalled,
@@ -1746,6 +1782,7 @@ export const {
   rgIPAdapterMethodChanged,
   rgIPAdapterModelChanged,
   rgIPAdapterCLIPVisionModelChanged,
+  rgIPAdapterFLUXReduxImageInfluenceChanged,
   // Inpaint mask
   inpaintMaskAdded,
   inpaintMaskConvertedToRegionalGuidance,
