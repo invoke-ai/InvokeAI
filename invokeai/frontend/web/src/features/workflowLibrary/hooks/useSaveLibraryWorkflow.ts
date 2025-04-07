@@ -1,7 +1,7 @@
 import type { ToastId } from '@invoke-ai/ui-library';
 import { useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { formFieldInitialValuesChanged, workflowSaved } from 'features/nodes/store/workflowSlice';
+import { formFieldInitialValuesChanged } from 'features/nodes/store/workflowSlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { useGetFormFieldInitialValues } from 'features/workflowLibrary/hooks/useGetFormInitialValues';
 import { workflowUpdated } from 'features/workflowLibrary/store/actions';
@@ -47,7 +47,6 @@ export const useSaveLibraryWorkflow = (): UseSaveLibraryWorkflowReturn => {
       try {
         await updateWorkflow(workflow).unwrap();
         dispatch(workflowUpdated());
-        dispatch(workflowSaved());
         // When a workflow is saved, the form field initial values are updated to the current form field values
         dispatch(formFieldInitialValuesChanged({ formFieldInitialValues: getFormFieldInitialValues() }));
         toast.update(toastRef.current, {

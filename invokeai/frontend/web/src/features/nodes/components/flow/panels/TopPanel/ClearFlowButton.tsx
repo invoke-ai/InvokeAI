@@ -1,7 +1,7 @@
 import { ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { selectWorkflowIsTouched } from 'features/nodes/store/workflowSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,7 @@ const ClearFlowButton = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
 
   const handleNewWorkflow = useCallback(() => {
     dispatch(nodeEditorReset());
@@ -26,12 +26,12 @@ const ClearFlowButton = () => {
   }, [dispatch, onClose, t]);
 
   const onClick = useCallback(() => {
-    if (!isTouched) {
+    if (doesWorkflowHaveUnsavedChanges) {
       handleNewWorkflow();
       return;
     }
     onOpen();
-  }, [handleNewWorkflow, isTouched, onOpen]);
+  }, [doesWorkflowHaveUnsavedChanges, handleNewWorkflow, onOpen]);
 
   return (
     <>

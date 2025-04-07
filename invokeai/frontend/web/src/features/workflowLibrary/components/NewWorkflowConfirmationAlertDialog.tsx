@@ -1,10 +1,11 @@
 import { ConfirmationAlertDialog, Flex, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
+import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
-import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +16,7 @@ export const useNewWorkflow = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const dialog = useDialogState();
-  const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
   const workflowLibraryModal = useWorkflowLibraryModal();
 
   const createImmediate = useCallback(() => {
@@ -33,12 +34,12 @@ export const useNewWorkflow = () => {
   }, [dialog, dispatch, t, workflowLibraryModal]);
 
   const createWithDialog = useCallback(() => {
-    if (!isTouched) {
+    if (!doesWorkflowHaveUnsavedChanges) {
       createImmediate();
       return;
     }
     dialog.open();
-  }, [dialog, createImmediate, isTouched]);
+  }, [doesWorkflowHaveUnsavedChanges, dialog, createImmediate]);
 
   return {
     createImmediate,

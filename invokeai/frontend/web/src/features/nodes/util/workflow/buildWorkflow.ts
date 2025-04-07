@@ -33,6 +33,7 @@ const workflowKeys = [
   'meta',
   'id',
   'form',
+  'is_published',
 ] satisfies (keyof WorkflowV3)[];
 
 type BuildWorkflowFunction = (arg: BuildWorkflowArg) => WorkflowV3;

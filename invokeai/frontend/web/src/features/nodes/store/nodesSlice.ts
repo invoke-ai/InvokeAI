@@ -593,51 +593,6 @@ export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
     if (!action.type.startsWith(nodesSlice.name)) {
       return false;
     }
-    if (nodesChanged.match(action)) {
-      if (action.payload.every((change) => change.type === 'dimensions')) {
-        return false;
-      }
-    }
     return true;
   },
 };
-
-// This is used for tracking `state.workflow.isTouched`
-export const isAnyNodeOrEdgeMutation = isAnyOf(
-  edgesChanged,
-  fieldBoardValueChanged,
-  fieldBooleanValueChanged,
-  fieldColorValueChanged,
-  fieldControlNetModelValueChanged,
-  fieldEnumModelValueChanged,
-  fieldImageValueChanged,
-  fieldImageCollectionValueChanged,
-  fieldIPAdapterModelValueChanged,
-  fieldT2IAdapterModelValueChanged,
-  fieldLabelChanged,
-  fieldLoRAModelValueChanged,
-  fieldLLaVAModelValueChanged,
-  fieldMainModelValueChanged,
-  fieldIntegerValueChanged,
-  fieldIntegerCollectionValueChanged,
-  fieldFloatValueChanged,
-  fieldFloatCollectionValueChanged,
-  fieldRefinerModelValueChanged,
-  fieldSchedulerValueChanged,
-  fieldStringValueChanged,
-  fieldStringCollectionValueChanged,
-  fieldVaeModelValueChanged,
-  fieldT5EncoderValueChanged,
-  fieldCLIPEmbedValueChanged,
-  fieldCLIPLEmbedValueChanged,
-  fieldCLIPGEmbedValueChanged,
-  fieldFluxVAEModelValueChanged,
-  // The `nodesChanged` has extra logic and is handled in its own extra reducer
-  // nodesChanged,
-  nodeIsIntermediateChanged,
-  nodeIsOpenChanged,
-  nodeLabelChanged,
-  nodeNotesChanged,
-  nodeUseCacheChanged,
-  notesNodeValueChanged
-);

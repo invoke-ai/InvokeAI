@@ -1,6 +1,7 @@
 import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowIsTouched, selectWorkflowMode, selectWorkflowName } from 'features/nodes/store/workflowSlice';
+import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
+import { selectWorkflowMode, selectWorkflowName } from 'features/nodes/store/workflowSlice';
 import { useTranslation } from 'react-i18next';
 import { PiDotOutlineFill } from 'react-icons/pi';
 
@@ -10,7 +11,7 @@ import { WorkflowWarning } from './viewMode/WorkflowWarning';
 export const WorkflowName = () => {
   const { t } = useTranslation();
   const name = useAppSelector(selectWorkflowName);
-  const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
   const mode = useAppSelector(selectWorkflowMode);
 
   return (
@@ -27,10 +28,10 @@ export const WorkflowName = () => {
         </Text>
       )}
 
-      {isTouched && mode === 'edit' && (
+      {doesWorkflowHaveUnsavedChanges && mode === 'edit' && (
         <Tooltip label={t('nodes.newWorkflowDesc2')}>
           <Flex>
-            <Icon as={PiDotOutlineFill} boxSize="20px" sx={{ color: 'invokeYellow.500' }} />
+            <Icon as={PiDotOutlineFill} boxSize="20px" color="invokeYellow.500" />
           </Flex>
         </Tooltip>
       )}

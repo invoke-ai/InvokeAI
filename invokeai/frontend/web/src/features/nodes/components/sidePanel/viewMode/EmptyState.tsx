@@ -1,13 +1,14 @@
 import { Button, Flex, Image, Link, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useIsWorkflowUntouched } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useWorkflowLibraryModal } from 'features/nodes/store/workflowLibraryModal';
-import { selectCleanEditor, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 export const EmptyState = () => {
-  const isCleanEditor = useAppSelector(selectCleanEditor);
+  const isWorkflowUntouched = useIsWorkflowUntouched();
 
   return (
     <Flex w="full" h="full" userSelect="none" justifyContent="center">
@@ -31,7 +32,7 @@ export const EmptyState = () => {
           minH={16}
           userSelect="none"
         />
-        {isCleanEditor ? <CleanEditorContent /> : <DirtyEditorContent />}
+        {isWorkflowUntouched ? <CleanEditorContent /> : <DirtyEditorContent />}
       </Flex>
     </Flex>
   );

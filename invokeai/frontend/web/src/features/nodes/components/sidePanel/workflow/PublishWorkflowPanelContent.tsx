@@ -19,6 +19,7 @@ import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { ExternalLink } from 'features/gallery/components/ImageViewer/NoContentForViewer';
 import { NodeFieldElementOverlay } from 'features/nodes/components/sidePanel/builder/NodeFieldElementEditMode';
+import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import {
   $isInPublishFlow,
   $isReadyToDoValidationRun,
@@ -36,7 +37,6 @@ import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { selectHasBatchOrGeneratorNodes } from 'features/nodes/store/selectors';
-import { selectIsWorkflowSaved } from 'features/nodes/store/workflowSlice';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
 import { selectAllowPublishWorkflows } from 'features/system/store/configSlice';
@@ -200,7 +200,7 @@ const PublishWorkflowButton = memo(() => {
   const { t } = useTranslation();
   const isReadyToDoValidationRun = useStore($isReadyToDoValidationRun);
   const isReadyToEnqueue = useStore($isReadyToEnqueue);
-  const isWorkflowSaved = useAppSelector(selectIsWorkflowSaved);
+  const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
   const hasBatchOrGeneratorNodes = useAppSelector(selectHasBatchOrGeneratorNodes);
   const outputNodeId = useStore($outputNodeId);
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
@@ -244,7 +244,7 @@ const PublishWorkflowButton = memo(() => {
 
   return (
     <PublishTooltip
-      isWorkflowSaved={isWorkflowSaved}
+      isWorkflowSaved={!doesWorkflowHaveUnsavedChanges}
       hasBatchOrGeneratorNodes={hasBatchOrGeneratorNodes}
       isReadyToEnqueue={isReadyToEnqueue}
       hasOutputNode={outputNodeId !== null && !isSelectingOutputNode}
@@ -256,7 +256,7 @@ const PublishWorkflowButton = memo(() => {
         isDisabled={
           !allowPublishWorkflows ||
           !isReadyToEnqueue ||
-          !isWorkflowSaved ||
+          doesWorkflowHaveUnsavedChanges ||
           hasBatchOrGeneratorNodes ||
           !isReadyToDoValidationRun ||
           !(outputNodeId !== null && !isSelectingOutputNode)
@@ -325,7 +325,7 @@ export const StartPublishFlowButton = memo(() => {
   const { t } = useTranslation();
   const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
   const isReadyToEnqueue = useStore($isReadyToEnqueue);
-  const isWorkflowSaved = useAppSelector(selectIsWorkflowSaved);
+  const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
   const hasBatchOrGeneratorNodes = useAppSelector(selectHasBatchOrGeneratorNodes);
   const inputs = usePublishInputs();
 
@@ -335,7 +335,7 @@ export const StartPublishFlowButton = memo(() => {
 
   return (
     <PublishTooltip
-      isWorkflowSaved={isWorkflowSaved}
+      isWorkflowSaved={!doesWorkflowHaveUnsavedChanges}
       hasBatchOrGeneratorNodes={hasBatchOrGeneratorNodes}
       isReadyToEnqueue={isReadyToEnqueue}
       hasOutputNode={true}
@@ -347,7 +347,9 @@ export const StartPublishFlowButton = memo(() => {
         leftIcon={<PiLightningFill />}
         variant="ghost"
         size="sm"
-        isDisabled={!allowPublishWorkflows || !isReadyToEnqueue || !isWorkflowSaved || hasBatchOrGeneratorNodes}
+        isDisabled={
+          !allowPublishWorkflows || !isReadyToEnqueue || doesWorkflowHaveUnsavedChanges || hasBatchOrGeneratorNodes
+        }
       >
         {t('workflows.builder.publish')}
       </Button>
