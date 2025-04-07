@@ -775,16 +775,31 @@ const isEdgeSelectionAction = (action: UnknownAction): action is EdgeSelectionAc
   return false;
 };
 
-type NodePositionOrDimensionAction = {
+type NodeDimensionChangeAction = {
+  type: ReturnType<typeof nodesChanged>['type'];
+  payload: NodeDimensionChange[];
+};
+
+const isDimensionsChangeAction = (action: UnknownAction): action is NodeDimensionChangeAction => {
+  if (!nodesChanged.match(action)) {
+    return false;
+  }
+  if (action.payload.every((change) => change.type === 'dimensions')) {
+    return true;
+  }
+  return false;
+};
+
+type NodePositionChangeAction = {
   type: ReturnType<typeof nodesChanged>['type'];
   payload: (NodeDimensionChange | NodePositionChange)[];
 };
 
-const isDimensionsOrPositionAction = (action: UnknownAction): action is NodePositionOrDimensionAction => {
+const isPositionChangeAction = (action: UnknownAction): action is NodePositionChangeAction => {
   if (!nodesChanged.match(action)) {
     return false;
   }
-  if (action.payload.every((change) => change.type === 'dimensions' || change.type === 'position')) {
+  if (action.payload.every((change) => change.type === 'position')) {
     return true;
   }
   return false;
@@ -837,18 +852,14 @@ export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
   limit: 64,
   undoType: nodesSlice.actions.undo.type,
   redoType: nodesSlice.actions.redo.type,
-  groupBy: (action, state, history) => {
-    if (isNodeSelectionAction(action) || isEdgeSelectionAction(action)) {
-      // Changes to selection should never be recorded on their own
-      return history.group;
-    }
+  groupBy: (action, _state, _history) => {
     if (isHighFrequencyFieldChangeAction(action)) {
       // Group by type, node id and field name
       const { type, payload } = action;
       const { nodeId, fieldName } = payload;
       return `${type}-${nodeId}-${fieldName}`;
     }
-    if (isDimensionsOrPositionAction(action)) {
+    if (isPositionChangeAction(action)) {
       const ids = action.payload.map((change) => change.id).join(',');
       // Group by type and node ids
       return `dimensions-or-position-${ids}`;
@@ -873,6 +884,14 @@ export const nodesUndoableConfig: UndoableOptions<NodesState, UnknownAction> = {
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
     if (!action.type.startsWith(nodesSlice.name)) {
+      return false;
+    }
+    // Ignore actions that only select or deselect nodes and edges
+    if (isNodeSelectionAction(action) || isEdgeSelectionAction(action)) {
+      return false;
+    }
+    if (isDimensionsChangeAction(action)) {
+      // Ignore actions that only change the dimensions of nodes - these are internal to reactflow
       return false;
     }
     return true;
