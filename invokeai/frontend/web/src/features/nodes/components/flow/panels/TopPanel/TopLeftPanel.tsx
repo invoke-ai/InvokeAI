@@ -1,22 +1,21 @@
 import { Alert, AlertDescription, AlertIcon, AlertTitle, Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
 import AddNodeButton from 'features/nodes/components/flow/panels/TopPanel/AddNodeButton';
 import UpdateNodesButton from 'features/nodes/components/flow/panels/TopPanel/UpdateNodesButton';
 import {
   $isInPublishFlow,
   $isSelectingOutputNode,
   useIsValidationRunInProgress,
+  useIsWorkflowPublished,
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
-import { selectWorkflowIsPublished } from 'features/nodes/store/workflowSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const TopLeftPanel = memo(() => {
   const isLocked = useIsWorkflowEditorLocked();
   const isInPublishFlow = useStore($isInPublishFlow);
-  const isPublished = useAppSelector(selectWorkflowIsPublished);
+  const isPublished = useIsWorkflowPublished();
   const isValidationRunInProgress = useIsValidationRunInProgress();
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
 

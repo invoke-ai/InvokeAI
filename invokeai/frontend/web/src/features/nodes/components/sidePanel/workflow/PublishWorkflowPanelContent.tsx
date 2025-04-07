@@ -25,7 +25,7 @@ import {
   $isReadyToDoValidationRun,
   $isSelectingOutputNode,
   $outputNodeId,
-  $validationRunBatchId,
+  $validationRunData,
   usePublishInputs,
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useInputFieldTemplateTitleOrThrow } from 'features/nodes/hooks/useInputFieldTemplateTitleOrThrow';
@@ -237,7 +237,11 @@ const PublishWorkflowButton = memo(() => {
         duration: null,
       });
       assert(result.value.enqueueResult.batch.batch_id);
-      $validationRunBatchId.set(result.value.enqueueResult.batch.batch_id);
+      assert(result.value.batchConfig.validation_run_data);
+      $validationRunData.set({
+        batchId: result.value.enqueueResult.batch.batch_id,
+        workflowId: result.value.batchConfig.validation_run_data.workflow_id,
+      });
       log.debug(parseify(result.value), 'Enqueued batch');
     }
   }, [enqueue, projectUrl, t]);

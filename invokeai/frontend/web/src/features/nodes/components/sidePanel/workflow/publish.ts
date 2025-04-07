@@ -5,13 +5,17 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
-import { selectWorkflowFormNodeFieldFieldIdentifiersDeduped } from 'features/nodes/store/workflowSlice';
+import {
+  selectWorkflowFormNodeFieldFieldIdentifiersDeduped,
+  selectWorkflowId,
+} from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isBoardFieldType } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { atom, computed } from 'nanostores';
 import { useMemo } from 'react';
 import { useGetBatchStatusQuery } from 'services/api/endpoints/queue';
+import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 import { assert } from 'tsafe';
 
 export const $isInPublishFlow = atom(false);
@@ -23,12 +27,12 @@ export const $isReadyToDoValidationRun = computed(
     return isInPublishFlow && outputNodeId !== null && !isSelectingOutputNode;
   }
 );
-export const $validationRunBatchId = atom<string | null>(null);
+export const $validationRunData = atom<{ batchId: string; workflowId: string } | null>(null);
 
 export const useIsValidationRunInProgress = () => {
-  const validationRunBatchId = useStore($validationRunBatchId);
+  const validationRunData = useStore($validationRunData);
   const { isValidationRunInProgress } = useGetBatchStatusQuery(
-    validationRunBatchId ? { batch_id: validationRunBatchId } : skipToken,
+    validationRunData?.batchId ? { batch_id: validationRunData.batchId } : skipToken,
     {
       selectFromResult: ({ currentData }) => {
         if (!currentData) {
@@ -41,7 +45,7 @@ export const useIsValidationRunInProgress = () => {
       },
     }
   );
-  return validationRunBatchId !== null || isValidationRunInProgress;
+  return validationRunData !== null || isValidationRunInProgress;
 };
 
 export const selectFieldIdentifiersWithInvocationTypes = createSelector(
@@ -87,4 +91,20 @@ export const usePublishInputs = () => {
   );
 
   return fieldIdentifiers;
+};
+
+const queryOptions = {
+  selectFromResult: ({ currentData }) => {
+    if (!currentData) {
+      return { isPublished: false };
+    }
+    return { isPublished: currentData.is_published };
+  },
+} satisfies Parameters<typeof useGetWorkflowQuery>[1];
+
+export const useIsWorkflowPublished = () => {
+  const workflowId = useAppSelector(selectWorkflowId);
+  const { isPublished } = useGetWorkflowQuery(workflowId ?? skipToken, queryOptions);
+
+  return isPublished;
 };

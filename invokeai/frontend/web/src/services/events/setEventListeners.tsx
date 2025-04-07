@@ -1,5 +1,7 @@
 import { ExternalLink } from '@invoke-ai/ui-library';
+import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import { listenerMiddleware } from 'app/store/middleware/listenerMiddleware';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
@@ -9,10 +11,9 @@ import { deepClone } from 'common/util/deepClone';
 import {
   $isInPublishFlow,
   $outputNodeId,
-  $validationRunBatchId,
+  $validationRunData,
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import { workflowIsPublishedChanged } from 'features/nodes/store/workflowSlice';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
@@ -22,6 +23,7 @@ import type { ApiTagDescription } from 'services/api';
 import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
+import { workflowsApi } from 'services/api/endpoints/workflows';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
@@ -425,14 +427,43 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       $lastProgressEvent.set(null);
 
       // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
-      if (batch_status.batch_id === $validationRunBatchId.get()) {
-        $validationRunBatchId.set(null);
-        if (status === 'completed') {
-          dispatch(workflowIsPublishedChanged(true));
-          $isInPublishFlow.set(false);
-          $outputNodeId.set(null);
-        }
+      const validationRunData = $validationRunData.get();
+      if (!validationRunData || batch_status.batch_id !== validationRunData.batchId || status !== 'completed') {
+        return;
       }
+
+      // The published status of a workflow is server state, provided to the client in by the getWorkflow query.
+      // After successfully publishing a workflow, we need to invalidate the query cache so that the published status is
+      // seen throughout the app. We also need to reset the publish flow state.
+      //
+      // But, there is a race condition! If we invalidate the query cache and then immediately clear the publish flow state,
+      // between the time when the publish state is cleared and the query is re-fetched, we will render the wrong UI.
+      //
+      // So, we really need to wait for the query re-fetch to complete before clearing the publish flow state. This isn't
+      // possible using the `invalidateTags()` API. But we can fudge it by adding a once-off listener for that query.
+
+      listenerMiddleware.startListening({
+        matcher: isAnyOf(
+          workflowsApi.endpoints.getWorkflow.matchFulfilled,
+          workflowsApi.endpoints.getWorkflow.matchRejected
+        ),
+        effect: (action, listenerApi) => {
+          if (workflowsApi.endpoints.getWorkflow.matchFulfilled(action)) {
+            // If this query was re-fetching the workflow that was just published, we can clear the publish flow state and
+            // unsubscribe from the listener
+            if (action.payload.workflow_id === validationRunData.workflowId) {
+              listenerApi.unsubscribe();
+              $validationRunData.set(null);
+              $isInPublishFlow.set(false);
+              $outputNodeId.set(null);
+            }
+          } else if (workflowsApi.endpoints.getWorkflow.matchRejected(action)) {
+            // If the query failed, we can unsubscribe from the listener
+            listenerApi.unsubscribe();
+          }
+        },
+      });
+      dispatch(workflowsApi.util.invalidateTags([{ type: 'Workflow', id: validationRunData.workflowId }]));
     }
   });
 

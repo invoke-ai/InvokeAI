@@ -54,7 +54,7 @@ const formElementDataChangedReducer = <T extends FormElement>(
   element.data = { ...element.data, ...changes } as T['data'];
 };
 
-export const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
+export const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges' | 'is_published'> => {
   return {
     name: '',
     author: '',
@@ -69,7 +69,6 @@ export const getBlankWorkflow = (): Omit<WorkflowV3, 'nodes' | 'edges'> => {
     // Even though these values are `undefined`, the keys _must_ be present for the presistence layer to rehydrate
     // them correctly. It uses a merge strategy that relies on the keys being present.
     id: undefined,
-    is_published: null,
   };
 };
 
@@ -115,9 +114,6 @@ export const workflowSlice = createSlice({
     },
     workflowIDChanged: (state, action: PayloadAction<string>) => {
       state.id = action.payload;
-    },
-    workflowIsPublishedChanged(state, action: PayloadAction<boolean>) {
-      state.is_published = action.payload;
     },
     formReset: (state) => {
       const rootElement = buildContainer('column', []);
@@ -175,7 +171,9 @@ export const workflowSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(workflowLoaded, (state, action): WorkflowState => {
-      const { nodes, edges: _edges, ...workflowExtra } = action.payload;
+      // nodes and edges are handled in the nodes slice
+      // is_published is server state
+      const { nodes, edges: _edges, is_published: _is_published, ...workflowExtra } = action.payload;
 
       const formFieldInitialValues = getFormFieldInitialValues(workflowExtra.form, nodes);
 
@@ -245,7 +243,6 @@ export const {
   workflowVersionChanged,
   workflowContactChanged,
   workflowIDChanged,
-  workflowIsPublishedChanged,
   formReset,
   formElementAdded,
   formElementRemoved,
@@ -309,7 +306,6 @@ export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
 export const selectWorkflowForm = createWorkflowSelector((workflow) => workflow.form);
-export const selectWorkflowIsPublished = createWorkflowSelector((workflow) => workflow.is_published);
 
 export const selectFormRootElementId = createWorkflowSelector((workflow) => {
   return workflow.form.rootElementId;

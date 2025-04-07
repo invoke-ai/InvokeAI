@@ -6,10 +6,9 @@ import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsS
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { $isInPublishFlow, useIsWorkflowPublished } from 'features/nodes/components/sidePanel/workflow/publish';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
-import { selectWorkflowIsPublished } from 'features/nodes/store/workflowSlice';
 import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue';
 import { getBatchSize } from 'features/nodes/util/node/resolveBatchValue';
 import type { Reason } from 'features/queue/store/readiness';
@@ -178,7 +177,7 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
   const [_, enqueueMutation] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
   const isInPublishFlow = useStore($isInPublishFlow);
-  const isPublished = useAppSelector(selectWorkflowIsPublished);
+  const isPublished = useIsWorkflowPublished();
 
   const text = useMemo(() => {
     if (enqueueMutation.isLoading) {
