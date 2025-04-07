@@ -25,7 +25,6 @@ import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware
 import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
-import { addUpdateAllNodesRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/updateAllNodesRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
@@ -84,9 +83,6 @@ addArchivedOrDeletedBoardListener(startAppListening);
 
 // Node schemas
 addGetOpenAPISchemaListener(startAppListening);
-
-// Workflows
-addUpdateAllNodesRequestedListener(startAppListening);
 
 // Models
 addModelSelectedListener(startAppListening);
