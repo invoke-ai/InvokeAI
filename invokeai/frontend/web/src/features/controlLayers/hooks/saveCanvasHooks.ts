@@ -14,6 +14,7 @@ import {
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { selectNegativePrompt, selectPositivePrompt, selectSeed } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -27,10 +28,12 @@ import type {
 import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import type { BoardId } from 'features/gallery/store/types';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
+import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -68,13 +71,22 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
 
     let metadata: JsonObject | undefined = undefined;
 
+    const state = store.getState();
+
     if (withMetadata) {
-      metadata = selectCanvasMetadata(store.getState());
+      metadata = selectCanvasMetadata(state);
+      metadata.positive_prompt = selectPositivePrompt(state);
+      metadata.negative_prompt = selectNegativePrompt(state);
+      metadata.seed = selectSeed(state);
+      const model = selectMainModelConfig(state);
+      if (model) {
+        metadata.model = Graph.getModelMetadataField(model);
+      }
     }
 
     let boardId: BoardId | undefined = undefined;
     if (saveToGallery) {
-      boardId = selectAutoAddBoardId(store.getState());
+      boardId = selectAutoAddBoardId(state);
     }
 
     const result = await withResultAsync(() => {
