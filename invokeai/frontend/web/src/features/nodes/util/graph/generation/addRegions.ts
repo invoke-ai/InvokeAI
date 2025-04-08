@@ -5,6 +5,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
 import { getRegionalGuidanceWarnings } from 'features/controlLayers/store/validators';
+import { IMAGE_INFLUENCE_TO_SETTINGS } from 'features/nodes/util/graph/generation/addFLUXRedux';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { serializeError } from 'serialize-error';
 import type { Invocation, MainModelConfig } from 'services/api/types';
@@ -313,6 +314,7 @@ export const addRegions = async ({
           image: {
             image_name: image.image_name,
           },
+          ...IMAGE_INFLUENCE_TO_SETTINGS[ipAdapter.imageInfluence ?? 'highest'],
         });
 
         // Connect the mask to the conditioning
