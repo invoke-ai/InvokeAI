@@ -130,7 +130,7 @@ const IPAdapterSettingsContent = memo(() => {
             icon={<PiBoundingBoxBold />}
           />
         </Flex>
-        <Flex gap={2} w="full" alignItems="center">
+        <Flex gap={2} w="full">
           {ipAdapter.type === 'ip_adapter' && (
             <Flex flexDir="column" gap={2} w="full">
               {!isFLUX && <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />}
