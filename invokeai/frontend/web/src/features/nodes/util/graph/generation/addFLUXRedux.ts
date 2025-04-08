@@ -48,7 +48,7 @@ export const addFLUXReduxes = ({ entities, g, collector, model }: AddFLUXReduxAr
  *
  * See invokeai/app/invocations/flux_redux.py for more details.
  */
-const IMAGE_INFLUENCE_TO_SETTINGS: Record<
+export const IMAGE_INFLUENCE_TO_SETTINGS: Record<
   FLUXReduxImageInfluence,
   Pick<Invocation<'flux_redux'>, 'downsampling_factor' | 'downsampling_function' | 'weight'>
 > = {
