@@ -23,13 +23,11 @@ export const convertImageUrlToBlob = (url: string) =>
 
       const context = canvas.getContext('2d');
       if (!context) {
-        canvas.remove();
         reject(new Error('Failed to get canvas context'));
         return;
       }
       context.drawImage(img, 0, 0);
       canvas.toBlob((blob) => {
-        canvas.remove();
         if (blob) {
           resolve(blob);
         } else {
