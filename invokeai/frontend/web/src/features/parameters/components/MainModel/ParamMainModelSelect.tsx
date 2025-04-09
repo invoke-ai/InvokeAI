@@ -1,9 +1,11 @@
-import { Box, Combobox, Flex, FormControl, FormLabel, Icon, Spacer, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Combobox, Flex, FormControl, FormLabel, Icon, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectModelKey } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
+import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { modelSelected } from 'features/parameters/store/actions';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
@@ -77,21 +79,17 @@ const ParamMainModelSelect = () => {
   }, [selectedModel]);
 
   return (
-    <FormControl isDisabled={!modelConfigs.length} isInvalid={!value || !modelConfigs.length}>
-      <Flex alignItems="center">
-        <InformationalPopover feature="paramModel">
-          <FormLabel>{t('modelManager.model')}</FormLabel>
+    <FormControl isDisabled={!modelConfigs.length} isInvalid={!value || !modelConfigs.length} gap={2}>
+      <InformationalPopover feature="paramModel">
+        <FormLabel>{t('modelManager.model')}</FormLabel>
+      </InformationalPopover>
+      {isFluxDevSelected && (
+        <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
+          <Flex justifyContent="flex-start">
+            <Icon as={MdMoneyOff} />
+          </Flex>
         </InformationalPopover>
-        {isFluxDevSelected ? (
-          <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
-            <Flex justifyContent="flex-start">
-              <Icon as={MdMoneyOff} />
-            </Flex>
-          </InformationalPopover>
-        ) : (
-          <Spacer />
-        )}
-      </Flex>
+      )}
       <Tooltip label={tooltipLabel}>
         <Box w="full" minW={0}>
           <Combobox
@@ -104,6 +102,8 @@ const ParamMainModelSelect = () => {
           />
         </Box>
       </Tooltip>
+      <NavigateToModelManagerButton />
+      <UseDefaultSettingsButton />
     </FormControl>
   );
 };

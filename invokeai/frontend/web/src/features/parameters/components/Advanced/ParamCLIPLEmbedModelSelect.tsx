@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { clipLEmbedModelSelected, selectCLIPLEmbedModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
@@ -32,9 +33,10 @@ const ParamCLIPEmbedModelSelect = () => {
   });
 
   return (
-    <FormControl isDisabled={!options.length} isInvalid={!options.length} minW={0} flexGrow={1}>
+    <FormControl isDisabled={!options.length} isInvalid={!options.length} minW={0} flexGrow={1} gap={2}>
       <FormLabel m={0}>{t('modelManager.clipLEmbed')}</FormLabel>
       <Combobox value={value} options={options} onChange={onChange} noOptionsMessage={noOptionsMessage} />
+      <NavigateToModelManagerButton />
     </FormControl>
   );
 };

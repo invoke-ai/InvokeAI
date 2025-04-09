@@ -13,6 +13,7 @@ import {
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import type { SpandrelFilterConfig } from 'features/controlLayers/store/filters';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -118,6 +119,7 @@ export const FilterSpandrel = ({ onChange, config }: Props) => {
             />
           </Box>
         </Tooltip>
+        <NavigateToModelManagerButton />
       </FormControl>
     </>
   );
