@@ -1,6 +1,5 @@
 import { MenuDivider } from '@invoke-ai/ui-library';
 import { IconMenuItemGroup } from 'common/components/IconMenuItem';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { ImageMenuItemChangeBoard } from 'features/gallery/components/ImageContextMenu/ImageMenuItemChangeBoard';
 import { ImageMenuItemCopy } from 'features/gallery/components/ImageContextMenu/ImageMenuItemCopy';
 import { ImageMenuItemDelete } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDelete';
@@ -38,10 +37,8 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <ImageMenuItemMetadataRecallActions />
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
-      <CanvasManagerProviderGate>
-        <ImageMenuItemNewCanvasFromImageSubMenu />
-        <ImageMenuItemNewLayerFromImageSubMenu />
-      </CanvasManagerProviderGate>
+      <ImageMenuItemNewCanvasFromImageSubMenu />
+      <ImageMenuItemNewLayerFromImageSubMenu />
       <MenuDivider />
       <ImageMenuItemChangeBoard />
       <ImageMenuItemStarUnstar />
