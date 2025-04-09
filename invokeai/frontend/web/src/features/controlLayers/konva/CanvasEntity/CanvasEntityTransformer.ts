@@ -1,5 +1,5 @@
 import { Mutex } from 'async-mutex';
-import { withResultAsync } from 'common/util/result';
+import { withResult, withResultAsync } from 'common/util/result';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -913,7 +913,17 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   calculateRect = debounce(() => {
     this.log.debug('Calculating bbox');
 
-    const canvas = this.parent.getCanvas();
+    const getCanvasResult = withResult(() => this.parent.getCanvas());
+    if (getCanvasResult.isErr()) {
+      this.log.error({ error: serializeError(getCanvasResult.error) }, 'Failed to get canvas, resetting bbox');
+      this.$nodeRect.set(getEmptyRect());
+      this.$pixelRect.set(getEmptyRect());
+      this.$isPendingRectCalculation.set(false);
+      this.transformMutex.release();
+      return;
+    }
+
+    const canvas = getCanvasResult.value;
 
     if (!this.parent.renderer.hasObjects()) {
       this.log.trace('No objects, resetting bbox');
