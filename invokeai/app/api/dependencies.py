@@ -39,6 +39,7 @@ from invokeai.app.services.workflow_records.workflow_records_sqlite import Sqlit
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     BasicConditioningInfo,
+    CogView4ConditioningInfo,
     ConditioningFieldData,
     FLUXConditioningInfo,
     SD3ConditioningInfo,
@@ -123,6 +124,7 @@ class ApiDependencies:
                     SDXLConditioningInfo,
                     FLUXConditioningInfo,
                     SD3ConditioningInfo,
+                    CogView4ConditioningInfo,
                 ],
                 ephemeral=True,
             ),
