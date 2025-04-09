@@ -9,8 +9,7 @@ import type { DndListTargetState } from 'features/dnd/types';
  */
 const line = {
   thickness: 2,
-  backgroundColor: 'red',
-  // backgroundColor: 'base.500',
+  backgroundColor: 'base.500',
 };
 
 type DropIndicatorProps = {
