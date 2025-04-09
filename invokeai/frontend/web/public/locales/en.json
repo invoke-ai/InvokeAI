@@ -871,7 +871,8 @@
         "installingXModels_one": "Installing {{count}} model",
         "installingXModels_other": "Installing {{count}} models",
         "skippingXDuplicates_one": ", skipping {{count}} duplicate",
-        "skippingXDuplicates_other": ", skipping {{count}} duplicates"
+        "skippingXDuplicates_other": ", skipping {{count}} duplicates",
+        "manageModels": "Manage Models"
     },
     "models": {
         "addLora": "Add LoRA",
