@@ -38,7 +38,7 @@ export const useModelCombobox = <T extends AnyModelConfig>(arg: UseModelCombobox
   }, [optionsFilter, getIsDisabled, modelConfigs, shouldShowModelDescriptions]);
 
   const value = useMemo(
-    () => options.find((m) => (selectedModel ? m.value === selectedModel.key : false)),
+    () => options.find((m) => (selectedModel ? m.value === selectedModel.key : false)) ?? null,
     [options, selectedModel]
   );
 
