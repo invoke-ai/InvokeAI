@@ -143,7 +143,6 @@ export const buildFLUXGraph = async (
   addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
 
   g.upsertMetadata({
-    generation_mode: 'flux_txt2img',
     guidance,
     width: originalSize.width,
     height: originalSize.height,
@@ -180,6 +179,7 @@ export const buildFLUXGraph = async (
     });
   } else if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    g.upsertMetadata({ generation_mode: 'flux_txt2img' });
   } else if (generationMode === 'img2img') {
     canvasOutput = await addImageToImage({
       g,
@@ -194,6 +194,7 @@ export const buildFLUXGraph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'flux_img2img' });
   } else if (generationMode === 'inpaint') {
     canvasOutput = await addInpaint({
       state,
@@ -209,6 +210,7 @@ export const buildFLUXGraph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'flux_inpaint' });
   } else if (generationMode === 'outpaint') {
     canvasOutput = await addOutpaint({
       state,
@@ -224,6 +226,7 @@ export const buildFLUXGraph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'flux_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
   }

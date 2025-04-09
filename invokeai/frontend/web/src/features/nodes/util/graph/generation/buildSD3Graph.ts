@@ -109,7 +109,6 @@ export const buildSD3Graph = async (
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   g.upsertMetadata({
-    generation_mode: 'sd3_txt2img',
     cfg_scale,
     width: originalSize.width,
     height: originalSize.height,
@@ -136,6 +135,7 @@ export const buildSD3Graph = async (
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    g.upsertMetadata({ generation_mode: 'sd3_txt2img' });
   } else if (generationMode === 'img2img') {
     canvasOutput = await addImageToImage({
       g,
@@ -150,6 +150,7 @@ export const buildSD3Graph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'sd3_img2img' });
   } else if (generationMode === 'inpaint') {
     canvasOutput = await addInpaint({
       state,
@@ -165,6 +166,7 @@ export const buildSD3Graph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'sd3_inpaint' });
   } else if (generationMode === 'outpaint') {
     canvasOutput = await addOutpaint({
       state,
@@ -180,6 +182,7 @@ export const buildSD3Graph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'sd3_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
   }

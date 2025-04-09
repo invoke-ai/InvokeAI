@@ -140,7 +140,6 @@ export const buildSDXLGraph = async (
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   g.upsertMetadata({
-    generation_mode: 'sdxl_txt2img',
     cfg_scale,
     cfg_rescale_multiplier,
     width: originalSize.width,
@@ -178,6 +177,7 @@ export const buildSDXLGraph = async (
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    g.upsertMetadata({ generation_mode: 'sdxl_txt2img' });
   } else if (generationMode === 'img2img') {
     canvasOutput = await addImageToImage({
       g,
@@ -192,6 +192,7 @@ export const buildSDXLGraph = async (
       denoising_start,
       fp32,
     });
+    g.upsertMetadata({ generation_mode: 'sdxl_img2img' });
   } else if (generationMode === 'inpaint') {
     canvasOutput = await addInpaint({
       state,
@@ -207,6 +208,7 @@ export const buildSDXLGraph = async (
       denoising_start,
       fp32,
     });
+    g.upsertMetadata({ generation_mode: 'sdxl_inpaint' });
   } else if (generationMode === 'outpaint') {
     canvasOutput = await addOutpaint({
       state,
@@ -222,6 +224,7 @@ export const buildSDXLGraph = async (
       denoising_start,
       fp32,
     });
+    g.upsertMetadata({ generation_mode: 'sdxl_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
   }
