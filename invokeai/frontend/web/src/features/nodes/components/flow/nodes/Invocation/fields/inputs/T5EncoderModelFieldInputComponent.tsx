@@ -1,12 +1,8 @@
-import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { ModelFieldCombobox } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelFieldCombobox';
 import { fieldT5EncoderValueChanged } from 'features/nodes/store/nodesSlice';
-import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { T5EncoderModelFieldInputInstance, T5EncoderModelFieldInputTemplate } from 'features/nodes/types/field';
-import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useT5EncoderModels } from 'services/api/hooks/modelsByType';
 import type { T5EncoderBnbQuantizedLlmInt8bModelConfig, T5EncoderModelConfig } from 'services/api/types';
 
@@ -16,11 +12,9 @@ type Props = FieldComponentProps<T5EncoderModelFieldInputInstance, T5EncoderMode
 
 const T5EncoderModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
-  const { t } = useTranslation();
-  const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useT5EncoderModels();
-  const _onChange = useCallback(
+  const onChange = useCallback(
     (value: T5EncoderBnbQuantizedLlmInt8bModelConfig | T5EncoderModelConfig | null) => {
       if (!value) {
         return;
@@ -35,31 +29,14 @@ const T5EncoderModelFieldInputComponent = (props: Props) => {
     },
     [dispatch, field.name, nodeId]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs,
-    onChange: _onChange,
-    isLoading,
-    selectedModel: field.value,
-  });
-  const required = props.fieldTemplate.required;
   return (
-    <Flex w="full" alignItems="center" gap={2}>
-      <Tooltip label={!isModelsTabDisabled && t('modelManager.starterModelsInModelManager')}>
-        <FormControl
-          className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`}
-          isDisabled={!options.length}
-          isInvalid={!value && required}
-        >
-          <Combobox
-            value={value}
-            placeholder={required ? placeholder : `(Optional) ${placeholder}`}
-            options={options}
-            onChange={onChange}
-            noOptionsMessage={noOptionsMessage}
-          />
-        </FormControl>
-      </Tooltip>
-    </Flex>
+    <ModelFieldCombobox
+      value={field.value}
+      modelConfigs={modelConfigs}
+      isLoadingConfigs={isLoading}
+      onChange={onChange}
+      required={props.fieldTemplate.required}
+    />
   );
 };
 
