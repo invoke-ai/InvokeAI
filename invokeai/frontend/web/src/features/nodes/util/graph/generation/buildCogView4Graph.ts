@@ -94,7 +94,6 @@ export const buildCogView4Graph = async (
   assert(modelConfig.base === 'cogview4');
 
   g.upsertMetadata({
-    generation_mode: 'cogview4_txt2img',
     cfg_scale,
     width: originalSize.width,
     height: originalSize.height,
@@ -111,6 +110,7 @@ export const buildCogView4Graph = async (
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    g.upsertMetadata({ generation_mode: 'cogview4_txt2img' });
   } else if (generationMode === 'img2img') {
     canvasOutput = await addImageToImage({
       g,
@@ -125,6 +125,7 @@ export const buildCogView4Graph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'cogview4_img2img' });
   } else if (generationMode === 'inpaint') {
     canvasOutput = await addInpaint({
       state,
@@ -140,6 +141,7 @@ export const buildCogView4Graph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'cogview4_inpaint' });
   } else if (generationMode === 'outpaint') {
     canvasOutput = await addOutpaint({
       state,
@@ -155,6 +157,7 @@ export const buildCogView4Graph = async (
       denoising_start,
       fp32: false,
     });
+    g.upsertMetadata({ generation_mode: 'cogview4_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
   }
