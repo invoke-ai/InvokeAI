@@ -347,7 +347,6 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
       const ctx = canvas.getContext('2d');
 
       if (!ctx) {
-        canvas.remove();
         reject(new Error('Failed to get canvas context'));
         return;
       }
@@ -356,7 +355,6 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
 
       ctx.drawImage(image, 0, 0);
       const imageData = ctx.getImageData(0, 0, width, height);
-      canvas.remove();
       resolve(imageData);
     };
 
