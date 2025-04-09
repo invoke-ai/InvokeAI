@@ -93,6 +93,9 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
             <Text fontWeight="semibold" noOfLines={1} wordBreak="break-all">
               {model.name}
             </Text>
+            <Text variant="subtext" fontStyle="italic">
+              {filesize(model.file_size)}
+            </Text>
             <Spacer />
           </Flex>
           <Text variant="subtext" noOfLines={1}>
@@ -109,7 +112,6 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           <ModelBaseBadge base={model.base} />
           <ModelFormatBadge format={model.format} />
         </Flex>
-        <Text>{filesize(model.file_size)}</Text>
       </Flex>
       <IconButton
         onClick={onClickDeleteButton}
