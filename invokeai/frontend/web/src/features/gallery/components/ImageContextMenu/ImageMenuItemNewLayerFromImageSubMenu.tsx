@@ -3,7 +3,6 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
@@ -21,9 +20,6 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusySafe();
-  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
-  const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
-  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
 
   const onClickNewRasterLayerFromImage = useCallback(() => {
     const { dispatch, getState } = store;
@@ -113,18 +109,10 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
           <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewInpaintMaskFromImage} isDisabled={isBusy}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
-          <MenuItem
-            icon={<NewLayerIcon />}
-            onClickCapture={onClickNewRegionalGuidanceFromImage}
-            isDisabled={isBusy || !isRegionalGuidanceEnabled}
-          >
+          <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRegionalGuidanceFromImage} isDisabled={isBusy}>
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
-          <MenuItem
-            icon={<NewLayerIcon />}
-            onClickCapture={onClickNewControlLayerFromImage}
-            isDisabled={isBusy || !isControlLayerEnabled}
-          >
+          <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewControlLayerFromImage} isDisabled={isBusy}>
             {t('controlLayers.controlLayer')}
           </MenuItem>
           <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRasterLayerFromImage} isDisabled={isBusy}>
@@ -133,14 +121,14 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
           <MenuItem
             icon={<NewLayerIcon />}
             onClickCapture={onClickNewRegionalReferenceImageFromImage}
-            isDisabled={isBusy || !isRegionalGuidanceEnabled}
+            isDisabled={isBusy}
           >
             {t('controlLayers.referenceImageRegional')}
           </MenuItem>
           <MenuItem
             icon={<NewLayerIcon />}
             onClickCapture={onClickNewGlobalReferenceImageFromImage}
-            isDisabled={isBusy || !isReferenceImageEnabled}
+            isDisabled={isBusy}
           >
             {t('controlLayers.referenceImageGlobal')}
           </MenuItem>
