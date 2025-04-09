@@ -4,6 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import type { CLIPVisionModelV2 } from 'features/controlLayers/store/types';
 import { isCLIPVisionModelV2 } from 'features/controlLayers/store/types';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
@@ -54,6 +55,7 @@ export const CLIPVisionModel = memo(({ model, onChange }: Props) => {
         value={clipVisionModelValue}
         onChange={_onChangeCLIPVisionModel}
       />
+      <NavigateToModelManagerButton />
     </FormControl>
   );
 });

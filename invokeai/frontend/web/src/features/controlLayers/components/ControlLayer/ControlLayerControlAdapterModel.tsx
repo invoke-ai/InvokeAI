@@ -2,6 +2,7 @@ import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useControlLayerModels } from 'services/api/hooks/modelsByType';
@@ -61,6 +62,7 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
         />
+        <NavigateToModelManagerButton />
       </FormControl>
     </Tooltip>
   );
