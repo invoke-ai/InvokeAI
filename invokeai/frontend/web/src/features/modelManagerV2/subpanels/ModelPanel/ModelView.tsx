@@ -4,6 +4,7 @@ import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
 import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
+import { filesize } from 'filesize';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
@@ -50,14 +51,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             <ModelAttrView label={t('modelManager.modelType')} value={modelConfig.type} />
             <ModelAttrView label={t('common.format')} value={modelConfig.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelConfig.path} />
-            <ModelAttrView
-              label={t('modelManager.fileSize')}
-              value={(modelConfig.file_size / 1024 ** 3).toLocaleString(undefined, {
-                maximumFractionDigits: 2,
-                style: 'unit',
-                unit: 'gigabyte',
-              })}
-            />
+            <ModelAttrView label={t('modelManager.fileSize')} value={filesize(modelConfig.file_size)} />
             {modelConfig.type === 'main' && (
               <ModelAttrView label={t('modelManager.variant')} value={modelConfig.variant} />
             )}
