@@ -2,7 +2,7 @@ from typing import Callable, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
-from diffusers import CogView4Transformer2DModel
+from diffusers.models.transformers.transformer_cogview4 import CogView4Transformer2DModel
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
