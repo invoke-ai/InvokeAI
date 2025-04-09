@@ -53,7 +53,13 @@ export const CanvasEntityPreviewImage = memo(() => {
         const nodeRect = adapter.transformer.$nodeRect.get();
         const canvasCache = adapter.$canvasCache.get();
 
-        if (!canvasCache || canvasCache.width === 0 || canvasCache.height === 0) {
+        if (
+          !canvasCache ||
+          canvasCache.width === 0 ||
+          canvasCache.height === 0 ||
+          pixelRect.width === 0 ||
+          pixelRect.height === 0
+        ) {
           // Draw an empty canvas
           ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
           return;
@@ -127,6 +133,12 @@ const TooltipContent = ({ canvasRef }: { canvasRef: React.RefObject<HTMLCanvasEl
     const ctx = canvasRef2.current.getContext('2d');
 
     if (!ctx) {
+      return;
+    }
+
+    if (canvasRef.current.width === 0 || canvasRef.current.height === 0) {
+      // If these are 0, drawImage will raise! Clear the canvas and bail
+      ctx.clearRect(0, 0, canvasRef2.current.width, canvasRef2.current.height);
       return;
     }
 

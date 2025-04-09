@@ -11,17 +11,25 @@ export const convertImageUrlToBlob = (url: string) =>
   new Promise<Blob | null>((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
+      if (img.width === 0 || img.height === 0) {
+        reject(new Error('Image has no dimensions. The URL may be invalid or the object may not exist.'));
+        return;
+      }
+
       const canvas = document.createElement('canvas');
+
       canvas.width = img.width;
       canvas.height = img.height;
 
       const context = canvas.getContext('2d');
       if (!context) {
+        canvas.remove();
         reject(new Error('Failed to get canvas context'));
         return;
       }
       context.drawImage(img, 0, 0);
       canvas.toBlob((blob) => {
+        canvas.remove();
         if (blob) {
           resolve(blob);
         } else {

@@ -327,28 +327,40 @@ export const downloadBlob = (blob: Blob, fileName: string) => {
  */
 export const dataURLToImageData = (dataURL: string, width: number, height: number): Promise<ImageData> => {
   return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-      canvas.remove();
-      reject('Unable to get context');
-      return;
-    }
-
-    ctx.imageSmoothingEnabled = false;
-
     const image = new Image();
     image.onload = function () {
+      if (image.width === 0 || image.height === 0) {
+        reject(new Error('Image has no dimensions. The URL may be invalid or the object may not exist.'));
+        return;
+      }
+
+      if (width === 0 || height === 0) {
+        reject(new Error('Cannot create ImageData with zero width or height'));
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        canvas.remove();
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+
+      ctx.imageSmoothingEnabled = false;
+
       ctx.drawImage(image, 0, 0);
+      const imageData = ctx.getImageData(0, 0, width, height);
       canvas.remove();
-      resolve(ctx.getImageData(0, 0, width, height));
+      resolve(imageData);
     };
 
     image.onerror = function (e) {
-      canvas.remove();
       reject(e);
     };
 
