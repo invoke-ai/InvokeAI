@@ -1,8 +1,6 @@
-import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { ModelFieldCombobox } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelFieldCombobox';
 import { fieldRefinerModelValueChanged } from 'features/nodes/store/nodesSlice';
-import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type {
   SDXLRefinerModelFieldInputInstance,
   SDXLRefinerModelFieldInputTemplate,
@@ -19,7 +17,7 @@ const RefinerModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useRefinerModels();
-  const _onChange = useCallback(
+  const onChange = useCallback(
     (value: MainModelConfig | null) => {
       if (!value) {
         return;
@@ -34,25 +32,15 @@ const RefinerModelFieldInputComponent = (props: Props) => {
     },
     [dispatch, field.name, nodeId]
   );
-  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs,
-    onChange: _onChange,
-    isLoading,
-    selectedModel: field.value,
-  });
 
   return (
-    <Flex w="full" alignItems="center" gap={2}>
-      <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isDisabled={!options.length} isInvalid={!value}>
-        <Combobox
-          value={value}
-          placeholder={placeholder}
-          options={options}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-      </FormControl>
-    </Flex>
+    <ModelFieldCombobox
+      value={field.value}
+      modelConfigs={modelConfigs}
+      isLoadingConfigs={isLoading}
+      onChange={onChange}
+      required={props.fieldTemplate.required}
+    />
   );
 };
 
