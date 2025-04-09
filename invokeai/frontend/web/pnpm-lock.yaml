@@ -50,6 +50,9 @@ dependencies:
   compare-versions:
     specifier: ^6.1.1
     version: 6.1.1
+  filesize:
+    specifier: ^10.1.6
+    version: 10.1.6
   fracturedjsonjs:
     specifier: ^4.0.2
     version: 4.0.2
@@ -5749,6 +5752,11 @@ packages:
     engines: {node: '>= 12'}
     dependencies:
       tslib: 2.7.0
+    dev: false
+
+  /filesize@10.1.6:
+    resolution: {integrity: sha512-sJslQKU2uM33qH5nqewAwVB2QgR6w1aMNsYUp3aN5rMRyXEwJGmZvaWzeJFNTOXWlHQyBFCWrdj3fV/fsTOX8w==}
+    engines: {node: '>= 10.4.0'}
     dev: false
 
   /fill-range@7.1.1:

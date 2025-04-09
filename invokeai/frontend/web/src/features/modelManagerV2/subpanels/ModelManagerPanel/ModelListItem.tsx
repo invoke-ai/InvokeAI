@@ -6,6 +6,7 @@ import { selectModelManagerV2Slice, setSelectedModelKey } from 'features/modelMa
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelFormatBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelFormatBadge';
 import { toast } from 'features/toast/toast';
+import { filesize } from 'filesize';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -108,13 +109,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
           <ModelBaseBadge base={model.base} />
           <ModelFormatBadge format={model.format} />
         </Flex>
-        <Text>
-          {(model.file_size / 1024 ** 3).toLocaleString(undefined, {
-            maximumFractionDigits: 2,
-            style: 'unit',
-            unit: 'gigabyte',
-          })}
-        </Text>
+        <Text>{filesize(model.file_size)}</Text>
       </Flex>
       <IconButton
         onClick={onClickDeleteButton}
