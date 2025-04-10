@@ -3,7 +3,6 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { typedMemo } from 'common/util/typedMemo';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import type { AnyModelConfig } from 'services/api/types';
 
 type Props<T extends AnyModelConfig> = {
@@ -45,7 +44,6 @@ const _ModelFieldCombobox = <T extends AnyModelConfig>({
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
       />
-      <NavigateToModelManagerButton />
     </FormControl>
   );
 };
