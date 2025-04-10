@@ -803,7 +803,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     this.$isTransforming.set(false);
 
-    // Reset the transform of the the entity. We've either replaced the transformed objects with a rasterized image, or
+    // Reset the transform of the entity. We've either replaced the transformed objects with a rasterized image, or
     // canceled a transformation. In either case, the scale should be reset.
     this.resetTransform();
     this.syncInteractionState();

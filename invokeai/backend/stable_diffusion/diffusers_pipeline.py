@@ -503,7 +503,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             for idx, tensor in enumerate(accum_adapter_state):
                 # The tensor size is supposed to be some integer downscale factor of the latents size.
                 # Internally, the unet will pad the latents before downscaling between levels when it is no longer divisible by its downscale factor.
-                # If the latent size does not scale down evenly, we need to pad the tensor so that it matches the the downscaled padded latents later on.
+                # If the latent size does not scale down evenly, we need to pad the tensor so that it matches the downscaled padded latents later on.
                 scale_factor = latents.size()[-1] // tensor.size()[-1]
                 required_padding_width = math.ceil(latents.size()[-1] / scale_factor) - tensor.size()[-1]
                 required_padding_height = math.ceil(latents.size()[-2] / scale_factor) - tensor.size()[-2]
