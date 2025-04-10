@@ -11,9 +11,7 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
-import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
@@ -68,17 +66,10 @@ export const GenerationSettingsAccordion = memo(() => {
     >
       <Box px={4} pt={4} data-testid="generation-accordion">
         <Flex gap={4} flexDir="column">
-          <Flex gap={4} alignItems="center">
-            <ParamMainModelSelect />
-            <Flex>
-              <UseDefaultSettingsButton />
-              <NavigateToModelManagerButton />
-            </Flex>
-          </Flex>
-          <Flex gap={4} flexDir="column">
-            <LoRASelect />
-            <LoRAList />
-          </Flex>
+          <ParamMainModelSelect />
+
+          <LoRASelect />
+          <LoRAList />
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>

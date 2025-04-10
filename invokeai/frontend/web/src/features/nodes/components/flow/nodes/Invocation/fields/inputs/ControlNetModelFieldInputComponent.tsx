@@ -1,8 +1,6 @@
-import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { ModelFieldCombobox } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelFieldCombobox';
 import { fieldControlNetModelValueChanged } from 'features/nodes/store/nodesSlice';
-import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { ControlNetModelFieldInputInstance, ControlNetModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
@@ -17,7 +15,7 @@ const ControlNetModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useControlNetModels();
 
-  const _onChange = useCallback(
+  const onChange = useCallback(
     (value: ControlNetModelConfig | null) => {
       if (!value) {
         return;
@@ -33,25 +31,14 @@ const ControlNetModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
 
-  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs,
-    onChange: _onChange,
-    selectedModel: field.value,
-    isLoading,
-  });
-
   return (
-    <Tooltip label={value?.description}>
-      <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isInvalid={!value}>
-        <Combobox
-          value={value}
-          placeholder={placeholder}
-          options={options}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-      </FormControl>
-    </Tooltip>
+    <ModelFieldCombobox
+      value={field.value}
+      modelConfigs={modelConfigs}
+      isLoadingConfigs={isLoading}
+      onChange={onChange}
+      required={props.fieldTemplate.required}
+    />
   );
 };
 
