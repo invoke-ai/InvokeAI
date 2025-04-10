@@ -11,7 +11,6 @@ from invokeai.app.invocations.baseinvocation import (
     Classification,
     invocation,
 )
-from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
     BoundingBoxField,
     ColorField,
@@ -268,18 +267,21 @@ class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
         return ImageOutput.build(image_dto)
 
 
+PNG_IMAGE_MODES = Literal["L", "RGB", "RGBA", "I"]
+
+
 @invocation(
     "img_conv",
     title="Convert Image Mode",
     tags=["image", "convert"],
     category="image",
-    version="1.2.2",
+    version="2.0.0",
 )
 class ImageConvertInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Converts an image to a different mode."""
 
     image: ImageField = InputField(description="The image to convert")
-    mode: IMAGE_MODES = InputField(default="L", description="The mode to convert to")
+    mode: PNG_IMAGE_MODES = InputField(default="L", description="The mode to convert to")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
