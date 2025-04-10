@@ -9638,7 +9638,7 @@ export type components = {
              * @default L
              * @enum {string}
              */
-            mode?: "L" | "RGB" | "RGBA" | "CMYK" | "YCbCr" | "LAB" | "HSV" | "I" | "F";
+            mode?: "L" | "RGB" | "RGBA" | "I";
             /**
              * type
              * @default img_conv
