@@ -35,15 +35,20 @@ ENV \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_MANAGED_PYTHON=1 \
-    UV_INDEX="https://download.pytorch.org/whl/cu124" \
     INVOKEAI_HOST=0.0.0.0 \
     INVOKEAI_PORT=9090 \
     CONTAINER_UID=${CONTAINER_UID:-1000} \
     CONTAINER_GID=${CONTAINER_GID:-1000}
 
+# Set the secondary index for UV to the appropriate PyTorch index URL based on the GPU driver and architecture
+# NOTE: this is the index URL that will be used by `uv` to install PyTorch and other packages
+# Instead of using an envar we write the value to the user-level config file for UV
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then export UV_INDEX="https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then export UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
-    fi
+    else export UV_INDEX="https://download.pytorch.org/whl/cu126"; \
+    fi \
+    && mkdir -p /home/${USERNAME}/.config/uv/ \
+    && echo "[[index]]\nurl = '$(echo $UV_INDEX)'\n" > /home/${USERNAME}/.config/uv/uv.toml
 
 # Set Python version
 # NOTE: this is the version of Python that will be installed by `uv`
@@ -58,7 +63,9 @@ ARG CACHE_DIR=/home/${USERNAME}/.cache
 # https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 ENV XDG_CACHE_HOME=${CACHE_DIR} \
     GIT_LFS_CACHE=${CACHE_DIR}/git-lfs \
-    PATH="$UV_PROJECT_ENVIRONMENT/bin:$CACHE_DIR/pnpm:$CACHE_DIR/uv:$PATH" 
+    PATH="$UV_PROJECT_ENVIRONMENT/bin:$CACHE_DIR/pnpm:$CACHE_DIR/uv:$PATH" \
+    PYTHONPATH="$PYTHONPATH:${INVOKEAI_SRC}"
+    # PYTHONPATH="$UV_PROJECT_ENVIRONMENT/lib/python${PYTHON_VERSION}/site-packages:$PYTHONPATH" \
 
 # Setup cache volume for dependencies
 VOLUME [ "${CACHE_DIR}", "${INVOKEAI_ROOT}", "${INVOKEAI_SRC}" ]
