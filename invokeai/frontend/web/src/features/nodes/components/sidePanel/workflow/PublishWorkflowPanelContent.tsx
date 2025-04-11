@@ -26,6 +26,7 @@ import {
   $isSelectingOutputNode,
   $outputNodeId,
   $validationRunData,
+  selectHasUnpublishableNodes,
   usePublishInputs,
 } from 'features/nodes/components/sidePanel/workflow/publish';
 import { useInputFieldTemplateTitleOrThrow } from 'features/nodes/hooks/useInputFieldTemplateTitleOrThrow';
@@ -36,7 +37,6 @@ import { useNodeUserTitleOrThrow } from 'features/nodes/hooks/useNodeUserTitleOr
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useOutputFieldTemplate } from 'features/nodes/hooks/useOutputFieldTemplate';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
-import { selectHasBatchOrGeneratorNodes } from 'features/nodes/store/selectors';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
 import { selectAllowPublishWorkflows } from 'features/system/store/configSlice';
@@ -201,7 +201,7 @@ const PublishWorkflowButton = memo(() => {
   const isReadyToDoValidationRun = useStore($isReadyToDoValidationRun);
   const isReadyToEnqueue = useStore($isReadyToEnqueue);
   const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
-  const hasBatchOrGeneratorNodes = useAppSelector(selectHasBatchOrGeneratorNodes);
+  const hasUnpublishableNodes = useAppSelector(selectHasUnpublishableNodes);
   const outputNodeId = useStore($outputNodeId);
   const isSelectingOutputNode = useStore($isSelectingOutputNode);
   const inputs = usePublishInputs();
@@ -249,7 +249,7 @@ const PublishWorkflowButton = memo(() => {
   return (
     <PublishTooltip
       isWorkflowSaved={!doesWorkflowHaveUnsavedChanges}
-      hasBatchOrGeneratorNodes={hasBatchOrGeneratorNodes}
+      hasUnpublishableNodes={hasUnpublishableNodes}
       isReadyToEnqueue={isReadyToEnqueue}
       hasOutputNode={outputNodeId !== null && !isSelectingOutputNode}
       hasPublishableInputs={inputs.publishable.length > 0}
@@ -261,7 +261,7 @@ const PublishWorkflowButton = memo(() => {
           !allowPublishWorkflows ||
           !isReadyToEnqueue ||
           doesWorkflowHaveUnsavedChanges ||
-          hasBatchOrGeneratorNodes ||
+          hasUnpublishableNodes ||
           !isReadyToDoValidationRun ||
           !(outputNodeId !== null && !isSelectingOutputNode)
         }
@@ -330,7 +330,7 @@ export const StartPublishFlowButton = memo(() => {
   const allowPublishWorkflows = useAppSelector(selectAllowPublishWorkflows);
   const isReadyToEnqueue = useStore($isReadyToEnqueue);
   const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
-  const hasBatchOrGeneratorNodes = useAppSelector(selectHasBatchOrGeneratorNodes);
+  const hasUnpublishableNodes = useAppSelector(selectHasUnpublishableNodes);
   const inputs = usePublishInputs();
 
   const onClick = useCallback(() => {
@@ -340,7 +340,7 @@ export const StartPublishFlowButton = memo(() => {
   return (
     <PublishTooltip
       isWorkflowSaved={!doesWorkflowHaveUnsavedChanges}
-      hasBatchOrGeneratorNodes={hasBatchOrGeneratorNodes}
+      hasUnpublishableNodes={hasUnpublishableNodes}
       isReadyToEnqueue={isReadyToEnqueue}
       hasOutputNode={true}
       hasPublishableInputs={inputs.publishable.length > 0}
@@ -352,7 +352,7 @@ export const StartPublishFlowButton = memo(() => {
         variant="ghost"
         size="sm"
         isDisabled={
-          !allowPublishWorkflows || !isReadyToEnqueue || doesWorkflowHaveUnsavedChanges || hasBatchOrGeneratorNodes
+          !allowPublishWorkflows || !isReadyToEnqueue || doesWorkflowHaveUnsavedChanges || hasUnpublishableNodes
         }
       >
         {t('workflows.builder.publish')}
@@ -366,7 +366,7 @@ StartPublishFlowButton.displayName = 'StartPublishFlowButton';
 const PublishTooltip = memo(
   ({
     isWorkflowSaved,
-    hasBatchOrGeneratorNodes,
+    hasUnpublishableNodes,
     isReadyToEnqueue,
     hasOutputNode,
     hasPublishableInputs,
@@ -374,7 +374,7 @@ const PublishTooltip = memo(
     children,
   }: PropsWithChildren<{
     isWorkflowSaved: boolean;
-    hasBatchOrGeneratorNodes: boolean;
+    hasUnpublishableNodes: boolean;
     isReadyToEnqueue: boolean;
     hasOutputNode: boolean;
     hasPublishableInputs: boolean;
@@ -396,8 +396,8 @@ const PublishTooltip = memo(
       if (!isWorkflowSaved) {
         _errors.push(t('workflows.builder.errorWorkflowHasUnsavedChanges'));
       }
-      if (hasBatchOrGeneratorNodes) {
-        _errors.push(t('workflows.builder.errorWorkflowHasBatchOrGeneratorNodes'));
+      if (hasUnpublishableNodes) {
+        _errors.push(t('workflows.builder.errorWorkflowHasUnpublishableNodes'));
       }
       if (!isReadyToEnqueue) {
         _errors.push(t('workflows.builder.errorWorkflowHasInvalidGraph'));
@@ -406,7 +406,7 @@ const PublishTooltip = memo(
         _errors.push(t('workflows.builder.errorWorkflowHasNoOutputNode'));
       }
       return _errors;
-    }, [hasBatchOrGeneratorNodes, hasOutputNode, isReadyToEnqueue, isWorkflowSaved, t]);
+    }, [hasUnpublishableNodes, hasOutputNode, isReadyToEnqueue, isWorkflowSaved, t]);
 
     if (errors.length === 0 && warnings.length === 0) {
       return children;
