@@ -179,7 +179,6 @@ cython_debug/
 
 # Scratch folder
 .scratch/
-.vscode/
 
 # source installer files
 installer/*zip
