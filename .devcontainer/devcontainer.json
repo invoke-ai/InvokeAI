@@ -46,6 +46,7 @@
     "80": { "label": "InvokeAI Frontend" },
     "9090": { "label": "InvokeAI Backend" }
   },
+  "onCreateCommand": "pnpm config --global set store-dir $XDG_CACHE_HOME/pnpm",
   "updateContentCommand": {
     "Frontend::Setup": "pnpm install --dir invokeai/frontend/web/ --frozen-lockfile --reporter append-only",
     // install all development python dependencies using the exact versions in the lockfile without deleting other packages which might not be specified in the lockfile.

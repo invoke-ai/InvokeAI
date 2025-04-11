@@ -76,7 +76,6 @@ RUN set -eux; \
 
 # Setup PNPM
 RUN corepack use pnpm && corepack enable
-RUN pnpm config --global set store-dir ${CACHE_DIR}/pnpm
 
 # Install `uv` for package management
 # TODO: Shouldnt this be put in the users .local dir?
