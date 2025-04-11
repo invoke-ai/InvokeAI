@@ -29,6 +29,32 @@
         "kind": "build",
         "isDefault": false
       }
+    },
+    {
+      "label": "[Test] Backend",
+      "type": "shell",
+      "command": "pytest",
+      "args": [],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/tests"
+      }
+    },
+    {
+      "label": "[Test] Frontend",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["test"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      }
     }
   ]
 }
