@@ -1809,7 +1809,7 @@
             "cannotPublish": "Cannot publish workflow",
             "publishWarnings": "Warnings",
             "errorWorkflowHasUnsavedChanges": "Workflow has unsaved changes",
-            "errorWorkflowHasBatchOrGeneratorNodes": "Workflow has batch and/or generator nodes",
+            "errorWorkflowHasUnpublishableNodes": "Workflow has batch, generator, or metadata extraction nodes",
             "errorWorkflowHasInvalidGraph": "Workflow graph invalid (hover Invoke button for details)",
             "errorWorkflowHasNoOutputNode": "No output node selected",
             "warningWorkflowHasNoPublishableInputFields": "No publishable input fields selected - published workflow will run with only default values",
