@@ -1,0 +1,24 @@
+{
+  "folders": [
+    {
+      // Folder for the entire git repo.
+      "name": "[Repository]",
+      "path": "../"
+    },
+    {
+      // Folder for specifically the frontend sub-project
+      "name": "[Frontend]",
+      "path": "../invokeai/frontend/web"
+    },
+    {
+      // Folder for specifically the backend sub-project
+      "name": "[Backend]",
+      "path": "../invokeai/backend"
+    },
+    {
+      // Folder for the invokeai program data (located at filesystem root)
+      "name": "[AppData]",
+      "path": "/invokeai"
+    }
+  ]
+}

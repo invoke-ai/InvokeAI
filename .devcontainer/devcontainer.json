@@ -1,0 +1,84 @@
+{
+  "name": "InvokeAI::Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "../..",
+    "args": {
+      "USERNAME": "node",
+      "PYTHON_VERSION": "3.12",
+      "INVOKEAI_ROOT": "/invokeai",
+      "INVOKEAI_SRC": "/workspaces/InvokeAI"
+    }
+  },
+  "mounts": [
+    {
+      // Setup a volume for all dependencies (pnpm, pip, uv, etc.)
+      "type": "volume",
+      "source": "invokeai-dev-cache",
+      "target": "/home/node/.cache"
+    },
+    {
+      // Setup a volume for the invokeai data (to prevent development work from corrupting users stable invokeai data)
+      "type": "volume",
+      "source": "invokeai-data-dev",
+      "target": "/invokeai"
+    },
+    {
+      // Insert the devcontainers vscode launch config into the container
+      "type": "bind",
+      "source": "${localWorkspaceFolder}/.devcontainer/.vscode/launch.json",
+      "target": "${containerWorkspaceFolder}/.vscode/launch.json"
+    }
+  ],
+  "containerEnv": {
+    "RUST_LOG": "trace",
+    "UV_LINK_MODE": "hardlink"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git-lfs": {},
+    "ghcr.io/devcontainers/features/github-cli": {}
+  },
+  "hostRequirements": {
+    "gpu": "optional"
+  },
+  "forwardPorts": [80, 9090],
+  "portsAttributes": {
+    "80": { "label": "InvokeAI Frontend" },
+    "9090": { "label": "InvokeAI Backend" }
+  },
+  "updateContentCommand": {
+    "Frontend::Setup": "pnpm install --dir invokeai/frontend/web/ --frozen-lockfile --reporter append-only",
+    // install all development python dependencies using the exact versions in the lockfile without deleting other packages which might not be specified in the lockfile.
+    "Backend::Setup": "uv sync --frozen --inexact --active --all-extras --no-extra onnx-directml --no-install-project --no-progress && uv pip install --editable ."
+    // "Backend::Setup": "uv sync --active --all-extras --no-extra onnx-directml --frozen --inexact && python -c \"from patchmatch import patch_match\"",
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        // Where your InvokeAI `venv`'s python executable lives
+        "python.defaultInterpreterPath": "$UV_PROJECT_ENVIRONMENT/bin/python",
+        // "python.defaultInterpreterPath": "/home/node/.cache/uv/bin/python",
+        "python.analysis.extraPaths": ["/invokeai", "${workspaceRoot}"],
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "always"
+        },
+        "ruff.linting.enabled": true
+      },
+      "extensions": [
+        "eamodio.gitlens",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-slideshow",
+        "charliermarsh.ruff",
+        "esbenp.prettier-vscode",
+        "DavidAnson.vscode-markdownlint",
+        "antfu.vite",
+        "docker.docker",
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}
