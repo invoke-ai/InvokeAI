@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "[Install] UV",
+      "type": "shell",
+      "command": "uv pip install .",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "[Install] PNPM",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["install", "--dir", "invokeai/frontend/web/"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "[Build] PatchMatch",
+      "type": "shell",
+      "command": "python",
+      "args": ["-c", "from patchmatch import patch_match"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    }
+  ]
+}
