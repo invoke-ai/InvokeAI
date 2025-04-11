@@ -127,13 +127,16 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
         return infilled
 
 
+LAMA_MODEL_URL = "https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt"
+
+
 @invocation("infill_lama", title="LaMa Infill", tags=["image", "inpaint"], category="inpaint", version="1.2.2")
 class LaMaInfillInvocation(InfillImageProcessorInvocation):
     """Infills transparent areas of an image using the LaMa model"""
 
     def infill(self, image: Image.Image):
         with self._context.models.load_remote_model(
-            source="https://github.com/Sanster/models/releases/download/add_big_lama/big-lama.pt",
+            source=LAMA_MODEL_URL,
             loader=LaMA.load_jit_model,
         ) as model:
             lama = LaMA(model)

@@ -5,7 +5,7 @@ import { getElement } from 'features/nodes/components/sidePanel/builder/form-man
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
-import { isBatchNode, isGeneratorNode, isInvocationNode } from 'features/nodes/types/invocation';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
 import { uniqBy } from 'lodash-es';
 import { assert } from 'tsafe';
@@ -83,10 +83,6 @@ export const selectMayUndo = createSelector(
 export const selectMayRedo = createSelector(
   (state: RootState) => state.nodes,
   (nodes) => nodes.future.length > 0
-);
-
-export const selectHasBatchOrGeneratorNodes = createSelector(selectNodes, (nodes) =>
-  nodes.filter(isInvocationNode).some((node) => isBatchNode(node) || isGeneratorNode(node))
 );
 
 export const selectWorkflowName = createNodesSelector((nodes) => nodes.name);
