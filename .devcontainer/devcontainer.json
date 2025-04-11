@@ -31,8 +31,8 @@
     }
   ],
   "containerEnv": {
-    "RUST_LOG": "trace",
-    "UV_LINK_MODE": "hardlink"
+    // "RUST_LOG": "trace",
+    "UV_COMPILE_BYTECODE": "0"
   },
   "features": {
     "ghcr.io/devcontainers/features/git-lfs": {},
@@ -48,16 +48,14 @@
   },
   "onCreateCommand": "pnpm config --global set store-dir $XDG_CACHE_HOME/pnpm",
   "updateContentCommand": {
-    "Frontend::Setup": "pnpm install --dir invokeai/frontend/web/ --frozen-lockfile --reporter append-only",
-    // install all development python dependencies using the exact versions in the lockfile without deleting other packages which might not be specified in the lockfile.
-    "Backend::Setup": "uv sync --frozen --inexact --active --all-extras --no-extra onnx-directml --no-install-project --no-progress && uv pip install --editable ."
-    // "Backend::Setup": "uv sync --active --all-extras --no-extra onnx-directml --frozen --inexact && python -c \"from patchmatch import patch_match\"",
+    "Frontend::Setup": "pnpm install --dir invokeai/frontend/web --reporter append-only --prefer-offline",
+    "Backend::Setup": "uv sync --inexact --all-extras --no-extra onnx-directml"
   },
   "customizations": {
     "vscode": {
       "settings": {
         // Where your InvokeAI `venv`'s python executable lives
-        "python.defaultInterpreterPath": "$UV_PROJECT_ENVIRONMENT/bin/python",
+        "python.defaultInterpreterPath": "~/.venv/bin/python",
         // "python.defaultInterpreterPath": "/home/node/.cache/uv/bin/python",
         "python.analysis.extraPaths": ["/invokeai", "${workspaceRoot}"],
         "editor.formatOnSave": true,
