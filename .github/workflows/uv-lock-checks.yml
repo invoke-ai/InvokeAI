@@ -30,7 +30,7 @@ on:
         default: true
 
 jobs:
-  python-checks:
+  uv-lock-checks:
     env:
       # uv requires a venv by default - but for this, we can simply use the system python
       UV_SYSTEM_PYTHON: 1
