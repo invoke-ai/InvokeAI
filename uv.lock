@@ -540,7 +540,7 @@ wheels = [
 
 [[package]]
 name = "diffusers"
-version = "0.32.2"
+version = "0.33.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -552,9 +552,9 @@ dependencies = [
     { name = "requests" },
     { name = "safetensors" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ee/72/d3f715e71a77f14a48f1ac081cea5bb6c6e6cd41c55b1291f401b1504679/diffusers-0.32.2.tar.gz", hash = "sha256:eb1e36b326aabb0675729af7c626caf7a76ce7ced3a126e879331790b1eaa230", size = 2614622 }
+sdist = { url = "https://files.pythonhosted.org/packages/c2/4a/ea270e695ce5ffbffab2fdd542e8eba138d7cd26b945b6323a7791128e1b/diffusers-0.33.0.tar.gz", hash = "sha256:0d649d642fc1e0e5cbdfb8b66ae0cd44847f5b00bd2ec7889deb902af93335b8", size = 2895110 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/c9/2b2e822d871b06605363e52555be5d7ff0996f4eeaf0f7e5fda15adedfbe/diffusers-0.32.2-py3-none-any.whl", hash = "sha256:d7f182b49c7f428737ee3bf6397d463ec03b85f4f3b2c9470bd1d73292b609ff", size = 3226075 },
+    { url = "https://files.pythonhosted.org/packages/92/be/0b204885f8b2763bcec71b68231b9df76348ee0d1c824fe6f750b0677bf0/diffusers-0.33.0-py3-none-any.whl", hash = "sha256:a9a07437dbb72ed72341cec6b8f07a3eab557b9a924adbac3411f77fa3614dcc", size = 3554677 },
 ]
 
 [package.optional-dependencies]
@@ -1052,7 +1052,7 @@ requires-dist = [
     { name = "blake3" },
     { name = "compel", specifier = "==2.0.2" },
     { name = "deprecated" },
-    { name = "diffusers", extras = ["torch"] },
+    { name = "diffusers", extras = ["torch"], specifier = "==0.33.0" },
     { name = "dnspython" },
     { name = "dynamicprompts" },
     { name = "einops" },
