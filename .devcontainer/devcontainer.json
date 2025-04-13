@@ -54,10 +54,12 @@
   "customizations": {
     "vscode": {
       "settings": {
-        // Where your InvokeAI `venv`'s python executable lives
         "python.defaultInterpreterPath": "~/.venv/bin/python",
-        // "python.defaultInterpreterPath": "/home/node/.cache/uv/bin/python",
-        "python.analysis.extraPaths": ["/invokeai", "${workspaceRoot}"],
+        "python.analysis.extraPaths": [
+          "/invokeai",
+          "/workspaces/InvokeAI",
+          "~/.venv/lib"
+        ],
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
           "source.organizeImports": "always"
