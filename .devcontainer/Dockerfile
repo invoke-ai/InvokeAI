@@ -45,7 +45,7 @@ ENV \
 # Instead of using an envar we write the value to the user-level config file for UV
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then export UV_INDEX="https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then export UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
-    else export UV_INDEX="https://download.pytorch.org/whl/cu126"; \
+    else export UV_INDEX="https://download.pytorch.org/whl/cu124"; \
     fi \
     && mkdir -p /home/${USERNAME}/.config/uv/ \
     && echo "[[index]]\nurl = '$(echo $UV_INDEX)'\n" > /home/${USERNAME}/.config/uv/uv.toml
