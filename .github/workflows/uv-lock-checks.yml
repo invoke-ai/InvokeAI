@@ -1,4 +1,6 @@
 # Check the `uv` lockfile for consistency with `pyproject.toml`.
+#
+# If this check fails, you should run `uv lock` to update the lockfile.
 
 name: 'uv lock checks'
 
