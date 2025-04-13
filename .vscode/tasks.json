@@ -2,58 +2,93 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "[Install] UV",
-      "type": "shell",
-      "command": "uv pip install .",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "[Install] PNPM",
-      "type": "shell",
-      "command": "pnpm",
-      "args": ["install", "--dir", "invokeai/frontend/web/"],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "[Build] PatchMatch",
+      "label": "Build :: PatchMatch",
       "type": "shell",
       "command": "python",
       "args": ["-c", "from patchmatch import patch_match"],
       "group": {
         "kind": "build",
         "isDefault": false
+      },
+      "presentation": {
+        "group": "build",
+        "echo": true
       }
     },
     {
-      "label": "[Test] Backend",
+      "label": "Test :: Backend",
       "type": "shell",
       "command": "pytest",
       "args": [],
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
       "options": {
         "cwd": "${workspaceFolder}/tests"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false,
+        "group": "test"
       }
     },
     {
-      "label": "[Test] Frontend",
+      "label": "Test :: Frontend",
       "type": "shell",
       "command": "pnpm",
       "args": ["test"],
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
       "options": {
         "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false,
+        "group": "test"
+      }
+    },
+    {
+      "label": "Install :: Backend",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "sync",
+        "--inexact",
+        "--all-extras",
+        "--no-extra",
+        "onnx-directml"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "install"
+      }
+    },
+    {
+      "label": "Install :: Frontend",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["install", "--dir", "invokeai/frontend/web/"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "install"
       }
     }
   ]
