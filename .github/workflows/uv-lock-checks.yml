@@ -1,0 +1,66 @@
+# Check the `uv` lockfile for consistency with `pyproject.toml`.
+
+name: 'uv lock checks'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  merge_group:
+  workflow_dispatch:
+    inputs:
+      always_run:
+        description: 'Always run the checks'
+        required: true
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      always_run:
+        description: 'Always run the checks'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  python-checks:
+    env:
+      # uv requires a venv by default - but for this, we can simply use the system python
+      UV_SYSTEM_PYTHON: 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # expected run time: <1 min
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: check for changed python files
+        if: ${{ inputs.always_run != true }}
+        id: changed-files
+        # Pinned to the _hash_ for v45.0.9 to prevent supply-chain attacks.
+        # See:
+        # - CVE-2025-30066
+        # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
+        # - https://github.com/tj-actions/changed-files/issues/2463
+        uses: tj-actions/changed-files@a284dc1814e3fd07f2e34267fc8f81227ed29fb8
+        with:
+          files_yaml: |
+            uvlock-pyprojecttoml:
+              - 'pyproject.toml'
+              - 'uv.lock'
+
+      - name: setup uv
+        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.6.10'
+          enable-cache: true
+
+      - name: check lockfile
+        if: ${{ steps.changed-files.outputs.uvlock-pyprojecttoml_any_changed == 'true' || inputs.always_run == true }}
+        run: uv lock --locked # this will exit with 1 if the lockfile is not consistent with pyproject.toml
+        shell: bash
