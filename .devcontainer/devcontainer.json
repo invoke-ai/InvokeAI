@@ -31,7 +31,6 @@
     }
   ],
   "containerEnv": {
-    // "RUST_LOG": "trace",
     "UV_COMPILE_BYTECODE": "0"
   },
   "features": {
