@@ -91,5 +91,6 @@ RUN uv python install ${PYTHON_VERSION}
 
 WORKDIR ${INVOKEAI_SRC}
 
+# TODO: consider building patchmatch in a seperate stage and copying the files over so we don't have to link deps and install stuff in the container
 # # build patchmatch
 # RUN ln -sf --relative /usr/lib/${USERNAME}-linux-gnu/pkgconfig/{opencv4,opencv}.pc && python -c "from patchmatch import patch_match"
