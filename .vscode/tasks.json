@@ -37,7 +37,7 @@
       "args": [],
       "group": {
         "kind": "test",
-        "isDefault": true
+        "isDefault": false
       },
       "options": {
         "cwd": "${workspaceFolder}/tests"
@@ -50,7 +50,7 @@
       "args": ["test"],
       "group": {
         "kind": "test",
-        "isDefault": true
+        "isDefault": false
       },
       "options": {
         "cwd": "${workspaceFolder}/invokeai/frontend/web/"
