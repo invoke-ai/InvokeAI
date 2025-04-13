@@ -65,7 +65,6 @@ ENV XDG_CACHE_HOME=${CACHE_DIR} \
     GIT_LFS_CACHE=${CACHE_DIR}/git-lfs \
     PATH="$UV_PROJECT_ENVIRONMENT/bin:$CACHE_DIR/pnpm:$CACHE_DIR/uv:$PATH" \
     PYTHONPATH="$PYTHONPATH:${INVOKEAI_SRC}"
-    # PYTHONPATH="$UV_PROJECT_ENVIRONMENT/lib/python${PYTHON_VERSION}/site-packages:$PYTHONPATH" \
 
 # Setup cache volume for dependencies
 VOLUME [ "${CACHE_DIR}", "${INVOKEAI_ROOT}", "${INVOKEAI_SRC}" ]
@@ -88,17 +87,9 @@ RUN corepack use pnpm && corepack enable
 # TODO: Shouldnt this be put in the users .local dir?
 COPY --from=ghcr.io/astral-sh/uv /uv /uvx /bin/
 
-# RUN --mount=type=cache,target=/home/${USERNAME}/.cache/uv \
 RUN uv python install ${PYTHON_VERSION}
 
 WORKDIR ${INVOKEAI_SRC}
-
-# RUN --mount=type=cache,target=/home/${USERNAME}/.cache/uv \
-#     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-#     --mount=type=bind,source=uv.lock,target=uv.lock \
-#     # this is just to get the package manager to recognize that the project exists, without making changes to the docker layer
-#     --mount=type=bind,source=invokeai/version,target=invokeai/version \
-#     uv sync --frozen --inexact --active --all-extras --no-extra onnx-directml
 
 # # build patchmatch
 # RUN ln -sf --relative /usr/lib/${USERNAME}-linux-gnu/pkgconfig/{opencv4,opencv}.pc && python -c "from patchmatch import patch_match"
