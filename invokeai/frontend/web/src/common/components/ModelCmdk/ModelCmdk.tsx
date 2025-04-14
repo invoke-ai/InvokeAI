@@ -8,7 +8,6 @@ import { atom } from 'nanostores';
 import type { ChangeEvent, RefObject } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
@@ -142,7 +141,7 @@ const ModelCommandRoot = memo(
     onSelect: (model: AnyModelConfig) => void;
   }) => {
     const { t } = useTranslation();
-
+    const [value, setValue] = useState('');
     const { inputRef, modelConfigs, onSelect } = props;
     const [searchTerm, setSearchTerm] = useState('');
     // Filtering the list is expensive - debounce the search term to avoid stutters
@@ -153,7 +152,7 @@ const ModelCommandRoot = memo(
     }, []);
 
     return (
-      <CommandRoot loop shouldFilter={false}>
+      <CommandRoot loop shouldFilter={false} value={value} onValueChange={setValue}>
         <Flex flexDir="column" h="full" gap={2}>
           <Input ref={inputRef} value={searchTerm} onChange={onChange} placeholder={t('nodes.nodeSearch')} />
           <Box w="full" h="full">
@@ -170,7 +169,12 @@ const ModelCommandRoot = memo(
                 />
               </CommandEmpty>
               <CommandList>
-                <ModelList searchTerm={debouncedSearchTerm} onSelect={onSelect} modelConfigs={modelConfigs} />
+                <ModelList
+                  searchTerm={debouncedSearchTerm}
+                  onSelect={onSelect}
+                  modelConfigs={modelConfigs}
+                  setValue={setValue}
+                />
               </CommandList>
             </ScrollableContent>
           </Box>
@@ -182,35 +186,34 @@ const ModelCommandRoot = memo(
 ModelCommandRoot.displayName = 'ModelCommandRoot';
 
 const ModelList = memo(
-  (props: { searchTerm: string; modelConfigs: AnyModelConfig[]; onSelect: (model: AnyModelConfig) => void }) => {
-    const { data } = useGetModelConfigsQuery();
+  (props: {
+    searchTerm: string;
+    modelConfigs: AnyModelConfig[];
+    onSelect: (model: AnyModelConfig) => void;
+    setValue: (value: string) => void;
+  }) => {
+    const { searchTerm, modelConfigs, onSelect: _onSelect, setValue } = props;
+
     const onSelect = useCallback(
       (key: string) => {
-        if (!data) {
-          // Data not loaded? No models? We should never get here.
-          return;
-        }
-        const model = modelConfigsAdapterSelectors.selectById(data, key);
+        const model = modelConfigs.find((model) => model.key === key);
         if (!model) {
           // Model not found? We should never get here.
           return;
         }
-        props.onSelect(model);
+        _onSelect(model);
       },
-      [data, props]
+      [_onSelect, modelConfigs]
     );
     const results = useMemo(() => {
-      if (!props.searchTerm) {
-        return props.modelConfigs;
+      if (!searchTerm) {
+        setValue(modelConfigs[0]?.key ?? '');
+        return modelConfigs;
       }
-      const results: AnyModelConfig[] = [];
-      for (const model of props.modelConfigs) {
-        if (isMatch(model, props.searchTerm)) {
-          results.push(model);
-        }
-      }
+      const results = modelConfigs.filter((model) => isMatch(model, searchTerm));
+      setValue(results[0]?.key ?? '');
       return results;
-    }, [props.modelConfigs, props.searchTerm]);
+    }, [modelConfigs, searchTerm, setValue]);
 
     return (
       <>
@@ -232,13 +235,22 @@ const cmdkItemSx: SystemStyleObject = {
   '&[data-selected="true"]': {
     bg: 'base.700',
   },
-};
-
-const cmdkItemHeaderSx: SystemStyleObject = {
-  display: 'flex',
-  gap: 2,
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  '.model-header': {
+    display: 'flex',
+    gap: 2,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    'model-name': {
+      fontSize: 'sm',
+    },
+    'model-base': {
+      fontSize: 'sm',
+      color: 'base.500',
+    },
+    'model-desc': {
+      color: 'base.200',
+    },
+  },
 };
 
 const ChakraCommandItem = chakra(CommandItem);
@@ -247,13 +259,11 @@ const ModelItem = memo((props: { model: AnyModelConfig; onSelect: (key: string) 
   const { model, onSelect } = props;
   return (
     <ChakraCommandItem value={model.key} onSelect={onSelect} role="button" sx={cmdkItemSx}>
-      <Flex sx={cmdkItemHeaderSx}>
-        <Text fontWeight="semibold">{model.name}</Text>
-        <Text variant="subtext" fontWeight="semibold">
-          {model.base}
-        </Text>
-      </Flex>
-      {model.description && <Text color="base.200">{model.description}</Text>}
+      <Box className="model-header">
+        <Text className="model-name">{model.name}</Text>
+        <Text className="model-base">{model.base}</Text>
+      </Box>
+      {model.description && <Text className="model-desc">{model.description}</Text>}
     </ChakraCommandItem>
   );
 });

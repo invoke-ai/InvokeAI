@@ -17,7 +17,7 @@ import { noop } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
-import { useAllModels } from 'services/api/hooks/modelsByType';
+import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
@@ -28,7 +28,7 @@ const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
-  const [modelConfigs] = useAllModels();
+  const [modelConfigs] = useControlNetModels();
   const modelCmdk = useModelCmdk({ onSelect: noop, modelConfigs });
 
   return (
