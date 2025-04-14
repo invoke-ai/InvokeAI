@@ -1,7 +1,7 @@
 import { Box, Button, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useModelCmdk } from 'common/components/ModelCmdk/ModelCmdk';
+import { useModelCombobox } from 'common/components/ModelCombobox/ModelCombobox';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
@@ -13,15 +13,20 @@ import { RefinerSettingsAccordion } from 'features/settingsAccordions/components
 import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
 import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
 import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePresetSlice';
-import { noop } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import { useControlNetModels } from 'services/api/hooks/modelsByType';
+import type { AnyModelConfig } from 'services/api/types';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
   width: '100%',
+};
+
+const onSelect = (modelConfig: AnyModelConfig) => {
+  // Handle model selection
+  console.log('Selected model:', modelConfig);
 };
 
 const ParametersPanelTextToImage = () => {
@@ -29,7 +34,7 @@ const ParametersPanelTextToImage = () => {
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
   const [modelConfigs] = useControlNetModels();
-  const modelCmdk = useModelCmdk({ onSelect: noop, modelConfigs });
+  const modelCmdk = useModelCombobox({ onSelect, modelConfigs });
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
