@@ -16,7 +16,7 @@ import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePreset
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
-import { useControlNetModels } from 'services/api/hooks/modelsByType';
+import { useAllModels } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig } from 'services/api/types';
 
 const overlayScrollbarsStyles: CSSProperties = {
@@ -33,7 +33,7 @@ const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
-  const [modelConfigs] = useControlNetModels();
+  const [modelConfigs] = useAllModels();
   const modelCmdk = useModelCombobox({ onSelect, modelConfigs });
 
   return (
