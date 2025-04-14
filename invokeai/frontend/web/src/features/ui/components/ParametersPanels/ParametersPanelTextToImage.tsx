@@ -1,7 +1,6 @@
 import { Box, Button, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { ModelCmdkOptions } from 'common/components/ModelCmdk/ModelCmdk';
 import { useModelCmdk } from 'common/components/ModelCmdk/ModelCmdk';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
@@ -18,23 +17,19 @@ import { noop } from 'lodash-es';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { useAllModels } from 'services/api/hooks/modelsByType';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
   width: '100%',
 };
 
-const options: ModelCmdkOptions = {
-  filter: isNonRefinerMainModelConfig,
-  onSelect: noop,
-};
-
 const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
-  const modelCmdk = useModelCmdk(options);
+  const [modelConfigs] = useAllModels();
+  const modelCmdk = useModelCmdk({ onSelect: noop, modelConfigs });
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
