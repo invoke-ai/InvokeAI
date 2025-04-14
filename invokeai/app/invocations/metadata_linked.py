@@ -39,7 +39,17 @@ from invokeai.app.invocations.model import (
     VAEField,
     VAEOutput,
 )
-from invokeai.app.invocations.primitives import BooleanOutput, FloatOutput, IntegerOutput, LatentsOutput, StringOutput
+from invokeai.app.invocations.primitives import (
+    BooleanCollectionOutput,
+    BooleanOutput,
+    FloatCollectionOutput,
+    FloatOutput,
+    IntegerCollectionOutput,
+    IntegerOutput,
+    LatentsOutput,
+    StringCollectionOutput,
+    StringOutput,
+)
 from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -1162,3 +1172,133 @@ class MetadataToT2IAdaptersInvocation(BaseInvocation, WithMetadata):
             adapters = append_list(T2IAdapterField, i.t2i_adapter, adapters)
 
         return MDT2IAdapterListOutput(t2i_adapter_list=adapters)
+
+
+@invocation(
+    "metadata_to_string_collection",
+    title="Metadata To String Collection",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToStringCollectionInvocation(BaseInvocation, WithMetadata):
+    """Extracts a string collection value of a label from metadata"""
+
+    label: CORE_LABELS_STRING = InputField(
+        default=CUSTOM_LABEL,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: list[str] = InputField(
+        description="The default string collection to use if not found in the metadata"
+    )
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> StringCollectionOutput:
+        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
+        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
+
+        return StringCollectionOutput(collection=output)
+
+
+@invocation(
+    "metadata_to_integer_collection",
+    title="Metadata To Integer Collection",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToIntegerCollectionInvocation(BaseInvocation, WithMetadata):
+    """Extracts an integer value Collection of a label from metadata"""
+
+    label: CORE_LABELS_INTEGER = InputField(
+        default=CUSTOM_LABEL,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: list[int] = InputField(description="The default integer to use if not found in the metadata")
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
+        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
+        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
+
+        return IntegerCollectionOutput(collection=output)
+
+
+@invocation(
+    "metadata_to_float_collection",
+    title="Metadata To Float Collection",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToFloatCollectionInvocation(BaseInvocation, WithMetadata):
+    """Extracts a Float value Collection of a label from metadata"""
+
+    label: CORE_LABELS_FLOAT = InputField(
+        default=CUSTOM_LABEL,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: list[float] = InputField(description="The default float to use if not found in the metadata")
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
+        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
+        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
+
+        return FloatCollectionOutput(collection=output)
+
+
+@invocation(
+    "metadata_to_bool_collection",
+    title="Metadata To Bool Collection",
+    tags=["metadata"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToBoolCollectionInvocation(BaseInvocation, WithMetadata):
+    """Extracts a Boolean value Collection of a label from metadata"""
+
+    label: CORE_LABELS_BOOL = InputField(
+        default=CUSTOM_LABEL,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    custom_label: Optional[str] = InputField(
+        default=None,
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+    default_value: list[bool] = InputField(description="The default bool to use if not found in the metadata")
+
+    _validate_custom_label = model_validator(mode="after")(validate_custom_label)
+
+    def invoke(self, context: InvocationContext) -> BooleanCollectionOutput:
+        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
+        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
+
+        return BooleanCollectionOutput(collection=output)
