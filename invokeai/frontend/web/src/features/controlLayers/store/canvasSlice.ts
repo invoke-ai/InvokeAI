@@ -1096,6 +1096,30 @@ export const canvasSlice = createSlice({
       state.inpaintMasks.entities = [data];
       state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
     },
+    inpaintMaskNoiseAdded: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.noiseLevel = 0.1; // Default noise level
+      }
+    },
+    inpaintMaskNoiseChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ noiseLevel: number }, 'inpaint_mask'>>
+    ) => {
+      const { entityIdentifier, noiseLevel } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.noiseLevel = noiseLevel;
+      }
+    },
+    inpaintMaskNoiseDeleted: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.noiseLevel = null;
+      }
+    },
     inpaintMaskConvertedToRegionalGuidance: {
       reducer: (
         state,
@@ -1869,6 +1893,9 @@ export const {
   // Inpaint mask
   inpaintMaskAdded,
   inpaintMaskConvertedToRegionalGuidance,
+  inpaintMaskNoiseAdded,
+  inpaintMaskNoiseChanged,
+  inpaintMaskNoiseDeleted,
   // inpaintMaskRecalled,
 } = canvasSlice.actions;
 
