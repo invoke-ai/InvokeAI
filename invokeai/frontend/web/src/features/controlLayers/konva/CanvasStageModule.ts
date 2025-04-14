@@ -22,12 +22,17 @@ type CanvasStageModuleConfig = {
    * The factor by which the canvas should be scaled when zooming in/out
    */
   SCALE_FACTOR: number;
+  /**
+   * The padding in pixels to use when fitting the layers to the stage.
+   */
+  FIT_LAYERS_TO_STAGE_PADDING_PX: number;
 };
 
 const DEFAULT_CONFIG: CanvasStageModuleConfig = {
   MIN_SCALE: 0.1,
   MAX_SCALE: 20,
   SCALE_FACTOR: 0.999,
+  FIT_LAYERS_TO_STAGE_PADDING_PX: 48,
 };
 
 export class CanvasStageModule extends CanvasModuleBase {
@@ -175,18 +180,20 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    const padding = 20; // Padding in absolute pixels
-
-    const availableWidth = width - padding * 2;
-    const availableHeight = height - padding * 2;
+    const availableWidth = width - this.config.FIT_LAYERS_TO_STAGE_PADDING_PX * 2;
+    const availableHeight = height - this.config.FIT_LAYERS_TO_STAGE_PADDING_PX * 2;
 
     // Make sure we don't accidentally set the scale to something nonsensical, like a negative number, 0 or something
     // outside the valid range
     const scale = this.constrainScale(
       Math.min(Math.min(availableWidth / rect.width, availableHeight / rect.height), 1)
     );
-    const x = Math.floor(-rect.x * scale + padding + (availableWidth - rect.width * scale) / 2);
-    const y = Math.floor(-rect.y * scale + padding + (availableHeight - rect.height * scale) / 2);
+    const x = Math.floor(
+      -rect.x * scale + this.config.FIT_LAYERS_TO_STAGE_PADDING_PX + (availableWidth - rect.width * scale) / 2
+    );
+    const y = Math.floor(
+      -rect.y * scale + this.config.FIT_LAYERS_TO_STAGE_PADDING_PX + (availableHeight - rect.height * scale) / 2
+    );
 
     this.konva.stage.setAttrs({
       x,
