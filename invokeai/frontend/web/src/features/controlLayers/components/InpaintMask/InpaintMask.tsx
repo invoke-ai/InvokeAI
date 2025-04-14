@@ -4,6 +4,7 @@ import { CanvasEntityHeader } from 'features/controlLayers/components/common/Can
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
+import { InpaintMaskSettings } from 'features/controlLayers/components/InpaintMask/InpaintMaskSettings';
 import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
 import { InpaintMaskAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -28,6 +29,7 @@ export const InpaintMask = memo(({ id }: Props) => {
               <Spacer />
               <CanvasEntityHeaderCommonActions />
             </CanvasEntityHeader>
+            <InpaintMaskSettings />
           </CanvasEntityContainer>
         </CanvasEntityStateGate>
       </InpaintMaskAdapterGate>
