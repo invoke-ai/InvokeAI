@@ -65,7 +65,7 @@
     "@xyflow/react": "^12.5.3",
     "async-mutex": "^0.5.0",
     "chakra-react-select": "^4.9.2",
-    "cmdk": "^1.0.0",
+    "cmdk": "^1.1.1",
     "compare-versions": "^6.1.1",
     "filesize": "^10.1.6",
     "fracturedjsonjs": "^4.0.2",
