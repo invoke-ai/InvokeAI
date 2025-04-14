@@ -13,6 +13,7 @@ import { RefinerSettingsAccordion } from 'features/settingsAccordions/components
 import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
 import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
 import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePresetSlice';
+import { toast } from 'features/toast/toast';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
@@ -26,7 +27,9 @@ const overlayScrollbarsStyles: CSSProperties = {
 
 const onSelect = (modelConfig: AnyModelConfig) => {
   // Handle model selection
-  console.log('Selected model:', modelConfig);
+  toast({
+    description: `Selected model: ${modelConfig.name}`,
+  });
 };
 
 const ParametersPanelTextToImage = () => {
