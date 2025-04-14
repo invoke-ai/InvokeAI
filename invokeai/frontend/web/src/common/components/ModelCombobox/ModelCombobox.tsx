@@ -1,13 +1,17 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Input, Modal, ModalBody, ModalContent, ModalOverlay, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, Input, Modal, ModalBody, ModalContent, ModalOverlay, Spacer, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
+import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
+import { filesize } from 'filesize';
 import { atom } from 'nanostores';
 import type { ChangeEvent, RefObject } from 'react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfig, BaseModelType } from 'services/api/types';
+import { useDebounce } from 'use-debounce';
 
 export type ModelComboboxOptions = {
   modelConfigs: AnyModelConfig[];
@@ -35,19 +39,24 @@ const getRegex = (searchTerm: string) =>
     'gi'
   );
 
+const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
+  'sd-1': ['sd1', 'sd1.4', 'sd1.5', 'sd-1'],
+  'sd-2': ['sd2', 'sd2.0', 'sd2.1', 'sd-2'],
+  'sd-3': ['sd3', 'sd3.0', 'sd3.5', 'sd-3'],
+};
+
 const isMatch = (model: AnyModelConfig, searchTerm: string) => {
   const regex = getRegex(searchTerm);
 
   if (
-    model.name.includes(searchTerm) ||
+    model.name.toLowerCase().includes(searchTerm) ||
     regex.test(model.name) ||
-    model.base.includes(searchTerm) ||
-    regex.test(model.base) ||
-    model.type.includes(searchTerm) ||
+    (BASE_KEYWORDS[model.base] ?? [model.base]).some((kw) => kw.toLowerCase().includes(searchTerm) || regex.test(kw)) ||
+    model.type.toLowerCase().includes(searchTerm) ||
     regex.test(model.type) ||
-    (model.description ?? '').includes(searchTerm) ||
+    (model.description ?? '').toLowerCase().includes(searchTerm) ||
     regex.test(model.description ?? '') ||
-    model.format.includes(searchTerm) ||
+    model.format.toLowerCase().includes(searchTerm) ||
     regex.test(model.format)
   ) {
     return true;
@@ -117,24 +126,25 @@ const ModelComboboxContent = memo(
     const [$value] = useState(() => atom(modelConfigs[0]?.key ?? ''));
     const value = useStore($value);
     const rootRef = useRef<HTMLDivElement>(null);
-    // const [value, setValue] = useState(modelConfigs[0]?.key ?? '');
     const [items, setItems] = useState<AnyModelConfig[]>(modelConfigs);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
-    const onChangeSearchTerm = useCallback(
-      (e: ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-        if (!e.target.value) {
-          setItems(modelConfigs);
-          $value.set(modelConfigs[0]?.key ?? '');
-        } else {
-          const filtered = modelConfigs.filter((model) => isMatch(model, e.target.value));
-          setItems(filtered);
-          $value.set(filtered[0]?.key ?? '');
-        }
-      },
-      [$value, modelConfigs]
-    );
+    const onChangeSearchTerm = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+      setSearchTerm(e.target.value);
+    }, []);
+
+    useEffect(() => {
+      if (!debouncedSearchTerm) {
+        setItems(modelConfigs);
+        $value.set(modelConfigs[0]?.key ?? '');
+      } else {
+        const lowercasedSearchTerm = debouncedSearchTerm.toLowerCase();
+        const filtered = modelConfigs.filter((model) => isMatch(model, lowercasedSearchTerm));
+        setItems(filtered);
+        $value.set(filtered[0]?.key ?? '');
+      }
+    }, [$value, modelConfigs, debouncedSearchTerm]);
 
     const onSelect = useCallback(
       (key: string) => {
@@ -289,11 +299,15 @@ ModelComboboxContent.displayName = 'ModelComboboxContent';
 const itemSx: SystemStyleObject = {
   display: 'flex',
   flexDir: 'column',
-  py: 1,
-  px: 2,
+  p: 2,
+  cursor: 'pointer',
   borderRadius: 'base',
   '&[data-selected="true"]': {
     bg: 'base.700',
+  },
+  '&[data-disabled="true"]': {
+    cursor: 'not-allowed',
+    opacity: 0.5,
   },
 };
 
@@ -333,17 +347,22 @@ ModelComboboxItem.displayName = 'ModelComboboxItem';
 
 const ModelComboboxItemContent = memo(({ model }: { model: AnyModelConfig }) => {
   return (
-    <>
-      <Flex tabIndex={-1} gap={2} alignItems="center" justifyContent="space-between">
-        <Text fontSize="sm" fontWeight="semibold">
-          {model.name}
-        </Text>
-        <Text fontSize="sm" color="base.500">
-          {model.base}
-        </Text>
+    <Flex tabIndex={-1} gap={2}>
+      <ModelImage image_url={model.cover_image} />
+      <Flex flexDir="column" gap={2} flex={1}>
+        <Flex gap={2} alignItems="center">
+          <Text fontSize="sm" fontWeight="semibold">
+            {model.name}
+          </Text>
+          <Spacer />
+          <Text variant="subtext" fontStyle="italic">
+            {filesize(model.file_size)}
+          </Text>
+          <ModelBaseBadge base={model.base} />
+        </Flex>
+        {model.description && <Text color="base.200">{model.description}</Text>}
       </Flex>
-      {model.description && <Text color="base.200">{model.description}</Text>}
-    </>
+    </Flex>
   );
 });
 ModelComboboxItemContent.displayName = 'ModelComboboxItemContent';
