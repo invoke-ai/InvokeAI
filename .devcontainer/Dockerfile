@@ -1,8 +1,6 @@
 FROM mcr.microsoft.com/devcontainers/typescript-node:22
 
 ARG USERNAME=vscode
-ARG CONTAINER_UID=1000
-ARG CONTAINER_GID=1000
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt \
@@ -36,9 +34,7 @@ ENV \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_MANAGED_PYTHON=1 \
     INVOKEAI_HOST=0.0.0.0 \
-    INVOKEAI_PORT=9090 \
-    CONTAINER_UID=${CONTAINER_UID:-1000} \
-    CONTAINER_GID=${CONTAINER_GID:-1000}
+    INVOKEAI_PORT=9090
 
 # Set the secondary index for UV to the appropriate PyTorch index URL based on the GPU driver and architecture
 # NOTE: this is the index URL that will be used by `uv` to install PyTorch and other packages
