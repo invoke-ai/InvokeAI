@@ -45,6 +45,7 @@
     "80": { "label": "InvokeAI Frontend" },
     "9090": { "label": "InvokeAI Backend" }
   },
+  "runArgs": ["--env-file", ".devcontainer/.env"],
   "onCreateCommand": "pnpm config --global set store-dir $XDG_CACHE_HOME/pnpm",
   "updateContentCommand": {
     "Frontend::Setup": "pnpm install --dir invokeai/frontend/web --reporter append-only --prefer-offline",
