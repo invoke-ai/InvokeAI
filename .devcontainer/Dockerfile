@@ -24,6 +24,7 @@ ARG GPU_DRIVER=cuda
 ARG INVOKEAI_SRC=/home/${USERNAME}/src/invokeai
 ARG INVOKEAI_ROOT=/home/${USERNAME}/invokeai-data
 ARG UV_PROJECT_ENVIRONMENT=/home/${USERNAME}/.venv
+ARG HF_HOME=/home/${USERNAME}/.invokeai-cache/huggingface
 
 ENV \
     VIRTUAL_ENV=${UV_PROJECT_ENVIRONMENT} \
@@ -34,7 +35,8 @@ ENV \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_MANAGED_PYTHON=1 \
     INVOKEAI_HOST=0.0.0.0 \
-    INVOKEAI_PORT=9090
+    INVOKEAI_PORT=9090 \
+    HF_HOME=${HF_HOME}
 
 # Set the secondary index for UV to the appropriate PyTorch index URL based on the GPU driver and architecture
 # NOTE: this is the index URL that will be used by `uv` to install PyTorch and other packages
@@ -63,7 +65,7 @@ ENV XDG_CACHE_HOME=${CACHE_DIR} \
     PYTHONPATH="$PYTHONPATH:${INVOKEAI_SRC}"
 
 # Setup cache volume for dependencies
-VOLUME [ "${CACHE_DIR}", "${INVOKEAI_ROOT}", "${INVOKEAI_SRC}" ]
+VOLUME [ "${CACHE_DIR}", "${INVOKEAI_ROOT}", "${INVOKEAI_SRC}", "${HF_HOME}" ]
 
 # Create & set ownership of directories
 RUN set -eux; \

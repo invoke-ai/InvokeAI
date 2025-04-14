@@ -18,6 +18,12 @@
       "target": "/home/node/.cache"
     },
     {
+      // Setup a volume for invokeai downloads cache
+      "type": "volume",
+      "source": "invokeai-downloads-cache",
+      "target": "/home/node/.invokeai-cache"
+    },
+    {
       // Setup a volume for the invokeai data (to prevent development work from corrupting users stable invokeai data)
       "type": "volume",
       "source": "invokeai-data-dev",
