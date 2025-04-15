@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { ModelComboboxItem } from 'common/components/ModelCombobox/ModelComboboxItem';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { useStateImperative } from 'common/hooks/useStateImperative';
 import { atom } from 'nanostores';
 import type { ChangeEvent, RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -122,8 +123,7 @@ const ModelComboboxContent = memo(
   }) => {
     const { inputRef, modelConfigs, onSelect: _onSelect } = props;
     const { t } = useTranslation();
-    const [$value] = useState(() => atom(modelConfigs[0]?.key ?? ''));
-    const value = useStore($value);
+    const [value, setValue, getValue] = useStateImperative(modelConfigs[0]?.key ?? '');
     const rootRef = useRef<HTMLDivElement>(null);
     const [items, setItems] = useState<AnyModelConfig[]>(modelConfigs);
     const [searchTerm, setSearchTerm] = useState('');
@@ -136,14 +136,14 @@ const ModelComboboxContent = memo(
     useEffect(() => {
       if (!debouncedSearchTerm) {
         setItems(modelConfigs);
-        $value.set(modelConfigs[0]?.key ?? '');
+        setValue(modelConfigs[0]?.key ?? '');
       } else {
         const lowercasedSearchTerm = debouncedSearchTerm.toLowerCase();
         const filtered = modelConfigs.filter((model) => isMatch(model, lowercasedSearchTerm));
         setItems(filtered);
-        $value.set(filtered[0]?.key ?? '');
+        setValue(filtered[0]?.key ?? '');
       }
-    }, [$value, modelConfigs, debouncedSearchTerm]);
+    }, [modelConfigs, debouncedSearchTerm, setValue]);
 
     const onSelect = useCallback(
       (key: string) => {
@@ -159,7 +159,7 @@ const ModelComboboxContent = memo(
 
     const setValueAndScrollIntoView = useCallback(
       (key: string) => {
-        $value.set(key);
+        setValue(key);
         const rootEl = rootRef.current;
         if (!rootEl) {
           return;
@@ -170,13 +170,13 @@ const ModelComboboxContent = memo(
         }
         itemEl.scrollIntoView({ block: 'nearest' });
       },
-      [$value]
+      [setValue]
     );
 
     const prev = useCallback(
       (e: React.KeyboardEvent) => {
         e.preventDefault();
-        const value = $value.get();
+        const value = getValue();
         if (items.length === 0) {
           return;
         }
@@ -200,13 +200,13 @@ const ModelComboboxContent = memo(
           setValueAndScrollIntoView(item.key);
         }
       },
-      [$value, items, setValueAndScrollIntoView]
+      [getValue, items, setValueAndScrollIntoView]
     );
 
     const next = useCallback(
       (e: React.KeyboardEvent) => {
         e.preventDefault();
-        const value = $value.get();
+        const value = getValue();
         if (items.length === 0) {
           return;
         }
@@ -231,7 +231,7 @@ const ModelComboboxContent = memo(
           setValueAndScrollIntoView(item.key);
         }
       },
-      [$value, items, setValueAndScrollIntoView]
+      [getValue, items, setValueAndScrollIntoView]
     );
 
     const onKeyDown = useCallback(
@@ -241,7 +241,7 @@ const ModelComboboxContent = memo(
         } else if (e.key === 'ArrowDown') {
           next(e);
         } else if (e.key === 'Enter') {
-          const value = $value.get();
+          const value = getValue();
           const model = items.find((model) => model.key === value);
           if (!model) {
             // Model not found? We should never get here.
@@ -257,7 +257,7 @@ const ModelComboboxContent = memo(
           inputRef.current?.select();
         }
       },
-      [$value, _onSelect, inputRef, items, next, prev]
+      [_onSelect, getValue, inputRef, items, next, prev]
     );
 
     return (
@@ -281,7 +281,7 @@ const ModelComboboxContent = memo(
                 <ModelComboboxItem
                   key={model.key}
                   model={model}
-                  setActive={$value.set}
+                  setActive={setValue}
                   onSelect={onSelect}
                   isSelected={model.key === value}
                   isDisabled={false}
