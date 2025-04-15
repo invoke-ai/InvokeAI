@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Input, Spacer, Text } from '@invoke-ai/ui-library';
+import { Box, Divider, Flex, Input, Spacer, Text } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStateImperative } from 'common/hooks/useStateImperative';
@@ -8,12 +8,22 @@ import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/Mode
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { filesize } from 'filesize';
 import type { ChangeEvent } from 'react';
-import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig, BaseModelType } from 'services/api/types';
 
+export type ModelConfigGroup = {
+  name: string;
+  description: string;
+  models: AnyModelConfig[];
+};
+
+const isModelConfigGroup = (modelConfig: AnyModelConfig | ModelConfigGroup): modelConfig is ModelConfigGroup => {
+  return modelConfig ? 'models' in modelConfig : false;
+};
+
 export type ModelPickerProps = {
-  modelConfigs: AnyModelConfig[];
+  modelConfigs: AnyModelConfig[] | ModelConfigGroup[];
   selectedModelConfig?: AnyModelConfig;
   onSelect?: (modelConfig: AnyModelConfig) => void;
   onClose?: () => void;
@@ -64,15 +74,51 @@ const isMatch = (model: AnyModelConfig, searchTerm: string) => {
   return false;
 };
 
+const getKeyOfFirstModel = (
+  modelConfigs: (AnyModelConfig | ModelConfigGroup)[],
+  selectedModelConfig?: AnyModelConfig
+): string => {
+  if (selectedModelConfig) {
+    return selectedModelConfig.key;
+  }
+  const first = modelConfigs[0];
+  if (!first) {
+    return '';
+  }
+  if (isModelConfigGroup(first)) {
+    return first.models[0]?.key ?? '';
+  }
+  return first?.key ?? '';
+};
+
+const findModel = (modelConfigs: (AnyModelConfig | ModelConfigGroup)[], key: string): AnyModelConfig | undefined => {
+  for (const modelConfig of modelConfigs) {
+    if (isModelConfigGroup(modelConfig)) {
+      const model = modelConfig.models.find((model) => model.key === key);
+      if (model) {
+        return model;
+      }
+    } else {
+      if (modelConfig.key === key) {
+        return modelConfig;
+      }
+    }
+  }
+};
+
 export const ModelPicker = memo(
   forwardRef<ImperativeModelPickerHandle, ModelPickerProps>((props, ref) => {
     const { t } = useTranslation();
-    const [activeModelKey, setActiveModelKey, getActiveModelKey] = useStateImperative(
-      props.selectedModelConfig?.key ?? props.modelConfigs[0]?.key ?? ''
+    const [activeModelKey, setActiveModelKey, getActiveModelKey] = useStateImperative(() =>
+      getKeyOfFirstModel(props.modelConfigs, props.selectedModelConfig)
     );
     const rootRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const [items, setItems] = useState<AnyModelConfig[]>(props.modelConfigs);
+    const [items, setItems] = useState<(AnyModelConfig | ModelConfigGroup)[]>(props.modelConfigs);
+    const flatItems = useMemo(
+      () => items.flatMap((item) => (isModelConfigGroup(item) ? item.models : [item])),
+      [items]
+    );
     const [searchTerm, setSearchTerm] = useState('');
     useImperativeHandle(ref, () => ({ inputRef, rootRef, searchTerm, setSearchTerm }), [searchTerm]);
 
@@ -83,19 +129,31 @@ export const ModelPicker = memo(
     useEffect(() => {
       if (!searchTerm) {
         setItems(props.modelConfigs);
-        setActiveModelKey(props.modelConfigs[0]?.key ?? '');
+        setActiveModelKey(getKeyOfFirstModel(props.modelConfigs));
       } else {
         const lowercasedSearchTerm = searchTerm.toLowerCase();
-        const filtered = props.modelConfigs.filter((model) => isMatch(model, lowercasedSearchTerm));
+        const filtered: (AnyModelConfig | ModelConfigGroup)[] = [];
+        for (const item of props.modelConfigs) {
+          if (isModelConfigGroup(item)) {
+            const filteredModels = item.models.filter((model) => isMatch(model, lowercasedSearchTerm));
+            if (filteredModels.length > 0) {
+              filtered.push({ ...item, models: filteredModels });
+            }
+          } else {
+            if (isMatch(item, searchTerm)) {
+              filtered.push(item);
+            }
+          }
+        }
         setItems(filtered);
-        setActiveModelKey(filtered[0]?.key ?? '');
+        setActiveModelKey(getKeyOfFirstModel(filtered));
       }
     }, [searchTerm, setActiveModelKey, props.modelConfigs]);
 
     const onSelect = useCallback(
       (key: string) => {
         const _onSelect = props.onSelect;
-        const model = props.modelConfigs.find((model) => model.key === key);
+        const model = findModel(props.modelConfigs, key);
         if (!model) {
           // Model not found? We should never get here.
           return;
@@ -125,61 +183,61 @@ export const ModelPicker = memo(
       (e: React.KeyboardEvent) => {
         e.preventDefault();
         const activeModelKey = getActiveModelKey();
-        if (items.length === 0) {
+        if (flatItems.length === 0) {
           return;
         }
         if (e.metaKey) {
-          const item = items.at(0);
+          const item = flatItems.at(0);
           if (item) {
             setValueAndScrollIntoView(item.key);
           }
           return;
         }
-        const currentIndex = items.findIndex((model) => model.key === activeModelKey);
+        const currentIndex = flatItems.findIndex((model) => model.key === activeModelKey);
         if (currentIndex < 0) {
           return;
         }
         let newIndex = currentIndex - 1;
         if (newIndex < 0) {
-          newIndex = items.length - 1;
+          newIndex = flatItems.length - 1;
         }
-        const item = items.at(newIndex);
+        const item = flatItems.at(newIndex);
         if (item) {
           setValueAndScrollIntoView(item.key);
         }
       },
-      [getActiveModelKey, items, setValueAndScrollIntoView]
+      [getActiveModelKey, flatItems, setValueAndScrollIntoView]
     );
 
     const next = useCallback(
       (e: React.KeyboardEvent) => {
         e.preventDefault();
         const activeModelKey = getActiveModelKey();
-        if (items.length === 0) {
+        if (flatItems.length === 0) {
           return;
         }
         if (e.metaKey) {
-          const item = items.at(-1);
+          const item = flatItems.at(-1);
           if (item) {
             setValueAndScrollIntoView(item.key);
           }
           return;
         }
 
-        const currentIndex = items.findIndex((model) => model.key === activeModelKey);
+        const currentIndex = flatItems.findIndex((model) => model.key === activeModelKey);
         if (currentIndex < 0) {
           return;
         }
         let newIndex = currentIndex + 1;
-        if (newIndex >= items.length) {
+        if (newIndex >= flatItems.length) {
           newIndex = 0;
         }
-        const item = items.at(newIndex);
+        const item = flatItems.at(newIndex);
         if (item) {
           setValueAndScrollIntoView(item.key);
         }
       },
-      [getActiveModelKey, items, setValueAndScrollIntoView]
+      [getActiveModelKey, flatItems, setValueAndScrollIntoView]
     );
 
     const onKeyDown = useCallback(
@@ -190,7 +248,7 @@ export const ModelPicker = memo(
           next(e);
         } else if (e.key === 'Enter') {
           const activeModelKey = getActiveModelKey();
-          const model = items.find((model) => model.key === activeModelKey);
+          const model = flatItems.find((model) => model.key === activeModelKey);
           if (!model) {
             // Model not found? We should never get here.
             return;
@@ -206,7 +264,7 @@ export const ModelPicker = memo(
           inputRef.current?.select();
         }
       },
-      [getActiveModelKey, items, next, prev, props.onClose, props.onSelect]
+      [getActiveModelKey, flatItems, next, prev, props.onClose, props.onSelect]
     );
 
     return (
@@ -225,6 +283,7 @@ export const ModelPicker = memo(
           <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder={t('nodes.nodeSearch')} />
           <NavigateToModelManagerButton />
         </Flex>
+        <Divider />
         <Flex tabIndex={-1} w="full" flexGrow={1}>
           <ScrollableContent>
             <ModelPickerList
@@ -250,7 +309,7 @@ const ModelPickerList = memo(
     selectedModelKey,
     onSelect,
   }: {
-    items: AnyModelConfig[];
+    items: (AnyModelConfig | ModelConfigGroup)[];
     activeModelKey: string;
     selectedModelKey: string | undefined;
     setActiveModelKey: (key: string) => void;
@@ -270,18 +329,46 @@ const ModelPickerList = memo(
       );
     }
     return (
-      <Flex flexDir="column" gap={2} w="full" h="full">
-        {items.map((model) => (
-          <ModelPickerItem
-            key={model.key}
-            model={model}
-            setActive={setActiveModelKey}
-            onSelect={onSelect}
-            isActive={model.key === activeModelKey}
-            isSelected={model.key === selectedModelKey}
-            isDisabled={false}
-          />
-        ))}
+      <Flex flexDir="column" gap={2} w="full">
+        {items.map((item) => {
+          if (isModelConfigGroup(item)) {
+            return (
+              <Flex key={item.name} flexDir="column" gap={2} w="full">
+                <Text fontSize="sm" fontWeight="semibold">
+                  {item.name}
+                </Text>
+                <Text color="base.200" fontSize="xs">
+                  {item.description}
+                </Text>
+                <Flex flexDir="column" gap={2} w="full">
+                  {item.models.map((model) => (
+                    <ModelPickerItem
+                      key={model.key}
+                      model={model}
+                      setActive={setActiveModelKey}
+                      onSelect={onSelect}
+                      isActive={model.key === activeModelKey}
+                      isSelected={model.key === selectedModelKey}
+                      isDisabled={false}
+                    />
+                  ))}
+                </Flex>
+              </Flex>
+            );
+          } else {
+            return (
+              <ModelPickerItem
+                key={item.key}
+                model={item}
+                setActive={setActiveModelKey}
+                onSelect={onSelect}
+                isActive={item.key === activeModelKey}
+                isSelected={item.key === selectedModelKey}
+                isDisabled={false}
+              />
+            );
+          }
+        })}
       </Flex>
     );
   }

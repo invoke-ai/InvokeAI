@@ -18,7 +18,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { ImperativeModelPickerHandle } from 'common/components/ModelPicker/ModelPicker';
+import type { ImperativeModelPickerHandle, ModelConfigGroup } from 'common/components/ModelPicker/ModelPicker';
 import { ModelPicker } from 'common/components/ModelPicker/ModelPicker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
@@ -43,7 +43,7 @@ import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfig, BaseModelType } from 'services/api/types';
 import { isFluxFillMainModelModelConfig } from 'services/api/types';
 
 const formLabelProps: FormLabelProps = {
@@ -117,6 +117,25 @@ GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
 const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const [modelConfigs] = useMainModels();
+  const grouped = useMemo<ModelConfigGroup[]>(() => {
+    const groups: { [base in BaseModelType]?: ModelConfigGroup } = {};
+
+    for (const modelConfig of modelConfigs) {
+      let group = groups[modelConfig.base];
+      if (!group) {
+        group = {
+          name: modelConfig.base,
+          description: 'asdfasdf',
+          models: [],
+        };
+        groups[modelConfig.base] = group;
+      }
+
+      group.models.push(modelConfig);
+    }
+
+    return Object.values(groups);
+  }, [modelConfigs]);
   const modelConfig = useSelectedModelConfig();
   const popover = useDisclosure(false);
   const pickerRef = useRef<ImperativeModelPickerHandle>(null);
@@ -159,12 +178,7 @@ const MainModelPicker = memo(() => {
       <PopoverContent p={0} w={400} h={400}>
         <PopoverArrow />
         <PopoverBody p={0} w="full" h="full">
-          <ModelPicker
-            ref={pickerRef}
-            modelConfigs={modelConfigs}
-            onSelect={onSelect}
-            selectedModelConfig={modelConfig}
-          />
+          <ModelPicker ref={pickerRef} modelConfigs={grouped} onSelect={onSelect} selectedModelConfig={modelConfig} />
         </PopoverBody>
       </PopoverContent>
     </Popover>
