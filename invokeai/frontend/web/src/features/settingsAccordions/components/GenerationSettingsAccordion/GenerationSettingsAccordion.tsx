@@ -5,16 +5,19 @@ import {
   Expander,
   Flex,
   FormControlGroup,
+  FormLabel,
   Popover,
   PopoverArrow,
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Spacer,
   StandaloneAccordion,
 } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { ImperativeModelPickerHandle } from 'common/components/ModelPicker/ModelPicker';
 import { ModelPicker } from 'common/components/ModelPicker/ModelPicker';
 import { useDisclosure } from 'common/hooks/useBoolean';
@@ -26,7 +29,9 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
+import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -35,7 +40,7 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPencilBold } from 'react-icons/pi';
+import { PiCaretDownBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 import type { AnyModelConfig } from 'services/api/types';
@@ -110,6 +115,7 @@ export const GenerationSettingsAccordion = memo(() => {
 GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
 
 const MainModelPicker = memo(() => {
+  const { t } = useTranslation();
   const [modelConfigs] = useMainModels();
   const modelConfig = useSelectedModelConfig();
   const popover = useDisclosure(false);
@@ -136,11 +142,20 @@ const MainModelPicker = memo(() => {
       onClose={onClose}
       initialFocusRef={pickerRef.current?.inputRef}
     >
-      <PopoverTrigger>
-        <Button variant="ghost" rightIcon={<PiPencilBold />}>
-          {modelConfig?.name ?? 'Select Model'}
-        </Button>
-      </PopoverTrigger>
+      <Flex alignItems="center" gap={2}>
+        <InformationalPopover feature="paramModel">
+          <FormLabel>{t('modelManager.model')}</FormLabel>
+        </InformationalPopover>
+        <PopoverTrigger>
+          <Button size="sm" flexGrow={1} variant="outline">
+            {modelConfig?.name ?? 'Select Model'}
+            <Spacer />
+            <PiCaretDownBold />
+          </Button>
+        </PopoverTrigger>
+        <NavigateToModelManagerButton />
+        <UseDefaultSettingsButton />
+      </Flex>
       <PopoverContent p={0} w={400} h={400}>
         <PopoverArrow />
         <PopoverBody p={0} w="full" h="full">
