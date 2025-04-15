@@ -28,6 +28,14 @@ export type ImperativeModelPickerHandle = {
   setSearchTerm: (searchTerm: string) => void;
 };
 
+const DefaultItemComponent = ({ id }: { id: string }) => {
+  return <Text fontWeight="bold">{id}</Text>;
+};
+
+const DefaultGroupHeaderComponent = ({ id }: { id: string }) => {
+  return <Text fontWeight="bold">{id}</Text>;
+};
+
 export type PickerProps<T extends object> = {
   options: (T | OptionGroup<T>)[];
   getId: (item: T) => string;
@@ -39,7 +47,7 @@ export type PickerProps<T extends object> = {
   noOptionsFallback?: React.ReactNode;
   noMatchesFallback?: React.ReactNode;
   handleRef?: React.Ref<ImperativeModelPickerHandle>;
-  ItemComponent: React.ComponentType<{ item: T }>;
+  ItemComponent?: React.ComponentType<{ item: T }>;
   GroupHeaderComponent?: React.ComponentType<{ group: OptionGroup<T> }>;
 };
 
@@ -365,7 +373,7 @@ const PickerList = typedMemo(
     onSelect: (key: string) => void;
     getId: (item: T) => string;
     getIsDisabled?: (item: T) => boolean;
-    ItemComponent: React.ComponentType<{ item: T }>;
+    ItemComponent?: React.ComponentType<{ item: T }>;
     GroupHeaderComponent?: React.ComponentType<{ group: OptionGroup<T> }>;
   }) => {
     if (items.length === 0) {
@@ -441,12 +449,12 @@ const PickerOptionGroup = typedMemo(
     activeOptionId: string | undefined;
     selectedItemId: string | undefined;
     getIsDisabled?: (item: T) => boolean;
-    ItemComponent: React.ComponentType<{ item: T }>;
+    ItemComponent?: React.ComponentType<{ item: T }>;
     GroupHeaderComponent?: React.ComponentType<{ group: OptionGroup<T> }>;
   }) => {
     return (
       <Flex key={group.id} flexDir="column" gap={2} w="full">
-        {GroupHeaderComponent ? <GroupHeaderComponent group={group} /> : <Text fontWeight="bold">{group.id}</Text>}
+        {GroupHeaderComponent ? <GroupHeaderComponent group={group} /> : <DefaultGroupHeaderComponent id={group.id} />}
         <Flex flexDir="column" gap={2} w="full">
           {group.options.map((item) => {
             const id = getId(item);
@@ -499,7 +507,7 @@ const PickerOption = typedMemo(
     isActive: boolean;
     isSelected: boolean;
     isDisabled: boolean;
-    ItemComponent: React.ComponentType<{ item: T }>;
+    ItemComponent?: React.ComponentType<{ item: T }>;
   }) => {
     const { id, item, ItemComponent, setActiveOptionId, onSelect, isActive, isDisabled, isSelected } = props;
     const onPointerMove = useCallback(() => {
@@ -519,7 +527,7 @@ const PickerOption = typedMemo(
         onPointerMove={isDisabled ? undefined : onPointerMove}
         onClick={isDisabled ? undefined : onClick}
       >
-        <ItemComponent item={item} />
+        {ItemComponent ? <ItemComponent item={item} /> : <DefaultItemComponent id={id} />}
       </Box>
     );
   }
