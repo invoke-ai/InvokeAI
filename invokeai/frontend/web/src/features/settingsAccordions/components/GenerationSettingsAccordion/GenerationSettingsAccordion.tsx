@@ -13,18 +13,22 @@ import {
   PopoverTrigger,
   Spacer,
   StandaloneAccordion,
+  Text,
 } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { ImperativeModelPickerHandle, ModelConfigGroup } from 'common/components/ModelPicker/ModelPicker';
-import { ModelPicker } from 'common/components/ModelPicker/ModelPicker';
+import type { ImperativeModelPickerHandle, OptionGroup } from 'common/components/Picker/Picker';
+import { isMatch, Picker } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
+import { typedMemo } from 'common/util/typedMemo';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectIsCogView4, selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
+import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
+import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
@@ -38,6 +42,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
@@ -114,24 +119,29 @@ export const GenerationSettingsAccordion = memo(() => {
 
 GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
 
+const getId = (modelConfig: AnyModelConfig) => modelConfig.key;
+const getIsDisabled = (modelConfig: AnyModelConfig) => {
+  return modelConfig.base === 'flux';
+};
+
 const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const [modelConfigs] = useMainModels();
-  const grouped = useMemo<ModelConfigGroup[]>(() => {
-    const groups: { [base in BaseModelType]?: ModelConfigGroup } = {};
+  const grouped = useMemo<OptionGroup<AnyModelConfig>[]>(() => {
+    const groups: { [base in BaseModelType]?: OptionGroup<AnyModelConfig, { name: string; description: string }> } = {};
 
     for (const modelConfig of modelConfigs) {
       let group = groups[modelConfig.base];
       if (!group) {
         group = {
-          name: modelConfig.base,
-          description: 'asdfasdf',
-          models: [],
+          id: modelConfig.base,
+          data: { name: modelConfig.base, description: 'asdfasdf' },
+          options: [],
         };
         groups[modelConfig.base] = group;
       }
 
-      group.models.push(modelConfig);
+      group.options.push(modelConfig);
     }
 
     return Object.values(groups);
@@ -178,10 +188,60 @@ const MainModelPicker = memo(() => {
       <PopoverContent p={0} w={400} h={400}>
         <PopoverArrow />
         <PopoverBody p={0} w="full" h="full">
-          <ModelPicker ref={pickerRef} modelConfigs={grouped} onSelect={onSelect} selectedModelConfig={modelConfig} />
+          <Picker<AnyModelConfig>
+            handleRef={pickerRef}
+            options={grouped}
+            getId={getId}
+            onSelect={onSelect}
+            selectedItem={modelConfig}
+            getIsDisabled={getIsDisabled}
+            isMatch={isMatch}
+            ItemComponent={PickerItemComponent}
+            GroupHeaderComponent={PickerGroupHeaderComponent}
+            noOptionsFallback={<Text>{t('common.noOptions')}</Text>}
+            noMatchesFallback={<Text>{t('common.noMatches')}</Text>}
+          />
         </PopoverBody>
       </PopoverContent>
     </Popover>
   );
 });
 MainModelPicker.displayName = 'MainModelPicker';
+
+const PickerGroupHeaderComponent = memo(
+  ({ group }: { group: OptionGroup<AnyModelConfig, { name: string; description: string }> }) => {
+    return (
+      <>
+        <Text fontSize="sm" fontWeight="semibold">
+          {group.data.name}
+        </Text>
+        <Text color="base.200" fontSize="xs">
+          {group.data.description}
+        </Text>
+      </>
+    );
+  }
+);
+PickerGroupHeaderComponent.displayName = 'PickerGroupHeaderComponent';
+
+export const PickerItemComponent = typedMemo(({ item }: { item: AnyModelConfig }) => {
+  return (
+    <Flex tabIndex={-1} gap={2}>
+      <ModelImage image_url={item.cover_image} />
+      <Flex flexDir="column" gap={2} flex={1}>
+        <Flex gap={2} alignItems="center">
+          <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
+            {item.name}
+          </Text>
+          <Spacer />
+          <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+            {filesize(item.file_size)}
+          </Text>
+          <ModelBaseBadge base={item.base} />
+        </Flex>
+        {item.description && <Text color="base.200">{item.description}</Text>}
+      </Flex>
+    </Flex>
+  );
+});
+PickerItemComponent.displayName = 'PickerItemComponent';
