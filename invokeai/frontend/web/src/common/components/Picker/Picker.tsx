@@ -7,7 +7,6 @@ import { typedMemo } from 'common/util/typedMemo';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export type Group<T extends object, U = any> = {
@@ -116,7 +115,6 @@ const flattenOptions = <T extends object>(options: (T | Group<T>)[]): T[] => {
 };
 
 export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
-  const { t } = useTranslation();
   const {
     getOptionId,
     options,
@@ -155,14 +153,12 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       const filtered: (T | Group<T>)[] = [];
       for (const item of props.options) {
         if (isGroup(item)) {
-          const filteredItems = item.options.filter(
-            (item) => !getIsDisabled?.(item) && isMatch(item, lowercasedSearchTerm)
-          );
+          const filteredItems = item.options.filter((item) => isMatch(item, lowercasedSearchTerm));
           if (filteredItems.length > 0) {
             filtered.push({ ...item, options: filteredItems });
           }
         } else {
-          if (!getIsDisabled?.(item) && isMatch(item, searchTerm)) {
+          if (isMatch(item, searchTerm)) {
             filtered.push(item);
           }
         }
@@ -170,7 +166,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       setFilteredOptions(filtered);
       setActiveOptionId(getFirstOptionId(filtered, getOptionId));
     }
-  }, [searchTerm, setActiveOptionId, props.options, options, getOptionId, isMatch, getIsDisabled]);
+  }, [searchTerm, setActiveOptionId, props.options, options, getOptionId, isMatch]);
 
   const onSelectInternal = useCallback(
     (id: string) => {
@@ -299,7 +295,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       onKeyDown={onKeyDown}
     >
       <Flex gap={2} alignItems="center">
-        <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder={t('nodes.nodeSearch')} />
+        <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder="Filter" />
         <NavigateToModelManagerButton />
       </Flex>
       <Divider />
@@ -363,7 +359,7 @@ const PickerList = typedMemo(
       );
     }
     return (
-      <Flex flexDir="column" gap={2} w="full">
+      <Flex flexDir="column" w="full" gap={1}>
         {items.map((itemOrGroup) => {
           if (isGroup(itemOrGroup)) {
             return (
@@ -428,7 +424,7 @@ const PickerOptionGroup = typedMemo(
     return (
       <Flex key={group.id} flexDir="column" gap={2} w="full">
         {GroupHeaderComponent ? <GroupHeaderComponent group={group} /> : <DefaultGroupHeaderComponent id={group.id} />}
-        <Flex flexDir="column" gap={2} w="full">
+        <Flex flexDir="column" gap={1} w="full">
           {group.options.map((item) => {
             const id = getOptionId(item);
             return (
