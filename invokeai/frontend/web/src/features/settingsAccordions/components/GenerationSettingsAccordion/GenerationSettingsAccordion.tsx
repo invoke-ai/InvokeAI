@@ -127,7 +127,7 @@ const getIsDisabled = (modelConfig: AnyModelConfig) => {
 const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const [modelConfigs] = useMainModels();
-  const grouped = useMemo<OptionGroup<AnyModelConfig>[]>(() => {
+  const grouped = useMemo<OptionGroup<AnyModelConfig, { name: string; description: string }>[]>(() => {
     const groups: { [base in BaseModelType]?: OptionGroup<AnyModelConfig, { name: string; description: string }> } = {};
 
     for (const modelConfig of modelConfigs) {
@@ -144,7 +144,31 @@ const MainModelPicker = memo(() => {
       group.options.push(modelConfig);
     }
 
-    return Object.values(groups);
+    const sortedGroups: OptionGroup<AnyModelConfig, { name: string; description: string }>[] = [];
+
+    if (groups['flux']) {
+      sortedGroups.push(groups['flux']);
+      delete groups['flux'];
+    }
+    if (groups['cogview4']) {
+      sortedGroups.push(groups['cogview4']);
+      delete groups['cogview4'];
+    }
+    if (groups['sd-1']) {
+      sortedGroups.push(groups['sd-1']);
+      delete groups['sd-1'];
+    }
+    if (groups['sd-2']) {
+      sortedGroups.push(groups['sd-2']);
+      delete groups['sd-2'];
+    }
+    if (groups['sd-3']) {
+      sortedGroups.push(groups['sd-3']);
+      delete groups['sd-3'];
+    }
+    sortedGroups.push(...Object.values(groups));
+
+    return sortedGroups;
   }, [modelConfigs]);
   const modelConfig = useSelectedModelConfig();
   const popover = useDisclosure(false);
@@ -211,14 +235,14 @@ MainModelPicker.displayName = 'MainModelPicker';
 const PickerGroupHeaderComponent = memo(
   ({ group }: { group: OptionGroup<AnyModelConfig, { name: string; description: string }> }) => {
     return (
-      <>
+      <Flex flexDir="column">
         <Text fontSize="sm" fontWeight="semibold">
           {group.data.name}
         </Text>
         <Text color="base.200" fontSize="xs">
           {group.data.description}
         </Text>
-      </>
+      </Flex>
     );
   }
 );
