@@ -216,12 +216,10 @@ const MainModelPicker = memo(() => {
             getOptionId={getOptionId}
             onSelect={onSelect}
             selectedItem={modelConfig}
-            getIsDisabled={getIsDisabled}
+            // getIsDisabled={getIsDisabled}
             isMatch={isMatch}
             OptionComponent={PickerItemComponent}
             GroupHeaderComponent={PickerGroupHeaderComponent}
-            noOptionsFallback={<Text>{t('common.noOptions')}</Text>}
-            noMatchesFallback={<Text>{t('common.noMatches')}</Text>}
           />
         </PopoverBody>
       </PopoverContent>
@@ -233,7 +231,7 @@ MainModelPicker.displayName = 'MainModelPicker';
 const PickerGroupHeaderComponent = memo(
   ({ group }: { group: Group<AnyModelConfig, { name: string; description: string }> }) => {
     return (
-      <Flex flexDir="column">
+      <Flex flexDir="column" ps={8}>
         <Text fontSize="sm" fontWeight="semibold">
           {group.data.name}
         </Text>
@@ -276,18 +274,11 @@ const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
 
 const isMatch = (model: AnyModelConfig, searchTerm: string) => {
   const regex = getRegex(searchTerm);
+  const bases = BASE_KEYWORDS[model.base] ?? [model.base];
+  const testString =
+    `${model.name} ${bases.join(' ')} ${model.type} ${model.description ?? ''} ${model.format}`.toLowerCase();
 
-  if (
-    model.name.toLowerCase().includes(searchTerm) ||
-    regex.test(model.name) ||
-    (BASE_KEYWORDS[model.base] ?? [model.base]).some((kw) => kw.toLowerCase().includes(searchTerm) || regex.test(kw)) ||
-    model.type.toLowerCase().includes(searchTerm) ||
-    regex.test(model.type) ||
-    (model.description ?? '').toLowerCase().includes(searchTerm) ||
-    regex.test(model.description ?? '') ||
-    model.format.toLowerCase().includes(searchTerm) ||
-    regex.test(model.format)
-  ) {
+  if (testString.includes(searchTerm) || regex.test(testString)) {
     return true;
   }
 

@@ -34,6 +34,22 @@ const DefaultGroupHeaderComponent = ({ id }: { id: string }) => {
   return <Text fontWeight="bold">{id}</Text>;
 };
 
+const DefaultNoOptionsFallback = () => {
+  return (
+    <Flex w="full" h="full" alignItems="center" justifyContent="center">
+      <Text variant="subtext">No options available</Text>
+    </Flex>
+  );
+};
+
+const DefaultNoMatchesFallback = () => {
+  return (
+    <Flex w="full" h="full" alignItems="center" justifyContent="center">
+      <Text variant="subtext">No matching options</Text>
+    </Flex>
+  );
+};
+
 export type PickerProps<T extends object> = {
   options: (T | Group<T>)[];
   getOptionId: (option: T) => string;
@@ -49,15 +65,21 @@ export type PickerProps<T extends object> = {
   GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
 };
 
-export const getRegex = (searchTerm: string) =>
-  new RegExp(
-    searchTerm
-      .trim()
-      .replace(/[-[\]{}()*+!<=:?./\\^$|#,]/g, '')
-      .split(' ')
-      .join('.*'),
-    'gi'
-  );
+export const getRegex = (searchTerm: string) => {
+  const terms = searchTerm
+    .trim()
+    .replace(/[-[\]{}()*+!<=:?./\\^$|#,]/g, '')
+    .split(' ')
+    .filter((term) => term.length > 0);
+
+  if (terms.length === 0) {
+    return new RegExp('', 'gi');
+  }
+
+  // Create positive lookaheads for each term - matches in any order
+  const pattern = terms.map((term) => `(?=.*${term})`).join('');
+  return new RegExp(`${pattern}.+`, 'i');
+};
 
 const getFirstOption = <T extends object>(options: (T | Group<T>)[]): T | undefined => {
   const firstOptionOrGroup = options[0];
@@ -121,8 +143,8 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     handleRef,
     isMatch,
     getIsDisabled,
-    noMatchesFallback,
-    noOptionsFallback,
+    noMatchesFallback = <DefaultNoMatchesFallback />,
+    noOptionsFallback = <DefaultNoOptionsFallback />,
     onClose,
     onSelect,
     selectedItem,
