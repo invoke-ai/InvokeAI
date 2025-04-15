@@ -1,5 +1,4 @@
 import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
-import { ModelCombobox } from 'common/components/ModelCombobox/ModelCombobox';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import { CanvasPasteModal } from 'features/controlLayers/components/CanvasPasteModal';
 import {
@@ -59,7 +58,6 @@ export const GlobalModalIsolator = memo(() => {
         <CanvasPasteModal />
       </CanvasManagerProviderGate>
       <LoadWorkflowFromGraphModal />
-      <ModelCombobox />
     </>
   );
 });
