@@ -7,7 +7,7 @@ import { getOverlayScrollbarsParams } from 'common/components/OverlayScrollbars/
 import type { OverlayScrollbarsComponentRef } from 'overlayscrollbars-react';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties, PropsWithChildren } from 'react';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 
 type Props = PropsWithChildren & {
   maxHeight?: ChakraProps['maxHeight'];
@@ -22,9 +22,9 @@ const ScrollableContent = ({ children, maxHeight, overflowX = 'hidden', overflow
     () => getOverlayScrollbarsParams({ overflowX, overflowY }).options,
     [overflowX, overflowY]
   );
-  const [os, osRef] = useState<OverlayScrollbarsComponentRef | null>(null);
+  const os = useRef<OverlayScrollbarsComponentRef>(null);
   useEffect(() => {
-    const osInstance = os?.osInstance();
+    const osInstance = os.current?.osInstance();
 
     if (!osInstance) {
       return;
@@ -46,7 +46,7 @@ const ScrollableContent = ({ children, maxHeight, overflowX = 'hidden', overflow
   return (
     <Flex w="full" h="full" maxHeight={maxHeight} position="relative">
       <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-        <OverlayScrollbarsComponent ref={osRef} style={styles} options={overlayscrollbarsOptions}>
+        <OverlayScrollbarsComponent ref={os} style={styles} options={overlayscrollbarsOptions}>
           {children}
         </OverlayScrollbarsComponent>
       </Box>
