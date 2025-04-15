@@ -19,8 +19,8 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { ImperativeModelPickerHandle, OptionGroup } from 'common/components/Picker/Picker';
-import { isMatch, Picker } from 'common/components/Picker/Picker';
+import type { Group,ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
+import { getRegex, Picker } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
@@ -127,8 +127,8 @@ const getIsDisabled = (modelConfig: AnyModelConfig) => {
 const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const [modelConfigs] = useMainModels();
-  const grouped = useMemo<OptionGroup<AnyModelConfig, { name: string; description: string }>[]>(() => {
-    const groups: { [base in BaseModelType]?: OptionGroup<AnyModelConfig, { name: string; description: string }> } = {};
+  const grouped = useMemo<Group<AnyModelConfig, { name: string; description: string }>[]>(() => {
+    const groups: { [base in BaseModelType]?: Group<AnyModelConfig, { name: string; description: string }> } = {};
 
     for (const modelConfig of modelConfigs) {
       let group = groups[modelConfig.base];
@@ -144,7 +144,7 @@ const MainModelPicker = memo(() => {
       group.options.push(modelConfig);
     }
 
-    const sortedGroups: OptionGroup<AnyModelConfig, { name: string; description: string }>[] = [];
+    const sortedGroups: Group<AnyModelConfig, { name: string; description: string }>[] = [];
 
     if (groups['flux']) {
       sortedGroups.push(groups['flux']);
@@ -220,7 +220,7 @@ const MainModelPicker = memo(() => {
             selectedItem={modelConfig}
             getIsDisabled={getIsDisabled}
             isMatch={isMatch}
-            ItemComponent={PickerItemComponent}
+            OptionComponent={PickerItemComponent}
             GroupHeaderComponent={PickerGroupHeaderComponent}
             noOptionsFallback={<Text>{t('common.noOptions')}</Text>}
             noMatchesFallback={<Text>{t('common.noMatches')}</Text>}
@@ -233,7 +233,7 @@ const MainModelPicker = memo(() => {
 MainModelPicker.displayName = 'MainModelPicker';
 
 const PickerGroupHeaderComponent = memo(
-  ({ group }: { group: OptionGroup<AnyModelConfig, { name: string; description: string }> }) => {
+  ({ group }: { group: Group<AnyModelConfig, { name: string; description: string }> }) => {
     return (
       <Flex flexDir="column">
         <Text fontSize="sm" fontWeight="semibold">
@@ -269,3 +269,29 @@ export const PickerItemComponent = typedMemo(({ item }: { item: AnyModelConfig }
   );
 });
 PickerItemComponent.displayName = 'PickerItemComponent';
+
+const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
+  'sd-1': ['sd1', 'sd1.4', 'sd1.5', 'sd-1'],
+  'sd-2': ['sd2', 'sd2.0', 'sd2.1', 'sd-2'],
+  'sd-3': ['sd3', 'sd3.0', 'sd3.5', 'sd-3'],
+};
+
+const isMatch = (model: AnyModelConfig, searchTerm: string) => {
+  const regex = getRegex(searchTerm);
+
+  if (
+    model.name.toLowerCase().includes(searchTerm) ||
+    regex.test(model.name) ||
+    (BASE_KEYWORDS[model.base] ?? [model.base]).some((kw) => kw.toLowerCase().includes(searchTerm) || regex.test(kw)) ||
+    model.type.toLowerCase().includes(searchTerm) ||
+    regex.test(model.type) ||
+    (model.description ?? '').toLowerCase().includes(searchTerm) ||
+    regex.test(model.description ?? '') ||
+    model.format.toLowerCase().includes(searchTerm) ||
+    regex.test(model.format)
+  ) {
+    return true;
+  }
+
+  return false;
+};
