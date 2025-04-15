@@ -1,7 +1,6 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ModelCombobox } from 'common/components/ModelCombobox/ModelCombobox';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
@@ -41,7 +40,6 @@ const ParametersPanelTextToImage = () => {
           )}
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
-              <ModelCombobox />
               <Prompts />
               <ImageSettingsAccordion />
               <GenerationSettingsAccordion />
