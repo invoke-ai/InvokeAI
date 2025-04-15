@@ -1,32 +1,41 @@
-import { Box, Flex, Input, Modal, ModalBody, ModalContent, ModalOverlay } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Button,
+  Flex,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalOverlay,
+  Spacer,
+  Text,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { ModelComboboxItem } from 'common/components/ModelCombobox/ModelComboboxItem';
-import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStateImperative } from 'common/hooks/useStateImperative';
-import { atom } from 'nanostores';
-import type { ChangeEvent, RefObject } from 'react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
+import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
+import { toast } from 'features/toast/toast';
+import { filesize } from 'filesize';
+import type { ChangeEvent } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAllModels } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig, BaseModelType } from 'services/api/types';
 import { useDebounce } from 'use-debounce';
 
-export type ModelComboboxOptions = {
+export type ModelPickerProps = {
   modelConfigs: AnyModelConfig[];
-  onSelect: (modelConfig: AnyModelConfig) => void;
+  onSelect?: (modelConfig: AnyModelConfig) => void;
   onClose?: () => void;
   noModelsInstalledFallback?: React.ReactNode;
   noModelsFoundFallback?: React.ReactNode;
 };
 
-const $modelComboboxState = atom<ModelComboboxOptions | null>(null);
-
-const openModelCombobox = (options: ModelComboboxOptions) => {
-  $modelComboboxState.set(options);
-};
-
-const closeModelCombobox = () => {
-  $modelComboboxState.set(null);
+export type ImperativeModelPickerHandle = {
+  inputRef: React.RefObject<HTMLInputElement>;
+  rootRef: React.RefObject<HTMLDivElement>;
 };
 
 const getRegex = (searchTerm: string) =>
@@ -65,67 +74,46 @@ const isMatch = (model: AnyModelConfig, searchTerm: string) => {
   return false;
 };
 
-export const useModelCombobox = (options: ModelComboboxOptions) => {
-  const onOpen = useCallback(() => {
-    openModelCombobox(options);
-  }, [options]);
-  const onClose = useCallback(() => {
-    closeModelCombobox();
-  }, []);
-  return {
-    onOpen,
-    onClose,
-  };
+const onSelect = (modelConfig: AnyModelConfig) => {
+  // Handle model selection
+  toast({
+    description: `Selected model: ${modelConfig.name}`,
+  });
 };
 
 export const ModelCombobox = memo(() => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const state = useStore($modelComboboxState);
-
-  const onSelect = useCallback(
-    (model: AnyModelConfig) => {
-      if (!state) {
-        // If the command menu is closed, we shouldn't do anything
-        return;
-      }
-      state.onSelect(model);
-      closeModelCombobox();
-    },
-    [state]
-  );
+  const pickerRef = useRef<ImperativeModelPickerHandle>(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [modelConfigs] = useAllModels();
 
   return (
-    <Modal
-      isOpen={!!state}
-      onClose={closeModelCombobox}
-      useInert={false}
-      initialFocusRef={inputRef}
-      size="xl"
-      isCentered
-    >
-      <ModalOverlay />
-      <ModalContent h="512" maxH="70%">
-        <ModalBody p={0}>
-          {state && <ModelComboboxContent inputRef={inputRef} modelConfigs={state.modelConfigs} onSelect={onSelect} />}
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+    <>
+      <Button onClick={onOpen} variant="outline">
+        model
+      </Button>
+      <Modal isOpen={isOpen} onClose={onClose} useInert={false} initialFocusRef={inputRef} size="xl" isCentered>
+        <ModalOverlay />
+        <ModalContent h="512" maxH="70%">
+          <ModalBody p={0}>
+            <ModelComboboxContent ref={pickerRef} modelConfigs={modelConfigs} onSelect={onSelect} />
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+    </>
   );
 });
 
 ModelCombobox.displayName = 'ModelCombobox';
 
 const ModelComboboxContent = memo(
-  (props: {
-    inputRef: RefObject<HTMLInputElement>;
-    modelConfigs: AnyModelConfig[];
-    onSelect: (model: AnyModelConfig) => void;
-  }) => {
-    const { inputRef, modelConfigs, onSelect: _onSelect } = props;
+  forwardRef<ImperativeModelPickerHandle, ModelPickerProps>((props, ref) => {
     const { t } = useTranslation();
-    const [value, setValue, getValue] = useStateImperative(modelConfigs[0]?.key ?? '');
+    const [value, setValue, getValue] = useStateImperative(props.modelConfigs[0]?.key ?? '');
     const rootRef = useRef<HTMLDivElement>(null);
-    const [items, setItems] = useState<AnyModelConfig[]>(modelConfigs);
+    const inputRef = useRef<HTMLInputElement>(null);
+    useImperativeHandle(ref, () => ({ inputRef, rootRef }), []);
+    const [items, setItems] = useState<AnyModelConfig[]>(props.modelConfigs);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
@@ -135,26 +123,27 @@ const ModelComboboxContent = memo(
 
     useEffect(() => {
       if (!debouncedSearchTerm) {
-        setItems(modelConfigs);
-        setValue(modelConfigs[0]?.key ?? '');
+        setItems(props.modelConfigs);
+        setValue(props.modelConfigs[0]?.key ?? '');
       } else {
         const lowercasedSearchTerm = debouncedSearchTerm.toLowerCase();
-        const filtered = modelConfigs.filter((model) => isMatch(model, lowercasedSearchTerm));
+        const filtered = props.modelConfigs.filter((model) => isMatch(model, lowercasedSearchTerm));
         setItems(filtered);
         setValue(filtered[0]?.key ?? '');
       }
-    }, [modelConfigs, debouncedSearchTerm, setValue]);
+    }, [debouncedSearchTerm, setValue, props.modelConfigs]);
 
     const onSelect = useCallback(
       (key: string) => {
-        const model = modelConfigs.find((model) => model.key === key);
+        const _onSelect = props.onSelect;
+        const model = props.modelConfigs.find((model) => model.key === key);
         if (!model) {
           // Model not found? We should never get here.
           return;
         }
-        _onSelect(model);
+        _onSelect?.(model);
       },
-      [_onSelect, modelConfigs]
+      [props.modelConfigs, props.onSelect]
     );
 
     const setValueAndScrollIntoView = useCallback(
@@ -247,50 +236,144 @@ const ModelComboboxContent = memo(
             // Model not found? We should never get here.
             return;
           }
-          _onSelect(model);
-          closeModelCombobox();
+          const _onSelect = props.onSelect;
+          _onSelect?.(model);
         } else if (e.key === 'Escape') {
-          closeModelCombobox();
+          const _onClose = props.onClose;
+          _onClose?.();
         } else if (e.key === '/') {
           e.preventDefault();
           inputRef.current?.focus();
           inputRef.current?.select();
         }
       },
-      [_onSelect, getValue, inputRef, items, next, prev]
+      [getValue, items, next, prev, props.onClose, props.onSelect]
     );
 
     return (
       <Flex tabIndex={-1} ref={rootRef} flexDir="column" p={2} h="full" gap={2} onKeyDown={onKeyDown}>
         <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder={t('nodes.nodeSearch')} />
         <Box tabIndex={-1} role="listbox" w="full" h="full">
-          <ScrollableContent>
-            {items.length === 0 && (
-              <IAINoContentFallback
-                position="absolute"
-                top={0}
-                right={0}
-                bottom={0}
-                left={0}
-                icon={null}
-                label="No matching models"
-              />
-            )}
-            {items.length > 0 &&
-              items.map((model) => (
-                <ModelComboboxItem
-                  key={model.key}
-                  model={model}
-                  setActive={setValue}
-                  onSelect={onSelect}
-                  isSelected={model.key === value}
-                  isDisabled={false}
-                />
-              ))}
-          </ScrollableContent>
+          {/* <ScrollableContent> */}
+          <ModelComboboxList items={items} value={value} setValue={setValue} onSelect={onSelect} />
+          {/* </ScrollableContent> */}
         </Box>
       </Flex>
     );
-  }
+  })
 );
 ModelComboboxContent.displayName = 'ModelComboboxContent';
+
+const ModelComboboxList = memo(
+  ({
+    items,
+    value,
+    setValue,
+    onSelect,
+  }: {
+    items: AnyModelConfig[];
+    value: string;
+    setValue: (key: string) => void;
+    onSelect: (key: string) => void;
+  }) => {
+    if (items.length === 0) {
+      return (
+        <IAINoContentFallback
+          position="absolute"
+          top={0}
+          right={0}
+          bottom={0}
+          left={0}
+          icon={null}
+          label="No matching models"
+        />
+      );
+    }
+    return (
+      <>
+        {items.map((model) => (
+          <ModelComboboxItem
+            key={model.key}
+            model={model}
+            setActive={setValue}
+            onSelect={onSelect}
+            isSelected={model.key === value}
+            isDisabled={false}
+          />
+        ))}
+      </>
+    );
+  }
+);
+ModelComboboxList.displayName = 'ModelComboboxList';
+
+const itemSx: SystemStyleObject = {
+  display: 'flex',
+  flexDir: 'column',
+  p: 2,
+  cursor: 'pointer',
+  borderRadius: 'base',
+  '&[data-selected="true"]': {
+    bg: 'base.700',
+  },
+  '&[data-disabled="true"]': {
+    cursor: 'not-allowed',
+    opacity: 0.5,
+  },
+};
+
+const ModelComboboxItem = memo(
+  (props: {
+    model: AnyModelConfig;
+    setActive: (key: string) => void;
+    onSelect: (key: string) => void;
+    isSelected: boolean;
+    isDisabled: boolean;
+  }) => {
+    const { model, setActive, onSelect, isDisabled, isSelected } = props;
+    const onPointerMove = useCallback(() => {
+      setActive(model.key);
+    }, [model.key, setActive]);
+    const onClick = useCallback(() => {
+      onSelect(model.key);
+    }, [model.key, onSelect]);
+    return (
+      <Box
+        role="option"
+        sx={itemSx}
+        id={model.key}
+        aria-disabled={isDisabled}
+        aria-selected={isSelected}
+        data-disabled={isDisabled}
+        data-selected={isSelected}
+        onPointerMove={isDisabled ? undefined : onPointerMove}
+        onClick={isDisabled ? undefined : onClick}
+      >
+        <ModelComboboxItemContent model={model} />
+      </Box>
+    );
+  }
+);
+ModelComboboxItem.displayName = 'ModelComboboxItem';
+
+const ModelComboboxItemContent = memo(({ model }: { model: AnyModelConfig }) => {
+  return (
+    <Flex tabIndex={-1} gap={2}>
+      <ModelImage image_url={model.cover_image} />
+      <Flex flexDir="column" gap={2} flex={1}>
+        <Flex gap={2} alignItems="center">
+          <Text fontSize="sm" fontWeight="semibold">
+            {model.name}
+          </Text>
+          <Spacer />
+          <Text variant="subtext" fontStyle="italic">
+            {filesize(model.file_size)}
+          </Text>
+          <ModelBaseBadge base={model.base} />
+        </Flex>
+        {model.description && <Text color="base.200">{model.description}</Text>}
+      </Flex>
+    </Flex>
+  );
+});
+ModelComboboxItemContent.displayName = 'ModelComboboxItemContent';
