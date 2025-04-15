@@ -1,8 +1,23 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Box, Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Button,
+  Expander,
+  Flex,
+  FormControlGroup,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  StandaloneAccordion,
+} from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { ImperativeModelPickerHandle } from 'common/components/ModelPicker/ModelPicker';
+import { ModelPicker } from 'common/components/ModelPicker/ModelPicker';
+import { useDisclosure } from 'common/hooks/useBoolean';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectIsCogView4, selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
@@ -14,12 +29,16 @@ import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
+import { modelSelected } from 'features/parameters/store/actions';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiPencilBold } from 'react-icons/pi';
+import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import type { AnyModelConfig } from 'services/api/types';
 import { isFluxFillMainModelModelConfig } from 'services/api/types';
 
 const formLabelProps: FormLabelProps = {
@@ -67,7 +86,7 @@ export const GenerationSettingsAccordion = memo(() => {
       <Box px={4} pt={4} data-testid="generation-accordion">
         <Flex gap={4} flexDir="column">
           <ParamMainModelSelect />
-
+          <MainModelPicker />
           <LoRASelect />
           <LoRAList />
         </Flex>
@@ -89,3 +108,51 @@ export const GenerationSettingsAccordion = memo(() => {
 });
 
 GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
+
+const MainModelPicker = memo(() => {
+  const [modelConfigs] = useMainModels();
+  const modelConfig = useSelectedModelConfig();
+  const popover = useDisclosure(false);
+  const pickerRef = useRef<ImperativeModelPickerHandle>(null);
+  const dispatch = useAppDispatch();
+
+  const onClose = useCallback(() => {
+    popover.close();
+    pickerRef.current?.setSearchTerm('');
+  }, [popover]);
+
+  const onSelect = useCallback(
+    (model: AnyModelConfig) => {
+      dispatch(modelSelected(model));
+      onClose();
+    },
+    [dispatch, onClose]
+  );
+
+  return (
+    <Popover
+      isOpen={popover.isOpen}
+      onOpen={popover.open}
+      onClose={onClose}
+      initialFocusRef={pickerRef.current?.inputRef}
+    >
+      <PopoverTrigger>
+        <Button variant="ghost" rightIcon={<PiPencilBold />}>
+          {modelConfig?.name ?? 'Select Model'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent p={0} w={400} h={400}>
+        <PopoverArrow />
+        <PopoverBody p={0} w="full" h="full">
+          <ModelPicker
+            ref={pickerRef}
+            modelConfigs={modelConfigs}
+            onSelect={onSelect}
+            selectedModelConfig={modelConfig}
+          />
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
+  );
+});
+MainModelPicker.displayName = 'MainModelPicker';
