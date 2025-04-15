@@ -34,7 +34,6 @@ import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
-import ParamMainModelSelect from 'features/parameters/components/MainModel/ParamMainModelSelect';
 import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
@@ -95,7 +94,6 @@ export const GenerationSettingsAccordion = memo(() => {
     >
       <Box px={4} pt={4} data-testid="generation-accordion">
         <Flex gap={4} flexDir="column">
-          <ParamMainModelSelect />
           <MainModelPicker />
           <LoRASelect />
           <LoRAList />
@@ -135,7 +133,7 @@ const MainModelPicker = memo(() => {
       if (!group) {
         group = {
           id: modelConfig.base,
-          data: { name: modelConfig.base, description: 'asdfasdf' },
+          data: { name: modelConfig.base, description: `A brief description of ${modelConfig.base} models.` },
           options: [],
         };
         groups[modelConfig.base] = group;
@@ -239,7 +237,7 @@ const PickerGroupHeaderComponent = memo(
         <Text fontSize="sm" fontWeight="semibold">
           {group.data.name}
         </Text>
-        <Text color="base.200" fontSize="xs">
+        <Text color="base.200" fontStyle="italic">
           {group.data.description}
         </Text>
       </Flex>
