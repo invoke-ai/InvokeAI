@@ -233,7 +233,7 @@ const PickerGroupHeaderComponent = memo(
     return (
       <Flex flexDir="column" ps={8}>
         <Text fontSize="sm" fontWeight="semibold">
-          {group.data.name}
+          {`${group.data.name} (${group.options.length} models)`}
         </Text>
         <Text color="base.200" fontStyle="italic">
           {group.data.description}
