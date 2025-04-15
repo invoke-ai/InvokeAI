@@ -46,7 +46,7 @@ const ScrollableContent = ({ children, maxHeight, overflowX = 'hidden', overflow
   return (
     <Flex w="full" h="full" maxHeight={maxHeight} position="relative">
       <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-        <OverlayScrollbarsComponent ref={os} style={styles} options={overlayscrollbarsOptions}>
+        <OverlayScrollbarsComponent ref={os} style={styles} options={overlayscrollbarsOptions} defer>
           {children}
         </OverlayScrollbarsComponent>
       </Box>

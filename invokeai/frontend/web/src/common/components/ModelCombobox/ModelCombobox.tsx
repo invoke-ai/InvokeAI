@@ -13,6 +13,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStateImperative } from 'common/hooks/useStateImperative';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
@@ -82,7 +83,6 @@ const onSelect = (modelConfig: AnyModelConfig) => {
 };
 
 export const ModelCombobox = memo(() => {
-  const inputRef = useRef<HTMLInputElement>(null);
   const pickerRef = useRef<ImperativeModelPickerHandle>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [modelConfigs] = useAllModels();
@@ -92,7 +92,14 @@ export const ModelCombobox = memo(() => {
       <Button onClick={onOpen} variant="outline">
         model
       </Button>
-      <Modal isOpen={isOpen} onClose={onClose} useInert={false} initialFocusRef={inputRef} size="xl" isCentered>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        useInert={false}
+        initialFocusRef={pickerRef.current?.inputRef}
+        size="xl"
+        isCentered
+      >
         <ModalOverlay />
         <ModalContent h="512" maxH="70%">
           <ModalBody p={0}>
@@ -254,9 +261,9 @@ const ModelComboboxContent = memo(
       <Flex tabIndex={-1} ref={rootRef} flexDir="column" p={2} h="full" gap={2} onKeyDown={onKeyDown}>
         <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder={t('nodes.nodeSearch')} />
         <Box tabIndex={-1} role="listbox" w="full" h="full">
-          {/* <ScrollableContent> */}
-          <ModelComboboxList items={items} value={value} setValue={setValue} onSelect={onSelect} />
-          {/* </ScrollableContent> */}
+          <ScrollableContent>
+            <ModelComboboxList items={items} value={value} setValue={setValue} onSelect={onSelect} />
+          </ScrollableContent>
         </Box>
       </Flex>
     );
