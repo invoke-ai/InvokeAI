@@ -19,7 +19,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { Group,ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
+import type { Group, ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
 import { getRegex, Picker } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
@@ -119,7 +119,7 @@ export const GenerationSettingsAccordion = memo(() => {
 
 GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
 
-const getId = (modelConfig: AnyModelConfig) => modelConfig.key;
+const getOptionId = (modelConfig: AnyModelConfig) => modelConfig.key;
 const getIsDisabled = (modelConfig: AnyModelConfig) => {
   return modelConfig.base === 'flux';
 };
@@ -215,7 +215,7 @@ const MainModelPicker = memo(() => {
           <Picker<AnyModelConfig>
             handleRef={pickerRef}
             options={grouped}
-            getId={getId}
+            getOptionId={getOptionId}
             onSelect={onSelect}
             selectedItem={modelConfig}
             getIsDisabled={getIsDisabled}
@@ -248,22 +248,22 @@ const PickerGroupHeaderComponent = memo(
 );
 PickerGroupHeaderComponent.displayName = 'PickerGroupHeaderComponent';
 
-export const PickerItemComponent = typedMemo(({ item }: { item: AnyModelConfig }) => {
+export const PickerItemComponent = typedMemo(({ option }: { option: AnyModelConfig }) => {
   return (
     <Flex tabIndex={-1} gap={2}>
-      <ModelImage image_url={item.cover_image} />
+      <ModelImage image_url={option.cover_image} />
       <Flex flexDir="column" gap={2} flex={1}>
         <Flex gap={2} alignItems="center">
           <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
-            {item.name}
+            {option.name}
           </Text>
           <Spacer />
           <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
-            {filesize(item.file_size)}
+            {filesize(option.file_size)}
           </Text>
-          <ModelBaseBadge base={item.base} />
+          <ModelBaseBadge base={option.base} />
         </Flex>
-        {item.description && <Text color="base.200">{item.description}</Text>}
+        {option.description && <Text color="base.200">{option.description}</Text>}
       </Flex>
     </Flex>
   );
