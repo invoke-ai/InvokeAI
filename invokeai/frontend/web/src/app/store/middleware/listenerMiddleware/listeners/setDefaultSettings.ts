@@ -39,9 +39,8 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         return;
       }
 
-      const request = dispatch(modelsApi.endpoints.getModelConfigs.initiate());
+      const request = dispatch(modelsApi.endpoints.getModelConfigs.initiate(undefined, { subscribe: false }));
       const data = await request.unwrap();
-      request.unsubscribe();
       const models = modelConfigsAdapterSelectors.selectAll(data);
 
       const modelConfig = models.find((model) => model.key === currentModel.key);
