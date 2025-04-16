@@ -33,14 +33,16 @@ export const useDynamicPromptsWatcher = () => {
         // Try to fetch the dynamic prompts and store in state
         try {
           const req = dispatch(
-            utilitiesApi.endpoints.dynamicPrompts.initiate({
-              prompt: positivePrompt,
-              max_prompts: maxPrompts,
-            })
+            utilitiesApi.endpoints.dynamicPrompts.initiate(
+              {
+                prompt: positivePrompt,
+                max_prompts: maxPrompts,
+              },
+              { subscribe: false }
+            )
           );
 
           const res = await req.unwrap();
-          req.unsubscribe();
 
           dispatch(promptsChanged(res.prompts));
           dispatch(parsingErrorChanged(res.error));
