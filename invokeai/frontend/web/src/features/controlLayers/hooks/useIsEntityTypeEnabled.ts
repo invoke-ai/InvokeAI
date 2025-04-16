@@ -1,13 +1,13 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsCogView4, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasEntityType } from 'features/controlLayers/store/types';
-import { useCallback } from 'react';
+import { useMemo } from 'react';
 
 export const useIsEntityTypeEnabled = (entityType: CanvasEntityType) => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
 
-  const isEntityTypeEnabled = useCallback(() => {
+  const isEntityTypeEnabled = useMemo<boolean>(() => {
     switch (entityType) {
       case 'reference_image':
         return !isSD3 && !isCogView4;
