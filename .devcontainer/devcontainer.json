@@ -59,7 +59,7 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "~/.venv/bin/python",
+        "python.defaultInterpreterPath": "home/node/.venv/bin/python",
         "python.analysis.extraPaths": [
           "/invokeai",
           "/workspaces/InvokeAI",
