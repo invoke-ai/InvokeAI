@@ -36,7 +36,7 @@ const ViewModeLeftPanelContentInner = memo(() => {
   }
 
   return (
-    <Flex w="full" h="full" justifyContent="center">
+    <Flex w="full" justifyContent="center">
       <RootContainerElementViewMode />
     </Flex>
   );
