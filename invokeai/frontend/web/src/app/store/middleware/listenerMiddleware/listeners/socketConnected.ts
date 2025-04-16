@@ -29,11 +29,8 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
 
       // Bail on the recovery logic if this is the first connection - we don't need to recover anything
       if ($isFirstConnection.get()) {
-        // Populate the model configs on first connection. This query cache has a 24hr timeout, so we can immediately
-        // unsubscribe.
-        const request = dispatch(modelsApi.endpoints.getModelConfigs.initiate());
-        request.unsubscribe();
-
+        // Populate the model configs on first connection.
+        dispatch(modelsApi.endpoints.getModelConfigs.initiate(undefined, { subscribe: false }));
         $isFirstConnection.set(false);
         return;
       }
@@ -61,10 +58,10 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
         const queueStatusRequest = dispatch(
           await queueApi.endpoints.getQueueStatus.initiate(undefined, {
             forceRefetch: true,
+            subscribe: false,
           })
         );
         const nextQueueStatusData = await queueStatusRequest.unwrap();
-        queueStatusRequest.unsubscribe();
 
         // If the queue hasn't changed, we don't need to do anything.
         if (isEqual(prevQueueStatusData?.queue, nextQueueStatusData.queue)) {
