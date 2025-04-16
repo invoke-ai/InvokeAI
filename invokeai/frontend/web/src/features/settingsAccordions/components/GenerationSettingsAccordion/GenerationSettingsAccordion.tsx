@@ -11,6 +11,7 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
+  Portal,
   Spacer,
   StandaloneAccordion,
   Text,
@@ -207,22 +208,24 @@ const MainModelPicker = memo(() => {
         <NavigateToModelManagerButton />
         <UseDefaultSettingsButton />
       </Flex>
-      <PopoverContent p={0} w={400} h={400}>
-        <PopoverArrow />
-        <PopoverBody p={0} w="full" h="full">
-          <Picker<AnyModelConfig>
-            handleRef={pickerRef}
-            options={grouped}
-            getOptionId={getOptionId}
-            onSelect={onSelect}
-            selectedItem={modelConfig}
-            // getIsDisabled={getIsDisabled}
-            isMatch={isMatch}
-            OptionComponent={PickerItemComponent}
-            GroupHeaderComponent={PickerGroupHeaderComponent}
-          />
-        </PopoverBody>
-      </PopoverContent>
+      <Portal>
+        <PopoverContent p={0} w={448} h={512}>
+          <PopoverArrow />
+          <PopoverBody p={0} w="full" h="full">
+            <Picker<AnyModelConfig>
+              handleRef={pickerRef}
+              options={grouped}
+              getOptionId={getOptionId}
+              onSelect={onSelect}
+              selectedItem={modelConfig}
+              // getIsDisabled={getIsDisabled}
+              isMatch={isMatch}
+              OptionComponent={PickerItemComponent}
+              GroupHeaderComponent={PickerGroupHeaderComponent}
+            />
+          </PopoverBody>
+        </PopoverContent>
+      </Portal>
     </Popover>
   );
 });
