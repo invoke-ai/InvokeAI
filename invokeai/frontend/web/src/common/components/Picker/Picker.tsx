@@ -87,7 +87,7 @@ type PickerContextState<T extends object> = {
   isMatch: (option: T, searchTerm: string) => boolean;
   getIsDisabled?: (option: T) => boolean;
   setActiveOptionId: (id: string) => void;
-  onSelectId: (id: string) => void;
+  onSelectById: (id: string) => void;
   noOptionsFallback?: React.ReactNode;
   noMatchesFallback?: React.ReactNode;
   OptionComponent?: React.ComponentType<{ option: T }>;
@@ -227,7 +227,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     }
   }, [searchTerm, setActiveOptionId, props.options, options, getOptionId, isMatch]);
 
-  const onSelectId = useCallback(
+  const onSelectById = useCallback(
     (id: string) => {
       const item = findOption(options, id, getOptionId);
       if (!item) {
@@ -327,7 +327,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         if (!activeOptionId) {
           return;
         }
-        onSelectId(activeOptionId);
+        onSelectById(activeOptionId);
       } else if (e.key === 'Escape') {
         onClose?.();
       } else if (e.key === '/') {
@@ -336,7 +336,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         inputRef.current?.select();
       }
     },
-    [prev, next, getActiveOptionId, onSelectId, onClose]
+    [prev, next, getActiveOptionId, onSelectById, onClose]
   );
 
   const ctx = useMemo(
@@ -345,7 +345,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         getOptionId,
         isMatch,
         getIsDisabled,
-        onSelectId,
+        onSelectById,
         noOptionsFallback,
         noMatchesFallback,
         OptionComponent,
@@ -360,7 +360,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       isMatch,
       noMatchesFallback,
       noOptionsFallback,
-      onSelectId,
+      onSelectById,
       setActiveOptionId,
     ]
   );
@@ -516,14 +516,14 @@ const itemSx: SystemStyleObject = {
 
 const PickerOption = typedMemo(
   <T extends object>(props: { id: string; option: T; isActive: boolean; isSelected: boolean; isDisabled: boolean }) => {
-    const { OptionComponent, setActiveOptionId, onSelectId } = usePickerContext<T>();
+    const { OptionComponent, setActiveOptionId, onSelectById } = usePickerContext<T>();
     const { id, option, isActive, isDisabled, isSelected } = props;
     const onPointerMove = useCallback(() => {
       setActiveOptionId(id);
     }, [id, setActiveOptionId]);
     const onClick = useCallback(() => {
-      onSelectId(id);
-    }, [id, onSelectId]);
+      onSelectById(id);
+    }, [id, onSelectById]);
     return (
       <Box
         role="option"
