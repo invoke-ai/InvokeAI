@@ -1,10 +1,10 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import type { InputProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Divider, Flex, Input, Text } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStateImperative } from 'common/hooks/useStateImperative';
+import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import type { ChangeEvent } from 'react';
 import {
   createContext,
@@ -37,17 +37,18 @@ export type ImperativeModelPickerHandle = {
   setSearchTerm: (searchTerm: string) => void;
 };
 
-const DefaultOptionComponent = typedMemo(({ id }: { id: string }) => {
-  return <Text fontWeight="bold">{id}</Text>;
+const DefaultOptionComponent = typedMemo(<T extends object>({ option }: { option: T }) => {
+  const { getOptionId } = usePickerContext();
+  return <Text fontWeight="bold">{getOptionId(option)}</Text>;
 });
 DefaultOptionComponent.displayName = 'DefaultOptionComponent';
 
-const DefaultGroupHeaderComponent = typedMemo(({ id }: { id: string }) => {
-  return <Text fontWeight="bold">{id}</Text>;
+const DefaultGroupHeaderComponent = typedMemo(<T extends object>({ group }: { group: Group<T> }) => {
+  return <Text fontWeight="bold">{group.id}</Text>;
 });
 DefaultGroupHeaderComponent.displayName = 'DefaultGroupHeaderComponent';
 
-const DefaultNoOptionsFallback = typedMemo(() => {
+const DefaultNoOptionsFallbackComponent = typedMemo(() => {
   const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
@@ -55,9 +56,9 @@ const DefaultNoOptionsFallback = typedMemo(() => {
     </Flex>
   );
 });
-DefaultNoOptionsFallback.displayName = 'DefaultNoOptionsFallback';
+DefaultNoOptionsFallbackComponent.displayName = 'DefaultNoOptionsFallbackComponent';
 
-const DefaultNoMatchesFallback = typedMemo(() => {
+const DefaultNoMatchesFallbackComponent = typedMemo(() => {
   const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
@@ -65,7 +66,7 @@ const DefaultNoMatchesFallback = typedMemo(() => {
     </Flex>
   );
 });
-DefaultNoMatchesFallback.displayName = 'DefaultNoMatchesFallback';
+DefaultNoMatchesFallbackComponent.displayName = 'DefaultNoMatchesFallbackComponent';
 
 export type PickerProps<T extends object> = {
   options: (T | Group<T>)[];
@@ -75,9 +76,10 @@ export type PickerProps<T extends object> = {
   selectedItem?: T;
   onSelect?: (option: T) => void;
   onClose?: () => void;
-  noOptionsFallback?: React.ReactNode;
-  noMatchesFallback?: React.ReactNode;
   handleRef?: React.Ref<ImperativeModelPickerHandle>;
+  SearchBarComponent?: ReturnType<typeof fixedForwardRef<HTMLInputElement, InputProps>>;
+  NoOptionsFallbackComponent?: React.ComponentType;
+  NoMatchesFallbackComponent?: React.ComponentType;
   OptionComponent?: React.ComponentType<{ option: T }>;
   GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
 };
@@ -88,10 +90,11 @@ type PickerContextState<T extends object> = {
   getIsDisabled?: (option: T) => boolean;
   setActiveOptionId: (id: string) => void;
   onSelectById: (id: string) => void;
-  noOptionsFallback?: React.ReactNode;
-  noMatchesFallback?: React.ReactNode;
-  OptionComponent?: React.ComponentType<{ option: T }>;
-  GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
+  SearchBarComponent: ReturnType<typeof fixedForwardRef<HTMLInputElement, InputProps>>;
+  NoOptionsFallbackComponent: React.ComponentType;
+  NoMatchesFallbackComponent: React.ComponentType;
+  OptionComponent: React.ComponentType<{ option: T }>;
+  GroupHeaderComponent: React.ComponentType<{ group: Group<T> }>;
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -180,13 +183,14 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     handleRef,
     isMatch,
     getIsDisabled,
-    noMatchesFallback = <DefaultNoMatchesFallback />,
-    noOptionsFallback = <DefaultNoOptionsFallback />,
     onClose,
     onSelect,
     selectedItem,
-    OptionComponent,
-    GroupHeaderComponent,
+    SearchBarComponent = DefaultPickerSearchBarComponent,
+    NoMatchesFallbackComponent = DefaultNoMatchesFallbackComponent,
+    NoOptionsFallbackComponent = DefaultNoOptionsFallbackComponent,
+    OptionComponent = DefaultOptionComponent,
+    GroupHeaderComponent = DefaultGroupHeaderComponent,
   } = props;
   const [activeOptionId, setActiveOptionId, getActiveOptionId] = useStateImperative(() =>
     getFirstOptionId(options, getOptionId)
@@ -346,22 +350,24 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         isMatch,
         getIsDisabled,
         onSelectById,
-        noOptionsFallback,
-        noMatchesFallback,
+        setActiveOptionId,
+        SearchBarComponent,
+        NoOptionsFallbackComponent,
+        NoMatchesFallbackComponent,
         OptionComponent,
         GroupHeaderComponent,
-        setActiveOptionId,
       }) satisfies PickerContextState<T>,
     [
-      GroupHeaderComponent,
-      OptionComponent,
-      getIsDisabled,
       getOptionId,
       isMatch,
-      noMatchesFallback,
-      noOptionsFallback,
+      getIsDisabled,
       onSelectById,
       setActiveOptionId,
+      SearchBarComponent,
+      NoOptionsFallbackComponent,
+      NoMatchesFallbackComponent,
+      OptionComponent,
+      GroupHeaderComponent,
     ]
   );
 
@@ -378,14 +384,11 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         gap={2}
         onKeyDown={onKeyDown}
       >
-        <Flex gap={2} alignItems="center">
-          <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder="Filter" />
-          <NavigateToModelManagerButton />
-        </Flex>
+        <SearchBarComponent ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} />
         <Divider />
         <Flex tabIndex={-1} w="full" flexGrow={1}>
-          {flattenedOptions.length === 0 && noOptionsFallback}
-          {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && noMatchesFallback}
+          {flattenedOptions.length === 0 && <NoOptionsFallbackComponent />}
+          {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && <NoMatchesFallbackComponent />}
           {flattenedOptions.length > 0 && flattenedFilteredOptions.length > 0 && (
             <ScrollableContent>
               <PickerList
@@ -401,6 +404,13 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   );
 });
 Picker.displayName = 'Picker';
+
+const DefaultPickerSearchBarComponent = typedMemo(
+  fixedForwardRef<HTMLInputElement, InputProps>((props, ref) => {
+    return <Input placeholder="Search" ref={ref} {...props} />;
+  })
+);
+DefaultPickerSearchBarComponent.displayName = 'DefaultPickerSearchBarComponent';
 
 const PickerList = typedMemo(
   <T extends object>({
@@ -473,7 +483,7 @@ const PickerOptionGroup = typedMemo(
 
     return (
       <Flex flexDir="column" gap={2} w="full">
-        {GroupHeaderComponent ? <GroupHeaderComponent group={group} /> : <DefaultGroupHeaderComponent id={group.id} />}
+        <GroupHeaderComponent group={group} />
         <Flex flexDir="column" gap={1} w="full">
           {group.options.map((item) => {
             const id = getOptionId(item);
@@ -535,7 +545,7 @@ const PickerOption = typedMemo(
         onPointerMove={isDisabled ? undefined : onPointerMove}
         onClick={isDisabled ? undefined : onClick}
       >
-        {OptionComponent ? <OptionComponent option={option} /> : <DefaultOptionComponent id={id} />}
+        <OptionComponent option={option} />
       </Box>
     );
   }

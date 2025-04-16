@@ -1,4 +1,4 @@
-import type { FormLabelProps } from '@invoke-ai/ui-library';
+import type { FormLabelProps, InputProps } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
@@ -6,6 +6,7 @@ import {
   Flex,
   FormControlGroup,
   FormLabel,
+  Input,
   Popover,
   PopoverArrow,
   PopoverBody,
@@ -23,6 +24,7 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import type { Group, ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
 import { getRegex, Picker } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
+import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectIsCogView4, selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
@@ -222,6 +224,7 @@ const MainModelPicker = memo(() => {
               isMatch={isMatch}
               OptionComponent={PickerItemComponent}
               GroupHeaderComponent={PickerGroupHeaderComponent}
+              SearchBarComponent={SearchBarComponent}
             />
           </PopoverBody>
         </PopoverContent>
@@ -230,6 +233,19 @@ const MainModelPicker = memo(() => {
   );
 });
 MainModelPicker.displayName = 'MainModelPicker';
+
+const SearchBarComponent = typedMemo(
+  fixedForwardRef<HTMLInputElement, InputProps>((props, ref) => {
+    const { t } = useTranslation();
+    return (
+      <Flex gap={2} alignItems="center">
+        <Input ref={ref} {...props} placeholder={t('common.search')} />
+        <NavigateToModelManagerButton />
+      </Flex>
+    );
+  })
+);
+SearchBarComponent.displayName = 'SearchBarComponent';
 
 const PickerGroupHeaderComponent = memo(
   ({ group }: { group: Group<AnyModelConfig, { name: string; description: string }> }) => {
