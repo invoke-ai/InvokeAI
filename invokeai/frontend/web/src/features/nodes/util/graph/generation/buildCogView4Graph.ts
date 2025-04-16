@@ -16,8 +16,8 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
   getBoardField,
-  getPresetModifiedPrompts,
   getSizes,
+  selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
 import type { Invocation } from 'services/api/types';
@@ -45,7 +45,7 @@ export const buildCogView4Graph = async (
   assert(model, 'No model found in state');
 
   const { originalSize, scaledSize } = getSizes(bbox);
-  const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
+  const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('cogview4_graph'));
   const modelLoader = g.addNode({

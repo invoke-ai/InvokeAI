@@ -9,6 +9,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
+import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
@@ -58,6 +59,7 @@ export const GlobalHookIsolator = memo(
     useSyncQueueStatus();
     useFocusRegionWatcher();
     useWorkflowBuilderWatcher();
+    useDynamicPromptsWatcher();
 
     return null;
   }

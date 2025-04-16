@@ -8,7 +8,7 @@ import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from '
 import { assert } from 'tsafe';
 
 import { addLoRAs } from './generation/addLoRAs';
-import { getBoardField, getPresetModifiedPrompts } from './graphBuilderUtils';
+import { getBoardField, selectPresetModifiedPrompts } from './graphBuilderUtils';
 
 export const buildMultidiffusionUpscaleGraph = async (
   state: RootState
@@ -97,7 +97,7 @@ export const buildMultidiffusionUpscaleGraph = async (
 
   if (model.base === 'sdxl') {
     const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } =
-      getPresetModifiedPrompts(state);
+      selectPresetModifiedPrompts(state);
 
     posCond = g.addNode({
       type: 'sdxl_compel_prompt',
@@ -130,7 +130,7 @@ export const buildMultidiffusionUpscaleGraph = async (
       negative_style_prompt: negativeStylePrompt,
     });
   } else {
-    const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
+    const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
 
     posCond = g.addNode({
       type: 'compel',

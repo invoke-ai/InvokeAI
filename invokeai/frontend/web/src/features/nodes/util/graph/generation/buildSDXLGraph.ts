@@ -20,8 +20,8 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
   getBoardField,
-  getPresetModifiedPrompts,
   getSizes,
+  selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
@@ -67,7 +67,8 @@ export const buildSDXLGraph = async (
 
   const fp32 = vaePrecision === 'fp32';
   const { originalSize, scaledSize } = getSizes(bbox);
-  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
+  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } =
+    selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sdxl_graph'));
   const modelLoader = g.addNode({

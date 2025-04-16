@@ -22,7 +22,6 @@ import { addImageToDeleteSelectedListener } from 'app/store/middleware/listenerM
 import { addImageUploadedFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageUploaded';
 import { addModelSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelSelected';
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
-import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import type { AppDispatch, RootState } from 'app/store/store';
@@ -94,8 +93,5 @@ addAppConfigReceivedListener(startAppListening);
 
 // Ad-hoc upscale workflwo
 addAdHocPostProcessingRequestedListener(startAppListening);
-
-// Prompts
-addDynamicPromptsListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);

@@ -146,3 +146,5 @@ export const getStylePreset = (
   const req = getStore().dispatch(stylePresetsApi.endpoints.getStylePreset.initiate(style_preset_id, _options));
   return req.unwrap();
 };
+
+export const selectListStylePresetsRequestState = stylePresetsApi.endpoints.listStylePresets.select();
