@@ -21,9 +21,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const addControlLayer = useAddControlLayer();
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
-  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
-  const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
-  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
+  const isEntityTypeEnabled = useIsEntityTypeEnabled();
 
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
@@ -37,7 +35,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addGlobalReferenceImage}
-              isDisabled={!isReferenceImageEnabled}
+              isDisabled={!isEntityTypeEnabled('reference_image')}
             >
               {t('controlLayers.globalReferenceImage')}
             </Button>
@@ -63,7 +61,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalGuidance}
-              isDisabled={!isRegionalGuidanceEnabled}
+              isDisabled={!isEntityTypeEnabled('regional_guidance')}
             >
               {t('controlLayers.regionalGuidance')}
             </Button>
@@ -75,7 +73,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addRegionalReferenceImage}
-              isDisabled={!isRegionalGuidanceEnabled}
+              isDisabled={!isEntityTypeEnabled('regional_guidance')}
             >
               {t('controlLayers.regionalReferenceImage')}
             </Button>
@@ -90,7 +88,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addControlLayer}
-              isDisabled={!isControlLayerEnabled}
+              isDisabled={!isEntityTypeEnabled('control_layer')}
             >
               {t('controlLayers.controlLayer')}
             </Button>

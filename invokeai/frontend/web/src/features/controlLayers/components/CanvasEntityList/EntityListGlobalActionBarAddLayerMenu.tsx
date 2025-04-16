@@ -22,9 +22,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
-  const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
-  const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
+  const isEntityTypeEnabled = useIsEntityTypeEnabled();
 
   return (
     <Menu>
@@ -41,7 +39,11 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
       />
       <MenuList>
         <MenuGroup title={t('controlLayers.global')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage} isDisabled={!isReferenceImageEnabled}>
+          <MenuItem
+            icon={<PiPlusBold />}
+            onClick={addGlobalReferenceImage}
+            isDisabled={!isEntityTypeEnabled('reference_image')}
+          >
             {t('controlLayers.globalReferenceImage')}
           </MenuItem>
         </MenuGroup>
@@ -49,15 +51,23 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance} isDisabled={!isRegionalGuidanceEnabled}>
+          <MenuItem
+            icon={<PiPlusBold />}
+            onClick={addRegionalGuidance}
+            isDisabled={!isEntityTypeEnabled('regional_guidance')}
+          >
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage} isDisabled={!isRegionalGuidanceEnabled}>
+          <MenuItem
+            icon={<PiPlusBold />}
+            onClick={addRegionalReferenceImage}
+            isDisabled={!isEntityTypeEnabled('regional_guidance')}
+          >
             {t('controlLayers.regionalReferenceImage')}
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.layer_other')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer} isDisabled={!isControlLayerEnabled}>
+          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer} isDisabled={!isEntityTypeEnabled('control_layer')}>
             {t('controlLayers.controlLayer')}
           </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
