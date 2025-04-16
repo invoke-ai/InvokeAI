@@ -113,7 +113,6 @@ class ApiDependencies:
                 safe_globals=[torch.Tensor],
                 ephemeral=True,
             ),
-            max_cache_size=0,
         )
         conditioning = ObjectSerializerForwardCache(
             ObjectSerializerDisk[ConditioningFieldData](
