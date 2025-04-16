@@ -113,7 +113,12 @@
         "board": "ボード",
         "seed": "シード",
         "combinatorial": "組み合わせ",
-        "aboutHeading": "想像力をこの手に"
+        "aboutHeading": "想像力をこの手に",
+        "systemInformation": "システム情報",
+        "value": "値",
+        "label": "ラベル",
+        "saveChanges": "変更を保存",
+        "error_withCount_other": "{{count}} 個のエラー"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
@@ -188,19 +193,49 @@
         "noHotkeysFound": "ホットキーが見つかりません",
         "viewer": {
             "runPostprocessing": {
-                "title": "ポストプロセスを実行"
+                "title": "ポストプロセスを実行",
+                "desc": "現画像の選択された後処理を実行."
             },
             "useSize": {
-                "title": "サイズを使用"
+                "title": "サイズを使用",
+                "desc": "現画像のサイズをbboxサイズとして使用する."
             },
             "recallPrompts": {
-                "title": "プロンプトを再使用"
+                "title": "プロンプトを再使用",
+                "desc": "現画像のポジティブプロンプトとネガティブプロンプトを呼び出す."
             },
             "recallAll": {
-                "title": "全てのメタデータを再使用"
+                "title": "全てのメタデータを再使用",
+                "desc": "現画像の全てのメタデータを呼び出す."
             },
             "recallSeed": {
-                "title": "シード値を再使用"
+                "title": "シード値を再使用",
+                "desc": "現画像の全てのシードを呼び出す."
+            },
+            "swapImages": {
+                "desc": "比較されている画像を交換.",
+                "title": "比較画像を交換"
+            },
+            "nextComparisonMode": {
+                "title": "次の比較モード",
+                "desc": "比較モード切り替え."
+            },
+            "toggleMetadata": {
+                "desc": "現画像のメタデータオーバーレイを表示/非表示.",
+                "title": "メタデータの表示/非表示"
+            },
+            "loadWorkflow": {
+                "title": "ワークフロー読み込み",
+                "desc": "現在の画像で保存されたワークフローを読み込み(1つ持っていたら)."
+            },
+            "title": "画像ビューア",
+            "toggleViewer": {
+                "title": "画像ビューアの表示/非表示",
+                "desc": "画像ビューアを表示/非表示.キャンバスタブだけで利用可能."
+            },
+            "remix": {
+                "desc": "現画像のシードを除き，全てのメタデータを呼び出す.",
+                "title": "リミックス"
             }
         },
         "canvas": {
@@ -324,17 +359,37 @@
         },
         "workflows": {
             "undo": {
-                "title": "取り消し"
+                "title": "取り消し",
+                "desc": "直前のワークフローアクションを元に戻す."
             },
             "redo": {
-                "title": "やり直し"
+                "title": "やり直し",
+                "desc": "直前のワークフローアクションをやり直す."
             },
             "title": "ワークフロー",
             "pasteSelection": {
-                "title": "ペースト"
+                "title": "ペースト",
+                "desc": "コピーしたノードとエッジを貼り付けます."
             },
             "copySelection": {
-                "title": "コピー"
+                "title": "コピー",
+                "desc": "選択したノードとエッジをコピーします."
+            },
+            "deleteSelection": {
+                "title": "削除",
+                "desc": "選択されたノードとエッジを削除."
+            },
+            "selectAll": {
+                "desc": "全てのノードとエッジを選択.",
+                "title": "全選択"
+            },
+            "addNode": {
+                "desc": "ノード追加メニューを開く．",
+                "title": "ノードを追加"
+            },
+            "pasteSelectionWithEdges": {
+                "title": "エッジ付き貼り付け",
+                "desc": "コピーされたノード，エッジ，コピーされたノードに付属した全てのエッジを貼り付けます."
             }
         },
         "app": {
@@ -398,7 +453,51 @@
         },
         "hotkeys": "ホットキー",
         "gallery": {
-            "title": "ギャラリー"
+            "title": "ギャラリー",
+            "galleryNavLeftAlt": {
+                "title": "左へ移動(画像比較)",
+                "desc": "左へ移動と同じですが，比較画像を選択し，比較モードがまだ開かれていなければ開きます."
+            },
+            "galleryNavUp": {
+                "desc": "ギャラリーグリッド内を上に移動し，その画像を選択.ページの上部にある場合，前のページに移動.",
+                "title": "上へ移動"
+            },
+            "galleryNavDown": {
+                "title": "下へ移動",
+                "desc": "ギャラリーグリッド内の下に移動し，その画像を選択.ページの下にある場合，次のページに移動."
+            },
+            "clearSelection": {
+                "title": "選択を消去",
+                "desc": "選択していれば消去."
+            },
+            "deleteSelection": {
+                "desc": "選択した全ての画像を削除します.デフォルトでは，削除について確認されます.アプリ内で画像を利用中の場合，警告されます.",
+                "title": "削除"
+            },
+            "galleryNavDownAlt": {
+                "desc": "下へ移動と同じですが，比較画像を選択し，比較モードがまだ開かれていなければ開きます.",
+                "title": "下へ移動(画像比較)"
+            },
+            "galleryNavUpAlt": {
+                "title": "上へ移動(画像比較)",
+                "desc": "上へ移動と同じですが，比較画像を選択し，比較モードがまだ開かれていなければ開きます."
+            },
+            "selectAllOnPage": {
+                "desc": "現在のページ上の全ての画像を選択.",
+                "title": "ページ上で全てを選択"
+            },
+            "galleryNavRight": {
+                "title": "右へ移動",
+                "desc": "ギャラリーグリッド内を右に移動し，その画像を選択.行の最後の画像にある場合，次の行に移動.ページの最後の画像にある場合，次のページに移動."
+            },
+            "galleryNavRightAlt": {
+                "title": "右へ移動(画像比較)",
+                "desc": "右へ移動と同じですが，比較画像を選択し，比較モードがまだ開かれていなければ開きます."
+            },
+            "galleryNavLeft": {
+                "desc": "ギャラリーグリッド内を左に移動し．その画像を選択.行の最初の画像にある場合，前の行に移動.ページの最初の画像にある場合，前のページに移動.",
+                "title": "左へ移動"
+            }
         }
     },
     "modelManager": {
@@ -462,7 +561,85 @@
         "edit": "編集",
         "install": "インストール",
         "huggingFacePlaceholder": "owner/model-name",
-        "variant": "Variant"
+        "variant": "Variant",
+        "scanFolderHelper": "フォルダはモデル向けに再起的にスキャンされます.これは大きいフォルダほど多少の時間がかかります.",
+        "controlLora": "コントロールLoRA",
+        "triggerPhrases": "トリガーフレーズ",
+        "t5Encoder": "T5エンコーダー",
+        "textualInversions": "テキスト反転",
+        "fluxRedux": "FLUX リダックス",
+        "installQueue": "キューをインストール",
+        "noMatchingModels": "マッチするモデルがありません",
+        "noDefaultSettings": "このモデルには構成されたデフォルト設定がありません.デフォルト設定を追加するためにモデルマネージャーにアクセスしてください.",
+        "usingDefaultSettings": "モデルのデフォルト設定を使用する",
+        "defaultSettingsOutOfSync": "いくつかの設定がデフォルト設定とマッチしません:",
+        "vaePrecision": "VAE精度",
+        "installingBundle": "バンドルをインストール",
+        "urlOrLocalPathHelper": "URLは1つのファイルを示さなくてはいけません.ローカルパスは1つのファイルか，1つのディヒューザーモデルのあるフォルダを指定できます.",
+        "clipEmbed": "クリップ埋め込み",
+        "loraTriggerPhrases": "LoRAトリガーフレーズ",
+        "main": "メイン",
+        "defaultSettings": "デフォルト設定",
+        "deleteModelImage": "モデル画像を削除",
+        "hfTokenInvalid": "ハギングフェイストークンが無効または見つかりません",
+        "hfForbiddenErrorMessage": "リポジトリにアクセスすることを勧めます.所有者はダウンロードにあたり利用規約への同意を要求する場合があります.",
+        "noModelsInstalled": "インストールされているモデルなし",
+        "pathToConfig": "設定へのパス",
+        "noModelsInstalledDesc1": "モデルを一緒にインストール",
+        "pruneTooltip": "完了したインポートをキューから削除",
+        "scanResults": "結果をスキャン",
+        "scanPlaceholder": "ローカルフォルダへのパス",
+        "typePhraseHere": "ここにフレーズを入力",
+        "ipAdapters": "IPアダプター",
+        "modelImageUpdated": "モデル画像アップデート",
+        "installAll": "全てインストール",
+        "installRepo": "リポジトリをインストール",
+        "localOnly": "ローカルのみ",
+        "huggingFaceHelper": "いくつかのモデルがこのリポジトリで見つかった場合，1つを選択してインストールするように求められます.",
+        "hfTokenInvalidErrorMessage": "ハギングフェイストークンが無効または見つかりません.",
+        "hfTokenRequired": "有効なハギングフェイストークンが必要なモデルをダウンロードしようとしています.",
+        "hfTokenInvalidErrorMessage2": "更新してください ",
+        "modelImageDeleted": "モデル画像削除",
+        "repoVariant": "リポジトリバリアント",
+        "llavaOnevision": "LLaVA ワンビジョン",
+        "installingXModels_other": "{{count}} 個のモデルをインストール",
+        "skippingXDuplicates_other": "{{count}}個の重複をスキップ",
+        "clipGEmbed": "クリップ-G 埋め込み",
+        "mainModelTriggerPhrases": "メインモデルトリガーフレーズ",
+        "upcastAttention": "アップキャストアテンション",
+        "urlOrLocalPath": "URLかローカルパス",
+        "clipLEmbed": "クリップ-L 埋め込み",
+        "defaultSettingsSaved": "デフォルト設定を保存しました",
+        "hfTokenUnableToVerify": "ハギングフェイストークンを確認できません",
+        "hfForbidden": "このハギングフェイスモデルにアクセスできません",
+        "hfTokenLabel": "ハギングフェイストークン(いくつかのモデルに必要)",
+        "noModelSelected": "モデルが選択されていません",
+        "prune": "除去",
+        "hfTokenHelperText": "いくつかのモデルにハギングフェイストークンが必要です.ここをクリックしてあなたのトークンを作成してください.",
+        "starterBundleHelpText": "メインモデル，コントロールネット，IPアダプターなど，ベースモデルから始めるのに必要なすべてのモデルを簡単にインストールできます.バンドルを選択すると，すでにインストールされているモデルはスキップされます.",
+        "inplaceInstallDesc": "ファイルをコピーせずにモデルをインストールします.このモデルを使ったとき，この場所からロードされます.利用できない場合，モデルファイルはInvoke管理モデルディレクトリにインストールしている間にコピーされます.",
+        "hfTokenUnableToVerifyErrorMessage": "ハギングフェイストークンを確認できません.ネットワークによるエラーの可能性があります.後ほどトライしてください.",
+        "restoreDefaultSettings": "クリックするとモデルのデフォルト設定が使用されます.",
+        "hfTokenSaved": "ハギングフェイストークンを保存しました",
+        "imageEncoderModelId": "画像エンコーダーモデルID",
+        "includesNModels": "{{n}}個のモデルとこれらの依存関係を含みます",
+        "learnMoreAboutSupportedModels": "私たちのサポートしているモデルについて更に学ぶ",
+        "modelImageUpdateFailed": "モデル画像アップデート失敗",
+        "scanFolder": "スキャンフォルダ",
+        "simpleModelPlaceholder": "ローカルファイルかディフューザーズフォルダへのURLかパス",
+        "installingModel": "モデルをインストール",
+        "sigLip": "シグリップ",
+        "spandrelImageToImage": "Image to Image(スパンドレル)",
+        "starterBundles": "スターターバンドル",
+        "starterModels": "スターターモデル",
+        "starterModelsInModelManager": "スターターモデルがモデルマネージャーで見つかりました",
+        "modelImageDeleteFailed": "モデル画像の削除失敗",
+        "urlForbidden": "このモデルにアクセスできません",
+        "urlForbiddenErrorMessage": "このモデルを配布しているサイトからリクエスト権限が必要かもしれません.",
+        "urlUnauthorizedErrorMessage": "このモデルにアクセスするためにAPIトークンを構成する必要があるかもしれません.",
+        "urlUnauthorizedErrorMessage2": "ここでどうやるか学びます.",
+        "inplaceInstall": "定位置にインストール",
+        "fileSize": "ファイルサイズ"
     },
     "parameters": {
         "images": "画像",
@@ -487,7 +664,27 @@
         "general": "基本設定",
         "setToOptimalSize": "サイズをモデルに最適化",
         "invoke": {
-            "addingImagesTo": "画像の追加先"
+            "addingImagesTo": "画像の追加先",
+            "collectionTooFewItems": "少なすぎる項目,最小{{minItems}}",
+            "collectionTooManyItems": "多すぎる項目,最大{{maxItems}}",
+            "missingFieldTemplate": "フィールドテンプレートの欠落",
+            "collectionStringTooShort": "短すぎます,最小{{minLength}}",
+            "batchNodeEmptyCollection": "いくつかのバッチノードに空のコレクションがあります",
+            "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (最小値を除く)",
+            "missingInputForField": "入力の欠落",
+            "noModelSelected": "モデルが選択されていません",
+            "emptyBatches": "空のバッチ",
+            "collectionStringTooLong": "長すぎます,最大{{maxLength}}",
+            "batchNodeCollectionSizeMismatchNoGroupId": "バッチグループのコレクションサイズが合いません",
+            "invoke": "呼び出す",
+            "collectionEmpty": "空のコレクション",
+            "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (最大値を除く)",
+            "collectionNumberNotMultipleOf": "{{value}} は {{multipleOf}} の倍数ではありません",
+            "batchNodeCollectionSizeMismatch": "バッチ {{batchGroupId}}のコレクションサイズが合いません",
+            "collectionNumberGTMax": "{{value}} > {{maximum}} (最大増加)",
+            "missingNodeTemplate": "ノードテンプレートの欠落",
+            "batchNodeNotConnected": "バッチノードが: {{label}}につながっていない",
+            "collectionNumberLTMin": "{{value}} < {{minimum}} (最小増加)"
         },
         "aspect": "縦横比",
         "lockAspectRatio": "縦横比を固定",
@@ -506,7 +703,20 @@
         },
         "cfgScale": "CFGスケール",
         "tileSize": "タイルサイズ",
-        "coherenceMode": "モード"
+        "coherenceMode": "モード",
+        "disabledNoRasterContent": "無効(ラスターコンテンツなし)",
+        "imageFit": "初期画像を出力サイズに合わせる",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (おそらく大きすぎます)",
+        "coherenceEdgeSize": "エッジサイズ",
+        "swapDimensions": "スワップ次元",
+        "controlNetControlMode": "制御モード",
+        "infillColorValue": "塗りつぶし色",
+        "coherenceMinDenoise": "最小ノイズ除去",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (おそらく小さすぎます)",
+        "cfgRescaleMultiplier": "CFGリスケール倍率",
+        "clipSkip": "クリップスキップ",
+        "guidance": "ガイダンス",
+        "infillMethod": "充填法"
     },
     "settings": {
         "models": "モデル",
@@ -568,7 +778,15 @@
         "generationMode": "生成モード",
         "vae": "VAE",
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
-        "canvasV2Metadata": "キャンバス"
+        "canvasV2Metadata": "キャンバス",
+        "guidance": "手引き",
+        "parsingFailed": "解析に失敗しました",
+        "seamlessXAxis": "シームレスX軸",
+        "seamlessYAxis": "シームレスY軸",
+        "parameterSet": "パラメーター {{parameter}} が設定されました",
+        "noMetaData": "メタデータが見つかりません",
+        "noRecallParameters": "呼び出されたパラメーターが見つかりません",
+        "noImageDetails": "画像の詳細が見つかりません"
     },
     "queue": {
         "queueEmpty": "キューが空です",
@@ -654,7 +872,10 @@
         "selectModel": "モデルを選択してください",
         "concepts": "コンセプト",
         "addLora": "LoRAを追加",
-        "lora": "LoRA"
+        "lora": "LoRA",
+        "defaultVAE": "デフォルトVAE",
+        "noLoRAsInstalled": "インストールされているLoRAはありません",
+        "noRefinerModelsInstalled": "インストールされているSDXLリファイナーモデルはありません"
     },
     "nodes": {
         "addNode": "ノードを追加",
@@ -688,7 +909,7 @@
         "cannotConnectInputToInput": "入力から入力には接続できません",
         "cannotConnectOutputToOutput": "出力から出力には接続できません",
         "cannotConnectToSelf": "自身のノードには接続できません",
-        "colorCodeEdges": "カラー-Code Edges",
+        "colorCodeEdges": "カラーコードエッジ",
         "loadingNodes": "ノードを読み込み中...",
         "scheduler": "スケジューラー",
         "version": "バージョン",
@@ -703,7 +924,131 @@
         "workflow": "ワークフロー",
         "workflowName": "名前",
         "workflowNotes": "ノート",
-        "enum": "Enum"
+        "enum": "Enum",
+        "arithmeticSequence": "等差数列",
+        "linearDistribution": "線形分布",
+        "addLinearView": "ライナービューに追加",
+        "animatedEdges": "アニメーションエッジ",
+        "uniformRandomDistribution": "一様ランダム分布",
+        "noBatchGroup": "グループなし",
+        "parseString": "文字列の解析",
+        "generatorImagesFromBoard": "ボードからの画像",
+        "generatorLoading": "読み込み中",
+        "missingNode": "呼び出しノードがありません",
+        "missingSourceOrTargetNode": "ソースまたはターゲットノードがありません",
+        "missingSourceOrTargetHandle": "ソースまたはターゲットハンドルがありません",
+        "fullyContainNodes": "選択するノードを完全に含む",
+        "noWorkflows": "ワークフローがありません",
+        "nodeSearch": "ノードを探します",
+        "showEdgeLabels": "エッジラベルを表示",
+        "downloadWorkflowError": "ワークフローのダウンロード中にエラーが発生しました",
+        "generatorNRandomValues_other": "{{count}} 個のランダムな値",
+        "dynamicPromptsRandom": "ダイナミックプロンプト(ランダム)",
+        "generatorLoadFromFile": "ファイルから読み込み",
+        "connectionWouldCreateCycle": "コネクションはサイクルをつくります",
+        "singleFieldType": "{{name}} (単数)",
+        "targetNodeDoesNotExist": "無効なエッジ:ターゲット/インプットノード {{node}} 存在しません",
+        "noConnectionInProgress": "進捗中のコネクションはありません",
+        "generatorImagesCategory": "カテゴリー",
+        "generatorImages_other": "{{count}} 個の画像",
+        "missingInvocationTemplate": "呼び出しテンプレートがありません",
+        "nodePack": "ノードパック",
+        "targetNodeFieldDoesNotExist": "無効なエッジ:ターゲット/インプットフィールド{{node}}.{{field}} が存在しません",
+        "mismatchedVersion": "無効なノード:ノード {{node}} のタイプ {{type}} はバージョンとミスマッチしています (アップデートを試されますか?)",
+        "dynamicPromptsCombinatorial": "ダイナミックプロンプト(組み合わせ)",
+        "cannotMixAndMatchCollectionItemTypes": "コレクション・アイテムの種類を組み合わせることはできません",
+        "missingFieldTemplate": "フィールドテンプレートがありません",
+        "editMode": "ワークフローエディタを編集します",
+        "sourceNodeDoesNotExist": "無効なエッジ:ソース/アウトプットノード{{node}}が存在しません",
+        "generatorNoValues": "空",
+        "collectionOrScalarFieldType": "{{name}} (単数またはコレクション)",
+        "unableToUpdateNode": "ノードアップロード失敗:ノード {{node}} のタイプ {{type}} (削除か再生成が必要かもしれません)",
+        "deletedInvalidEdge": "無効なエッジを削除しました{{source}} -> {{target}}",
+        "noFieldsLinearview": "線形ビューに追加されたフィールドがありません",
+        "collectionFieldType": "{{name}} (コレクション)",
+        "colorCodeEdgesHelp": "接続されたフィールドによるカラーコードエッジ",
+        "showEdgeLabelsHelp": "エッジのラベルを表示，接続されているノードを示す",
+        "sourceNodeFieldDoesNotExist": "無効なエッジ:ソース/アウトプットフィールド{{node}}.{{field}}が存在しません",
+        "deletedMissingNodeFieldFormElement": "不足しているフォームフィールドを削除しました: ノード {{nodeId}} フィールド {{fieldName}}",
+        "nodeName": "ノード名",
+        "splitOn": "分割オン",
+        "noMatchingWorkflows": "マッチするワークフローがありません",
+        "unknownNodeType": "不明なノード型",
+        "inputFieldTypeParseError": "入力フィールド{{node}}.{{field}}の型を解析できません ({{message}})",
+        "loadWorkflowDesc": "ワークフローを読み込みますか？",
+        "loadWorkflowDesc2": "現在のワークフローは保存されていない変更があります.",
+        "clearWorkflowDesc": "このワークフローをクリアして新しいワークフローにしますか？",
+        "updateNode": "ノードをアップデート",
+        "versionUnknown": " バージョン不明",
+        "graph": "グラフ",
+        "workflowContact": "お問い合わせ",
+        "outputFieldTypeParseError": "出力フィールド {{node}}.{{field}} の型を解析できません({{message}})",
+        "unableToExtractEnumOptions": "enum オプションを抽出できません",
+        "zoomOutNodes": "縮小",
+        "unableToGetWorkflowVersion": "ワークフローのスキーマバージョンを取得できません",
+        "missingField_withName": "欠落しているフィールド \"{{name}}\"",
+        "zoomInNodes": "拡大",
+        "addItem": "項目を追加",
+        "boardAccessError": "ボード {{board_id}}が見つからないので,デフォルトにリセットします",
+        "unknownNode": "不明なノード",
+        "imageAccessError": "画像{{image_name}}が見つからないので,デフォルトにリセットします",
+        "prototypeDesc": "この呼び出しはプロトタイプです.アプリの更新時に変更される可能性があり,いつでも削除される可能性があります.",
+        "reloadNodeTemplates": "ノードテンプレートを再読み込み",
+        "snapToGridHelp": "移動されたときにノードをグリッドにスナップ",
+        "unableToExtractSchemaNameFromRef": "参照からスキーマ名を抽出できません",
+        "unableToUpdateNodes_other": "{{count}} 個のノードをアップデートできません",
+        "workflowSettings": "ワークフローエディター設定",
+        "generateValues": "値を生成",
+        "floatRangeGenerator": "浮動小数点レンジ生成器",
+        "integerRangeGenerator": "整数レンジ生成器",
+        "specialDesc": "この呼び出しは,アプリ内で特別な処理を行います.例えば,バッチノードは1つのワークフローから複数のグラフをキューに入れるために使用されます.",
+        "modelAccessError": "モデル {{key}}が見つからないので,デフォルトにリセットします",
+        "betaDesc": "この呼び出しはベータ版です.安定するまでは,アプリのアップデートの際に変更される可能性があります.この呼び出しは長期的にサポートする予定です.",
+        "internalDesc": "この呼び出しはInvokeによって内部的に使用されます.アプリの更新時に変更される可能性があり,いつでも削除される可能性があります.",
+        "noFieldsViewMode": "このワークフローには表示する選択フィールドがありません.値を設定するためにはワークフロー全体を表示します.",
+        "clearWorkflow": "ワークフローをクリア",
+        "removeLinearView": "線形ビューから削除",
+        "snapToGrid": "グリッドにスナップ",
+        "showMinimapnodes": "ミニマップを表示",
+        "reorderLinearView": "線形ビューの並び替え",
+        "description": "説明",
+        "notesDescription": "ワークフローに関するメモを追加する",
+        "newWorkflowDesc2": "現在のワークフローに保存されていない変更があります.",
+        "unknownField": "不明なフィールド",
+        "unexpectedField_withName": "予期しないフィールド\"{{name}}\"",
+        "loadingTemplates": "読み込み中 {{name}}",
+        "validateConnectionsHelp": "無効な接続が行われたり,無効なグラフが呼び出されたりしないようにします.",
+        "validateConnections": "接続とグラフを確認する",
+        "saveToGallery": "ギャラリーに保存",
+        "newWorkflowDesc": "新しいワークフローを作りますか？",
+        "unknownFieldType": "$t(nodes.unknownField)型:{type}}",
+        "unsupportedArrayItemType": "サポートされていない配列項目型です \"{{type}}\"",
+        "unableToLoadWorkflow": "ワークフローが読み込めません",
+        "unableToValidateWorkflow": "ワークフローを確認できません",
+        "unknownErrorValidatingWorkflow": "ワークフローの確認で不明なエラーが発生",
+        "clearWorkflowDesc2": "現在のワークフローは保存されていない変更があります.",
+        "showLegendNodes": "フィールドタイプの凡例を表示",
+        "unsupportedMismatchedUnion": "CollectionOrScalar型とベース型{{firstType}}および{{secondType}}が不一致です",
+        "updateApp": "アプリケーションをアップデート",
+        "noGraph": "グラフなし",
+        "unsupportedAnyOfLength": "結合したメンバーが多すぎます ({{count}})",
+        "updateAllNodes": "ノードをアップデート",
+        "allNodesUpdated": "全てのノードをアップデート",
+        "workflowHelpText": "ヘルプは<LinkComponent>Getting Started with Workflows</LinkComponent> のガイドをご覧ください.",
+        "noNodeSelected": "選択されたノードがありません",
+        "problemSettingTitle": "問題設定のタイトル",
+        "resetToDefaultValue": "デフォルト値にリセット",
+        "newWorkflow": "新しいワークフロー",
+        "unknownField_withName": "不明なフィールド\"{{name}}\"",
+        "unknownFieldEditWorkflowToFix_withName": "ワークフローは不明なフィールドを含んでいます \"{{name}}\".\n問題を修正するためにワークフローを編集してください.",
+        "viewMode": "線形ビューでの使用",
+        "workflowDescription": "短い説明",
+        "workflowValidation": "ワークフロー検証エラー",
+        "noOutputRecorded": "記録されたアウトプットがありません",
+        "unknownTemplate": "不明なテンプレート",
+        "nodeOpacity": "ノードの不透明度",
+        "unableToParseFieldType": "フィールドタイプを解析できません",
+        "unknownInput": "不明な入力: {{name}}"
     },
     "boards": {
         "autoAddBoard": "自動追加するボード",
