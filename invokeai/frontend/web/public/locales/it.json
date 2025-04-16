@@ -636,7 +636,8 @@
         "urlUnauthorizedErrorMessage2": "Scopri come qui.",
         "urlForbidden": "Non hai accesso a questo modello",
         "urlForbiddenErrorMessage": "Potrebbe essere necessario richiedere l'autorizzazione al sito che distribuisce il modello.",
-        "urlUnauthorizedErrorMessage": "Potrebbe essere necessario configurare un gettone API per accedere a questo modello."
+        "urlUnauthorizedErrorMessage": "Potrebbe essere necessario configurare un gettone API per accedere a questo modello.",
+        "fileSize": "Dimensione del file"
     },
     "parameters": {
         "images": "Immagini",
@@ -717,7 +718,8 @@
             "collectionNumberGTExclusiveMax": "{{value}} >= {{exclusiveMaximum}} (excl max)",
             "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (excl min)",
             "collectionEmpty": "raccolta vuota",
-            "batchNodeCollectionSizeMismatchNoGroupId": "Dimensione della raccolta di gruppo nel Lotto non corrisponde"
+            "batchNodeCollectionSizeMismatchNoGroupId": "Dimensione della raccolta di gruppo nel Lotto non corrisponde",
+            "modelIncompatibleBboxWidth": "La larghezza del riquadro di delimitazione è {{width}} ma {{model}} richiede multipli di {{multiple}}"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
