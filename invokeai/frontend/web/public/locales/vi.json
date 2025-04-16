@@ -2339,7 +2339,6 @@
             "publishedWorkflowInputs": "Đầu Vào",
             "unpublish": "Chưa Đăng",
             "workflowLockedPublished": "Workflow được đăng tải sẽ bị khóa không thể biên tập.\nBạn có thể ngừng đăng để chỉnh sửa, hoặc tạo một bản sao của nó.",
-            "errorWorkflowHasBatchOrGeneratorNodes": "Workflow có lô node và/hoặc node sản sinh",
             "errorWorkflowHasInvalidGraph": "Đồ thị workflow không hợp lệ (di chuột đến nút Khởi Động để xem chi tiết)",
             "errorWorkflowHasNoOutputNode": "Không có node đầu ra được chọn",
             "warningWorkflowHasUnpublishableInputFields": "Workflow có một số đầu ra không đăng được - chúng sẽ bị bỏ sót khỏi workflow",
@@ -2410,8 +2409,7 @@
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
             "Workflow: Hỗ trợ xâu ký tự thả xuống tùy chỉnh trong Trình Tạo Vùng Nhập.",
-            "FLUX: Hỗ trợ FLUX Fill trong Workflow và Canvas.",
-            "LLaVA OneVision VLLM: Hỗ trợ phiên bản Beta trong Workflow."
+            "FLUX: Hỗ trợ FLUX Fill trong Workflow và Canvas."
         ]
     },
     "upsell": {

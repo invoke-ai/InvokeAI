@@ -1809,7 +1809,6 @@
             "unpublishableInputs": "Questi input non pubblicabili verranno omessi",
             "publishWarnings": "Avvertenze",
             "errorWorkflowHasUnsavedChanges": "Il flusso di lavoro presenta modifiche non salvate",
-            "errorWorkflowHasBatchOrGeneratorNodes": "Il flusso di lavoro ha nodi lotto e/o generatori",
             "errorWorkflowHasInvalidGraph": "Grafico del flusso di lavoro non valido (passare il mouse sul pulsante Invoke per i dettagli)",
             "errorWorkflowHasNoOutputNode": "Nessun nodo di uscita selezionato",
             "warningWorkflowHasUnpublishableInputFields": "Il flusso di lavoro presenta alcuni ingressi non pubblicabili: questi verranno omessi dal flusso di lavoro pubblicato",
@@ -2401,8 +2400,7 @@
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
             "Flussi di lavoro: supporto per menu a discesa di stringhe personalizzate nel Generatore di Flussi di lavoro.",
-            "FLUX: supporto per FLUX Fill in Flussi di lavoro e Tela.",
-            "LLaVA OneVision VLLM: supporto beta nei flussi di lavoro."
+            "FLUX: supporto per FLUX Fill in Flussi di lavoro e Tela."
         ]
     },
     "system": {
