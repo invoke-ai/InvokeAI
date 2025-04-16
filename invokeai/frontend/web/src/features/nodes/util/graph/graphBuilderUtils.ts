@@ -1,11 +1,13 @@
+import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
+import { type ParamsState, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
+import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { pick } from 'lodash-es';
-import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
+import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -25,44 +27,47 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
 /**
  * Gets the prompts, modified for the active style preset.
  */
-export const getPresetModifiedPrompts = (
-  state: RootState
-): { positivePrompt: string; negativePrompt: string; positiveStylePrompt?: string; negativeStylePrompt?: string } => {
-  const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = state.params;
-  const { activeStylePresetId } = state.stylePreset;
+export const selectPresetModifiedPrompts = createSelector(
+  selectParamsSlice,
+  selectStylePresetSlice,
+  selectListStylePresetsRequestState,
+  (params, stylePresetSlice, listStylePresetsRequestState) => {
+    const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = params;
+    const { activeStylePresetId } = stylePresetSlice;
 
-  if (activeStylePresetId) {
-    const { data } = stylePresetsApi.endpoints.listStylePresets.select()(state);
+    if (activeStylePresetId) {
+      const { data } = listStylePresetsRequestState;
 
-    const activeStylePreset = data?.find((item) => item.id === activeStylePresetId);
+      const activeStylePreset = data?.find((item) => item.id === activeStylePresetId);
 
-    if (activeStylePreset) {
-      const presetModifiedPositivePrompt = buildPresetModifiedPrompt(
-        activeStylePreset.preset_data.positive_prompt,
-        positivePrompt
-      );
+      if (activeStylePreset) {
+        const presetModifiedPositivePrompt = buildPresetModifiedPrompt(
+          activeStylePreset.preset_data.positive_prompt,
+          positivePrompt
+        );
 
-      const presetModifiedNegativePrompt = buildPresetModifiedPrompt(
-        activeStylePreset.preset_data.negative_prompt,
-        negativePrompt
-      );
+        const presetModifiedNegativePrompt = buildPresetModifiedPrompt(
+          activeStylePreset.preset_data.negative_prompt,
+          negativePrompt
+        );
 
-      return {
-        positivePrompt: presetModifiedPositivePrompt,
-        negativePrompt: presetModifiedNegativePrompt,
-        positiveStylePrompt: shouldConcatPrompts ? presetModifiedPositivePrompt : positivePrompt2,
-        negativeStylePrompt: shouldConcatPrompts ? presetModifiedNegativePrompt : negativePrompt2,
-      };
+        return {
+          positivePrompt: presetModifiedPositivePrompt,
+          negativePrompt: presetModifiedNegativePrompt,
+          positiveStylePrompt: shouldConcatPrompts ? presetModifiedPositivePrompt : positivePrompt2,
+          negativeStylePrompt: shouldConcatPrompts ? presetModifiedNegativePrompt : negativePrompt2,
+        };
+      }
     }
-  }
 
-  return {
-    positivePrompt,
-    negativePrompt,
-    positiveStylePrompt: shouldConcatPrompts ? positivePrompt : positivePrompt2,
-    negativeStylePrompt: shouldConcatPrompts ? negativePrompt : negativePrompt2,
-  };
-};
+    return {
+      positivePrompt,
+      negativePrompt,
+      positiveStylePrompt: shouldConcatPrompts ? positivePrompt : positivePrompt2,
+      negativeStylePrompt: shouldConcatPrompts ? negativePrompt : negativePrompt2,
+    };
+  }
+);
 
 export const getSizes = (bboxState: CanvasState['bbox']) => {
   const originalSize = pick(bboxState.rect, 'width', 'height');

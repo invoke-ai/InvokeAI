@@ -19,8 +19,8 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
   getBoardField,
-  getPresetModifiedPrompts,
   getSizes,
+  selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
@@ -91,7 +91,7 @@ export const buildFLUXGraph = async (
     guidance = 30;
   }
 
-  const { positivePrompt } = getPresetModifiedPrompts(state);
+  const { positivePrompt } = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('flux_graph'));
   const modelLoader = g.addNode({

@@ -36,12 +36,6 @@ export const dynamicPromptsSlice = createSlice({
     maxPromptsChanged: (state, action: PayloadAction<number>) => {
       state.maxPrompts = action.payload;
     },
-    maxPromptsReset: (state) => {
-      state.maxPrompts = initialDynamicPromptsState.maxPrompts;
-    },
-    combinatorialToggled: (state) => {
-      state.combinatorial = !state.combinatorial;
-    },
     promptsChanged: (state, action: PayloadAction<string[]>) => {
       state.prompts = action.payload;
       state.isLoading = false;
@@ -63,8 +57,6 @@ export const dynamicPromptsSlice = createSlice({
 
 export const {
   maxPromptsChanged,
-  maxPromptsReset,
-  combinatorialToggled,
   promptsChanged,
   parsingErrorChanged,
   isErrorChanged,

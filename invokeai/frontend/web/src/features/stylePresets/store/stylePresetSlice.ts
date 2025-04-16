@@ -70,7 +70,7 @@ export const stylePresetPersistConfig: PersistConfig<StylePresetState> = {
   persistDenylist: [],
 };
 
-const selectStylePresetSlice = (state: RootState) => state.stylePreset;
+export const selectStylePresetSlice = (state: RootState) => state.stylePreset;
 const createStylePresetSelector = <T>(selector: Selector<StylePresetState, T>) =>
   createSelector(selectStylePresetSlice, selector);
 
