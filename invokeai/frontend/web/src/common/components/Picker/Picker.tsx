@@ -6,7 +6,18 @@ import { useStateImperative } from 'common/hooks/useStateImperative';
 import { typedMemo } from 'common/util/typedMemo';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import type { ChangeEvent } from 'react';
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+import { assert } from 'tsafe';
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 export type Group<T extends object, U = any> = {
@@ -26,29 +37,35 @@ export type ImperativeModelPickerHandle = {
   setSearchTerm: (searchTerm: string) => void;
 };
 
-const DefaultOptionComponent = ({ id }: { id: string }) => {
+const DefaultOptionComponent = typedMemo(({ id }: { id: string }) => {
   return <Text fontWeight="bold">{id}</Text>;
-};
+});
+DefaultOptionComponent.displayName = 'DefaultOptionComponent';
 
-const DefaultGroupHeaderComponent = ({ id }: { id: string }) => {
+const DefaultGroupHeaderComponent = typedMemo(({ id }: { id: string }) => {
   return <Text fontWeight="bold">{id}</Text>;
-};
+});
+DefaultGroupHeaderComponent.displayName = 'DefaultGroupHeaderComponent';
 
-const DefaultNoOptionsFallback = () => {
+const DefaultNoOptionsFallback = typedMemo(() => {
+  const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
-      <Text variant="subtext">No options available</Text>
+      <Text variant="subtext">{t('common.noOptions')}</Text>
     </Flex>
   );
-};
+});
+DefaultNoOptionsFallback.displayName = 'DefaultNoOptionsFallback';
 
-const DefaultNoMatchesFallback = () => {
+const DefaultNoMatchesFallback = typedMemo(() => {
+  const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
-      <Text variant="subtext">No matching options</Text>
+      <Text variant="subtext">{t('common.noMatches')}</Text>
     </Flex>
   );
-};
+});
+DefaultNoMatchesFallback.displayName = 'DefaultNoMatchesFallback';
 
 export type PickerProps<T extends object> = {
   options: (T | Group<T>)[];
@@ -63,6 +80,26 @@ export type PickerProps<T extends object> = {
   handleRef?: React.Ref<ImperativeModelPickerHandle>;
   OptionComponent?: React.ComponentType<{ option: T }>;
   GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
+};
+
+type PickerContextState<T extends object> = {
+  getOptionId: (option: T) => string;
+  isMatch: (option: T, searchTerm: string) => boolean;
+  getIsDisabled?: (option: T) => boolean;
+  setActiveOptionId: (id: string) => void;
+  onSelectId: (id: string) => void;
+  noOptionsFallback?: React.ReactNode;
+  noMatchesFallback?: React.ReactNode;
+  OptionComponent?: React.ComponentType<{ option: T }>;
+  GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
+};
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+const PickerContext = createContext<PickerContextState<any> | null>(null);
+const usePickerContext = <T extends object>(): PickerContextState<T> => {
+  const context = useContext(PickerContext);
+  assert(context !== null, 'usePickerContext must be used within a PickerProvider');
+  return context;
 };
 
 export const getRegex = (searchTerm: string) => {
@@ -190,7 +227,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     }
   }, [searchTerm, setActiveOptionId, props.options, options, getOptionId, isMatch]);
 
-  const onSelectInternal = useCallback(
+  const onSelectId = useCallback(
     (id: string) => {
       const item = findOption(options, id, getOptionId);
       if (!item) {
@@ -287,12 +324,10 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         next(e);
       } else if (e.key === 'Enter') {
         const activeOptionId = getActiveOptionId();
-        const item = flattenedFilteredOptions.find((item) => getOptionId(item) === activeOptionId);
-        if (!item) {
-          // Model not found? We should never get here.
+        if (!activeOptionId) {
           return;
         }
-        onSelect?.(item);
+        onSelectId(activeOptionId);
       } else if (e.key === 'Escape') {
         onClose?.();
       } else if (e.key === '/') {
@@ -301,46 +336,68 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         inputRef.current?.select();
       }
     },
-    [prev, next, getActiveOptionId, flattenedFilteredOptions, onSelect, getOptionId, onClose]
+    [prev, next, getActiveOptionId, onSelectId, onClose]
+  );
+
+  const ctx = useMemo(
+    () =>
+      ({
+        getOptionId,
+        isMatch,
+        getIsDisabled,
+        onSelectId,
+        noOptionsFallback,
+        noMatchesFallback,
+        OptionComponent,
+        GroupHeaderComponent,
+        setActiveOptionId,
+      }) satisfies PickerContextState<T>,
+    [
+      GroupHeaderComponent,
+      OptionComponent,
+      getIsDisabled,
+      getOptionId,
+      isMatch,
+      noMatchesFallback,
+      noOptionsFallback,
+      onSelectId,
+      setActiveOptionId,
+    ]
   );
 
   return (
-    <Flex
-      tabIndex={-1}
-      ref={rootRef}
-      flexGrow={1}
-      flexDir="column"
-      p={2}
-      w="full"
-      h="full"
-      gap={2}
-      onKeyDown={onKeyDown}
-    >
-      <Flex gap={2} alignItems="center">
-        <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder="Filter" />
-        <NavigateToModelManagerButton />
+    <PickerContext.Provider value={ctx}>
+      <Flex
+        tabIndex={-1}
+        ref={rootRef}
+        flexGrow={1}
+        flexDir="column"
+        p={2}
+        w="full"
+        h="full"
+        gap={2}
+        onKeyDown={onKeyDown}
+      >
+        <Flex gap={2} alignItems="center">
+          <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder="Filter" />
+          <NavigateToModelManagerButton />
+        </Flex>
+        <Divider />
+        <Flex tabIndex={-1} w="full" flexGrow={1}>
+          {flattenedOptions.length === 0 && noOptionsFallback}
+          {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && noMatchesFallback}
+          {flattenedOptions.length > 0 && flattenedFilteredOptions.length > 0 && (
+            <ScrollableContent>
+              <PickerList
+                items={filteredOptions}
+                activeOptionId={activeOptionId}
+                selectedItemId={selectedItem ? getOptionId(selectedItem) : undefined}
+              />
+            </ScrollableContent>
+          )}
+        </Flex>
       </Flex>
-      <Divider />
-      <Flex tabIndex={-1} w="full" flexGrow={1}>
-        {flattenedOptions.length === 0 && noOptionsFallback}
-        {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && noMatchesFallback}
-        {flattenedOptions.length > 0 && flattenedFilteredOptions.length > 0 && (
-          <ScrollableContent>
-            <PickerList
-              items={filteredOptions}
-              getOptionId={getOptionId}
-              activeOptionId={activeOptionId}
-              setActiveOptionId={setActiveOptionId}
-              selectedItemId={selectedItem ? getOptionId(selectedItem) : undefined}
-              onSelect={onSelectInternal}
-              getIsDisabled={getIsDisabled}
-              OptionComponent={OptionComponent}
-              GroupHeaderComponent={GroupHeaderComponent}
-            />
-          </ScrollableContent>
-        )}
-      </Flex>
-    </Flex>
+    </PickerContext.Provider>
   );
 });
 Picker.displayName = 'Picker';
@@ -349,24 +406,14 @@ const PickerList = typedMemo(
   <T extends object>({
     items,
     activeOptionId,
-    setActiveOptionId,
     selectedItemId,
-    onSelect,
-    getOptionId,
-    getIsDisabled,
-    OptionComponent,
-    GroupHeaderComponent,
   }: {
     items: (T | Group<T>)[];
     activeOptionId: string | undefined;
-    setActiveOptionId: (key: string) => void;
     selectedItemId: string | undefined;
-    onSelect: (key: string) => void;
-    getOptionId: (option: T) => string;
-    getIsDisabled?: (option: T) => boolean;
-    OptionComponent?: React.ComponentType<{ option: T }>;
-    GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
   }) => {
+    const { getOptionId, getIsDisabled } = usePickerContext<T>();
+
     if (items.length === 0) {
       return (
         <IAINoContentFallback
@@ -388,14 +435,8 @@ const PickerList = typedMemo(
               <PickerOptionGroup
                 key={itemOrGroup.id}
                 group={itemOrGroup}
-                setActiveOptionId={setActiveOptionId}
                 activeOptionId={activeOptionId}
-                getOptionId={getOptionId}
-                onSelect={onSelect}
                 selectedItemId={selectedItemId}
-                OptionComponent={OptionComponent}
-                getIsDisabled={getIsDisabled}
-                GroupHeaderComponent={GroupHeaderComponent}
               />
             );
           } else {
@@ -405,12 +446,9 @@ const PickerList = typedMemo(
                 key={id}
                 id={id}
                 option={itemOrGroup}
-                setActiveOptionId={setActiveOptionId}
-                onSelect={onSelect}
                 isActive={id === activeOptionId}
                 isSelected={id === selectedItemId}
                 isDisabled={getIsDisabled?.(itemOrGroup) ?? false}
-                OptionComponent={OptionComponent}
               />
             );
           }
@@ -424,27 +462,17 @@ PickerList.displayName = 'PickerList';
 const PickerOptionGroup = typedMemo(
   <T extends object>({
     group,
-    getOptionId,
-    setActiveOptionId,
-    onSelect,
     activeOptionId,
     selectedItemId,
-    getIsDisabled,
-    OptionComponent,
-    GroupHeaderComponent,
   }: {
     group: Group<T>;
-    getOptionId: (option: T) => string;
-    setActiveOptionId: (key: string) => void;
-    onSelect: (key: string) => void;
     activeOptionId: string | undefined;
     selectedItemId: string | undefined;
-    getIsDisabled?: (option: T) => boolean;
-    OptionComponent?: React.ComponentType<{ option: T }>;
-    GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
   }) => {
+    const { getOptionId, GroupHeaderComponent, getIsDisabled } = usePickerContext<T>();
+
     return (
-      <Flex key={group.id} flexDir="column" gap={2} w="full">
+      <Flex flexDir="column" gap={2} w="full">
         {GroupHeaderComponent ? <GroupHeaderComponent group={group} /> : <DefaultGroupHeaderComponent id={group.id} />}
         <Flex flexDir="column" gap={1} w="full">
           {group.options.map((item) => {
@@ -454,12 +482,9 @@ const PickerOptionGroup = typedMemo(
                 key={id}
                 id={id}
                 option={item}
-                setActiveOptionId={setActiveOptionId}
-                onSelect={onSelect}
                 isActive={id === activeOptionId}
                 isSelected={id === selectedItemId}
                 isDisabled={getIsDisabled?.(item) ?? false}
-                OptionComponent={OptionComponent}
               />
             );
           })}
@@ -490,23 +515,15 @@ const itemSx: SystemStyleObject = {
 };
 
 const PickerOption = typedMemo(
-  <T extends object>(props: {
-    id: string;
-    option: T;
-    setActiveOptionId: (key: string) => void;
-    onSelect: (key: string) => void;
-    isActive: boolean;
-    isSelected: boolean;
-    isDisabled: boolean;
-    OptionComponent?: React.ComponentType<{ option: T }>;
-  }) => {
-    const { id, option, OptionComponent, setActiveOptionId, onSelect, isActive, isDisabled, isSelected } = props;
+  <T extends object>(props: { id: string; option: T; isActive: boolean; isSelected: boolean; isDisabled: boolean }) => {
+    const { OptionComponent, setActiveOptionId, onSelectId } = usePickerContext<T>();
+    const { id, option, isActive, isDisabled, isSelected } = props;
     const onPointerMove = useCallback(() => {
       setActiveOptionId(id);
     }, [id, setActiveOptionId]);
     const onClick = useCallback(() => {
-      onSelect(id);
-    }, [id, onSelect]);
+      onSelectId(id);
+    }, [id, onSelectId]);
     return (
       <Box
         role="option"
