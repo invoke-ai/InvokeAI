@@ -71,7 +71,14 @@ The following commands vary depending on the version of Invoke being installed a
 
 7. Determine the `PyPI` index URL to use for installation, if any. This is necessary to get the right version of torch installed.
 
-    === "Invoke v5 or later"
+    === "Invoke v5.10.0 and later"
+
+        - If you are on Windows or Linux with an Nvidia GPU, use `https://download.pytorch.org/whl/cu126`.
+        - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
+        - If you are on Linux with an AMD GPU, use `https://download.pytorch.org/whl/rocm6.2.4`.
+        - **In all other cases, do not use an index.**
+
+    === "Invoke v5.0.0 to v5.9.1"
 
         - If you are on Windows with an Nvidia GPU, use `https://download.pytorch.org/whl/cu124`.
         - If you are on Linux with no GPU, use `https://download.pytorch.org/whl/cpu`.
