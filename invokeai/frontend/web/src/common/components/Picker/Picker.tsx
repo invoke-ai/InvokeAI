@@ -1,11 +1,11 @@
-import type { InputProps, SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Divider, Flex, Input, Text } from '@invoke-ai/ui-library';
+import type { BoxProps, InputProps } from '@invoke-ai/ui-library';
+import { Flex, Input, Text } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useStateImperative } from 'common/hooks/useStateImperative';
 import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, PropsWithChildren } from 'react';
 import {
   createContext,
   useCallback,
@@ -26,7 +26,7 @@ export type Group<T extends object, U = any> = {
   options: T[];
 };
 
-const isGroup = <T extends object>(option: T | Group<T>): option is Group<T> => {
+export const isGroup = <T extends object>(option: T | Group<T>): option is Group<T> => {
   return option ? 'options' in option && Array.isArray(option.options) : false;
 };
 
@@ -43,10 +43,19 @@ const DefaultOptionComponent = typedMemo(<T extends object>({ option }: { option
 });
 DefaultOptionComponent.displayName = 'DefaultOptionComponent';
 
-const DefaultGroupHeaderComponent = typedMemo(<T extends object>({ group }: { group: Group<T> }) => {
-  return <Text fontWeight="bold">{group.id}</Text>;
-});
-DefaultGroupHeaderComponent.displayName = 'DefaultGroupHeaderComponent';
+const DefaultGroupComponent = typedMemo(
+  <T extends object>({ group, children }: PropsWithChildren<{ group: Group<T> }>) => {
+    return (
+      <Flex flexDir="column" gap={2} w="full">
+        <Text fontWeight="bold">{group.id}</Text>
+        <Flex flexDir="column" gap={1} w="full">
+          {children}
+        </Flex>
+      </Flex>
+    );
+  }
+);
+DefaultGroupComponent.displayName = 'DefaultGroupComponent';
 
 const DefaultNoOptionsFallbackComponent = typedMemo(() => {
   const { t } = useTranslation();
@@ -68,7 +77,7 @@ const DefaultNoMatchesFallbackComponent = typedMemo(() => {
 });
 DefaultNoMatchesFallbackComponent.displayName = 'DefaultNoMatchesFallbackComponent';
 
-export type PickerProps<T extends object> = {
+export type PickerProps<T extends object, U> = {
   options: (T | Group<T>)[];
   getOptionId: (option: T) => string;
   isMatch: (option: T, searchTerm: string) => boolean;
@@ -80,11 +89,18 @@ export type PickerProps<T extends object> = {
   SearchBarComponent?: ReturnType<typeof fixedForwardRef<HTMLInputElement, InputProps>>;
   NoOptionsFallbackComponent?: React.ComponentType;
   NoMatchesFallbackComponent?: React.ComponentType;
-  OptionComponent?: React.ComponentType<{ option: T }>;
-  GroupHeaderComponent?: React.ComponentType<{ group: Group<T> }>;
+  OptionComponent?: React.ComponentType<
+    {
+      option: T;
+    } & BoxProps
+  >;
+  GroupComponent?: React.ComponentType<
+    PropsWithChildren<{ group: Group<T, U>; activeOptionId: string | undefined } & BoxProps>
+  >;
 };
 
-type PickerContextState<T extends object> = {
+type PickerContextState<T extends object, U> = {
+  options: (T | Group<T>)[];
   getOptionId: (option: T) => string;
   isMatch: (option: T, searchTerm: string) => boolean;
   getIsDisabled?: (option: T) => boolean;
@@ -93,13 +109,15 @@ type PickerContextState<T extends object> = {
   SearchBarComponent: ReturnType<typeof fixedForwardRef<HTMLInputElement, InputProps>>;
   NoOptionsFallbackComponent: React.ComponentType;
   NoMatchesFallbackComponent: React.ComponentType;
-  OptionComponent: React.ComponentType<{ option: T }>;
-  GroupHeaderComponent: React.ComponentType<{ group: Group<T> }>;
+  OptionComponent: React.ComponentType<{ option: T } & BoxProps>;
+  GroupComponent: React.ComponentType<
+    PropsWithChildren<{ group: Group<T, U>; activeOptionId: string | undefined } & BoxProps>
+  >;
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const PickerContext = createContext<PickerContextState<any> | null>(null);
-const usePickerContext = <T extends object>(): PickerContextState<T> => {
+const PickerContext = createContext<PickerContextState<any, any> | null>(null);
+export const usePickerContext = <T extends object, U>(): PickerContextState<T, U> => {
   const context = useContext(PickerContext);
   assert(context !== null, 'usePickerContext must be used within a PickerProvider');
   return context;
@@ -176,7 +194,7 @@ const flattenOptions = <T extends object>(options: (T | Group<T>)[]): T[] => {
   return flattened;
 };
 
-export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
+export const Picker = typedMemo(<T extends object, U>(props: PickerProps<T, U>) => {
   const {
     getOptionId,
     options,
@@ -190,14 +208,14 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     NoMatchesFallbackComponent = DefaultNoMatchesFallbackComponent,
     NoOptionsFallbackComponent = DefaultNoOptionsFallbackComponent,
     OptionComponent = DefaultOptionComponent,
-    GroupHeaderComponent = DefaultGroupHeaderComponent,
+    GroupComponent = DefaultGroupComponent,
   } = props;
   const [activeOptionId, setActiveOptionId, getActiveOptionId] = useStateImperative(() =>
     getFirstOptionId(options, getOptionId)
   );
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [filteredOptions, setFilteredOptions] = useState<(T | Group<T>)[]>(options);
+  const [filteredOptions, setFilteredOptions] = useState<(T | Group<T, U>)[]>(options);
   const flattenedOptions = useMemo(() => flattenOptions(options), [options]);
   const flattenedFilteredOptions = useMemo(() => flattenOptions(filteredOptions), [filteredOptions]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -213,7 +231,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       setActiveOptionId(getFirstOptionId(options, getOptionId));
     } else {
       const lowercasedSearchTerm = searchTerm.toLowerCase();
-      const filtered: (T | Group<T>)[] = [];
+      const filtered: (T | Group<T, U>)[] = [];
       for (const item of props.options) {
         if (isGroup(item)) {
           const filteredItems = item.options.filter((item) => isMatch(item, lowercasedSearchTerm));
@@ -346,6 +364,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const ctx = useMemo(
     () =>
       ({
+        options,
         getOptionId,
         isMatch,
         getIsDisabled,
@@ -355,9 +374,10 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         NoOptionsFallbackComponent,
         NoMatchesFallbackComponent,
         OptionComponent,
-        GroupHeaderComponent,
-      }) satisfies PickerContextState<T>,
+        GroupComponent,
+      }) satisfies PickerContextState<T, U>,
     [
+      options,
       getOptionId,
       isMatch,
       getIsDisabled,
@@ -367,7 +387,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       NoOptionsFallbackComponent,
       NoMatchesFallbackComponent,
       OptionComponent,
-      GroupHeaderComponent,
+      GroupComponent,
     ]
   );
 
@@ -385,7 +405,6 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         onKeyDown={onKeyDown}
       >
         <SearchBarComponent ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} />
-        <Divider />
         <Flex tabIndex={-1} w="full" flexGrow={1}>
           {flattenedOptions.length === 0 && <NoOptionsFallbackComponent />}
           {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && <NoMatchesFallbackComponent />}
@@ -413,16 +432,16 @@ const DefaultPickerSearchBarComponent = typedMemo(
 DefaultPickerSearchBarComponent.displayName = 'DefaultPickerSearchBarComponent';
 
 const PickerList = typedMemo(
-  <T extends object>({
+  <T extends object, U>({
     items,
     activeOptionId,
     selectedItemId,
   }: {
-    items: (T | Group<T>)[];
+    items: (T | Group<T, U>)[];
     activeOptionId: string | undefined;
     selectedItemId: string | undefined;
   }) => {
-    const { getOptionId, getIsDisabled } = usePickerContext<T>();
+    const { getOptionId, getIsDisabled } = usePickerContext<T, U>();
 
     if (items.length === 0) {
       return (
@@ -470,63 +489,47 @@ const PickerList = typedMemo(
 PickerList.displayName = 'PickerList';
 
 const PickerOptionGroup = typedMemo(
-  <T extends object>({
+  <T extends object, U>({
     group,
     activeOptionId,
     selectedItemId,
   }: {
-    group: Group<T>;
+    group: Group<T, U>;
     activeOptionId: string | undefined;
     selectedItemId: string | undefined;
   }) => {
-    const { getOptionId, GroupHeaderComponent, getIsDisabled } = usePickerContext<T>();
+    const { getOptionId, GroupComponent, getIsDisabled } = usePickerContext<T, U>();
 
     return (
-      <Flex flexDir="column" gap={2} w="full">
-        <GroupHeaderComponent group={group} />
-        <Flex flexDir="column" gap={1} w="full">
-          {group.options.map((item) => {
-            const id = getOptionId(item);
-            return (
-              <PickerOption
-                key={id}
-                id={id}
-                option={item}
-                isActive={id === activeOptionId}
-                isSelected={id === selectedItemId}
-                isDisabled={getIsDisabled?.(item) ?? false}
-              />
-            );
-          })}
-        </Flex>
-      </Flex>
+      <GroupComponent group={group} activeOptionId={activeOptionId}>
+        {group.options.map((item) => {
+          const id = getOptionId(item);
+          return (
+            <PickerOption
+              key={id}
+              id={id}
+              option={item}
+              isActive={id === activeOptionId}
+              isSelected={id === selectedItemId}
+              isDisabled={getIsDisabled?.(item) ?? false}
+            />
+          );
+        })}
+      </GroupComponent>
     );
   }
 );
 PickerOptionGroup.displayName = 'PickerOptionGroup';
 
-const itemSx: SystemStyleObject = {
-  display: 'flex',
-  flexDir: 'column',
-  p: 2,
-  cursor: 'pointer',
-  borderRadius: 'base',
-  '&[data-selected="true"]': {
-    borderColor: 'invokeBlue.300',
-    borderWidth: 1,
-  },
-  '&[data-active="true"]': {
-    bg: 'base.700',
-  },
-  '&[data-disabled="true"]': {
-    cursor: 'not-allowed',
-    opacity: 0.5,
-  },
-};
-
 const PickerOption = typedMemo(
-  <T extends object>(props: { id: string; option: T; isActive: boolean; isSelected: boolean; isDisabled: boolean }) => {
-    const { OptionComponent, setActiveOptionId, onSelectById } = usePickerContext<T>();
+  <T extends object, U>(props: {
+    id: string;
+    option: T;
+    isActive: boolean;
+    isSelected: boolean;
+    isDisabled: boolean;
+  }) => {
+    const { OptionComponent, setActiveOptionId, onSelectById } = usePickerContext<T, U>();
     const { id, option, isActive, isDisabled, isSelected } = props;
     const onPointerMove = useCallback(() => {
       setActiveOptionId(id);
@@ -535,18 +538,16 @@ const PickerOption = typedMemo(
       onSelectById(id);
     }, [id, onSelectById]);
     return (
-      <Box
-        role="option"
-        sx={itemSx}
+      <OptionComponent
+        tabIndex={-1}
+        option={option}
         id={id}
         data-disabled={isDisabled}
         data-selected={isSelected}
         data-active={isActive}
         onPointerMove={isDisabled ? undefined : onPointerMove}
         onClick={isDisabled ? undefined : onClick}
-      >
-        <OptionComponent option={option} />
-      </Box>
+      />
     );
   }
 );
