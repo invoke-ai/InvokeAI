@@ -442,7 +442,7 @@ const optionNameSx: SystemStyleObject = {
   },
 };
 
-export const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModelConfig } & BoxProps) => {
+const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModelConfig } & BoxProps) => {
   const compactModelPicker = useAppSelector(selectCompactModelPicker);
 
   return (
