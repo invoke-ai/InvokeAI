@@ -682,24 +682,24 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Load the conditioning image and resize it to the target image size.
         assert self.controlnet_vae is not None, 'Controlnet Vae must be set for UNO encoding'
         vae_info = context.models.load(self.controlnet_vae.vae)
-        
+
         assert self.uno_reference is not None, "Needs reference images for UNO"
 
         ref_img_names: list[str] = self.uno_reference.image_names
         ref_latents: list[torch.Tensor] = []
-        
-        # TODO: Maybe move reference side to UNO Node
+
+        # TODO: Maybe move reference side to UNO Node as parameter
         ref_long_side = 512 if len(ref_img_names) <= 1 else 320
-        
+
         for img_name in ref_img_names:
             image_pil = context.images.get_pil(img_name)
             image_pil = image_pil.convert("RGB")  # To correct resizing
             image_pil = preprocess_ref(image_pil, ref_long_side)  # resize and crop
-            
+
             image_tensor = (TVF.to_tensor(image_pil) * 2.0 - 1.0).unsqueeze(0).float()
             ref_latent = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
             ref_latents.append(ref_latent)
-        
+
         return ref_latents
 
     def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor | None:
