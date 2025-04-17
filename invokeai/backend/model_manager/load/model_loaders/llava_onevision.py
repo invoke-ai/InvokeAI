@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import Optional
 
-from invokeai.backend.llava_onevision_model import LlavaOnevisionModel
+from transformers import LlavaOnevisionForConditionalGeneration
+
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
 )
@@ -23,6 +24,8 @@ class LlavaOnevisionModelLoader(ModelLoader):
             raise ValueError("Unexpected submodel requested for LLaVA OneVision model.")
 
         model_path = Path(config.path)
-        model = LlavaOnevisionModel.load_from_path(model_path)
-        model.to(dtype=self._torch_dtype)
+        model = LlavaOnevisionForConditionalGeneration.from_pretrained(
+            model_path, local_files_only=True, torch_dtype=self._torch_dtype
+        )
+        assert isinstance(model, LlavaOnevisionForConditionalGeneration)
         return model
