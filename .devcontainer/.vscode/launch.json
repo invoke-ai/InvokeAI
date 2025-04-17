@@ -18,6 +18,9 @@
       "program": "scripts/invokeai-web.py",
       "args": [],
       "justMyCode": true,
+      "env": {
+        "INVOKE_DEV_RELOAD": "1"
+      },
       "presentation": {
         "echo": true,
         "reveal": "always",
