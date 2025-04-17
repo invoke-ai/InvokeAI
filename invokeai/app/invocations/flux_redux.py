@@ -3,6 +3,7 @@ from typing import Literal, Optional
 
 import torch
 from PIL import Image
+from transformers import SiglipImageProcessor, SiglipVisionModel
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -115,8 +116,14 @@ class FluxReduxInvocation(BaseInvocation):
     @torch.no_grad()
     def _siglip_encode(self, context: InvocationContext, image: Image.Image) -> torch.Tensor:
         siglip_model_config = self._get_siglip_model(context)
-        with context.models.load(siglip_model_config.key).model_on_device() as (_, siglip_pipeline):
-            assert isinstance(siglip_pipeline, SigLipPipeline)
+        with context.models.load(siglip_model_config.key).model_on_device() as (_, model):
+            assert isinstance(model, SiglipVisionModel)
+
+            model_abs_path = context.models.get_absolute_path(siglip_model_config)
+            processor = SiglipImageProcessor.from_pretrained(model_abs_path, local_files_only=True)
+            assert isinstance(processor, SiglipImageProcessor)
+
+            siglip_pipeline = SigLipPipeline(processor, model)
             return siglip_pipeline.encode_image(
                 x=image, device=TorchDevice.choose_torch_device(), dtype=TorchDevice.choose_torch_dtype()
             )
