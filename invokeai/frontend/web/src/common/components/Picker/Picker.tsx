@@ -94,9 +94,7 @@ export type PickerProps<T extends object, U> = {
       option: T;
     } & BoxProps
   >;
-  GroupComponent?: React.ComponentType<
-    PropsWithChildren<{ group: Group<T, U>; activeOptionId: string | undefined } & BoxProps>
-  >;
+  GroupComponent?: React.ComponentType<PropsWithChildren<{ group: Group<T, U> } & BoxProps>>;
 };
 
 type PickerContextState<T extends object, U> = {
@@ -110,9 +108,7 @@ type PickerContextState<T extends object, U> = {
   NoOptionsFallbackComponent: React.ComponentType;
   NoMatchesFallbackComponent: React.ComponentType;
   OptionComponent: React.ComponentType<{ option: T } & BoxProps>;
-  GroupComponent: React.ComponentType<
-    PropsWithChildren<{ group: Group<T, U>; activeOptionId: string | undefined } & BoxProps>
-  >;
+  GroupComponent: React.ComponentType<PropsWithChildren<{ group: Group<T, U> } & BoxProps>>;
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -501,7 +497,7 @@ const PickerOptionGroup = typedMemo(
     const { getOptionId, GroupComponent, getIsDisabled } = usePickerContext<T, U>();
 
     return (
-      <GroupComponent group={group} activeOptionId={activeOptionId}>
+      <GroupComponent group={group}>
         {group.options.map((item) => {
           const id = getOptionId(item);
           return (
