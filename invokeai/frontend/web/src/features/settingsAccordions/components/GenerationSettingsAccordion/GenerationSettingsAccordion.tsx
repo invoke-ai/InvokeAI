@@ -8,6 +8,7 @@ import {
   FormControlGroup,
   FormLabel,
   Icon,
+  IconButton,
   Input,
   Popover,
   PopoverArrow,
@@ -47,12 +48,13 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { selectActiveTab, selectCompactModelPicker } from 'features/ui/store/uiSelectors';
+import { compactModelPickerToggled } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold } from 'react-icons/pi';
+import { PiArrowsInLineVerticalBold, PiArrowsOutLineVerticalBold, PiCaretDownBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 import type { AnyModelConfig, BaseModelType } from 'services/api/types';
@@ -246,11 +248,24 @@ MainModelPicker.displayName = 'MainModelPicker';
 const SearchBarComponent = typedMemo(
   fixedForwardRef<HTMLInputElement, InputProps>((props, ref) => {
     const { t } = useTranslation();
+    const dispatch = useAppDispatch();
+    const compactModelPicker = useAppSelector(selectCompactModelPicker);
+
+    const onToggleCompact = useCallback(() => {
+      dispatch(compactModelPickerToggled());
+    }, [dispatch]);
     return (
       <Flex flexDir="column" w="full">
         <Flex gap={2} alignItems="center">
           <Input ref={ref} {...props} placeholder={t('modelManager.filterModels')} />
           <NavigateToModelManagerButton />
+          <IconButton
+            aria-label="Toggle compact view"
+            size="sm"
+            variant="ghost"
+            icon={compactModelPicker ? <PiArrowsOutLineVerticalBold /> : <PiArrowsInLineVerticalBold />}
+            onClick={onToggleCompact}
+          />
         </Flex>
         <Flex gap={2} alignItems="center"></Flex>
       </Flex>
@@ -291,7 +306,7 @@ const PickerGroupComponent = memo(
       >
         <GroupHeader group={group} isOpen={isOpen} toggle={toggle} />
         <Collapse in={isOpen} animateOpacity>
-          <Flex flexDir="column" gap={1} w="full" pb={2}>
+          <Flex flexDir="column" gap={1} w="full" py={1}>
             {children}
           </Flex>
         </Collapse>
@@ -301,6 +316,20 @@ const PickerGroupComponent = memo(
 );
 PickerGroupComponent.displayName = 'PickerGroupComponent';
 
+const groupSx = {
+  alignItems: 'center',
+  ps: 2,
+  pe: 4,
+  py: 1,
+  userSelect: 'none',
+  position: 'sticky',
+  top: 0,
+  bg: 'base.800',
+  minH: 8,
+  borderRadius: 'base',
+  _hover: { bg: 'base.750' },
+} satisfies SystemStyleObject;
+
 const GroupHeader = memo(
   ({
     group,
@@ -309,20 +338,10 @@ const GroupHeader = memo(
     ...rest
   }: { group: Group<AnyModelConfig, GroupData>; isOpen: boolean; toggle: () => void } & BoxProps) => {
     const { t } = useTranslation();
+    const compactModelPicker = useAppSelector(selectCompactModelPicker);
 
     return (
-      <Flex
-        {...rest}
-        role="button"
-        alignItems="center"
-        px={2}
-        onClick={toggle}
-        userSelect="none"
-        position="sticky"
-        top={0}
-        bg="base.800"
-        pb={2}
-      >
+      <Flex {...rest} role="button" sx={groupSx} onClick={toggle}>
         <Flex flexDir="column" flex={1}>
           <Flex gap={2} alignItems="center">
             <Text fontSize="sm" fontWeight="semibold" color={`${BASE_COLOR_MAP[group.data.base]}.300`}>
@@ -332,9 +351,11 @@ const GroupHeader = memo(
               {t('common.model_withCount', { count: group.options.length })}
             </Text>
           </Flex>
-          <Text color="base.200" fontStyle="italic">
-            {group.data.description}
-          </Text>
+          {!compactModelPicker && (
+            <Text color="base.200" fontStyle="italic">
+              {group.data.description}
+            </Text>
+          )}
           <Spacer />
         </Flex>
         <Icon color="base.300" as={PiCaretDownBold} sx={toggleButtonSx} data-expanded={isOpen} boxSize={4} />
@@ -351,9 +372,9 @@ const optionSx: SystemStyleObject = {
   borderRadius: 'base',
   '&[data-selected="true"]': {
     bg: 'base.700',
-  '&[data-active="true"]': {
-    bg: 'base.650',
-  },
+    '&[data-active="true"]': {
+      bg: 'base.650',
+    },
   },
   '&[data-active="true"]': {
     bg: 'base.750',
@@ -362,13 +383,18 @@ const optionSx: SystemStyleObject = {
     cursor: 'not-allowed',
     opacity: 0.5,
   },
+  '&[data-is-compact="true"]': {
+    py: 1,
+  },
   scrollMarginTop: '42px', // magic number, this is the height of the header
 };
 
 export const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModelConfig } & BoxProps) => {
+  const compactModelPicker = useAppSelector(selectCompactModelPicker);
+
   return (
-    <Flex {...rest} sx={optionSx}>
-      <ModelImage image_url={option.cover_image} />
+    <Flex {...rest} sx={optionSx} data-is-compact={compactModelPicker}>
+      {!compactModelPicker && <ModelImage image_url={option.cover_image} />}
       <Flex flexDir="column" gap={2} flex={1}>
         <Flex gap={2} alignItems="center">
           <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
@@ -379,7 +405,7 @@ export const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: A
             {filesize(option.file_size)}
           </Text>
         </Flex>
-        {option.description && <Text color="base.200">{option.description}</Text>}
+        {option.description && !compactModelPicker && <Text color="base.200">{option.description}</Text>}
       </Flex>
     </Flex>
   );
