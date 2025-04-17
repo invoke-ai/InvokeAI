@@ -27,7 +27,7 @@ export type Group<T extends object, U = any> = {
   options: T[];
 };
 
-export const isGroup = <T extends object>(option: T | Group<T>): option is Group<T> => {
+const isGroup = <T extends object>(option: T | Group<T>): option is Group<T> => {
   return option ? 'options' in option && Array.isArray(option.options) : false;
 };
 
@@ -78,7 +78,7 @@ export const DefaultNoMatchesFallback = typedMemo(({ label }: { label?: string }
 });
 DefaultNoMatchesFallback.displayName = 'DefaultNoMatchesFallback';
 
-export type PickerProps<T extends object, U, C> = {
+type PickerProps<T extends object, U, C> = {
   options: (T | Group<T>)[];
   getOptionId: (option: T) => string;
   isMatch: (option: T, searchTerm: string) => boolean;

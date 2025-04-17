@@ -56,18 +56,6 @@ const buildModelsHook =
 
     return [modelConfigs, result] as const;
   };
-export const useAllModels = () => {
-  const result = useGetModelConfigsQuery(undefined);
-  const modelConfigs = useMemo(() => {
-    if (!result.data) {
-      return EMPTY_ARRAY;
-    }
-
-    return modelConfigsAdapterSelectors.selectAll(result.data);
-  }, [result.data]);
-
-  return [modelConfigs, result] as const;
-};
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
