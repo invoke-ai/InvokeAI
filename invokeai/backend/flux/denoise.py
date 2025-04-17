@@ -32,6 +32,8 @@ def denoise(
     neg_ip_adapter_extensions: list[XLabsIPAdapterExtension],
     # extra img tokens
     img_cond: torch.Tensor | None,
+    uno_ref_imgs: list[torch.Tensor] | None = None,
+    uno_ref_ids: list[torch.Tensor] | None = None,
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -86,6 +88,8 @@ def denoise(
             controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
             ip_adapter_extensions=pos_ip_adapter_extensions,
             regional_prompting_extension=pos_regional_prompting_extension,
+            uno_ref_imgs=uno_ref_imgs,
+            uno_ref_ids=uno_ref_ids,
         )
 
         step_cfg_scale = cfg_scale[step_index]

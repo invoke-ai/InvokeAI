@@ -7,6 +7,7 @@ import numpy.typing as npt
 import torch
 import torchvision.transforms as tv_transforms
 from PIL import Image
+import torchvision.transforms.functional as TVF
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
@@ -17,6 +18,7 @@ from invokeai.app.invocations.fields import (
     FluxConditioningField,
     FluxFillConditioningField,
     FluxReduxConditioningField,
+    FluxUnoReferenceField,
     ImageField,
     Input,
     InputField,
@@ -27,6 +29,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.ip_adapter import IPAdapterField
+from invokeai.app.invocations.flux_uno import preprocess_ref
 from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -42,6 +45,7 @@ from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
     generate_img_ids,
+    prepare_multi_ip,
     get_noise,
     get_schedule,
     pack,
@@ -105,6 +109,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         input=Input.Connection,
     )
     redux_conditioning: FluxReduxConditioningField | list[FluxReduxConditioningField] | None = InputField(
+        default=None,
+        description="FLUX Redux conditioning tensor.",
+        input=Input.Connection,
+    )
+    uno_reference: FluxUnoReferenceField | None = InputField(
         default=None,
         description="FLUX Redux conditioning tensor.",
         input=Input.Connection,
@@ -284,6 +293,15 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         img_ids = generate_img_ids(h=latent_h, w=latent_w, batch_size=b, device=x.device, dtype=x.dtype)
 
+        is_flux_uno = self.uno_reference is not None
+        if is_flux_uno:
+            # Encode reference images and prepare position ids
+            uno_ref_imgs = self._prep_uno_reference_imgs(context)
+            uno_ref_imgs, uno_ref_ids = prepare_multi_ip(x, uno_ref_imgs)
+        else:
+            uno_ref_imgs = None
+            uno_ref_ids = None
+
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
         inpaint_mask = pack(inpaint_mask) if inpaint_mask is not None else None
@@ -391,6 +409,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 pos_ip_adapter_extensions=pos_ip_adapter_extensions,
                 neg_ip_adapter_extensions=neg_ip_adapter_extensions,
                 img_cond=img_cond,
+                uno_ref_imgs=uno_ref_imgs,
+                uno_ref_ids=uno_ref_ids,
             )
 
         x = unpack(x.float(), self.height, self.width)
@@ -657,6 +677,30 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise ValueError(f"Unsupported ControlNet model type: {type(model)}")
 
         return controlnet_extensions
+    
+    def _prep_uno_reference_imgs(self, context: InvocationContext) -> list[torch.Tensor]:
+        # Load the conditioning image and resize it to the target image size.
+        assert self.controlnet_vae is not None, 'Controlnet Vae must be set for UNO encoding'
+        vae_info = context.models.load(self.controlnet_vae.vae)
+        
+        assert self.uno_reference is not None, "Needs reference images for UNO"
+
+        ref_img_names: list[str] = self.uno_reference.image_names
+        ref_latents: list[torch.Tensor] = []
+        
+        # TODO: Maybe move reference side to UNO Node
+        ref_long_side = 512 if len(ref_img_names) <= 1 else 320
+        
+        for img_name in ref_img_names:
+            image_pil = context.images.get_pil(img_name)
+            image_pil = image_pil.convert("RGB")  # To correct resizing
+            image_pil = preprocess_ref(image_pil, ref_long_side)  # resize and crop
+            
+            image_tensor = (TVF.to_tensor(image_pil) * 2.0 - 1.0).unsqueeze(0).float()
+            ref_latent = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
+            ref_latents.append(ref_latent)
+        
+        return ref_latents
 
     def _prep_structural_control_img_cond(self, context: InvocationContext) -> torch.Tensor | None:
         if self.control_lora is None:
@@ -714,6 +758,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         cond_img = context.images.get_pil(self.fill_conditioning.image.image_name, mode="RGB")
         cond_img = cond_img.resize((self.width, self.height), Image.Resampling.BICUBIC)
         cond_img = np.array(cond_img)
+
         cond_img = torch.from_numpy(cond_img).float() / 127.5 - 1.0
         cond_img = einops.rearrange(cond_img, "h w c -> 1 c h w")
         cond_img = cond_img.to(device=device, dtype=dtype)
