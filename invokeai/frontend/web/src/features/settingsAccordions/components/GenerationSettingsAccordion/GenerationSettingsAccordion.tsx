@@ -2,12 +2,10 @@ import type { BoxProps, FormLabelProps, InputProps, SystemStyleObject } from '@i
 import {
   Box,
   Button,
-  Collapse,
   Expander,
   Flex,
   FormControlGroup,
   FormLabel,
-  Icon,
   IconButton,
   Input,
   Popover,
@@ -27,7 +25,6 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import type { Group, ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
 import { getRegex, Picker } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
-import { useStateImperative } from 'common/hooks/useStateImperative';
 import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
@@ -52,7 +49,7 @@ import { selectActiveTab, selectCompactModelPicker } from 'features/ui/store/uiS
 import { compactModelPickerToggled } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import type { PropsWithChildren } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsInLineVerticalBold, PiArrowsOutLineVerticalBold, PiCaretDownBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
@@ -274,28 +271,8 @@ const SearchBarComponent = typedMemo(
 );
 SearchBarComponent.displayName = 'SearchBarComponent';
 
-const toggleButtonSx = {
-  "&[data-expanded='true']": {
-    transform: 'rotate(180deg)',
-  },
-} satisfies SystemStyleObject;
-
 const PickerGroupComponent = memo(
-  ({
-    group,
-    activeOptionId,
-    children,
-  }: PropsWithChildren<{ group: Group<AnyModelConfig, GroupData>; activeOptionId: string | undefined }>) => {
-    const [isOpen, setIsOpen, getIsOpen] = useStateImperative(true);
-    useEffect(() => {
-      if (group.options.some((option) => option.key === activeOptionId) && !getIsOpen()) {
-        setIsOpen(true);
-      }
-    }, [activeOptionId, getIsOpen, group.options, setIsOpen]);
-    const toggle = useCallback(() => {
-      setIsOpen((prev) => !prev);
-    }, [setIsOpen]);
-
+  ({ group, children }: PropsWithChildren<{ group: Group<AnyModelConfig, GroupData> }>) => {
     return (
       <Flex
         flexDir="column"
@@ -304,12 +281,10 @@ const PickerGroupComponent = memo(
         borderLeftWidth={4}
         ps={2}
       >
-        <GroupHeader group={group} isOpen={isOpen} toggle={toggle} />
-        <Collapse in={isOpen} animateOpacity>
-          <Flex flexDir="column" gap={1} w="full" py={1}>
-            {children}
-          </Flex>
-        </Collapse>
+        <GroupHeader group={group} />
+        <Flex flexDir="column" gap={1} w="full" py={1}>
+          {children}
+        </Flex>
       </Flex>
     );
   }
@@ -317,7 +292,8 @@ const PickerGroupComponent = memo(
 PickerGroupComponent.displayName = 'PickerGroupComponent';
 
 const groupSx = {
-  alignItems: 'center',
+  flexDir: 'column',
+  flex: 1,
   ps: 2,
   pe: 4,
   py: 1,
@@ -326,43 +302,30 @@ const groupSx = {
   top: 0,
   bg: 'base.800',
   minH: 8,
-  borderRadius: 'base',
-  _hover: { bg: 'base.750' },
 } satisfies SystemStyleObject;
 
-const GroupHeader = memo(
-  ({
-    group,
-    isOpen,
-    toggle,
-    ...rest
-  }: { group: Group<AnyModelConfig, GroupData>; isOpen: boolean; toggle: () => void } & BoxProps) => {
-    const { t } = useTranslation();
-    const compactModelPicker = useAppSelector(selectCompactModelPicker);
+const GroupHeader = memo(({ group, ...rest }: { group: Group<AnyModelConfig, GroupData> } & BoxProps) => {
+  const { t } = useTranslation();
+  const compactModelPicker = useAppSelector(selectCompactModelPicker);
 
-    return (
-      <Flex {...rest} role="button" sx={groupSx} onClick={toggle}>
-        <Flex flexDir="column" flex={1}>
-          <Flex gap={2} alignItems="center">
-            <Text fontSize="sm" fontWeight="semibold" color={`${BASE_COLOR_MAP[group.data.base]}.300`}>
-              {MODEL_TYPE_SHORT_MAP[group.data.base]}
-            </Text>
-            <Text fontSize="sm" color="base.300" noOfLines={1}>
-              {t('common.model_withCount', { count: group.options.length })}
-            </Text>
-          </Flex>
-          {!compactModelPicker && (
-            <Text color="base.200" fontStyle="italic">
-              {group.data.description}
-            </Text>
-          )}
-          <Spacer />
-        </Flex>
-        <Icon color="base.300" as={PiCaretDownBold} sx={toggleButtonSx} data-expanded={isOpen} boxSize={4} />
+  return (
+    <Flex {...rest} sx={groupSx}>
+      <Flex gap={2} alignItems="center">
+        <Text fontSize="sm" fontWeight="semibold" color={`${BASE_COLOR_MAP[group.data.base]}.300`}>
+          {MODEL_TYPE_SHORT_MAP[group.data.base]}
+        </Text>
+        <Text fontSize="sm" color="base.300" noOfLines={1}>
+          {t('common.model_withCount', { count: group.options.length })}
+        </Text>
       </Flex>
-    );
-  }
-);
+      {!compactModelPicker && (
+        <Text color="base.200" fontStyle="italic">
+          {group.data.description}
+        </Text>
+      )}
+    </Flex>
+  );
+});
 GroupHeader.displayName = 'GroupHeader';
 
 const optionSx: SystemStyleObject = {
@@ -389,6 +352,15 @@ const optionSx: SystemStyleObject = {
   scrollMarginTop: '42px', // magic number, this is the height of the header
 };
 
+const optionNameSx: SystemStyleObject = {
+  fontSize: 'sm',
+  noOfLines: 1,
+  fontWeight: 'semibold',
+  '&[data-is-compact="true"]': {
+    fontWeight: 'normal',
+  },
+};
+
 export const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModelConfig } & BoxProps) => {
   const compactModelPicker = useAppSelector(selectCompactModelPicker);
 
@@ -397,7 +369,7 @@ export const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: A
       {!compactModelPicker && <ModelImage image_url={option.cover_image} />}
       <Flex flexDir="column" gap={2} flex={1}>
         <Flex gap={2} alignItems="center">
-          <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
+          <Text sx={optionNameSx} data-is-compact={compactModelPicker}>
             {option.name}
           </Text>
           <Spacer />
