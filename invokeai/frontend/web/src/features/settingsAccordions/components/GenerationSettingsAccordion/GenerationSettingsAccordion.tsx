@@ -136,7 +136,6 @@ const getOptionId = (modelConfig: AnyModelConfig) => modelConfig.key;
 
 type GroupData = {
   base: BaseModelType;
-  description: string;
 };
 
 type BaseModelTypeFilters = { [key in BaseModelType]?: boolean };
@@ -200,7 +199,7 @@ const MainModelPicker = memo(() => {
       if (!group && baseModelTypeFilters[modelConfig.base]) {
         group = {
           id: modelConfig.base,
-          data: { base: modelConfig.base, description: `A brief description of ${modelConfig.base} models.` },
+          data: { base: modelConfig.base },
           options: [],
         };
         groups[modelConfig.base] = group;
@@ -394,7 +393,6 @@ const groupSx = {
 
 const GroupHeader = memo(({ group, ...rest }: { group: Group<AnyModelConfig, GroupData> } & BoxProps) => {
   const { t } = useTranslation();
-  const compactModelPicker = useAppSelector(selectCompactModelPicker);
 
   return (
     <Flex {...rest} sx={groupSx}>
@@ -406,11 +404,6 @@ const GroupHeader = memo(({ group, ...rest }: { group: Group<AnyModelConfig, Gro
           {t('common.model_withCount', { count: group.options.length })}
         </Text>
       </Flex>
-      {!compactModelPicker && (
-        <Text color="base.200" fontStyle="italic">
-          {group.data.description}
-        </Text>
-      )}
     </Flex>
   );
 });
