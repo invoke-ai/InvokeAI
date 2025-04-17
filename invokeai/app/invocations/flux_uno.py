@@ -1,10 +1,8 @@
 from typing import Literal, Optional
 
 from PIL import Image
-import torchvision.transforms.functional as TVF
 
 from invokeai.app.invocations.baseinvocation import (
-    BaseModel,
     BaseInvocation,
     BaseInvocationOutput,
     Classification,
@@ -62,19 +60,19 @@ class FluxUnoOutput(BaseInvocationOutput):
         description="Reference images container", title="Reference images"
     )
 
-# TODO(attashe): adjust tags and category
+
 @invocation(
     "flux_uno",
     title="FLUX UNO",
-    tags=["ip_adapter", "control"],
+    tags=["uno", "control"],
     category="ip_adapter",
     version="2.1.0",
     classification=Classification.Beta,
 )
-class FluxReduxInvocation(BaseInvocation):
-    """Runs a FLUX Redux model to generate a conditioning tensor."""
+class FluxUnoInvocation(BaseInvocation):
+    """Loads a FLUX UNO reference images."""
 
-    image: ImageField = InputField(description="The FLUX Redux image prompt.")
+    image: ImageField = InputField(description="The UNO reference image.")
     image2: Optional[ImageField] = InputField(default=None, description="2nd reference")
     image3: Optional[ImageField] = InputField(default=None, description="3rd reference")
     image4: Optional[ImageField] = InputField(default=None, description="4th reference")
