@@ -23,7 +23,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { Group, ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
-import { getRegex, Picker } from 'common/components/Picker/Picker';
+import { DefaultNoMatchesFallback, DefaultNoOptionsFallback, getRegex, Picker } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
@@ -228,11 +228,12 @@ const MainModelPicker = memo(() => {
               getOptionId={getOptionId}
               onSelect={onSelect}
               selectedItem={modelConfig}
-              // getIsDisabled={getIsDisabled}
               isMatch={isMatch}
               OptionComponent={PickerOptionComponent}
               GroupComponent={PickerGroupComponent}
               SearchBarComponent={SearchBarComponent}
+              noOptionsFallback={<DefaultNoOptionsFallback label={t('modelManager.noModelsInstalled')} />}
+              noMatchesFallback={<DefaultNoMatchesFallback label={t('modelManager.noMatchingModels')} />}
             />
           </PopoverBody>
         </PopoverContent>
