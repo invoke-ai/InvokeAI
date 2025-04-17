@@ -131,21 +131,6 @@ class InpaintCropInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_dto = context.images.save(image=image_crop)
         return ImageOutput.build(image_dto)
 
-# class ACEppProcessorField(BaseModel):
-#     """A FLUX Redux conditioning tensor primitive value"""
-
-#     conditioning: TensorField = Field(description="The Redux image conditioning tensor.")
-#     mask: Optional[TensorField] = Field(
-#         default=None,
-#         description="The mask associated with this conditioning tensor. Excluded regions should be set to False, "
-#         "included regions should be set to True.",
-#     )
-#     image_name: Optional[str] = Field(
-#         default=None,
-#         description="The name of the image associated with this conditioning tensor. This is used to store the image "
-#         "in the context.",
-#     )
-
 
 @invocation_output("ace_plus_plus_output")
 class ACEppProcessorOutput(BaseInvocationOutput):
@@ -260,17 +245,3 @@ class ACEppProcessor(BaseInvocation):
             crop_height=int(out_H * scale),
             crop_width=int(out_W * scale),
         )
-
-
-# @invocation(
-#     "ace_plus_plus_conditioning",
-#     title="ACE++ conditioning",
-#     tags=["image_processing"],
-#     version="1.0.0",
-# )
-# class ACEppConditioning(BaseInvocation):
-#     reference_image: ImageField = InputField(description="Reference Image")
-    
-#     def invoke(self, context: InvocationContext):
-#         pass
-    
