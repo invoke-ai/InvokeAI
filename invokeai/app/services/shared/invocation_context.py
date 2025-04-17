@@ -21,6 +21,7 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.step_callback import diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
+    ModelConfigBase,
 )
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
@@ -542,6 +543,30 @@ class ModelsInterface(InvocationContextInterface):
 
         self._util.signal_progress(f"Loading model {source}")
         return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
+    def get_absolute_path(self, config_or_path: AnyModelConfig | Path | str) -> Path:
+        """Gets the absolute path for a given model config or path.
+
+        For example, if the model's path is `flux/main/FLUX Dev.safetensors`, and the models path is
+        `/home/username/InvokeAI/models`, this method will return
+        `/home/username/InvokeAI/models/flux/main/FLUX Dev.safetensors`.
+
+        Args:
+            config_or_path: The model config or path.
+
+        Returns:
+            The absolute path to the model.
+        """
+
+        model_path = Path(config_or_path.path) if isinstance(config_or_path, ModelConfigBase) else Path(config_or_path)
+
+        if model_path.is_absolute():
+            return model_path.resolve()
+
+        base_models_path = self._services.configuration.models_path
+        joined_path = base_models_path / model_path
+        resolved_path = joined_path.resolve()
+        return resolved_path
 
 
 class ConfigInterface(InvocationContextInterface):
