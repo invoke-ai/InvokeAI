@@ -1,11 +1,13 @@
-import type { FormLabelProps, InputProps } from '@invoke-ai/ui-library';
+import type { BoxProps, FormLabelProps, InputProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
+  Collapse,
   Expander,
   Flex,
   FormControlGroup,
   FormLabel,
+  Icon,
   Input,
   Popover,
   PopoverArrow,
@@ -24,13 +26,14 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import type { Group, ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
 import { getRegex, Picker } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
+import { useStateImperative } from 'common/hooks/useStateImperative';
 import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectIsCogView4, selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
-import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
+import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
@@ -41,11 +44,13 @@ import { UseDefaultSettingsButton } from 'features/parameters/components/MainMod
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { modelSelected } from 'features/parameters/store/actions';
+import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { filesize } from 'filesize';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import type { PropsWithChildren } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
@@ -121,22 +126,26 @@ export const GenerationSettingsAccordion = memo(() => {
 GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
 
 const getOptionId = (modelConfig: AnyModelConfig) => modelConfig.key;
-const getIsDisabled = (modelConfig: AnyModelConfig) => {
-  return modelConfig.base === 'flux';
+
+type GroupData = {
+  base: BaseModelType;
+  description: string;
 };
 
 const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const [modelConfigs] = useMainModels();
-  const grouped = useMemo<Group<AnyModelConfig, { name: string; description: string }>[]>(() => {
-    const groups: { [base in BaseModelType]?: Group<AnyModelConfig, { name: string; description: string }> } = {};
+  const grouped = useMemo<Group<AnyModelConfig, GroupData>[]>(() => {
+    const groups: {
+      [base in BaseModelType]?: Group<AnyModelConfig, GroupData>;
+    } = {};
 
     for (const modelConfig of modelConfigs) {
       let group = groups[modelConfig.base];
       if (!group) {
         group = {
           id: modelConfig.base,
-          data: { name: modelConfig.base, description: `A brief description of ${modelConfig.base} models.` },
+          data: { base: modelConfig.base, description: `A brief description of ${modelConfig.base} models.` },
           options: [],
         };
         groups[modelConfig.base] = group;
@@ -145,7 +154,7 @@ const MainModelPicker = memo(() => {
       group.options.push(modelConfig);
     }
 
-    const sortedGroups: Group<AnyModelConfig, { name: string; description: string }>[] = [];
+    const sortedGroups: Group<AnyModelConfig, GroupData>[] = [];
 
     if (groups['flux']) {
       sortedGroups.push(groups['flux']);
@@ -210,11 +219,11 @@ const MainModelPicker = memo(() => {
         <NavigateToModelManagerButton />
         <UseDefaultSettingsButton />
       </Flex>
-      <Portal>
+      <Portal appendToParentPortal={false}>
         <PopoverContent p={0} w={448} h={512}>
           <PopoverArrow />
           <PopoverBody p={0} w="full" h="full">
-            <Picker<AnyModelConfig>
+            <Picker<AnyModelConfig, GroupData>
               handleRef={pickerRef}
               options={grouped}
               getOptionId={getOptionId}
@@ -222,8 +231,8 @@ const MainModelPicker = memo(() => {
               selectedItem={modelConfig}
               // getIsDisabled={getIsDisabled}
               isMatch={isMatch}
-              OptionComponent={PickerItemComponent}
-              GroupHeaderComponent={PickerGroupHeaderComponent}
+              OptionComponent={PickerOptionComponent}
+              GroupComponent={PickerGroupComponent}
               SearchBarComponent={SearchBarComponent}
             />
           </PopoverBody>
@@ -238,34 +247,127 @@ const SearchBarComponent = typedMemo(
   fixedForwardRef<HTMLInputElement, InputProps>((props, ref) => {
     const { t } = useTranslation();
     return (
-      <Flex gap={2} alignItems="center">
-        <Input ref={ref} {...props} placeholder={t('common.search')} />
-        <NavigateToModelManagerButton />
+      <Flex flexDir="column" w="full">
+        <Flex gap={2} alignItems="center">
+          <Input ref={ref} {...props} placeholder={t('modelManager.filterModels')} />
+          <NavigateToModelManagerButton />
+        </Flex>
+        <Flex gap={2} alignItems="center"></Flex>
       </Flex>
     );
   })
 );
 SearchBarComponent.displayName = 'SearchBarComponent';
 
-const PickerGroupHeaderComponent = memo(
-  ({ group }: { group: Group<AnyModelConfig, { name: string; description: string }> }) => {
+const toggleButtonSx = {
+  "&[data-expanded='true']": {
+    transform: 'rotate(180deg)',
+  },
+} satisfies SystemStyleObject;
+
+const PickerGroupComponent = memo(
+  ({
+    group,
+    activeOptionId,
+    children,
+  }: PropsWithChildren<{ group: Group<AnyModelConfig, GroupData>; activeOptionId: string | undefined }>) => {
+    const [isOpen, setIsOpen, getIsOpen] = useStateImperative(true);
+    useEffect(() => {
+      if (group.options.some((option) => option.key === activeOptionId) && !getIsOpen()) {
+        setIsOpen(true);
+      }
+    }, [activeOptionId, getIsOpen, group.options, setIsOpen]);
+    const toggle = useCallback(() => {
+      setIsOpen((prev) => !prev);
+    }, [setIsOpen]);
+
     return (
-      <Flex flexDir="column" ps={8}>
-        <Text fontSize="sm" fontWeight="semibold">
-          {`${group.data.name} (${group.options.length} models)`}
-        </Text>
-        <Text color="base.200" fontStyle="italic">
-          {group.data.description}
-        </Text>
+      <Flex
+        flexDir="column"
+        w="full"
+        borderLeftColor={`${BASE_COLOR_MAP[group.data.base]}.300`}
+        borderLeftWidth={4}
+        ps={2}
+      >
+        <GroupHeader group={group} isOpen={isOpen} toggle={toggle} />
+        <Collapse in={isOpen} animateOpacity>
+          <Flex flexDir="column" gap={1} w="full" pb={2}>
+            {children}
+          </Flex>
+        </Collapse>
       </Flex>
     );
   }
 );
-PickerGroupHeaderComponent.displayName = 'PickerGroupHeaderComponent';
+PickerGroupComponent.displayName = 'PickerGroupComponent';
 
-export const PickerItemComponent = typedMemo(({ option }: { option: AnyModelConfig }) => {
+const GroupHeader = memo(
+  ({
+    group,
+    isOpen,
+    toggle,
+    ...rest
+  }: { group: Group<AnyModelConfig, GroupData>; isOpen: boolean; toggle: () => void } & BoxProps) => {
+    const { t } = useTranslation();
+
+    return (
+      <Flex
+        {...rest}
+        role="button"
+        alignItems="center"
+        px={2}
+        onClick={toggle}
+        userSelect="none"
+        position="sticky"
+        top={0}
+        bg="base.800"
+        pb={2}
+      >
+        <Flex flexDir="column" flex={1}>
+          <Flex gap={2} alignItems="center">
+            <Text fontSize="sm" fontWeight="semibold" color={`${BASE_COLOR_MAP[group.data.base]}.300`}>
+              {MODEL_TYPE_SHORT_MAP[group.data.base]}
+            </Text>
+            <Text fontSize="sm" color="base.300" noOfLines={1}>
+              {t('common.model_withCount', { count: group.options.length })}
+            </Text>
+          </Flex>
+          <Text color="base.200" fontStyle="italic">
+            {group.data.description}
+          </Text>
+          <Spacer />
+        </Flex>
+        <Icon color="base.300" as={PiCaretDownBold} sx={toggleButtonSx} data-expanded={isOpen} boxSize={4} />
+      </Flex>
+    );
+  }
+);
+GroupHeader.displayName = 'GroupHeader';
+
+const optionSx: SystemStyleObject = {
+  p: 2,
+  gap: 2,
+  cursor: 'pointer',
+  borderRadius: 'base',
+  '&[data-selected="true"]': {
+    bg: 'base.700',
+  '&[data-active="true"]': {
+    bg: 'base.650',
+  },
+  },
+  '&[data-active="true"]': {
+    bg: 'base.750',
+  },
+  '&[data-disabled="true"]': {
+    cursor: 'not-allowed',
+    opacity: 0.5,
+  },
+  scrollMarginTop: '42px', // magic number, this is the height of the header
+};
+
+export const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModelConfig } & BoxProps) => {
   return (
-    <Flex tabIndex={-1} gap={2}>
+    <Flex {...rest} sx={optionSx}>
       <ModelImage image_url={option.cover_image} />
       <Flex flexDir="column" gap={2} flex={1}>
         <Flex gap={2} alignItems="center">
@@ -276,14 +378,13 @@ export const PickerItemComponent = typedMemo(({ option }: { option: AnyModelConf
           <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
             {filesize(option.file_size)}
           </Text>
-          <ModelBaseBadge base={option.base} />
         </Flex>
         {option.description && <Text color="base.200">{option.description}</Text>}
       </Flex>
     </Flex>
   );
 });
-PickerItemComponent.displayName = 'PickerItemComponent';
+PickerOptionComponent.displayName = 'PickerItemComponent';
 
 const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
   'sd-1': ['sd1', 'sd1.4', 'sd1.5', 'sd-1'],
