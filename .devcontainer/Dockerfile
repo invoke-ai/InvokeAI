@@ -36,6 +36,7 @@ ENV \
     UV_MANAGED_PYTHON=1 \
     INVOKEAI_HOST=0.0.0.0 \
     INVOKEAI_PORT=9090 \
+    INVOKEAI_ROOT=${INVOKEAI_ROOT} \
     HF_HOME=${HF_HOME}
 
 # Set the secondary index for UV to the appropriate PyTorch index URL based on the GPU driver and architecture
