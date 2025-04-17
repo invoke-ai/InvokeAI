@@ -1,13 +1,14 @@
 from pathlib import Path
 from typing import Optional
 
+from transformers import SiglipVisionModel
+
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.sig_lip.sig_lip_pipeline import SigLipPipeline
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.SigLIP, format=ModelFormat.Diffusers)
@@ -23,6 +24,5 @@ class SigLIPModelLoader(ModelLoader):
             raise ValueError("Unexpected submodel requested for LLaVA OneVision model.")
 
         model_path = Path(config.path)
-        model = SigLipPipeline.load_from_path(model_path)
-        model.to(dtype=self._torch_dtype)
+        model = SiglipVisionModel.from_pretrained(model_path, local_files_only=True, torch_dtype=self._torch_dtype)
         return model
