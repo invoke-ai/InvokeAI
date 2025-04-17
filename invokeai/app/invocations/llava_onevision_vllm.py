@@ -3,13 +3,14 @@ from typing import Any
 import torch
 from PIL.Image import Image
 from pydantic import field_validator
+from transformers import AutoProcessor, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, ImageField, InputField, UIComponent, UIType
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.llava_onevision_model import LlavaOnevisionModel
+from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -54,10 +55,17 @@ class LlavaOnevisionVllmInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> StringOutput:
         images = self._get_images(context)
+        model_config = context.models.get_config(self.vllm_model)
 
-        with context.models.load(self.vllm_model) as vllm_model:
-            assert isinstance(vllm_model, LlavaOnevisionModel)
-            output = vllm_model.run(
+        with context.models.load(self.vllm_model).model_on_device() as (_, model):
+            assert isinstance(model, LlavaOnevisionForConditionalGeneration)
+
+            model_abs_path = context.models.get_absolute_path(model_config)
+            processor = AutoProcessor.from_pretrained(model_abs_path, local_files_only=True)
+            assert isinstance(processor, LlavaOnevisionProcessor)
+
+            model = LlavaOnevisionPipeline(model, processor)
+            output = model.run(
                 prompt=self.prompt,
                 images=images,
                 device=TorchDevice.choose_torch_device(),
