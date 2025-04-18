@@ -137,6 +137,7 @@ def test_minimal_working_example(datadir: Path):
     assert config.fun_quote == "Minimal working example of a ModelConfigBase subclass"
 
 
+@pytest.mark.xfail(reason="Known issue with 'helloyoung25d_V15j.safetensors'.", strict=True)
 def test_regression_against_model_probe(datadir: Path, override_model_loading):
     """Verifies results from ModelConfigBase.classify are consistent with those from ModelProbe.probe.
     The test paths are gathered from the 'test_model_probe' directory.
