@@ -66,14 +66,14 @@ ENV XDG_CACHE_HOME=${CACHE_DIR} \
     PYTHONPATH="$PYTHONPATH:${INVOKEAI_SRC}"
 
 # Setup cache volume for dependencies
-VOLUME [ "${CACHE_DIR}", "${INVOKEAI_ROOT}", "${INVOKEAI_SRC}", "${HF_HOME}" ]
+VOLUME [ "${CACHE_DIR}", "${INVOKEAI_SRC}", "${HF_HOME}"]
 
 # Create & set ownership of directories
 RUN set -eux; \
     mkdir -p ${CACHE_DIR} && \
-    mkdir -p ${CACHE_DIR}/pnpm && \
     mkdir -p ${CACHE_DIR}/uv && \
-    mkdir -p ${INVOKEAI_ROOT} && \
+    mkdir -p ${CACHE_DIR}/pnpm && \
+    mkdir -p ${INVOKEAI_ROOT}/models && \
     mkdir -p ${UV_PROJECT_ENVIRONMENT} && \
     chown --recursive ${USERNAME}:${USERNAME} ${CACHE_DIR} && \
     chown --recursive ${USERNAME}:${USERNAME} ${INVOKEAI_ROOT} && \

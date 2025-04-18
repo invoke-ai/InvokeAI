@@ -6,7 +6,7 @@
     "args": {
       "USERNAME": "node",
       "PYTHON_VERSION": "3.12",
-      "INVOKEAI_ROOT": "/invokeai",
+      "INVOKEAI_ROOT": "/home/node/invokeai",
       "INVOKEAI_SRC": "/workspaces/InvokeAI"
     }
   },
@@ -21,13 +21,7 @@
       // Setup a volume for invokeai downloads cache
       "type": "volume",
       "source": "invokeai-downloads-cache",
-      "target": "/home/node/.invokeai-cache"
-    },
-    {
-      // Setup a volume for the invokeai data (to prevent development work from corrupting users stable invokeai data)
-      "type": "volume",
-      "source": "invokeai-data-dev",
-      "target": "/invokeai"
+      "target": "/home/node/invokeai/models/.download_cache"
     },
     {
       // Insert the devcontainers vscode launch config into the container
@@ -37,7 +31,8 @@
     }
   ],
   "containerEnv": {
-    "UV_COMPILE_BYTECODE": "0"
+    "UV_COMPILE_BYTECODE": "0",
+    "INVOKEAI_DEV_RELOAD": "true"
   },
   "features": {
     "ghcr.io/devcontainers/features/git-lfs": {},
@@ -59,7 +54,7 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "home/node/.venv/bin/python",
+        "python.defaultInterpreterPath": "/home/node/.venv/bin/python",
         "python.analysis.extraPaths": [
           "/invokeai",
           "/workspaces/InvokeAI",
