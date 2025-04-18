@@ -1,11 +1,6 @@
 {
   "folders": [
     {
-      // Folder for the entire git repo.
-      "name": "[Repository]",
-      "path": "../"
-    },
-    {
       // Folder for specifically the frontend sub-project
       "name": "[Frontend]",
       "path": "../invokeai/frontend/web"
@@ -16,9 +11,18 @@
       "path": "../invokeai/backend"
     },
     {
+      "name": "[Custom Nodes]",
+      "path": "/home/node/invokeai/nodes"
+    },
+    {
       // Folder for the invokeai program data (located at filesystem root)
       "name": "[AppData]",
-      "path": "/invokeai"
+      "path": "/home/node/invokeai"
+    },
+    {
+      // Folder for the entire git repo.
+      "name": "[Repository]",
+      "path": "../"
     }
   ]
 }
