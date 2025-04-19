@@ -719,7 +719,10 @@
             "collectionNumberLTExclusiveMin": "{{value}} <= {{exclusiveMinimum}} (excl min)",
             "collectionEmpty": "raccolta vuota",
             "batchNodeCollectionSizeMismatchNoGroupId": "Dimensione della raccolta di gruppo nel Lotto non corrisponde",
-            "modelIncompatibleBboxWidth": "La larghezza del riquadro di delimitazione è {{width}} ma {{model}} richiede multipli di {{multiple}}"
+            "modelIncompatibleBboxWidth": "La larghezza del riquadro di delimitazione è {{width}} ma {{model}} richiede multipli di {{multiple}}",
+            "modelIncompatibleBboxHeight": "L'altezza del riquadro è {{height}} ma {{model}} richiede multipli di {{multiple}}",
+            "modelIncompatibleScaledBboxWidth": "La larghezza scalata del riquadro è {{width}} ma {{model}} richiede multipli di {{multiple}}",
+            "modelIncompatibleScaledBboxHeight": "L'altezza scalata del riquadro è {{height}} ma {{model}} richiede multipli di {{multiple}}"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -855,7 +858,10 @@
         "unableToCopy": "Impossibile copiare",
         "unableToCopyDesc": "Il tuo browser non supporta l'accesso agli appunti. Gli utenti di Firefox potrebbero risolvere il problema seguendo ",
         "unableToCopyDesc_theseSteps": "questi passaggi",
-        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill non è compatibile con Testo a Immagine o Immagine a Immagine. Per queste attività, utilizzare altri modelli FLUX."
+        "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill non è compatibile con Testo a Immagine o Immagine a Immagine. Per queste attività, utilizzare altri modelli FLUX.",
+        "problemUnpublishingWorkflow": "Problema durante l'annullamento della pubblicazione del flusso di lavoro",
+        "problemUnpublishingWorkflowDescription": "Si è verificato un problema durante l'annullamento della pubblicazione del flusso di lavoro. Riprova.",
+        "workflowUnpublished": "Flusso di lavoro non pubblicato"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1821,7 +1827,10 @@
             "publishingValidationRunInProgress": "È in corso la convalida della pubblicazione.",
             "publishedWorkflowsLocked": "I flussi di lavoro pubblicati sono bloccati e non possono essere modificati o eseguiti. Annulla la pubblicazione del flusso di lavoro o salva una copia per modificare o eseguire questo flusso di lavoro.",
             "warningWorkflowHasNoPublishableInputFields": "Nessun campo di ingresso pubblicabile selezionato: il flusso di lavoro pubblicato verrà eseguito solo con i valori predefiniti",
-            "publishInProgress": "Pubblicazione in corso"
+            "publishInProgress": "Pubblicazione in corso",
+            "selectingOutputNode": "Selezione del nodo di uscita",
+            "selectingOutputNodeDesc": "Fare clic su un nodo per selezionarlo come nodo di uscita del flusso di lavoro.",
+            "errorWorkflowHasUnpublishableNodes": "Il flusso di lavoro ha nodi di estrazione lotto, generatore o metadati"
         },
         "loadMore": "Carica altro",
         "searchPlaceholder": "Cerca per nome, descrizione o etichetta",
@@ -2299,6 +2308,14 @@
         "errors": {
             "unableToFindImage": "Impossibile trovare l'immagine",
             "unableToLoadImage": "Impossibile caricare l'immagine"
+        },
+        "fluxReduxImageInfluence": {
+            "high": "Alta",
+            "low": "Basso",
+            "imageInfluence": "Influenza dell'immagine",
+            "lowest": "Il più basso",
+            "medium": "Medio",
+            "highest": "La più alta"
         }
     },
     "ui": {
@@ -2399,8 +2416,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "Flussi di lavoro: supporto per menu a discesa di stringhe personalizzate nel Generatore di Flussi di lavoro.",
-            "FLUX: supporto per FLUX Fill in Flussi di lavoro e Tela."
+            "CogView4: supporto per i modelli CogView4 in Tela e Flussi di lavoro.",
+            "Dipendenze aggiornate: Invoke ora funziona con l'ultima versione delle sue dipendenze, tra cui Python 3.12 e Pytorch 2.6.0."
         ]
     },
     "system": {
