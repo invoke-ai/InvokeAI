@@ -37,7 +37,7 @@
     }
   ],
   "containerEnv": {
-    "UV_COMPILE_BYTECODE": "0",
+    "UV_COMPILE_BYTECODE": "1",
     "INVOKEAI_DEV_RELOAD": "true"
   },
   "features": {
