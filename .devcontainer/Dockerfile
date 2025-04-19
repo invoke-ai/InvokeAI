@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/devcontainers/typescript-node:22
-
-ARG USERNAME=vscode
+# The default username for most devcontainer-base-images is 'vscode', but the typescript-node image uses 'node'.
+ARG USERNAME=node
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt \
@@ -89,7 +89,3 @@ COPY --from=ghcr.io/astral-sh/uv /uv /uvx /bin/
 RUN uv python install ${PYTHON_VERSION}
 
 WORKDIR ${INVOKEAI_SRC}
-
-# TODO: consider building patchmatch in a seperate stage and copying the files over so we don't have to link deps and install stuff in the container
-# # build patchmatch
-# RUN ln -sf --relative /usr/lib/${USERNAME}-linux-gnu/pkgconfig/{opencv4,opencv}.pc && python -c "from patchmatch import patch_match"
