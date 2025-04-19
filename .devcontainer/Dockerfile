@@ -83,8 +83,7 @@ RUN set -eux; \
 RUN corepack use pnpm && corepack enable
 
 # Install `uv` for package management
-# TODO: Shouldnt this be put in the users .local dir?
-COPY --from=ghcr.io/astral-sh/uv /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /uvx /bin/
 
 RUN uv python install ${PYTHON_VERSION}
 
