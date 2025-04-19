@@ -10,3 +10,13 @@ All normal development tooling will work as expected, including:
 - Import resolution.
 - Linting and formatting.
 - Type checking.
+
+## VSCode Workspace
+
+Within the .devcontainer folder there is a `.code-workspace` file.
+Opening this workspace within the devcontainer is encouraged as it will provide easy access to the most commonly used folders and files, including:
+
+- InvokeAI application data folder.
+- All custom node folders.
+- InvokeAI frontend code
+- InvokeAI backend code
