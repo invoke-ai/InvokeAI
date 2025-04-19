@@ -2,10 +2,25 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build :: PatchMatch",
+      "label": "Lint :: Fix Python Linting Errors",
       "type": "shell",
-      "command": "python",
-      "args": ["-c", "from patchmatch import patch_match"],
+      "command": "ruff check --fix",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "build",
+        "echo": true
+      }
+    },
+    {
+      "label": "Lint :: Fix TypeScript Linting Errors",
+      "type": "shell",
+      "command": "pnpm fix",
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      },
       "group": {
         "kind": "build",
         "isDefault": false
