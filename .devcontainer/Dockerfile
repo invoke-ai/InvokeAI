@@ -73,7 +73,7 @@ RUN set -eux; \
     mkdir -p ${CACHE_DIR} && \
     mkdir -p ${CACHE_DIR}/uv && \
     mkdir -p ${CACHE_DIR}/pnpm && \
-    mkdir -p ${INVOKEAI_ROOT}/models && \
+    mkdir -p ${INVOKEAI_ROOT}/models/.download_cache && \
     mkdir -p ${UV_PROJECT_ENVIRONMENT} && \
     chown --recursive ${USERNAME}:${USERNAME} ${CACHE_DIR} && \
     chown --recursive ${USERNAME}:${USERNAME} ${INVOKEAI_ROOT} && \
