@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
 RUN mkdir -p "/opt/amdgpu/share/libdrm" &&\
 ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids"
 
-ARG GPU_DRIVER=cuda
+ARG COMPUTE_DEVICE=cuda
 ARG INVOKEAI_SRC=/home/${USERNAME}/src/invokeai
 ARG INVOKEAI_ROOT=/home/${USERNAME}/invokeai-data
 ARG UV_PROJECT_ENVIRONMENT=/home/${USERNAME}/.venv
@@ -42,8 +42,8 @@ ENV \
 # Set the secondary index for UV to the appropriate PyTorch index URL based on the GPU driver and architecture
 # NOTE: this is the index URL that will be used by `uv` to install PyTorch and other packages
 # Instead of using an envar we write the value to the user-level config file for UV
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then export UV_INDEX="https://download.pytorch.org/whl/cpu"; \
-    elif [ "$GPU_DRIVER" = "rocm" ]; then export UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$COMPUTE_DEVICE" = "cpu" ]; then export UV_INDEX="https://download.pytorch.org/whl/cpu"; \
+    elif [ "$COMPUTE_DEVICE" = "rocm" ]; then export UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
     else export UV_INDEX="https://download.pytorch.org/whl/cu124"; \
     fi \
     && mkdir -p /home/${USERNAME}/.config/uv/ \
