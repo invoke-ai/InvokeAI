@@ -28,6 +28,12 @@
       "type": "bind",
       "source": "${localWorkspaceFolder}/.devcontainer/.vscode/launch.json",
       "target": "${containerWorkspaceFolder}/.vscode/launch.json"
+    },
+    {
+      // Mount the custom-nodes folder at repo root to allow for easier custom-node development
+      "type": "bind",
+      "source": "${localWorkspaceFolder}/.devcontainer/mounts/custom-nodes",
+      "target": "${containerWorkspaceFolder}/invokeai/app/invocations/custom_nodes/src"
     }
   ],
   "containerEnv": {
@@ -40,10 +46,6 @@
   },
   "hostRequirements": {
     "gpu": "optional"
-  },
-  "forwardPorts": [9090],
-  "portsAttributes": {
-    "9090": { "label": "InvokeAI Backend" }
   },
   "runArgs": ["--env-file", ".devcontainer/.env"],
   "onCreateCommand": "pnpm config --global set store-dir $XDG_CACHE_HOME/pnpm",
@@ -58,7 +60,7 @@
         "python.analysis.extraPaths": [
           "/invokeai",
           "/workspaces/InvokeAI",
-          "~/.venv/lib"
+          "/home/node/.venv/lib"
         ],
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {

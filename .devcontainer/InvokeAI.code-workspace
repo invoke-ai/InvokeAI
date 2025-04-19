@@ -1,6 +1,15 @@
 {
   "folders": [
     {
+      // Folder for the invokeai program data (located at filesystem root)
+      "name": "[AppData]",
+      "path": "/home/node/invokeai"
+    },
+    {
+      "name": "[Custom Nodes]",
+      "path": "../invokeai/app/invocations/custom_nodes/src"
+    },
+    {
       // Folder for specifically the frontend sub-project
       "name": "[Frontend]",
       "path": "../invokeai/frontend/web"
@@ -9,15 +18,6 @@
       // Folder for specifically the backend sub-project
       "name": "[Backend]",
       "path": "../invokeai/backend"
-    },
-    {
-      "name": "[Custom Nodes]",
-      "path": "/home/node/invokeai/nodes"
-    },
-    {
-      // Folder for the invokeai program data (located at filesystem root)
-      "name": "[AppData]",
-      "path": "/home/node/invokeai"
     },
     {
       // Folder for the entire git repo.
