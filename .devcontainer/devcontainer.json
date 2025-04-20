@@ -38,8 +38,7 @@
   ],
   "containerEnv": {
     "UV_COMPILE_BYTECODE": "1",
-    "INVOKEAI_DEV_RELOAD": "true",
-    "TORCH_LOG": "perf_hints, guards, dynamic"
+    "INVOKEAI_DEV_RELOAD": "true"
   },
   "features": {
     "ghcr.io/devcontainers/features/git-lfs": {},

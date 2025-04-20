@@ -19,7 +19,8 @@
       "args": [],
       "justMyCode": true,
       "env": {
-        "INVOKE_DEV_RELOAD": "1"
+        "INVOKE_DEV_RELOAD": "1",
+        "TORCH_LOGS": "perf_hints,guards,dynamic"
       },
       "presentation": {
         "echo": true,
