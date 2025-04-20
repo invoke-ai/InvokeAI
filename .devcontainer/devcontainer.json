@@ -62,6 +62,7 @@
           "/workspaces/InvokeAI",
           "/home/node/.venv/lib"
         ],
+        "files.autoSaveWhenNoErrors": true,
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
           "source.organizeImports": "always"
