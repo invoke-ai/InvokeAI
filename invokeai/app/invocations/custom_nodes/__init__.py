@@ -25,11 +25,12 @@ for _, pkg_name, is_pkg in pkgutil.iter_modules([src_path]):
         continue
 
     try:
-        logger.info(f"Mounting custom-node package for development {pkg_name!r}")
+        logger.info(f"Loading custom-node package for development {pkg_name!r}")
         importlib.import_module(pkg_name)
         loaded += 1
     except Exception as e:
-        logger.error(f"Failed to import {pkg_name!r}: {e}")
+        logger.error(f"Failed to load {pkg_name!r}: {e}", exc_info=True)
+        continue
 
 if loaded:
-    logger.info(f"Loaded {loaded} custom-node package(s) from {src_path!r}")
+    logger.info(f"Loaded {loaded} custom-node package(s)")
