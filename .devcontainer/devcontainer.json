@@ -7,7 +7,7 @@
       "USERNAME": "node",
       "PYTHON_VERSION": "3.12", // The python version which will be installed in the container
       "INVOKEAI_ROOT": "/home/node/invokeai",
-      "INVOKEAI_SRC": "/workspaces/InvokeAI"
+      "INVOKEAI_SRC": "${containerWorkspaceFolder}"
     }
   },
   "mounts": [
@@ -38,7 +38,8 @@
   ],
   "containerEnv": {
     "UV_COMPILE_BYTECODE": "1",
-    "INVOKEAI_DEV_RELOAD": "true"
+    "INVOKEAI_DEV_RELOAD": "true",
+    "UV_LINK_MODE": "symlink" // Using symlink because they are fast and always work, if you encounter issues after a cache purge, just rebuild the container.
   },
   "features": {
     "ghcr.io/devcontainers/features/git-lfs": {},
@@ -48,19 +49,18 @@
     "gpu": "optional"
   },
   "runArgs": ["--env-file", ".devcontainer/.env"],
+  "initializeCommand": [".devcontainer/scripts/init"],
   "onCreateCommand": "pnpm config --global set store-dir $XDG_CACHE_HOME/pnpm",
-  "updateContentCommand": {
-    "Frontend::Setup": "pnpm install --dir invokeai/frontend/web --reporter append-only --prefer-offline",
-    "Backend::Setup": "uv sync --inexact --all-extras --no-extra onnx-directml"
-  },
+  "updateContentCommand": "pnpm install --dir invokeai/frontend/web --prefer-offline",
+  "postAttachCommand": "uv sync --extra using-$(echo ${COMPUTE_DEVICE:-cpu}) --extra dev --extra test --extra docs",
   "customizations": {
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "/home/node/.venv/bin/python",
         "python.analysis.extraPaths": [
-          "/invokeai",
-          "/workspaces/InvokeAI",
-          "/home/node/.venv/lib"
+          "/home/node/invokeai",
+          "/home/node/.venv/lib",
+          "${containerWorkspaceFolder}"
         ],
         "files.autoSaveWhenNoErrors": true,
         "editor.formatOnSave": true,
@@ -70,18 +70,21 @@
         "ruff.linting.enabled": true
       },
       "extensions": [
-        "eamodio.gitlens",
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker",
         "ms-toolsai.jupyter",
         "ms-toolsai.vscode-jupyter-cell-tags",
         "ms-toolsai.jupyter-renderers",
         "ms-toolsai.vscode-jupyter-slideshow",
+        "ms-python.python",
         "charliermarsh.ruff",
         "esbenp.prettier-vscode",
         "DavidAnson.vscode-markdownlint",
         "antfu.vite",
         "docker.docker",
-        "ms-vscode-remote.remote-containers",
-        "ms-azuretools.vscode-docker"
+        "dbaeumer.vscode-eslint",
+        "vitest.explorer",
+        "tamasfe.even-better-toml"
       ]
     }
   }

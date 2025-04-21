@@ -31,6 +31,7 @@ ENV \
     UV_PROJECT_ENVIRONMENT=${UV_PROJECT_ENVIRONMENT}
 
 ENV \
+    COMPUTE_DEVICE=${COMPUTE_DEVICE} \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_MANAGED_PYTHON=1 \
@@ -38,16 +39,6 @@ ENV \
     INVOKEAI_PORT=9090 \
     INVOKEAI_ROOT=${INVOKEAI_ROOT} \
     HF_HOME=${HF_HOME}
-
-# Set the secondary index for UV to the appropriate PyTorch index URL based on the GPU driver and architecture
-# NOTE: this is the index URL that will be used by `uv` to install PyTorch and other packages
-# Instead of using an envar we write the value to the user-level config file for UV
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$COMPUTE_DEVICE" = "cpu" ]; then export UV_INDEX="https://download.pytorch.org/whl/cpu"; \
-    elif [ "$COMPUTE_DEVICE" = "rocm" ]; then export UV_INDEX="https://download.pytorch.org/whl/rocm6.2"; \
-    else export UV_INDEX="https://download.pytorch.org/whl/cu124"; \
-    fi \
-    && mkdir -p /home/${USERNAME}/.config/uv/ \
-    && echo "[[index]]\nurl = '$(echo $UV_INDEX)'\n" > /home/${USERNAME}/.config/uv/uv.toml
 
 # Set Python version
 # NOTE: this is the version of Python that will be installed by `uv`
@@ -60,24 +51,32 @@ UV_PYTHON=${PYTHON_VERSION}
 ARG CACHE_DIR=/home/${USERNAME}/.cache
 # Setting XDG_CACHE_HOME will affect the location of the cache for pnpm and uv, and possibly other tools
 # https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+# We set XDG_DATA_HOME to a non-volume-mounted location to guarantee that UV pre-installs python. (if its mounted it will only be installed after container start)
 ENV XDG_CACHE_HOME=${CACHE_DIR} \
+    XDG_DATA_HOME=/home/${USERNAME}/.data \
     GIT_LFS_CACHE=${CACHE_DIR}/git-lfs \
     PATH="$UV_PROJECT_ENVIRONMENT/bin:$CACHE_DIR/pnpm:$CACHE_DIR/uv:$PATH" \
     PYTHONPATH="$PYTHONPATH:${INVOKEAI_SRC}"
 
-# Setup cache volume for dependencies
-VOLUME [ "${CACHE_DIR}", "${INVOKEAI_SRC}", "${HF_HOME}"]
+# Predeclare volume mounting points for directories which will be written to.
+# This guarantees that even if the devcontainer doesnt mount a volume for these paths, their contents will still be handled by a volume, 
+# rather than being written to the container image layers itself.
+VOLUME [ "${CACHE_DIR}", "${INVOKEAI_SRC}", "${INVOKEAI_ROOT}", "${HF_HOME}"]
 
 # Create & set ownership of directories
 RUN set -eux; \
     mkdir -p ${CACHE_DIR} && \
     mkdir -p ${CACHE_DIR}/uv && \
     mkdir -p ${CACHE_DIR}/pnpm && \
+    mkdir -p ${CACHE_DIR}/node && \
+    mkdir -p ${CACHE_DIR}/Microsoft && \
     mkdir -p ${INVOKEAI_ROOT}/models/.download_cache && \
     mkdir -p ${UV_PROJECT_ENVIRONMENT} && \
     chown --recursive ${USERNAME}:${USERNAME} ${CACHE_DIR} && \
     chown --recursive ${USERNAME}:${USERNAME} ${INVOKEAI_ROOT} && \
-    chown --recursive ${USERNAME}:${USERNAME} ${UV_PROJECT_ENVIRONMENT} 
+    chown --recursive ${USERNAME}:${USERNAME} ${UV_PROJECT_ENVIRONMENT} && \
+    mkdir -p /home/${USERNAME}/.data && \
+    chown --recursive ${USERNAME}:${USERNAME} /home/${USERNAME}/.data
 
 # Setup PNPM
 RUN corepack use pnpm && corepack enable
@@ -85,6 +84,7 @@ RUN corepack use pnpm && corepack enable
 # Install `uv` for package management
 COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /uvx /bin/
 
-RUN uv python install ${PYTHON_VERSION}
+RUN uv venv && uv python install ${PYTHON_VERSION}
+ENV UV_PYTHON_DOWNLOADS=never
 
 WORKDIR ${INVOKEAI_SRC}

@@ -5,13 +5,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "InvokeAI :: Chrome",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:9090",
-      "webRoot": "${workspaceFolder}/invokeai/frontend/web"
-    },
-    {
       "name": "InvokeAI :: Backend",
       "type": "debugpy",
       "request": "launch",
