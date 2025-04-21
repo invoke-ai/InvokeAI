@@ -5,7 +5,7 @@
     "context": "../..",
     "args": {
       "USERNAME": "node",
-      "PYTHON_VERSION": "3.12",
+      "PYTHON_VERSION": "3.12", // The python version which will be installed in the container
       "INVOKEAI_ROOT": "/home/node/invokeai",
       "INVOKEAI_SRC": "/workspaces/InvokeAI"
     }
@@ -33,7 +33,7 @@
       // Mount the custom-nodes folder at repo root to allow for easier custom-node development
       "type": "bind",
       "source": "${localWorkspaceFolder}/.devcontainer/mounts/custom-nodes",
-      "target": "${containerWorkspaceFolder}/invokeai/app/invocations/custom_nodes/src"
+      "target": "/home/node/invokeai/nodes"
     }
   ],
   "containerEnv": {
