@@ -7,7 +7,7 @@
     },
     {
       "name": "[Custom Nodes]",
-      "path": "../invokeai/app/invocations/custom_nodes/src"
+      "path": "/home/node/invokeai/nodes"
     },
     {
       // Folder for specifically the frontend sub-project
