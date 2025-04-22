@@ -460,7 +460,12 @@ export const Picker = typedMemo(<T extends object, U = undefined, C = undefined>
         gap={2}
         onKeyDown={onKeyDown}
       >
-        <SearchBarComponent ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} />
+        <SearchBarComponent
+          ref={inputRef}
+          value={searchTerm}
+          onChange={onChangeSearchTerm}
+          isDisabled={flattenedOptions.length === 0}
+        />
         <Flex tabIndex={-1} w="full" flexGrow={1}>
           {flattenedOptions.length === 0 && <NoOptionsFallbackWrapper>{noOptionsFallback}</NoOptionsFallbackWrapper>}
           {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && (
