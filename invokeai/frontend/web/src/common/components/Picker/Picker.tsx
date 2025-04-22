@@ -148,6 +148,7 @@ type PickerProps<T extends object, U, C> = {
   /**
    * An optional object that can be used to pass additional data to custom picker components.
    */
+  extra: C;
 };
 
 type PickerContextState<T extends object, U, C> = {
@@ -163,7 +164,7 @@ type PickerContextState<T extends object, U, C> = {
   noMatchesFallback?: React.ReactNode;
   OptionComponent: React.ComponentType<{ option: T } & BoxProps>;
   GroupComponent: React.ComponentType<PropsWithChildren<{ group: Group<T, U> } & BoxProps>>;
-  ctx: C;
+  extra: C;
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -260,7 +261,7 @@ export const Picker = typedMemo(<T extends object, U = undefined, C = undefined>
     noOptionsFallback,
     OptionComponent = DefaultOptionComponent,
     GroupComponent = DefaultGroupComponent,
-    ctx: ctxProp,
+    extra,
   } = props;
   const [activeOptionId, setActiveOptionId, getActiveOptionId] = useStateImperative(() =>
     getFirstOptionId(options, getOptionId)
@@ -427,7 +428,7 @@ export const Picker = typedMemo(<T extends object, U = undefined, C = undefined>
         noMatchesFallback,
         OptionComponent,
         GroupComponent,
-        ctx: ctxProp,
+        extra,
         setSearchTerm,
       }) satisfies PickerContextState<T, U, C>,
     [
@@ -442,7 +443,7 @@ export const Picker = typedMemo(<T extends object, U = undefined, C = undefined>
       noMatchesFallback,
       OptionComponent,
       GroupComponent,
-      ctxProp,
+      extra,
     ]
   );
 

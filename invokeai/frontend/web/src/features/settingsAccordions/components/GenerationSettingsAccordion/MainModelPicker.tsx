@@ -95,7 +95,7 @@ export const MainModelPicker = memo(() => {
     },
     [basesWithModels]
   );
-  const ctx = useMemo(
+  const extra = useMemo(
     () => ({ toggleBaseModelTypeFilter, basesWithModels, baseModelTypeFilters }),
     [toggleBaseModelTypeFilter, basesWithModels, baseModelTypeFilters]
   );
@@ -201,7 +201,7 @@ export const MainModelPicker = memo(() => {
               SearchBarComponent={SearchBarComponent}
               noOptionsFallback={t('modelManager.noModelsInstalled')}
               noMatchesFallback={t('modelManager.noMatchingModels')}
-              ctx={ctx}
+              extra={extra}
             />
           </PopoverBody>
         </PopoverContent>
@@ -216,7 +216,7 @@ const SearchBarComponent = typedMemo(
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
     const compactModelPicker = useAppSelector(selectCompactModelPicker);
-    const { ctx, setSearchTerm } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
+    const { extra, setSearchTerm } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
     const onToggleCompact = useCallback(() => {
       dispatch(compactModelPickerToggled());
     }, [dispatch]);
@@ -251,7 +251,7 @@ const SearchBarComponent = typedMemo(
           />
         </Flex>
         <Flex gap={2} alignItems="center">
-          {ctx.basesWithModels.map((base) => (
+          {extra.basesWithModels.map((base) => (
             <ModelBaseFilterButton key={base} base={base} />
           ))}
         </Flex>
@@ -262,11 +262,11 @@ const SearchBarComponent = typedMemo(
 SearchBarComponent.displayName = 'SearchBarComponent';
 
 const ModelBaseFilterButton = memo(({ base }: { base: BaseModelType }) => {
-  const { ctx } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
+  const { extra } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
 
   const onClick = useCallback(() => {
-    ctx.toggleBaseModelTypeFilter(base);
-  }, [base, ctx]);
+    extra.toggleBaseModelTypeFilter(base);
+  }, [base, extra]);
 
   return (
     <Badge
@@ -274,8 +274,8 @@ const ModelBaseFilterButton = memo(({ base }: { base: BaseModelType }) => {
       size="xs"
       variant="solid"
       userSelect="none"
-      bg={ctx.baseModelTypeFilters[base] ? `${BASE_COLOR_MAP[base]}.300` : 'transparent'}
-      color={ctx.baseModelTypeFilters[base] ? undefined : 'base.200'}
+      bg={extra.baseModelTypeFilters[base] ? `${BASE_COLOR_MAP[base]}.300` : 'transparent'}
+      color={extra.baseModelTypeFilters[base] ? undefined : 'base.200'}
       borderColor={`${BASE_COLOR_MAP[base]}.300`}
       borderWidth={1}
       onClick={onClick}
