@@ -113,9 +113,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="FLUX Redux conditioning tensor.",
         input=Input.Connection,
     )
-    uno_reference: FluxUnoReferenceField | None = InputField(
+    uno_ref: FluxUnoReferenceField | None = InputField(
         default=None,
-        description="FLUX Redux conditioning tensor.",
+        description="FLUX Uno reference.",
         input=Input.Connection,
     )
     fill_conditioning: FluxFillConditioningField | None = InputField(
@@ -293,10 +293,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         img_ids = generate_img_ids(h=latent_h, w=latent_w, batch_size=b, device=x.device, dtype=x.dtype)
 
-        is_flux_uno = self.uno_reference is not None
-        if is_flux_uno:
+        if self.uno_ref is not None:
             # Encode reference images and prepare position ids
-            uno_ref_imgs = self._prep_uno_reference_imgs(context)
+            uno_ref_imgs = self._prep_uno_reference_imgs(context=context)
             uno_ref_imgs, uno_ref_ids = prepare_multi_ip(x, uno_ref_imgs)
         else:
             uno_ref_imgs = None
@@ -680,20 +679,20 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _prep_uno_reference_imgs(self, context: InvocationContext) -> list[torch.Tensor]:
         # Load the conditioning image and resize it to the target image size.
-        assert self.controlnet_vae is not None, 'Controlnet Vae must be set for UNO encoding'
+
+        assert self.uno_ref is not None, "uno_ref must be set when using UNO."
+        ref_img_names = [i.image_name for i in self.uno_ref.images]
+
+        assert self.controlnet_vae is not None, "Controlnet Vae must be set for UNO encoding"
         vae_info = context.models.load(self.controlnet_vae.vae)
 
-        assert self.uno_reference is not None, "Needs reference images for UNO"
-
-        ref_img_names: list[str] = self.uno_reference.image_names
         ref_latents: list[torch.Tensor] = []
 
         # TODO: Maybe move reference side to UNO Node as parameter
         ref_long_side = 512 if len(ref_img_names) <= 1 else 320
 
         for img_name in ref_img_names:
-            image_pil = context.images.get_pil(img_name)
-            image_pil = image_pil.convert("RGB")  # To correct resizing
+            image_pil = context.images.get_pil(img_name, mode="RGB")
             image_pil = preprocess_ref(image_pil, ref_long_side)  # resize and crop
 
             image_tensor = (TVF.to_tensor(image_pil) * 2.0 - 1.0).unsqueeze(0).float()

@@ -286,11 +286,7 @@ class FluxReduxConditioningField(BaseModel):
 class FluxUnoReferenceField(BaseModel):
     """A FLUX Uno image list primitive value"""
 
-    image_names: list[str] | None = Field(
-        default=None,
-        description="The name of the image associated with this conditioning tensor. This is used to store the image "
-        "in the context.",
-    )
+    images: list[ImageField] = Field(description="The images to use as reference for FLUX Uno.")
 
 
 class FluxFillConditioningField(BaseModel):

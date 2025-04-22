@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import (
@@ -52,7 +50,7 @@ def preprocess_ref(raw_image: Image.Image, long_size: int = 512) -> Image.Image:
 class FluxUnoOutput(BaseInvocationOutput):
     """The conditioning output of a FLUX Redux invocation."""
 
-    uno_refs: FluxUnoReferenceField = OutputField(description="Reference images container", title="Reference images")
+    uno_ref: FluxUnoReferenceField = OutputField(description="Reference images container", title="Reference images")
 
 
 @invocation(
@@ -66,16 +64,8 @@ class FluxUnoOutput(BaseInvocationOutput):
 class FluxUnoInvocation(BaseInvocation):
     """Loads a FLUX UNO reference images."""
 
-    image: ImageField = InputField(description="The UNO reference image.")
-    image2: Optional[ImageField] = InputField(default=None, description="2nd reference")
-    image3: Optional[ImageField] = InputField(default=None, description="3rd reference")
-    image4: Optional[ImageField] = InputField(default=None, description="4th reference")
+    images: list[ImageField] | None = InputField(default=None, description="The UNO reference images.")
 
     def invoke(self, context: InvocationContext) -> FluxUnoOutput:
-        images: list[str] = []
-        for image in [self.image, self.image2, self.image3, self.image4]:
-            if image is not None:
-                image_pil = context.images.get_pil(image.image_name)
-                images.append(context.images.save(image=image_pil).image_name)
-
-        return FluxUnoOutput(uno_refs=FluxUnoReferenceField(image_names=images))
+        uno_ref = FluxUnoReferenceField(images=self.images or [])
+        return FluxUnoOutput(uno_ref=uno_ref)
