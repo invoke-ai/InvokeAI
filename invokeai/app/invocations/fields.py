@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Callable, Optional, Tuple, List
+from typing import Any, Callable, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter, model_validator
 from pydantic.fields import _Unset
@@ -286,11 +286,12 @@ class FluxReduxConditioningField(BaseModel):
 class FluxUnoReferenceField(BaseModel):
     """A FLUX Uno image list primitive value"""
 
-    image_names: List[str] = Field(
+    image_names: list[str] | None = Field(
         default=None,
         description="The name of the image associated with this conditioning tensor. This is used to store the image "
         "in the context.",
     )
+
 
 class FluxFillConditioningField(BaseModel):
     """A FLUX Fill conditioning field."""

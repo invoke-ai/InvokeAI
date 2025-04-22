@@ -6,8 +6,8 @@ import numpy as np
 import numpy.typing as npt
 import torch
 import torchvision.transforms as tv_transforms
-from PIL import Image
 import torchvision.transforms.functional as TVF
+from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
@@ -27,9 +27,9 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
+from invokeai.app.invocations.flux_uno import preprocess_ref
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.ip_adapter import IPAdapterField
-from invokeai.app.invocations.flux_uno import preprocess_ref
 from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -45,10 +45,10 @@ from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
     generate_img_ids,
-    prepare_multi_ip,
     get_noise,
     get_schedule,
     pack,
+    prepare_multi_ip,
     unpack,
 )
 from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
@@ -677,7 +677,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise ValueError(f"Unsupported ControlNet model type: {type(model)}")
 
         return controlnet_extensions
-    
+
     def _prep_uno_reference_imgs(self, context: InvocationContext) -> list[torch.Tensor]:
         # Load the conditioning image and resize it to the target image size.
         assert self.controlnet_vae is not None, 'Controlnet Vae must be set for UNO encoding'

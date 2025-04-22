@@ -123,10 +123,10 @@ class Flux(nn.Module):
         img_end = img.shape[1]  # length of original image vector
         if uno_ref_imgs is not None and uno_ref_ids is not None:
             img_in = [img] + [self.img_in(ref) for ref in uno_ref_imgs]
-            img_ids = [ids] + [ref_ids for ref_ids in uno_ref_ids]
-            img = torch.cat(img_in, dim=1)  
+            img_ids = [ids] + uno_ref_ids
+            img = torch.cat(img_in, dim=1)
             ids = torch.cat(img_ids, dim=1)
-            
+
         pe = self.pe_embedder(ids)
 
         # Validate double_block_residuals shape.
