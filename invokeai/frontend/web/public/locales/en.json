@@ -201,7 +201,9 @@
         "column": "Column",
         "value": "Value",
         "label": "Label",
-        "systemInformation": "System Information"
+        "systemInformation": "System Information",
+        "compact": "Compact",
+        "full": "Full"
     },
     "hrf": {
         "hrf": "High Resolution Fix",

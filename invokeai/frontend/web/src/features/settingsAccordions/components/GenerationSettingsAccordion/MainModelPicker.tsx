@@ -249,7 +249,8 @@ const SearchBarComponent = typedMemo(
           </InputGroup>
           <NavigateToModelManagerButton />
           <IconButton
-            aria-label="Toggle compact view"
+            aria-label={compactModelPicker ? t('common.full') : t('common.compact')}
+            tooltip={compactModelPicker ? t('common.full') : t('common.compact')}
             size="sm"
             variant="ghost"
             icon={compactModelPicker ? <PiArrowsOutLineVerticalBold /> : <PiArrowsInLineVerticalBold />}
