@@ -106,6 +106,7 @@ type PickerContextState<T extends object, U, C> = {
   getIsDisabled?: (option: T) => boolean;
   setActiveOptionId: (id: string) => void;
   onSelectById: (id: string) => void;
+  setSearchTerm: (searchTerm: string) => void;
   SearchBarComponent: ReturnType<typeof fixedForwardRef<HTMLInputElement, InputProps>>;
   noOptionsFallback: React.ReactNode;
   noMatchesFallback: React.ReactNode;
@@ -376,6 +377,7 @@ export const Picker = typedMemo(<T extends object, U = undefined, C = undefined>
         OptionComponent,
         GroupComponent,
         ctx: ctxProp,
+        setSearchTerm,
       }) satisfies PickerContextState<T, U, C>,
     [
       options,
