@@ -30,7 +30,7 @@ def preprocess_ref(raw_image: Image.Image, long_size: int = 512) -> Image.Image:
         new_w = int((long_size / image_h) * image_w)
 
     # Scale proportionally to the new width and height
-    raw_image = raw_image.resize((new_w, new_h), resample=Image.LANCZOS)
+    raw_image = raw_image.resize((new_w, new_h), resample=Image.Resampling.LANCZOS)
     target_w = new_w // 16 * 16
     target_h = new_h // 16 * 16
 
