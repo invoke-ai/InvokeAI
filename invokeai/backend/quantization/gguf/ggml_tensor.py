@@ -119,6 +119,13 @@ class GGMLTensor(torch.Tensor):
             return self.tensor_shape[dim]
         return self.tensor_shape
 
+    @overload
+    def to(self, *args, **kwargs) -> torch.Tensor: ...
+
+    def to(self, *args, **kwargs):
+        self.quantized_data = self.quantized_data.to(*args, **kwargs)
+        return self
+
     @property
     def shape(self) -> torch.Size:  # pyright: ignore[reportIncompatibleVariableOverride] pyright doesn't understand this for some reason.
         """The shape of the tensor after dequantization. I.e. the shape that will be used in any math ops."""
