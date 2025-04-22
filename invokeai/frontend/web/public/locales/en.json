@@ -828,6 +828,8 @@
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",
         "name": "Name",
+        "modelPickerFallbackNoModelsInstalled": "No models installed.",
+        "modelPickerFallbackNoModelsInstalled2": "Visit the <LinkComponent>Model Manager</LinkComponent> to install models.",
         "noModelsInstalledDesc1": "Install models with the",
         "noModelSelected": "No Model Selected",
         "noMatchingModels": "No matching models",
