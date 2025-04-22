@@ -20,13 +20,7 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { Group, ImperativeModelPickerHandle } from 'common/components/Picker/Picker';
-import {
-  DefaultNoMatchesFallback,
-  DefaultNoOptionsFallback,
-  getRegex,
-  Picker,
-  usePickerContext,
-} from 'common/components/Picker/Picker';
+import { getRegex, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
@@ -183,13 +177,12 @@ export const MainModelPicker = memo(() => {
           <FormLabel>{t('modelManager.model')}</FormLabel>
         </InformationalPopover>
         <PopoverTrigger>
-          <Button size="sm" flexGrow={1} variant="outline">
+          <Button size="sm" flexGrow={1} variant="outline" colorScheme={modelConfig ? undefined : 'error'}>
             {modelConfig?.name ?? 'Select Model'}
             <Spacer />
             <PiCaretDownBold />
           </Button>
         </PopoverTrigger>
-        <NavigateToModelManagerButton />
         <UseDefaultSettingsButton />
       </Flex>
       <Portal appendToParentPortal={false}>
@@ -206,8 +199,8 @@ export const MainModelPicker = memo(() => {
               OptionComponent={PickerOptionComponent}
               GroupComponent={PickerGroupComponent}
               SearchBarComponent={SearchBarComponent}
-              noOptionsFallback={<DefaultNoOptionsFallback label={t('modelManager.noModelsInstalled')} />}
-              noMatchesFallback={<DefaultNoMatchesFallback label={t('modelManager.noMatchingModels')} />}
+              noOptionsFallback={t('modelManager.noModelsInstalled')}
+              noMatchesFallback={t('modelManager.noMatchingModels')}
               ctx={ctx}
             />
           </PopoverBody>

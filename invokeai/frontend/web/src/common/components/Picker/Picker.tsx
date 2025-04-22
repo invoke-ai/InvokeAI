@@ -58,25 +58,33 @@ const DefaultGroupComponent = typedMemo(
 );
 DefaultGroupComponent.displayName = 'DefaultGroupComponent';
 
-export const DefaultNoOptionsFallback = typedMemo(({ label }: { label?: string }) => {
+export const NoOptionsFallbackWrapper = typedMemo(({ children }: PropsWithChildren) => {
   const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
-      <Text variant="subtext">{label || t('common.noOptions')}</Text>
+      {typeof children === 'string' ? (
+        <Text variant="subtext">{children}</Text>
+      ) : (
+        (children ?? <Text variant="subtext">{t('common.noOptions')}</Text>)
+      )}
     </Flex>
   );
 });
-DefaultNoOptionsFallback.displayName = 'DefaultNoOptionsFallback';
+NoOptionsFallbackWrapper.displayName = 'NoOptionsFallbackWrapper';
 
-export const DefaultNoMatchesFallback = typedMemo(({ label }: { label?: string }) => {
+export const NoMatchesFallbackWrapper = typedMemo(({ children }: PropsWithChildren) => {
   const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
-      <Text variant="subtext">{label || t('common.noMatches')}</Text>
+      {typeof children === 'string' ? (
+        <Text variant="subtext">{children}</Text>
+      ) : (
+        (children ?? <Text variant="subtext">{t('common.noMatches')}</Text>)
+      )}
     </Flex>
   );
 });
-DefaultNoMatchesFallback.displayName = 'DefaultNoMatchesFallback';
+NoMatchesFallbackWrapper.displayName = 'NoMatchesFallbackWrapper';
 
 type PickerProps<T extends object, U, C> = {
   options: (T | Group<T>)[];
@@ -108,8 +116,8 @@ type PickerContextState<T extends object, U, C> = {
   onSelectById: (id: string) => void;
   setSearchTerm: (searchTerm: string) => void;
   SearchBarComponent: ReturnType<typeof fixedForwardRef<HTMLInputElement, InputProps>>;
-  noOptionsFallback: React.ReactNode;
-  noMatchesFallback: React.ReactNode;
+  noOptionsFallback?: React.ReactNode;
+  noMatchesFallback?: React.ReactNode;
   OptionComponent: React.ComponentType<{ option: T } & BoxProps>;
   GroupComponent: React.ComponentType<PropsWithChildren<{ group: Group<T, U> } & BoxProps>>;
   ctx: C;
@@ -205,8 +213,8 @@ export const Picker = typedMemo(<T extends object, U = undefined, C = undefined>
     onSelect,
     selectedItem,
     SearchBarComponent = DefaultPickerSearchBarComponent,
-    noMatchesFallback = <DefaultNoMatchesFallback />,
-    noOptionsFallback = <DefaultNoOptionsFallback />,
+    noMatchesFallback,
+    noOptionsFallback,
     OptionComponent = DefaultOptionComponent,
     GroupComponent = DefaultGroupComponent,
     ctx: ctxProp,
@@ -410,8 +418,10 @@ export const Picker = typedMemo(<T extends object, U = undefined, C = undefined>
       >
         <SearchBarComponent ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} />
         <Flex tabIndex={-1} w="full" flexGrow={1}>
-          {flattenedOptions.length === 0 && noOptionsFallback}
-          {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && noMatchesFallback}
+          {flattenedOptions.length === 0 && <NoOptionsFallbackWrapper>{noOptionsFallback}</NoOptionsFallbackWrapper>}
+          {flattenedOptions.length > 0 && flattenedFilteredOptions.length === 0 && (
+            <NoMatchesFallbackWrapper>{noMatchesFallback}</NoMatchesFallbackWrapper>
+          )}
           {flattenedOptions.length > 0 && flattenedFilteredOptions.length > 0 && (
             <ScrollableContent>
               <PickerList
