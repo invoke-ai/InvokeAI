@@ -128,7 +128,7 @@ class GGMLTensor(torch.Tensor):
                 raise ValueError("Operation changed the dtype of GGMLTensor unexpectedly.")
         if 'dtype' in kwargs.keys():
             if kwargs['dtype'] != self.quantized_data.dtype:
-                raise ValueError("Operation changed the dtype of GGMLTensor unexpectedly."
+                raise ValueError("Operation changed the dtype of GGMLTensor unexpectedly.")
         self.quantized_data = self.quantized_data.to(*args, **kwargs)
         return self
 
