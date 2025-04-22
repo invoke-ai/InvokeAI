@@ -244,7 +244,7 @@ const SearchBarComponent = typedMemo(
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
     const compactModelPicker = useAppSelector(selectCompactModelPicker);
-    const { extra, setSearchTerm } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
+    const { extra, setSearchTerm, options } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
     const onToggleCompact = useCallback(() => {
       dispatch(compactModelPickerToggled());
     }, [dispatch]);
@@ -276,6 +276,7 @@ const SearchBarComponent = typedMemo(
             variant="ghost"
             icon={compactModelPicker ? <PiArrowsOutLineVerticalBold /> : <PiArrowsInLineVerticalBold />}
             onClick={onToggleCompact}
+            isDisabled={options.length === 0}
           />
         </Flex>
         <Flex gap={2} alignItems="center">
