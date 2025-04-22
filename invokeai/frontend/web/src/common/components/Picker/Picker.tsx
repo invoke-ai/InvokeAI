@@ -87,24 +87,67 @@ export const NoMatchesFallbackWrapper = typedMemo(({ children }: PropsWithChildr
 NoMatchesFallbackWrapper.displayName = 'NoMatchesFallbackWrapper';
 
 type PickerProps<T extends object, U, C> = {
+  /**
+   * The options to display in the picker. This can be a flat array of options or an array of groups.
+   */
   options: (T | Group<T>)[];
+  /**
+   * A function that returns the id of an option.
+   */
   getOptionId: (option: T) => string;
+  /**
+   * A function that returns true if the option matches the search term.
+   */
   isMatch: (option: T, searchTerm: string) => boolean;
+  /**
+   * A function that returns true if the option is disabled.
+   */
   getIsDisabled?: (option: T) => boolean;
+  /**
+   * The currently selected item.
+   */
   selectedItem?: T;
+  /**
+   * A function that is called when an option is selected.
+   */
   onSelect?: (option: T) => void;
+  /**
+   * A function that is called when the picker is closed.
+   */
   onClose?: () => void;
+  /**
+   * A ref to an imperative handle that can be used to control the picker.
+   */
   handleRef?: React.Ref<ImperativeModelPickerHandle>;
+  /**
+   * A custom search bar component. If not provided, a default search bar will be used.
+   */
   SearchBarComponent?: ReturnType<typeof fixedForwardRef<HTMLInputElement, InputProps>>;
-  noOptionsFallback?: React.ReactNode;
-  noMatchesFallback?: React.ReactNode;
+  /**
+   * A custom option component. If not provided, a default option component will be used.
+   */
   OptionComponent?: React.ComponentType<
     {
       option: T;
     } & BoxProps
   >;
+  /**
+   * A custom group component. If not provided, a default group component will be used.
+   */
   GroupComponent?: React.ComponentType<PropsWithChildren<{ group: Group<T, U> } & BoxProps>>;
-  ctx: C;
+  /**
+   * A fallback component to display when there are no options. If a string is provided, it will be formatted
+   * as a text element with appropriate styling. If a React node is provided, it will be rendered as is.
+   */
+  noOptionsFallback?: React.ReactNode;
+  /**
+   * A fallback component to display when there are no matches. If a string is provided, it will be formatted
+   * as a text element with appropriate styling. If a React node is provided, it will be rendered as is.
+   */
+  noMatchesFallback?: React.ReactNode;
+  /**
+   * An optional object that can be used to pass additional data to custom picker components.
+   */
 };
 
 type PickerContextState<T extends object, U, C> = {
