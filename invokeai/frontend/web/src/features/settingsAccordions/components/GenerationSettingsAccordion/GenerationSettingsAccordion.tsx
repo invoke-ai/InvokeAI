@@ -9,6 +9,8 @@ import {
   FormLabel,
   IconButton,
   Input,
+  InputGroup,
+  InputRightElement,
   Popover,
   PopoverArrow,
   PopoverBody,
@@ -59,7 +61,7 @@ import { isEqual } from 'lodash-es';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsInLineVerticalBold, PiArrowsOutLineVerticalBold, PiCaretDownBold } from 'react-icons/pi';
+import { PiArrowsInLineVerticalBold, PiArrowsOutLineVerticalBold, PiCaretDownBold, PiXBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 import type { AnyModelConfig, BaseModelType } from 'services/api/types';
@@ -307,14 +309,30 @@ const SearchBarComponent = typedMemo(
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
     const compactModelPicker = useAppSelector(selectCompactModelPicker);
-    const { ctx } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
+    const { ctx, setSearchTerm } = usePickerContext<AnyModelConfig, GroupData, PickerExtraContext>();
     const onToggleCompact = useCallback(() => {
       dispatch(compactModelPickerToggled());
     }, [dispatch]);
+    const onClearSearchTerm = useCallback(() => {
+      setSearchTerm('');
+    }, [setSearchTerm]);
     return (
       <Flex flexDir="column" w="full" gap={2}>
         <Flex gap={2} alignItems="center">
-          <Input ref={ref} {...props} placeholder={t('modelManager.filterModels')} />
+          <InputGroup>
+            <Input ref={ref} {...props} placeholder={t('modelManager.filterModels')} />
+            {props.value && (
+              <InputRightElement h="full" pe={2}>
+                <IconButton
+                  onClick={onClearSearchTerm}
+                  size="sm"
+                  variant="link"
+                  aria-label="Clear search"
+                  icon={<PiXBold />}
+                />
+              </InputRightElement>
+            )}
+          </InputGroup>
           <NavigateToModelManagerButton />
           <IconButton
             aria-label="Toggle compact view"
