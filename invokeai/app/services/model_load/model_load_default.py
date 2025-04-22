@@ -76,9 +76,12 @@ class ModelLoadService(ModelLoadServiceBase):
         return loaded_model
 
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+        self,
+        model_path: Path,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+        cache_key_extra: Optional[str] = None,
     ) -> LoadedModelWithoutConfig:
-        cache_key = str(model_path)
+        cache_key = f"{model_path}:{cache_key_extra}" if cache_key_extra else str(model_path)
         try:
             return LoadedModelWithoutConfig(cache_record=self._ram_cache.get(key=cache_key), cache=self._ram_cache)
         except IndexError:

@@ -30,7 +30,10 @@ class ModelLoadServiceBase(ABC):
 
     @abstractmethod
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+        self,
+        model_path: Path,
+        loader: Optional[Callable[[Path], AnyModel]] = None,
+        cache_key_extra: Optional[str] = None,
     ) -> LoadedModelWithoutConfig:
         """
         Load the model file or directory located at the indicated Path.
@@ -46,6 +49,8 @@ class ModelLoadServiceBase(ABC):
         Args:
           model_path: A pathlib.Path to a checkpoint-style models file
           loader: A Callable that expects a Path and returns a Dict[str, Tensor]
+          cache_key_extra: A string to append to the cache key. This is useful for
+            differentiating an instances of the same model with different parameters.
 
         Returns:
           A LoadedModel object.
