@@ -1,4 +1,4 @@
-import type { BoxProps, InputProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import type { BoxProps, ButtonProps, InputProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Badge,
   Button,
@@ -24,6 +24,7 @@ import { getRegex, Picker, usePickerContext } from 'common/components/Picker/Pic
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { fixedForwardRef } from 'common/util/fixedForwardRef';
 import { typedMemo } from 'common/util/typedMemo';
+import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
@@ -31,12 +32,12 @@ import { UseDefaultSettingsButton } from 'features/parameters/components/MainMod
 import { modelSelected } from 'features/parameters/store/actions';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { selectCompactModelPicker } from 'features/ui/store/uiSelectors';
-import { compactModelPickerToggled } from 'features/ui/store/uiSlice';
+import { compactModelPickerToggled, setActiveTab } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import { isEqual } from 'lodash-es';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { PiArrowsInLineVerticalBold, PiArrowsOutLineVerticalBold, PiCaretDownBold, PiXBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
@@ -55,6 +56,33 @@ type PickerExtraContext = {
   basesWithModels: BaseModelType[];
   baseModelTypeFilters: BaseModelTypeFilters;
 };
+
+const ModelManagerLink = memo((props: ButtonProps) => {
+  const dispatch = useAppDispatch();
+  const onClick = useCallback(() => {
+    dispatch(setActiveTab('models'));
+    $installModelsTab.set(3);
+  }, [dispatch]);
+  return <Button size="sm" flexGrow={0} variant="link" color="base.200" onClick={onClick} {...props} />;
+});
+ModelManagerLink.displayName = 'ModelManagerLink';
+
+const components = {
+  LinkComponent: <ModelManagerLink />,
+};
+
+const NoOptionsFallback = memo(() => {
+  const { t } = useTranslation();
+  return (
+    <Flex flexDir="column" gap={4} alignItems="center">
+      <Text color="base.200">{t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
+      <Text color="base.200">
+        <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
+      </Text>
+    </Flex>
+  );
+});
+NoOptionsFallback.displayName = 'NoOptionsFallback';
 
 export const MainModelPicker = memo(() => {
   const { t } = useTranslation();
@@ -199,7 +227,7 @@ export const MainModelPicker = memo(() => {
               OptionComponent={PickerOptionComponent}
               GroupComponent={PickerGroupComponent}
               SearchBarComponent={SearchBarComponent}
-              noOptionsFallback={t('modelManager.noModelsInstalled')}
+              noOptionsFallback={<NoOptionsFallback />}
               noMatchesFallback={t('modelManager.noMatchingModels')}
               extra={extra}
             />
