@@ -166,7 +166,7 @@ const MainModelPicker = memo(() => {
     }
     for (const base of basesWithModels) {
       if (newFilters[base] === undefined) {
-        newFilters[base] = true;
+        newFilters[base] = false;
       } else {
         newFilters[base] = baseModelTypeFilters[base];
       }
@@ -190,13 +190,15 @@ const MainModelPicker = memo(() => {
     [toggleBaseModelTypeFilter, basesWithModels, baseModelTypeFilters]
   );
   const grouped = useMemo<Group<AnyModelConfig, GroupData>[]>(() => {
+    // When all groups are disabled, we show all models
+    const areAllGroupsDisabled = Object.values(baseModelTypeFilters).every((v) => !v);
     const groups: {
       [base in BaseModelType]?: Group<AnyModelConfig, GroupData>;
     } = {};
 
     for (const modelConfig of modelConfigs) {
       let group = groups[modelConfig.base];
-      if (!group && baseModelTypeFilters[modelConfig.base]) {
+      if (!group && (baseModelTypeFilters[modelConfig.base] || areAllGroupsDisabled)) {
         group = {
           id: modelConfig.base,
           data: { base: modelConfig.base },
