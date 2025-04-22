@@ -58,7 +58,7 @@ const DefaultGroupComponent = typedMemo(
 );
 DefaultGroupComponent.displayName = 'DefaultGroupComponent';
 
-export const NoOptionsFallbackWrapper = typedMemo(({ children }: PropsWithChildren) => {
+const NoOptionsFallbackWrapper = typedMemo(({ children }: PropsWithChildren) => {
   const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
@@ -72,7 +72,7 @@ export const NoOptionsFallbackWrapper = typedMemo(({ children }: PropsWithChildr
 });
 NoOptionsFallbackWrapper.displayName = 'NoOptionsFallbackWrapper';
 
-export const NoMatchesFallbackWrapper = typedMemo(({ children }: PropsWithChildren) => {
+const NoMatchesFallbackWrapper = typedMemo(({ children }: PropsWithChildren) => {
   const { t } = useTranslation();
   return (
     <Flex w="full" h="full" alignItems="center" justifyContent="center">
