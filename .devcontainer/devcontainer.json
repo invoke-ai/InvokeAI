@@ -46,9 +46,17 @@
     "ghcr.io/devcontainers/features/github-cli": {}
   },
   "hostRequirements": {
-    "gpu": "optional"
+    "gpu": "optional",
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "10gb" // rough estimate of all dev packages & a handful of ai-models
   },
-  "runArgs": ["--env-file", ".devcontainer/.env"],
+  "runArgs": [
+    "--env-file",
+    ".devcontainer/.env"
+    // "--userns=keep-id", // Uncomment if using podman instead of docker.
+    // "--device=nvidia.com/gpu=all", // Uncomment if using podman instead of docker.
+  ],
   "initializeCommand": [".devcontainer/scripts/init"],
   "onCreateCommand": "pnpm config --global set store-dir $XDG_CACHE_HOME/pnpm",
   "updateContentCommand": "pnpm install --dir invokeai/frontend/web --prefer-offline",
@@ -61,6 +69,10 @@
           "/home/node/invokeai",
           "/home/node/.venv/lib",
           "${containerWorkspaceFolder}"
+        ],
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "--no-cov" // prevents interference from code-coverage when running tests within the debugger
         ],
         "files.autoSaveWhenNoErrors": true,
         "editor.formatOnSave": true,

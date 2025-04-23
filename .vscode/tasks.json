@@ -2,7 +2,38 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Lint :: Fix Python Linting Errors",
+      "label": "Backend :: Install",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "sync",
+        "--extra using-$(echo ${COMPUTE_DEVICE:-cpu})",
+        "--extra dev",
+        "--extra test",
+        "--extra docs"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "install"
+      }
+    },
+    {
+      "label": "Backend :: Linting :: Scan All",
+      "type": "shell",
+      "command": "ruff check",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "backend"
+      }
+    },
+    {
+      "label": "Backend :: Linting :: Fix All",
       "type": "shell",
       "command": "ruff check --fix",
       "group": {
@@ -10,28 +41,23 @@
         "isDefault": false
       },
       "presentation": {
-        "group": "build",
-        "echo": true
+        "group": "backend"
       }
     },
     {
-      "label": "Lint :: Fix TypeScript Linting Errors",
+      "label": "Backend :: Linting :: Format All",
       "type": "shell",
-      "command": "pnpm fix",
-      "options": {
-        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
-      },
+      "command": "ruff format",
       "group": {
         "kind": "build",
         "isDefault": false
       },
       "presentation": {
-        "group": "build",
-        "echo": true
+        "group": "backend"
       }
     },
     {
-      "label": "Test :: Backend",
+      "label": "Backend :: Testing :: Unit Tests",
       "type": "shell",
       "command": "pytest",
       "args": [],
@@ -43,17 +69,59 @@
         "isDefault": false
       },
       "presentation": {
-        "echo": true,
         "reveal": "always",
         "focus": true,
         "panel": "dedicated",
         "showReuseMessage": false,
         "clear": false,
-        "group": "test"
+        "group": "backend"
       }
     },
     {
-      "label": "Test :: Frontend",
+      "label": "Frontend :: Install",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["install", "--dir", "invokeai/frontend/web/"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "install"
+      }
+    },
+    {
+      "label": "Frontend :: Linting :: Scan All",
+      "type": "shell",
+      "command": "pnpm lint",
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "Frontend :: Linting :: Fix All",
+      "type": "shell",
+      "command": "pnpm fix",
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "Frontend :: Testing :: Unit Tests",
       "type": "shell",
       "command": "pnpm",
       "args": ["test"],
@@ -65,45 +133,52 @@
         "isDefault": false
       },
       "presentation": {
-        "echo": true,
-        "reveal": "always",
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "Tooling :: OpenAPI :: Generate Types",
+      "dependsOn": ["tools/regenerate-openapi-definitions"],
+      "type": "shell",
+      "command": "pnpm typegen",
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "tools/regenerate-openapi-definitions",
+      "type": "shell",
+      "command": "python",
+      "args": ["../../../scripts/generate_openapi_schema.py"],
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "hide": true
+    },
+    {
+      "label": "Backend :: Testing :: Run Active File",
+      "type": "process",
+      "command": "pytest",
+      "args": ["${file}"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$python",
+      "group": {
+        "kind": "test",
+        "isDefault": "**/tests/**.py"
+      },
+      "presentation": {
         "focus": true,
-        "panel": "dedicated",
-        "showReuseMessage": false,
-        "clear": false,
-        "group": "test"
-      }
-    },
-    {
-      "label": "Install :: Backend",
-      "type": "shell",
-      "command": "uv",
-      "args": [
-        "sync",
-        "--inexact",
-        "--all-extras",
-        "--no-extra",
-        "onnx-directml"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "presentation": {
-        "group": "install"
-      }
-    },
-    {
-      "label": "Install :: Frontend",
-      "type": "shell",
-      "command": "pnpm",
-      "args": ["install", "--dir", "invokeai/frontend/web/"],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "presentation": {
-        "group": "install"
+        "clear": true,
+        "panel": "dedicated"
       }
     }
   ]
