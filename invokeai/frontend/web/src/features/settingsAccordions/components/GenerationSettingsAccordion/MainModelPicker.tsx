@@ -411,9 +411,11 @@ const PickerOptionComponent = typedMemo(({ option, ...rest }: { option: AnyModel
             {option.name}
           </Text>
           <Spacer />
-          <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
-            {filesize(option.file_size)}
-          </Text>
+          {option.file_size > 0 && (
+            <Text variant="subtext" fontStyle="italic" noOfLines={1} flexShrink={0} overflow="visible">
+              {filesize(option.file_size)}
+            </Text>
+          )}
         </Flex>
         {option.description && !compactModelPicker && <Text color="base.200">{option.description}</Text>}
       </Flex>
