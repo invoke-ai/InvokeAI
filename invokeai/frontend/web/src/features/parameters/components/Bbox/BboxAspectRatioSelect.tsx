@@ -1,15 +1,14 @@
-import type { ComboboxOption, SystemStyleObject } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { FormControl, FormLabel, Select } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { SingleValue } from 'chakra-react-select';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectAspectRatioID } from 'features/controlLayers/store/selectors';
-import { isAspectRatioID } from 'features/controlLayers/store/types';
-import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/Bbox/constants';
-import { memo, useCallback, useMemo } from 'react';
+import { isAspectRatioID, zAspectRatioID } from 'features/controlLayers/store/types';
+import type { ChangeEventHandler } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiCaretDownBold } from 'react-icons/pi';
 
 export const BboxAspectRatioSelect = memo(() => {
   const { t } = useTranslation();
@@ -17,28 +16,30 @@ export const BboxAspectRatioSelect = memo(() => {
   const id = useAppSelector(selectAspectRatioID);
   const isStaging = useAppSelector(selectIsStaging);
 
-  const onChange = useCallback(
-    (v: SingleValue<ComboboxOption>) => {
-      if (!v || !isAspectRatioID(v.value)) {
+  const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
+    (e) => {
+      if (!isAspectRatioID(e.target.value)) {
         return;
       }
-      dispatch(bboxAspectRatioIdChanged({ id: v.value }));
+      dispatch(bboxAspectRatioIdChanged({ id: e.target.value }));
     },
     [dispatch]
   );
-
-  const value = useMemo(() => ASPECT_RATIO_OPTIONS.filter((o) => o.value === id)[0], [id]);
 
   return (
     <FormControl isDisabled={isStaging}>
       <InformationalPopover feature="paramAspect">
         <FormLabel>{t('parameters.aspect')}</FormLabel>
       </InformationalPopover>
-      <Combobox value={value} onChange={onChange} options={ASPECT_RATIO_OPTIONS} sx={selectStyles} />
+      <Select size="sm" value={id} onChange={onChange} cursor="pointer" iconSize="0.75rem" icon={<PiCaretDownBold />}>
+        {zAspectRatioID.options.map((ratio) => (
+          <option key={ratio} value={ratio}>
+            {ratio}
+          </option>
+        ))}
+      </Select>
     </FormControl>
   );
 });
 
 BboxAspectRatioSelect.displayName = 'BboxAspectRatioSelect';
-
-const selectStyles: SystemStyleObject = { minW: 24 };
