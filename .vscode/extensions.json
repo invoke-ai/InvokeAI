@@ -14,6 +14,7 @@
     "docker.docker",
     "dbaeumer.vscode-eslint",
     "vitest.explorer",
-    "tamasfe.even-better-toml"
+    "tamasfe.even-better-toml",
+    "eamodio.gitlens"
   ]
 }
