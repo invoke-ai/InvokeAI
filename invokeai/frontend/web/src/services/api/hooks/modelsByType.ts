@@ -56,7 +56,6 @@ const buildModelsHook =
 
     return [modelConfigs, result] as const;
   };
-
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);

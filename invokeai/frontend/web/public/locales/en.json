@@ -118,6 +118,8 @@
         "error": "Error",
         "error_withCount_one": "{{count}} error",
         "error_withCount_other": "{{count}} errors",
+        "model_withCount_one": "{{count}} model",
+        "model_withCount_other": "{{count}} models",
         "file": "File",
         "folder": "Folder",
         "format": "format",
@@ -138,6 +140,8 @@
         "localSystem": "Local System",
         "learnMore": "Learn More",
         "modelManager": "Model Manager",
+        "noMatches": "No matches",
+        "noOptions": "No options",
         "nodes": "Workflows",
         "notInstalled": "Not $t(common.installed)",
         "openInNewTab": "Open in New Tab",
@@ -197,7 +201,9 @@
         "column": "Column",
         "value": "Value",
         "label": "Label",
-        "systemInformation": "System Information"
+        "systemInformation": "System Information",
+        "compact": "Compact",
+        "full": "Full"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -768,6 +774,7 @@
         "description": "Description",
         "edit": "Edit",
         "fileSize": "File Size",
+        "filterModels": "Filter models",
         "fluxRedux": "FLUX Redux",
         "height": "Height",
         "huggingFace": "HuggingFace",
@@ -821,10 +828,12 @@
         "modelUpdated": "Model Updated",
         "modelUpdateFailed": "Model Update Failed",
         "name": "Name",
-        "noModelsInstalled": "No Models Installed",
+        "modelPickerFallbackNoModelsInstalled": "No models installed.",
+        "modelPickerFallbackNoModelsInstalled2": "Visit the <LinkComponent>Model Manager</LinkComponent> to install models.",
         "noModelsInstalledDesc1": "Install models with the",
         "noModelSelected": "No Model Selected",
-        "noMatchingModels": "No matching Models",
+        "noMatchingModels": "No matching models",
+        "noModelsInstalled": "No models installed",
         "none": "none",
         "path": "Path",
         "pathToConfig": "Path To Config",
@@ -871,7 +880,8 @@
         "installingXModels_one": "Installing {{count}} model",
         "installingXModels_other": "Installing {{count}} models",
         "skippingXDuplicates_one": ", skipping {{count}} duplicate",
-        "skippingXDuplicates_other": ", skipping {{count}} duplicates"
+        "skippingXDuplicates_other": ", skipping {{count}} duplicates",
+        "manageModels": "Manage Models"
     },
     "models": {
         "addLora": "Add LoRA",
