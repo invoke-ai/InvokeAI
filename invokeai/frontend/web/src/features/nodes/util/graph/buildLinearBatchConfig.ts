@@ -50,7 +50,9 @@ export const prepareLinearUIBatch = (
     // seedBehaviour = SeedBehaviour.PerRun
     const seeds = generateSeeds({
       count: iterations,
-      start: shouldRandomizeSeed ? undefined : seed,
+      // Imagen3's support for seeded generation is iffy, we are just not going too use in in linear UI generations.
+      start:
+        model?.base === 'imagen3' ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX) : shouldRandomizeSeed ? undefined : seed,
     });
 
     secondBatchDatumList.push({
