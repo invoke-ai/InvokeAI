@@ -519,7 +519,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
       return imageDTO;
     } catch (error) {
-      this.log.error({ rasterizeArgs, error: serializeError(error) }, 'Failed to rasterize entity');
+      this.log.error({ rasterizeArgs, error: serializeError(error as Error) }, 'Failed to rasterize entity');
       throw error;
     } finally {
       this.manager.stateApi.$rasterizingAdapter.set(null);

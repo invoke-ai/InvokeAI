@@ -41,7 +41,7 @@ export const useCopyLayerToClipboard = () => {
           });
         });
       } catch (error) {
-        log.error({ error: serializeError(error) }, 'Problem copying layer to clipboard');
+        log.error({ error: serializeError(error as Error) }, 'Problem copying layer to clipboard');
         toast({
           status: 'error',
           title: t('toast.problemCopyingLayer'),
@@ -82,7 +82,7 @@ export const useCopyCanvasToClipboard = (region: 'canvas' | 'bbox') => {
         toast({ title: t('controlLayers.regionCopiedToClipboard', { region: startCase(region) }) });
       });
     } catch (error) {
-      log.error({ error: serializeError(error) }, 'Failed to save canvas to gallery');
+      log.error({ error: serializeError(error as Error) }, 'Failed to save canvas to gallery');
       toast({ title: t('controlLayers.copyRegionError', { region: startCase(region) }), status: 'error' });
     }
   }, [canvasManager.compositor, canvasManager.stateApi, clipboard, region, t]);
