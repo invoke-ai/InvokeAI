@@ -57,7 +57,7 @@ def enable_dev_reload(custom_nodes_path=None) -> None:
         paths = [str(invokeai_source_dir() / "*.py")]
         if custom_nodes_path:
             paths.append(str(custom_nodes_path / "*.py"))
-        jurigged.watch(pattern=paths, logger=InvokeAILogger.get_logger(name="jurigged").info, poll=True)
+        jurigged.watch(pattern=paths, logger=InvokeAILogger.get_logger(name="jurigged").info)
 
 
 def apply_monkeypatches() -> None:
