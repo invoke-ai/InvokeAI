@@ -145,7 +145,10 @@ const unserialize: UnserializeFunction = (data, key) => {
     );
     return transformed;
   } catch (err) {
-    log.warn({ error: serializeError(err) }, `Error rehydrating slice "${key}", falling back to default initial state`);
+    log.warn(
+      { error: serializeError(err as Error) },
+      `Error rehydrating slice "${key}", falling back to default initial state`
+    );
     return persistConfig.initialState;
   }
 };

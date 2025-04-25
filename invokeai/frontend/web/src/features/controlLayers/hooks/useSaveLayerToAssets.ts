@@ -41,7 +41,7 @@ export const useSaveLayerToAssets = () => {
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
         });
       } catch (error) {
-        log.error({ error: serializeError(error) }, 'Problem copying layer to clipboard');
+        log.error({ error: serializeError(error as Error) }, 'Problem copying layer to clipboard');
         toast({
           status: 'error',
           title: t('toast.problemSavingLayer'),

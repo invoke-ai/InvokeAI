@@ -27,7 +27,7 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
         await req.unwrap();
         log.debug(parseify({ batchConfig }), 'Enqueued batch');
       } catch (error) {
-        log.error({ error: serializeError(error) }, 'Failed to enqueue batch');
+        log.error({ error: serializeError(error as Error) }, 'Failed to enqueue batch');
       } finally {
         req.reset();
       }
