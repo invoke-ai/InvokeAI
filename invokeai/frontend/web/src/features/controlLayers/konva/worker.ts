@@ -10,12 +10,12 @@ export type Extents = {
 
 /**
  * Get the bounding box of an image.
- * @param buffer The ArrayBuffer of the image to get the bounding box of.
+ * @param buffer The ArrayBufferLike of the image to get the bounding box of.
  * @param width The width of the image.
  * @param height The height of the image.
  * @returns The minimum and maximum x and y values of the image's bounding box, or null if the image has no pixels.
  */
-const getImageDataBboxArrayBuffer = (buffer: ArrayBuffer, width: number, height: number): Extents | null => {
+const getImageDataBboxArrayBufferLike = (buffer: ArrayBufferLike, width: number, height: number): Extents | null => {
   let minX = width;
   let minY = height;
   let maxX = -1;
@@ -50,7 +50,7 @@ const getImageDataBboxArrayBuffer = (buffer: ArrayBuffer, width: number, height:
 
 export type GetBboxTask = {
   type: 'get_bbox';
-  data: { id: string; buffer: ArrayBuffer; width: number; height: number };
+  data: { id: string; buffer: ArrayBufferLike; width: number; height: number };
 };
 
 type TaskWithTimestamps<T extends Record<string, unknown>> = T & { started: number | null; finished: number | null };
@@ -95,7 +95,7 @@ function processNextTask() {
   // Process the task
   if (task.type === 'get_bbox') {
     const { buffer, width, height, id } = task.data;
-    const extents = getImageDataBboxArrayBuffer(buffer, width, height);
+    const extents = getImageDataBboxArrayBufferLike(buffer, width, height);
     const result: ExtentsResult = {
       type: 'extents',
       data: { id, extents },
