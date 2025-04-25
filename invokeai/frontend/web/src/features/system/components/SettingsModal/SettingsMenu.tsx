@@ -49,8 +49,8 @@ const SettingsMenu = () => {
       <Portal>
         <MenuList>
           <MenuGroup title={t('upsell.professional')}>
-            <SettingsUpsellMenuItem menuText={t('upsell.inviteTeammates')} menuIcon={PiUsersBold} />
-            <SettingsUpsellMenuItem menuText={t('upsell.shareAccess')} menuIcon={PiShareNetworkFill} />
+            <SettingsUpsellMenuItem menuText={t('upsell.inviteTeammates')} menuIcon={<PiUsersBold />} />
+            <SettingsUpsellMenuItem menuText={t('upsell.shareAccess')} menuIcon={<PiShareNetworkFill />} />
           </MenuGroup>
 
           <MenuGroup title={t('common.communityLabel')}>
