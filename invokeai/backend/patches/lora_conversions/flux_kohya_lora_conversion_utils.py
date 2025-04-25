@@ -74,8 +74,8 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
     t5_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
     for layer_name, layer_state_dict in grouped_state_dict.items():
         if layer_name.startswith("lora_unet"):
+            # Skip the final layer. This is incompatible with current model definition.
             if layer_name.startswith("lora_unet_final_layer"):
-                print(layer_name)
                 continue
             transformer_grouped_sd[layer_name] = layer_state_dict
         elif layer_name.startswith("lora_te1"):
