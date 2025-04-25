@@ -1665,12 +1665,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * A
              * @description The first number
              * @default 0
@@ -1712,12 +1706,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The mask image to convert.
              * @default null
@@ -1885,12 +1873,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The mask tensor to apply.
              * @default null
              */
@@ -1947,12 +1929,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image from which to extract the masked region
              * @default null
@@ -2178,12 +2154,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Width
              * @description The width of the image
              * @default 512
@@ -2243,12 +2213,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -2638,12 +2602,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Collection
              * @description The collection of boolean values
              * @default []
@@ -2697,12 +2655,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Value
              * @description The boolean value
@@ -2807,12 +2759,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * X Min
              * @description x-coordinate of the bounding box's top left vertex
@@ -3171,12 +3117,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * CLIP
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
              * @default null
@@ -3326,12 +3266,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -3404,12 +3338,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Image Width
              * @description The image width, in pixels, to calculate tiles for.
              * @default 1024
@@ -3470,12 +3398,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Image Width
              * @description The image width, in pixels, to calculate tiles for.
              * @default 1024
@@ -3535,12 +3457,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Image Width
              * @description The image width, in pixels, to calculate tiles for.
@@ -3660,12 +3576,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -3722,12 +3632,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The source image
              * @default null
@@ -3790,12 +3694,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The source image onto which the masked generated image is pasted. If omitted, the masked generated image is returned with transparency.
              * @default null
              */
@@ -3846,12 +3744,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to crop
              * @default null
@@ -3977,12 +3869,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -4091,12 +3977,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to encode.
              * @default null
              */
@@ -4147,12 +4027,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -4192,12 +4066,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /** @description CogView4 model (Transformer) to load */
             model: components["schemas"]["ModelIdentifierField"];
             /**
@@ -4259,12 +4127,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Prompt
              * @description Text prompt to encode.
              * @default null
@@ -4306,12 +4168,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection Item
              * @description The item to collect (all inputs must be of the same type)
@@ -4399,12 +4255,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to color-correct
              * @default null
              */
@@ -4482,12 +4332,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The color value
              * @default {
              *       "r": 0,
@@ -4537,12 +4381,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -4600,12 +4438,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Prompt
              * @description Prompt to be parsed by Compel to create a conditioning tensor
              * @default
@@ -4652,12 +4484,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection
              * @description The collection of conditioning tensors
@@ -4729,12 +4555,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Conditioning tensor
              * @default null
              */
@@ -4794,12 +4614,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -5232,12 +5046,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The control image
              * @default null
              */
@@ -5368,12 +5176,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Generation Mode
              * @description The generation mode that output this image
@@ -5608,12 +5410,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description VAE
              * @default null
              */
@@ -5670,12 +5466,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Image which will be masked
              * @default null
@@ -5770,12 +5560,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to crop
              * @default null
              */
@@ -5816,12 +5600,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -5910,12 +5688,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to inpaint
              * @default null
              */
@@ -5965,12 +5737,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -6044,12 +5810,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Positive Conditioning
              * @description Positive conditioning tensor
@@ -6169,12 +5929,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Positive Conditioning
              * @description Positive conditioning tensor
@@ -6341,12 +6095,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -6388,12 +6136,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * A
              * @description The first number
@@ -6645,12 +6387,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Prompt
              * @description The prompt to parse with dynamicprompts
              * @default null
@@ -6715,12 +6451,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The input image
              * @default null
@@ -6828,12 +6558,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The mask to expand
              * @default null
              */
@@ -6887,12 +6611,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
@@ -6958,12 +6676,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Image to face detect
              * @default null
              */
@@ -7015,12 +6727,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Image to face detect
              * @default null
@@ -7124,12 +6830,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Image for face detection
              * @default null
@@ -7276,12 +6976,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -7324,12 +7018,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection
              * @description The collection of float values
@@ -7384,12 +7072,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Generator Type
              * @description The float generator.
@@ -7446,12 +7128,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Value
              * @description The float value
              * @default 0
@@ -7487,12 +7163,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Start
              * @description The first value of the range
@@ -7541,12 +7211,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Operation
              * @description The operation to perform
@@ -7614,12 +7278,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Value
              * @description The value to round
@@ -7700,12 +7358,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Control LoRA
              * @description Control LoRA model to load
@@ -7811,12 +7463,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The control image
              * @default null
              */
@@ -7912,12 +7558,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -8087,12 +7727,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -8261,12 +7895,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The FLUX Fill reference image.
              * @default null
              */
@@ -8324,12 +7952,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The IP-Adapter image prompt(s).
              * @default null
@@ -8397,12 +8019,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * LoRA
              * @description LoRA model to load
@@ -8494,12 +8110,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /** @description Flux model (Transformer) to load */
             model: components["schemas"]["ModelIdentifierField"];
             /**
@@ -8677,12 +8287,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The FLUX Redux image prompt.
              * @default null
              */
@@ -8766,12 +8370,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * CLIP
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
              * @default null
@@ -8842,12 +8440,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -8887,12 +8479,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to encode.
              * @default null
@@ -8979,12 +8565,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * UNet
              * @description UNet (scheduler, LoRAs)
              * @default null
@@ -9044,12 +8624,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The mask to crop.
              * @default null
@@ -9199,12 +8773,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Model
              * @description The Grounding DINO model to use.
              * @default null
@@ -9268,12 +8836,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -9346,12 +8908,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to resize
              * @default null
@@ -9572,12 +9128,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Image
              * @description The IP-Adapter image prompt(s).
              * @default null
@@ -9787,12 +9337,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Width
              * @description Final image width
              * @default 1024
@@ -9869,12 +9413,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -9927,12 +9465,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to blur
              * @default null
@@ -10004,12 +9536,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to get the channel from
              * @default null
              */
@@ -10061,12 +9587,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to adjust
              * @default null
@@ -10132,12 +9652,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to adjust
              * @default null
              */
@@ -10185,12 +9699,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection
              * @description The collection of image values
@@ -10256,12 +9764,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to convert
              * @default null
              */
@@ -10313,12 +9815,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to crop
              * @default null
@@ -10470,12 +9966,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Generator Type
              * @description The image generator.
              */
@@ -10541,12 +10031,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to adjust
              * @default null
              */
@@ -10598,12 +10082,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to lerp
              * @default null
              */
@@ -10651,12 +10129,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to load
              * @default null
              */
@@ -10701,12 +10173,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to lerp
              * @default null
@@ -10759,12 +10225,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The mask image to convert.
              * @default null
@@ -10823,12 +10283,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The first image to multiply
              * @default null
              */
@@ -10879,12 +10333,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to check
              * @default null
              */
@@ -10929,12 +10377,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to add noise to
              * @default null
@@ -11058,12 +10500,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Width
              * @description The width of the entire grid.
              * @default null
@@ -11139,12 +10575,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The base image
              * @default null
@@ -11250,12 +10680,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to resize
              * @default null
              */
@@ -11320,12 +10744,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to scale
              * @default null
              */
@@ -11373,12 +10791,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to encode
              * @default null
@@ -11479,12 +10891,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to check
              * @default null
              */
@@ -11557,12 +10963,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -11617,12 +11017,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -11681,12 +11075,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -11792,12 +11180,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -11840,12 +11222,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection
              * @description The collection of integer values
@@ -11901,12 +11277,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Generator Type
              * @description The integer generator.
              */
@@ -11959,12 +11329,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Value
              * @description The integer value
              * @default 0
@@ -12000,12 +11364,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Operation
              * @description The operation to perform
@@ -12073,12 +11431,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The tensor mask to convert.
              * @default null
@@ -13049,12 +12401,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to adjust
              * @default null
              */
@@ -13131,12 +12477,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Image from which to get channel
              * @default null
              */
@@ -13181,12 +12521,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The top image to blend
              * @default null
@@ -13287,12 +12621,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Image of the subject on a plain monochrome background
              * @default null
              */
@@ -13374,12 +12702,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image from which to create a mask
              * @default null
              */
@@ -13449,12 +12771,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image for which to apply processing
              * @default null
@@ -13531,12 +12847,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image from which to create a mask
              * @default null
              */
@@ -13601,12 +12911,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection
              * @description The list of items to iterate over
@@ -13689,12 +12993,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -13729,12 +13027,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection
              * @description The collection of latents tensors
@@ -13806,12 +13098,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The latents tensor
              * @default null
@@ -13910,12 +13196,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -13984,12 +13264,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -14034,12 +13308,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -14160,12 +13428,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Images
              * @description Input image.
              * @default null
@@ -14213,12 +13475,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
@@ -14358,12 +13614,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * LoRA
              * @description LoRA model to load
@@ -14538,12 +13788,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * LoRA
              * @description LoRA model to load
              * @default null
@@ -14681,12 +13925,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -15188,12 +14426,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Main model (UNet, VAE, CLIP) to load
              * @default null
              */
@@ -15238,12 +14470,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The first mask to combine
              * @default null
@@ -15294,12 +14520,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to apply the mask to
              * @default null
@@ -15370,12 +14590,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to create the mask from
              * @default null
              */
@@ -15426,12 +14640,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to create the mask from
              * @default null
@@ -15520,12 +14728,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The mask tensor to convert.
              * @default null
              */
@@ -15570,12 +14772,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -15624,12 +14820,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Collection
              * @description Collection of Metadata
              * @default null
@@ -15675,12 +14865,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Tiles With Images
              * @description A list of tile images with tile properties.
@@ -15738,12 +14922,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to extract metadata from
              * @default null
              */
@@ -15785,12 +14963,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -15825,12 +14997,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Items
              * @description A single metadata item or collection of metadata items
@@ -15881,12 +15047,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Label
              * @description Label for this metadata item
              * @default null
@@ -15933,12 +15093,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -16021,12 +15175,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -16080,12 +15228,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -16141,12 +15283,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * ControlNet-List
              * @default null
              */
@@ -16186,12 +15322,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -16247,12 +15377,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -16307,12 +15431,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * IP-Adapter-List
              * @description IP-Adapter to apply
              * @default null
@@ -16353,12 +15471,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -16414,12 +15526,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -16473,12 +15579,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -16545,12 +15645,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * UNet
              * @description UNet (scheduler, LoRAs)
              * @default null
@@ -16597,12 +15691,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -16695,12 +15783,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * UNet
              * @description UNet (scheduler, LoRAs)
              * @default null
@@ -16753,12 +15835,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -16856,12 +15932,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Label
              * @description Label for this metadata item
              * @default scheduler
@@ -16917,12 +15987,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -16976,12 +16040,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -17037,12 +16095,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * T2I-Adapter
              * @description IP-Adapter to apply
              * @default null
@@ -17083,12 +16135,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Label
              * @description Label for this metadata item
@@ -17172,12 +16218,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Model
              * @description The model to select
@@ -17707,12 +16747,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * A
              * @description The first number
              * @default 0
@@ -17772,12 +16806,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Seed
              * @description Seed for random number generation
@@ -17867,12 +16895,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -17996,12 +17018,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The tile image.
              * @default null
              */
@@ -18066,12 +17082,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to paste
              * @default null
              */
@@ -18126,12 +17136,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to process
              * @default null
@@ -18218,12 +17222,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * File Path
              * @description Path to prompt text file
@@ -18428,12 +17426,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Low
              * @description The inclusive low value
              * @default 0
@@ -18482,12 +17474,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Low
              * @description The inclusive low value
              * @default 0
@@ -18529,12 +17515,6 @@ export type components = {
              * @default false
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Low
              * @description The inclusive low value
@@ -18590,12 +17570,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Start
              * @description The start of the range
              * @default 0
@@ -18643,12 +17617,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Start
              * @description The start of the range
@@ -18702,12 +17670,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Width
              * @description The width of the entire mask.
@@ -18812,12 +17774,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -18900,12 +17856,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Value
              * @description The float value
@@ -19012,12 +17962,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -19127,12 +18071,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to encode
              * @default null
              */
@@ -19183,12 +18121,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -19228,12 +18160,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Prompt
              * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -19324,12 +18250,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
@@ -19383,12 +18303,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * LoRA
              * @description LoRA model to load
@@ -19481,12 +18395,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load
              * @default null
              */
@@ -19555,12 +18463,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Style
              * @description Prompt to be parsed by Compel to create a conditioning tensor
              * @default
@@ -19627,12 +18529,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load
              * @default null
@@ -19712,12 +18608,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to process
              * @default null
              */
@@ -19752,12 +18642,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -19812,12 +18696,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Scheduler
              * @description Scheduler to use during inference
@@ -19877,12 +18755,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /** @description SD3 model (MMDiTX) to load */
             model: components["schemas"]["ModelIdentifierField"];
             /**
@@ -19978,12 +18850,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * CLIP L
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
              * @default null
@@ -20037,12 +18903,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * UNet
              * @description UNet (scheduler, LoRAs)
@@ -20122,12 +18982,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Model
              * @description The Segment Anything model to use.
@@ -20541,12 +19395,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to show
              * @default null
              */
@@ -20669,12 +19517,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The input image
              * @default null
@@ -20821,12 +19663,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The input image
              * @default null
              */
@@ -20952,12 +19788,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -21000,12 +19830,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Collection
              * @description The collection of string values
@@ -21060,12 +19884,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * Generator Type
              * @description The string generator.
@@ -21122,12 +19940,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * Value
              * @description The string value
              * @default
@@ -21163,12 +19975,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * String Left
              * @description String Left
@@ -21211,12 +20017,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * String Left
              * @description String Left
@@ -21307,12 +20107,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * String
              * @description String to work on
              * @default
@@ -21367,12 +20161,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * String
              * @description String to split
              * @default
@@ -21414,12 +20202,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * String
              * @description String to split
@@ -21492,12 +20274,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * A
              * @description The first number
@@ -21652,12 +20428,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description The IP-Adapter image prompt.
              * @default null
@@ -22116,12 +20886,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The tile to split into properties.
              * @default null
              */
@@ -22228,12 +20992,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * @description Positive conditioning tensor
              * @default null
@@ -22516,12 +21274,6 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
-            /**
              * @description The image to use
              * @default null
              */
@@ -22753,12 +21505,6 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /**
-             * Output Metadata
-             * @description Optional metadata dictionary for the invocation
-             * @default null
-             */
-            output_metadata?: Record<string, never> | null;
             /**
              * VAE
              * @description VAE model to load

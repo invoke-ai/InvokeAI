@@ -70,6 +70,9 @@ def get_openapi_func(
             json_schema = invocation.model_json_schema(
                 mode="serialization", ref_template="#/components/schemas/{model}"
             )
+            # Remove output_metadata that is only used on back-end from the schema
+            if "output_metadata" in json_schema["properties"]:
+                json_schema["properties"].pop("output_metadata")
             move_defs_to_top_level(openapi_schema, json_schema)
             output_title = invocation.get_output_annotation().__name__
             outputs_ref = {"$ref": f"#/components/schemas/{output_title}"}
