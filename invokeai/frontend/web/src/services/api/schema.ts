@@ -1665,6 +1665,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * A
              * @description The first number
              * @default 0
@@ -1680,6 +1686,7 @@ export type components = {
              * type
              * @default add
              * @constant
+             * @enum {string}
              */
             type: "add";
         };
@@ -1706,6 +1713,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The mask image to convert.
              * @default null
              */
@@ -1720,6 +1733,7 @@ export type components = {
              * type
              * @default alpha_mask_to_tensor
              * @constant
+             * @enum {string}
              */
             type: "alpha_mask_to_tensor";
         };
@@ -1871,6 +1885,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The mask tensor to apply.
              * @default null
              */
@@ -1890,6 +1910,7 @@ export type components = {
              * type
              * @default apply_tensor_mask_to_image
              * @constant
+             * @enum {string}
              */
             type: "apply_tensor_mask_to_image";
         };
@@ -1927,6 +1948,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image from which to extract the masked region
              * @default null
              */
@@ -1946,6 +1973,7 @@ export type components = {
              * type
              * @default apply_mask_to_image
              * @constant
+             * @enum {string}
              */
             type: "apply_mask_to_image";
         };
@@ -2150,6 +2178,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Width
              * @description The width of the image
              * @default 512
@@ -2182,6 +2216,7 @@ export type components = {
              * type
              * @default blank_image
              * @constant
+             * @enum {string}
              */
             type: "blank_image";
         };
@@ -2209,6 +2244,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -2233,6 +2274,7 @@ export type components = {
              * type
              * @default lblend
              * @constant
+             * @enum {string}
              */
             type: "lblend";
         };
@@ -2596,6 +2638,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The collection of boolean values
              * @default []
@@ -2605,6 +2653,7 @@ export type components = {
              * type
              * @default boolean_collection
              * @constant
+             * @enum {string}
              */
             type: "boolean_collection";
         };
@@ -2622,6 +2671,7 @@ export type components = {
              * type
              * @default boolean_collection_output
              * @constant
+             * @enum {string}
              */
             type: "boolean_collection_output";
         };
@@ -2648,6 +2698,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Value
              * @description The boolean value
              * @default false
@@ -2657,6 +2713,7 @@ export type components = {
              * type
              * @default boolean
              * @constant
+             * @enum {string}
              */
             type: "boolean";
         };
@@ -2674,6 +2731,7 @@ export type components = {
              * type
              * @default boolean_output
              * @constant
+             * @enum {string}
              */
             type: "boolean_output";
         };
@@ -2691,6 +2749,7 @@ export type components = {
              * type
              * @default bounding_box_collection_output
              * @constant
+             * @enum {string}
              */
             type: "bounding_box_collection_output";
         };
@@ -2749,6 +2808,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * X Min
              * @description x-coordinate of the bounding box's top left vertex
              * @default 0
@@ -2776,6 +2841,7 @@ export type components = {
              * type
              * @default bounding_box
              * @constant
+             * @enum {string}
              */
             type: "bounding_box";
         };
@@ -2790,6 +2856,7 @@ export type components = {
              * type
              * @default bounding_box_output
              * @constant
+             * @enum {string}
              */
             type: "bounding_box_output";
         };
@@ -2927,12 +2994,14 @@ export type components = {
              * Type
              * @default clip_embed
              * @constant
+             * @enum {string}
              */
             type: "clip_embed";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -2972,6 +3041,7 @@ export type components = {
              * Variant
              * @default gigantic
              * @constant
+             * @enum {string}
              */
             variant?: "gigantic";
         };
@@ -3009,12 +3079,14 @@ export type components = {
              * Type
              * @default clip_embed
              * @constant
+             * @enum {string}
              */
             type: "clip_embed";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -3054,6 +3126,7 @@ export type components = {
              * Variant
              * @default large
              * @constant
+             * @enum {string}
              */
             variant?: "large";
         };
@@ -3071,6 +3144,7 @@ export type components = {
              * type
              * @default clip_output
              * @constant
+             * @enum {string}
              */
             type: "clip_output";
         };
@@ -3097,6 +3171,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * CLIP
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
              * @default null
@@ -3112,6 +3192,7 @@ export type components = {
              * type
              * @default clip_skip
              * @constant
+             * @enum {string}
              */
             type: "clip_skip";
         };
@@ -3130,6 +3211,7 @@ export type components = {
              * type
              * @default clip_skip_output
              * @constant
+             * @enum {string}
              */
             type: "clip_skip_output";
         };
@@ -3167,12 +3249,14 @@ export type components = {
              * Type
              * @default clip_vision
              * @constant
+             * @enum {string}
              */
             type: "clip_vision";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -3242,6 +3326,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -3250,6 +3340,7 @@ export type components = {
              * type
              * @default infill_cv2
              * @constant
+             * @enum {string}
              */
             type: "infill_cv2";
         };
@@ -3313,6 +3404,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Image Width
              * @description The image width, in pixels, to calculate tiles for.
              * @default 1024
@@ -3346,6 +3443,7 @@ export type components = {
              * type
              * @default calculate_image_tiles_even_split
              * @constant
+             * @enum {string}
              */
             type: "calculate_image_tiles_even_split";
         };
@@ -3371,6 +3469,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Image Width
              * @description The image width, in pixels, to calculate tiles for.
@@ -3405,6 +3509,7 @@ export type components = {
              * type
              * @default calculate_image_tiles
              * @constant
+             * @enum {string}
              */
             type: "calculate_image_tiles";
         };
@@ -3430,6 +3535,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Image Width
              * @description The image width, in pixels, to calculate tiles for.
@@ -3464,6 +3575,7 @@ export type components = {
              * type
              * @default calculate_image_tiles_min_overlap
              * @constant
+             * @enum {string}
              */
             type: "calculate_image_tiles_min_overlap";
         };
@@ -3478,6 +3590,7 @@ export type components = {
              * type
              * @default calculate_image_tiles_output
              * @constant
+             * @enum {string}
              */
             type: "calculate_image_tiles_output";
         };
@@ -3547,6 +3660,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -3567,6 +3686,7 @@ export type components = {
              * type
              * @default canny_edge_detection
              * @constant
+             * @enum {string}
              */
             type: "canny_edge_detection";
         };
@@ -3603,6 +3723,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The source image
              * @default null
              */
@@ -3627,6 +3753,7 @@ export type components = {
              * type
              * @default canvas_paste_back
              * @constant
+             * @enum {string}
              */
             type: "canvas_paste_back";
         };
@@ -3663,6 +3790,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The source image onto which the masked generated image is pasted. If omitted, the masked generated image is returned with transparency.
              * @default null
              */
@@ -3687,6 +3820,7 @@ export type components = {
              * type
              * @default canvas_v2_mask_and_crop
              * @constant
+             * @enum {string}
              */
             type: "canvas_v2_mask_and_crop";
         };
@@ -3712,6 +3846,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to crop
              * @default null
@@ -3745,6 +3885,7 @@ export type components = {
              * type
              * @default img_pad_crop
              * @constant
+             * @enum {string}
              */
             type: "img_pad_crop";
         };
@@ -3799,6 +3940,7 @@ export type components = {
              * type
              * @default cogview4_conditioning_output
              * @constant
+             * @enum {string}
              */
             type: "cogview4_conditioning_output";
         };
@@ -3834,6 +3976,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -3906,6 +4054,7 @@ export type components = {
              * type
              * @default cogview4_denoise
              * @constant
+             * @enum {string}
              */
             type: "cogview4_denoise";
         };
@@ -3942,6 +4091,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to encode.
              * @default null
              */
@@ -3955,6 +4110,7 @@ export type components = {
              * type
              * @default cogview4_i2l
              * @constant
+             * @enum {string}
              */
             type: "cogview4_i2l";
         };
@@ -3991,6 +4147,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -4004,6 +4166,7 @@ export type components = {
              * type
              * @default cogview4_l2i
              * @constant
+             * @enum {string}
              */
             type: "cogview4_l2i";
         };
@@ -4029,12 +4192,19 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /** @description CogView4 model (Transformer) to load */
             model: components["schemas"]["ModelIdentifierField"];
             /**
              * type
              * @default cogview4_model_loader
              * @constant
+             * @enum {string}
              */
             type: "cogview4_model_loader";
         };
@@ -4062,6 +4232,7 @@ export type components = {
              * type
              * @default cogview4_model_loader_output
              * @constant
+             * @enum {string}
              */
             type: "cogview4_model_loader_output";
         };
@@ -4088,6 +4259,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Prompt
              * @description Text prompt to encode.
              * @default null
@@ -4103,6 +4280,7 @@ export type components = {
              * type
              * @default cogview4_text_encoder
              * @constant
+             * @enum {string}
              */
             type: "cogview4_text_encoder";
         };
@@ -4129,6 +4307,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection Item
              * @description The item to collect (all inputs must be of the same type)
              * @default null
@@ -4144,6 +4328,7 @@ export type components = {
              * type
              * @default collect
              * @constant
+             * @enum {string}
              */
             type: "collect";
         };
@@ -4158,6 +4343,7 @@ export type components = {
              * type
              * @default collect_output
              * @constant
+             * @enum {string}
              */
             type: "collect_output";
         };
@@ -4175,6 +4361,7 @@ export type components = {
              * type
              * @default color_collection_output
              * @constant
+             * @enum {string}
              */
             type: "color_collection_output";
         };
@@ -4212,6 +4399,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to color-correct
              * @default null
              */
@@ -4236,6 +4429,7 @@ export type components = {
              * type
              * @default color_correct
              * @constant
+             * @enum {string}
              */
             type: "color_correct";
         };
@@ -4288,6 +4482,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The color value
              * @default {
              *       "r": 0,
@@ -4301,6 +4501,7 @@ export type components = {
              * type
              * @default color
              * @constant
+             * @enum {string}
              */
             type: "color";
         };
@@ -4337,6 +4538,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -4351,6 +4558,7 @@ export type components = {
              * type
              * @default color_map
              * @constant
+             * @enum {string}
              */
             type: "color_map";
         };
@@ -4365,6 +4573,7 @@ export type components = {
              * type
              * @default color_output
              * @constant
+             * @enum {string}
              */
             type: "color_output";
         };
@@ -4391,6 +4600,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Prompt
              * @description Prompt to be parsed by Compel to create a conditioning tensor
              * @default
@@ -4411,6 +4626,7 @@ export type components = {
              * type
              * @default compel
              * @constant
+             * @enum {string}
              */
             type: "compel";
         };
@@ -4437,6 +4653,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The collection of conditioning tensors
              * @default []
@@ -4446,6 +4668,7 @@ export type components = {
              * type
              * @default conditioning_collection
              * @constant
+             * @enum {string}
              */
             type: "conditioning_collection";
         };
@@ -4463,6 +4686,7 @@ export type components = {
              * type
              * @default conditioning_collection_output
              * @constant
+             * @enum {string}
              */
             type: "conditioning_collection_output";
         };
@@ -4505,6 +4729,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Conditioning tensor
              * @default null
              */
@@ -4513,6 +4743,7 @@ export type components = {
              * type
              * @default conditioning
              * @constant
+             * @enum {string}
              */
             type: "conditioning";
         };
@@ -4527,6 +4758,7 @@ export type components = {
              * type
              * @default conditioning_output
              * @constant
+             * @enum {string}
              */
             type: "conditioning_output";
         };
@@ -4563,6 +4795,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -4577,6 +4815,7 @@ export type components = {
              * type
              * @default content_shuffle
              * @constant
+             * @enum {string}
              */
             type: "content_shuffle";
         };
@@ -4658,12 +4897,14 @@ export type components = {
              * Type
              * @default control_lora
              * @constant
+             * @enum {string}
              */
             type: "control_lora";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -4751,12 +4992,14 @@ export type components = {
              * Type
              * @default control_lora
              * @constant
+             * @enum {string}
              */
             type: "control_lora";
             /**
              * Format
              * @default lycoris
              * @constant
+             * @enum {string}
              */
             format: "lycoris";
             /** @description The base model. */
@@ -4832,6 +5075,7 @@ export type components = {
              * Type
              * @default controlnet
              * @constant
+             * @enum {string}
              */
             type: "controlnet";
             /**
@@ -4919,12 +5163,14 @@ export type components = {
              * Type
              * @default controlnet
              * @constant
+             * @enum {string}
              */
             type: "controlnet";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -4986,6 +5232,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The control image
              * @default null
              */
@@ -5031,6 +5283,7 @@ export type components = {
              * type
              * @default controlnet
              * @constant
+             * @enum {string}
              */
             type: "controlnet";
         };
@@ -5089,6 +5342,7 @@ export type components = {
              * type
              * @default control_output
              * @constant
+             * @enum {string}
              */
             type: "control_output";
         };
@@ -5114,6 +5368,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Generation Mode
              * @description The generation mode that output this image
@@ -5319,6 +5579,7 @@ export type components = {
              * type
              * @default core_metadata
              * @constant
+             * @enum {string}
              */
             type: "core_metadata";
         } & {
@@ -5346,6 +5607,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description VAE
              * @default null
@@ -5377,6 +5644,7 @@ export type components = {
              * type
              * @default create_denoise_mask
              * @constant
+             * @enum {string}
              */
             type: "create_denoise_mask";
         };
@@ -5402,6 +5670,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Image which will be masked
              * @default null
@@ -5459,6 +5733,7 @@ export type components = {
              * type
              * @default create_gradient_mask
              * @constant
+             * @enum {string}
              */
             type: "create_gradient_mask";
         };
@@ -5495,6 +5770,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to crop
              * @default null
              */
@@ -5508,6 +5789,7 @@ export type components = {
              * type
              * @default crop_image_to_bounding_box
              * @constant
+             * @enum {string}
              */
             type: "crop_image_to_bounding_box";
         };
@@ -5534,6 +5816,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -5567,6 +5855,7 @@ export type components = {
              * type
              * @default crop_latents
              * @constant
+             * @enum {string}
              */
             type: "crop_latents";
         };
@@ -5621,6 +5910,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to inpaint
              * @default null
              */
@@ -5634,6 +5929,7 @@ export type components = {
              * type
              * @default cv_inpaint
              * @constant
+             * @enum {string}
              */
             type: "cv_inpaint";
         };
@@ -5670,6 +5966,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -5693,6 +5995,7 @@ export type components = {
              * type
              * @default dw_openpose_detection
              * @constant
+             * @enum {string}
              */
             type: "dw_openpose_detection";
         };
@@ -5741,6 +6044,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Positive Conditioning
              * @description Positive conditioning tensor
@@ -5832,6 +6141,7 @@ export type components = {
              * type
              * @default denoise_latents
              * @constant
+             * @enum {string}
              */
             type: "denoise_latents";
         };
@@ -5859,6 +6169,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Positive Conditioning
              * @description Positive conditioning tensor
@@ -5950,6 +6266,7 @@ export type components = {
              * type
              * @default denoise_latents_meta
              * @constant
+             * @enum {string}
              */
             type: "denoise_latents_meta";
         };
@@ -5987,6 +6304,7 @@ export type components = {
              * type
              * @default denoise_mask_output
              * @constant
+             * @enum {string}
              */
             type: "denoise_mask_output";
         };
@@ -6023,6 +6341,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -6038,6 +6362,7 @@ export type components = {
              * type
              * @default depth_anything_depth_estimation
              * @constant
+             * @enum {string}
              */
             type: "depth_anything_depth_estimation";
         };
@@ -6064,6 +6389,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * A
              * @description The first number
              * @default 0
@@ -6079,6 +6410,7 @@ export type components = {
              * type
              * @default div
              * @constant
+             * @enum {string}
              */
             type: "div";
         };
@@ -6313,6 +6645,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Prompt
              * @description The prompt to parse with dynamicprompts
              * @default null
@@ -6334,6 +6672,7 @@ export type components = {
              * type
              * @default dynamic_prompt
              * @constant
+             * @enum {string}
              */
             type: "dynamic_prompt";
         };
@@ -6377,6 +6716,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The input image
              * @default null
              */
@@ -6398,6 +6743,7 @@ export type components = {
              * type
              * @default esrgan
              * @constant
+             * @enum {string}
              */
             type: "esrgan";
         };
@@ -6482,6 +6828,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The mask to expand
              * @default null
              */
@@ -6502,6 +6854,7 @@ export type components = {
              * type
              * @default expand_mask_with_fade
              * @constant
+             * @enum {string}
              */
             type: "expand_mask_with_fade";
         };
@@ -6535,6 +6888,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
@@ -6562,6 +6921,7 @@ export type components = {
              * type
              * @default flux_lora_collection_loader
              * @constant
+             * @enum {string}
              */
             type: "flux_lora_collection_loader";
         };
@@ -6598,6 +6958,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Image to face detect
              * @default null
              */
@@ -6618,6 +6984,7 @@ export type components = {
              * type
              * @default face_identifier
              * @constant
+             * @enum {string}
              */
             type: "face_identifier";
         };
@@ -6648,6 +7015,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Image to face detect
              * @default null
@@ -6693,6 +7066,7 @@ export type components = {
              * type
              * @default face_mask_detection
              * @constant
+             * @enum {string}
              */
             type: "face_mask_detection";
         };
@@ -6717,6 +7091,7 @@ export type components = {
              * type
              * @default face_mask_output
              * @constant
+             * @enum {string}
              */
             type: "face_mask_output";
             /** @description The output mask */
@@ -6749,6 +7124,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Image for face detection
              * @default null
@@ -6794,6 +7175,7 @@ export type components = {
              * type
              * @default face_off
              * @constant
+             * @enum {string}
              */
             type: "face_off";
         };
@@ -6818,6 +7200,7 @@ export type components = {
              * type
              * @default face_off_output
              * @constant
+             * @enum {string}
              */
             type: "face_off_output";
             /** @description The output mask */
@@ -6893,6 +7276,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -6909,6 +7298,7 @@ export type components = {
              * type
              * @default float_batch
              * @constant
+             * @enum {string}
              */
             type: "float_batch";
         };
@@ -6935,6 +7325,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The collection of float values
              * @default []
@@ -6944,6 +7340,7 @@ export type components = {
              * type
              * @default float_collection
              * @constant
+             * @enum {string}
              */
             type: "float_collection";
         };
@@ -6961,6 +7358,7 @@ export type components = {
              * type
              * @default float_collection_output
              * @constant
+             * @enum {string}
              */
             type: "float_collection_output";
         };
@@ -6987,6 +7385,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Generator Type
              * @description The float generator.
              */
@@ -6995,6 +7399,7 @@ export type components = {
              * type
              * @default float_generator
              * @constant
+             * @enum {string}
              */
             type: "float_generator";
         };
@@ -7014,6 +7419,7 @@ export type components = {
              * type
              * @default float_generator_output
              * @constant
+             * @enum {string}
              */
             type: "float_generator_output";
         };
@@ -7040,6 +7446,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Value
              * @description The float value
              * @default 0
@@ -7049,6 +7461,7 @@ export type components = {
              * type
              * @default float
              * @constant
+             * @enum {string}
              */
             type: "float";
         };
@@ -7075,6 +7488,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Start
              * @description The first value of the range
              * @default 5
@@ -7096,6 +7515,7 @@ export type components = {
              * type
              * @default float_range
              * @constant
+             * @enum {string}
              */
             type: "float_range";
         };
@@ -7122,6 +7542,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Operation
              * @description The operation to perform
              * @default ADD
@@ -7144,6 +7570,7 @@ export type components = {
              * type
              * @default float_math
              * @constant
+             * @enum {string}
              */
             type: "float_math";
         };
@@ -7161,6 +7588,7 @@ export type components = {
              * type
              * @default float_output
              * @constant
+             * @enum {string}
              */
             type: "float_output";
         };
@@ -7187,6 +7615,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Value
              * @description The value to round
              * @default 0
@@ -7209,6 +7643,7 @@ export type components = {
              * type
              * @default float_to_int
              * @constant
+             * @enum {string}
              */
             type: "float_to_int";
         };
@@ -7239,6 +7674,7 @@ export type components = {
              * type
              * @default flux_conditioning_output
              * @constant
+             * @enum {string}
              */
             type: "flux_conditioning_output";
         };
@@ -7265,6 +7701,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Control LoRA
              * @description Control LoRA model to load
              * @default null
@@ -7285,6 +7727,7 @@ export type components = {
              * type
              * @default flux_control_lora_loader
              * @constant
+             * @enum {string}
              */
             type: "flux_control_lora_loader";
         };
@@ -7303,6 +7746,7 @@ export type components = {
              * type
              * @default flux_control_lora_loader_output
              * @constant
+             * @enum {string}
              */
             type: "flux_control_lora_loader_output";
         };
@@ -7367,6 +7811,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The control image
              * @default null
              */
@@ -7411,6 +7861,7 @@ export type components = {
              * type
              * @default flux_controlnet
              * @constant
+             * @enum {string}
              */
             type: "flux_controlnet";
         };
@@ -7425,6 +7876,7 @@ export type components = {
              * type
              * @default flux_controlnet_output
              * @constant
+             * @enum {string}
              */
             type: "flux_controlnet_output";
         };
@@ -7460,6 +7912,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -7592,6 +8050,7 @@ export type components = {
              * type
              * @default flux_denoise
              * @constant
+             * @enum {string}
              */
             type: "flux_denoise";
         };
@@ -7627,6 +8086,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -7759,6 +8224,7 @@ export type components = {
              * type
              * @default flux_denoise_meta
              * @constant
+             * @enum {string}
              */
             type: "flux_denoise_meta";
         };
@@ -7795,6 +8261,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The FLUX Fill reference image.
              * @default null
              */
@@ -7808,6 +8280,7 @@ export type components = {
              * type
              * @default flux_fill
              * @constant
+             * @enum {string}
              */
             type: "flux_fill";
         };
@@ -7825,6 +8298,7 @@ export type components = {
              * type
              * @default flux_fill_output
              * @constant
+             * @enum {string}
              */
             type: "flux_fill_output";
         };
@@ -7851,6 +8325,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The IP-Adapter image prompt(s).
              * @default null
              */
@@ -7866,6 +8346,7 @@ export type components = {
              * @description CLIP Vision model to use.
              * @default ViT-L
              * @constant
+             * @enum {string}
              */
             clip_vision_model?: "ViT-L";
             /**
@@ -7890,6 +8371,7 @@ export type components = {
              * type
              * @default flux_ip_adapter
              * @constant
+             * @enum {string}
              */
             type: "flux_ip_adapter";
         };
@@ -7915,6 +8397,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * LoRA
              * @description LoRA model to load
@@ -7949,6 +8437,7 @@ export type components = {
              * type
              * @default flux_lora_loader
              * @constant
+             * @enum {string}
              */
             type: "flux_lora_loader";
         };
@@ -7979,6 +8468,7 @@ export type components = {
              * type
              * @default flux_lora_loader_output
              * @constant
+             * @enum {string}
              */
             type: "flux_lora_loader_output";
         };
@@ -8004,6 +8494,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /** @description Flux model (Transformer) to load */
             model: components["schemas"]["ModelIdentifierField"];
             /**
@@ -8026,6 +8522,7 @@ export type components = {
              * type
              * @default flux_model_loader
              * @constant
+             * @enum {string}
              */
             type: "flux_model_loader";
         };
@@ -8064,6 +8561,7 @@ export type components = {
              * type
              * @default flux_model_loader_output
              * @constant
+             * @enum {string}
              */
             type: "flux_model_loader_output";
         };
@@ -8114,12 +8612,14 @@ export type components = {
              * Type
              * @default flux_redux
              * @constant
+             * @enum {string}
              */
             type: "flux_redux";
             /**
              * Format
              * @default checkpoint
              * @constant
+             * @enum {string}
              */
             format: "checkpoint";
             /** @description The base model. */
@@ -8177,6 +8677,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The FLUX Redux image prompt.
              * @default null
              */
@@ -8215,6 +8721,7 @@ export type components = {
              * type
              * @default flux_redux
              * @constant
+             * @enum {string}
              */
             type: "flux_redux";
         };
@@ -8232,6 +8739,7 @@ export type components = {
              * type
              * @default flux_redux_output
              * @constant
+             * @enum {string}
              */
             type: "flux_redux_output";
         };
@@ -8257,6 +8765,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * CLIP
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
@@ -8291,6 +8805,7 @@ export type components = {
              * type
              * @default flux_text_encoder
              * @constant
+             * @enum {string}
              */
             type: "flux_text_encoder";
         };
@@ -8327,6 +8842,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -8340,6 +8861,7 @@ export type components = {
              * type
              * @default flux_vae_decode
              * @constant
+             * @enum {string}
              */
             type: "flux_vae_decode";
         };
@@ -8366,6 +8888,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to encode.
              * @default null
              */
@@ -8379,6 +8907,7 @@ export type components = {
              * type
              * @default flux_vae_encode
              * @constant
+             * @enum {string}
              */
             type: "flux_vae_encode";
         };
@@ -8450,6 +8979,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * UNet
              * @description UNet (scheduler, LoRAs)
              * @default null
@@ -8483,6 +9018,7 @@ export type components = {
              * type
              * @default freeu
              * @constant
+             * @enum {string}
              */
             type: "freeu";
         };
@@ -8509,6 +9045,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The mask to crop.
              * @default null
              */
@@ -8533,6 +9075,7 @@ export type components = {
              * type
              * @default get_image_mask_bounding_box
              * @constant
+             * @enum {string}
              */
             type: "get_image_mask_bounding_box";
         };
@@ -8556,6 +9099,7 @@ export type components = {
              * type
              * @default gradient_mask_output
              * @constant
+             * @enum {string}
              */
             type: "gradient_mask_output";
         };
@@ -8655,6 +9199,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Model
              * @description The Grounding DINO model to use.
              * @default null
@@ -8682,6 +9232,7 @@ export type components = {
              * type
              * @default grounding_dino
              * @constant
+             * @enum {string}
              */
             type: "grounding_dino";
         };
@@ -8718,6 +9269,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -8732,6 +9289,7 @@ export type components = {
              * type
              * @default hed_edge_detection
              * @constant
+             * @enum {string}
              */
             type: "hed_edge_detection";
         };
@@ -8789,6 +9347,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to resize
              * @default null
              */
@@ -8809,6 +9373,7 @@ export type components = {
              * type
              * @default heuristic_resize
              * @constant
+             * @enum {string}
              */
             type: "heuristic_resize";
         };
@@ -8901,12 +9466,14 @@ export type components = {
              * Type
              * @default ip_adapter
              * @constant
+             * @enum {string}
              */
             type: "ip_adapter";
             /**
              * Format
              * @default checkpoint
              * @constant
+             * @enum {string}
              */
             format: "checkpoint";
             /** @description The base model. */
@@ -9005,6 +9572,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Image
              * @description The IP-Adapter image prompt(s).
              * @default null
@@ -9057,6 +9630,7 @@ export type components = {
              * type
              * @default ip_adapter
              * @constant
+             * @enum {string}
              */
             type: "ip_adapter";
         };
@@ -9094,12 +9668,14 @@ export type components = {
              * Type
              * @default ip_adapter
              * @constant
+             * @enum {string}
              */
             type: "ip_adapter";
             /**
              * Format
              * @default invokeai
              * @constant
+             * @enum {string}
              */
             format: "invokeai";
             /** @description The base model. */
@@ -9184,6 +9760,7 @@ export type components = {
              * type
              * @default ip_adapter_output
              * @constant
+             * @enum {string}
              */
             type: "ip_adapter_output";
         };
@@ -9209,6 +9786,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Width
              * @description Final image width
@@ -9236,6 +9819,7 @@ export type components = {
              * type
              * @default ideal_size
              * @constant
+             * @enum {string}
              */
             type: "ideal_size";
         };
@@ -9258,6 +9842,7 @@ export type components = {
              * type
              * @default ideal_size_output
              * @constant
+             * @enum {string}
              */
             type: "ideal_size_output";
         };
@@ -9284,6 +9869,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -9300,6 +9891,7 @@ export type components = {
              * type
              * @default image_batch
              * @constant
+             * @enum {string}
              */
             type: "image_batch";
         };
@@ -9336,6 +9928,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to blur
              * @default null
              */
@@ -9357,6 +9955,7 @@ export type components = {
              * type
              * @default img_blur
              * @constant
+             * @enum {string}
              */
             type: "img_blur";
         };
@@ -9405,6 +10004,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to get the channel from
              * @default null
              */
@@ -9420,6 +10025,7 @@ export type components = {
              * type
              * @default img_chan
              * @constant
+             * @enum {string}
              */
             type: "img_chan";
         };
@@ -9456,6 +10062,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to adjust
              * @default null
              */
@@ -9483,6 +10095,7 @@ export type components = {
              * type
              * @default img_channel_multiply
              * @constant
+             * @enum {string}
              */
             type: "img_channel_multiply";
         };
@@ -9519,6 +10132,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to adjust
              * @default null
              */
@@ -9540,6 +10159,7 @@ export type components = {
              * type
              * @default img_channel_offset
              * @constant
+             * @enum {string}
              */
             type: "img_channel_offset";
         };
@@ -9566,6 +10186,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The collection of image values
              * @default null
@@ -9575,6 +10201,7 @@ export type components = {
              * type
              * @default image_collection
              * @constant
+             * @enum {string}
              */
             type: "image_collection";
         };
@@ -9592,6 +10219,7 @@ export type components = {
              * type
              * @default image_collection_output
              * @constant
+             * @enum {string}
              */
             type: "image_collection_output";
         };
@@ -9628,6 +10256,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to convert
              * @default null
              */
@@ -9643,6 +10277,7 @@ export type components = {
              * type
              * @default img_conv
              * @constant
+             * @enum {string}
              */
             type: "img_conv";
         };
@@ -9679,6 +10314,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to crop
              * @default null
              */
@@ -9711,6 +10352,7 @@ export type components = {
              * type
              * @default img_crop
              * @constant
+             * @enum {string}
              */
             type: "img_crop";
         };
@@ -9828,6 +10470,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Generator Type
              * @description The image generator.
              */
@@ -9836,6 +10484,7 @@ export type components = {
              * type
              * @default image_generator
              * @constant
+             * @enum {string}
              */
             type: "image_generator";
         };
@@ -9855,6 +10504,7 @@ export type components = {
              * type
              * @default image_generator_output
              * @constant
+             * @enum {string}
              */
             type: "image_generator_output";
         };
@@ -9891,6 +10541,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to adjust
              * @default null
              */
@@ -9905,6 +10561,7 @@ export type components = {
              * type
              * @default img_hue_adjust
              * @constant
+             * @enum {string}
              */
             type: "img_hue_adjust";
         };
@@ -9941,6 +10598,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to lerp
              * @default null
              */
@@ -9961,6 +10624,7 @@ export type components = {
              * type
              * @default img_ilerp
              * @constant
+             * @enum {string}
              */
             type: "img_ilerp";
         };
@@ -9987,6 +10651,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to load
              * @default null
              */
@@ -9995,6 +10665,7 @@ export type components = {
              * type
              * @default image
              * @constant
+             * @enum {string}
              */
             type: "image";
         };
@@ -10031,6 +10702,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to lerp
              * @default null
              */
@@ -10051,6 +10728,7 @@ export type components = {
              * type
              * @default img_lerp
              * @constant
+             * @enum {string}
              */
             type: "img_lerp";
         };
@@ -10082,6 +10760,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The mask image to convert.
              * @default null
              */
@@ -10102,6 +10786,7 @@ export type components = {
              * type
              * @default image_mask_to_tensor
              * @constant
+             * @enum {string}
              */
             type: "image_mask_to_tensor";
         };
@@ -10138,6 +10823,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The first image to multiply
              * @default null
              */
@@ -10151,6 +10842,7 @@ export type components = {
              * type
              * @default img_mul
              * @constant
+             * @enum {string}
              */
             type: "img_mul";
         };
@@ -10187,6 +10879,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to check
              * @default null
              */
@@ -10195,6 +10893,7 @@ export type components = {
              * type
              * @default img_nsfw
              * @constant
+             * @enum {string}
              */
             type: "img_nsfw";
         };
@@ -10230,6 +10929,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to add noise to
              * @default null
@@ -10270,6 +10975,7 @@ export type components = {
              * type
              * @default img_noise
              * @constant
+             * @enum {string}
              */
             type: "img_noise";
         };
@@ -10294,6 +11000,7 @@ export type components = {
              * type
              * @default image_output
              * @constant
+             * @enum {string}
              */
             type: "image_output";
         };
@@ -10323,6 +11030,7 @@ export type components = {
              * type
              * @default image_panel_coordinate_output
              * @constant
+             * @enum {string}
              */
             type: "image_panel_coordinate_output";
         };
@@ -10349,6 +11057,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Width
              * @description The width of the entire grid.
@@ -10389,6 +11103,7 @@ export type components = {
              * type
              * @default image_panel_layout
              * @constant
+             * @enum {string}
              */
             type: "image_panel_layout";
         };
@@ -10424,6 +11139,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The base image
              * @default null
@@ -10461,6 +11182,7 @@ export type components = {
              * type
              * @default img_paste
              * @constant
+             * @enum {string}
              */
             type: "img_paste";
         };
@@ -10528,6 +11250,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to resize
              * @default null
              */
@@ -10555,6 +11283,7 @@ export type components = {
              * type
              * @default img_resize
              * @constant
+             * @enum {string}
              */
             type: "img_resize";
         };
@@ -10591,6 +11320,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to scale
              * @default null
              */
@@ -10612,6 +11347,7 @@ export type components = {
              * type
              * @default img_scale
              * @constant
+             * @enum {string}
              */
             type: "img_scale";
         };
@@ -10637,6 +11373,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The image to encode
              * @default null
@@ -10669,6 +11411,7 @@ export type components = {
              * type
              * @default i2l
              * @constant
+             * @enum {string}
              */
             type: "i2l";
         };
@@ -10736,6 +11479,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to check
              * @default null
              */
@@ -10750,6 +11499,7 @@ export type components = {
              * type
              * @default img_watermark
              * @constant
+             * @enum {string}
              */
             type: "img_watermark";
         };
@@ -10807,6 +11557,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -10825,6 +11581,7 @@ export type components = {
              * type
              * @default infill_rgba
              * @constant
+             * @enum {string}
              */
             type: "infill_rgba";
         };
@@ -10861,6 +11618,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -10882,6 +11645,7 @@ export type components = {
              * type
              * @default infill_patchmatch
              * @constant
+             * @enum {string}
              */
             type: "infill_patchmatch";
         };
@@ -10918,6 +11682,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -10938,6 +11708,7 @@ export type components = {
              * type
              * @default infill_tile
              * @constant
+             * @enum {string}
              */
             type: "infill_tile";
         };
@@ -11021,6 +11792,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -11037,6 +11814,7 @@ export type components = {
              * type
              * @default integer_batch
              * @constant
+             * @enum {string}
              */
             type: "integer_batch";
         };
@@ -11063,6 +11841,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The collection of integer values
              * @default []
@@ -11072,6 +11856,7 @@ export type components = {
              * type
              * @default integer_collection
              * @constant
+             * @enum {string}
              */
             type: "integer_collection";
         };
@@ -11089,6 +11874,7 @@ export type components = {
              * type
              * @default integer_collection_output
              * @constant
+             * @enum {string}
              */
             type: "integer_collection_output";
         };
@@ -11115,6 +11901,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Generator Type
              * @description The integer generator.
              */
@@ -11123,6 +11915,7 @@ export type components = {
              * type
              * @default integer_generator
              * @constant
+             * @enum {string}
              */
             type: "integer_generator";
         };
@@ -11139,6 +11932,7 @@ export type components = {
              * type
              * @default integer_generator_output
              * @constant
+             * @enum {string}
              */
             type: "integer_generator_output";
         };
@@ -11165,6 +11959,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Value
              * @description The integer value
              * @default 0
@@ -11174,6 +11974,7 @@ export type components = {
              * type
              * @default integer
              * @constant
+             * @enum {string}
              */
             type: "integer";
         };
@@ -11200,6 +12001,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Operation
              * @description The operation to perform
              * @default ADD
@@ -11222,6 +12029,7 @@ export type components = {
              * type
              * @default integer_math
              * @constant
+             * @enum {string}
              */
             type: "integer_math";
         };
@@ -11239,6 +12047,7 @@ export type components = {
              * type
              * @default integer_output
              * @constant
+             * @enum {string}
              */
             type: "integer_output";
         };
@@ -11265,6 +12074,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The tensor mask to convert.
              * @default null
              */
@@ -11273,6 +12088,7 @@ export type components = {
              * type
              * @default invert_tensor_mask
              * @constant
+             * @enum {string}
              */
             type: "invert_tensor_mask";
         };
@@ -12233,6 +13049,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to adjust
              * @default null
              */
@@ -12272,6 +13094,7 @@ export type components = {
              * type
              * @default invokeai_img_hue_adjust_plus
              * @constant
+             * @enum {string}
              */
             type: "invokeai_img_hue_adjust_plus";
         };
@@ -12308,6 +13131,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Image from which to get channel
              * @default null
              */
@@ -12316,6 +13145,7 @@ export type components = {
              * type
              * @default invokeai_ealightness
              * @constant
+             * @enum {string}
              */
             type: "invokeai_ealightness";
         };
@@ -12351,6 +13181,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The top image to blend
              * @default null
@@ -12414,6 +13250,7 @@ export type components = {
              * type
              * @default invokeai_img_blend
              * @constant
+             * @enum {string}
              */
             type: "invokeai_img_blend";
         };
@@ -12449,6 +13286,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Image of the subject on a plain monochrome background
              * @default null
@@ -12499,6 +13342,7 @@ export type components = {
              * type
              * @default invokeai_img_composite
              * @constant
+             * @enum {string}
              */
             type: "invokeai_img_composite";
         };
@@ -12529,6 +13373,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The image from which to create a mask
              * @default null
@@ -12563,6 +13413,7 @@ export type components = {
              * type
              * @default invokeai_img_dilate_erode
              * @constant
+             * @enum {string}
              */
             type: "invokeai_img_dilate_erode";
         };
@@ -12598,6 +13449,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The image for which to apply processing
              * @default null
@@ -12637,6 +13494,7 @@ export type components = {
              * type
              * @default invokeai_img_enhance
              * @constant
+             * @enum {string}
              */
             type: "invokeai_img_enhance";
         };
@@ -12672,6 +13530,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description The image from which to create a mask
              * @default null
@@ -12711,6 +13575,7 @@ export type components = {
              * type
              * @default invokeai_img_val_thresholds
              * @constant
+             * @enum {string}
              */
             type: "invokeai_img_val_thresholds";
         };
@@ -12737,6 +13602,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The list of items to iterate over
              * @default []
@@ -12752,6 +13623,7 @@ export type components = {
              * type
              * @default iterate
              * @constant
+             * @enum {string}
              */
             type: "iterate";
         };
@@ -12779,6 +13651,7 @@ export type components = {
              * type
              * @default iterate_output
              * @constant
+             * @enum {string}
              */
             type: "iterate_output";
         };
@@ -12816,6 +13689,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -12824,6 +13703,7 @@ export type components = {
              * type
              * @default infill_lama
              * @constant
+             * @enum {string}
              */
             type: "infill_lama";
         };
@@ -12850,6 +13730,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The collection of latents tensors
              * @default null
@@ -12859,6 +13745,7 @@ export type components = {
              * type
              * @default latents_collection
              * @constant
+             * @enum {string}
              */
             type: "latents_collection";
         };
@@ -12876,6 +13763,7 @@ export type components = {
              * type
              * @default latents_collection_output
              * @constant
+             * @enum {string}
              */
             type: "latents_collection_output";
         };
@@ -12919,6 +13807,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The latents tensor
              * @default null
              */
@@ -12927,6 +13821,7 @@ export type components = {
              * type
              * @default latents
              * @constant
+             * @enum {string}
              */
             type: "latents";
         };
@@ -12941,6 +13836,7 @@ export type components = {
              * type
              * @default latents_meta_output
              * @constant
+             * @enum {string}
              */
             type: "latents_meta_output";
             /** @description Latents tensor */
@@ -12977,6 +13873,7 @@ export type components = {
              * type
              * @default latents_output
              * @constant
+             * @enum {string}
              */
             type: "latents_output";
         };
@@ -13013,6 +13910,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -13044,6 +13947,7 @@ export type components = {
              * type
              * @default l2i
              * @constant
+             * @enum {string}
              */
             type: "l2i";
         };
@@ -13080,6 +13984,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -13088,6 +13998,7 @@ export type components = {
              * type
              * @default lineart_anime_edge_detection
              * @constant
+             * @enum {string}
              */
             type: "lineart_anime_edge_detection";
         };
@@ -13124,6 +14035,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -13138,6 +14055,7 @@ export type components = {
              * type
              * @default lineart_edge_detection
              * @constant
+             * @enum {string}
              */
             type: "lineart_edge_detection";
         };
@@ -13175,12 +14093,14 @@ export type components = {
              * Type
              * @default llava_onevision
              * @constant
+             * @enum {string}
              */
             type: "llava_onevision";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -13240,6 +14160,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Images
              * @description Input image.
              * @default null
@@ -13261,6 +14187,7 @@ export type components = {
              * type
              * @default llava_onevision_vllm
              * @constant
+             * @enum {string}
              */
             type: "llava_onevision_vllm";
         };
@@ -13287,6 +14214,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
              * @default null
@@ -13308,6 +14241,7 @@ export type components = {
              * type
              * @default lora_collection_loader
              * @constant
+             * @enum {string}
              */
             type: "lora_collection_loader";
         };
@@ -13345,12 +14279,14 @@ export type components = {
              * Type
              * @default lora
              * @constant
+             * @enum {string}
              */
             type: "lora";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -13423,6 +14359,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * LoRA
              * @description LoRA model to load
              * @default null
@@ -13450,6 +14392,7 @@ export type components = {
              * type
              * @default lora_loader
              * @constant
+             * @enum {string}
              */
             type: "lora_loader";
         };
@@ -13474,6 +14417,7 @@ export type components = {
              * type
              * @default lora_loader_output
              * @constant
+             * @enum {string}
              */
             type: "lora_loader_output";
         };
@@ -13511,12 +14455,14 @@ export type components = {
              * Type
              * @default lora
              * @constant
+             * @enum {string}
              */
             type: "lora";
             /**
              * Format
              * @default lycoris
              * @constant
+             * @enum {string}
              */
             format: "lycoris";
             /** @description The base model. */
@@ -13592,6 +14538,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * LoRA
              * @description LoRA model to load
              * @default null
@@ -13607,6 +14559,7 @@ export type components = {
              * type
              * @default lora_selector
              * @constant
+             * @enum {string}
              */
             type: "lora_selector";
         };
@@ -13624,6 +14577,7 @@ export type components = {
              * type
              * @default lora_selector_output
              * @constant
+             * @enum {string}
              */
             type: "lora_selector_output";
         };
@@ -13661,6 +14615,7 @@ export type components = {
              * type
              * @default md_control_list_output
              * @constant
+             * @enum {string}
              */
             type: "md_control_list_output";
         };
@@ -13675,6 +14630,7 @@ export type components = {
              * type
              * @default md_ip_adapter_list_output
              * @constant
+             * @enum {string}
              */
             type: "md_ip_adapter_list_output";
         };
@@ -13689,6 +14645,7 @@ export type components = {
              * type
              * @default md_ip_adapters_output
              * @constant
+             * @enum {string}
              */
             type: "md_ip_adapters_output";
         };
@@ -13725,6 +14682,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -13745,6 +14708,7 @@ export type components = {
              * type
              * @default mlsd_detection
              * @constant
+             * @enum {string}
              */
             type: "mlsd_detection";
         };
@@ -13782,12 +14746,14 @@ export type components = {
              * Type
              * @default main
              * @constant
+             * @enum {string}
              */
             type: "main";
             /**
              * Format
              * @default bnb_quantized_nf4b
              * @constant
+             * @enum {string}
              */
             format: "bnb_quantized_nf4b";
             /** @description The base model. */
@@ -13885,6 +14851,7 @@ export type components = {
              * Type
              * @default main
              * @constant
+             * @enum {string}
              */
             type: "main";
             /**
@@ -13989,12 +14956,14 @@ export type components = {
              * Type
              * @default main
              * @constant
+             * @enum {string}
              */
             type: "main";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -14077,12 +15046,14 @@ export type components = {
              * Type
              * @default main
              * @constant
+             * @enum {string}
              */
             type: "main";
             /**
              * Format
              * @default gguf_quantized
              * @constant
+             * @enum {string}
              */
             format: "gguf_quantized";
             /** @description The base model. */
@@ -14217,6 +15188,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Main model (UNet, VAE, CLIP) to load
              * @default null
              */
@@ -14225,6 +15202,7 @@ export type components = {
              * type
              * @default main_model_loader
              * @constant
+             * @enum {string}
              */
             type: "main_model_loader";
         };
@@ -14261,6 +15239,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The first mask to combine
              * @default null
              */
@@ -14274,6 +15258,7 @@ export type components = {
              * type
              * @default mask_combine
              * @constant
+             * @enum {string}
              */
             type: "mask_combine";
         };
@@ -14310,6 +15295,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to apply the mask to
              * @default null
              */
@@ -14342,6 +15333,7 @@ export type components = {
              * type
              * @default mask_edge
              * @constant
+             * @enum {string}
              */
             type: "mask_edge";
         };
@@ -14378,6 +15370,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to create the mask from
              * @default null
              */
@@ -14392,6 +15390,7 @@ export type components = {
              * type
              * @default tomask
              * @constant
+             * @enum {string}
              */
             type: "tomask";
         };
@@ -14428,6 +15427,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to create the mask from
              * @default null
              */
@@ -14453,6 +15458,7 @@ export type components = {
              * type
              * @default mask_from_id
              * @constant
+             * @enum {string}
              */
             type: "mask_from_id";
         };
@@ -14477,6 +15483,7 @@ export type components = {
              * type
              * @default mask_output
              * @constant
+             * @enum {string}
              */
             type: "mask_output";
         };
@@ -14513,6 +15520,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The mask tensor to convert.
              * @default null
              */
@@ -14521,6 +15534,7 @@ export type components = {
              * type
              * @default tensor_mask_to_image
              * @constant
+             * @enum {string}
              */
             type: "tensor_mask_to_image";
         };
@@ -14557,6 +15571,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -14577,6 +15597,7 @@ export type components = {
              * type
              * @default mediapipe_face_detection
              * @constant
+             * @enum {string}
              */
             type: "mediapipe_face_detection";
         };
@@ -14603,6 +15624,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description Collection of Metadata
              * @default null
@@ -14612,6 +15639,7 @@ export type components = {
              * type
              * @default merge_metadata
              * @constant
+             * @enum {string}
              */
             type: "merge_metadata";
         };
@@ -14648,6 +15676,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Tiles With Images
              * @description A list of tile images with tile properties.
              * @default null
@@ -14670,6 +15704,7 @@ export type components = {
              * type
              * @default merge_tiles_to_image
              * @constant
+             * @enum {string}
              */
             type: "merge_tiles_to_image";
         };
@@ -14703,6 +15738,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to extract metadata from
              * @default null
              */
@@ -14717,6 +15758,7 @@ export type components = {
              * type
              * @default metadata_field_extractor
              * @constant
+             * @enum {string}
              */
             type: "metadata_field_extractor";
         };
@@ -14743,6 +15785,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -14751,6 +15799,7 @@ export type components = {
              * type
              * @default metadata_from_image
              * @constant
+             * @enum {string}
              */
             type: "metadata_from_image";
         };
@@ -14777,6 +15826,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Items
              * @description A single metadata item or collection of metadata items
              * @default null
@@ -14786,6 +15841,7 @@ export type components = {
              * type
              * @default metadata
              * @constant
+             * @enum {string}
              */
             type: "metadata";
         };
@@ -14825,6 +15881,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default null
@@ -14840,6 +15902,7 @@ export type components = {
              * type
              * @default metadata_item
              * @constant
+             * @enum {string}
              */
             type: "metadata_item";
         };
@@ -14871,6 +15934,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -14893,6 +15962,7 @@ export type components = {
              * type
              * @default metadata_item_linked
              * @constant
+             * @enum {string}
              */
             type: "metadata_item_linked";
         };
@@ -14907,6 +15977,7 @@ export type components = {
              * type
              * @default metadata_item_output
              * @constant
+             * @enum {string}
              */
             type: "metadata_item_output";
         };
@@ -14918,6 +15989,7 @@ export type components = {
              * type
              * @default metadata_output
              * @constant
+             * @enum {string}
              */
             type: "metadata_output";
         };
@@ -14949,6 +16021,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -14971,6 +16049,7 @@ export type components = {
              * type
              * @default metadata_to_bool_collection
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_bool_collection";
         };
@@ -15002,6 +16081,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -15024,6 +16109,7 @@ export type components = {
              * type
              * @default metadata_to_bool
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_bool";
         };
@@ -15055,6 +16141,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * ControlNet-List
              * @default null
              */
@@ -15063,6 +16155,7 @@ export type components = {
              * type
              * @default metadata_to_controlnets
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_controlnets";
         };
@@ -15094,6 +16187,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -15116,6 +16215,7 @@ export type components = {
              * type
              * @default metadata_to_float_collection
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_float_collection";
         };
@@ -15147,6 +16247,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -15169,6 +16275,7 @@ export type components = {
              * type
              * @default metadata_to_float
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_float";
         };
@@ -15200,6 +16307,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * IP-Adapter-List
              * @description IP-Adapter to apply
              * @default null
@@ -15209,6 +16322,7 @@ export type components = {
              * type
              * @default metadata_to_ip_adapters
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_ip_adapters";
         };
@@ -15240,6 +16354,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -15262,6 +16382,7 @@ export type components = {
              * type
              * @default metadata_to_integer_collection
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_integer_collection";
         };
@@ -15293,6 +16414,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -15315,6 +16442,7 @@ export type components = {
              * type
              * @default metadata_to_integer
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_integer";
         };
@@ -15346,6 +16474,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Custom Label
              * @description Label for this metadata item
              * @default loras
@@ -15361,6 +16495,7 @@ export type components = {
              * type
              * @default metadata_to_lora_collection
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_lora_collection";
         };
@@ -15378,6 +16513,7 @@ export type components = {
              * type
              * @default metadata_to_lora_collection_output
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_lora_collection_output";
         };
@@ -15409,6 +16545,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * UNet
              * @description UNet (scheduler, LoRAs)
              * @default null
@@ -15424,6 +16566,7 @@ export type components = {
              * type
              * @default metadata_to_loras
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_loras";
         };
@@ -15455,6 +16598,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default model
@@ -15476,6 +16625,7 @@ export type components = {
              * type
              * @default metadata_to_model
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_model";
         };
@@ -15513,6 +16663,7 @@ export type components = {
              * type
              * @default metadata_to_model_output
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_model_output";
         };
@@ -15544,6 +16695,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * UNet
              * @description UNet (scheduler, LoRAs)
              * @default null
@@ -15565,6 +16722,7 @@ export type components = {
              * type
              * @default metadata_to_sdlx_loras
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_sdlx_loras";
         };
@@ -15596,6 +16754,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default model
@@ -15617,6 +16781,7 @@ export type components = {
              * type
              * @default metadata_to_sdxl_model
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_sdxl_model";
         };
@@ -15659,6 +16824,7 @@ export type components = {
              * type
              * @default metadata_to_sdxl_model_output
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_sdxl_model_output";
         };
@@ -15690,6 +16856,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default scheduler
@@ -15713,6 +16885,7 @@ export type components = {
              * type
              * @default metadata_to_scheduler
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_scheduler";
         };
@@ -15744,6 +16917,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -15766,6 +16945,7 @@ export type components = {
              * type
              * @default metadata_to_string_collection
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_string_collection";
         };
@@ -15797,6 +16977,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default * CUSTOM LABEL *
@@ -15819,6 +17005,7 @@ export type components = {
              * type
              * @default metadata_to_string
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_string";
         };
@@ -15850,6 +17037,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * T2I-Adapter
              * @description IP-Adapter to apply
              * @default null
@@ -15859,6 +17052,7 @@ export type components = {
              * type
              * @default metadata_to_t2i_adapters
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_t2i_adapters";
         };
@@ -15890,6 +17084,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Label
              * @description Label for this metadata item
              * @default vae
@@ -15911,6 +17111,7 @@ export type components = {
              * type
              * @default metadata_to_vae
              * @constant
+             * @enum {string}
              */
             type: "metadata_to_vae";
         };
@@ -15972,6 +17173,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Model
              * @description The model to select
              * @default null
@@ -15981,6 +17188,7 @@ export type components = {
              * type
              * @default model_identifier
              * @constant
+             * @enum {string}
              */
             type: "model_identifier";
         };
@@ -15998,6 +17206,7 @@ export type components = {
              * type
              * @default model_identifier_output
              * @constant
+             * @enum {string}
              */
             type: "model_identifier_output";
         };
@@ -16345,6 +17554,7 @@ export type components = {
              * type
              * @default model_loader_output
              * @constant
+             * @enum {string}
              */
             type: "model_loader_output";
             /**
@@ -16497,6 +17707,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * A
              * @description The first number
              * @default 0
@@ -16512,6 +17728,7 @@ export type components = {
              * type
              * @default mul
              * @constant
+             * @enum {string}
              */
             type: "mul";
         };
@@ -16556,6 +17773,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Seed
              * @description Seed for random number generation
              * @default 0
@@ -16583,6 +17806,7 @@ export type components = {
              * type
              * @default noise
              * @constant
+             * @enum {string}
              */
             type: "noise";
         };
@@ -16607,6 +17831,7 @@ export type components = {
              * type
              * @default noise_output
              * @constant
+             * @enum {string}
              */
             type: "noise_output";
         };
@@ -16643,6 +17868,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -16651,6 +17882,7 @@ export type components = {
              * type
              * @default normal_map
              * @constant
+             * @enum {string}
              */
             type: "normal_map";
         };
@@ -16764,6 +17996,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The tile image.
              * @default null
              */
@@ -16777,6 +18015,7 @@ export type components = {
              * type
              * @default pair_tile_image
              * @constant
+             * @enum {string}
              */
             type: "pair_tile_image";
         };
@@ -16788,6 +18027,7 @@ export type components = {
              * type
              * @default pair_tile_image_output
              * @constant
+             * @enum {string}
              */
             type: "pair_tile_image_output";
         };
@@ -16826,6 +18066,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to paste
              * @default null
              */
@@ -16844,6 +18090,7 @@ export type components = {
              * type
              * @default paste_image_into_bounding_box
              * @constant
+             * @enum {string}
              */
             type: "paste_image_into_bounding_box";
         };
@@ -16880,6 +18127,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -16900,6 +18153,7 @@ export type components = {
              * type
              * @default pidi_edge_detection
              * @constant
+             * @enum {string}
              */
             type: "pidi_edge_detection";
         };
@@ -16965,6 +18219,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * File Path
              * @description Path to prompt text file
              * @default null
@@ -16998,6 +18258,7 @@ export type components = {
              * type
              * @default prompt_from_file
              * @constant
+             * @enum {string}
              */
             type: "prompt_from_file";
         };
@@ -17167,6 +18428,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Low
              * @description The inclusive low value
              * @default 0
@@ -17188,6 +18455,7 @@ export type components = {
              * type
              * @default rand_float
              * @constant
+             * @enum {string}
              */
             type: "rand_float";
         };
@@ -17214,6 +18482,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Low
              * @description The inclusive low value
              * @default 0
@@ -17229,6 +18503,7 @@ export type components = {
              * type
              * @default rand_int
              * @constant
+             * @enum {string}
              */
             type: "rand_int";
         };
@@ -17254,6 +18529,12 @@ export type components = {
              * @default false
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Low
              * @description The inclusive low value
@@ -17282,6 +18563,7 @@ export type components = {
              * type
              * @default random_range
              * @constant
+             * @enum {string}
              */
             type: "random_range";
         };
@@ -17308,6 +18590,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Start
              * @description The start of the range
              * @default 0
@@ -17329,6 +18617,7 @@ export type components = {
              * type
              * @default range
              * @constant
+             * @enum {string}
              */
             type: "range";
         };
@@ -17355,6 +18644,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Start
              * @description The start of the range
              * @default 0
@@ -17376,6 +18671,7 @@ export type components = {
              * type
              * @default range_of_size
              * @constant
+             * @enum {string}
              */
             type: "range_of_size";
         };
@@ -17406,6 +18702,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Width
              * @description The width of the entire mask.
@@ -17446,6 +18748,7 @@ export type components = {
              * type
              * @default rectangle_mask
              * @constant
+             * @enum {string}
              */
             type: "rectangle_mask";
         };
@@ -17509,6 +18812,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -17542,6 +18851,7 @@ export type components = {
              * type
              * @default lresize
              * @constant
+             * @enum {string}
              */
             type: "lresize";
         };
@@ -17591,6 +18901,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Value
              * @description The float value
              * @default 0
@@ -17606,6 +18922,7 @@ export type components = {
              * type
              * @default round_float
              * @constant
+             * @enum {string}
              */
             type: "round_float";
         };
@@ -17659,6 +18976,7 @@ export type components = {
              * type
              * @default sd3_conditioning_output
              * @constant
+             * @enum {string}
              */
             type: "sd3_conditioning_output";
         };
@@ -17694,6 +19012,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -17766,6 +19090,7 @@ export type components = {
              * type
              * @default sd3_denoise
              * @constant
+             * @enum {string}
              */
             type: "sd3_denoise";
         };
@@ -17802,6 +19127,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to encode
              * @default null
              */
@@ -17815,6 +19146,7 @@ export type components = {
              * type
              * @default sd3_i2l
              * @constant
+             * @enum {string}
              */
             type: "sd3_i2l";
         };
@@ -17851,6 +19183,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -17864,6 +19202,7 @@ export type components = {
              * type
              * @default sd3_l2i
              * @constant
+             * @enum {string}
              */
             type: "sd3_l2i";
         };
@@ -17889,6 +19228,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Prompt
              * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -17952,6 +19297,7 @@ export type components = {
              * type
              * @default sdxl_compel_prompt
              * @constant
+             * @enum {string}
              */
             type: "sdxl_compel_prompt";
         };
@@ -17977,6 +19323,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * LoRAs
              * @description LoRA models and weights. May be a single LoRA or collection.
@@ -18005,6 +19357,7 @@ export type components = {
              * type
              * @default sdxl_lora_collection_loader
              * @constant
+             * @enum {string}
              */
             type: "sdxl_lora_collection_loader";
         };
@@ -18030,6 +19383,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * LoRA
              * @description LoRA model to load
@@ -18064,6 +19423,7 @@ export type components = {
              * type
              * @default sdxl_lora_loader
              * @constant
+             * @enum {string}
              */
             type: "sdxl_lora_loader";
         };
@@ -18094,6 +19454,7 @@ export type components = {
              * type
              * @default sdxl_lora_loader_output
              * @constant
+             * @enum {string}
              */
             type: "sdxl_lora_loader_output";
         };
@@ -18120,6 +19481,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load
              * @default null
              */
@@ -18128,6 +19495,7 @@ export type components = {
              * type
              * @default sdxl_model_loader
              * @constant
+             * @enum {string}
              */
             type: "sdxl_model_loader";
         };
@@ -18160,6 +19528,7 @@ export type components = {
              * type
              * @default sdxl_model_loader_output
              * @constant
+             * @enum {string}
              */
             type: "sdxl_model_loader_output";
         };
@@ -18185,6 +19554,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Style
              * @description Prompt to be parsed by Compel to create a conditioning tensor
@@ -18226,6 +19601,7 @@ export type components = {
              * type
              * @default sdxl_refiner_compel_prompt
              * @constant
+             * @enum {string}
              */
             type: "sdxl_refiner_compel_prompt";
         };
@@ -18252,6 +19628,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load
              * @default null
              */
@@ -18260,6 +19642,7 @@ export type components = {
              * type
              * @default sdxl_refiner_model_loader
              * @constant
+             * @enum {string}
              */
             type: "sdxl_refiner_model_loader";
         };
@@ -18287,6 +19670,7 @@ export type components = {
              * type
              * @default sdxl_refiner_model_loader_output
              * @constant
+             * @enum {string}
              */
             type: "sdxl_refiner_model_loader_output";
         };
@@ -18328,6 +19712,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to process
              * @default null
              */
@@ -18336,6 +19726,7 @@ export type components = {
              * type
              * @default save_image
              * @constant
+             * @enum {string}
              */
             type: "save_image";
         };
@@ -18361,6 +19752,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Latents tensor
              * @default null
@@ -18389,6 +19786,7 @@ export type components = {
              * type
              * @default lscale
              * @constant
+             * @enum {string}
              */
             type: "lscale";
         };
@@ -18415,6 +19813,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Scheduler
              * @description Scheduler to use during inference
              * @default euler
@@ -18425,6 +19829,7 @@ export type components = {
              * type
              * @default scheduler
              * @constant
+             * @enum {string}
              */
             type: "scheduler";
         };
@@ -18440,6 +19845,7 @@ export type components = {
              * type
              * @default scheduler_output
              * @constant
+             * @enum {string}
              */
             type: "scheduler_output";
         };
@@ -18471,6 +19877,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /** @description SD3 model (MMDiTX) to load */
             model: components["schemas"]["ModelIdentifierField"];
             /**
@@ -18501,6 +19913,7 @@ export type components = {
              * type
              * @default sd3_model_loader
              * @constant
+             * @enum {string}
              */
             type: "sd3_model_loader";
         };
@@ -18538,6 +19951,7 @@ export type components = {
              * type
              * @default sd3_model_loader_output
              * @constant
+             * @enum {string}
              */
             type: "sd3_model_loader_output";
         };
@@ -18563,6 +19977,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * CLIP L
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
@@ -18591,6 +20011,7 @@ export type components = {
              * type
              * @default sd3_text_encoder
              * @constant
+             * @enum {string}
              */
             type: "sd3_text_encoder";
         };
@@ -18616,6 +20037,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * UNet
              * @description UNet (scheduler, LoRAs)
@@ -18644,6 +20071,7 @@ export type components = {
              * type
              * @default seamless
              * @constant
+             * @enum {string}
              */
             type: "seamless";
         };
@@ -18668,6 +20096,7 @@ export type components = {
              * type
              * @default seamless_output
              * @constant
+             * @enum {string}
              */
             type: "seamless_output";
         };
@@ -18693,6 +20122,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * Model
              * @description The Segment Anything model to use.
@@ -18734,6 +20169,7 @@ export type components = {
              * type
              * @default segment_anything
              * @constant
+             * @enum {string}
              */
             type: "segment_anything";
         };
@@ -19105,6 +20541,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to show
              * @default null
              */
@@ -19113,6 +20555,7 @@ export type components = {
              * type
              * @default show_image
              * @constant
+             * @enum {string}
              */
             type: "show_image";
         };
@@ -19150,12 +20593,14 @@ export type components = {
              * Type
              * @default siglip
              * @constant
+             * @enum {string}
              */
             type: "siglip";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -19225,6 +20670,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The input image
              * @default null
              */
@@ -19245,6 +20696,7 @@ export type components = {
              * type
              * @default spandrel_image_to_image_autoscale
              * @constant
+             * @enum {string}
              */
             type: "spandrel_image_to_image_autoscale";
             /**
@@ -19294,12 +20746,14 @@ export type components = {
              * Type
              * @default spandrel_image_to_image
              * @constant
+             * @enum {string}
              */
             type: "spandrel_image_to_image";
             /**
              * Format
              * @default checkpoint
              * @constant
+             * @enum {string}
              */
             format: "checkpoint";
             /** @description The base model. */
@@ -19367,6 +20821,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The input image
              * @default null
              */
@@ -19387,6 +20847,7 @@ export type components = {
              * type
              * @default spandrel_image_to_image
              * @constant
+             * @enum {string}
              */
             type: "spandrel_image_to_image";
         };
@@ -19464,6 +20925,7 @@ export type components = {
              * type
              * @default string_2_output
              * @constant
+             * @enum {string}
              */
             type: "string_2_output";
         };
@@ -19490,6 +20952,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Batch Group
              * @description The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.
              * @default None
@@ -19506,6 +20974,7 @@ export type components = {
              * type
              * @default string_batch
              * @constant
+             * @enum {string}
              */
             type: "string_batch";
         };
@@ -19532,6 +21001,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Collection
              * @description The collection of string values
              * @default []
@@ -19541,6 +21016,7 @@ export type components = {
              * type
              * @default string_collection
              * @constant
+             * @enum {string}
              */
             type: "string_collection";
         };
@@ -19558,6 +21034,7 @@ export type components = {
              * type
              * @default string_collection_output
              * @constant
+             * @enum {string}
              */
             type: "string_collection_output";
         };
@@ -19584,6 +21061,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Generator Type
              * @description The string generator.
              */
@@ -19592,6 +21075,7 @@ export type components = {
              * type
              * @default string_generator
              * @constant
+             * @enum {string}
              */
             type: "string_generator";
         };
@@ -19611,6 +21095,7 @@ export type components = {
              * type
              * @default string_generator_output
              * @constant
+             * @enum {string}
              */
             type: "string_generator_output";
         };
@@ -19637,6 +21122,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * Value
              * @description The string value
              * @default
@@ -19646,6 +21137,7 @@ export type components = {
              * type
              * @default string
              * @constant
+             * @enum {string}
              */
             type: "string";
         };
@@ -19672,6 +21164,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * String Left
              * @description String Left
              * @default
@@ -19687,6 +21185,7 @@ export type components = {
              * type
              * @default string_join
              * @constant
+             * @enum {string}
              */
             type: "string_join";
         };
@@ -19713,6 +21212,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * String Left
              * @description String Left
              * @default
@@ -19734,6 +21239,7 @@ export type components = {
              * type
              * @default string_join_three
              * @constant
+             * @enum {string}
              */
             type: "string_join_three";
         };
@@ -19751,6 +21257,7 @@ export type components = {
              * type
              * @default string_output
              * @constant
+             * @enum {string}
              */
             type: "string_output";
         };
@@ -19773,6 +21280,7 @@ export type components = {
              * type
              * @default string_pos_neg_output
              * @constant
+             * @enum {string}
              */
             type: "string_pos_neg_output";
         };
@@ -19798,6 +21306,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * String
              * @description String to work on
@@ -19826,6 +21340,7 @@ export type components = {
              * type
              * @default string_replace
              * @constant
+             * @enum {string}
              */
             type: "string_replace";
         };
@@ -19852,6 +21367,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * String
              * @description String to split
              * @default
@@ -19867,6 +21388,7 @@ export type components = {
              * type
              * @default string_split
              * @constant
+             * @enum {string}
              */
             type: "string_split";
         };
@@ -19893,6 +21415,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * String
              * @description String to split
              * @default
@@ -19902,6 +21430,7 @@ export type components = {
              * type
              * @default string_split_neg
              * @constant
+             * @enum {string}
              */
             type: "string_split_neg";
         };
@@ -19964,6 +21493,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * A
              * @description The first number
              * @default 0
@@ -19979,6 +21514,7 @@ export type components = {
              * type
              * @default sub
              * @constant
+             * @enum {string}
              */
             type: "sub";
         };
@@ -20016,12 +21552,14 @@ export type components = {
              * Type
              * @default t2i_adapter
              * @constant
+             * @enum {string}
              */
             type: "t2i_adapter";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -20115,6 +21653,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The IP-Adapter image prompt.
              * @default null
              */
@@ -20154,6 +21698,7 @@ export type components = {
              * type
              * @default t2i_adapter
              * @constant
+             * @enum {string}
              */
             type: "t2i_adapter";
         };
@@ -20205,6 +21750,7 @@ export type components = {
              * type
              * @default t2i_adapter_output
              * @constant
+             * @enum {string}
              */
             type: "t2i_adapter_output";
         };
@@ -20239,12 +21785,14 @@ export type components = {
              * Type
              * @default t5_encoder
              * @constant
+             * @enum {string}
              */
             type: "t5_encoder";
             /**
              * Format
              * @default bnb_quantized_int8b
              * @constant
+             * @enum {string}
              */
             format: "bnb_quantized_int8b";
             /** @description The base model. */
@@ -20310,12 +21858,14 @@ export type components = {
              * Type
              * @default t5_encoder
              * @constant
+             * @enum {string}
              */
             type: "t5_encoder";
             /**
              * Format
              * @default t5_encoder
              * @constant
+             * @enum {string}
              */
             format: "t5_encoder";
             /** @description The base model. */
@@ -20418,12 +21968,14 @@ export type components = {
              * Type
              * @default embedding
              * @constant
+             * @enum {string}
              */
             type: "embedding";
             /**
              * Format
              * @default embedding_file
              * @constant
+             * @enum {string}
              */
             format: "embedding_file";
             /** @description The base model. */
@@ -20492,12 +22044,14 @@ export type components = {
              * Type
              * @default embedding
              * @constant
+             * @enum {string}
              */
             type: "embedding";
             /**
              * Format
              * @default embedding_folder
              * @constant
+             * @enum {string}
              */
             format: "embedding_folder";
             /** @description The base model. */
@@ -20562,6 +22116,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The tile to split into properties.
              * @default null
              */
@@ -20570,6 +22130,7 @@ export type components = {
              * type
              * @default tile_to_properties
              * @constant
+             * @enum {string}
              */
             type: "tile_to_properties";
         };
@@ -20629,6 +22190,7 @@ export type components = {
              * type
              * @default tile_to_properties_output
              * @constant
+             * @enum {string}
              */
             type: "tile_to_properties_output";
         };
@@ -20666,6 +22228,12 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
+            /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
             /**
              * @description Positive conditioning tensor
              * @default null
@@ -20756,6 +22324,7 @@ export type components = {
              * type
              * @default tiled_multi_diffusion_denoise_latents
              * @constant
+             * @enum {string}
              */
             type: "tiled_multi_diffusion_denoise_latents";
         };
@@ -20879,6 +22448,7 @@ export type components = {
              * type
              * @default unet_output
              * @constant
+             * @enum {string}
              */
             type: "unet_output";
         };
@@ -20946,6 +22516,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * @description The image to use
              * @default null
              */
@@ -20966,6 +22542,7 @@ export type components = {
              * type
              * @default unsharp_mask
              * @constant
+             * @enum {string}
              */
             type: "unsharp_mask";
         };
@@ -21016,6 +22593,7 @@ export type components = {
              * Type
              * @default vae
              * @constant
+             * @enum {string}
              */
             type: "vae";
             /**
@@ -21101,12 +22679,14 @@ export type components = {
              * Type
              * @default vae
              * @constant
+             * @enum {string}
              */
             type: "vae";
             /**
              * Format
              * @default diffusers
              * @constant
+             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -21174,6 +22754,12 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * Output Metadata
+             * @description Optional metadata dictionary for the invocation
+             * @default null
+             */
+            output_metadata?: Record<string, never> | null;
+            /**
              * VAE
              * @description VAE model to load
              * @default null
@@ -21183,6 +22769,7 @@ export type components = {
              * type
              * @default vae_loader
              * @constant
+             * @enum {string}
              */
             type: "vae_loader";
         };
@@ -21200,6 +22787,7 @@ export type components = {
              * type
              * @default vae_output
              * @constant
+             * @enum {string}
              */
             type: "vae_output";
         };
