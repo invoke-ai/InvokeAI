@@ -78,7 +78,7 @@ class UIConfigBase(BaseModel):
     This is used internally by the @invocation decorator logic. Do not use this directly.
     """
 
-    tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
+    tags: Optional[list[str]] = Field(default=None, description="The node's tags")
     title: Optional[str] = Field(default=None, description="The node's display name")
     category: Optional[str] = Field(default=None, description="The node's category")
     version: str = Field(
