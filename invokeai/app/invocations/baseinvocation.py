@@ -235,6 +235,12 @@ class BaseInvocation(ABC, BaseModel):
         json_schema_extra={"field_kind": FieldKind.NodeAttribute},
     )
 
+    output_metadata: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Optional metadata dictionary for the invocation",
+        json_schema_extra={"field_kind": FieldKind.NodeAttribute},
+    )
+
     UIConfig: ClassVar[UIConfigBase]
 
     model_config = ConfigDict(
@@ -354,6 +360,7 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
     "use_cache",
     "type",
     "workflow",
+    "output_metadata",
 }
 
 RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
