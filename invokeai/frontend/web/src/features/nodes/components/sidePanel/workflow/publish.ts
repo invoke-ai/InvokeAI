@@ -121,6 +121,8 @@ const NODE_TYPE_PUBLISH_DENYLIST = [
   'metadata_to_controlnets',
   'metadata_to_ip_adapters',
   'metadata_to_t2i_adapters',
+  'google_imagen3_generate',
+  'google_imagen3_edit',
 ];
 
 export const selectHasUnpublishableNodes = createSelector(selectNodes, (nodes) => {
