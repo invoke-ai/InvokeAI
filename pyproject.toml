@@ -302,7 +302,7 @@ torch = [
   # { index = "default", marker = "sys_platform == 'darwin'" }, # macOS
   { index = "pytorch-arm", marker = "sys_platform != 'darwin' and platform_machine == 'arm64'" },
   # Linux and Windows
-  { index = "pytorch-cu126", marker = "sys_platform != 'darwin' and platform_machine == 'x86_64' and extra == 'using-cuda' and extra != 'using-rocm'" },
+  { index = "pytorch-cuda", marker = "sys_platform != 'darwin' and platform_machine == 'x86_64' and extra == 'using-cuda' and extra != 'using-rocm'" },
   { index = "pytorch-rocm", marker = "sys_platform != 'darwin' and platform_machine == 'x86_64' and extra != 'using-cuda' and extra == 'using-rocm'" },
   { index = "pytorch-cpu", marker = "sys_platform != 'darwin' and platform_machine == 'x86_64' and extra != 'using-cuda' and extra != 'using-rocm'" },
 ]
@@ -313,7 +313,7 @@ url      = "https://download.pytorch.org/whl/rocm6.2"
 explicit = true
 
 [[tool.uv.index]]
-name     = "pytorch-cu126"
+name     = "pytorch-cuda"
 url      = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
