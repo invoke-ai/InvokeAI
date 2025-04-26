@@ -65,11 +65,19 @@
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "/home/node/.venv/bin/python",
+        "python.analysis.typeCheckingMode": "standard",
+        "python.analysis.exclude": [
+          "**/node_modules",
+          "**/dist",
+          "**/build",
+          "${containerWorkspaceFolder}/invokeai/frontend/web"
+        ],
         "python.analysis.extraPaths": [
           "/home/node/invokeai",
           "/home/node/.venv/lib",
           "${containerWorkspaceFolder}"
         ],
+        "python.testing.promptToConfigure": false,
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [
           "--no-cov" // prevents interference from code-coverage when running tests within the debugger
