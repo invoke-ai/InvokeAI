@@ -11,6 +11,7 @@ import type { AnyModelConfig } from 'services/api/types';
 
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
+import { RelatedModels } from './RelatedModels';
 
 type Props = {
   modelConfig: AnyModelConfig;
@@ -83,6 +84,9 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             )}
           </Box>
         )}
+        <Box maxH="200px" overflowY="auto" layerStyle="second" borderRadius="base" p={4}>
+          <RelatedModels modelConfig={modelConfig} />
+        </Box>
       </Flex>
     </Flex>
   );
