@@ -2,7 +2,6 @@
   "name": "InvokeAI::Dev",
   "build": {
     "dockerfile": "Dockerfile",
-    "context": "../..",
     "args": {
       "USERNAME": "node",
       "PYTHON_VERSION": "3.12", // The python version which will be installed in the container
