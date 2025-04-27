@@ -204,6 +204,38 @@
         "focus": true,
         "panel": "shared"
       }
+    },
+    {
+      "label": "Frontend :: Show Dependency Version",
+      "detail": "Print the currently installed version of a dependency",
+      "group": "build",
+      "type": "process",
+      "command": "pnpm",
+      "args": ["list", "--fail-if-no-match", "${input:depName}"],
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Frontend :: Show Dependency Version (All)",
+      "detail": "Print the currently installed version of all dependencies",
+      "group": "build",
+      "type": "process",
+      "command": "pnpm",
+      "args": ["list", "--fail-if-no-match"],
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
     }
   ],
   "inputs": [
