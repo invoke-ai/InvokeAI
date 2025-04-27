@@ -192,6 +192,18 @@
         "focus": true,
         "panel": "shared"
       }
+    },
+    {
+      "label": "Backend :: Show Dependency Version (All)",
+      "detail": "Print the currently installed version of all dependencies",
+      "group": "build",
+      "type": "shell",
+      "command": "uv tree --depth 1",
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
     }
   ],
   "inputs": [
