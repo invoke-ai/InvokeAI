@@ -53,7 +53,7 @@
   "runArgs": [
     "--env-file",
     ".devcontainer/.env"
-    // "--userns=keep-id", // Uncomment if using podman instead of docker.
+    // "--userns=keep-id", // Uncomment if using podman instead of docker. (remove after next vscode-remote extension release: https://github.com/microsoft/vscode-remote-release/issues/10798#issuecomment-2826767753)
     // "--device=nvidia.com/gpu=all", // Uncomment if using podman instead of docker.
   ],
   "initializeCommand": [".devcontainer/scripts/init"],
@@ -72,16 +72,14 @@
           "${containerWorkspaceFolder}/invokeai/frontend/web"
         ],
         "python.analysis.extraPaths": [
-          "/home/node/invokeai",
+          "/home/node/invokeai/nodes",
           "/home/node/.venv/lib",
           "${containerWorkspaceFolder}"
         ],
         "python.testing.promptToConfigure": false,
         "python.testing.pytestEnabled": true,
-        "python.testing.pytestArgs": [
-          "--no-cov" // prevents interference from code-coverage when running tests within the debugger
-        ],
-        "files.autoSaveWhenNoErrors": true,
+        "python.testing.pytestArgs": ["--tb=line", "--no-header"], // makes the output of pytest more human readable and parseable by vscode
+        "files.autoSaveWhenNoErrors": true, // prevents auto-saving when there are errors in the code, makes hot-reloading more reliable by not flooding the tooling with errors which tend to break it.
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
           "source.organizeImports": "always"
