@@ -180,6 +180,25 @@
         "clear": true,
         "panel": "dedicated"
       }
+    },
+    {
+      "label": "Backend :: Show Dependency Version",
+      "detail": "Print the currently installed version of a dependency",
+      "group": "build",
+      "type": "shell",
+      "command": "uv tree --depth 0 --package ${input:depName}",
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "depName",
+      "type": "promptString",
+      "description": "Dependency name (e.g. torch, pytest, etc):"
     }
   ]
 }
