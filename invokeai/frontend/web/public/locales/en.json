@@ -1322,7 +1322,7 @@
         "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
         "unableToCopyDesc_theseSteps": "these steps",
         "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks.",
-        "image3IncompatibleWithInpaintAndOutpaint": "Imagen3 is does not support Inpainting or Outpainting. Use other models for these tasks.",
+        "image3IncompatibleWithInpaintAndOutpaint": "Imagen3 does not support Inpainting or Outpainting. Use other models for these tasks.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
         "workflowUnpublished": "Workflow Unpublished"
