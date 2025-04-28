@@ -60,6 +60,13 @@ class LoRALayer(LoRALayerBase):
         return self.down.shape[0]
 
     def fuse_weights(self, up: torch.Tensor, down: torch.Tensor) -> torch.Tensor:
+        """
+        Fuse the weights of the up and down matrices of a LoRA layer with different ranks.
+
+        Since the Huggingface implementation of KQV projections are fused, when we convert to Kohya format
+        the LoRA weights have different ranks. This function handles the fusion of these differently sized
+        matrices.
+        """
 
         fused_lora = torch.zeros(
             (up.shape[0], down.shape[1]), device=down.device, dtype=down.dtype
@@ -85,7 +92,7 @@ class LoRALayer(LoRALayerBase):
             down = self.down.reshape(self.down.shape[0], self.down.shape[1])
             weight = torch.einsum("m n w h, i m, n j -> i j w h", self.mid, up, down)
         else:
-            # up matrix and down matrix have different ranks so we cant simply multiply them
+            # up matrix and down matrix have different ranks so we can't simply multiply them
             if not self.are_ranks_equal:
                 weight = self.fuse_weights(self.up, self.down)
                 return weight
