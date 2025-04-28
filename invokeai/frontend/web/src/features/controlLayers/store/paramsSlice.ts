@@ -79,6 +79,7 @@ export type ParamsState = {
   clipLEmbedModel: ParameterCLIPLEmbedModel | null;
   clipGEmbedModel: ParameterCLIPGEmbedModel | null;
   controlLora: ParameterControlLoRAModel | null;
+  imagen3EnhancePrompt: boolean;
 };
 
 const initialState: ParamsState = {
@@ -128,6 +129,7 @@ const initialState: ParamsState = {
   clipLEmbedModel: null,
   clipGEmbedModel: null,
   controlLora: null,
+  imagen3EnhancePrompt: true,
 };
 
 export const paramsSlice = createSlice({
@@ -290,6 +292,9 @@ export const paramsSlice = createSlice({
     setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceMinDenoise = action.payload;
     },
+    imagen3EnhancePromptChanged: (state, action: PayloadAction<boolean>) => {
+      state.imagen3EnhancePrompt = action.payload;
+    },
     paramsReset: (state) => resetState(state),
   },
   extraReducers(builder) {
@@ -357,6 +362,7 @@ export const {
   setRefinerStart,
   modelChanged,
   paramsReset,
+  imagen3EnhancePromptChanged,
 } = paramsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -380,6 +386,7 @@ export const selectIsSDXL = createParamsSelector((params) => params.model?.base 
 export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
+export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
@@ -414,6 +421,7 @@ export const selectNegativePrompt = createParamsSelector((params) => params.nega
 export const selectPositivePrompt2 = createParamsSelector((params) => params.positivePrompt2);
 export const selectNegativePrompt2 = createParamsSelector((params) => params.negativePrompt2);
 export const selectShouldConcatPrompts = createParamsSelector((params) => params.shouldConcatPrompts);
+export const selectImagen3EnhancePrompt = createParamsSelector((params) => params.imagen3EnhancePrompt);
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);

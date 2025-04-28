@@ -8,6 +8,7 @@ import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
+import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
@@ -48,6 +49,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
             return await buildFLUXGraph(state, manager);
           case 'cogview4':
             return await buildCogView4Graph(state, manager);
+          case 'imagen3':
+            return await buildImagen3Graph(state, manager);
           default:
             assert(false, `No graph builders for base ${base}`);
         }
@@ -68,12 +71,20 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         return;
       }
 
-      const { g, noise, posCond } = buildGraphResult.value;
+      const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
 
       const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
 
       const prepareBatchResult = withResult(() =>
-        prepareLinearUIBatch(state, g, prepend, noise, posCond, 'canvas', destination)
+        prepareLinearUIBatch(
+          state,
+          g,
+          prepend,
+          seedFieldIdentifier,
+          positivePromptFieldIdentifier,
+          'canvas',
+          destination
+        )
       );
 
       if (prepareBatchResult.isErr()) {

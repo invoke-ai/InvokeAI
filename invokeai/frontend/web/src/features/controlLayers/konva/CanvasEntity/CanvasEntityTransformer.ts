@@ -346,7 +346,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     // If the user is not holding shift, the transform is retaining aspect ratio. It's not possible to snap to the grid
     // in this case, because that would change the aspect ratio. So, we only snap to the grid when shift is held.
-    const gridSize = this.manager.stateApi.$shiftKey.get() ? this.manager.stateApi.getGridSize() : 1;
+    const gridSize = this.manager.stateApi.$shiftKey.get() ? this.manager.stateApi.getPositionGridSize() : 1;
 
     // We need to snap the anchor to the selected grid size, but the positions provided to this callback are absolute,
     // scaled coordinates. They need to be converted to stage coordinates, snapped, then converted back to absolute
@@ -464,7 +464,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
-    const gridSize = this.manager.stateApi.getGridSize();
+    const gridSize = this.manager.stateApi.getPositionGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();
     const scaleX = rect.width / width;
@@ -498,7 +498,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
-    const gridSize = this.manager.stateApi.getGridSize();
+    const gridSize = this.manager.stateApi.getPositionGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();
     const scaleX = rect.width / width;
@@ -523,7 +523,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   onDragMove = () => {
     // Snap the interaction rect to the grid
-    const gridSize = this.manager.stateApi.getGridSize();
+    const gridSize = this.manager.stateApi.getPositionGridSize();
     this.konva.proxyRect.x(roundToMultiple(this.konva.proxyRect.x(), gridSize));
     this.konva.proxyRect.y(roundToMultiple(this.konva.proxyRect.y(), gridSize));
 

@@ -1,18 +1,17 @@
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
-import type { Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
-
-import type { ConditioningNodes, NoiseNodes } from './types';
+import type { Batch, EnqueueBatchArg } from 'services/api/types';
 
 export const prepareLinearUIBatch = (
   state: RootState,
   g: Graph,
   prepend: boolean,
-  noise: Invocation<NoiseNodes>,
-  posCond: Invocation<ConditioningNodes>,
+  seedFieldIdentifier: FieldIdentifier,
+  positivePromptFieldIdentifier: FieldIdentifier,
   origin: 'canvas' | 'workflows' | 'upscaling',
   destination: 'canvas' | 'gallery'
 ): EnqueueBatchArg => {
@@ -31,8 +30,8 @@ export const prepareLinearUIBatch = (
     });
 
     firstBatchDatumList.push({
-      node_path: noise.id,
-      field_name: 'seed',
+      node_path: seedFieldIdentifier.nodeId,
+      field_name: seedFieldIdentifier.fieldName,
       items: seeds,
     });
 
@@ -51,8 +50,8 @@ export const prepareLinearUIBatch = (
     });
 
     secondBatchDatumList.push({
-      node_path: noise.id,
-      field_name: 'seed',
+      node_path: seedFieldIdentifier.nodeId,
+      field_name: seedFieldIdentifier.fieldName,
       items: seeds,
     });
 
@@ -70,8 +69,8 @@ export const prepareLinearUIBatch = (
 
   // zipped batch of prompts
   firstBatchDatumList.push({
-    node_path: posCond.id,
-    field_name: 'prompt',
+    node_path: positivePromptFieldIdentifier.nodeId,
+    field_name: positivePromptFieldIdentifier.fieldName,
     items: extendedPrompts,
   });
 
@@ -85,7 +84,7 @@ export const prepareLinearUIBatch = (
 
   if (shouldConcatPrompts && model?.base === 'sdxl') {
     firstBatchDatumList.push({
-      node_path: posCond.id,
+      node_path: positivePromptFieldIdentifier.nodeId,
       field_name: 'style',
       items: extendedPrompts,
     });

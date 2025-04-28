@@ -493,7 +493,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the _positional_ grid size for the current canvas. Note that this is not the same as bbox grid size, which is
    * based on the currently-selected model.
    */
-  getGridSize = (): number => {
+  getPositionGridSize = (): number => {
     const snapToGrid = this.getSettings().snapToGrid;
     if (!snapToGrid) {
       return 1;

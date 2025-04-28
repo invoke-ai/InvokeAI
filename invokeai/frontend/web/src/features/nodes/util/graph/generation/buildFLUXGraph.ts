@@ -5,6 +5,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -37,7 +38,7 @@ const log = logger('system');
 export const buildFLUXGraph = async (
   state: RootState,
   manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'noise' | 'flux_denoise'>; posCond: Invocation<'flux_text_encoder'> }> => {
+): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building FLUX graph');
 
@@ -336,5 +337,9 @@ export const buildFLUXGraph = async (
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return { g, noise: denoise, posCond };
+  return {
+    g,
+    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
+    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+  };
 };

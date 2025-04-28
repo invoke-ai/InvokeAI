@@ -6,6 +6,7 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -30,7 +31,7 @@ const log = logger('system');
 export const buildCogView4Graph = async (
   state: RootState,
   manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'cogview4_denoise'>; posCond: Invocation<'cogview4_text_encoder'> }> => {
+): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building CogView4 graph');
 
@@ -186,5 +187,9 @@ export const buildCogView4Graph = async (
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return { g, noise: denoise, posCond };
+  return {
+    g,
+    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
+    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+  };
 };

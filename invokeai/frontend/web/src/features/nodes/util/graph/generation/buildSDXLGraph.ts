@@ -5,6 +5,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -36,7 +37,7 @@ const log = logger('system');
 export const buildSDXLGraph = async (
   state: RootState,
   manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'sdxl_compel_prompt'> }> => {
+): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
@@ -323,5 +324,9 @@ export const buildSDXLGraph = async (
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return { g, noise, posCond };
+  return {
+    g,
+    seedFieldIdentifier: { nodeId: noise.id, fieldName: 'seed' },
+    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+  };
 };

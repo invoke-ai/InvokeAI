@@ -2,13 +2,21 @@ import { CompositeNumberInput, FormControl, FormLabel } from '@invoke-ai/ui-libr
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectSeed, selectShouldRandomizeSeed, setSeed } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectImagen3EnhancePrompt,
+  selectIsImagen3,
+  selectSeed,
+  selectShouldRandomizeSeed,
+  setSeed,
+} from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const ParamSeedNumberInput = memo(() => {
   const seed = useAppSelector(selectSeed);
   const shouldRandomizeSeed = useAppSelector(selectShouldRandomizeSeed);
+  const isImagen3 = useAppSelector(selectIsImagen3);
+  const imagen3EnhancePrompt = useAppSelector(selectImagen3EnhancePrompt);
 
   const { t } = useTranslation();
 
@@ -17,7 +25,7 @@ export const ParamSeedNumberInput = memo(() => {
   const handleChangeSeed = useCallback((v: number) => dispatch(setSeed(v)), [dispatch]);
 
   return (
-    <FormControl flexGrow={1}>
+    <FormControl flexGrow={1} isDisabled={shouldRandomizeSeed || (isImagen3 && imagen3EnhancePrompt)}>
       <InformationalPopover feature="paramSeed">
         <FormLabel>{t('parameters.seed')}</FormLabel>
       </InformationalPopover>
@@ -25,7 +33,6 @@ export const ParamSeedNumberInput = memo(() => {
         step={1}
         min={NUMPY_RAND_MIN}
         max={NUMPY_RAND_MAX}
-        isDisabled={shouldRandomizeSeed}
         onChange={handleChangeSeed}
         value={seed}
         flexGrow={1}
