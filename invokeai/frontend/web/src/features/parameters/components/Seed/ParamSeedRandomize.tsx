@@ -1,11 +1,6 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  selectImagen3EnhancePrompt,
-  selectIsImagen3,
-  selectShouldRandomizeSeed,
-  setShouldRandomizeSeed,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectShouldRandomizeSeed, setShouldRandomizeSeed } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,8 +8,6 @@ import { useTranslation } from 'react-i18next';
 export const ParamSeedRandomize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isImagen3 = useAppSelector(selectIsImagen3);
-  const imagen3EnhancePrompt = useAppSelector(selectImagen3EnhancePrompt);
 
   const shouldRandomizeSeed = useAppSelector(selectShouldRandomizeSeed);
 
@@ -24,7 +17,7 @@ export const ParamSeedRandomize = memo(() => {
   );
 
   return (
-    <FormControl w="min-content" isDisabled={isImagen3 && imagen3EnhancePrompt}>
+    <FormControl w="min-content">
       <FormLabel m={0}>{t('common.random')}</FormLabel>
       <Switch isChecked={shouldRandomizeSeed} onChange={handleChangeShouldRandomizeSeed} />
     </FormControl>

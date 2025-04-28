@@ -73,9 +73,17 @@ export const ImageSettingsAccordion = memo(() => {
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
+      <Flex
+        px={4}
+        pt={4}
+        pb={isImagen3 ? 4 : 0}
+        w="full"
+        h="full"
+        flexDir="column"
+        data-testid="image-settings-accordion"
+      >
         <BboxSettings />
-        <ParamSeed py={3} />
+        {!isImagen3 && <ParamSeed py={3} />}
         {!isImagen3 && (
           <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
             <Flex gap={4} pb={4} flexDir="column">

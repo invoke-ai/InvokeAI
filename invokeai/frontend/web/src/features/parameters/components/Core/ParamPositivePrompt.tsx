@@ -2,7 +2,6 @@ import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { positivePromptChanged, selectBase, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
-import { Imagen3EnhancePromptButton } from 'features/parameters/components/Core/Imagen3EnhancePromptButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
@@ -88,7 +87,6 @@ export const ParamPositivePrompt = memo(() => {
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
           {baseModel === 'sdxl' && <SDXLConcatButton />}
-          {baseModel === 'imagen3' && <Imagen3EnhancePromptButton />}
           <ShowDynamicPromptsPreviewButton />
         </PromptOverlayButtonWrapper>
         <PromptLabel label={t('parameters.positivePromptPlaceholder')} />
