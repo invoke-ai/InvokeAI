@@ -23,11 +23,3 @@ export type MainModelLoaderNodes =
   | 'cogview4_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
-export type NoiseNodes = 'noise' | 'flux_denoise' | 'sd3_denoise' | 'cogview4_denoise';
-
-export type ConditioningNodes =
-  | 'compel'
-  | 'sdxl_compel_prompt'
-  | 'flux_text_encoder'
-  | 'sd3_text_encoder'
-  | 'cogview4_text_encoder';
