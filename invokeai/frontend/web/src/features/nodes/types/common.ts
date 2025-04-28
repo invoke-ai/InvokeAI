@@ -89,7 +89,6 @@ const zModelType = z.enum([
   'siglip',
   'flux_redux',
 ]);
-export type ModelType = z.infer<typeof zModelType>;
 const zSubModelType = z.enum([
   'unet',
   'transformer',

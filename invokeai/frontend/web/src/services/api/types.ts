@@ -65,7 +65,7 @@ export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type SigLipModelConfig = S['SigLIPConfig'];
 export type FLUXReduxModelConfig = S['FluxReduxConfig'];
-export type ApiModelConfig = S['ApiModelConfig'];
+type ApiModelConfig = S['ApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
