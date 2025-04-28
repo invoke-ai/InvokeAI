@@ -3,9 +3,14 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectIsImagen3 } from 'features/controlLayers/store/paramsSlice';
+import { selectIsGPTImage, selectIsImagen3 } from 'features/controlLayers/store/paramsSlice';
 import { selectAspectRatioID } from 'features/controlLayers/store/selectors';
-import { isAspectRatioID, zAspectRatioID, zImagen3AspectRatioID } from 'features/controlLayers/store/types';
+import {
+  isAspectRatioID,
+  zAspectRatioID,
+  zGPTImageAspectRatioID,
+  zImagen3AspectRatioID,
+} from 'features/controlLayers/store/types';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,13 +22,18 @@ export const BboxAspectRatioSelect = memo(() => {
   const id = useAppSelector(selectAspectRatioID);
   const isStaging = useAppSelector(selectIsStaging);
   const isImagen3 = useAppSelector(selectIsImagen3);
+  const isGPTImage = useAppSelector(selectIsGPTImage);
 
   const options = useMemo(() => {
-    if (!isImagen3) {
+    if (!isImagen3 && !isGPTImage) {
       return zAspectRatioID.options;
     }
-    return zImagen3AspectRatioID.options;
-  }, [isImagen3]);
+    if (isImagen3) {
+      return zImagen3AspectRatioID.options;
+    }
+
+    return zGPTImageAspectRatioID.options;
+  }, [isImagen3, isGPTImage]);
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
     (e) => {
