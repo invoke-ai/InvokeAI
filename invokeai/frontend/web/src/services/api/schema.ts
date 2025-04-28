@@ -20871,6 +20871,7 @@ export type components = {
             /**
              * Tags
              * @description The node's tags
+             * @default null
              */
             tags: string[] | null;
             /**
