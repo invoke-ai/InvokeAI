@@ -61,6 +61,10 @@ def get_openapi_func(
         # We need to manually add all outputs to the schema - pydantic doesn't add them because they aren't used directly.
         for output in InvocationRegistry.get_output_classes():
             json_schema = output.model_json_schema(mode="serialization", ref_template="#/components/schemas/{model}")
+            # Remove output_metadata that is only used on back-end from the schema
+            if "output_meta" in json_schema["properties"]:
+                json_schema["properties"].pop("output_meta")
+
             move_defs_to_top_level(openapi_schema, json_schema)
             openapi_schema["components"]["schemas"][output.__name__] = json_schema
 

@@ -25,7 +25,7 @@ from typing import (
 )
 
 import semver
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
@@ -99,6 +99,12 @@ class BaseInvocationOutput(BaseModel):
 
     All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
     """
+
+    output_meta: Optional[dict[str, JsonValue]] = Field(
+        default=None,
+        description="Optional dictionary of metadata for the invocation output, unrelated to the invocation's actual output value. This is not exposed as an output field.",
+        json_schema_extra={"field_kind": FieldKind.NodeAttribute},
+    )
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocationOutput]) -> None:
@@ -397,7 +403,7 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
 
 RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
 
-RESERVED_OUTPUT_FIELD_NAMES = {"type"}
+RESERVED_OUTPUT_FIELD_NAMES = {"type", "output_meta"}
 
 
 class _Model(BaseModel):
