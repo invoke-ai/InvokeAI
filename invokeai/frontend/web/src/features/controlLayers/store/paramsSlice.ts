@@ -381,6 +381,7 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
+export const selectIsGPTImage = createParamsSelector((params) => params.model?.base === 'gpt-image');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);

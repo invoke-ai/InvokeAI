@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsFLUX,
+  selectIsGPTImage,
   selectIsImagen3,
   selectIsSD3,
   selectParamsSlice,
@@ -18,7 +19,7 @@ import { BboxSettings } from 'features/parameters/components/Bbox/BboxSettings';
 import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectBadges = createMemoizedSelector([selectCanvasSlice, selectParamsSlice], (canvas, params) => {
@@ -65,6 +66,11 @@ export const ImageSettingsAccordion = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
   const isImagen3 = useAppSelector(selectIsImagen3);
+  const isGPTImage = useAppSelector(selectIsGPTImage);
+
+  const isApiModel = useMemo(() => {
+    return isImagen3 || isGPTImage;
+  }, [isImagen3, isGPTImage]);
 
   return (
     <StandaloneAccordion
@@ -76,15 +82,15 @@ export const ImageSettingsAccordion = memo(() => {
       <Flex
         px={4}
         pt={4}
-        pb={isImagen3 ? 4 : 0}
+        pb={isApiModel ? 4 : 0}
         w="full"
         h="full"
         flexDir="column"
         data-testid="image-settings-accordion"
       >
         <BboxSettings />
-        {!isImagen3 && <ParamSeed py={3} />}
-        {!isImagen3 && (
+        {!isApiModel && <ParamSeed py={3} />}
+        {!isApiModel && (
           <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
             <Flex gap={4} pb={4} flexDir="column">
               {(isFLUX || isSD3) && <ParamOptimizedDenoisingToggle />}

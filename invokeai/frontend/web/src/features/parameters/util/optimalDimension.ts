@@ -44,6 +44,7 @@ export const getGridSize = (base?: BaseModelType | null): number => {
     case 'sd-2':
     case 'sdxl':
     case 'imagen3':
+    case 'gpt-image':
     default:
       return 8;
   }

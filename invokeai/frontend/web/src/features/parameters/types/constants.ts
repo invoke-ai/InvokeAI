@@ -13,6 +13,7 @@ export const MODEL_TYPE_MAP = {
   flux: 'FLUX',
   cogview4: 'CogView4',
   imagen3: 'Imagen3',
+  'gpt-image': 'GPT-Image',
 };
 
 /**
@@ -28,6 +29,7 @@ export const MODEL_TYPE_SHORT_MAP = {
   flux: 'FLUX',
   cogview4: 'CogView4',
   imagen3: 'Imagen3',
+  'gpt-image': 'GPT-Image',
 };
 
 /**
@@ -67,6 +69,10 @@ export const CLIP_SKIP_MAP = {
     markers: [],
   },
   imagen3: {
+    maxClip: 0,
+    markers: [],
+  },
+  'gpt-image': {
     maxClip: 0,
     markers: [],
   },
