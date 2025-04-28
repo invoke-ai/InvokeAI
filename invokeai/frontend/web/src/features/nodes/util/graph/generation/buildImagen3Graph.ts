@@ -1,0 +1,97 @@
+import { logger } from 'app/logging/logger';
+import type { RootState } from 'app/store/store';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { isImagen3AspectRatioID } from 'features/controlLayers/store/types';
+import type { FieldIdentifier } from 'features/nodes/types/field';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import {
+  CANVAS_OUTPUT_PREFIX,
+  getBoardField,
+  selectPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
+import { t } from 'i18next';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
+
+const log = logger('system');
+
+export const buildImagen3Graph = async (
+  state: RootState,
+  manager: CanvasManager
+): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
+  const generationMode = await manager.compositor.getGenerationMode();
+
+  assert(
+    generationMode === 'txt2img' || generationMode === 'img2img',
+    t('toast.image3IncompatibleWithInpaintAndOutpaint')
+  );
+
+  log.debug({ generationMode }, 'Building Imagen3 graph');
+
+  const params = selectParamsSlice(state);
+  const canvas = selectCanvasSlice(state);
+  const canvasSettings = selectCanvasSettingsSlice(state);
+
+  const { bbox } = canvas;
+  const { seed, imagen3EnhancePrompt: enhance_prompt } = params;
+  const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
+
+  assert(isImagen3AspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
+
+  const is_intermediate = canvasSettings.sendToCanvas;
+  const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
+
+  if (generationMode === 'txt2img') {
+    const g = new Graph(getPrefixedId('imagen3_txt2img_graph'));
+    const imagen3 = g.addNode({
+      // @ts-expect-error: These nodes are not available in the OSS application
+      type: 'google_imagen3_generate',
+      id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      aspect_ratio: bbox.aspectRatio.id,
+      seed,
+      enhance_prompt,
+      // When enhance_prompt is true, Imagen3 will return a new image every time, ignoring the seed.
+      use_cache: !enhance_prompt,
+      is_intermediate,
+      board,
+    });
+    return {
+      g,
+      seedFieldIdentifier: { nodeId: imagen3.id, fieldName: 'seed' },
+      positivePromptFieldIdentifier: { nodeId: imagen3.id, fieldName: 'positive_prompt' },
+    };
+  }
+
+  if (generationMode === 'img2img') {
+    const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
+    const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
+      is_intermediate: true,
+      silent: true,
+    });
+    const g = new Graph(getPrefixedId('imagen3_img2img_graph'));
+    const imagen3 = g.addNode({
+      // @ts-expect-error: These nodes are not available in the OSS application
+      type: 'google_imagen3_edit',
+      id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      seed,
+      base_image: { image_name },
+      is_intermediate,
+      board,
+    });
+    return {
+      g,
+      seedFieldIdentifier: { nodeId: imagen3.id, fieldName: 'seed' },
+      positivePromptFieldIdentifier: { nodeId: imagen3.id, fieldName: 'positive_prompt' },
+    };
+  }
+
+  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for imagen3');
+};

@@ -214,7 +214,7 @@ export const MainModelPicker = memo(() => {
         <UseDefaultSettingsButton />
       </Flex>
       <Portal appendToParentPortal={false}>
-        <PopoverContent p={0} w={448} h={512}>
+        <PopoverContent p={0} w={400} h={400}>
           <PopoverArrow />
           <PopoverBody p={0} w="full" h="full">
             <Picker<AnyModelConfig, GroupData, PickerExtraContext>

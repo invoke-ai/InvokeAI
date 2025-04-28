@@ -67,7 +67,7 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isRenderableEntity } from './types';
+import { getEntityIdentifier, isImagen3AspectRatioID, isRenderableEntity } from './types';
 import {
   converters,
   getControlLayerState,
@@ -1139,7 +1139,21 @@ export const canvasSlice = createSlice({
       syncScaledSize(state);
     },
     bboxChangedFromCanvas: (state, action: PayloadAction<IRect>) => {
-      state.bbox.rect = action.payload;
+      const newBboxRect = action.payload;
+      const oldBboxRect = state.bbox.rect;
+
+      state.bbox.rect = newBboxRect;
+
+      if (newBboxRect.width === oldBboxRect.width && newBboxRect.height === oldBboxRect.height) {
+        return;
+      }
+
+      const oldAspectRatio = state.bbox.aspectRatio.value;
+      const newAspectRatio = newBboxRect.width / newBboxRect.height;
+
+      if (oldAspectRatio === newAspectRatio) {
+        return;
+      }
 
       // TODO(psyche): Figure out a way to handle this without resetting the aspect ratio on every change.
       // This action is dispatched when the user resizes or moves the bbox from the canvas. For now, when the user
@@ -1198,6 +1212,26 @@ export const canvasSlice = createSlice({
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
+      } else if (state.bbox.modelBase === 'imagen3' && isImagen3AspectRatioID(id)) {
+        // Imagen3 has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
+        if (id === '16:9') {
+          state.bbox.rect.width = 1408;
+          state.bbox.rect.height = 768;
+        } else if (id === '4:3') {
+          state.bbox.rect.width = 1280;
+          state.bbox.rect.height = 896;
+        } else if (id === '1:1') {
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
+        } else if (id === '3:4') {
+          state.bbox.rect.width = 896;
+          state.bbox.rect.height = 1280;
+        } else if (id === '9:16') {
+          state.bbox.rect.width = 768;
+          state.bbox.rect.height = 1408;
+        }
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
       } else {
         state.bbox.aspectRatio.isLocked = true;
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -1670,6 +1704,13 @@ export const canvasSlice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
+        if (base === 'imagen3') {
+          state.bbox.aspectRatio.isLocked = true;
+          state.bbox.aspectRatio.value = 1;
+          state.bbox.aspectRatio.id = '1:1';
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
+        }
         syncScaledSize(state);
       }
     });
@@ -1802,6 +1843,10 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const syncScaledSize = (state: CanvasState) => {
+  if (state.bbox.modelBase === 'imagen3') {
+    // Imagen3 has fixed sizes. Scaled bbox is not supported.
+    return;
+  }
   if (state.bbox.scaleMethod === 'auto') {
     // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;

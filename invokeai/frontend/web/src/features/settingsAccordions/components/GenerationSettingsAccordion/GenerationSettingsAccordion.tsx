@@ -4,7 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectIsCogView4, selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
+import { selectIsCogView4, selectIsFLUX, selectIsImagen3, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
@@ -33,6 +33,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
+  const isImagen3 = useAppSelector(selectIsImagen3);
 
   const isUpscaling = useMemo(() => {
     return activeTabName === 'upscaling';
@@ -42,7 +43,12 @@ export const GenerationSettingsAccordion = memo(() => {
       createMemoizedSelector(selectLoRAsSlice, (loras) => {
         const enabledLoRAsCount = loras.loras.filter((l) => l.isEnabled).length;
         const loraTabBadges = enabledLoRAsCount ? [`${enabledLoRAsCount} ${t('models.concepts')}`] : EMPTY_ARRAY;
-        const accordionBadges = modelConfig ? [modelConfig.name, modelConfig.base] : EMPTY_ARRAY;
+        const accordionBadges =
+          modelConfig?.base === 'imagen3'
+            ? [modelConfig.name]
+            : modelConfig
+              ? [modelConfig.name, modelConfig.base]
+              : EMPTY_ARRAY;
         return { loraTabBadges, accordionBadges };
       }),
     [modelConfig, t]
@@ -65,23 +71,25 @@ export const GenerationSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Box px={4} pt={4} data-testid="generation-accordion">
-        <Flex gap={4} flexDir="column">
+        <Flex gap={4} flexDir="column" pb={isImagen3 ? 4 : 0}>
           <MainModelPicker />
-          <LoRASelect />
-          <LoRAList />
+          {!isImagen3 && <LoRASelect />}
+          {!isImagen3 && <LoRAList />}
         </Flex>
-        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-          <Flex gap={4} flexDir="column" pb={4}>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && !isSD3 && !isCogView4 && !isUpscaling && <ParamScheduler />}
-              {isUpscaling && <ParamUpscaleScheduler />}
-              <ParamSteps />
-              {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
-              {isUpscaling && <ParamUpscaleCFGScale />}
-              {!isFLUX && !isUpscaling && <ParamCFGScale />}
-            </FormControlGroup>
-          </Flex>
-        </Expander>
+        {!isImagen3 && (
+          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+            <Flex gap={4} flexDir="column" pb={4}>
+              <FormControlGroup formLabelProps={formLabelProps}>
+                {!isFLUX && !isSD3 && !isCogView4 && !isUpscaling && <ParamScheduler />}
+                {isUpscaling && <ParamUpscaleScheduler />}
+                <ParamSteps />
+                {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
+                {isUpscaling && <ParamUpscaleCFGScale />}
+                {!isFLUX && !isUpscaling && <ParamCFGScale />}
+              </FormControlGroup>
+            </Flex>
+          </Expander>
+        )}
       </Box>
     </StandaloneAccordion>
   );

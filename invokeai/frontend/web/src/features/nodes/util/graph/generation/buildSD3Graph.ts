@@ -5,6 +5,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -29,7 +30,7 @@ const log = logger('system');
 export const buildSD3Graph = async (
   state: RootState,
   manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'sd3_denoise'>; posCond: Invocation<'sd3_text_encoder'> }> => {
+): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD3 graph');
 
@@ -211,5 +212,9 @@ export const buildSD3Graph = async (
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return { g, noise: denoise, posCond };
+  return {
+    g,
+    seedFieldIdentifier: { nodeId: denoise.id, fieldName: 'seed' },
+    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+  };
 };
