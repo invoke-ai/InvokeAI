@@ -57,8 +57,7 @@ ARG DATA_DIR=/home/${USERNAME}/.data
 ENV XDG_CACHE_HOME=${CACHE_DIR} \
     XDG_DATA_HOME=${DATA_DIR} \
     GIT_LFS_CACHE=${CACHE_DIR}/git-lfs \
-    PATH="$UV_PROJECT_ENVIRONMENT/bin:$CACHE_DIR/pnpm:$CACHE_DIR/uv:$PATH" \
-    PYTHONPATH="$PYTHONPATH:${INVOKEAI_SRC}"
+    PATH="$UV_PROJECT_ENVIRONMENT/bin:$CACHE_DIR/pnpm:$CACHE_DIR/uv:$PATH"
 
 # Predeclare volume mounting points for directories which will be written to.
 # This guarantees that even if the devcontainer doesnt mount a volume for these paths, their contents will still be handled by a volume, 
