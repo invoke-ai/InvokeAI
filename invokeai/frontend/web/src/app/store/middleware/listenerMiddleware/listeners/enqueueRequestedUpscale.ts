@@ -18,9 +18,17 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
       const state = getState();
       const { prepend } = action.payload;
 
-      const { g, noise, posCond } = await buildMultidiffusionUpscaleGraph(state);
+      const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = await buildMultidiffusionUpscaleGraph(state);
 
-      const batchConfig = prepareLinearUIBatch(state, g, prepend, noise, posCond, 'upscaling', 'gallery');
+      const batchConfig = prepareLinearUIBatch(
+        state,
+        g,
+        prepend,
+        seedFieldIdentifier,
+        positivePromptFieldIdentifier,
+        'upscaling',
+        'gallery'
+      );
 
       const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));
       try {
