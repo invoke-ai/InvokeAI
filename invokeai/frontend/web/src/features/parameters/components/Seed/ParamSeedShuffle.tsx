@@ -3,8 +3,6 @@ import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import randomInt from 'common/util/randomInt';
 import {
-  selectImagen3EnhancePrompt,
-  selectIsImagen3,
   selectShouldRandomizeSeed,
   setSeed,
 } from 'features/controlLayers/store/paramsSlice';
@@ -15,8 +13,6 @@ import { PiShuffleBold } from 'react-icons/pi';
 export const ParamSeedShuffle = memo(() => {
   const dispatch = useAppDispatch();
   const shouldRandomizeSeed = useAppSelector(selectShouldRandomizeSeed);
-  const isImagen3 = useAppSelector(selectIsImagen3);
-  const imagen3EnhancePrompt = useAppSelector(selectImagen3EnhancePrompt);
 
   const { t } = useTranslation();
 
@@ -28,7 +24,7 @@ export const ParamSeedShuffle = memo(() => {
   return (
     <Button
       size="sm"
-      isDisabled={shouldRandomizeSeed || (isImagen3 && imagen3EnhancePrompt)}
+      isDisabled={shouldRandomizeSeed}
       onClick={handleClickRandomizeSeed}
       leftIcon={<PiShuffleBold />}
       flexShrink={0}

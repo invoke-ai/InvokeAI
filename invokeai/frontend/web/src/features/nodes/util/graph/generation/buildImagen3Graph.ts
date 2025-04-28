@@ -3,7 +3,6 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isImagen3AspectRatioID } from 'features/controlLayers/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
@@ -32,12 +31,10 @@ export const buildImagen3Graph = async (
 
   log.debug({ generationMode }, 'Building Imagen3 graph');
 
-  const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
 
   const { bbox } = canvas;
-  const { seed, imagen3EnhancePrompt: enhance_prompt } = params;
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
 
   assert(isImagen3AspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
@@ -54,10 +51,9 @@ export const buildImagen3Graph = async (
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       aspect_ratio: bbox.aspectRatio.id,
-      seed,
-      enhance_prompt,
+      enhance_prompt: true,
       // When enhance_prompt is true, Imagen3 will return a new image every time, ignoring the seed.
-      use_cache: !enhance_prompt,
+      use_cache: false,
       is_intermediate,
       board,
     });
@@ -81,7 +77,6 @@ export const buildImagen3Graph = async (
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      seed,
       base_image: { image_name },
       is_intermediate,
       board,

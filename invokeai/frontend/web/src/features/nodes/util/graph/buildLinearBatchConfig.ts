@@ -1,5 +1,7 @@
+import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
+import randomInt from 'common/util/randomInt';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { range } from 'lodash-es';
@@ -26,7 +28,9 @@ export const prepareLinearUIBatch = (
   if (seedBehaviour === 'PER_PROMPT') {
     const seeds = generateSeeds({
       count: prompts.length * iterations,
-      start: shouldRandomizeSeed ? undefined : seed,
+      // Imagen3's support for seeded generation is iffy, we are just not going too use in in linear UI generations.
+      start:
+        model?.base === 'imagen3' ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX) : shouldRandomizeSeed ? undefined : seed,
     });
 
     firstBatchDatumList.push({
