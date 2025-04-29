@@ -67,7 +67,7 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isImagen3AspectRatioID, isRenderableEntity } from './types';
+import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagen3AspectRatioID, isRenderableEntity } from './types';
 import {
   converters,
   getControlLayerState,
@@ -1232,6 +1232,20 @@ export const canvasSlice = createSlice({
         }
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
+      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
+        // gpt-image has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
+        if (id === '3:2') {
+          state.bbox.rect.width = 1536;
+          state.bbox.rect.height = 1024;
+        } else if (id === '1:1') {
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
+        } else if (id === '2:3') {
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1536;
+        }
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
       } else {
         state.bbox.aspectRatio.isLocked = true;
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -1704,7 +1718,7 @@ export const canvasSlice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
-        if (base === 'imagen3') {
+        if (base === 'imagen3' || base === 'chatgpt-4o') {
           state.bbox.aspectRatio.isLocked = true;
           state.bbox.aspectRatio.value = 1;
           state.bbox.aspectRatio.id = '1:1';
@@ -1843,7 +1857,7 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const syncScaledSize = (state: CanvasState) => {
-  if (state.bbox.modelBase === 'imagen3') {
+  if (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'chatgpt-4o') {
     // Imagen3 has fixed sizes. Scaled bbox is not supported.
     return;
   }

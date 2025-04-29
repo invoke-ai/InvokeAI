@@ -388,9 +388,15 @@ export type StagingAreaImage = {
 };
 
 export const zAspectRatioID = z.enum(['Free', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
+
 export const zImagen3AspectRatioID = z.enum(['16:9', '4:3', '1:1', '3:4', '9:16']);
 export const isImagen3AspectRatioID = (v: unknown): v is z.infer<typeof zImagen3AspectRatioID> =>
   zImagen3AspectRatioID.safeParse(v).success;
+
+export const zChatGPT4oAspectRatioID = z.enum(['3:2', '1:1', '2:3']);
+export const isChatGPT4oAspectRatioID = (v: unknown): v is z.infer<typeof zChatGPT4oAspectRatioID> =>
+  zChatGPT4oAspectRatioID.safeParse(v).success;
+
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: unknown): v is AspectRatioID => zAspectRatioID.safeParse(v).success;
 

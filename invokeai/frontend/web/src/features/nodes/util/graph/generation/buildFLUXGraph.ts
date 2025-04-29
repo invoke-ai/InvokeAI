@@ -5,7 +5,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { FieldIdentifier } from 'features/nodes/types/field';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -23,7 +22,7 @@ import {
   getSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
+import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
@@ -35,10 +34,7 @@ import { addIPAdapters } from './addIPAdapters';
 
 const log = logger('system');
 
-export const buildFLUXGraph = async (
-  state: RootState,
-  manager: CanvasManager
-): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
+export const buildFLUXGraph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building FLUX graph');
 

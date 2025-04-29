@@ -6,6 +6,7 @@ import { withResult, withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
@@ -51,6 +52,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
             return await buildCogView4Graph(state, manager);
           case 'imagen3':
             return await buildImagen3Graph(state, manager);
+          case 'chatgpt-4o':
+            return await buildChatGPT4oGraph(state, manager);
           default:
             assert(false, `No graph builders for base ${base}`);
         }
@@ -76,15 +79,15 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
 
       const prepareBatchResult = withResult(() =>
-        prepareLinearUIBatch(
+        prepareLinearUIBatch({
           state,
           g,
           prepend,
           seedFieldIdentifier,
           positivePromptFieldIdentifier,
-          'canvas',
-          destination
-        )
+          origin: 'canvas',
+          destination,
+        })
       );
 
       if (prepareBatchResult.isErr()) {
