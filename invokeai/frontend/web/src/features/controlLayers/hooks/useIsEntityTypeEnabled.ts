@@ -1,7 +1,7 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import {
+  selectIsChatGTP4o,
   selectIsCogView4,
-  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSD3,
 } from 'features/controlLayers/store/paramsSlice';
@@ -14,24 +14,24 @@ export const useIsEntityTypeEnabled = (entityType: CanvasEntityType) => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPT4oImage);
+  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
 
   const isEntityTypeEnabled = useMemo<boolean>(() => {
     switch (entityType) {
       case 'reference_image':
-        return !isSD3 && !isCogView4 && !isImagen3 && !isGPTImage;
+        return !isSD3 && !isCogView4 && !isImagen3 && !isChatGPT4o;
       case 'regional_guidance':
-        return !isSD3 && !isCogView4 && !isImagen3 && !isGPTImage;
+        return !isSD3 && !isCogView4 && !isImagen3 && !isChatGPT4o;
       case 'control_layer':
-        return !isSD3 && !isCogView4 && !isImagen3 && !isGPTImage;
+        return !isSD3 && !isCogView4 && !isImagen3 && !isChatGPT4o;
       case 'inpaint_mask':
-        return !isImagen3 && !isGPTImage;
+        return !isImagen3 && !isChatGPT4o;
       case 'raster_layer':
-        return !isImagen3 && !isGPTImage;
+        return !isImagen3 && !isChatGPT4o;
       default:
         assert<Equals<typeof entityType, never>>(false);
     }
-  }, [entityType, isSD3, isCogView4, isImagen3, isGPTImage]);
+  }, [entityType, isSD3, isCogView4, isImagen3, isChatGPT4o]);
 
   return isEntityTypeEnabled;
 };

@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectIsGPT4oImage, selectIsImagen3 } from 'features/controlLayers/store/paramsSlice';
+import { selectIsChatGTP4o, selectIsImagen3 } from 'features/controlLayers/store/paramsSlice';
 import { selectAspectRatioID } from 'features/controlLayers/store/selectors';
 import {
   isAspectRatioID,
@@ -22,10 +22,10 @@ export const BboxAspectRatioSelect = memo(() => {
   const id = useAppSelector(selectAspectRatioID);
   const isStaging = useAppSelector(selectIsStaging);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPT4oImage);
+  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
 
   const options = useMemo(() => {
-    if (!isImagen3 && !isGPTImage) {
+    if (!isImagen3 && !isChatGPT4o) {
       return zAspectRatioID.options;
     }
     if (isImagen3) {
@@ -33,7 +33,7 @@ export const BboxAspectRatioSelect = memo(() => {
     }
 
     return zGPTImageAspectRatioID.options;
-  }, [isImagen3, isGPTImage]);
+  }, [isImagen3, isChatGPT4o]);
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
     (e) => {

@@ -4,8 +4,8 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
+  selectIsChatGTP4o,
   selectIsFLUX,
-  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSD3,
   selectParamsSlice,
@@ -66,11 +66,11 @@ export const ImageSettingsAccordion = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPT4oImage);
+  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
 
   const isApiModel = useMemo(() => {
-    return isImagen3 || isGPTImage;
-  }, [isImagen3, isGPTImage]);
+    return isImagen3 || isChatGPT4o;
+  }, [isImagen3, isChatGPT4o]);
 
   return (
     <StandaloneAccordion

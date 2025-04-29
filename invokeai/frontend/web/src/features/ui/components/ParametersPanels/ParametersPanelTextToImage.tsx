@@ -3,8 +3,8 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import {
+  selectIsChatGTP4o,
   selectIsCogView4,
-  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSDXL,
 } from 'features/controlLayers/store/paramsSlice';
@@ -30,12 +30,12 @@ const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPT4oImage);
+  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   const isApiModel = useMemo(() => {
-    return isImagen3 || isGPTImage;
-  }, [isImagen3, isGPTImage]);
+    return isImagen3 || isChatGPT4o;
+  }, [isImagen3, isChatGPT4o]);
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>

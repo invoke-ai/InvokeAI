@@ -5,9 +5,9 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import {
+  selectIsChatGTP4o,
   selectIsCogView4,
   selectIsFLUX,
-  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSD3,
 } from 'features/controlLayers/store/paramsSlice';
@@ -40,11 +40,11 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPT4oImage);
+  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
 
   const isApiModel = useMemo(() => {
-    return isImagen3 || isGPTImage;
-  }, [isImagen3, isGPTImage]);
+    return isImagen3 || isChatGPT4o;
+  }, [isImagen3, isChatGPT4o]);
 
   const isUpscaling = useMemo(() => {
     return activeTabName === 'upscaling';
