@@ -18,7 +18,7 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildGPTImageGraph = async (
+export const buildChatGPT4oGraph = async (
   state: RootState,
   manager: CanvasManager
 ): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
