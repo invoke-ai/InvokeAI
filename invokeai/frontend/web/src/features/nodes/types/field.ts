@@ -184,6 +184,10 @@ const zFluxMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxMainModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zBriaMainModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('BriaMainModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -304,6 +308,7 @@ const zStatefulFieldType = z.union([
   zIntegerGeneratorFieldType,
   zStringGeneratorFieldType,
   zImageGeneratorFieldType,
+  zBriaMainModelFieldType,
 ]);
 export type StatefulFieldType = z.infer<typeof zStatefulFieldType>;
 const statefulFieldTypeNames = zStatefulFieldType.options.map((o) => o.shape.name.value);
@@ -320,6 +325,7 @@ const modelFieldTypeNames = [
   zSD3MainModelFieldType.shape.name.value,
   zCogView4MainModelFieldType.shape.name.value,
   zFluxMainModelFieldType.shape.name.value,
+  zBriaMainModelFieldType.shape.name.value,
   zSDXLRefinerModelFieldType.shape.name.value,
   zVAEModelFieldType.shape.name.value,
   zLoRAModelFieldType.shape.name.value,
@@ -861,6 +867,26 @@ export type FluxMainModelFieldInputTemplate = z.infer<typeof zFluxMainModelField
 export const isFluxMainModelFieldInputInstance = buildInstanceTypeGuard(zFluxMainModelFieldInputInstance);
 export const isFluxMainModelFieldInputTemplate =
   buildTemplateTypeGuard<FluxMainModelFieldInputTemplate>('FluxMainModelField');
+// #endregion
+
+// #region BriaMainModelField
+const zBriaMainModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL models only.
+const zBriaMainModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zBriaMainModelFieldValue,
+});
+const zBriaMainModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zBriaMainModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zBriaMainModelFieldValue,
+});
+const zBriaMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zBriaMainModelFieldType,
+});
+export type BriaMainModelFieldInputInstance = z.infer<typeof zBriaMainModelFieldInputInstance>;
+export type BriaMainModelFieldInputTemplate = z.infer<typeof zBriaMainModelFieldInputTemplate>;
+export const isBriaMainModelFieldInputInstance = buildInstanceTypeGuard(zBriaMainModelFieldInputInstance);
+export const isBriaMainModelFieldInputTemplate =
+  buildTemplateTypeGuard<BriaMainModelFieldInputTemplate>('BriaMainModelField');
 // #endregion
 
 // #region SDXLRefinerModelField
@@ -1790,6 +1816,7 @@ export const zStatefulFieldValue = z.union([
   zMainModelFieldValue,
   zSDXLMainModelFieldValue,
   zFluxMainModelFieldValue,
+  zBriaMainModelFieldValue,
   zSD3MainModelFieldValue,
   zCogView4MainModelFieldValue,
   zSDXLRefinerModelFieldValue,
@@ -1837,6 +1864,7 @@ const zStatefulFieldInputInstance = z.union([
   zModelIdentifierFieldInputInstance,
   zMainModelFieldInputInstance,
   zFluxMainModelFieldInputInstance,
+  zBriaMainModelFieldInputInstance,
   zSD3MainModelFieldInputInstance,
   zCogView4MainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
@@ -1879,6 +1907,7 @@ const zStatefulFieldInputTemplate = z.union([
   zModelIdentifierFieldInputTemplate,
   zMainModelFieldInputTemplate,
   zFluxMainModelFieldInputTemplate,
+  zBriaMainModelFieldInputTemplate,
   zSD3MainModelFieldInputTemplate,
   zCogView4MainModelFieldInputTemplate,
   zSDXLMainModelFieldInputTemplate,
@@ -1927,6 +1956,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zModelIdentifierFieldOutputTemplate,
   zMainModelFieldOutputTemplate,
   zFluxMainModelFieldOutputTemplate,
+  zBriaMainModelFieldOutputTemplate,
   zSD3MainModelFieldOutputTemplate,
   zCogView4MainModelFieldOutputTemplate,
   zSDXLMainModelFieldOutputTemplate,

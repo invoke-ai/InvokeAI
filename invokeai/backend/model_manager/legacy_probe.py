@@ -125,6 +125,7 @@ class ModelProbe(object):
     }
 
     CLASS2TYPE = {
+        "BriaPipeline": ModelType.Main,
         "FluxPipeline": ModelType.Main,
         "StableDiffusionPipeline": ModelType.Main,
         "StableDiffusionInpaintPipeline": ModelType.Main,
@@ -861,6 +862,8 @@ class PipelineFolderProbe(FolderProbeBase):
                 return BaseModelType.StableDiffusion3
             elif transformer_conf["_class_name"] == "CogView4Transformer2DModel":
                 return BaseModelType.CogView4
+            elif transformer_conf["_class_name"] == "BriaTransformer2DModel":
+                return BaseModelType.Bria
             else:
                 raise InvalidModelConfigException(f"Unknown base model for {self.model_path}")
 

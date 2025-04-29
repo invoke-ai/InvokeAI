@@ -28,6 +28,7 @@ class BaseModelType(str, Enum):
     CogView4 = "cogview4"
     Imagen3 = "imagen3"
     ChatGPT4o = "chatgpt-4o"
+    Bria = "bria"
 
 
 class ModelType(str, Enum):
