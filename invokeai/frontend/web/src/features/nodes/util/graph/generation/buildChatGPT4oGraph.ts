@@ -40,12 +40,12 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
   const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
 
   if (generationMode === 'txt2img') {
-    const g = new Graph(getPrefixedId('gpt_image_txt2img_graph'));
+    const g = new Graph(getPrefixedId('chatgpt_4o_txt2img_graph'));
     const gptImage = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'chatgpt_create_image',
+      type: 'chatgpt_4o_generate_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
-      prompt: positivePrompt,
+      positive_prompt: positivePrompt,
       aspect_ratio: bbox.aspectRatio.id,
       use_cache: false,
       is_intermediate,
@@ -53,7 +53,7 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
     });
     return {
       g,
-      positivePromptFieldIdentifier: { nodeId: gptImage.id, fieldName: 'prompt' },
+      positivePromptFieldIdentifier: { nodeId: gptImage.id, fieldName: 'positive_prompt' },
     };
   }
 
@@ -63,19 +63,19 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
       is_intermediate: true,
       silent: true,
     });
-    const g = new Graph(getPrefixedId('gpt_image_img2img_graph'));
+    const g = new Graph(getPrefixedId('chatgpt_4o_img2img_graph'));
     const gptImage = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'chatgpt_edit_image',
+      type: 'chatgpt_4o_edit_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       positive_prompt: positivePrompt,
       image: { image_name },
+      use_cache: false,
       is_intermediate,
       board,
     });
     return {
       g,
-      seedFieldIdentifier: { nodeId: gptImage.id, fieldName: 'seed' },
       positivePromptFieldIdentifier: { nodeId: gptImage.id, fieldName: 'positive_prompt' },
     };
   }

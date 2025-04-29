@@ -40,7 +40,7 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
     const g = new Graph(getPrefixedId('imagen3_txt2img_graph'));
     const imagen3 = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'google_imagen3_generate',
+      type: 'google_imagen3_generate_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
@@ -67,7 +67,7 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
     const g = new Graph(getPrefixedId('imagen3_img2img_graph'));
     const imagen3 = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'google_imagen3_edit',
+      type: 'google_imagen3_edit_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
