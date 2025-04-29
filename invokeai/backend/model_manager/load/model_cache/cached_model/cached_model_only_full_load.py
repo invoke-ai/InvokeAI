@@ -1,3 +1,4 @@
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from typing import Any
 
 import torch
@@ -76,7 +77,15 @@ class CachedModelOnlyFullLoad:
             for k, v in self._cpu_state_dict.items():
                 new_state_dict[k] = v.to(self._compute_device, copy=True)
             self._model.load_state_dict(new_state_dict, assign=True)
-        self._model.to(self._compute_device)
+
+        check_for_gguf = self._model.state_dict().get("img_in.weight")
+        if isinstance(check_for_gguf, GGMLTensor):
+            old_value = torch.__future__.get_overwrite_module_params_on_conversion()
+            torch.__future__.set_overwrite_module_params_on_conversion(True)
+            self._model.to(self._compute_device)
+            torch.__future__.set_overwrite_module_params_on_conversion(old_value)
+        else:
+            self._model.to(self._compute_device)
 
         self._is_in_vram = True
         return self._total_bytes
@@ -92,7 +101,15 @@ class CachedModelOnlyFullLoad:
 
         if self._cpu_state_dict is not None:
             self._model.load_state_dict(self._cpu_state_dict, assign=True)
-        self._model.to(self._offload_device)
+
+        check_for_gguf = self._model.state_dict().get("img_in.weight")
+        if isinstance(check_for_gguf, GGMLTensor):
+            old_value = torch.__future__.get_overwrite_module_params_on_conversion()
+            torch.__future__.set_overwrite_module_params_on_conversion(True)
+            self._model.to(self._compute_device)
+            torch.__future__.set_overwrite_module_params_on_conversion(old_value)
+        else:
+            self._model.to(self._compute_device)
 
         self._is_in_vram = False
         return self._total_bytes

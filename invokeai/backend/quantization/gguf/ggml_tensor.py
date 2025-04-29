@@ -119,19 +119,6 @@ class GGMLTensor(torch.Tensor):
             return self.tensor_shape[dim]
         return self.tensor_shape
 
-    @overload
-    def to(self, *args, **kwargs) -> torch.Tensor: ...
-
-    def to(self, *args, **kwargs):
-        for func_arg in args:
-            if isinstance(func_arg, torch.dtype) and func_arg != self.quantized_data.dtype:
-                raise ValueError("Operation changed the dtype of GGMLTensor unexpectedly.")
-        if "dtype" in kwargs.keys():
-            if kwargs["dtype"] != self.quantized_data.dtype:
-                raise ValueError("Operation changed the dtype of GGMLTensor unexpectedly.")
-        self.quantized_data = self.quantized_data.to(*args, **kwargs)
-        return self
-
     @property
     def shape(self) -> torch.Size:  # pyright: ignore[reportIncompatibleVariableOverride] pyright doesn't understand this for some reason.
         """The shape of the tensor after dequantization. I.e. the shape that will be used in any math ops."""
