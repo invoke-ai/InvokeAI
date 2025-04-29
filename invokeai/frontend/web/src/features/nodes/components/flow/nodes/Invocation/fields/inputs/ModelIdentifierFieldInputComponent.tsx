@@ -1,9 +1,7 @@
-import { Combobox, Flex, FormControl } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { ModelFieldCombobox } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelFieldCombobox';
 import { fieldModelIdentifierValueChanged } from 'features/nodes/store/nodesSlice';
-import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { ModelIdentifierFieldInputInstance, ModelIdentifierFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
@@ -17,7 +15,7 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const { data, isLoading } = useGetModelConfigsQuery();
-  const _onChange = useCallback(
+  const onChange = useCallback(
     (value: AnyModelConfig | null) => {
       if (!value) {
         return;
@@ -41,26 +39,15 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
     return modelConfigsAdapterSelectors.selectAll(data);
   }, [data]);
 
-  const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs,
-    onChange: _onChange,
-    isLoading,
-    selectedModel: field.value,
-    groupByType: true,
-  });
-
   return (
-    <Flex w="full" alignItems="center" gap={2}>
-      <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS}`} isDisabled={!options.length} isInvalid={!value}>
-        <Combobox
-          value={value}
-          placeholder={placeholder}
-          options={options}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-      </FormControl>
-    </Flex>
+    <ModelFieldCombobox
+      value={field.value}
+      modelConfigs={modelConfigs}
+      isLoadingConfigs={isLoading}
+      onChange={onChange}
+      required={props.fieldTemplate.required}
+      groupByType
+    />
   );
 };
 

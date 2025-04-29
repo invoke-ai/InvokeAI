@@ -34,4 +34,8 @@ export interface UIState {
    * Whether or not to show the user the open notification. Bump version to reset users who may have closed previous version.
    */
   shouldShowNotificationV2: boolean;
+  /**
+   * Whether or not to use compact view for the model picker.
+   */
+  compactModelPicker: boolean;
 }

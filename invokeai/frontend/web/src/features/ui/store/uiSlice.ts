@@ -16,6 +16,7 @@ const initialUIState: UIState = {
   accordions: {},
   expanders: {},
   shouldShowNotificationV2: true,
+  compactModelPicker: false,
 };
 
 export const uiSlice = createSlice({
@@ -45,6 +46,9 @@ export const uiSlice = createSlice({
     shouldShowNotificationChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
+    compactModelPickerToggled: (state) => {
+      state.compactModelPicker = !state.compactModelPicker;
+    },
   },
   extraReducers(builder) {
     builder.addCase(workflowLoaded, (state) => {
@@ -64,6 +68,7 @@ export const {
   accordionStateChanged,
   expanderStateChanged,
   shouldShowNotificationChanged,
+  compactModelPickerToggled,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;

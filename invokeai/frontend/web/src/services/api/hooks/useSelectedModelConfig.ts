@@ -5,7 +5,7 @@ import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 export const useSelectedModelConfig = () => {
   const key = useAppSelector(selectModelKey);
-  const { currentData: modelConfig } = useGetModelConfigQuery(key ?? skipToken);
+  const { data: modelConfig } = useGetModelConfigQuery(key ?? skipToken);
 
   return modelConfig;
 };

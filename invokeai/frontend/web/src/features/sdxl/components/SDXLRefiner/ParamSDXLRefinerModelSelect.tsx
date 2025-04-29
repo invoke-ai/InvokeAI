@@ -1,9 +1,10 @@
-import { Combobox, Flex, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
+import { Combobox, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { refinerModelChanged, selectRefinerModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
@@ -39,27 +40,26 @@ const ParamSDXLRefinerModelSelect = () => {
   }, [_onChange]);
 
   return (
-    <FormControl isDisabled={!options.length} isInvalid={!options.length} w="full">
+    <FormControl isDisabled={!options.length} isInvalid={!options.length} w="full" gap={2}>
       <InformationalPopover feature="refinerModel">
         <FormLabel>{t('sdxl.refinermodel')}</FormLabel>
       </InformationalPopover>
-      <Flex w="full" minW={0} gap={2} alignItems="center">
-        <Combobox
-          value={value}
-          placeholder={placeholder}
-          options={options}
-          onChange={onChange}
-          noOptionsMessage={noOptionsMessage}
-        />
-        <IconButton
-          size="sm"
-          variant="ghost"
-          icon={<PiXBold />}
-          aria-label={t('common.reset')}
-          onClick={onReset}
-          isDisabled={!value}
-        />
-      </Flex>
+      <Combobox
+        value={value}
+        placeholder={placeholder}
+        options={options}
+        onChange={onChange}
+        noOptionsMessage={noOptionsMessage}
+      />
+      <IconButton
+        size="sm"
+        variant="ghost"
+        icon={<PiXBold />}
+        aria-label={t('common.reset')}
+        onClick={onReset}
+        isDisabled={!value}
+      />
+      <NavigateToModelManagerButton />
     </FormControl>
   );
 };

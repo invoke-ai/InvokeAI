@@ -12,6 +12,7 @@ import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $logo } from 'app/store/nanostores/logo';
+import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
 import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
@@ -59,6 +60,10 @@ interface Props extends PropsWithChildren {
   workflowTagCategories?: WorkflowTagCategory[];
   workflowSortOptions?: WorkflowSortOption[];
   loggingOverrides?: LoggingOverrides;
+  /**
+   * If provided, overrides in-app navigation to the model manager
+   */
+  onClickGoToModelManager?: () => void;
 }
 
 const InvokeAIUI = ({
@@ -81,6 +86,7 @@ const InvokeAIUI = ({
   workflowTagCategories,
   workflowSortOptions,
   loggingOverrides,
+  onClickGoToModelManager,
 }: Props) => {
   useLayoutEffect(() => {
     /*
@@ -204,6 +210,16 @@ const InvokeAIUI = ({
       $logo.set(undefined);
     };
   }, [logo]);
+
+  useEffect(() => {
+    if (onClickGoToModelManager) {
+      $onClickGoToModelManager.set(onClickGoToModelManager);
+    }
+
+    return () => {
+      $onClickGoToModelManager.set(undefined);
+    };
+  }, [onClickGoToModelManager]);
 
   useEffect(() => {
     if (workflowCategories) {
