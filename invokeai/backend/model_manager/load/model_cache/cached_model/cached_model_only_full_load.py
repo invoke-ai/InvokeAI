@@ -106,10 +106,10 @@ class CachedModelOnlyFullLoad:
         if isinstance(check_for_gguf, GGMLTensor):
             old_value = torch.__future__.get_overwrite_module_params_on_conversion()
             torch.__future__.set_overwrite_module_params_on_conversion(True)
-            self._model.to(self._compute_device)
+            self._model.to(self._offload_device)
             torch.__future__.set_overwrite_module_params_on_conversion(old_value)
         else:
-            self._model.to(self._compute_device)
+            self._model.to(self._offload_device)
 
         self._is_in_vram = False
         return self._total_bytes
