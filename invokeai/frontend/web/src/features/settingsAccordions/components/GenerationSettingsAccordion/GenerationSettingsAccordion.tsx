@@ -55,7 +55,7 @@ export const GenerationSettingsAccordion = memo(() => {
         const enabledLoRAsCount = loras.loras.filter((l) => l.isEnabled).length;
         const loraTabBadges = enabledLoRAsCount ? [`${enabledLoRAsCount} ${t('models.concepts')}`] : EMPTY_ARRAY;
         const accordionBadges =
-          modelConfig?.base === 'imagen3' || modelConfig?.base === 'gpt-image'
+          modelConfig?.base === 'imagen3' || modelConfig?.base === 'chatgpt-4o'
             ? [modelConfig.name]
             : modelConfig
               ? [modelConfig.name, modelConfig.base]

@@ -8,7 +8,7 @@ import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
-import { buildGPTImageGraph } from 'features/nodes/util/graph/generation/buildGptImageGraph';
+import { buildGPTImageGraph } from 'features/nodes/util/graph/generation/buildGPTImageGraph';
 import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
