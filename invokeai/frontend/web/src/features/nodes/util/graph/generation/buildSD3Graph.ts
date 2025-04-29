@@ -5,7 +5,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { FieldIdentifier } from 'features/nodes/types/field';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -19,7 +18,7 @@ import {
   getSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
+import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -27,10 +26,7 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildSD3Graph = async (
-  state: RootState,
-  manager: CanvasManager
-): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
+export const buildSD3Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD3 graph');
 

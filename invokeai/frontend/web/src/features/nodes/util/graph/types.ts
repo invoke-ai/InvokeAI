@@ -1,3 +1,6 @@
+import type { FieldIdentifier } from 'features/nodes/types/field';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+
 export type ImageOutputNodes =
   | 'l2i'
   | 'img_nsfw'
@@ -23,3 +26,9 @@ export type MainModelLoaderNodes =
   | 'cogview4_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
+
+export type GraphBuilderReturn = {
+  g: Graph;
+  seedFieldIdentifier?: FieldIdentifier;
+  positivePromptFieldIdentifier: FieldIdentifier;
+};

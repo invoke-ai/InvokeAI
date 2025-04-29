@@ -5,23 +5,20 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isImagen3AspectRatioID } from 'features/controlLayers/store/types';
-import type { FieldIdentifier } from 'features/nodes/types/field';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
   getBoardField,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildImagen3Graph = async (
-  state: RootState,
-  manager: CanvasManager
-): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
+export const buildImagen3Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
   assert(generationMode === 'txt2img', t('toast.imagen3IncompatibleGenerationMode'));

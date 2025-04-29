@@ -5,23 +5,20 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID } from 'features/controlLayers/store/types';
-import type { FieldIdentifier } from 'features/nodes/types/field';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
   getBoardField,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { GraphBuilderReturn } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildChatGPT4oGraph = async (
-  state: RootState,
-  manager: CanvasManager
-): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
+export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
   assert(
@@ -48,7 +45,7 @@ export const buildChatGPT4oGraph = async (
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'chatgpt_create_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
-      positive_prompt: positivePrompt,
+      prompt: positivePrompt,
       aspect_ratio: bbox.aspectRatio.id,
       use_cache: false,
       is_intermediate,
@@ -56,8 +53,7 @@ export const buildChatGPT4oGraph = async (
     });
     return {
       g,
-      seedFieldIdentifier: { nodeId: gptImage.id, fieldName: 'seed' },
-      positivePromptFieldIdentifier: { nodeId: gptImage.id, fieldName: 'positive_prompt' },
+      positivePromptFieldIdentifier: { nodeId: gptImage.id, fieldName: 'prompt' },
     };
   }
 
