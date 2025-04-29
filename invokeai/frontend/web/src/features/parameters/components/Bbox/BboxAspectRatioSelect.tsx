@@ -8,7 +8,7 @@ import { selectAspectRatioID } from 'features/controlLayers/store/selectors';
 import {
   isAspectRatioID,
   zAspectRatioID,
-  zGPTImageAspectRatioID,
+  zChatGPT4oAspectRatioID,
   zImagen3AspectRatioID,
 } from 'features/controlLayers/store/types';
 import type { ChangeEventHandler } from 'react';
@@ -25,14 +25,15 @@ export const BboxAspectRatioSelect = memo(() => {
   const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
 
   const options = useMemo(() => {
-    if (!isImagen3 && !isChatGPT4o) {
-      return zAspectRatioID.options;
-    }
+    // Imagen3 and ChatGPT4o have different aspect ratio options, and do not support freeform sizes
     if (isImagen3) {
       return zImagen3AspectRatioID.options;
     }
-
-    return zGPTImageAspectRatioID.options;
+    if (isChatGPT4o) {
+      return zChatGPT4oAspectRatioID.options;
+    }
+    // All other models
+    return zAspectRatioID.options;
   }, [isImagen3, isChatGPT4o]);
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(

@@ -4,7 +4,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { isGPTImageAspectRatioID } from 'features/controlLayers/store/types';
+import { isChatGPT4oAspectRatioID } from 'features/controlLayers/store/types';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
@@ -37,7 +37,7 @@ export const buildChatGPT4oGraph = async (
   const { bbox } = canvas;
   const { positivePrompt } = selectPresetModifiedPrompts(state);
 
-  assert(isGPTImageAspectRatioID(bbox.aspectRatio.id), 'GPT Image does not support this aspect ratio');
+  assert(isChatGPT4oAspectRatioID(bbox.aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
   const is_intermediate = canvasSettings.sendToCanvas;
   const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);

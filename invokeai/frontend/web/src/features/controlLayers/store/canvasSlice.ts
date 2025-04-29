@@ -67,7 +67,7 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isGPTImageAspectRatioID, isImagen3AspectRatioID, isRenderableEntity } from './types';
+import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagen3AspectRatioID, isRenderableEntity } from './types';
 import {
   converters,
   getControlLayerState,
@@ -1232,7 +1232,7 @@ export const canvasSlice = createSlice({
         }
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'chatgpt-4o' && isGPTImageAspectRatioID(id)) {
+      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
         // gpt-image has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
         if (id === '3:2') {
           state.bbox.rect.width = 1536;
