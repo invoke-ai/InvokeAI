@@ -19,7 +19,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
     case 'sd-3':
     case 'cogview4':
     case 'imagen3':
-    case 'gpt-image':
+    case 'chatgpt-4o':
     default:
       return 1024;
   }
@@ -45,7 +45,7 @@ export const getGridSize = (base?: BaseModelType | null): number => {
     case 'sd-2':
     case 'sdxl':
     case 'imagen3':
-    case 'gpt-image':
+    case 'chatgpt-4o':
     default:
       return 8;
   }

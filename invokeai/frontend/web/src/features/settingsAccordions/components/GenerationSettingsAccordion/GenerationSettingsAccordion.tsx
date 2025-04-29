@@ -7,7 +7,7 @@ import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import {
   selectIsCogView4,
   selectIsFLUX,
-  selectIsGPTImage,
+  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSD3,
 } from 'features/controlLayers/store/paramsSlice';
@@ -40,7 +40,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPTImage);
+  const isGPTImage = useAppSelector(selectIsGPT4oImage);
 
   const isApiModel = useMemo(() => {
     return isImagen3 || isGPTImage;

@@ -235,7 +235,7 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     if (tool !== 'bbox') {
       return NO_ANCHORS;
     }
-    if (model?.base === 'imagen3' || model?.base === 'gpt-image') {
+    if (model?.base === 'imagen3' || model?.base === 'chatgpt-4o') {
       // The bbox is not resizable in these modes
       return NO_ANCHORS;
     }

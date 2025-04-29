@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import {
   selectIsCogView4,
-  selectIsGPTImage,
+  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSDXL,
 } from 'features/controlLayers/store/paramsSlice';
@@ -30,7 +30,7 @@ const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPTImage);
+  const isGPTImage = useAppSelector(selectIsGPT4oImage);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   const isApiModel = useMemo(() => {

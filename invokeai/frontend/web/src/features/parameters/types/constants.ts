@@ -1,9 +1,10 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
+import type { BaseModelType } from 'services/api/types';
 
 /**
  * Mapping of base model to human readable name
  */
-export const MODEL_TYPE_MAP = {
+export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
   any: 'Any',
   'sd-1': 'Stable Diffusion 1.x',
   'sd-2': 'Stable Diffusion 2.x',
@@ -13,13 +14,13 @@ export const MODEL_TYPE_MAP = {
   flux: 'FLUX',
   cogview4: 'CogView4',
   imagen3: 'Imagen3',
-  'gpt-image': 'GPT Image',
+  'chatgpt-4o': 'ChatGPT 4o',
 };
 
 /**
  * Mapping of base model to (short) human readable name
  */
-export const MODEL_TYPE_SHORT_MAP = {
+export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
   any: 'Any',
   'sd-1': 'SD1.X',
   'sd-2': 'SD2.X',
@@ -29,13 +30,13 @@ export const MODEL_TYPE_SHORT_MAP = {
   flux: 'FLUX',
   cogview4: 'CogView4',
   imagen3: 'Imagen3',
-  'gpt-image': 'GPT Image',
+  'chatgpt-4o': 'ChatGPT 4o',
 };
 
 /**
  * Mapping of base model to CLIP skip parameter constraints
  */
-export const CLIP_SKIP_MAP = {
+export const CLIP_SKIP_MAP: Record<BaseModelType, { maxClip: number; markers: number[] }> = {
   any: {
     maxClip: 0,
     markers: [],
@@ -72,7 +73,7 @@ export const CLIP_SKIP_MAP = {
     maxClip: 0,
     markers: [],
   },
-  'gpt-image': {
+  'chatgpt-4o': {
     maxClip: 0,
     markers: [],
   },

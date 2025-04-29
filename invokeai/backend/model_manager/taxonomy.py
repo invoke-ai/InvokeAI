@@ -27,7 +27,7 @@ class BaseModelType(str, Enum):
     Flux = "flux"
     CogView4 = "cogview4"
     Imagen3 = "imagen3"
-    GPTImage = "gpt-image"
+    ChatGPT4o = "chatgpt-4o"
 
 
 class ModelType(str, Enum):

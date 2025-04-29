@@ -1,7 +1,7 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsCogView4,
-  selectIsGPTImage,
+  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSD3,
 } from 'features/controlLayers/store/paramsSlice';
@@ -14,7 +14,7 @@ export const useIsEntityTypeEnabled = (entityType: CanvasEntityType) => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPTImage);
+  const isGPTImage = useAppSelector(selectIsGPT4oImage);
 
   const isEntityTypeEnabled = useMemo<boolean>(() => {
     switch (entityType) {

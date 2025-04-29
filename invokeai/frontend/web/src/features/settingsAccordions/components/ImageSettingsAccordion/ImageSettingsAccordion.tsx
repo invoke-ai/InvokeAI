@@ -5,7 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsFLUX,
-  selectIsGPTImage,
+  selectIsGPT4oImage,
   selectIsImagen3,
   selectIsSD3,
   selectParamsSlice,
@@ -66,7 +66,7 @@ export const ImageSettingsAccordion = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isGPTImage = useAppSelector(selectIsGPTImage);
+  const isGPTImage = useAppSelector(selectIsGPT4oImage);
 
   const isApiModel = useMemo(() => {
     return isImagen3 || isGPTImage;

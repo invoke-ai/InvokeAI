@@ -52,7 +52,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
             return await buildCogView4Graph(state, manager);
           case 'imagen3':
             return await buildImagen3Graph(state, manager);
-          case 'gpt-image':
+          case 'chatgpt-4o':
             return await buildGPTImageGraph(state, manager);
           default:
             assert(false, `No graph builders for base ${base}`);
