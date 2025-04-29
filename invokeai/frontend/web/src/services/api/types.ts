@@ -279,6 +279,10 @@ export const isFluxMainModelModelConfig = (config: AnyModelConfig): config is Ma
   return config.type === 'main' && config.base === 'flux';
 };
 
+export const isBriaMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'bria';
+};
+
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.variant === 'inpaint';
 };

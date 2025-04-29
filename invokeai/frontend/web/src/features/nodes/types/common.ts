@@ -76,6 +76,7 @@ const zBaseModel = z.enum([
   'imagen4',
   'chatgpt-4o',
   'flux-kontext',
+  'bria',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModel>;
 export const zMainModelBase = z.enum([
@@ -89,6 +90,7 @@ export const zMainModelBase = z.enum([
   'imagen4',
   'chatgpt-4o',
   'flux-kontext',
+  'bria',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;

@@ -29,6 +29,8 @@ import {
   isBooleanFieldInputTemplate,
   isChatGPT4oModelFieldInputInstance,
   isChatGPT4oModelFieldInputTemplate,
+  isBriaMainModelFieldInputInstance,
+  isBriaMainModelFieldInputTemplate,
   isCLIPEmbedModelFieldInputInstance,
   isCLIPEmbedModelFieldInputTemplate,
   isCLIPGEmbedModelFieldInputInstance,
@@ -117,6 +119,7 @@ import { assert } from 'tsafe';
 
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
+import BriaMainModelFieldInputComponent from './inputs/BriaMainModelFieldInputComponent';
 import CLIPEmbedModelFieldInputComponent from './inputs/CLIPEmbedModelFieldInputComponent';
 import CLIPGEmbedModelFieldInputComponent from './inputs/CLIPGEmbedModelFieldInputComponent';
 import CLIPLEmbedModelFieldInputComponent from './inputs/CLIPLEmbedModelFieldInputComponent';
@@ -446,6 +449,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <FluxMainModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isBriaMainModelFieldInputTemplate(template)) {
+    if (!isBriaMainModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <BriaMainModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isSD3MainModelFieldInputTemplate(template)) {
