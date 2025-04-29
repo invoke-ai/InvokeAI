@@ -24,10 +24,7 @@ export const buildImagen3Graph = async (
 ): Promise<{ g: Graph; seedFieldIdentifier: FieldIdentifier; positivePromptFieldIdentifier: FieldIdentifier }> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
-  assert(
-    generationMode === 'txt2img' || generationMode === 'img2img',
-    t('toast.image3IncompatibleWithInpaintAndOutpaint')
-  );
+  assert(generationMode === 'txt2img', t('toast.imagen3IncompatibleGenerationMode'));
 
   log.debug({ generationMode }, 'Building Imagen3 graph');
 
