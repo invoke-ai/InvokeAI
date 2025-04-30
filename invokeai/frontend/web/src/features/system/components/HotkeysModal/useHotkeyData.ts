@@ -79,9 +79,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('app', 'selectCanvasTab', ['1']);
     addHotkey('app', 'selectUpscalingTab', ['2']);
     addHotkey('app', 'selectWorkflowsTab', ['3']);
-    if (isModelManagerEnabled) {
-      addHotkey('app', 'selectModelsTab', ['4']);
-    }
+    addHotkey('app', 'selectModelsTab', ['4'], isModelManagerEnabled);
     addHotkey('app', 'selectQueueTab', isModelManagerEnabled ? ['5'] : ['4']);
     addHotkey('app', 'focusPrompt', ['alt+a']);
     addHotkey('app', 'toggleLeftPanel', ['t', 'o']);
