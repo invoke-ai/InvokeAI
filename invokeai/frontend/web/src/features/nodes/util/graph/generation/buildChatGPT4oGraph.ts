@@ -24,7 +24,7 @@ const log = logger('system');
 export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
-  assert(generationMode === 'txt2img', t('toast.chatGPT4oIncompatibleGenerationMode'));
+  assert(generationMode === 'txt2img' || generationMode === 'img2img', t('toast.chatGPT4oIncompatibleGenerationMode'));
 
   log.debug({ generationMode }, 'Building GPT Image graph');
 
@@ -80,5 +80,30 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
     };
   }
 
-  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for ChatGPT 4o');
+  if (generationMode === 'img2img') {
+    const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
+    const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
+      is_intermediate: true,
+      silent: true,
+    });
+    const g = new Graph(getPrefixedId('chatgpt_4o_img2img_graph'));
+    const gptImage = g.addNode({
+      // @ts-expect-error: These nodes are not available in the OSS application
+      type: 'chatgpt_4o_edit_image',
+      id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+      positive_prompt: positivePrompt,
+      aspect_ratio: bbox.aspectRatio.id,
+      base_image: { image_name },
+      reference_images,
+      use_cache: false,
+      is_intermediate,
+      board,
+    });
+    return {
+      g,
+      positivePromptFieldIdentifier: { nodeId: gptImage.id, fieldName: 'positive_prompt' },
+    };
+  }
+
+  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for ChatGPT ');
 };
