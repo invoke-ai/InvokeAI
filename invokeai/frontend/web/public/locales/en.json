@@ -1103,6 +1103,7 @@
         "info": "Info",
         "invoke": {
             "addingImagesTo": "Adding images to",
+            "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
             "invoke": "Invoke",
             "missingFieldTemplate": "Missing field template",
             "missingInputForField": "missing input",
@@ -1183,7 +1184,8 @@
         "width": "Width",
         "gaussianBlur": "Gaussian Blur",
         "boxBlur": "Box Blur",
-        "staged": "Staged"
+        "staged": "Staged",
+        "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your <LinkComponent>account settings</LinkComponent> to upgrade."
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
