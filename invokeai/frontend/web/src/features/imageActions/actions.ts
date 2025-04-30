@@ -1,6 +1,6 @@
 import type { AppDispatch, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { selectDefaultIPAdapter, selectDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
@@ -116,7 +116,7 @@ export const createNewCanvasEntityFromImage = (arg: {
       break;
     }
     case 'reference_image': {
-      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
+      const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
       break;
@@ -238,7 +238,7 @@ export const newCanvasFromImage = (arg: {
       break;
     }
     case 'reference_image': {
-      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
+      const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       dispatch(canvasReset());
       dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
