@@ -27,6 +27,7 @@ import { typedMemo } from 'common/util/typedMemo';
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
+import { DisabledModelWarning } from 'features/parameters/components/MainModel/DisabledModelWarning';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -200,6 +201,7 @@ export const MainModelPicker = memo(() => {
       onClose={onClose}
       initialFocusRef={pickerRef.current?.inputRef}
     >
+      <DisabledModelWarning />
       <Flex alignItems="center" gap={2}>
         <InformationalPopover feature="paramModel">
           <FormLabel>{t('modelManager.model')}</FormLabel>

@@ -14,6 +14,8 @@ import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { type AnyModelConfig, isCheckpointMainModelConfig, type MainModelConfig } from 'services/api/types';
 
+import { DisabledModelWarning } from './DisabledModelWarning';
+
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -79,32 +81,35 @@ const ParamMainModelSelect = () => {
   }, [selectedModel]);
 
   return (
-    <FormControl isDisabled={!modelConfigs.length} isInvalid={!value || !modelConfigs.length} gap={2}>
-      <InformationalPopover feature="paramModel">
-        <FormLabel>{t('modelManager.model')}</FormLabel>
-      </InformationalPopover>
-      {isFluxDevSelected && (
-        <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
-          <Flex justifyContent="flex-start">
-            <Icon as={MdMoneyOff} />
-          </Flex>
+    <>
+      <DisabledModelWarning />
+      <FormControl isDisabled={!modelConfigs.length} isInvalid={!value || !modelConfigs.length} gap={2}>
+        <InformationalPopover feature="paramModel">
+          <FormLabel>{t('modelManager.model')}</FormLabel>
         </InformationalPopover>
-      )}
-      <Tooltip label={tooltipLabel}>
-        <Box w="full" minW={0}>
-          <Combobox
-            value={value}
-            placeholder={placeholder}
-            options={options}
-            onChange={onChange}
-            noOptionsMessage={noOptionsMessage}
-            isInvalid={value?.isDisabled}
-          />
-        </Box>
-      </Tooltip>
-      <NavigateToModelManagerButton />
-      <UseDefaultSettingsButton />
-    </FormControl>
+        {isFluxDevSelected && (
+          <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
+            <Flex justifyContent="flex-start">
+              <Icon as={MdMoneyOff} />
+            </Flex>
+          </InformationalPopover>
+        )}
+        <Tooltip label={tooltipLabel}>
+          <Box w="full" minW={0}>
+            <Combobox
+              value={value}
+              placeholder={placeholder}
+              options={options}
+              onChange={onChange}
+              noOptionsMessage={noOptionsMessage}
+              isInvalid={value?.isDisabled}
+            />
+          </Box>
+        </Tooltip>
+        <NavigateToModelManagerButton />
+        <UseDefaultSettingsButton />
+      </FormControl>
+    </>
   );
 };
 
