@@ -1323,7 +1323,7 @@
         "unableToCopyDesc_theseSteps": "these steps",
         "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks.",
         "imagen3IncompatibleGenerationMode": "Google Imagen3 supports Text to Image only. Ensure the bounding box is empty, or use other models for Image to Image, Inpainting and Outpainting tasks.",
-        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image only. Ensure the bounding box is empty, or use other models for Image to Image, Inpainting and Outpainting tasks.",
+        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image and Image to Image. Use other models Inpainting and Outpainting tasks.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
         "workflowUnpublished": "Workflow Unpublished"
