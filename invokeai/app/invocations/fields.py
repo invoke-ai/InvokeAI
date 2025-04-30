@@ -42,6 +42,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     MainModel = "MainModelField"
     CogView4MainModel = "CogView4MainModelField"
     FluxMainModel = "FluxMainModelField"
+    BriaMainModel = "BriaMainModelField"
     SD3MainModel = "SD3MainModelField"
     SDXLMainModel = "SDXLMainModelField"
     SDXLRefinerModel = "SDXLRefinerModelField"

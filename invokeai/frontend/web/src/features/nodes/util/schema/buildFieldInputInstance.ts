@@ -17,6 +17,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   SchedulerField: 'dpmpp_3m_k',
   SDXLMainModelField: undefined,
   FluxMainModelField: undefined,
+  BriaMainModelField: undefined,
   SD3MainModelField: undefined,
   CogView4MainModelField: undefined,
   SDXLRefinerModelField: undefined,
