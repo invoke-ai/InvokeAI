@@ -44,7 +44,8 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
   const validRefImages = canvas.referenceImages.entities
     .filter((entity) => entity.isEnabled)
     .filter((entity) => isChatGPT4oReferenceImageConfig(entity.ipAdapter))
-    .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
+    .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
+    .toReversed(); // sends them in order they are displayed in the list
 
   let reference_images: ImageField[] | undefined = undefined;
 
