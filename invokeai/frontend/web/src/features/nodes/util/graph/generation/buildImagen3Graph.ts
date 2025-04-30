@@ -58,29 +58,5 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
     };
   }
 
-  if (generationMode === 'img2img') {
-    const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
-    const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
-      is_intermediate: true,
-      silent: true,
-    });
-    const g = new Graph(getPrefixedId('imagen3_img2img_graph'));
-    const imagen3 = g.addNode({
-      // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'google_imagen3_edit_image',
-      id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
-      positive_prompt: positivePrompt,
-      negative_prompt: negativePrompt,
-      base_image: { image_name },
-      is_intermediate,
-      board,
-    });
-    return {
-      g,
-      seedFieldIdentifier: { nodeId: imagen3.id, fieldName: 'seed' },
-      positivePromptFieldIdentifier: { nodeId: imagen3.id, fieldName: 'positive_prompt' },
-    };
-  }
-
-  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for imagen3');
+  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for Imagen3');
 };

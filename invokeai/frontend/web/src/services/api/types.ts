@@ -65,7 +65,7 @@ export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type SigLipModelConfig = S['SigLIPConfig'];
 export type FLUXReduxModelConfig = S['FluxReduxConfig'];
-type ApiModelConfig = S['ApiModelConfig'];
+export type ApiModelConfig = S['ApiModelConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig | ApiModelConfig;
 export type AnyModelConfig =
   | ControlLoRAModelConfig
@@ -226,6 +226,10 @@ export const isSigLipModelConfig = (config: AnyModelConfig): config is SigLipMod
 
 export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXReduxModelConfig => {
   return config.type === 'flux_redux';
+};
+
+export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+  return config.type === 'main' && config.base === 'chatgpt-4o';
 };
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
