@@ -34,9 +34,10 @@ import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/com
 import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import { merge } from 'lodash-es';
+import { isEqual, merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
 import type {
+  ApiModelConfig,
   ControlLoRAModelConfig,
   ControlNetModelConfig,
   FLUXReduxModelConfig,
@@ -76,6 +77,7 @@ import {
   getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
+  initialChatGPT4oReferenceImage,
   initialControlLoRA,
   initialControlNet,
   initialFLUXRedux,
@@ -644,7 +646,10 @@ export const canvasSlice = createSlice({
     referenceImageIPAdapterModelChanged: (
       state,
       action: PayloadAction<
-        EntityIdentifierPayload<{ modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | null }, 'reference_image'>
+        EntityIdentifierPayload<
+          { modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null },
+          'reference_image'
+        >
       >
     ) => {
       const { entityIdentifier, modelConfig } = action.payload;
@@ -652,14 +657,36 @@ export const canvasSlice = createSlice({
       if (!entity) {
         return;
       }
+
+      const oldModel = entity.ipAdapter.model;
+
+      // First set the new model
       entity.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
 
       if (!entity.ipAdapter.model) {
         return;
       }
 
-      if (entity.ipAdapter.type === 'ip_adapter' && entity.ipAdapter.model.type === 'flux_redux') {
-        // Switching from ip_adapter to flux_redux
+      if (isEqual(oldModel, entity.ipAdapter.model)) {
+        // Nothing changed, so we don't need to do anything
+        return;
+      }
+
+      // The type of ref image depends on the model. When the user switches the model, we rebuild the ref image.
+      // When we switch the model, we keep the image the same, but change the other parameters.
+
+      if (entity.ipAdapter.model.base === 'chatgpt-4o') {
+        // Switching to chatgpt-4o ref image
+        entity.ipAdapter = {
+          ...initialChatGPT4oReferenceImage,
+          image: entity.ipAdapter.image,
+          model: entity.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (entity.ipAdapter.model.type === 'flux_redux') {
+        // Switching to flux_redux
         entity.ipAdapter = {
           ...initialFLUXRedux,
           image: entity.ipAdapter.image,
@@ -668,17 +695,13 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (entity.ipAdapter.type === 'flux_redux' && entity.ipAdapter.model.type === 'ip_adapter') {
-        // Switching from flux_redux to ip_adapter
+      if (entity.ipAdapter.model.type === 'ip_adapter') {
+        // Switching to ip_adapter
         entity.ipAdapter = {
           ...initialIPAdapter,
           image: entity.ipAdapter.image,
           model: entity.ipAdapter.model,
         };
-        return;
-      }
-
-      if (entity.ipAdapter.type === 'ip_adapter') {
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
         if (entity.ipAdapter.model?.base === 'flux') {
           entity.ipAdapter.clipVisionModel = 'ViT-L';
@@ -686,6 +709,7 @@ export const canvasSlice = createSlice({
           // Fall back to ViT-H (ViT-G would also work)
           entity.ipAdapter.clipVisionModel = 'ViT-H';
         }
+        return;
       }
     },
     referenceImageIPAdapterCLIPVisionModelChanged: (

@@ -245,6 +245,18 @@ const zFLUXReduxConfig = z.object({
 });
 export type FLUXReduxConfig = z.infer<typeof zFLUXReduxConfig>;
 
+const zChatGPT4oReferenceImageConfig = z.object({
+  type: z.literal('chatgpt_4o_reference_image'),
+  image: zImageWithDims.nullable(),
+  /**
+   * TODO(psyche): Technically there is no model for ChatGPT 4o reference images - it's just a field in the API call.
+   * But we use a model drop down to switch between different ref image types, so there needs to be a model here else
+   * there will be no way to switch between ref image types.
+   */
+  model: zServerValidatedModelIdentifierField.nullable(),
+});
+export type ChatGPT4oReferenceImageConfig = z.infer<typeof zChatGPT4oReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -254,15 +266,19 @@ const zCanvasEntityBase = z.object({
 
 const zCanvasReferenceImageState = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),
-  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
+  // This should be named `referenceImage` but we need to keep it as `ipAdapter` for backwards compatibility
+  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zChatGPT4oReferenceImageConfig]),
 });
 export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
 
-export const isIPAdapterConfig = (config: IPAdapterConfig | FLUXReduxConfig): config is IPAdapterConfig =>
+export const isIPAdapterConfig = (config: CanvasReferenceImageState['ipAdapter']): config is IPAdapterConfig =>
   config.type === 'ip_adapter';
 
-export const isFLUXReduxConfig = (config: IPAdapterConfig | FLUXReduxConfig): config is FLUXReduxConfig =>
+export const isFLUXReduxConfig = (config: CanvasReferenceImageState['ipAdapter']): config is FLUXReduxConfig =>
   config.type === 'flux_redux';
+export const isChatGPT4oReferenceImageConfig = (
+  config: CanvasReferenceImageState['ipAdapter']
+): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;

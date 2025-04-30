@@ -9,6 +9,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isChatGPT4oModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isCogView4MainModelModelConfig,
@@ -81,7 +82,10 @@ export const useFluxVAEModels = (args?: ModelHookArgs) =>
 export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
 export const useSigLipModels = buildModelsHook(isSigLipModelConfig);
 export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);
-export const useIPAdapterOrFLUXReduxModels = buildModelsHook(
+export const useGlobalReferenceImageModels = buildModelsHook(
+  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isChatGPT4oModelConfig(config)
+);
+export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
 export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);

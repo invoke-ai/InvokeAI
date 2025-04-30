@@ -19,7 +19,7 @@ export const useIsEntityTypeEnabled = (entityType: CanvasEntityType) => {
   const isEntityTypeEnabled = useMemo<boolean>(() => {
     switch (entityType) {
       case 'reference_image':
-        return !isSD3 && !isCogView4 && !isImagen3 && !isChatGPT4o;
+        return !isSD3 && !isCogView4 && !isImagen3;
       case 'regional_guidance':
         return !isSD3 && !isCogView4 && !isImagen3 && !isChatGPT4o;
       case 'control_layer':

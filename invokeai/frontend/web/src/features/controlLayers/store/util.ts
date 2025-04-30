@@ -7,6 +7,7 @@ import type {
   CanvasRasterLayerState,
   CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
+  ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
   ControlNetConfig,
   FLUXReduxConfig,
@@ -76,6 +77,11 @@ export const initialFLUXRedux: FLUXReduxConfig = {
   image: null,
   model: null,
   imageInfluence: 'highest',
+};
+export const initialChatGPT4oReferenceImage: ChatGPT4oReferenceImageConfig = {
+  type: 'chatgpt_4o_reference_image',
+  image: null,
+  model: null,
 };
 export const initialT2IAdapter: T2IAdapterConfig = {
   type: 't2i_adapter',
