@@ -74,7 +74,7 @@ export const selectDefaultControlAdapter = createSelector(
   }
 );
 
-const selectDefaultRefImageConfig = createSelector(
+export const selectDefaultRefImageConfig = createSelector(
   selectMainModelConfig,
   selectModelConfigsQuery,
   selectBase,

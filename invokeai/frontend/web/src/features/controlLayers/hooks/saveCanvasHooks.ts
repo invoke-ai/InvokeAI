@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { selectDefaultIPAdapter, selectDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
@@ -198,7 +198,7 @@ export const useNewRegionalReferenceImageFromBbox = () => {
 export const useNewGlobalReferenceImageFromBbox = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+  const defaultIPAdapter = useAppSelector(selectDefaultRefImageConfig);
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
