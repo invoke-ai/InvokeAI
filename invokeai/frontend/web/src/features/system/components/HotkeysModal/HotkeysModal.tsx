@@ -53,6 +53,9 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
         hotkeys: [],
       };
       Object.values(category.hotkeys).forEach((item) => {
+        if (!item.isEnabled) {
+          return;
+        }
         if (!trimmedHotkeyFilter.length) {
           filteredGroup.hotkeys.push(item);
         } else if (item.title.toLowerCase().includes(trimmedHotkeyFilter)) {
