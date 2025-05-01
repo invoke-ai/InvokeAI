@@ -34,6 +34,7 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
 
   assert(isImagen3AspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
+  assert(positivePrompt.length > 0, 'Imagen3 requires positive prompt to have at least one character');
 
   const is_intermediate = canvasSettings.sendToCanvas;
   const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
