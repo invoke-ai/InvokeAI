@@ -4,7 +4,6 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { refinerModelChanged, selectRefinerModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
@@ -59,7 +58,6 @@ const ParamSDXLRefinerModelSelect = () => {
         onClick={onReset}
         isDisabled={!value}
       />
-      <NavigateToModelManagerButton />
     </FormControl>
   );
 };
