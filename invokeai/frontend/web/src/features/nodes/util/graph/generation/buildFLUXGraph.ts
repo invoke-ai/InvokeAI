@@ -22,7 +22,11 @@ import {
   getSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
+import {
+  type GraphBuilderReturn,
+  type ImageOutputNodes,
+  UnsupportedGenerationModeError,
+} from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
@@ -80,7 +84,9 @@ export const buildFLUXGraph = async (state: RootState, manager: CanvasManager): 
     //
     // The other asserts above are just for sanity & type check and should never be hit, so they do not have
     // translations.
-    assert(generationMode === 'inpaint' || generationMode === 'outpaint', t('toast.fluxFillIncompatibleWithT2IAndI2I'));
+    if (generationMode === 'txt2img' || generationMode === 'img2img') {
+      throw new UnsupportedGenerationModeError(t('toast.fluxFillIncompatibleWithT2IAndI2I'));
+    }
 
     // FLUX Fill wants much higher guidance values than normal FLUX - silently "fix" the value for the user.
     // TODO(psyche): Figure out a way to alert the user that this is happening - maybe return warnings from the graph
