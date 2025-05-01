@@ -175,6 +175,8 @@
         "blue": "Blue",
         "alpha": "Alpha",
         "selected": "Selected",
+        "search": "Search",
+        "clear": "Clear",
         "tab": "Tab",
         "view": "View",
         "edit": "Edit",
@@ -202,8 +204,10 @@
         "value": "Value",
         "label": "Label",
         "systemInformation": "System Information",
-        "compact": "Compact",
-        "full": "Full"
+        "compactView": "Compact View",
+        "fullView": "Full View",
+        "options_withCount_one": "{{count}} option",
+        "options_withCount_other": "{{count}} options"
     },
     "hrf": {
         "hrf": "High Resolution Fix",

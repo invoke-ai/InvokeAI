@@ -17,6 +17,7 @@ import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
+import { DisabledModelWarning } from 'features/parameters/components/MainModel/DisabledModelWarning';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
@@ -83,6 +84,7 @@ export const GenerationSettingsAccordion = memo(() => {
     >
       <Box px={4} pt={4} data-testid="generation-accordion">
         <Flex gap={4} flexDir="column" pb={isApiModel ? 4 : 0}>
+          <DisabledModelWarning />
           <MainModelPicker />
           {!isApiModel && <LoRASelect />}
           {!isApiModel && <LoRAList />}
