@@ -17,7 +17,7 @@ import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { AnyStore, ReadableAtom, Task, WritableAtom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { StoreValues } from 'nanostores/computed';
-import type { ChangeEvent, PropsWithChildren, RefObject } from 'react';
+import type { ChangeEvent, MouseEventHandler, PropsWithChildren, RefObject } from 'react';
 import React, {
   createContext,
   useCallback,
@@ -29,7 +29,12 @@ import React, {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsInLineVerticalBold, PiArrowsOutLineVerticalBold, PiXBold } from 'react-icons/pi';
+import {
+  PiArrowCounterClockwiseBold,
+  PiArrowsInLineVerticalBold,
+  PiArrowsOutLineVerticalBold,
+  PiXBold,
+} from 'react-icons/pi';
 import { assert } from 'tsafe';
 import { useDebounce } from 'use-debounce';
 
@@ -194,7 +199,7 @@ type PickerProps<T extends object> = {
 };
 
 export type PickerContextState<T extends object> = {
-  optionsOrGroups: T[] | Group<T>[];
+  $optionsOrGroups: WritableAtom<T[] | Group<T>[]>;
   $groupStatusMap: WritableAtom<GroupStatusMap>;
   $compactView: WritableAtom<boolean>;
   $activeOptionId: WritableAtom<string | undefined>;
@@ -490,19 +495,16 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     NextToSearchBar,
     searchable,
   } = props;
-  const [$activeOptionId] = useState(() => {
-    const initialValue = getFirstOptionId(optionsOrGroups, getOptionId);
-    return atom<string | undefined>(initialValue);
-  });
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } = useTogglableGroups(optionsOrGroups);
+  const $activeOptionId = useAtom(getFirstOptionId(optionsOrGroups, getOptionId));
   const $compactView = useAtom(true);
-  const $filteredOptions = useAtom<T[] | Group<T>[]>([]);
-  const $flattenedFilteredOptions = useComputed([$filteredOptions], (filteredOptions) =>
-    flattenOptions(filteredOptions)
-  );
-  const $totalOptionCount = useComputed([$filteredOptions], (optionsOrGroups) => {
+  const $optionsOrGroups = useAtom(optionsOrGroups);
+  useEffect(() => {
+    $optionsOrGroups.set(optionsOrGroups);
+  }, [optionsOrGroups, $optionsOrGroups]);
+  const $totalOptionCount = useComputed([$optionsOrGroups], (optionsOrGroups) => {
     let count = 0;
     for (const optionOrGroup of optionsOrGroups) {
       if (isGroup(optionOrGroup)) {
@@ -513,6 +515,10 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     }
     return count;
   });
+  const $filteredOptions = useAtom<T[] | Group<T>[]>([]);
+  const $flattenedFilteredOptions = useComputed([$filteredOptions], (filteredOptions) =>
+    flattenOptions(filteredOptions)
+  );
   const $hasOptions = useComputed([$totalOptionCount], (count) => count > 0);
   const $filteredOptionsCount = useComputed([$flattenedFilteredOptions], (options) => options.length);
   const $hasFilteredOptions = useComputed([$filteredOptionsCount], (count) => count > 0);
@@ -543,7 +549,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const ctx = useMemo(
     () =>
       ({
-        optionsOrGroups,
+        $optionsOrGroups,
         $groupStatusMap,
         $compactView,
         $activeOptionId,
@@ -570,7 +576,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         $selectedItemId,
       }) satisfies PickerContextState<T>,
     [
-      optionsOrGroups,
+      $optionsOrGroups,
       $groupStatusMap,
       $compactView,
       $activeOptionId,
@@ -616,7 +622,7 @@ Picker.displayName = 'Picker';
 
 const PickerSyncer = typedMemo(<T extends object>() => {
   const {
-    optionsOrGroups,
+    $optionsOrGroups,
     $searchTerm,
     $activeOptionId,
     $groupStatusMap,
@@ -629,6 +635,7 @@ const PickerSyncer = typedMemo(<T extends object>() => {
   const searchTerm = useStore($searchTerm);
   const groupStatusMap = useStore($groupStatusMap);
   const areAllGroupsDisabled = useStore($areAllGroupsDisabled);
+  const optionsOrGroups = useStore($optionsOrGroups);
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
   useEffect(() => {
@@ -714,13 +721,27 @@ const NoMatchesFallback = typedMemo(<T extends object>() => {
 NoMatchesFallback.displayName = 'NoMatchesFallback';
 
 const PickerSearchBar = typedMemo(<T extends object>() => {
-  const { optionsOrGroups, inputRef, $searchTerm, $totalOptionCount, searchPlaceholder, NextToSearchBar } =
-    usePickerContext<T>();
+  const { NextToSearchBar } = usePickerContext<T>();
+
+  return (
+    <Flex flexDir="column" w="full" gap={2}>
+      <Flex gap={2} alignItems="center">
+        <SearchInput />
+        {NextToSearchBar}
+        <CompactViewToggleButton />
+      </Flex>
+      <GroupToggleButtons />
+    </Flex>
+  );
+});
+PickerSearchBar.displayName = 'PickerSearchBar';
+
+const SearchInput = typedMemo(<T extends object>() => {
+  const { inputRef, $totalOptionCount, $searchTerm, searchPlaceholder } = usePickerContext<T>();
   const { t } = useTranslation();
   const searchTerm = useStore($searchTerm);
   const totalOptionCount = useStore($totalOptionCount);
   const placeholder = searchPlaceholder ?? t('common.search');
-
   const resetSearchTerm = useCallback(() => {
     $searchTerm.set('');
     inputRef.current?.focus();
@@ -732,8 +753,31 @@ const PickerSearchBar = typedMemo(<T extends object>() => {
     },
     [$searchTerm]
   );
-
-  const groups = useMemo(() => {
+  return (
+    <InputGroup>
+      <Input ref={inputRef} value={searchTerm} onChange={onChangeSearchTerm} placeholder={placeholder} />
+      {searchTerm && (
+        <InputRightElement h="full" pe={2}>
+          <IconButton
+            onClick={resetSearchTerm}
+            size="sm"
+            variant="link"
+            aria-label={t('common.clear')}
+            tooltip={t('common.clear')}
+            icon={<PiXBold />}
+            isDisabled={totalOptionCount === 0}
+            disabled={false}
+          />
+        </InputRightElement>
+      )}
+    </InputGroup>
+  );
+});
+SearchInput.displayName = 'SearchInput';
+const GroupToggleButtons = typedMemo(<T extends object>() => {
+  const { $optionsOrGroups, $groupStatusMap, $areAllGroupsDisabled } = usePickerContext<T>();
+  const { t } = useTranslation();
+  const $groups = useComputed([$optionsOrGroups], (optionsOrGroups) => {
     const _groups: Group<T>[] = [];
     for (const optionOrGroup of optionsOrGroups) {
       if (isGroup(optionOrGroup)) {
@@ -741,44 +785,45 @@ const PickerSearchBar = typedMemo(<T extends object>() => {
       }
     }
     return _groups;
-  }, [optionsOrGroups]);
+  });
+  const groups = useStore($groups);
+  const areAllGroupsDisabled = useStore($areAllGroupsDisabled);
+
+  const onClick = useCallback<MouseEventHandler>(() => {
+    const newMap: GroupStatusMap = {};
+    for (const { id } of groups) {
+      newMap[id] = false;
+    }
+    $groupStatusMap.set(newMap);
+  }, [$groupStatusMap, groups]);
+
+  if (!groups.length) {
+    return null;
+  }
 
   return (
-    <Flex flexDir="column" w="full" gap={2}>
-      <Flex gap={2} alignItems="center">
-        <InputGroup>
-          <Input
-            ref={inputRef}
-            value={searchTerm}
-            onChange={onChangeSearchTerm}
-            placeholder={placeholder}
-            isDisabled={totalOptionCount === 0}
-          />
-          {searchTerm && (
-            <InputRightElement h="full" pe={2}>
-              <IconButton
-                onClick={resetSearchTerm}
-                size="sm"
-                variant="link"
-                aria-label={t('common.clear')}
-                tooltip={t('common.clear')}
-                icon={<PiXBold />}
-              />
-            </InputRightElement>
-          )}
-        </InputGroup>
-        {NextToSearchBar}
-        <CompactViewToggleButton />
-      </Flex>
-      <Flex gap={2} alignItems="center">
-        {groups.map((group) => (
-          <GroupToggleButton key={group.id} group={group} />
-        ))}
-      </Flex>
+    <Flex gap={2} alignItems="center">
+      {groups.map((group) => (
+        <GroupToggleButton key={group.id} group={group} />
+      ))}
+      <Spacer />
+      <IconButton
+        icon={<PiArrowCounterClockwiseBold />}
+        aria-label={t('common.reset')}
+        tooltip={t('common.reset')}
+        size="sm"
+        variant="link"
+        alignSelf="stretch"
+        onClick={onClick}
+        // When a focused element is disabled, it blurs. This closes the popover. Fake the disabled state to prevent this.
+        // See: https://github.com/chakra-ui/chakra-ui/issues/7965
+        opacity={areAllGroupsDisabled ? 0.5 : undefined}
+        pointerEvents={areAllGroupsDisabled ? 'none' : undefined}
+      />
     </Flex>
   );
 });
-PickerSearchBar.displayName = 'PickerSearchBar';
+GroupToggleButtons.displayName = 'GroupToggleButtons';
 
 const CompactViewToggleButton = typedMemo(<T extends object>() => {
   const { t } = useTranslation();
