@@ -80,12 +80,14 @@ export type Group<T extends object> = {
   [uniqueGroupKey]: true;
 };
 
+type OptionOrGroup<T extends object> = T | Group<T>;
+
 export const buildGroup = <T extends object>(group: Omit<Group<T>, typeof uniqueGroupKey>): Group<T> => ({
   ...group,
   [uniqueGroupKey]: true,
 });
 
-const isGroup = <T extends object>(optionOrGroup: T | Group<T>): optionOrGroup is Group<T> => {
+const isGroup = <T extends object>(optionOrGroup: OptionOrGroup<T>): optionOrGroup is Group<T> => {
   return uniqueGroupKey in optionOrGroup && optionOrGroup[uniqueGroupKey] === true;
 };
 
@@ -141,7 +143,7 @@ type PickerProps<T extends object> = {
   /**
    * The options to display in the picker. This can be a flat array of options or an array of groups.
    */
-  optionsOrGroups: T[] | Group<T>[];
+  optionsOrGroups: OptionOrGroup<T>[];
   /**
    * A function that returns the id of an option.
    */
@@ -199,11 +201,11 @@ type PickerProps<T extends object> = {
 };
 
 export type PickerContextState<T extends object> = {
-  $optionsOrGroups: WritableAtom<T[] | Group<T>[]>;
+  $optionsOrGroups: WritableAtom<OptionOrGroup<T>[]>;
   $groupStatusMap: WritableAtom<GroupStatusMap>;
   $compactView: WritableAtom<boolean>;
   $activeOptionId: WritableAtom<string | undefined>;
-  $filteredOptions: WritableAtom<T[] | Group<T>[]>;
+  $filteredOptions: WritableAtom<OptionOrGroup<T>[]>;
   $flattenedFilteredOptions: ReadableAtom<T[]>;
   $totalOptionCount: ReadableAtom<number>;
   $areAllGroupsDisabled: ReadableAtom<boolean>;
@@ -250,7 +252,7 @@ export const getRegex = (searchTerm: string) => {
   return new RegExp(`${pattern}.+`, 'i');
 };
 
-const getFirstOption = <T extends object>(options: T[] | Group<T>[]): T | undefined => {
+const getFirstOption = <T extends object>(options: OptionOrGroup<T>[]): T | undefined => {
   const firstOptionOrGroup = options[0];
   if (!firstOptionOrGroup) {
     return;
@@ -263,7 +265,7 @@ const getFirstOption = <T extends object>(options: T[] | Group<T>[]): T | undefi
 };
 
 const getFirstOptionId = <T extends object>(
-  options: T[] | Group<T>[],
+  options: OptionOrGroup<T>[],
   getOptionId: (item: T) => string
 ): string | undefined => {
   const firstOptionOrGroup = getFirstOption(options);
@@ -275,7 +277,7 @@ const getFirstOptionId = <T extends object>(
 };
 
 const findOption = <T extends object>(
-  options: T[] | Group<T>[],
+  options: OptionOrGroup<T>[],
   id: string,
   getOptionId: (item: T) => string
 ): T | undefined => {
@@ -293,7 +295,7 @@ const findOption = <T extends object>(
   }
 };
 
-const flattenOptions = <T extends object>(options: (T | Group<T>)[]): T[] => {
+const flattenOptions = <T extends object>(options: OptionOrGroup<T>[]): T[] => {
   const flattened: T[] = [];
   for (const optionOrGroup of options) {
     if (isGroup(optionOrGroup)) {
@@ -307,7 +309,7 @@ const flattenOptions = <T extends object>(options: (T | Group<T>)[]): T[] => {
 
 type GroupStatusMap = Record<string, boolean>;
 
-const useTogglableGroups = <T extends object>(options: (T | Group<T>)[]) => {
+const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[]) => {
   const groupsWithOptions = useMemo(() => {
     const ids: string[] = [];
     for (const optionOrGroup of options) {
@@ -478,6 +480,18 @@ const useComputed = <Value, OriginStores extends AnyStore[]>(
   return useState(() => computed(stores, cb))[0];
 };
 
+const countOptions = <T extends object>(optionsOrGroups: OptionOrGroup<T>[]) => {
+  let count = 0;
+  for (const optionOrGroup of optionsOrGroups) {
+    if (isGroup(optionOrGroup)) {
+      count += optionOrGroup.options.length;
+    } else {
+      count++;
+    }
+  }
+  return count;
+};
+
 export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const {
     getOptionId,
@@ -501,24 +515,9 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const $activeOptionId = useAtom(getFirstOptionId(optionsOrGroups, getOptionId));
   const $compactView = useAtom(true);
   const $optionsOrGroups = useAtom(optionsOrGroups);
-  useEffect(() => {
-    $optionsOrGroups.set(optionsOrGroups);
-  }, [optionsOrGroups, $optionsOrGroups]);
-  const $totalOptionCount = useComputed([$optionsOrGroups], (optionsOrGroups) => {
-    let count = 0;
-    for (const optionOrGroup of optionsOrGroups) {
-      if (isGroup(optionOrGroup)) {
-        count += optionOrGroup.options.length;
-      } else {
-        count++;
-      }
-    }
-    return count;
-  });
-  const $filteredOptions = useAtom<T[] | Group<T>[]>([]);
-  const $flattenedFilteredOptions = useComputed([$filteredOptions], (filteredOptions) =>
-    flattenOptions(filteredOptions)
-  );
+  const $totalOptionCount = useComputed([$optionsOrGroups], countOptions);
+  const $filteredOptions = useAtom<OptionOrGroup<T>[]>([]);
+  const $flattenedFilteredOptions = useComputed([$filteredOptions], flattenOptions);
   const $hasOptions = useComputed([$totalOptionCount], (count) => count > 0);
   const $filteredOptionsCount = useComputed([$flattenedFilteredOptions], (options) => options.length);
   const $hasFilteredOptions = useComputed([$filteredOptionsCount], (count) => count > 0);
@@ -542,9 +541,14 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     [$filteredOptions, getOptionId, onSelect]
   );
 
+  // Sync the picker's nanostores when props change
   useEffect(() => {
     $selectedItem.set(selectedOption);
   }, [$selectedItem, selectedOption]);
+
+  useEffect(() => {
+    $optionsOrGroups.set(optionsOrGroups);
+  }, [optionsOrGroups, $optionsOrGroups]);
 
   const ctx = useMemo(
     () =>
@@ -647,8 +651,8 @@ const PickerSyncer = typedMemo(<T extends object>() => {
           return true;
         }
       });
-      $filteredOptions.set(filtered as T[] | Group<T>[]);
-      $activeOptionId.set(getFirstOptionId(filtered as T[] | Group<T>[], getOptionId));
+      $filteredOptions.set(filtered);
+      $activeOptionId.set(getFirstOptionId(filtered, getOptionId));
     } else {
       const lowercasedSearchTerm = debouncedSearchTerm.toLowerCase();
       const filtered = [];
@@ -667,8 +671,8 @@ const PickerSyncer = typedMemo(<T extends object>() => {
           }
         }
       }
-      $filteredOptions.set(filtered as T[] | Group<T>[]);
-      $activeOptionId.set(getFirstOptionId(filtered as T[] | Group<T>[], getOptionId));
+      $filteredOptions.set(filtered);
+      $activeOptionId.set(getFirstOptionId(filtered, getOptionId));
     }
   }, [
     debouncedSearchTerm,
