@@ -32,3 +32,10 @@ export type GraphBuilderReturn = {
   seedFieldIdentifier?: FieldIdentifier;
   positivePromptFieldIdentifier: FieldIdentifier;
 };
+
+export class UnsupportedGenerationModeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}

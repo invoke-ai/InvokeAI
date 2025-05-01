@@ -1,3 +1,4 @@
+import type { AlertStatus } from '@invoke-ai/ui-library';
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
@@ -13,6 +14,7 @@ import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildIma
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
+import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { toast } from 'features/toast/toast';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
@@ -60,15 +62,21 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       });
 
       if (buildGraphResult.isErr()) {
+        let title = 'Failed to build graph';
+        let status: AlertStatus = 'error';
         let description: string | null = null;
         if (buildGraphResult.error instanceof AssertionError) {
           description = extractMessageFromAssertionError(buildGraphResult.error);
+        } else if (buildGraphResult.error instanceof UnsupportedGenerationModeError) {
+          title = 'Unsupported generation mode';
+          description = buildGraphResult.error.message;
+          status = 'warning';
         }
         const error = serializeError(buildGraphResult.error);
         log.error({ error }, 'Failed to build graph');
         toast({
-          status: 'error',
-          title: 'Failed to build graph',
+          status,
+          title,
           description,
         });
         return;

@@ -5,6 +5,7 @@ import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
+import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -46,6 +47,7 @@ interface Props extends PropsWithChildren {
   token?: string;
   config?: PartialAppConfig;
   customNavComponent?: ReactNode;
+  accountSettingsLink?: string;
   middleware?: Middleware[];
   projectId?: string;
   projectName?: string;
@@ -72,6 +74,7 @@ const InvokeAIUI = ({
   token,
   config,
   customNavComponent,
+  accountSettingsLink,
   middleware,
   projectId,
   projectName,
@@ -174,6 +177,16 @@ const InvokeAIUI = ({
       $customNavComponent.set(undefined);
     };
   }, [customNavComponent]);
+
+  useEffect(() => {
+    if (accountSettingsLink) {
+      $accountSettingsLink.set(accountSettingsLink);
+    }
+
+    return () => {
+      $accountSettingsLink.set(undefined);
+    };
+  }, [accountSettingsLink]);
 
   useEffect(() => {
     if (openAPISchemaUrl) {

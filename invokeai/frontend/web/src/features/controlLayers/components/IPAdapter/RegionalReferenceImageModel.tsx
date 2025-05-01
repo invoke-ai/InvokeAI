@@ -2,7 +2,6 @@ import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRegionalReferenceImageModels } from 'services/api/hooks/modelsByType';
@@ -64,7 +63,6 @@ export const RegionalReferenceImageModel = memo(({ modelKey, onChangeModel }: Pr
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
         />
-        <NavigateToModelManagerButton />
       </FormControl>
     </Tooltip>
   );

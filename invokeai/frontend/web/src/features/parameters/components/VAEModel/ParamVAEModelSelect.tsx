@@ -4,7 +4,6 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectBase, selectVAE, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVAEModels } from 'services/api/hooks/modelsByType';
@@ -51,7 +50,6 @@ const ParamVAEModelSelect = () => {
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
       />
-      <NavigateToModelManagerButton />
     </FormControl>
   );
 };
