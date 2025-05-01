@@ -208,6 +208,9 @@ export type PickerContextState<T extends object> = {
   $filteredOptions: WritableAtom<OptionOrGroup<T>[]>;
   $flattenedFilteredOptions: ReadableAtom<T[]>;
   $totalOptionCount: ReadableAtom<number>;
+  $hasOptions: ReadableAtom<boolean>;
+  $filteredOptionsCount: ReadableAtom<number>;
+  $hasFilteredOptions: ReadableAtom<boolean>;
   $areAllGroupsDisabled: ReadableAtom<boolean>;
   $selectedItem: WritableAtom<T | undefined>;
   $selectedItemId: ReadableAtom<string | undefined>;
@@ -525,9 +528,6 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const $searchTerm = useAtom('');
   const $selectedItemId = useComputed([$selectedItem], (item) => (item ? getOptionId(item) : undefined));
 
-  const hasOptions = useStore($hasOptions);
-  const hasFilteredOptions = useStore($hasFilteredOptions);
-
   const onSelectById = useCallback(
     (id: string) => {
       const options = $filteredOptions.get();
@@ -578,6 +578,9 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         searchable,
         $areAllGroupsDisabled,
         $selectedItemId,
+        $hasOptions,
+        $hasFilteredOptions,
+        $filteredOptionsCount,
       }) satisfies PickerContextState<T>,
     [
       $optionsOrGroups,
@@ -603,6 +606,9 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       searchable,
       $areAllGroupsDisabled,
       $selectedItemId,
+      $hasOptions,
+      $hasFilteredOptions,
+      $filteredOptionsCount,
     ]
   );
 
@@ -611,11 +617,11 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   return (
     <PickerContext.Provider value={ctx}>
       <PickerContainer>
-        {searchable && <PickerSearchBar />}
+        <PickerSearchBar />
         <Flex tabIndex={-1} w="full" flexGrow={1}>
-          {!hasOptions && <NoOptionsFallback />}
-          {hasOptions && !hasFilteredOptions && <NoMatchesFallback />}
-          {hasOptions && hasFilteredOptions && <PickerList />}
+          <NoOptionsFallback />
+          <NoMatchesFallback />
+          <PickerList />
         </Flex>
       </PickerContainer>
       <PickerSyncer />
@@ -713,19 +719,41 @@ const PickerContainer = typedMemo(({ children }: PropsWithChildren) => {
 PickerContainer.displayName = 'PickerContainer';
 
 const NoOptionsFallback = typedMemo(<T extends object>() => {
-  const { noOptionsFallback } = usePickerContext<T>();
+  const { noOptionsFallback, $hasOptions } = usePickerContext<T>();
+  const hasOptions = useStore($hasOptions);
+
+  if (hasOptions) {
+    return null;
+  }
+
   return <NoOptionsFallbackWrapper>{noOptionsFallback}</NoOptionsFallbackWrapper>;
 });
 NoOptionsFallback.displayName = 'NoOptionsFallback';
 
 const NoMatchesFallback = typedMemo(<T extends object>() => {
-  const { noMatchesFallback } = usePickerContext<T>();
+  const { noMatchesFallback, $hasOptions, $hasFilteredOptions } = usePickerContext<T>();
+
+  const hasOptions = useStore($hasOptions);
+  const hasFilteredOptions = useStore($hasFilteredOptions);
+
+  if (!hasOptions) {
+    return null;
+  }
+
+  if (hasFilteredOptions) {
+    return null;
+  }
+
   return <NoMatchesFallbackWrapper>{noMatchesFallback}</NoMatchesFallbackWrapper>;
 });
 NoMatchesFallback.displayName = 'NoMatchesFallback';
 
 const PickerSearchBar = typedMemo(<T extends object>() => {
-  const { NextToSearchBar } = usePickerContext<T>();
+  const { NextToSearchBar, searchable } = usePickerContext<T>();
+
+  if (!searchable) {
+    return null;
+  }
 
   return (
     <Flex flexDir="column" w="full" gap={2}>
@@ -889,6 +917,10 @@ const PickerList = typedMemo(<T extends object>() => {
   const { getOptionId, $compactView, $filteredOptions } = usePickerContext<T>();
   const compactView = useStore($compactView);
   const filteredOptions = useStore($filteredOptions);
+
+  if (filteredOptions.length === 0) {
+    return null;
+  }
 
   return (
     <ScrollableContent>
