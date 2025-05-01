@@ -43,12 +43,7 @@ export const MainModelPicker = memo(() => {
           </Flex>
         </InformationalPopover>
       )}
-      <ModelPicker
-        modelConfigs={modelConfigs}
-        selectedModelConfig={selectedModelConfig}
-        onChange={onChange}
-        grouped
-      ></ModelPicker>
+      <ModelPicker modelConfigs={modelConfigs} selectedModelConfig={selectedModelConfig} onChange={onChange} grouped />
       <UseDefaultSettingsButton />
     </Flex>
   );
