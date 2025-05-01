@@ -11,7 +11,7 @@ import {
   getBoardField,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { GraphBuilderReturn } from 'features/nodes/util/graph/types';
+import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -21,7 +21,9 @@ const log = logger('system');
 export const buildImagen3Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
-  assert(generationMode === 'txt2img', t('toast.imagen3IncompatibleGenerationMode'));
+  if (generationMode !== 'txt2img') {
+    throw new UnsupportedGenerationModeError(t('toast.imagen3IncompatibleGenerationMode'));
+  }
 
   log.debug({ generationMode }, 'Building Imagen3 graph');
 

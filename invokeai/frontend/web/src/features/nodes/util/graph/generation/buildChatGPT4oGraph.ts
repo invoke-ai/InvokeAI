@@ -13,7 +13,7 @@ import {
   getBoardField,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { GraphBuilderReturn } from 'features/nodes/util/graph/types';
+import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Equals } from 'tsafe';
@@ -24,7 +24,9 @@ const log = logger('system');
 export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
-  assert(generationMode === 'txt2img' || generationMode === 'img2img', t('toast.chatGPT4oIncompatibleGenerationMode'));
+  if (generationMode !== 'txt2img' && generationMode !== 'img2img') {
+    throw new UnsupportedGenerationModeError(t('toast.chatGPT4oIncompatibleGenerationMode'));
+  }
 
   log.debug({ generationMode }, 'Building GPT Image graph');
 
