@@ -68,18 +68,16 @@ class LoRALayer(LoRALayerBase):
         matrices.
         """
 
-        fused_lora = torch.zeros(
-            (up.shape[0], down.shape[1]), device=down.device, dtype=down.dtype
-        )
-        rank_diff = down.shape[0]/up.shape[1]
+        fused_lora = torch.zeros((up.shape[0], down.shape[1]), device=down.device, dtype=down.dtype)
+        rank_diff = down.shape[0] / up.shape[1]
 
         if rank_diff > 1:
-            rank_diff = down.shape[0]/up.shape[1]
+            rank_diff = down.shape[0] / up.shape[1]
             w_down = down.chunk(int(rank_diff), dim=0)
             for w_down_chunk in w_down:
                 fused_lora = fused_lora + (torch.mm(up, w_down_chunk))
         else:
-            rank_diff = up.shape[1]/down.shape[0]
+            rank_diff = up.shape[1] / down.shape[0]
             w_up = up.chunk(int(rank_diff), dim=0)
             for w_up_chunk in w_up:
                 fused_lora = fused_lora + (torch.mm(w_up_chunk, down))
