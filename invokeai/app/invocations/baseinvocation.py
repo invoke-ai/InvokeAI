@@ -22,6 +22,7 @@ from typing import (
     Literal,
     Optional,
     Type,
+    TypedDict,
     TypeVar,
     Union,
 )
@@ -106,6 +107,11 @@ class UIConfigBase(BaseModel):
     )
 
 
+class OriginalModelField(TypedDict):
+    annotation: Any
+    field_info: FieldInfo
+
+
 class BaseInvocationOutput(BaseModel):
     """
     Base class for all invocation outputs.
@@ -133,6 +139,9 @@ class BaseInvocationOutput(BaseModel):
     def get_type(cls) -> str:
         """Gets the invocation output's type, as provided by the `@invocation_output` decorator."""
         return cls.model_fields["type"].default
+
+    _original_model_fields: ClassVar[dict[str, OriginalModelField]] = {}
+    """The original model fields, before any modifications were made by the @invocation_output decorator."""
 
     model_config = ConfigDict(
         protected_namespaces=(),
@@ -265,6 +274,9 @@ class BaseInvocation(ABC, BaseModel):
         json_schema_serialization_defaults_required=False,
         coerce_numbers_to_str=True,
     )
+
+    _original_model_fields: ClassVar[dict[str, OriginalModelField]] = {}
+    """The original model fields, before any modifications were made by the @invocation decorator."""
 
 
 TBaseInvocation = TypeVar("TBaseInvocation", bound=BaseInvocation)
@@ -575,6 +587,8 @@ def invocation(
                 f"{field_name} on invocation {invocation_type} has a non-dict json_schema_extra, did you forget to use InputField?"
             )
 
+            cls._original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
+
             validate_field_default(cls.__name__, field_name, invocation_type, annotation, field_info)
 
             if field_info.default is None and not is_optional(annotation):
@@ -686,6 +700,9 @@ def invocation_output(
             assert isinstance(field_info.json_schema_extra, dict), (
                 f"{field_name} on invocation output {output_type} has a non-dict json_schema_extra, did you forget to use InputField?"
             )
+
+            cls._original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
+
             if field_info.default is not PydanticUndefined and is_optional(annotation):
                 annotation = annotation | None
             fields[field_name] = (annotation, field_info)
