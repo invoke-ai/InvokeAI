@@ -17,6 +17,7 @@ const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
   bnb_quantized_int8b: 'bnb_quantized_int8b',
   bnb_quantized_nf4b: 'quantized',
   gguf_quantized: 'gguf',
+  api: 'api',
 };
 
 const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
@@ -30,6 +31,7 @@ const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
   bnb_quantized_int8b: 'base',
   bnb_quantized_nf4b: 'base',
   gguf_quantized: 'base',
+  api: 'base',
 };
 
 const ModelFormatBadge = ({ format }: Props) => {

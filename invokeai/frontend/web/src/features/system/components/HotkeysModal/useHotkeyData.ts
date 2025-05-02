@@ -13,6 +13,7 @@ export type Hotkey = {
   desc: string;
   hotkeys: string[];
   platformKeys: string[][];
+  isEnabled: boolean;
 };
 
 type HotkeyCategoryData = { title: string; hotkeys: Record<string, Hotkey> };
@@ -60,7 +61,7 @@ export const useHotkeyData = (): HotkeysData => {
       },
     };
 
-    const addHotkey = (category: HotkeyCategory, id: string, keys: string[]) => {
+    const addHotkey = (category: HotkeyCategory, id: string, keys: string[], isEnabled: boolean = true) => {
       data[category].hotkeys[id] = {
         id,
         category,
@@ -68,6 +69,7 @@ export const useHotkeyData = (): HotkeysData => {
         desc: t(`hotkeys.${category}.${id}.desc`),
         hotkeys: keys,
         platformKeys: formatKeysForPlatform(keys, isMacOS),
+        isEnabled,
       };
     };
 
@@ -79,9 +81,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('app', 'selectCanvasTab', ['1']);
     addHotkey('app', 'selectUpscalingTab', ['2']);
     addHotkey('app', 'selectWorkflowsTab', ['3']);
-    if (isModelManagerEnabled) {
-      addHotkey('app', 'selectModelsTab', ['4']);
-    }
+    addHotkey('app', 'selectModelsTab', ['4'], isModelManagerEnabled);
     addHotkey('app', 'selectQueueTab', isModelManagerEnabled ? ['5'] : ['4']);
     addHotkey('app', 'focusPrompt', ['alt+a']);
     addHotkey('app', 'toggleLeftPanel', ['t', 'o']);
@@ -191,17 +191,28 @@ type UseRegisteredHotkeysArg = {
 };
 
 /**
- * A wrapper around `useHotkeys` that registers the hotkey with the hotkey registry.
- *
- * Registered hotkeys will be displayed in the hotkeys modal.
+ * A wrapper around `useHotkeys` that adds a handler for a registered hotkey.
  */
 export const useRegisteredHotkeys = ({ id, category, callback, options, dependencies }: UseRegisteredHotkeysArg) => {
   const hotkeysData = useHotkeyData();
-  const keys = useMemo(() => {
-    const _keys = hotkeysData[category].hotkeys[id]?.hotkeys;
-    assert(_keys !== undefined, `Hotkey ${category}.${id} not found`);
-    return _keys;
+  const data = useMemo(() => {
+    const _data = hotkeysData[category].hotkeys[id];
+    assert(_data !== undefined, `Hotkey ${category}.${id} not found`);
+    return _data;
   }, [category, hotkeysData, id]);
+  const _options = useMemo(() => {
+    // If no options are provided, return the default. This includes if the hotkey is globally disabled.
+    if (!options) {
+      return {
+        enabled: data.isEnabled,
+      } satisfies Options;
+    }
+    // Otherwise, return the provided optiosn, but override the enabled state.
+    return {
+      ...options,
+      enabled: data.isEnabled ? options.enabled : false,
+    } satisfies Options;
+  }, [data.isEnabled, options]);
 
-  return useHotkeys(keys, callback, options, dependencies);
+  return useHotkeys(data.hotkeys, callback, _options, dependencies);
 };

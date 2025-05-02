@@ -17,16 +17,26 @@ import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
+  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   ControlLoRAConfig,
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/util';
+import {
+  initialChatGPT4oReferenceImage,
+  initialControlNet,
+  initialIPAdapter,
+  initialT2IAdapter,
+} from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
-import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import {
+  modelConfigsAdapterSelectors,
+  selectMainModelConfig,
+  selectModelConfigsQuery,
+} from 'services/api/endpoints/models';
 import type {
   ControlLoRAModelConfig,
   ControlNetModelConfig,
@@ -61,6 +71,35 @@ export const selectDefaultControlAdapter = createSelector(
       controlAdapter.model = zModelIdentifierField.parse(model);
     }
     return controlAdapter;
+  }
+);
+
+export const selectDefaultRefImageConfig = createSelector(
+  selectMainModelConfig,
+  selectModelConfigsQuery,
+  selectBase,
+  (selectedMainModel, query, base): CanvasReferenceImageState['ipAdapter'] => {
+    if (selectedMainModel?.base === 'chatgpt-4o') {
+      const referenceImage = deepClone(initialChatGPT4oReferenceImage);
+      referenceImage.model = zModelIdentifierField.parse(selectedMainModel);
+      return referenceImage;
+    }
+
+    const { data } = query;
+    let model: IPAdapterModelConfig | null = null;
+    if (data) {
+      const modelConfigs = modelConfigsAdapterSelectors.selectAll(data).filter(isIPAdapterModelConfig);
+      const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
+      model = compatibleModels[0] ?? modelConfigs[0] ?? null;
+    }
+    const ipAdapter = deepClone(initialIPAdapter);
+    if (model) {
+      ipAdapter.model = zModelIdentifierField.parse(model);
+      if (model.base === 'flux') {
+        ipAdapter.clipVisionModel = 'ViT-L';
+      }
+    }
+    return ipAdapter;
   }
 );
 
@@ -146,11 +185,11 @@ export const useAddRegionalReferenceImage = () => {
 
 export const useAddGlobalReferenceImage = () => {
   const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+  const defaultRefImage = useAppSelector(selectDefaultRefImageConfig);
   const func = useCallback(() => {
-    const overrides = { ipAdapter: deepClone(defaultIPAdapter) };
+    const overrides = { ipAdapter: deepClone(defaultRefImage) };
     dispatch(referenceImageAdded({ isSelected: true, overrides }));
-  }, [defaultIPAdapter, dispatch]);
+  }, [defaultRefImage, dispatch]);
 
   return func;
 };

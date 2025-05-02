@@ -24,6 +24,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
   const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
+  const isInpaintLayerEnabled = useIsEntityTypeEnabled('inpaint_mask');
 
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
@@ -52,6 +53,7 @@ export const CanvasAddEntityButtons = memo(() => {
               justifyContent="flex-start"
               leftIcon={<PiPlusBold />}
               onClick={addInpaintMask}
+              isDisabled={!isInpaintLayerEnabled}
             >
               {t('controlLayers.inpaintMask')}
             </Button>

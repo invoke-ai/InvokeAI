@@ -25,7 +25,7 @@ from typing import (
 )
 
 import semver
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, create_model
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
@@ -78,7 +78,7 @@ class UIConfigBase(BaseModel):
     This is used internally by the @invocation decorator logic. Do not use this directly.
     """
 
-    tags: Optional[list[str]] = Field(default_factory=None, description="The node's tags")
+    tags: Optional[list[str]] = Field(default=None, description="The node's tags")
     title: Optional[str] = Field(default=None, description="The node's display name")
     category: Optional[str] = Field(default=None, description="The node's category")
     version: str = Field(
@@ -99,6 +99,12 @@ class BaseInvocationOutput(BaseModel):
 
     All invocation outputs must use the `@invocation_output` decorator to provide their unique type.
     """
+
+    output_meta: Optional[dict[str, JsonValue]] = Field(
+        default=None,
+        description="Optional dictionary of metadata for the invocation output, unrelated to the invocation's actual output value. This is not exposed as an output field.",
+        json_schema_extra={"field_kind": FieldKind.NodeAttribute},
+    )
 
     @staticmethod
     def json_schema_extra(schema: dict[str, Any], model_class: Type[BaseInvocationOutput]) -> None:
@@ -256,6 +262,26 @@ class InvocationRegistry:
     @classmethod
     def register_invocation(cls, invocation: type[BaseInvocation]) -> None:
         """Registers an invocation."""
+
+        invocation_type = invocation.get_type()
+        node_pack = invocation.UIConfig.node_pack
+
+        # Log a warning when an existing invocation is being clobbered by the one we are registering
+        clobbered_invocation = InvocationRegistry.get_invocation_for_type(invocation_type)
+        if clobbered_invocation is not None:
+            # This should always be true - we just checked if the invocation type was in the set
+            clobbered_node_pack = clobbered_invocation.UIConfig.node_pack
+
+            if clobbered_node_pack == "invokeai":
+                # The invocation being clobbered is a core invocation
+                logger.warning(f'Overriding core node "{invocation_type}" with node from "{node_pack}"')
+            else:
+                # The invocation being clobbered is a custom invocation
+                logger.warning(
+                    f'Overriding node "{invocation_type}" from "{node_pack}" with node from "{clobbered_node_pack}"'
+                )
+            cls._invocation_classes.remove(clobbered_invocation)
+
         cls._invocation_classes.add(invocation)
         cls.invalidate_invocation_typeadapter()
 
@@ -314,6 +340,15 @@ class InvocationRegistry:
     @classmethod
     def register_output(cls, output: "type[TBaseInvocationOutput]") -> None:
         """Registers an invocation output."""
+        output_type = output.get_type()
+
+        # Log a warning when an existing invocation is being clobbered by the one we are registering
+        clobbered_output = InvocationRegistry.get_output_for_type(output_type)
+        if clobbered_output is not None:
+            # TODO(psyche): We do not record the node pack of the output, so we cannot log it here
+            logger.warning(f'Overriding invocation output "{output_type}"')
+            cls._output_classes.remove(clobbered_output)
+
         cls._output_classes.add(output)
         cls.invalidate_output_typeadapter()
 
@@ -321,6 +356,11 @@ class InvocationRegistry:
     def get_output_classes(cls) -> Iterable[type[BaseInvocationOutput]]:
         """Gets all invocation outputs."""
         return cls._output_classes
+
+    @classmethod
+    def get_outputs_map(cls) -> dict[str, type[BaseInvocationOutput]]:
+        """Gets a map of all output types to their output classes."""
+        return {i.get_type(): i for i in cls.get_output_classes()}
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -347,6 +387,11 @@ class InvocationRegistry:
         """Gets all invocation output types."""
         return (i.get_type() for i in cls.get_output_classes())
 
+    @classmethod
+    def get_output_for_type(cls, output_type: str) -> type[BaseInvocationOutput] | None:
+        """Gets the output class for a given output type."""
+        return cls.get_outputs_map().get(output_type)
+
 
 RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
     "id",
@@ -358,7 +403,7 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
 
 RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
 
-RESERVED_OUTPUT_FIELD_NAMES = {"type"}
+RESERVED_OUTPUT_FIELD_NAMES = {"type", "output_meta"}
 
 
 class _Model(BaseModel):
@@ -460,25 +505,6 @@ def invocation(
         # The node pack is the module name - will be "invokeai" for built-in nodes
         node_pack = cls.__module__.split(".")[0]
 
-        # Handle the case where an existing node is being clobbered by the one we are registering
-        if invocation_type in InvocationRegistry.get_invocation_types():
-            clobbered_invocation = InvocationRegistry.get_invocation_for_type(invocation_type)
-            # This should always be true - we just checked if the invocation type was in the set
-            assert clobbered_invocation is not None
-
-            clobbered_node_pack = clobbered_invocation.UIConfig.node_pack
-
-            if clobbered_node_pack == "invokeai":
-                # The node being clobbered is a core node
-                raise ValueError(
-                    f'Cannot load node "{invocation_type}" from node pack "{node_pack}" - a core node with the same type already exists'
-                )
-            else:
-                # The node being clobbered is a custom node
-                raise ValueError(
-                    f'Cannot load node "{invocation_type}" from node pack "{node_pack}" - a node with the same type already exists in node pack "{clobbered_node_pack}"'
-                )
-
         validate_fields(cls.model_fields, invocation_type)
 
         # Add OpenAPI schema extras
@@ -572,13 +598,9 @@ def invocation_output(
         if re.compile(r"^\S+$").match(output_type) is None:
             raise ValueError(f'"output_type" must consist of non-whitespace characters, got "{output_type}"')
 
-        if output_type in InvocationRegistry.get_output_types():
-            raise ValueError(f'Invocation type "{output_type}" already exists')
-
         validate_fields(cls.model_fields, output_type)
 
         # Add the output type to the model.
-
         output_type_annotation = Literal[output_type]  # type: ignore
         output_type_field = Field(
             title="type", default=output_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}

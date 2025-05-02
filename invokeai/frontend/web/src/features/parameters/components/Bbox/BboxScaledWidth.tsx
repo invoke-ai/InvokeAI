@@ -2,8 +2,8 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxScaledWidthChanged } from 'features/controlLayers/store/canvasSlice';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectCanvasSlice, selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +18,7 @@ const selectScaledBoundingBoxWidthConfig = createSelector(
 const BboxScaledWidth = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isStaging = useAppSelector(selectIsStaging);
+  const isBboxSizeLocked = useIsBboxSizeLocked();
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const isManual = useAppSelector(selectIsManual);
   const scaledWidth = useAppSelector(selectScaledWidth);
@@ -33,7 +33,7 @@ const BboxScaledWidth = () => {
   );
 
   return (
-    <FormControl isDisabled={!isManual || isStaging}>
+    <FormControl isDisabled={!isManual || isBboxSizeLocked}>
       <FormLabel>{t('parameters.scaledWidth')}</FormLabel>
       <CompositeSlider
         min={config.sliderMin}

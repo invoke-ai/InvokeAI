@@ -25,6 +25,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
   const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
+  const isInpaintLayerEnabled = useIsEntityTypeEnabled('inpaint_mask');
 
   return (
     <Menu>
@@ -46,7 +47,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.regional')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
+          <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask} isDisabled={!isInpaintLayerEnabled}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance} isDisabled={!isRegionalGuidanceEnabled}>

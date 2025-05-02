@@ -2,8 +2,8 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectGridSize, selectOptimalDimension, selectWidth } from 'features/controlLayers/store/selectors';
+import { useIsBboxSizeLocked } from 'features/parameters/components/Bbox/use-is-bbox-size-locked';
 import { selectWidthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,7 @@ export const BboxWidth = memo(() => {
   const width = useAppSelector(selectWidth);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const config = useAppSelector(selectWidthConfig);
-  const isStaging = useAppSelector(selectIsStaging);
+  const isBboxSizeLocked = useIsBboxSizeLocked();
   const gridSize = useAppSelector(selectGridSize);
 
   const onChange = useCallback(
@@ -30,7 +30,7 @@ export const BboxWidth = memo(() => {
   );
 
   return (
-    <FormControl isDisabled={isStaging}>
+    <FormControl isDisabled={isBboxSizeLocked}>
       <InformationalPopover feature="paramWidth">
         <FormLabel>{t('parameters.width')}</FormLabel>
       </InformationalPopover>

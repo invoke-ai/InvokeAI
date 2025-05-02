@@ -34,9 +34,10 @@ import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/com
 import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import { merge } from 'lodash-es';
+import { isEqual, merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
 import type {
+  ApiModelConfig,
   ControlLoRAModelConfig,
   ControlNetModelConfig,
   FLUXReduxModelConfig,
@@ -67,7 +68,7 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isRenderableEntity } from './types';
+import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagen3AspectRatioID, isRenderableEntity } from './types';
 import {
   converters,
   getControlLayerState,
@@ -76,6 +77,7 @@ import {
   getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
+  initialChatGPT4oReferenceImage,
   initialControlLoRA,
   initialControlNet,
   initialFLUXRedux,
@@ -644,7 +646,10 @@ export const canvasSlice = createSlice({
     referenceImageIPAdapterModelChanged: (
       state,
       action: PayloadAction<
-        EntityIdentifierPayload<{ modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | null }, 'reference_image'>
+        EntityIdentifierPayload<
+          { modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null },
+          'reference_image'
+        >
       >
     ) => {
       const { entityIdentifier, modelConfig } = action.payload;
@@ -652,14 +657,36 @@ export const canvasSlice = createSlice({
       if (!entity) {
         return;
       }
+
+      const oldModel = entity.ipAdapter.model;
+
+      // First set the new model
       entity.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
 
       if (!entity.ipAdapter.model) {
         return;
       }
 
-      if (entity.ipAdapter.type === 'ip_adapter' && entity.ipAdapter.model.type === 'flux_redux') {
-        // Switching from ip_adapter to flux_redux
+      if (isEqual(oldModel, entity.ipAdapter.model)) {
+        // Nothing changed, so we don't need to do anything
+        return;
+      }
+
+      // The type of ref image depends on the model. When the user switches the model, we rebuild the ref image.
+      // When we switch the model, we keep the image the same, but change the other parameters.
+
+      if (entity.ipAdapter.model.base === 'chatgpt-4o') {
+        // Switching to chatgpt-4o ref image
+        entity.ipAdapter = {
+          ...initialChatGPT4oReferenceImage,
+          image: entity.ipAdapter.image,
+          model: entity.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (entity.ipAdapter.model.type === 'flux_redux') {
+        // Switching to flux_redux
         entity.ipAdapter = {
           ...initialFLUXRedux,
           image: entity.ipAdapter.image,
@@ -668,17 +695,13 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (entity.ipAdapter.type === 'flux_redux' && entity.ipAdapter.model.type === 'ip_adapter') {
-        // Switching from flux_redux to ip_adapter
+      if (entity.ipAdapter.model.type === 'ip_adapter') {
+        // Switching to ip_adapter
         entity.ipAdapter = {
           ...initialIPAdapter,
           image: entity.ipAdapter.image,
           model: entity.ipAdapter.model,
         };
-        return;
-      }
-
-      if (entity.ipAdapter.type === 'ip_adapter') {
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
         if (entity.ipAdapter.model?.base === 'flux') {
           entity.ipAdapter.clipVisionModel = 'ViT-L';
@@ -686,6 +709,7 @@ export const canvasSlice = createSlice({
           // Fall back to ViT-H (ViT-G would also work)
           entity.ipAdapter.clipVisionModel = 'ViT-H';
         }
+        return;
       }
     },
     referenceImageIPAdapterCLIPVisionModelChanged: (
@@ -1139,7 +1163,21 @@ export const canvasSlice = createSlice({
       syncScaledSize(state);
     },
     bboxChangedFromCanvas: (state, action: PayloadAction<IRect>) => {
-      state.bbox.rect = action.payload;
+      const newBboxRect = action.payload;
+      const oldBboxRect = state.bbox.rect;
+
+      state.bbox.rect = newBboxRect;
+
+      if (newBboxRect.width === oldBboxRect.width && newBboxRect.height === oldBboxRect.height) {
+        return;
+      }
+
+      const oldAspectRatio = state.bbox.aspectRatio.value;
+      const newAspectRatio = newBboxRect.width / newBboxRect.height;
+
+      if (oldAspectRatio === newAspectRatio) {
+        return;
+      }
 
       // TODO(psyche): Figure out a way to handle this without resetting the aspect ratio on every change.
       // This action is dispatched when the user resizes or moves the bbox from the canvas. For now, when the user
@@ -1198,6 +1236,40 @@ export const canvasSlice = createSlice({
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
+      } else if (state.bbox.modelBase === 'imagen3' && isImagen3AspectRatioID(id)) {
+        // Imagen3 has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
+        if (id === '16:9') {
+          state.bbox.rect.width = 1408;
+          state.bbox.rect.height = 768;
+        } else if (id === '4:3') {
+          state.bbox.rect.width = 1280;
+          state.bbox.rect.height = 896;
+        } else if (id === '1:1') {
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
+        } else if (id === '3:4') {
+          state.bbox.rect.width = 896;
+          state.bbox.rect.height = 1280;
+        } else if (id === '9:16') {
+          state.bbox.rect.width = 768;
+          state.bbox.rect.height = 1408;
+        }
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
+      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
+        // gpt-image has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
+        if (id === '3:2') {
+          state.bbox.rect.width = 1536;
+          state.bbox.rect.height = 1024;
+        } else if (id === '1:1') {
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
+        } else if (id === '2:3') {
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1536;
+        }
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
       } else {
         state.bbox.aspectRatio.isLocked = true;
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -1670,6 +1742,13 @@ export const canvasSlice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
+        if (base === 'imagen3' || base === 'chatgpt-4o') {
+          state.bbox.aspectRatio.isLocked = true;
+          state.bbox.aspectRatio.value = 1;
+          state.bbox.aspectRatio.id = '1:1';
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
+        }
         syncScaledSize(state);
       }
     });
@@ -1802,6 +1881,10 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const syncScaledSize = (state: CanvasState) => {
+  if (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'chatgpt-4o') {
+    // Imagen3 has fixed sizes. Scaled bbox is not supported.
+    return;
+  }
   if (state.bbox.scaleMethod === 'auto') {
     // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;

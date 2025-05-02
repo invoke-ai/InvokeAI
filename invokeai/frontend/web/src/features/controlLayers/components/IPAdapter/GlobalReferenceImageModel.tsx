@@ -2,36 +2,24 @@ import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useIPAdapterOrFLUXReduxModels } from 'services/api/hooks/modelsByType';
-import type { AnyModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
+import { useGlobalReferenceImageModels } from 'services/api/hooks/modelsByType';
+import type { AnyModelConfig, ApiModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
 
 type Props = {
-  isRegionalGuidance: boolean;
   modelKey: string | null;
-  onChangeModel: (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig) => void;
+  onChangeModel: (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig) => void;
 };
 
-export const IPAdapterModel = memo(({ isRegionalGuidance, modelKey, onChangeModel }: Props) => {
+export const GlobalReferenceImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   const { t } = useTranslation();
   const currentBaseModel = useAppSelector(selectBase);
-  const filter = useCallback(
-    (config: IPAdapterModelConfig | FLUXReduxModelConfig) => {
-      // FLUX supports regional guidance for FLUX Redux models only - not IP Adapter models.
-      if (isRegionalGuidance && config.base === 'flux' && config.type === 'ip_adapter') {
-        return false;
-      }
-      return true;
-    },
-    [isRegionalGuidance]
-  );
-  const [modelConfigs, { isLoading }] = useIPAdapterOrFLUXReduxModels(filter);
+  const [modelConfigs, { isLoading }] = useGlobalReferenceImageModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 
   const _onChangeModel = useCallback(
-    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | null) => {
+    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig | null) => {
       if (!modelConfig) {
         return;
       }
@@ -67,10 +55,9 @@ export const IPAdapterModel = memo(({ isRegionalGuidance, modelKey, onChangeMode
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
         />
-        <NavigateToModelManagerButton />
       </FormControl>
     </Tooltip>
   );
 });
 
-IPAdapterModel.displayName = 'IPAdapterModel';
+GlobalReferenceImageModel.displayName = 'GlobalReferenceImageModel';

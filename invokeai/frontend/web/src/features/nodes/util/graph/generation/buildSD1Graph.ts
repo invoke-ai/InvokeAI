@@ -23,7 +23,7 @@ import {
   getSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
+import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -33,10 +33,7 @@ import { addRegions } from './addRegions';
 
 const log = logger('system');
 
-export const buildSD1Graph = async (
-  state: RootState,
-  manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel'> }> => {
+export const buildSD1Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
@@ -316,5 +313,9 @@ export const buildSD1Graph = async (
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return { g, noise, posCond };
+  return {
+    g,
+    seedFieldIdentifier: { nodeId: noise.id, fieldName: 'seed' },
+    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+  };
 };

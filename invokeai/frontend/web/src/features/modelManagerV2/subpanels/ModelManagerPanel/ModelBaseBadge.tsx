@@ -16,6 +16,8 @@ export const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   'sdxl-refiner': 'invokeBlue',
   flux: 'gold',
   cogview4: 'red',
+  imagen3: 'pink',
+  'chatgpt-4o': 'pink',
 };
 
 const ModelBaseBadge = ({ base }: Props) => {

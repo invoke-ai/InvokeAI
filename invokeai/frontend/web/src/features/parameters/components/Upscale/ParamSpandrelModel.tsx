@@ -2,7 +2,6 @@ import { Box, Combobox, Flex, FormControl, FormLabel, Tooltip } from '@invoke-ai
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { selectUpscaleModel, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,7 +54,6 @@ const ParamSpandrelModel = () => {
             />
           </Box>
         </Tooltip>
-        <NavigateToModelManagerButton />
       </Flex>
     </FormControl>
   );

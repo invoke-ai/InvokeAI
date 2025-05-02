@@ -18,16 +18,24 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
       const state = getState();
       const { prepend } = action.payload;
 
-      const { g, noise, posCond } = await buildMultidiffusionUpscaleGraph(state);
+      const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = await buildMultidiffusionUpscaleGraph(state);
 
-      const batchConfig = prepareLinearUIBatch(state, g, prepend, noise, posCond, 'upscaling', 'gallery');
+      const batchConfig = prepareLinearUIBatch({
+        state,
+        g,
+        prepend,
+        seedFieldIdentifier,
+        positivePromptFieldIdentifier,
+        origin: 'upscaling',
+        destination: 'gallery',
+      });
 
       const req = dispatch(queueApi.endpoints.enqueueBatch.initiate(batchConfig, enqueueMutationFixedCacheKeyOptions));
       try {
         await req.unwrap();
         log.debug(parseify({ batchConfig }), 'Enqueued batch');
       } catch (error) {
-        log.error({ error: serializeError(error) }, 'Failed to enqueue batch');
+        log.error({ error: serializeError(error as Error) }, 'Failed to enqueue batch');
       } finally {
         req.reset();
       }

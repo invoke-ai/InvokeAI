@@ -4,27 +4,30 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useControlLayerModels } from 'services/api/hooks/modelsByType';
-import type {
-  AnyModelConfig,
-  ControlLoRAModelConfig,
-  ControlNetModelConfig,
-  T2IAdapterModelConfig,
-} from 'services/api/types';
+import { useRegionalReferenceImageModels } from 'services/api/hooks/modelsByType';
+import type { AnyModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
 
 type Props = {
   modelKey: string | null;
-  onChange: (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig) => void;
+  onChangeModel: (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig) => void;
 };
 
-export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onChangeModel }: Props) => {
+const filter = (config: IPAdapterModelConfig | FLUXReduxModelConfig) => {
+  // FLUX supports regional guidance for FLUX Redux models only - not IP Adapter models.
+  if (config.base === 'flux' && config.type === 'ip_adapter') {
+    return false;
+  }
+  return true;
+};
+
+export const RegionalReferenceImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   const { t } = useTranslation();
   const currentBaseModel = useAppSelector(selectBase);
-  const [modelConfigs, { isLoading }] = useControlLayerModels();
+  const [modelConfigs, { isLoading }] = useRegionalReferenceImageModels(filter);
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 
-  const _onChange = useCallback(
-    (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig | null) => {
+  const _onChangeModel = useCallback(
+    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | null) => {
       if (!modelConfig) {
         return;
       }
@@ -35,20 +38,19 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
 
   const getIsDisabled = useCallback(
     (model: AnyModelConfig): boolean => {
-      const isCompatible = currentBaseModel === model.base;
       const hasMainModel = Boolean(currentBaseModel);
-      return !hasMainModel || !isCompatible;
+      const hasSameBase = currentBaseModel === model.base;
+      return !hasMainModel || !hasSameBase;
     },
     [currentBaseModel]
   );
 
   const { options, value, onChange, noOptionsMessage } = useGroupedModelCombobox({
     modelConfigs,
-    onChange: _onChange,
+    onChange: _onChangeModel,
     selectedModel,
     getIsDisabled,
     isLoading,
-    groupByType: true,
   });
 
   return (
@@ -66,4 +68,4 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
   );
 });
 
-ControlLayerControlAdapterModel.displayName = 'ControlLayerControlAdapterModel';
+RegionalReferenceImageModel.displayName = 'RegionalReferenceImageModel';

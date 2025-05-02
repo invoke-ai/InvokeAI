@@ -118,7 +118,7 @@ export const useValidateAndLoadWorkflow = () => {
           });
         } else {
           // Some other error occurred
-          log.error({ error: serializeError(e) }, t('nodes.unknownErrorValidatingWorkflow'));
+          log.error({ error: serializeError(e as Error) }, t('nodes.unknownErrorValidatingWorkflow'));
           toast({
             id: 'UNABLE_TO_VALIDATE_WORKFLOW',
             title: t('nodes.unableToValidateWorkflow'),

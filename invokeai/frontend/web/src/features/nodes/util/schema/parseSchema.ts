@@ -287,7 +287,7 @@ const getFieldType = (
           node: type,
           field: propertyName,
           schema: parseify(property),
-          error: serializeError(e),
+          error: serializeError(e as Error),
         },
         t(tKey, {
           node: type,

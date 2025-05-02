@@ -3,19 +3,23 @@ import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-a
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectIsFLUX, selectIsSD3, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectIsChatGTP4o,
+  selectIsFLUX,
+  selectIsImagen3,
+  selectIsSD3,
+  selectParamsSlice,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectScaleMethod } from 'features/controlLayers/store/selectors';
 import { ParamOptimizedDenoisingToggle } from 'features/parameters/components/Advanced/ParamOptimizedDenoisingToggle';
 import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
 import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
 import BboxScaleMethod from 'features/parameters/components/Bbox/BboxScaleMethod';
 import { BboxSettings } from 'features/parameters/components/Bbox/BboxSettings';
-import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
-import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
-import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
+import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectBadges = createMemoizedSelector([selectCanvasSlice, selectParamsSlice], (canvas, params) => {
@@ -61,6 +65,12 @@ export const ImageSettingsAccordion = memo(() => {
   });
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
+  const isImagen3 = useAppSelector(selectIsImagen3);
+  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
+
+  const isApiModel = useMemo(() => {
+    return isImagen3 || isChatGPT4o;
+  }, [isImagen3, isChatGPT4o]);
 
   return (
     <StandaloneAccordion
@@ -69,25 +79,31 @@ export const ImageSettingsAccordion = memo(() => {
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
+      <Flex
+        px={4}
+        pt={4}
+        pb={isApiModel ? 4 : 0}
+        w="full"
+        h="full"
+        flexDir="column"
+        data-testid="image-settings-accordion"
+      >
         <BboxSettings />
-        <Flex py={3} gap={4} alignItems="center">
-          <ParamSeedNumberInput />
-          <ParamSeedShuffle />
-          <ParamSeedRandomize />
-        </Flex>
-        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-          <Flex gap={4} pb={4} flexDir="column">
-            {(isFLUX || isSD3) && <ParamOptimizedDenoisingToggle />}
-            <BboxScaleMethod />
-            {scaleMethod !== 'none' && (
-              <FormControlGroup formLabelProps={scalingLabelProps}>
-                <BboxScaledWidth />
-                <BboxScaledHeight />
-              </FormControlGroup>
-            )}
-          </Flex>
-        </Expander>
+        {!isApiModel && <ParamSeed py={3} />}
+        {!isApiModel && (
+          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+            <Flex gap={4} pb={4} flexDir="column">
+              {(isFLUX || isSD3) && <ParamOptimizedDenoisingToggle />}
+              <BboxScaleMethod />
+              {scaleMethod !== 'none' && (
+                <FormControlGroup formLabelProps={scalingLabelProps}>
+                  <BboxScaledWidth />
+                  <BboxScaledHeight />
+                </FormControlGroup>
+              )}
+            </Flex>
+          </Expander>
+        )}
       </Flex>
     </StandaloneAccordion>
   );

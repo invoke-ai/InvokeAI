@@ -12,9 +12,7 @@ import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
-import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
-import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
-import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
+import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
@@ -94,11 +92,7 @@ export const AdvancedSettingsAccordion = memo(() => {
           {!isFLUX && !isSD3 && <ParamVAEPrecision />}
         </Flex>
         {activeTabName === 'upscaling' ? (
-          <Flex gap={4} alignItems="center">
-            <ParamSeedNumberInput />
-            <ParamSeedShuffle />
-            <ParamSeedRandomize />
-          </Flex>
+          <ParamSeed />
         ) : (
           <>
             {!isFLUX && !isSD3 && (

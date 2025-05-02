@@ -476,15 +476,24 @@ export function getImageDataTransparency(imageData: ImageData): Transparency {
 /**
  * Loads an image from a URL and returns a promise that resolves with the loaded image element.
  * @param src The image source URL
+ * @param fetchUrlFirst Whether to fetch the image's URL first, assuming the provided `src` will redirect to a different URL. This addresses an issue where CORS headers are dropped during a redirect.
  * @returns A promise that resolves with the loaded image element
  */
-export function loadImage(src: string): Promise<HTMLImageElement> {
+export async function loadImage(src: string, fetchUrlFirst?: boolean): Promise<HTMLImageElement> {
+  const authToken = $authToken.get();
+  let url = src;
+  if (authToken && fetchUrlFirst) {
+    const response = await fetch(`${src}?url_only=true`, { credentials: 'include' });
+    const data = await response.json();
+    url = data.url;
+  }
+
   return new Promise((resolve, reject) => {
     const imageElement = new Image();
     imageElement.onload = () => resolve(imageElement);
     imageElement.onerror = (error) => reject(error);
     imageElement.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
-    imageElement.src = src;
+    imageElement.src = url;
   });
 }
 

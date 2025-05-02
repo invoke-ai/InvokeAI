@@ -6,6 +6,7 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { CLIPVisionModel } from 'features/controlLayers/components/IPAdapter/CLIPVisionModel';
 import { FLUXReduxImageInfluence } from 'features/controlLayers/components/IPAdapter/FLUXReduxImageInfluence';
+import { GlobalReferenceImageModel } from 'features/controlLayers/components/IPAdapter/GlobalReferenceImageModel';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterSettingsEmptyState } from 'features/controlLayers/components/IPAdapter/IPAdapterSettingsEmptyState';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -33,10 +34,9 @@ import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
-import type { FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
+import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
-import { IPAdapterModel } from './IPAdapterModel';
 
 const buildSelectIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) =>
   createSelector(
@@ -80,7 +80,7 @@ const IPAdapterSettingsContent = memo(() => {
   );
 
   const onChangeModel = useCallback(
-    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig) => {
+    (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig) => {
       dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier, modelConfig }));
     },
     [dispatch, entityIdentifier]
@@ -113,11 +113,7 @@ const IPAdapterSettingsContent = memo(() => {
     <CanvasEntitySettingsWrapper>
       <Flex flexDir="column" gap={2} position="relative" w="full">
         <Flex gap={2} alignItems="center" w="full">
-          <IPAdapterModel
-            isRegionalGuidance={false}
-            modelKey={ipAdapter.model?.key ?? null}
-            onChangeModel={onChangeModel}
-          />
+          <GlobalReferenceImageModel modelKey={ipAdapter.model?.key ?? null} onChangeModel={onChangeModel} />
           {ipAdapter.type === 'ip_adapter' && (
             <CLIPVisionModel model={ipAdapter.clipVisionModel} onChange={onChangeCLIPVisionModel} />
           )}

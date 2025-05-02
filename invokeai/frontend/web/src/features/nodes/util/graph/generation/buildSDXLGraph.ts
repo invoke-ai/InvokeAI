@@ -23,7 +23,7 @@ import {
   getSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ImageOutputNodes } from 'features/nodes/util/graph/types';
+import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
@@ -33,10 +33,7 @@ import { addRegions } from './addRegions';
 
 const log = logger('system');
 
-export const buildSDXLGraph = async (
-  state: RootState,
-  manager: CanvasManager
-): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'sdxl_compel_prompt'> }> => {
+export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
@@ -323,5 +320,9 @@ export const buildSDXLGraph = async (
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return { g, noise, posCond };
+  return {
+    g,
+    seedFieldIdentifier: { nodeId: noise.id, fieldName: 'seed' },
+    positivePromptFieldIdentifier: { nodeId: posCond.id, fieldName: 'prompt' },
+  };
 };

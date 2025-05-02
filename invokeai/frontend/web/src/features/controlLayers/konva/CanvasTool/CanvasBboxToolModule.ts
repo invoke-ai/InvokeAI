@@ -4,8 +4,10 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { fitRectToGrid, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
-import type { Coordinate, Rect } from 'features/controlLayers/store/types';
+import type { Coordinate, Rect, Tool } from 'features/controlLayers/store/types';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import Konva from 'konva';
 import { noop } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -178,6 +180,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     // Listen for the bbox overlay setting to update the overlay's visibility
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectBboxOverlay, this.render));
 
+    // Listen for the model changing - some model types constraint the bbox to a certain size or aspect ratio.
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectModel, this.render));
+
     // Update on busy state changes
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
   }
@@ -218,10 +223,23 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
 
     this.syncOverlay();
 
+    const model = this.manager.stateApi.runSelector(selectModel);
+
     this.konva.transformer.setAttrs({
       listening: tool === 'bbox',
-      enabledAnchors: tool === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
+      enabledAnchors: this.getEnabledAnchors(tool, model),
     });
+  };
+
+  getEnabledAnchors = (tool: Tool, model?: ModelIdentifierField | null): string[] => {
+    if (tool !== 'bbox') {
+      return NO_ANCHORS;
+    }
+    if (model?.base === 'imagen3' || model?.base === 'chatgpt-4o') {
+      // The bbox is not resizable in these modes
+      return NO_ANCHORS;
+    }
+    return ALL_ANCHORS;
   };
 
   syncOverlay = () => {
@@ -251,7 +269,7 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
   onDragMove = () => {
     // The grid size here is the _position_ grid size, not the _dimension_ grid size - it is not constratined by the
     // currently-selected model.
-    const gridSize = this.manager.stateApi.getGridSize();
+    const gridSize = this.manager.stateApi.getPositionGridSize();
     const bbox = this.manager.stateApi.getBbox();
     const bboxRect: Rect = {
       ...bbox.rect,

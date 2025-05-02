@@ -28,7 +28,8 @@ export type AppFeature =
   | 'starterModels'
   | 'hfToken'
   | 'retryQueueItem'
-  | 'cancelAndClearAll';
+  | 'cancelAndClearAll'
+  | 'apiModels';
 /**
  * A disable-able Stable Diffusion feature
  */

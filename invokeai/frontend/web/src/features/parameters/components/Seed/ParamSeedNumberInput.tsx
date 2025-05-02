@@ -17,7 +17,7 @@ export const ParamSeedNumberInput = memo(() => {
   const handleChangeSeed = useCallback((v: number) => dispatch(setSeed(v)), [dispatch]);
 
   return (
-    <FormControl flexGrow={1}>
+    <FormControl flexGrow={1} isDisabled={shouldRandomizeSeed}>
       <InformationalPopover feature="paramSeed">
         <FormLabel>{t('parameters.seed')}</FormLabel>
       </InformationalPopover>
@@ -25,7 +25,6 @@ export const ParamSeedNumberInput = memo(() => {
         step={1}
         min={NUMPY_RAND_MIN}
         max={NUMPY_RAND_MAX}
-        isDisabled={shouldRandomizeSeed}
         onChange={handleChangeSeed}
         value={seed}
         flexGrow={1}

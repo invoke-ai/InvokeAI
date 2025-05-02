@@ -175,6 +175,8 @@
         "blue": "Blue",
         "alpha": "Alpha",
         "selected": "Selected",
+        "search": "Search",
+        "clear": "Clear",
         "tab": "Tab",
         "view": "View",
         "edit": "Edit",
@@ -202,8 +204,10 @@
         "value": "Value",
         "label": "Label",
         "systemInformation": "System Information",
-        "compact": "Compact",
-        "full": "Full"
+        "compactView": "Compact View",
+        "fullView": "Full View",
+        "options_withCount_one": "{{count}} option",
+        "options_withCount_other": "{{count}} options"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -1103,6 +1107,7 @@
         "info": "Info",
         "invoke": {
             "addingImagesTo": "Adding images to",
+            "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
             "invoke": "Invoke",
             "missingFieldTemplate": "Missing field template",
             "missingInputForField": "missing input",
@@ -1183,7 +1188,8 @@
         "width": "Width",
         "gaussianBlur": "Gaussian Blur",
         "boxBlur": "Box Blur",
-        "staged": "Staged"
+        "staged": "Staged",
+        "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your <LinkComponent>account settings</LinkComponent> to upgrade."
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
@@ -1322,6 +1328,8 @@
         "unableToCopyDesc": "Your browser does not support clipboard access. Firefox users may be able to fix this by following ",
         "unableToCopyDesc_theseSteps": "these steps",
         "fluxFillIncompatibleWithT2IAndI2I": "FLUX Fill is not compatible with Text to Image or Image to Image. Use other FLUX models for these tasks.",
+        "imagen3IncompatibleGenerationMode": "Google Imagen3 supports Text to Image only. Use other models for Image to Image, Inpainting and Outpainting tasks.",
+        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supports Text to Image and Image to Image only. Use other models Inpainting and Outpainting tasks.",
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
         "workflowUnpublished": "Workflow Unpublished"

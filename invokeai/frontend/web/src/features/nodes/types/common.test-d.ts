@@ -1,4 +1,5 @@
 import type {
+  BaseModelType,
   BoardField,
   Classification,
   ColorField,
@@ -9,9 +10,10 @@ import type {
   ModelIdentifierField,
   ProgressImage,
   SchedulerField,
+  SubModelType,
   T2IAdapterField,
 } from 'features/nodes/types/common';
-import type { Invocation, S } from 'services/api/types';
+import type { Invocation, ModelType, S } from 'services/api/types';
 import type { Equals, Extends } from 'tsafe';
 import { assert } from 'tsafe';
 import { describe, test } from 'vitest';
@@ -34,6 +36,9 @@ describe('Common types', () => {
 
   // Model component types
   test('ModelIdentifier', () => assert<Equals<ModelIdentifierField, S['ModelIdentifierField']>>());
+  test('ModelIdentifier', () => assert<Equals<BaseModelType, S['BaseModelType']>>());
+  test('ModelIdentifier', () => assert<Equals<SubModelType, S['SubModelType']>>());
+  test('ModelIdentifier', () => assert<Equals<ModelType, S['ModelType']>>());
 
   // Misc types
   test('ProgressImage', () => assert<Equals<ProgressImage, S['ProgressImage']>>());

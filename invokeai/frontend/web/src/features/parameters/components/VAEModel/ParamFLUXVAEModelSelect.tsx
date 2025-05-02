@@ -4,7 +4,6 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fluxVAESelected, selectFLUXVAE } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFluxVAEModels } from 'services/api/hooks/modelsByType';
@@ -38,7 +37,6 @@ const ParamFLUXVAEModelSelect = () => {
         <FormLabel m={0}>{t('modelManager.vae')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} onChange={onChange} noOptionsMessage={noOptionsMessage} />
-      <NavigateToModelManagerButton />
     </FormControl>
   );
 };
