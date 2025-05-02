@@ -2262,9 +2262,14 @@ export type components = {
             mode?: "RGB" | "RGBA";
             /**
              * @description The color of the image
-             * @default null
+             * @default {
+             *       "r": 0,
+             *       "g": 0,
+             *       "b": 0,
+             *       "a": 255
+             *     }
              */
-            color?: components["schemas"]["ColorField"] | null;
+            color?: components["schemas"]["ColorField"];
             /**
              * type
              * @default blank_image
@@ -7024,9 +7029,9 @@ export type components = {
             /**
              * Floats
              * @description The floats to batch over
-             * @default []
+             * @default null
              */
-            floats?: number[];
+            floats?: number[] | null;
             /**
              * type
              * @default float_batch
@@ -9428,9 +9433,9 @@ export type components = {
             /**
              * Images
              * @description The images to batch over
-             * @default []
+             * @default null
              */
-            images?: components["schemas"]["ImageField"][];
+            images?: components["schemas"]["ImageField"][] | null;
             /**
              * type
              * @default image_batch
@@ -11163,9 +11168,9 @@ export type components = {
             /**
              * Integers
              * @description The integers to batch over
-             * @default []
+             * @default null
              */
-            integers?: number[];
+            integers?: number[] | null;
             /**
              * type
              * @default integer_batch
@@ -19692,9 +19697,9 @@ export type components = {
             /**
              * Strings
              * @description The strings to batch over
-             * @default []
+             * @default null
              */
-            strings?: string[];
+            strings?: string[] | null;
             /**
              * type
              * @default string_batch
