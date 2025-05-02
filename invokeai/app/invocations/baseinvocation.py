@@ -495,7 +495,9 @@ class NoDefaultSentinel:
     pass
 
 
-def validate_field_default(field_name: str, invocation_type: str, annotation: Any, field_info: FieldInfo) -> None:
+def validate_field_default(
+    cls_name: str, field_name: str, invocation_type: str, annotation: Any, field_info: FieldInfo
+) -> None:
     """Validates the default value of a field against its pydantic field definition."""
 
     assert isinstance(field_info.json_schema_extra, dict), "json_schema_extra is not a dict"
@@ -507,13 +509,15 @@ def validate_field_default(field_name: str, invocation_type: str, annotation: An
     if orig_default is NoDefaultSentinel:
         return
 
-    TempDefaultValidator = create_model("TempDefaultValidator", field_to_validate=(annotation, field_info))
+    TempDefaultValidator = create_model(cls_name, **{field_name: (annotation, field_info)})
 
     # Validate the default value against the annotation
     try:
-        TempDefaultValidator(field_to_validate=orig_default)
+        TempDefaultValidator.model_validate({field_name: orig_default})
     except Exception as e:
-        raise ValueError(f"Default value for field {field_name} on invocation {invocation_type} is invalid, {e}") from e
+        raise InvalidFieldError(
+            f'Default value for field "{field_name}" on invocation "{invocation_type}" is invalid, {e}'
+        ) from e
 
 
 def is_optional(annotation: Any) -> bool:
@@ -571,7 +575,7 @@ def invocation(
                 f"{field_name} on invocation {invocation_type} has a non-dict json_schema_extra, did you forget to use InputField?"
             )
 
-            validate_field_default(field_name, invocation_type, annotation, field_info)
+            validate_field_default(cls.__name__, field_name, invocation_type, annotation, field_info)
 
             if field_info.default is None and not is_optional(annotation):
                 annotation = annotation | None
