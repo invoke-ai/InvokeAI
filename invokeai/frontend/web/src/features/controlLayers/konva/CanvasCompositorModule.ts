@@ -1,5 +1,6 @@
 import { withResult, withResultAsync } from 'common/util/result';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
+import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -424,6 +425,147 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     const entityIdentifiers = entities.map(getEntityIdentifier);
 
     return this.mergeByEntityIdentifiers(entityIdentifiers, false);
+  };
+
+  /**
+   * Creates and uploads a grayscale representation of the noise masks or any other attribute.
+   * This produces an image with a white background where the mask is represented by dark values
+   * rather than transparency.
+   *
+   * @param adapters The adapters for the canvas entities to composite
+   * @param rect The region to include in the rasterized image
+   * @param attribute The attribute to use for grayscale values (defaults to 'noiseLevel')
+   * @param uploadOptions Options for uploading the image
+   * @param forceUpload If true, the image is always re-uploaded, returning a new image DTO
+   * @returns A promise that resolves to the image DTO
+   */
+  getGrayscaleMaskCompositeImageDTO = async (
+    adapters: CanvasEntityAdapterInpaintMask[],
+    rect: Rect,
+    attribute: 'noiseLevel' = 'noiseLevel',
+    uploadOptions: SetOptional<Omit<UploadImageArg, 'file'>, 'image_category'> = { is_intermediate: true },
+    forceUpload?: boolean
+  ): Promise<ImageDTO> => {
+    assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
+
+    //const entityIdentifiers = adapters.map((adapter) => adapter.entityIdentifier);
+
+    // Use a unique hash that includes the attribute name for caching
+    const hash = this.getCompositeHash(adapters, { rect, attribute, grayscale: true });
+    const cachedImageName = forceUpload ? undefined : this.manager.cache.imageNameCache.get(hash);
+
+    let imageDTO: ImageDTO | null = null;
+
+    if (cachedImageName) {
+      imageDTO = await getImageDTOSafe(cachedImageName);
+      if (imageDTO) {
+        this.log.debug({ rect, imageName: cachedImageName, imageDTO }, 'Using cached grayscale composite image');
+        return imageDTO;
+      }
+      this.log.warn({ rect, imageName: cachedImageName }, 'Cached grayscale image name not found, recompositing');
+    }
+
+    // Create a white background canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    const ctx = canvas.getContext('2d');
+    assert(ctx !== null, 'Canvas 2D context is null');
+
+    // Fill with white first (creates white background)
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    // Apply special compositing mode
+    ctx.globalCompositeOperation = 'darken';
+
+    // Draw each adapter's content
+    for (const adapter of adapters) {
+      this.log.debug({ entityIdentifier: adapter.entityIdentifier }, 'Drawing entity to grayscale composite canvas');
+
+      // Get the canvas from the adapter
+      const adapterCanvas = adapter.getCanvas(rect);
+
+      // Create a temporary canvas for grayscale conversion
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = adapterCanvas.width;
+      tempCanvas.height = adapterCanvas.height;
+
+      const tempCtx = tempCanvas.getContext('2d');
+      assert(tempCtx !== null, 'Temp canvas 2D context is null');
+
+      // Draw the original adapter canvas to the temp canvas
+      tempCtx.drawImage(adapterCanvas, 0, 0);
+
+      // Get the image data for processing
+      const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const data = imageData.data;
+
+      // Convert alpha values to grayscale based on the specified attribute
+      // Get the attribute value with proper type checking
+      const attributeValue = typeof adapter.state[attribute] === 'number' ? (adapter.state[attribute] as number) : 1.0; // Default to full strength if attribute is not a number
+
+      // Process all pixels in the image data
+      for (let i = 3; i < data.length; i += 4) {
+        // Make sure we're accessing valid array indices
+        if (i + 3 < data.length) {
+          const alpha = data[i + 3]! / 255;
+
+          // Calculate grayscale value: white (255) for no mask, darker for stronger mask
+          // Scale according to the attribute value (higher attribute = darker pixels)
+          const grayValue = Math.max(0, Math.min(255, 255 - Math.round(255 * alpha * attributeValue)));
+
+          data[i] = grayValue; // R
+          data[i + 1] = grayValue; // G
+          data[i + 2] = grayValue; // B
+          data[i + 3] = 255; // A (fully opaque)
+        }
+      }
+
+      // Put the processed image data back to the temp canvas
+      tempCtx.putImageData(imageData, 0, 0);
+
+      // Draw the temp canvas to the main canvas
+      ctx.drawImage(tempCanvas, 0, 0);
+    }
+
+    // Convert to blob and upload
+    this.$isProcessing.set(true);
+    const blobResult = await withResultAsync(() => canvasToBlob(canvas));
+    this.$isProcessing.set(false);
+
+    if (blobResult.isErr()) {
+      this.log.error(
+        { error: serializeError(blobResult.error) },
+        'Failed to convert grayscale composite canvas to blob'
+      );
+      throw blobResult.error;
+    }
+
+    const blob = blobResult.value;
+
+    if (this.manager._isDebugging) {
+      previewBlob(blob, 'Grayscale Composite');
+    }
+
+    this.$isUploading.set(true);
+    const uploadResult = await withResultAsync(() =>
+      uploadImage({
+        file: new File([blob], 'canvas-grayscale-composite.png', { type: 'image/png' }),
+        image_category: 'general',
+        ...uploadOptions,
+      })
+    );
+    this.$isUploading.set(false);
+
+    if (uploadResult.isErr()) {
+      throw uploadResult.error;
+    }
+
+    imageDTO = uploadResult.value;
+    this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
+    return imageDTO;
   };
 
   /**
