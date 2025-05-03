@@ -502,26 +502,29 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
       const data = imageData.data;
 
-      // Convert alpha values to grayscale based on the specified attribute
+      // Convert values to grayscale based on the specified attribute
       // Get the attribute value with proper type checking
       const attributeValue = typeof adapter.state[attribute] === 'number' ? (adapter.state[attribute] as number) : 1.0; // Default to full strength if attribute is not a number
 
       // Process all pixels in the image data
-      for (let i = 3; i < data.length; i += 4) {
+      for (let i = 0; i < data.length; i += 4) {
         // Make sure we're accessing valid array indices
         if (i + 3 < data.length) {
-          const alpha = data[i + 3]! / 255;
-
           // Calculate grayscale value: white (255) for no mask, darker for stronger mask
           // Scale according to the attribute value (higher attribute = darker pixels)
-          const grayValue = Math.max(0, Math.min(255, 255 - Math.round(255 * alpha * attributeValue)));
+          let grayValue = 255; // Default to white for unmasked areas
+          if ((data[i + 3] ?? 0) > 127) {
+            grayValue = Math.max(0, Math.min(255, 255 - Math.round(255 * attributeValue)));
+          }
 
-          data[i] = grayValue; // R
-          data[i + 1] = grayValue; // G
-          data[i + 2] = grayValue; // B
-          data[i + 3] = 255; // A (fully opaque)
+          data[i] = grayValue; // R of current pixel
+          data[i + 1] = grayValue; // G of current pixel
+          data[i + 2] = grayValue; // B of current pixel
+          data[i + 3] = 255; // A of current pixel (fully opaque)
         }
       }
+
+      imageData.data.set(data); // Update the image data with the processed values
 
       // Put the processed image data back to the temp canvas
       tempCtx.putImageData(imageData, 0, 0);
