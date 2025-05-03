@@ -10444,6 +10444,11 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"] | null;
             /**
+             * @description Optional mask determining where to apply noise (black=noise, white=no noise)
+             * @default null
+             */
+            mask?: components["schemas"]["ImageField"] | null;
+            /**
              * Seed
              * @description Seed for random number generation
              * @default 0
