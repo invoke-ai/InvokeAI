@@ -39,7 +39,7 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
   const { positivePrompt } = selectPresetModifiedPrompts(state);
 
   assert(model, 'No model found in state');
-  assert(model.base === 'chatgpt-4o', 'Model is not a FLUX model');
+  assert(model.base === 'chatgpt-4o', 'Model is not a ChatGPT 4o model');
 
   assert(isChatGPT4oAspectRatioID(bbox.aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
@@ -77,6 +77,12 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
       is_intermediate,
       board,
     });
+    g.upsertMetadata({
+      positive_prompt: positivePrompt,
+      model: Graph.getModelMetadataField(model),
+      width: bbox.rect.width,
+      height: bbox.rect.height,
+    });
     return {
       g,
       positivePromptFieldIdentifier: { nodeId: gptImage.id, fieldName: 'positive_prompt' },
@@ -101,6 +107,12 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
       use_cache: false,
       is_intermediate,
       board,
+    });
+    g.upsertMetadata({
+      positive_prompt: positivePrompt,
+      model: Graph.getModelMetadataField(model),
+      width: bbox.rect.width,
+      height: bbox.rect.height,
     });
     return {
       g,

@@ -13,6 +13,7 @@ import {
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
+import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -32,7 +33,9 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
 
   const { bbox } = canvas;
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
+  const model = selectMainModelConfig(state);
 
+  assert(model, 'No model found for Imagen3 graph');
   assert(isImagen3AspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
   assert(positivePrompt.length > 0, 'Imagen3 requires positive prompt to have at least one character');
 
@@ -53,6 +56,13 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
       use_cache: false,
       is_intermediate,
       board,
+    });
+    g.upsertMetadata({
+      positive_prompt: positivePrompt,
+      negative_prompt: negativePrompt,
+      width: bbox.rect.width,
+      height: bbox.rect.height,
+      model: Graph.getModelMetadataField(model),
     });
     return {
       g,
