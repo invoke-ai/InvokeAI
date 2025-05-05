@@ -84,6 +84,7 @@ export type AppConfig = {
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
   isLocal?: boolean;
+  shouldShowCredits: boolean;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
