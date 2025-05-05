@@ -4,13 +4,14 @@ import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
-import {
-  type AnyModelConfig,
-  type GetHFTokenStatusResponse,
-  isNonRefinerMainModelConfig,
-  type SetHFTokenArg,
-  type SetHFTokenResponse,
+import type {
+  AnyModelConfig,
+  GetHFTokenStatusResponse,
+  ResetHFTokenResponse,
+  SetHFTokenArg,
+  SetHFTokenResponse,
 } from 'services/api/types';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Param0 } from 'tsafe';
 
 import type { ApiTagDescription } from '..';
@@ -293,6 +294,10 @@ export const modelsApi = api.injectEndpoints({
         }
       },
     }),
+    resetHFToken: build.mutation<ResetHFTokenResponse, void>({
+      query: () => ({ url: buildModelsUrl('hf_login'), method: 'DELETE' }),
+      invalidatesTags: ['HFTokenStatus'],
+    }),
     emptyModelCache: build.mutation<void, void>({
       query: () => ({ url: buildModelsUrl('empty_model_cache'), method: 'POST' }),
     }),
@@ -316,6 +321,7 @@ export const {
   useGetStarterModelsQuery,
   useGetHFTokenStatusQuery,
   useSetHFTokenMutation,
+  useResetHFTokenMutation,
   useEmptyModelCacheMutation,
 } = modelsApi;
 
