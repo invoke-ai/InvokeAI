@@ -352,7 +352,8 @@ export type paths = {
         put?: never;
         /** Do Hf Login */
         post: operations["do_hf_login"];
-        delete?: never;
+        /** Reset Hf Token */
+        delete: operations["reset_hf_token"];
         options?: never;
         head?: never;
         patch?: never;
@@ -22498,6 +22499,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_hf_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HFTokenStatus"];
                 };
             };
         };
