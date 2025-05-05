@@ -19416,7 +19416,7 @@ export type components = {
              * Credits
              * @description The total credits used for this queue item
              */
-            credits: number | null;
+            credits?: number | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
