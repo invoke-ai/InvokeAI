@@ -19293,7 +19293,7 @@ export type components = {
             api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /**
              * Credits
-             * @description Total credits used for this queue item
+             * @description The total credits used for this queue item
              */
             credits?: number | null;
             /** @description The fully-populated session to be executed */
@@ -19414,9 +19414,9 @@ export type components = {
             api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /**
              * Credits
-             * @description Total credits used for this queue item
+             * @description The total credits used for this queue item
              */
-            credits?: number | null;
+            credits: number | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
