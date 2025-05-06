@@ -1,9 +1,6 @@
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 import sqlite3
-from typing import cast, TYPE_CHECKING
 from invokeai.app.services.model_relationship_records.model_relationship_records_base import ModelRelationshipRecordStorageBase
-if TYPE_CHECKING:
-    from invokeai.backend.model_manager.config import AnyModelConfig
 
 class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
@@ -62,28 +59,3 @@ class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
             model_keys + model_keys
         )
             return [row[0] for row in cursor.fetchall()]
-
-    def get_related_model_key_count(self, model_key: str) -> int:
-        cursor = self._conn.execute(
-            """
-            SELECT COUNT(*) FROM (
-                SELECT model_key_2 FROM model_relationships WHERE model_key_1 = ?
-                UNION
-                SELECT model_key_1 FROM model_relationships WHERE model_key_2 = ?
-            )
-            """,
-            (model_key, model_key),
-        )
-        return cast(int, cursor.fetchone()[0])
-
-    def add_relationship_from_models(self, model_1: "AnyModelConfig", model_2: "AnyModelConfig") -> None:
-        self.add_model_relationship(model_1.key, model_2.key)
-
-    def remove_relationship_from_models(self, model_1: "AnyModelConfig", model_2: "AnyModelConfig") -> None:
-        self.remove_model_relationship(model_1.key, model_2.key)
-
-    def get_related_keys_from_model(self, model: "AnyModelConfig") -> list[str]:
-        return self.get_related_model_keys(model.key)
-
-    def get_related_model_key_count_from_model(self, model: "AnyModelConfig") -> int:
-        return self.get_related_model_key_count(model.key)
