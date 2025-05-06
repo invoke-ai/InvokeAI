@@ -321,6 +321,9 @@ export type GetHFTokenStatusResponse =
 export type SetHFTokenResponse = NonNullable<
   paths['/api/v2/models/hf_login']['post']['responses']['200']['content']['application/json']
 >;
+export type ResetHFTokenResponse = NonNullable<
+  paths['/api/v2/models/hf_login']['delete']['responses']['200']['content']['application/json']
+>;
 export type SetHFTokenArg = NonNullable<
   paths['/api/v2/models/hf_login']['post']['requestBody']['content']['application/json']
 >;

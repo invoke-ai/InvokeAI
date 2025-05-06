@@ -893,6 +893,12 @@ class HFTokenHelper:
             huggingface_hub.login(token=token, add_to_git_credential=False)
         return cls.get_status()
 
+    @classmethod
+    def reset_token(cls) -> HFTokenStatus:
+        with SuppressOutput(), contextlib.suppress(Exception):
+            huggingface_hub.logout()
+        return cls.get_status()
+
 
 @model_manager_router.get("/hf_login", operation_id="get_hf_login_status", response_model=HFTokenStatus)
 async def get_hf_login_status() -> HFTokenStatus:
@@ -915,3 +921,8 @@ async def do_hf_login(
         ApiDependencies.invoker.services.logger.warning("Unable to verify HF token")
 
     return token_status
+
+
+@model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
+async def reset_hf_token() -> HFTokenStatus:
+    return HFTokenHelper.reset_token()

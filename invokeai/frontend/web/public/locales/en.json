@@ -799,6 +799,7 @@
         "hfTokenUnableToVerify": "Unable to Verify HF Token",
         "hfTokenUnableToVerifyErrorMessage": "Unable to verify HuggingFace token. This is likely due to a network error. Please try again later.",
         "hfTokenSaved": "HF Token Saved",
+        "hfTokenReset": "HF Token Reset",
         "urlUnauthorizedErrorMessage": "You may need to configure an API token to access this model.",
         "urlUnauthorizedErrorMessage2": "Learn how here.",
         "imageEncoderModelId": "Image Encoder Model ID",

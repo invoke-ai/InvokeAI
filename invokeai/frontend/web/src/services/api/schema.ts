@@ -352,7 +352,8 @@ export type paths = {
         put?: never;
         /** Do Hf Login */
         post: operations["do_hf_login"];
-        delete?: never;
+        /** Reset Hf Token */
+        delete: operations["reset_hf_token"];
         options?: never;
         head?: never;
         patch?: never;
@@ -19419,7 +19420,11 @@ export type components = {
             api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /**
              * Credits
+<<<<<<< HEAD
              * @description Total credits used for this queue item
+=======
+             * @description The total credits used for this queue item
+>>>>>>> origin/main
              */
             credits?: number | null;
         };
@@ -22850,6 +22855,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_hf_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HFTokenStatus"];
                 };
             };
         };
