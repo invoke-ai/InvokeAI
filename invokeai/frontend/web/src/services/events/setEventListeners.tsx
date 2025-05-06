@@ -337,6 +337,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       error_message,
       error_traceback,
       destination,
+      credits,
     } = data;
 
     log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
@@ -354,6 +355,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
             error_type,
             error_message,
             error_traceback,
+            credits,
           },
         });
       })
