@@ -37,6 +37,13 @@ type Props = {
   modelConfig: AnyModelConfig;
 };
 
+type ModelGroup = {
+  type: string;
+  label: string;
+  color: string;
+  models: AnyModelConfig[];
+};
+
 // Determines if two models are compatible for relationship linking based on their base type.
 //
 // Models with a base of 'any' are considered universally compatible.
@@ -52,6 +59,49 @@ const isBaseCompatible = (a: AnyModelConfig, b: AnyModelConfig): boolean => {
   return a.base === b.base;
 };
 
+// Drying out and setting up for potential export
+
+// Defines custom tag colors for model types in the UI.
+//
+// The default UI color scheme (mostly grey and orange) felt too flat,
+// so this mapping provides a slightly more expressive color flow.
+//
+// Note: This is purely aesthetic. Safe to remove if project preferences change.
+const getModelTagColor = (type: string): string => {
+  switch (type) {
+    case 'main':
+    case 'checkpoint':
+      return 'orange';
+    case 'lora':
+    case 'lycoris':
+      return 'purple';
+    case 'embedding':
+    case 'embedding_file':
+      return 'teal';
+    case 'vae':
+      return 'blue';
+    case 'controlnet':
+    case 'ip_adapter':
+    case 't2i_adapter':
+      return 'cyan';
+    case 'onnx':
+    case 'bnb_quantized_int8b':
+    case 'bnb_quantized_nf4b':
+    case 'gguf_quantized':
+      return 'pink';
+    case 't5_encoder':
+    case 'clip_embed':
+    case 'clip_vision':
+    case 'siglip':
+      return 'green';
+    default:
+      return 'base';
+  }
+};
+
+// Extracts model type from a label string (e.g., 'Base/LoRA' → 'lora')
+const getTypeFromLabel = (label: string): string => label.split('/')[1]?.trim().toLowerCase() || '';
+
 export const RelatedModels = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
   const [addModelRelationship, { isLoading: isAdding }] = useAddModelRelationshipMutation();
@@ -61,14 +111,49 @@ export const RelatedModels = memo(({ modelConfig }: Props) => {
   const { data: modelConfigs } = useGetModelConfigsQuery();
   const { data: relatedModels = [] } = useGetRelatedModelIdsQuery(modelConfig.key);
   const relatedIDs = useMemo(() => new Set(relatedModels), [relatedModels]);
-  // Used to prioritize certain model types in UI sorting
+
+  // Defines model types to prioritize first in UI sorting.
+  // Types not listed here will appear afterward in default order.
   const MODEL_TYPE_PRIORITY = useMemo(() => ['main', 'lora'], []);
+
+  // Defines disallowed connection types.
+  const DISALLOWED_RELATIONSHIPS = useMemo(
+    () =>
+      new Set([
+        'main|main',
+        'vae|vae',
+        'controlnet|controlnet',
+        'clip_vision|clip_vision',
+        'control_lora|control_lora',
+        'clip_embed|clip_embed',
+        'spandrel_image_to_image|spandrel_image_to_image',
+        'siglip|siglip',
+        'flux_redux|flux_redux',
+      ]),
+    []
+  );
+
+  // Drying out sorting
+  const prioritySort = useCallback(
+    (a: string, b: string): number => {
+      const aIndex = MODEL_TYPE_PRIORITY.indexOf(a);
+      const bIndex = MODEL_TYPE_PRIORITY.indexOf(b);
+
+      const aScore = aIndex === -1 ? 99 : aIndex;
+      const bScore = bIndex === -1 ? 99 : bIndex;
+
+      return aScore - bScore;
+    },
+    [MODEL_TYPE_PRIORITY]
+  );
 
   //Get all modelConfigs that are not already related to the current model.
   const availableModels = useMemo(() => {
     if (!modelConfigs) {
       return [];
     }
+    const isDisallowedRelationship = (a: string, b: string): boolean =>
+      DISALLOWED_RELATIONSHIPS.has(`${a}|${b}`) || DISALLOWED_RELATIONSHIPS.has(`${b}|${a}`);
 
     return Object.values(modelConfigs.entities).filter(
       (m): m is AnyModelConfig =>
@@ -76,9 +161,9 @@ export const RelatedModels = memo(({ modelConfig }: Props) => {
         m.key !== modelConfig.key &&
         !relatedIDs.has(m.key) &&
         isBaseCompatible(modelConfig, m) &&
-        !(modelConfig.type === 'main' && m.type === 'main') // still block main↔main
+        !isDisallowedRelationship(modelConfig.type, m.type)
     );
-  }, [modelConfigs, modelConfig, relatedIDs]);
+  }, [modelConfigs, modelConfig, relatedIDs, DISALLOWED_RELATIONSHIPS]);
 
   // Tracks validation errors for current input (e.g., duplicate key or no selection).
   const errors = useMemo(() => {
@@ -100,7 +185,7 @@ export const RelatedModels = memo(({ modelConfig }: Props) => {
     }
 
     setSelectedKey('');
-    await Promise.all([addModelRelationship({ model_key_1: modelConfig.key, model_key_2: target.key })]);
+    await addModelRelationship({ model_key_1: modelConfig.key, model_key_2: target.key });
   }, [modelConfig, availableModels, addModelRelationship, selectedKey]);
 
   const {
@@ -120,81 +205,65 @@ export const RelatedModels = memo(({ modelConfig }: Props) => {
     groupByType: true,
   });
 
-  // Unlinks an existing related model via API.
-  const handleRemove = useCallback(
-    async (id: string) => {
-      const target = modelConfigs?.entities[id];
-      if (!target) {
-        return;
-      }
-
-      await Promise.all([removeModelRelationship({ model_key_1: modelConfig.key, model_key_2: target.key })]);
-    },
-    [modelConfig, modelConfigs, removeModelRelationship]
-  );
-
   // Finds the selected model's combobox option to control current dropdown state.
   const selectedOption = useMemo(() => {
     return options.flatMap((group) => group.options).find((o) => o.value === selectedKey) ?? null;
   }, [selectedKey, options]);
 
-  const makeRemoveHandler = useCallback((id: string) => () => handleRemove(id), [handleRemove]);
-
-  // Defines custom tag colors for model types in the UI.
-  //
-  // The default UI color scheme (mostly grey and orange) felt too flat,
-  // so this mapping provides a slightly more expressive color flow.
-  //
-  // Note: This is purely aesthetic. Safe to remove if project preferences change.
-  const getModelTagColor = (type: string): string => {
-    switch (type) {
-      case 'main':
-      case 'checkpoint':
-        return 'orange';
-      case 'lora':
-      case 'lycoris':
-        return 'purple';
-      case 'embedding':
-      case 'embedding_file':
-        return 'teal';
-      case 'vae':
-        return 'blue';
-      case 'controlnet':
-      case 'ip_adapter':
-      case 't2i_adapter':
-        return 'cyan';
-      case 'onnx':
-      case 'bnb_quantized_int8b':
-      case 'bnb_quantized_nf4b':
-      case 'gguf_quantized':
-        return 'pink';
-      case 't5_encoder':
-      case 'clip_embed':
-      case 'clip_vision':
-      case 'siglip':
-        return 'green';
-      default:
-        return 'base';
-    }
-  };
-
-  // Force group priority order: Main first, then LoRA
-  const getTypeFromLabel = (label: string): string => label.split('/')[1]?.trim().toLowerCase() || '';
-
   const sortedOptions = useMemo(() => {
-    return [...options].sort((a, b) => {
-      const aType = getTypeFromLabel(a.label ?? '');
-      const bType = getTypeFromLabel(b.label ?? '');
+    return [...options].sort((a, b) => prioritySort(getTypeFromLabel(a.label ?? ''), getTypeFromLabel(b.label ?? '')));
+  }, [options, prioritySort]);
 
-      const aIndex = MODEL_TYPE_PRIORITY.indexOf(aType);
-      const bIndex = MODEL_TYPE_PRIORITY.indexOf(bType);
+  const groupedModelConfigs = useMemo(() => {
+    if (!modelConfigs) {
+      return [];
+    }
 
-      const aScore = aIndex === -1 ? 99 : aIndex;
-      const bScore = bIndex === -1 ? 99 : bIndex;
+    const models = [...relatedModels].map((id) => modelConfigs.entities[id]).filter((m): m is AnyModelConfig => !!m);
 
-      return aScore - bScore;
-    });
-  }, [options, MODEL_TYPE_PRIORITY]);
+    models.sort((a, b) => prioritySort(a.type, b.type) || a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+
+    const groupsMap = new Map<string, ModelGroup>();
+
+    for (const model of models) {
+      if (!groupsMap.has(model.type)) {
+        groupsMap.set(model.type, {
+          type: model.type,
+          label: model.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          color: getModelTagColor(model.type),
+          models: [],
+        });
+      }
+      groupsMap.get(model.type)!.models.push(model);
+    }
+
+    return Array.from(groupsMap.values());
+  }, [modelConfigs, relatedModels, prioritySort]);
+
+  const removeHandlers = useMemo(() => {
+    const map = new Map<string, () => void>();
+    if (!modelConfigs) {
+      return map;
+    }
+
+    for (const group of groupedModelConfigs) {
+      for (const model of group.models) {
+        map.set(model.key, () => {
+          const target = modelConfigs.entities[model.key];
+          if (!target) {
+            return;
+          }
+
+          removeModelRelationship({
+            model_key_1: modelConfig.key,
+            model_key_2: model.key,
+          }).unwrap();
+        });
+      }
+    }
+
+    return map;
+  }, [groupedModelConfigs, modelConfig.key, modelConfigs, removeModelRelationship]);
 
   return (
     <Flex direction="column" gap="5" w="full">
@@ -204,7 +273,7 @@ export const RelatedModels = memo(({ modelConfig }: Props) => {
           <Combobox
             value={selectedOption}
             placeholder={placeholder}
-            options={sortedOptions} // Sorts options to prioritize 'main' and 'lora' types at the top.
+            options={sortedOptions}
             onChange={comboboxOnChange}
             noOptionsMessage={noOptionsMessage}
           />
@@ -224,77 +293,59 @@ export const RelatedModels = memo(({ modelConfig }: Props) => {
       </FormControl>
       <Box>
         <Flex gap="2" flexWrap="wrap">
-          {
-            // Render the related model tags as styled components.
-            //
-            // Models are grouped visually by type, sorted with 'main' and 'lora' types at the front.
-            // A vertical Divider is inserted when the type changes between adjacent models.
-            // Tags include:
-            //   - Colored background based on model type (via getModelTagColor)
-            //   - Tooltip showing "<ModelType>: <ModelName>"
-            //   - Ellipsis-truncated tag name for compact layout
-            //   - A close button to remove the relationship
-            [...relatedModels]
-              .sort((aKey, bKey) => {
-                const a = modelConfigs?.entities[aKey];
-                const b = modelConfigs?.entities[bKey];
-                if (!a || !b) {
-                  return 0;
-                }
+          {groupedModelConfigs.map((group, i) => {
+            const withDivider = i < groupedModelConfigs.length - 1;
 
-                // Floats Mains and LoRAs to the front
-                const aPriority = MODEL_TYPE_PRIORITY.indexOf(a.type);
-                const bPriority = MODEL_TYPE_PRIORITY.indexOf(b.type);
-
-                const aScore = aPriority === -1 ? 99 : aPriority;
-                const bScore = bPriority === -1 ? 99 : bPriority;
-
-                return aScore - bScore || a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
-              })
-              .reduce<JSX.Element[]>((acc, id, index, arr) => {
-                const model = modelConfigs?.entities[id];
-                if (!model) {
-                  return acc;
-                }
-
-                const modelName = model.name ?? id;
-                const modelType = model.type ?? 'unknown';
-                const modelTypeLabel = modelType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-                //  Create a divider if the previous model is of a different type. Just a small dash of visual flair.
-                const prevId = index > 0 ? arr[index - 1] : undefined;
-                const prevModel = prevId ? modelConfigs?.entities[prevId] : null;
-                const needsDivider = prevModel && prevModel.type !== model.type;
-
-                if (needsDivider) {
-                  acc.push(<Divider orientation="vertical" key={`divider-${id}`} opacity={0.3} />);
-                }
-
-                acc.push(
-                  <Tag key={id} py={2} px={4} bg={`${getModelTagColor(model.type)}.700`}>
-                    <Tooltip label={`${modelTypeLabel}: ${modelName}`} hasArrow>
-                      <TagLabel
-                        style={{
-                          maxWidth: '50px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {modelName}
-                      </TagLabel>
-                    </Tooltip>
-                    <TagCloseButton onClick={makeRemoveHandler(id)} isDisabled={isLoading} />
-                  </Tag>
-                );
-
-                return acc;
-              }, [])
-          }
+            return (
+              <Box key={group.type} mb={4}>
+                <ModelTagGroup group={group} isLoading={isLoading} removeHandlers={removeHandlers} />
+                {withDivider && <Divider my={4} opacity={0.3} />}
+              </Box>
+            );
+          })}
         </Flex>
       </Box>
     </Flex>
   );
 });
+
+const ModelTag = ({
+  model,
+  onRemove,
+  isLoading,
+}: {
+  model: AnyModelConfig;
+  onRemove: () => void;
+  isLoading: boolean;
+}) => {
+  return (
+    <Tag py={2} px={4} bg={`${getModelTagColor(model.type)}.700`}>
+      <Tooltip label={`${model.type}: ${model.name}`} hasArrow>
+        <TagLabel maxWidth="50px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+          {model.name}
+        </TagLabel>
+      </Tooltip>
+      <TagCloseButton onClick={onRemove} isDisabled={isLoading} />
+    </Tag>
+  );
+};
+
+const ModelTagGroup = ({
+  group,
+  isLoading,
+  removeHandlers,
+}: {
+  group: ModelGroup;
+  isLoading: boolean;
+  removeHandlers: Map<string, () => void>;
+}) => {
+  return (
+    <Flex gap="2" flexWrap="wrap" alignItems="center">
+      {group.models.map((model) => (
+        <ModelTag key={model.key} model={model} onRemove={removeHandlers.get(model.key)!} isLoading={isLoading} />
+      ))}
+    </Flex>
+  );
+};
 
 RelatedModels.displayName = 'RelatedModels';
