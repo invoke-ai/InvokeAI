@@ -1681,7 +1681,6 @@ export type components = {
              * type
              * @default add
              * @constant
-             * @enum {string}
              */
             type: "add";
         };
@@ -1722,7 +1721,6 @@ export type components = {
              * type
              * @default alpha_mask_to_tensor
              * @constant
-             * @enum {string}
              */
             type: "alpha_mask_to_tensor";
         };
@@ -1760,14 +1758,12 @@ export type components = {
              * Type
              * @default main
              * @constant
-             * @enum {string}
              */
             type: "main";
             /**
              * Format
              * @default api
              * @constant
-             * @enum {string}
              */
             format: "api";
             /** @description The base model. */
@@ -1981,7 +1977,6 @@ export type components = {
              * type
              * @default apply_tensor_mask_to_image
              * @constant
-             * @enum {string}
              */
             type: "apply_tensor_mask_to_image";
         };
@@ -2038,7 +2033,6 @@ export type components = {
              * type
              * @default apply_mask_to_image
              * @constant
-             * @enum {string}
              */
             type: "apply_mask_to_image";
         };
@@ -2275,7 +2269,6 @@ export type components = {
              * type
              * @default blank_image
              * @constant
-             * @enum {string}
              */
             type: "blank_image";
         };
@@ -2327,7 +2320,6 @@ export type components = {
              * type
              * @default lblend
              * @constant
-             * @enum {string}
              */
             type: "lblend";
         };
@@ -2700,7 +2692,6 @@ export type components = {
              * type
              * @default boolean_collection
              * @constant
-             * @enum {string}
              */
             type: "boolean_collection";
         };
@@ -2718,7 +2709,6 @@ export type components = {
              * type
              * @default boolean_collection_output
              * @constant
-             * @enum {string}
              */
             type: "boolean_collection_output";
         };
@@ -2754,7 +2744,6 @@ export type components = {
              * type
              * @default boolean
              * @constant
-             * @enum {string}
              */
             type: "boolean";
         };
@@ -2772,7 +2761,6 @@ export type components = {
              * type
              * @default boolean_output
              * @constant
-             * @enum {string}
              */
             type: "boolean_output";
         };
@@ -2790,7 +2778,6 @@ export type components = {
              * type
              * @default bounding_box_collection_output
              * @constant
-             * @enum {string}
              */
             type: "bounding_box_collection_output";
         };
@@ -2876,7 +2863,6 @@ export type components = {
              * type
              * @default bounding_box
              * @constant
-             * @enum {string}
              */
             type: "bounding_box";
         };
@@ -2891,7 +2877,6 @@ export type components = {
              * type
              * @default bounding_box_output
              * @constant
-             * @enum {string}
              */
             type: "bounding_box_output";
         };
@@ -3029,14 +3014,12 @@ export type components = {
              * Type
              * @default clip_embed
              * @constant
-             * @enum {string}
              */
             type: "clip_embed";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -3076,7 +3059,6 @@ export type components = {
              * Variant
              * @default gigantic
              * @constant
-             * @enum {string}
              */
             variant?: "gigantic";
         };
@@ -3114,14 +3096,12 @@ export type components = {
              * Type
              * @default clip_embed
              * @constant
-             * @enum {string}
              */
             type: "clip_embed";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -3161,7 +3141,6 @@ export type components = {
              * Variant
              * @default large
              * @constant
-             * @enum {string}
              */
             variant?: "large";
         };
@@ -3179,7 +3158,6 @@ export type components = {
              * type
              * @default clip_output
              * @constant
-             * @enum {string}
              */
             type: "clip_output";
         };
@@ -3221,7 +3199,6 @@ export type components = {
              * type
              * @default clip_skip
              * @constant
-             * @enum {string}
              */
             type: "clip_skip";
         };
@@ -3240,7 +3217,6 @@ export type components = {
              * type
              * @default clip_skip_output
              * @constant
-             * @enum {string}
              */
             type: "clip_skip_output";
         };
@@ -3278,14 +3254,12 @@ export type components = {
              * Type
              * @default clip_vision
              * @constant
-             * @enum {string}
              */
             type: "clip_vision";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -3363,7 +3337,6 @@ export type components = {
              * type
              * @default infill_cv2
              * @constant
-             * @enum {string}
              */
             type: "infill_cv2";
         };
@@ -3460,7 +3433,6 @@ export type components = {
              * type
              * @default calculate_image_tiles_even_split
              * @constant
-             * @enum {string}
              */
             type: "calculate_image_tiles_even_split";
         };
@@ -3520,7 +3492,6 @@ export type components = {
              * type
              * @default calculate_image_tiles
              * @constant
-             * @enum {string}
              */
             type: "calculate_image_tiles";
         };
@@ -3580,7 +3551,6 @@ export type components = {
              * type
              * @default calculate_image_tiles_min_overlap
              * @constant
-             * @enum {string}
              */
             type: "calculate_image_tiles_min_overlap";
         };
@@ -3595,7 +3565,6 @@ export type components = {
              * type
              * @default calculate_image_tiles_output
              * @constant
-             * @enum {string}
              */
             type: "calculate_image_tiles_output";
         };
@@ -3685,7 +3654,6 @@ export type components = {
              * type
              * @default canny_edge_detection
              * @constant
-             * @enum {string}
              */
             type: "canny_edge_detection";
         };
@@ -3746,7 +3714,6 @@ export type components = {
              * type
              * @default canvas_paste_back
              * @constant
-             * @enum {string}
              */
             type: "canvas_paste_back";
         };
@@ -3807,7 +3774,6 @@ export type components = {
              * type
              * @default canvas_v2_mask_and_crop
              * @constant
-             * @enum {string}
              */
             type: "canvas_v2_mask_and_crop";
         };
@@ -3866,7 +3832,6 @@ export type components = {
              * type
              * @default img_pad_crop
              * @constant
-             * @enum {string}
              */
             type: "img_pad_crop";
         };
@@ -3921,7 +3886,6 @@ export type components = {
              * type
              * @default cogview4_conditioning_output
              * @constant
-             * @enum {string}
              */
             type: "cogview4_conditioning_output";
         };
@@ -4029,7 +3993,6 @@ export type components = {
              * type
              * @default cogview4_denoise
              * @constant
-             * @enum {string}
              */
             type: "cogview4_denoise";
         };
@@ -4079,7 +4042,6 @@ export type components = {
              * type
              * @default cogview4_i2l
              * @constant
-             * @enum {string}
              */
             type: "cogview4_i2l";
         };
@@ -4129,7 +4091,6 @@ export type components = {
              * type
              * @default cogview4_l2i
              * @constant
-             * @enum {string}
              */
             type: "cogview4_l2i";
         };
@@ -4161,7 +4122,6 @@ export type components = {
              * type
              * @default cogview4_model_loader
              * @constant
-             * @enum {string}
              */
             type: "cogview4_model_loader";
         };
@@ -4189,7 +4149,6 @@ export type components = {
              * type
              * @default cogview4_model_loader_output
              * @constant
-             * @enum {string}
              */
             type: "cogview4_model_loader_output";
         };
@@ -4231,7 +4190,6 @@ export type components = {
              * type
              * @default cogview4_text_encoder
              * @constant
-             * @enum {string}
              */
             type: "cogview4_text_encoder";
         };
@@ -4273,7 +4231,6 @@ export type components = {
              * type
              * @default collect
              * @constant
-             * @enum {string}
              */
             type: "collect";
         };
@@ -4288,7 +4245,6 @@ export type components = {
              * type
              * @default collect_output
              * @constant
-             * @enum {string}
              */
             type: "collect_output";
         };
@@ -4306,7 +4262,6 @@ export type components = {
              * type
              * @default color_collection_output
              * @constant
-             * @enum {string}
              */
             type: "color_collection_output";
         };
@@ -4368,7 +4323,6 @@ export type components = {
              * type
              * @default color_correct
              * @constant
-             * @enum {string}
              */
             type: "color_correct";
         };
@@ -4434,7 +4388,6 @@ export type components = {
              * type
              * @default color
              * @constant
-             * @enum {string}
              */
             type: "color";
         };
@@ -4485,7 +4438,6 @@ export type components = {
              * type
              * @default color_map
              * @constant
-             * @enum {string}
              */
             type: "color_map";
         };
@@ -4500,7 +4452,6 @@ export type components = {
              * type
              * @default color_output
              * @constant
-             * @enum {string}
              */
             type: "color_output";
         };
@@ -4547,7 +4498,6 @@ export type components = {
              * type
              * @default compel
              * @constant
-             * @enum {string}
              */
             type: "compel";
         };
@@ -4583,7 +4533,6 @@ export type components = {
              * type
              * @default conditioning_collection
              * @constant
-             * @enum {string}
              */
             type: "conditioning_collection";
         };
@@ -4601,7 +4550,6 @@ export type components = {
              * type
              * @default conditioning_collection_output
              * @constant
-             * @enum {string}
              */
             type: "conditioning_collection_output";
         };
@@ -4652,7 +4600,6 @@ export type components = {
              * type
              * @default conditioning
              * @constant
-             * @enum {string}
              */
             type: "conditioning";
         };
@@ -4667,7 +4614,6 @@ export type components = {
              * type
              * @default conditioning_output
              * @constant
-             * @enum {string}
              */
             type: "conditioning_output";
         };
@@ -4718,7 +4664,6 @@ export type components = {
              * type
              * @default content_shuffle
              * @constant
-             * @enum {string}
              */
             type: "content_shuffle";
         };
@@ -4800,14 +4745,12 @@ export type components = {
              * Type
              * @default control_lora
              * @constant
-             * @enum {string}
              */
             type: "control_lora";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -4895,14 +4838,12 @@ export type components = {
              * Type
              * @default control_lora
              * @constant
-             * @enum {string}
              */
             type: "control_lora";
             /**
              * Format
              * @default lycoris
              * @constant
-             * @enum {string}
              */
             format: "lycoris";
             /** @description The base model. */
@@ -4978,7 +4919,6 @@ export type components = {
              * Type
              * @default controlnet
              * @constant
-             * @enum {string}
              */
             type: "controlnet";
             /**
@@ -5066,14 +5006,12 @@ export type components = {
              * Type
              * @default controlnet
              * @constant
-             * @enum {string}
              */
             type: "controlnet";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -5180,7 +5118,6 @@ export type components = {
              * type
              * @default controlnet
              * @constant
-             * @enum {string}
              */
             type: "controlnet";
         };
@@ -5239,7 +5176,6 @@ export type components = {
              * type
              * @default control_output
              * @constant
-             * @enum {string}
              */
             type: "control_output";
         };
@@ -5470,7 +5406,6 @@ export type components = {
              * type
              * @default core_metadata
              * @constant
-             * @enum {string}
              */
             type: "core_metadata";
         } & {
@@ -5529,7 +5464,6 @@ export type components = {
              * type
              * @default create_denoise_mask
              * @constant
-             * @enum {string}
              */
             type: "create_denoise_mask";
         };
@@ -5612,7 +5546,6 @@ export type components = {
              * type
              * @default create_gradient_mask
              * @constant
-             * @enum {string}
              */
             type: "create_gradient_mask";
         };
@@ -5662,7 +5595,6 @@ export type components = {
              * type
              * @default crop_image_to_bounding_box
              * @constant
-             * @enum {string}
              */
             type: "crop_image_to_bounding_box";
         };
@@ -5722,7 +5654,6 @@ export type components = {
              * type
              * @default crop_latents
              * @constant
-             * @enum {string}
              */
             type: "crop_latents";
         };
@@ -5790,7 +5721,6 @@ export type components = {
              * type
              * @default cv_inpaint
              * @constant
-             * @enum {string}
              */
             type: "cv_inpaint";
         };
@@ -5850,7 +5780,6 @@ export type components = {
              * type
              * @default dw_openpose_detection
              * @constant
-             * @enum {string}
              */
             type: "dw_openpose_detection";
         };
@@ -5990,7 +5919,6 @@ export type components = {
              * type
              * @default denoise_latents
              * @constant
-             * @enum {string}
              */
             type: "denoise_latents";
         };
@@ -6109,7 +6037,6 @@ export type components = {
              * type
              * @default denoise_latents_meta
              * @constant
-             * @enum {string}
              */
             type: "denoise_latents_meta";
         };
@@ -6147,7 +6074,6 @@ export type components = {
              * type
              * @default denoise_mask_output
              * @constant
-             * @enum {string}
              */
             type: "denoise_mask_output";
         };
@@ -6199,7 +6125,6 @@ export type components = {
              * type
              * @default depth_anything_depth_estimation
              * @constant
-             * @enum {string}
              */
             type: "depth_anything_depth_estimation";
         };
@@ -6241,7 +6166,6 @@ export type components = {
              * type
              * @default div
              * @constant
-             * @enum {string}
              */
             type: "div";
         };
@@ -6497,7 +6421,6 @@ export type components = {
              * type
              * @default dynamic_prompt
              * @constant
-             * @enum {string}
              */
             type: "dynamic_prompt";
         };
@@ -6562,7 +6485,6 @@ export type components = {
              * type
              * @default esrgan
              * @constant
-             * @enum {string}
              */
             type: "esrgan";
         };
@@ -6667,7 +6589,6 @@ export type components = {
              * type
              * @default expand_mask_with_fade
              * @constant
-             * @enum {string}
              */
             type: "expand_mask_with_fade";
         };
@@ -6728,7 +6649,6 @@ export type components = {
              * type
              * @default flux_lora_collection_loader
              * @constant
-             * @enum {string}
              */
             type: "flux_lora_collection_loader";
         };
@@ -6785,7 +6705,6 @@ export type components = {
              * type
              * @default face_identifier
              * @constant
-             * @enum {string}
              */
             type: "face_identifier";
         };
@@ -6861,7 +6780,6 @@ export type components = {
              * type
              * @default face_mask_detection
              * @constant
-             * @enum {string}
              */
             type: "face_mask_detection";
         };
@@ -6886,7 +6804,6 @@ export type components = {
              * type
              * @default face_mask_output
              * @constant
-             * @enum {string}
              */
             type: "face_mask_output";
             /** @description The output mask */
@@ -6964,7 +6881,6 @@ export type components = {
              * type
              * @default face_off
              * @constant
-             * @enum {string}
              */
             type: "face_off";
         };
@@ -6989,7 +6905,6 @@ export type components = {
              * type
              * @default face_off_output
              * @constant
-             * @enum {string}
              */
             type: "face_off_output";
             /** @description The output mask */
@@ -7081,7 +6996,6 @@ export type components = {
              * type
              * @default float_batch
              * @constant
-             * @enum {string}
              */
             type: "float_batch";
         };
@@ -7117,7 +7031,6 @@ export type components = {
              * type
              * @default float_collection
              * @constant
-             * @enum {string}
              */
             type: "float_collection";
         };
@@ -7135,7 +7048,6 @@ export type components = {
              * type
              * @default float_collection_output
              * @constant
-             * @enum {string}
              */
             type: "float_collection_output";
         };
@@ -7170,7 +7082,6 @@ export type components = {
              * type
              * @default float_generator
              * @constant
-             * @enum {string}
              */
             type: "float_generator";
         };
@@ -7190,7 +7101,6 @@ export type components = {
              * type
              * @default float_generator_output
              * @constant
-             * @enum {string}
              */
             type: "float_generator_output";
         };
@@ -7226,7 +7136,6 @@ export type components = {
              * type
              * @default float
              * @constant
-             * @enum {string}
              */
             type: "float";
         };
@@ -7274,7 +7183,6 @@ export type components = {
              * type
              * @default float_range
              * @constant
-             * @enum {string}
              */
             type: "float_range";
         };
@@ -7323,7 +7231,6 @@ export type components = {
              * type
              * @default float_math
              * @constant
-             * @enum {string}
              */
             type: "float_math";
         };
@@ -7341,7 +7248,6 @@ export type components = {
              * type
              * @default float_output
              * @constant
-             * @enum {string}
              */
             type: "float_output";
         };
@@ -7390,7 +7296,6 @@ export type components = {
              * type
              * @default float_to_int
              * @constant
-             * @enum {string}
              */
             type: "float_to_int";
         };
@@ -7421,7 +7326,6 @@ export type components = {
              * type
              * @default flux_conditioning_output
              * @constant
-             * @enum {string}
              */
             type: "flux_conditioning_output";
         };
@@ -7468,7 +7372,6 @@ export type components = {
              * type
              * @default flux_control_lora_loader
              * @constant
-             * @enum {string}
              */
             type: "flux_control_lora_loader";
         };
@@ -7487,7 +7390,6 @@ export type components = {
              * type
              * @default flux_control_lora_loader_output
              * @constant
-             * @enum {string}
              */
             type: "flux_control_lora_loader_output";
         };
@@ -7596,7 +7498,6 @@ export type components = {
              * type
              * @default flux_controlnet
              * @constant
-             * @enum {string}
              */
             type: "flux_controlnet";
         };
@@ -7611,7 +7512,6 @@ export type components = {
              * type
              * @default flux_controlnet_output
              * @constant
-             * @enum {string}
              */
             type: "flux_controlnet_output";
         };
@@ -7779,7 +7679,6 @@ export type components = {
              * type
              * @default flux_denoise
              * @constant
-             * @enum {string}
              */
             type: "flux_denoise";
         };
@@ -7947,7 +7846,6 @@ export type components = {
              * type
              * @default flux_denoise_meta
              * @constant
-             * @enum {string}
              */
             type: "flux_denoise_meta";
         };
@@ -7997,7 +7895,6 @@ export type components = {
              * type
              * @default flux_fill
              * @constant
-             * @enum {string}
              */
             type: "flux_fill";
         };
@@ -8015,7 +7912,6 @@ export type components = {
              * type
              * @default flux_fill_output
              * @constant
-             * @enum {string}
              */
             type: "flux_fill_output";
         };
@@ -8057,7 +7953,6 @@ export type components = {
              * @description CLIP Vision model to use.
              * @default ViT-L
              * @constant
-             * @enum {string}
              */
             clip_vision_model?: "ViT-L";
             /**
@@ -8082,7 +7977,6 @@ export type components = {
              * type
              * @default flux_ip_adapter
              * @constant
-             * @enum {string}
              */
             type: "flux_ip_adapter";
         };
@@ -8142,7 +8036,6 @@ export type components = {
              * type
              * @default flux_lora_loader
              * @constant
-             * @enum {string}
              */
             type: "flux_lora_loader";
         };
@@ -8173,7 +8066,6 @@ export type components = {
              * type
              * @default flux_lora_loader_output
              * @constant
-             * @enum {string}
              */
             type: "flux_lora_loader_output";
         };
@@ -8221,7 +8113,6 @@ export type components = {
              * type
              * @default flux_model_loader
              * @constant
-             * @enum {string}
              */
             type: "flux_model_loader";
         };
@@ -8260,7 +8151,6 @@ export type components = {
              * type
              * @default flux_model_loader_output
              * @constant
-             * @enum {string}
              */
             type: "flux_model_loader_output";
         };
@@ -8311,14 +8201,12 @@ export type components = {
              * Type
              * @default flux_redux
              * @constant
-             * @enum {string}
              */
             type: "flux_redux";
             /**
              * Format
              * @default checkpoint
              * @constant
-             * @enum {string}
              */
             format: "checkpoint";
             /** @description The base model. */
@@ -8414,7 +8302,6 @@ export type components = {
              * type
              * @default flux_redux
              * @constant
-             * @enum {string}
              */
             type: "flux_redux";
         };
@@ -8432,7 +8319,6 @@ export type components = {
              * type
              * @default flux_redux_output
              * @constant
-             * @enum {string}
              */
             type: "flux_redux_output";
         };
@@ -8492,7 +8378,6 @@ export type components = {
              * type
              * @default flux_text_encoder
              * @constant
-             * @enum {string}
              */
             type: "flux_text_encoder";
         };
@@ -8542,7 +8427,6 @@ export type components = {
              * type
              * @default flux_vae_decode
              * @constant
-             * @enum {string}
              */
             type: "flux_vae_decode";
         };
@@ -8582,7 +8466,6 @@ export type components = {
              * type
              * @default flux_vae_encode
              * @constant
-             * @enum {string}
              */
             type: "flux_vae_encode";
         };
@@ -8687,7 +8570,6 @@ export type components = {
              * type
              * @default freeu
              * @constant
-             * @enum {string}
              */
             type: "freeu";
         };
@@ -8738,7 +8620,6 @@ export type components = {
              * type
              * @default get_image_mask_bounding_box
              * @constant
-             * @enum {string}
              */
             type: "get_image_mask_bounding_box";
         };
@@ -8762,7 +8643,6 @@ export type components = {
              * type
              * @default gradient_mask_output
              * @constant
-             * @enum {string}
              */
             type: "gradient_mask_output";
         };
@@ -8889,7 +8769,6 @@ export type components = {
              * type
              * @default grounding_dino
              * @constant
-             * @enum {string}
              */
             type: "grounding_dino";
         };
@@ -8940,7 +8819,6 @@ export type components = {
              * type
              * @default hed_edge_detection
              * @constant
-             * @enum {string}
              */
             type: "hed_edge_detection";
         };
@@ -9018,7 +8896,6 @@ export type components = {
              * type
              * @default heuristic_resize
              * @constant
-             * @enum {string}
              */
             type: "heuristic_resize";
         };
@@ -9111,14 +8988,12 @@ export type components = {
              * Type
              * @default ip_adapter
              * @constant
-             * @enum {string}
              */
             type: "ip_adapter";
             /**
              * Format
              * @default checkpoint
              * @constant
-             * @enum {string}
              */
             format: "checkpoint";
             /** @description The base model. */
@@ -9269,7 +9144,6 @@ export type components = {
              * type
              * @default ip_adapter
              * @constant
-             * @enum {string}
              */
             type: "ip_adapter";
         };
@@ -9307,14 +9181,12 @@ export type components = {
              * Type
              * @default ip_adapter
              * @constant
-             * @enum {string}
              */
             type: "ip_adapter";
             /**
              * Format
              * @default invokeai
              * @constant
-             * @enum {string}
              */
             format: "invokeai";
             /** @description The base model. */
@@ -9399,7 +9271,6 @@ export type components = {
              * type
              * @default ip_adapter_output
              * @constant
-             * @enum {string}
              */
             type: "ip_adapter_output";
         };
@@ -9452,7 +9323,6 @@ export type components = {
              * type
              * @default ideal_size
              * @constant
-             * @enum {string}
              */
             type: "ideal_size";
         };
@@ -9475,7 +9345,6 @@ export type components = {
              * type
              * @default ideal_size_output
              * @constant
-             * @enum {string}
              */
             type: "ideal_size_output";
         };
@@ -9518,7 +9387,6 @@ export type components = {
              * type
              * @default image_batch
              * @constant
-             * @enum {string}
              */
             type: "image_batch";
         };
@@ -9576,7 +9444,6 @@ export type components = {
              * type
              * @default img_blur
              * @constant
-             * @enum {string}
              */
             type: "img_blur";
         };
@@ -9640,7 +9507,6 @@ export type components = {
              * type
              * @default img_chan
              * @constant
-             * @enum {string}
              */
             type: "img_chan";
         };
@@ -9704,7 +9570,6 @@ export type components = {
              * type
              * @default img_channel_multiply
              * @constant
-             * @enum {string}
              */
             type: "img_channel_multiply";
         };
@@ -9762,7 +9627,6 @@ export type components = {
              * type
              * @default img_channel_offset
              * @constant
-             * @enum {string}
              */
             type: "img_channel_offset";
         };
@@ -9798,7 +9662,6 @@ export type components = {
              * type
              * @default image_collection
              * @constant
-             * @enum {string}
              */
             type: "image_collection";
         };
@@ -9816,7 +9679,6 @@ export type components = {
              * type
              * @default image_collection_output
              * @constant
-             * @enum {string}
              */
             type: "image_collection_output";
         };
@@ -9868,7 +9730,6 @@ export type components = {
              * type
              * @default img_conv
              * @constant
-             * @enum {string}
              */
             type: "img_conv";
         };
@@ -9937,7 +9798,6 @@ export type components = {
              * type
              * @default img_crop
              * @constant
-             * @enum {string}
              */
             type: "img_crop";
         };
@@ -10063,7 +9923,6 @@ export type components = {
              * type
              * @default image_generator
              * @constant
-             * @enum {string}
              */
             type: "image_generator";
         };
@@ -10083,7 +9942,6 @@ export type components = {
              * type
              * @default image_generator_output
              * @constant
-             * @enum {string}
              */
             type: "image_generator_output";
         };
@@ -10134,7 +9992,6 @@ export type components = {
              * type
              * @default img_hue_adjust
              * @constant
-             * @enum {string}
              */
             type: "img_hue_adjust";
         };
@@ -10191,7 +10048,6 @@ export type components = {
              * type
              * @default img_ilerp
              * @constant
-             * @enum {string}
              */
             type: "img_ilerp";
         };
@@ -10226,7 +10082,6 @@ export type components = {
              * type
              * @default image
              * @constant
-             * @enum {string}
              */
             type: "image";
         };
@@ -10283,7 +10138,6 @@ export type components = {
              * type
              * @default img_lerp
              * @constant
-             * @enum {string}
              */
             type: "img_lerp";
         };
@@ -10335,7 +10189,6 @@ export type components = {
              * type
              * @default image_mask_to_tensor
              * @constant
-             * @enum {string}
              */
             type: "image_mask_to_tensor";
         };
@@ -10385,7 +10238,6 @@ export type components = {
              * type
              * @default img_mul
              * @constant
-             * @enum {string}
              */
             type: "img_mul";
         };
@@ -10430,7 +10282,6 @@ export type components = {
              * type
              * @default img_nsfw
              * @constant
-             * @enum {string}
              */
             type: "img_nsfw";
         };
@@ -10506,7 +10357,6 @@ export type components = {
              * type
              * @default img_noise
              * @constant
-             * @enum {string}
              */
             type: "img_noise";
         };
@@ -10531,7 +10381,6 @@ export type components = {
              * type
              * @default image_output
              * @constant
-             * @enum {string}
              */
             type: "image_output";
         };
@@ -10561,7 +10410,6 @@ export type components = {
              * type
              * @default image_panel_coordinate_output
              * @constant
-             * @enum {string}
              */
             type: "image_panel_coordinate_output";
         };
@@ -10628,7 +10476,6 @@ export type components = {
              * type
              * @default image_panel_layout
              * @constant
-             * @enum {string}
              */
             type: "image_panel_layout";
         };
@@ -10701,7 +10548,6 @@ export type components = {
              * type
              * @default img_paste
              * @constant
-             * @enum {string}
              */
             type: "img_paste";
         };
@@ -10796,7 +10642,6 @@ export type components = {
              * type
              * @default img_resize
              * @constant
-             * @enum {string}
              */
             type: "img_resize";
         };
@@ -10854,7 +10699,6 @@ export type components = {
              * type
              * @default img_scale
              * @constant
-             * @enum {string}
              */
             type: "img_scale";
         };
@@ -10912,7 +10756,6 @@ export type components = {
              * type
              * @default i2l
              * @constant
-             * @enum {string}
              */
             type: "i2l";
         };
@@ -10994,7 +10837,6 @@ export type components = {
              * type
              * @default img_watermark
              * @constant
-             * @enum {string}
              */
             type: "img_watermark";
         };
@@ -11070,7 +10912,6 @@ export type components = {
              * type
              * @default infill_rgba
              * @constant
-             * @enum {string}
              */
             type: "infill_rgba";
         };
@@ -11128,7 +10969,6 @@ export type components = {
              * type
              * @default infill_patchmatch
              * @constant
-             * @enum {string}
              */
             type: "infill_patchmatch";
         };
@@ -11185,7 +11025,6 @@ export type components = {
              * type
              * @default infill_tile
              * @constant
-             * @enum {string}
              */
             type: "infill_tile";
         };
@@ -11285,7 +11124,6 @@ export type components = {
              * type
              * @default integer_batch
              * @constant
-             * @enum {string}
              */
             type: "integer_batch";
         };
@@ -11321,7 +11159,6 @@ export type components = {
              * type
              * @default integer_collection
              * @constant
-             * @enum {string}
              */
             type: "integer_collection";
         };
@@ -11339,7 +11176,6 @@ export type components = {
              * type
              * @default integer_collection_output
              * @constant
-             * @enum {string}
              */
             type: "integer_collection_output";
         };
@@ -11374,7 +11210,6 @@ export type components = {
              * type
              * @default integer_generator
              * @constant
-             * @enum {string}
              */
             type: "integer_generator";
         };
@@ -11391,7 +11226,6 @@ export type components = {
              * type
              * @default integer_generator_output
              * @constant
-             * @enum {string}
              */
             type: "integer_generator_output";
         };
@@ -11427,7 +11261,6 @@ export type components = {
              * type
              * @default integer
              * @constant
-             * @enum {string}
              */
             type: "integer";
         };
@@ -11476,7 +11309,6 @@ export type components = {
              * type
              * @default integer_math
              * @constant
-             * @enum {string}
              */
             type: "integer_math";
         };
@@ -11494,7 +11326,6 @@ export type components = {
              * type
              * @default integer_output
              * @constant
-             * @enum {string}
              */
             type: "integer_output";
         };
@@ -11529,7 +11360,6 @@ export type components = {
              * type
              * @default invert_tensor_mask
              * @constant
-             * @enum {string}
              */
             type: "invert_tensor_mask";
         };
@@ -12529,7 +12359,6 @@ export type components = {
              * type
              * @default invokeai_img_hue_adjust_plus
              * @constant
-             * @enum {string}
              */
             type: "invokeai_img_hue_adjust_plus";
         };
@@ -12574,7 +12403,6 @@ export type components = {
              * type
              * @default invokeai_ealightness
              * @constant
-             * @enum {string}
              */
             type: "invokeai_ealightness";
         };
@@ -12673,7 +12501,6 @@ export type components = {
              * type
              * @default invokeai_img_blend
              * @constant
-             * @enum {string}
              */
             type: "invokeai_img_blend";
         };
@@ -12759,7 +12586,6 @@ export type components = {
              * type
              * @default invokeai_img_composite
              * @constant
-             * @enum {string}
              */
             type: "invokeai_img_composite";
         };
@@ -12824,7 +12650,6 @@ export type components = {
              * type
              * @default invokeai_img_dilate_erode
              * @constant
-             * @enum {string}
              */
             type: "invokeai_img_dilate_erode";
         };
@@ -12899,7 +12724,6 @@ export type components = {
              * type
              * @default invokeai_img_enhance
              * @constant
-             * @enum {string}
              */
             type: "invokeai_img_enhance";
         };
@@ -12974,7 +12798,6 @@ export type components = {
              * type
              * @default invokeai_img_val_thresholds
              * @constant
-             * @enum {string}
              */
             type: "invokeai_img_val_thresholds";
         };
@@ -13016,7 +12839,6 @@ export type components = {
              * type
              * @default iterate
              * @constant
-             * @enum {string}
              */
             type: "iterate";
         };
@@ -13044,7 +12866,6 @@ export type components = {
              * type
              * @default iterate_output
              * @constant
-             * @enum {string}
              */
             type: "iterate_output";
         };
@@ -13090,7 +12911,6 @@ export type components = {
              * type
              * @default infill_lama
              * @constant
-             * @enum {string}
              */
             type: "infill_lama";
         };
@@ -13126,7 +12946,6 @@ export type components = {
              * type
              * @default latents_collection
              * @constant
-             * @enum {string}
              */
             type: "latents_collection";
         };
@@ -13144,7 +12963,6 @@ export type components = {
              * type
              * @default latents_collection_output
              * @constant
-             * @enum {string}
              */
             type: "latents_collection_output";
         };
@@ -13196,7 +13014,6 @@ export type components = {
              * type
              * @default latents
              * @constant
-             * @enum {string}
              */
             type: "latents";
         };
@@ -13211,7 +13028,6 @@ export type components = {
              * type
              * @default latents_meta_output
              * @constant
-             * @enum {string}
              */
             type: "latents_meta_output";
             /** @description Latents tensor */
@@ -13248,7 +13064,6 @@ export type components = {
              * type
              * @default latents_output
              * @constant
-             * @enum {string}
              */
             type: "latents_output";
         };
@@ -13316,7 +13131,6 @@ export type components = {
              * type
              * @default l2i
              * @constant
-             * @enum {string}
              */
             type: "l2i";
         };
@@ -13361,7 +13175,6 @@ export type components = {
              * type
              * @default lineart_anime_edge_detection
              * @constant
-             * @enum {string}
              */
             type: "lineart_anime_edge_detection";
         };
@@ -13412,7 +13225,6 @@ export type components = {
              * type
              * @default lineart_edge_detection
              * @constant
-             * @enum {string}
              */
             type: "lineart_edge_detection";
         };
@@ -13450,14 +13262,12 @@ export type components = {
              * Type
              * @default llava_onevision
              * @constant
-             * @enum {string}
              */
             type: "llava_onevision";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -13538,7 +13348,6 @@ export type components = {
              * type
              * @default llava_onevision_vllm
              * @constant
-             * @enum {string}
              */
             type: "llava_onevision_vllm";
         };
@@ -13586,7 +13395,6 @@ export type components = {
              * type
              * @default lora_collection_loader
              * @constant
-             * @enum {string}
              */
             type: "lora_collection_loader";
         };
@@ -13624,14 +13432,12 @@ export type components = {
              * Type
              * @default lora
              * @constant
-             * @enum {string}
              */
             type: "lora";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -13731,7 +13537,6 @@ export type components = {
              * type
              * @default lora_loader
              * @constant
-             * @enum {string}
              */
             type: "lora_loader";
         };
@@ -13756,7 +13561,6 @@ export type components = {
              * type
              * @default lora_loader_output
              * @constant
-             * @enum {string}
              */
             type: "lora_loader_output";
         };
@@ -13794,14 +13598,12 @@ export type components = {
              * Type
              * @default lora
              * @constant
-             * @enum {string}
              */
             type: "lora";
             /**
              * Format
              * @default lycoris
              * @constant
-             * @enum {string}
              */
             format: "lycoris";
             /** @description The base model. */
@@ -13892,7 +13694,6 @@ export type components = {
              * type
              * @default lora_selector
              * @constant
-             * @enum {string}
              */
             type: "lora_selector";
         };
@@ -13910,7 +13711,6 @@ export type components = {
              * type
              * @default lora_selector_output
              * @constant
-             * @enum {string}
              */
             type: "lora_selector_output";
         };
@@ -13948,7 +13748,6 @@ export type components = {
              * type
              * @default md_control_list_output
              * @constant
-             * @enum {string}
              */
             type: "md_control_list_output";
         };
@@ -13963,7 +13762,6 @@ export type components = {
              * type
              * @default md_ip_adapter_list_output
              * @constant
-             * @enum {string}
              */
             type: "md_ip_adapter_list_output";
         };
@@ -13978,7 +13776,6 @@ export type components = {
              * type
              * @default md_ip_adapters_output
              * @constant
-             * @enum {string}
              */
             type: "md_ip_adapters_output";
         };
@@ -14035,7 +13832,6 @@ export type components = {
              * type
              * @default mlsd_detection
              * @constant
-             * @enum {string}
              */
             type: "mlsd_detection";
         };
@@ -14073,14 +13869,12 @@ export type components = {
              * Type
              * @default main
              * @constant
-             * @enum {string}
              */
             type: "main";
             /**
              * Format
              * @default bnb_quantized_nf4b
              * @constant
-             * @enum {string}
              */
             format: "bnb_quantized_nf4b";
             /** @description The base model. */
@@ -14178,7 +13972,6 @@ export type components = {
              * Type
              * @default main
              * @constant
-             * @enum {string}
              */
             type: "main";
             /**
@@ -14283,14 +14076,12 @@ export type components = {
              * Type
              * @default main
              * @constant
-             * @enum {string}
              */
             type: "main";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -14373,14 +14164,12 @@ export type components = {
              * Type
              * @default main
              * @constant
-             * @enum {string}
              */
             type: "main";
             /**
              * Format
              * @default gguf_quantized
              * @constant
-             * @enum {string}
              */
             format: "gguf_quantized";
             /** @description The base model. */
@@ -14523,7 +14312,6 @@ export type components = {
              * type
              * @default main_model_loader
              * @constant
-             * @enum {string}
              */
             type: "main_model_loader";
         };
@@ -14573,7 +14361,6 @@ export type components = {
              * type
              * @default mask_combine
              * @constant
-             * @enum {string}
              */
             type: "mask_combine";
         };
@@ -14642,7 +14429,6 @@ export type components = {
              * type
              * @default mask_edge
              * @constant
-             * @enum {string}
              */
             type: "mask_edge";
         };
@@ -14693,7 +14479,6 @@ export type components = {
              * type
              * @default tomask
              * @constant
-             * @enum {string}
              */
             type: "tomask";
         };
@@ -14755,7 +14540,6 @@ export type components = {
              * type
              * @default mask_from_id
              * @constant
-             * @enum {string}
              */
             type: "mask_from_id";
         };
@@ -14780,7 +14564,6 @@ export type components = {
              * type
              * @default mask_output
              * @constant
-             * @enum {string}
              */
             type: "mask_output";
         };
@@ -14825,7 +14608,6 @@ export type components = {
              * type
              * @default tensor_mask_to_image
              * @constant
-             * @enum {string}
              */
             type: "tensor_mask_to_image";
         };
@@ -14882,7 +14664,6 @@ export type components = {
              * type
              * @default mediapipe_face_detection
              * @constant
-             * @enum {string}
              */
             type: "mediapipe_face_detection";
         };
@@ -14918,7 +14699,6 @@ export type components = {
              * type
              * @default merge_metadata
              * @constant
-             * @enum {string}
              */
             type: "merge_metadata";
         };
@@ -14977,7 +14757,6 @@ export type components = {
              * type
              * @default merge_tiles_to_image
              * @constant
-             * @enum {string}
              */
             type: "merge_tiles_to_image";
         };
@@ -15025,7 +14804,6 @@ export type components = {
              * type
              * @default metadata_field_extractor
              * @constant
-             * @enum {string}
              */
             type: "metadata_field_extractor";
         };
@@ -15060,7 +14838,6 @@ export type components = {
              * type
              * @default metadata_from_image
              * @constant
-             * @enum {string}
              */
             type: "metadata_from_image";
         };
@@ -15096,7 +14873,6 @@ export type components = {
              * type
              * @default metadata
              * @constant
-             * @enum {string}
              */
             type: "metadata";
         };
@@ -15151,7 +14927,6 @@ export type components = {
              * type
              * @default metadata_item
              * @constant
-             * @enum {string}
              */
             type: "metadata_item";
         };
@@ -15205,7 +14980,6 @@ export type components = {
              * type
              * @default metadata_item_linked
              * @constant
-             * @enum {string}
              */
             type: "metadata_item_linked";
         };
@@ -15220,7 +14994,6 @@ export type components = {
              * type
              * @default metadata_item_output
              * @constant
-             * @enum {string}
              */
             type: "metadata_item_output";
         };
@@ -15232,7 +15005,6 @@ export type components = {
              * type
              * @default metadata_output
              * @constant
-             * @enum {string}
              */
             type: "metadata_output";
         };
@@ -15286,7 +15058,6 @@ export type components = {
              * type
              * @default metadata_to_bool_collection
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_bool_collection";
         };
@@ -15340,7 +15111,6 @@ export type components = {
              * type
              * @default metadata_to_bool
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_bool";
         };
@@ -15380,7 +15150,6 @@ export type components = {
              * type
              * @default metadata_to_controlnets
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_controlnets";
         };
@@ -15434,7 +15203,6 @@ export type components = {
              * type
              * @default metadata_to_float_collection
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_float_collection";
         };
@@ -15488,7 +15256,6 @@ export type components = {
              * type
              * @default metadata_to_float
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_float";
         };
@@ -15529,7 +15296,6 @@ export type components = {
              * type
              * @default metadata_to_ip_adapters
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_ip_adapters";
         };
@@ -15583,7 +15349,6 @@ export type components = {
              * type
              * @default metadata_to_integer_collection
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_integer_collection";
         };
@@ -15637,7 +15402,6 @@ export type components = {
              * type
              * @default metadata_to_integer
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_integer";
         };
@@ -15684,7 +15448,6 @@ export type components = {
              * type
              * @default metadata_to_lora_collection
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_lora_collection";
         };
@@ -15702,7 +15465,6 @@ export type components = {
              * type
              * @default metadata_to_lora_collection_output
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_lora_collection_output";
         };
@@ -15749,7 +15511,6 @@ export type components = {
              * type
              * @default metadata_to_loras
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_loras";
         };
@@ -15802,7 +15563,6 @@ export type components = {
              * type
              * @default metadata_to_model
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_model";
         };
@@ -15840,7 +15600,6 @@ export type components = {
              * type
              * @default metadata_to_model_output
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_model_output";
         };
@@ -15893,7 +15652,6 @@ export type components = {
              * type
              * @default metadata_to_sdlx_loras
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_sdlx_loras";
         };
@@ -15946,7 +15704,6 @@ export type components = {
              * type
              * @default metadata_to_sdxl_model
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_sdxl_model";
         };
@@ -15989,7 +15746,6 @@ export type components = {
              * type
              * @default metadata_to_sdxl_model_output
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_sdxl_model_output";
         };
@@ -16044,7 +15800,6 @@ export type components = {
              * type
              * @default metadata_to_scheduler
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_scheduler";
         };
@@ -16098,7 +15853,6 @@ export type components = {
              * type
              * @default metadata_to_string_collection
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_string_collection";
         };
@@ -16152,7 +15906,6 @@ export type components = {
              * type
              * @default metadata_to_string
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_string";
         };
@@ -16193,7 +15946,6 @@ export type components = {
              * type
              * @default metadata_to_t2i_adapters
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_t2i_adapters";
         };
@@ -16246,7 +15998,6 @@ export type components = {
              * type
              * @default metadata_to_vae
              * @constant
-             * @enum {string}
              */
             type: "metadata_to_vae";
         };
@@ -16317,7 +16068,6 @@ export type components = {
              * type
              * @default model_identifier
              * @constant
-             * @enum {string}
              */
             type: "model_identifier";
         };
@@ -16335,7 +16085,6 @@ export type components = {
              * type
              * @default model_identifier_output
              * @constant
-             * @enum {string}
              */
             type: "model_identifier_output";
         };
@@ -16683,7 +16432,6 @@ export type components = {
              * type
              * @default model_loader_output
              * @constant
-             * @enum {string}
              */
             type: "model_loader_output";
             /**
@@ -16851,7 +16599,6 @@ export type components = {
              * type
              * @default mul
              * @constant
-             * @enum {string}
              */
             type: "mul";
         };
@@ -16923,7 +16670,6 @@ export type components = {
              * type
              * @default noise
              * @constant
-             * @enum {string}
              */
             type: "noise";
         };
@@ -16948,7 +16694,6 @@ export type components = {
              * type
              * @default noise_output
              * @constant
-             * @enum {string}
              */
             type: "noise_output";
         };
@@ -16993,7 +16738,6 @@ export type components = {
              * type
              * @default normal_map
              * @constant
-             * @enum {string}
              */
             type: "normal_map";
         };
@@ -17120,7 +16864,6 @@ export type components = {
              * type
              * @default pair_tile_image
              * @constant
-             * @enum {string}
              */
             type: "pair_tile_image";
         };
@@ -17132,7 +16875,6 @@ export type components = {
              * type
              * @default pair_tile_image_output
              * @constant
-             * @enum {string}
              */
             type: "pair_tile_image_output";
         };
@@ -17189,7 +16931,6 @@ export type components = {
              * type
              * @default paste_image_into_bounding_box
              * @constant
-             * @enum {string}
              */
             type: "paste_image_into_bounding_box";
         };
@@ -17246,7 +16987,6 @@ export type components = {
              * type
              * @default pidi_edge_detection
              * @constant
-             * @enum {string}
              */
             type: "pidi_edge_detection";
         };
@@ -17345,7 +17085,6 @@ export type components = {
              * type
              * @default prompt_from_file
              * @constant
-             * @enum {string}
              */
             type: "prompt_from_file";
         };
@@ -17542,7 +17281,6 @@ export type components = {
              * type
              * @default rand_float
              * @constant
-             * @enum {string}
              */
             type: "rand_float";
         };
@@ -17584,7 +17322,6 @@ export type components = {
              * type
              * @default rand_int
              * @constant
-             * @enum {string}
              */
             type: "rand_int";
         };
@@ -17638,7 +17375,6 @@ export type components = {
              * type
              * @default random_range
              * @constant
-             * @enum {string}
              */
             type: "random_range";
         };
@@ -17686,7 +17422,6 @@ export type components = {
              * type
              * @default range
              * @constant
-             * @enum {string}
              */
             type: "range";
         };
@@ -17734,7 +17469,6 @@ export type components = {
              * type
              * @default range_of_size
              * @constant
-             * @enum {string}
              */
             type: "range_of_size";
         };
@@ -17805,7 +17539,6 @@ export type components = {
              * type
              * @default rectangle_mask
              * @constant
-             * @enum {string}
              */
             type: "rectangle_mask";
         };
@@ -17902,7 +17635,6 @@ export type components = {
              * type
              * @default lresize
              * @constant
-             * @enum {string}
              */
             type: "lresize";
         };
@@ -17967,7 +17699,6 @@ export type components = {
              * type
              * @default round_float
              * @constant
-             * @enum {string}
              */
             type: "round_float";
         };
@@ -18021,7 +17752,6 @@ export type components = {
              * type
              * @default sd3_conditioning_output
              * @constant
-             * @enum {string}
              */
             type: "sd3_conditioning_output";
         };
@@ -18129,7 +17859,6 @@ export type components = {
              * type
              * @default sd3_denoise
              * @constant
-             * @enum {string}
              */
             type: "sd3_denoise";
         };
@@ -18179,7 +17908,6 @@ export type components = {
              * type
              * @default sd3_i2l
              * @constant
-             * @enum {string}
              */
             type: "sd3_i2l";
         };
@@ -18229,7 +17957,6 @@ export type components = {
              * type
              * @default sd3_l2i
              * @constant
-             * @enum {string}
              */
             type: "sd3_l2i";
         };
@@ -18318,7 +18045,6 @@ export type components = {
              * type
              * @default sdxl_compel_prompt
              * @constant
-             * @enum {string}
              */
             type: "sdxl_compel_prompt";
         };
@@ -18372,7 +18098,6 @@ export type components = {
              * type
              * @default sdxl_lora_collection_loader
              * @constant
-             * @enum {string}
              */
             type: "sdxl_lora_collection_loader";
         };
@@ -18432,7 +18157,6 @@ export type components = {
              * type
              * @default sdxl_lora_loader
              * @constant
-             * @enum {string}
              */
             type: "sdxl_lora_loader";
         };
@@ -18463,7 +18187,6 @@ export type components = {
              * type
              * @default sdxl_lora_loader_output
              * @constant
-             * @enum {string}
              */
             type: "sdxl_lora_loader_output";
         };
@@ -18498,7 +18221,6 @@ export type components = {
              * type
              * @default sdxl_model_loader
              * @constant
-             * @enum {string}
              */
             type: "sdxl_model_loader";
         };
@@ -18531,7 +18253,6 @@ export type components = {
              * type
              * @default sdxl_model_loader_output
              * @constant
-             * @enum {string}
              */
             type: "sdxl_model_loader_output";
         };
@@ -18598,7 +18319,6 @@ export type components = {
              * type
              * @default sdxl_refiner_compel_prompt
              * @constant
-             * @enum {string}
              */
             type: "sdxl_refiner_compel_prompt";
         };
@@ -18633,7 +18353,6 @@ export type components = {
              * type
              * @default sdxl_refiner_model_loader
              * @constant
-             * @enum {string}
              */
             type: "sdxl_refiner_model_loader";
         };
@@ -18661,7 +18380,6 @@ export type components = {
              * type
              * @default sdxl_refiner_model_loader_output
              * @constant
-             * @enum {string}
              */
             type: "sdxl_refiner_model_loader_output";
         };
@@ -18711,7 +18429,6 @@ export type components = {
              * type
              * @default save_image
              * @constant
-             * @enum {string}
              */
             type: "save_image";
         };
@@ -18765,7 +18482,6 @@ export type components = {
              * type
              * @default lscale
              * @constant
-             * @enum {string}
              */
             type: "lscale";
         };
@@ -18802,7 +18518,6 @@ export type components = {
              * type
              * @default scheduler
              * @constant
-             * @enum {string}
              */
             type: "scheduler";
         };
@@ -18818,7 +18533,6 @@ export type components = {
              * type
              * @default scheduler_output
              * @constant
-             * @enum {string}
              */
             type: "scheduler_output";
         };
@@ -18880,7 +18594,6 @@ export type components = {
              * type
              * @default sd3_model_loader
              * @constant
-             * @enum {string}
              */
             type: "sd3_model_loader";
         };
@@ -18918,7 +18631,6 @@ export type components = {
              * type
              * @default sd3_model_loader_output
              * @constant
-             * @enum {string}
              */
             type: "sd3_model_loader_output";
         };
@@ -18972,7 +18684,6 @@ export type components = {
              * type
              * @default sd3_text_encoder
              * @constant
-             * @enum {string}
              */
             type: "sd3_text_encoder";
         };
@@ -19026,7 +18737,6 @@ export type components = {
              * type
              * @default seamless
              * @constant
-             * @enum {string}
              */
             type: "seamless";
         };
@@ -19051,7 +18761,6 @@ export type components = {
              * type
              * @default seamless_output
              * @constant
-             * @enum {string}
              */
             type: "seamless_output";
         };
@@ -19118,7 +18827,6 @@ export type components = {
              * type
              * @default segment_anything
              * @constant
-             * @enum {string}
              */
             type: "segment_anything";
         };
@@ -19299,7 +19007,7 @@ export type components = {
             api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /**
              * Credits
-             * @description Total credits used for this queue item
+             * @description The total credits used for this queue item
              */
             credits?: number | null;
             /** @description The fully-populated session to be executed */
@@ -19420,11 +19128,7 @@ export type components = {
             api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
             /**
              * Credits
-<<<<<<< HEAD
-             * @description Total credits used for this queue item
-=======
              * @description The total credits used for this queue item
->>>>>>> origin/main
              */
             credits?: number | null;
         };
@@ -19512,7 +19216,6 @@ export type components = {
              * type
              * @default show_image
              * @constant
-             * @enum {string}
              */
             type: "show_image";
         };
@@ -19550,14 +19253,12 @@ export type components = {
              * Type
              * @default siglip
              * @constant
-             * @enum {string}
              */
             type: "siglip";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -19647,7 +19348,6 @@ export type components = {
              * type
              * @default spandrel_image_to_image_autoscale
              * @constant
-             * @enum {string}
              */
             type: "spandrel_image_to_image_autoscale";
             /**
@@ -19697,14 +19397,12 @@ export type components = {
              * Type
              * @default spandrel_image_to_image
              * @constant
-             * @enum {string}
              */
             type: "spandrel_image_to_image";
             /**
              * Format
              * @default checkpoint
              * @constant
-             * @enum {string}
              */
             format: "checkpoint";
             /** @description The base model. */
@@ -19792,7 +19490,6 @@ export type components = {
              * type
              * @default spandrel_image_to_image
              * @constant
-             * @enum {string}
              */
             type: "spandrel_image_to_image";
         };
@@ -19870,7 +19567,6 @@ export type components = {
              * type
              * @default string_2_output
              * @constant
-             * @enum {string}
              */
             type: "string_2_output";
         };
@@ -19913,7 +19609,6 @@ export type components = {
              * type
              * @default string_batch
              * @constant
-             * @enum {string}
              */
             type: "string_batch";
         };
@@ -19949,7 +19644,6 @@ export type components = {
              * type
              * @default string_collection
              * @constant
-             * @enum {string}
              */
             type: "string_collection";
         };
@@ -19967,7 +19661,6 @@ export type components = {
              * type
              * @default string_collection_output
              * @constant
-             * @enum {string}
              */
             type: "string_collection_output";
         };
@@ -20002,7 +19695,6 @@ export type components = {
              * type
              * @default string_generator
              * @constant
-             * @enum {string}
              */
             type: "string_generator";
         };
@@ -20022,7 +19714,6 @@ export type components = {
              * type
              * @default string_generator_output
              * @constant
-             * @enum {string}
              */
             type: "string_generator_output";
         };
@@ -20058,7 +19749,6 @@ export type components = {
              * type
              * @default string
              * @constant
-             * @enum {string}
              */
             type: "string";
         };
@@ -20100,7 +19790,6 @@ export type components = {
              * type
              * @default string_join
              * @constant
-             * @enum {string}
              */
             type: "string_join";
         };
@@ -20148,7 +19837,6 @@ export type components = {
              * type
              * @default string_join_three
              * @constant
-             * @enum {string}
              */
             type: "string_join_three";
         };
@@ -20166,7 +19854,6 @@ export type components = {
              * type
              * @default string_output
              * @constant
-             * @enum {string}
              */
             type: "string_output";
         };
@@ -20189,7 +19876,6 @@ export type components = {
              * type
              * @default string_pos_neg_output
              * @constant
-             * @enum {string}
              */
             type: "string_pos_neg_output";
         };
@@ -20243,7 +19929,6 @@ export type components = {
              * type
              * @default string_replace
              * @constant
-             * @enum {string}
              */
             type: "string_replace";
         };
@@ -20285,7 +19970,6 @@ export type components = {
              * type
              * @default string_split
              * @constant
-             * @enum {string}
              */
             type: "string_split";
         };
@@ -20321,7 +20005,6 @@ export type components = {
              * type
              * @default string_split_neg
              * @constant
-             * @enum {string}
              */
             type: "string_split_neg";
         };
@@ -20399,7 +20082,6 @@ export type components = {
              * type
              * @default sub
              * @constant
-             * @enum {string}
              */
             type: "sub";
         };
@@ -20437,14 +20119,12 @@ export type components = {
              * Type
              * @default t2i_adapter
              * @constant
-             * @enum {string}
              */
             type: "t2i_adapter";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -20577,7 +20257,6 @@ export type components = {
              * type
              * @default t2i_adapter
              * @constant
-             * @enum {string}
              */
             type: "t2i_adapter";
         };
@@ -20629,7 +20308,6 @@ export type components = {
              * type
              * @default t2i_adapter_output
              * @constant
-             * @enum {string}
              */
             type: "t2i_adapter_output";
         };
@@ -20664,14 +20342,12 @@ export type components = {
              * Type
              * @default t5_encoder
              * @constant
-             * @enum {string}
              */
             type: "t5_encoder";
             /**
              * Format
              * @default bnb_quantized_int8b
              * @constant
-             * @enum {string}
              */
             format: "bnb_quantized_int8b";
             /** @description The base model. */
@@ -20737,14 +20413,12 @@ export type components = {
              * Type
              * @default t5_encoder
              * @constant
-             * @enum {string}
              */
             type: "t5_encoder";
             /**
              * Format
              * @default t5_encoder
              * @constant
-             * @enum {string}
              */
             format: "t5_encoder";
             /** @description The base model. */
@@ -20847,14 +20521,12 @@ export type components = {
              * Type
              * @default embedding
              * @constant
-             * @enum {string}
              */
             type: "embedding";
             /**
              * Format
              * @default embedding_file
              * @constant
-             * @enum {string}
              */
             format: "embedding_file";
             /** @description The base model. */
@@ -20923,14 +20595,12 @@ export type components = {
              * Type
              * @default embedding
              * @constant
-             * @enum {string}
              */
             type: "embedding";
             /**
              * Format
              * @default embedding_folder
              * @constant
-             * @enum {string}
              */
             format: "embedding_folder";
             /** @description The base model. */
@@ -21003,7 +20673,6 @@ export type components = {
              * type
              * @default tile_to_properties
              * @constant
-             * @enum {string}
              */
             type: "tile_to_properties";
         };
@@ -21063,7 +20732,6 @@ export type components = {
              * type
              * @default tile_to_properties_output
              * @constant
-             * @enum {string}
              */
             type: "tile_to_properties_output";
         };
@@ -21191,7 +20859,6 @@ export type components = {
              * type
              * @default tiled_multi_diffusion_denoise_latents
              * @constant
-             * @enum {string}
              */
             type: "tiled_multi_diffusion_denoise_latents";
         };
@@ -21316,7 +20983,6 @@ export type components = {
              * type
              * @default unet_output
              * @constant
-             * @enum {string}
              */
             type: "unet_output";
         };
@@ -21404,7 +21070,6 @@ export type components = {
              * type
              * @default unsharp_mask
              * @constant
-             * @enum {string}
              */
             type: "unsharp_mask";
         };
@@ -21455,7 +21120,6 @@ export type components = {
              * Type
              * @default vae
              * @constant
-             * @enum {string}
              */
             type: "vae";
             /**
@@ -21541,14 +21205,12 @@ export type components = {
              * Type
              * @default vae
              * @constant
-             * @enum {string}
              */
             type: "vae";
             /**
              * Format
              * @default diffusers
              * @constant
-             * @enum {string}
              */
             format: "diffusers";
             /** @description The base model. */
@@ -21625,7 +21287,6 @@ export type components = {
              * type
              * @default vae_loader
              * @constant
-             * @enum {string}
              */
             type: "vae_loader";
         };
@@ -21643,7 +21304,6 @@ export type components = {
              * type
              * @default vae_output
              * @constant
-             * @enum {string}
              */
             type: "vae_output";
         };
