@@ -6,7 +6,7 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
-import { type ImageField,zModelIdentifierField } from 'features/nodes/types/common';
+import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
