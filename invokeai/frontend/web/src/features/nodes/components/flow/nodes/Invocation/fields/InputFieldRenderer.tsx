@@ -1,10 +1,12 @@
 import { FloatFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInput';
 import { FloatFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInputAndSlider';
 import { FloatFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldSlider';
+import ChatGPT4oModelFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ChatGPT4oModelFieldInputComponent';
 import { FloatFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatFieldCollectionInputComponent';
 import { FloatGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/FloatGeneratorFieldComponent';
 import { ImageFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageFieldCollectionInputComponent';
 import { ImageGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ImageGeneratorFieldComponent';
+import Imagen3ModelFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/Imagen3ModelFieldInputComponent';
 import { IntegerFieldCollectionInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerFieldCollectionInputComponent';
 import { IntegerGeneratorFieldInputComponent } from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/IntegerGeneratorFieldComponent';
 import ModelIdentifierFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ModelIdentifierFieldInputComponent';
@@ -23,6 +25,8 @@ import {
   isBoardFieldInputTemplate,
   isBooleanFieldInputInstance,
   isBooleanFieldInputTemplate,
+  isChatGPT4oModelFieldInputInstance,
+  isChatGPT4oModelFieldInputTemplate,
   isCLIPEmbedModelFieldInputInstance,
   isCLIPEmbedModelFieldInputTemplate,
   isCLIPGEmbedModelFieldInputInstance,
@@ -57,6 +61,8 @@ import {
   isImageFieldInputTemplate,
   isImageGeneratorFieldInputInstance,
   isImageGeneratorFieldInputTemplate,
+  isImagen3ModelFieldInputInstance,
+  isImagen3ModelFieldInputTemplate,
   isIntegerFieldCollectionInputInstance,
   isIntegerFieldCollectionInputTemplate,
   isIntegerFieldInputInstance,
@@ -392,6 +398,20 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <FluxReduxModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isImagen3ModelFieldInputTemplate(template)) {
+    if (!isImagen3ModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <Imagen3ModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isChatGPT4oModelFieldInputTemplate(template)) {
+    if (!isChatGPT4oModelFieldInputInstance(field)) {
+      return null;
+    }
+    return <ChatGPT4oModelFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isColorFieldInputTemplate(template)) {
