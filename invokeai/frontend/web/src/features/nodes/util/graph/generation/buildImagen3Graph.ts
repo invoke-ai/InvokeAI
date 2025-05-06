@@ -5,6 +5,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isImagen3AspectRatioID } from 'features/controlLayers/store/types';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
@@ -36,6 +37,7 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
   const model = selectMainModelConfig(state);
 
   assert(model, 'No model found for Imagen3 graph');
+  assert(model.base === 'imagen3', 'Imagen3 graph requires Imagen3 model');
   assert(isImagen3AspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
   assert(positivePrompt.length > 0, 'Imagen3 requires positive prompt to have at least one character');
 
@@ -48,6 +50,7 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'google_imagen3_generate_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+      model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       aspect_ratio: bbox.aspectRatio.id,
