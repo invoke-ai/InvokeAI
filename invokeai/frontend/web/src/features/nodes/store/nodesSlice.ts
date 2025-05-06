@@ -23,6 +23,7 @@ import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
   BooleanFieldValue,
+  ChatGPT4oModelFieldValue,
   CLIPEmbedModelFieldValue,
   CLIPGEmbedModelFieldValue,
   CLIPLEmbedModelFieldValue,
@@ -38,6 +39,7 @@ import type {
   ImageFieldCollectionValue,
   ImageFieldValue,
   ImageGeneratorFieldValue,
+  Imagen3ModelFieldValue,
   IntegerFieldCollectionValue,
   IntegerFieldValue,
   IntegerGeneratorFieldValue,
@@ -61,6 +63,7 @@ import type {
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
+  zChatGPT4oModelFieldValue,
   zCLIPEmbedModelFieldValue,
   zCLIPGEmbedModelFieldValue,
   zCLIPLEmbedModelFieldValue,
@@ -76,6 +79,7 @@ import {
   zImageFieldCollectionValue,
   zImageFieldValue,
   zImageGeneratorFieldValue,
+  zImagen3ModelFieldValue,
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIntegerGeneratorFieldValue,
@@ -512,6 +516,12 @@ export const nodesSlice = createSlice({
     fieldFluxReduxModelValueChanged: (state, action: FieldValueAction<FluxReduxModelFieldValue>) => {
       fieldValueReducer(state, action, zFluxReduxModelFieldValue);
     },
+    fieldImagen3ModelValueChanged: (state, action: FieldValueAction<Imagen3ModelFieldValue>) => {
+      fieldValueReducer(state, action, zImagen3ModelFieldValue);
+    },
+    fieldChatGPT4oModelValueChanged: (state, action: FieldValueAction<ChatGPT4oModelFieldValue>) => {
+      fieldValueReducer(state, action, zChatGPT4oModelFieldValue);
+    },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
@@ -679,6 +689,8 @@ export const {
   fieldFluxVAEModelValueChanged,
   fieldSigLipModelValueChanged,
   fieldFluxReduxModelValueChanged,
+  fieldImagen3ModelValueChanged,
+  fieldChatGPT4oModelValueChanged,
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,
   fieldStringGeneratorValueChanged,

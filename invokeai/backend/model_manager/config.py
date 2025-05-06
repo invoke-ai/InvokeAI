@@ -144,6 +144,7 @@ class ModelConfigBase(ABC, BaseModel):
     submodels: Optional[Dict[SubModelType, SubmodelDefinition]] = Field(
         description="Loadable submodels in this model", default=None
     )
+    usage_info: Optional[str] = Field(default=None, description="Usage information for this model")
 
     _USING_LEGACY_PROBE: ClassVar[set] = set()
     _USING_CLASSIFY_API: ClassVar[set] = set()
