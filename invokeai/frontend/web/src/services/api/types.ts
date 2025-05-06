@@ -232,6 +232,10 @@ export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ApiMod
   return config.type === 'main' && config.base === 'chatgpt-4o';
 };
 
+export const isImagen3ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+  return config.type === 'main' && config.base === 'imagen3';
+};
+
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
