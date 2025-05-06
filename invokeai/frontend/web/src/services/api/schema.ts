@@ -17469,6 +17469,12 @@ export type components = {
              * @description The ID of the session (aka graph execution state)
              */
             session_id: string;
+            /**
+             * Credits
+             * @description The total credits used for this queue item
+             * @default null
+             */
+            credits: number | null;
         };
         /**
          * QueueItemsRetriedEvent
