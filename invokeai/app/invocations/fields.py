@@ -61,6 +61,8 @@ class UIType(str, Enum, metaclass=MetaEnum):
     SigLipModel = "SigLipModelField"
     FluxReduxModel = "FluxReduxModelField"
     LlavaOnevisionModel = "LLaVAModelField"
+    Imagen3Model = "Imagen3ModelField"
+    ChatGPT4oModel = "ChatGPT4oModelField"
     # endregion
 
     # region Misc Field Types
