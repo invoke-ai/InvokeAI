@@ -18,6 +18,7 @@ import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
+import { $whatsNew } from 'app/store/nanostores/whatsNew';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
@@ -58,6 +59,7 @@ interface Props extends PropsWithChildren {
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
   logo?: ReactNode;
+  whatsNew?: ReactNode[];
   workflowCategories?: WorkflowCategory[];
   workflowTagCategories?: WorkflowTagCategory[];
   workflowSortOptions?: WorkflowSortOption[];
@@ -90,6 +92,7 @@ const InvokeAIUI = ({
   workflowSortOptions,
   loggingOverrides,
   onClickGoToModelManager,
+  whatsNew,
 }: Props) => {
   useLayoutEffect(() => {
     /*
@@ -223,6 +226,16 @@ const InvokeAIUI = ({
       $logo.set(undefined);
     };
   }, [logo]);
+
+  useEffect(() => {
+    if (whatsNew) {
+      $whatsNew.set(whatsNew);
+    }
+
+    return () => {
+      $whatsNew.set(undefined);
+    };
+  }, [whatsNew]);
 
   useEffect(() => {
     if (onClickGoToModelManager) {
