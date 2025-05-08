@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    "ms-vscode-remote.remote-containers",
+    "ms-azuretools.vscode-docker",
+    "ms-toolsai.jupyter",
+    "ms-toolsai.vscode-jupyter-cell-tags",
+    "ms-toolsai.jupyter-renderers",
+    "ms-toolsai.vscode-jupyter-slideshow",
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "esbenp.prettier-vscode",
+    "DavidAnson.vscode-markdownlint",
+    "antfu.vite",
+    "docker.docker",
+    "dbaeumer.vscode-eslint",
+    "vitest.explorer",
+    "tamasfe.even-better-toml",
+    "eamodio.gitlens"
+  ]
+}

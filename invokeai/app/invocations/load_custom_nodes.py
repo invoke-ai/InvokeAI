@@ -28,7 +28,10 @@ def load_custom_nodes(custom_nodes_path: Path, logger: logging.Logger):
     target_custom_nodes_readme_path = Path(custom_nodes_path) / "README.md"
 
     # copy our custom nodes README to the custom nodes directory
-    shutil.copy(source_custom_nodes_readme_path, target_custom_nodes_readme_path)
+    try:
+        shutil.copy(source_custom_nodes_readme_path, target_custom_nodes_readme_path)
+    except Exception as e:
+        logger.warning(f"Failed to copy custom nodes README file to {custom_nodes_path}: {e}")
 
     loaded_packs: list[str] = []
     failed_packs: list[str] = []

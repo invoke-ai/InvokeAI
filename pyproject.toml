@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "pip", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "InvokeAI"
@@ -38,8 +38,8 @@ dependencies = [
   "compel==2.0.2",
   "diffusers[torch]==0.33.0",
   "gguf",
-  "invisible-watermark==0.2.0",           # needed to install SDXL base and refiner using their repo_ids
-  "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
+  "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
+  "mediapipe==0.10.14", # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
@@ -47,11 +47,10 @@ dependencies = [
   "safetensors",
   "sentencepiece",
   "spandrel",
-  "torch~=2.6.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
-  "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
+  "torch~=2.6.0", # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torchsde", # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
   "transformers",
-
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
   "fastapi",
@@ -60,7 +59,6 @@ dependencies = [
   "pydantic",
   "python-socketio",
   "uvicorn[standard]",
-
   # Auxiliary dependencies, pinned only if necessary.
   "blake3",
   "Deprecated",
@@ -82,7 +80,6 @@ dependencies = [
   "xformers>=0.0.28.post1; sys_platform!='darwin'",
   # torch 2.4+cu carries its own triton dependency
 ]
-
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
@@ -108,6 +105,10 @@ dependencies = [
   "polyfactory==2.19.0",
   "humanize==4.12.1",
 ]
+# Have to declare these here so they are valid values for the `extra` field
+"using-cpu" = []
+"using-cuda" = ["onnxruntime-gpu"]
+"using-rocm" = []
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
@@ -119,37 +120,35 @@ dependencies = [
 "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
 "Discord" = "https://discord.gg/ZmtBAhwWhy"
 
-[tool.setuptools.dynamic]
-version = { attr = "invokeai.version.__version__" }
+[tool.hatch.version]
+path = "invokeai/version/invokeai_version.py"
+attribute = "__version__"
 
-[tool.setuptools.packages.find]
-"where" = ["."]
-"include" = [
-  "invokeai.assets.fonts*",
-  "invokeai.version*",
-  "invokeai.generator*",
-  "invokeai.backend*",
-  "invokeai.frontend*",
-  "invokeai.frontend.web.dist*",
-  "invokeai.frontend.web.static*",
-  "invokeai.configs*",
-  "invokeai.app*",
-  "invokeai.invocation_api*",
+[tool.hatch.build]
+include = [
+  "invokeai/app/assets/**/*.png",
+  "invokeai/app/services/workflow_records/default_workflows/*.json",
+  "invokeai/app/services/style_preset_records/*.json",
+  "invokeai/app/services/style_preset_images/default_style_preset_images/*.png",
+  "invokeai/assets/fonts/**/*.ttf",
+  "invokeai/backend/**/*.png",
+  "invokeai/configs/*.example",
+  "invokeai/configs/**/*.yaml",
+  "invokeai/configs/*.txt",
+  "invokeai/frontend/web/dist/**",
+  "invokeai/frontend/web/static/**",
+  "invokeai/app/invocations/**",
+  "README.md",
+  "LICENSE",
 ]
+# exclude = ["tests/**", "docs/**"]
 
-[tool.setuptools.package-data]
-"invokeai.app.assets" = ["**/*.png"]
-"invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
-"invokeai.app.services.style_preset_records" = ["*.json"]
-"invokeai.app.services.style_preset_images.default_style_preset_images" = [
-  "*.png",
-]
-"invokeai.assets.fonts" = ["**/*.ttf"]
-"invokeai.backend" = ["**.png", "**/*.icc"]
-"invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
-"invokeai.frontend.web.dist" = ["**"]
-"invokeai.frontend.web.static" = ["**"]
-"invokeai.app.invocations" = ["**"]
+[tool.hatch.build.targets.wheel]
+# Wheel gets exactly the same files by default, no extra config needed.
+
+[tool.hatch.build.targets.sdist]
+# Sdist will pull in everything under include/exclude.
+
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
@@ -295,3 +294,37 @@ reportUntypedBaseClass = "warning"
 reportUntypedClassDecorator = "warning"
 reportUntypedFunctionDecorator = "warning"
 reportUntypedNamedTuple = "warning"
+
+#=== Begin: UV
+
+[tool.uv.sources]
+torch = [
+  # { index = "default", marker = "sys_platform == 'darwin'" }, # macOS
+  { index = "pytorch-arm", marker = "sys_platform != 'darwin' and platform_machine == 'arm64'" },
+  # Linux and Windows
+  { index = "pytorch-cuda", marker = "sys_platform != 'darwin' and platform_machine == 'x86_64' and extra == 'using-cuda' and extra != 'using-rocm'" },
+  { index = "pytorch-rocm", marker = "sys_platform != 'darwin' and platform_machine == 'x86_64' and extra != 'using-cuda' and extra == 'using-rocm'" },
+  { index = "pytorch-cpu", marker = "sys_platform != 'darwin' and platform_machine == 'x86_64' and extra != 'using-cuda' and extra != 'using-rocm'" },
+]
+
+[[tool.uv.index]]
+name     = "pytorch-rocm"
+url      = "https://download.pytorch.org/whl/rocm6.2"
+explicit = true
+
+[[tool.uv.index]]
+name     = "pytorch-cuda"
+url      = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name     = "pytorch-arm"
+url      = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name     = "pytorch-cpu"
+url      = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+#=== End: UV

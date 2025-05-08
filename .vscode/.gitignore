@@ -1,0 +1,3 @@
+# Ignore launch.json for now since everyone has their own setup
+launch.json
+settings.json
