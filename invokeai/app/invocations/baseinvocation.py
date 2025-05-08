@@ -72,6 +72,17 @@ class Classification(str, Enum, metaclass=MetaEnum):
     Special = "special"
 
 
+class Bottleneck(str, Enum, metaclass=MetaEnum):
+    """
+    The bottleneck of an invocation.
+    - `Network`: The invocation's execution is network-bound.
+    - `GPU`: The invocation's execution is GPU-bound.
+    """
+
+    Network = "network"
+    GPU = "gpu"
+
+
 class UIConfigBase(BaseModel):
     """
     Provides additional node configuration to the UI.
@@ -241,6 +252,8 @@ class BaseInvocation(ABC, BaseModel):
         json_schema_extra={"field_kind": FieldKind.NodeAttribute},
     )
 
+    bottleneck: ClassVar[Bottleneck]
+
     UIConfig: ClassVar[UIConfigBase]
 
     model_config = ConfigDict(
@@ -399,6 +412,7 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
     "use_cache",
     "type",
     "workflow",
+    "bottleneck",
 }
 
 RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
@@ -483,6 +497,7 @@ def invocation(
     version: Optional[str] = None,
     use_cache: Optional[bool] = True,
     classification: Classification = Classification.Stable,
+    bottleneck: Bottleneck = Bottleneck.GPU,
 ) -> Callable[[Type[TBaseInvocation]], Type[TBaseInvocation]]:
     """
     Registers an invocation.
@@ -494,6 +509,7 @@ def invocation(
     :param Optional[str] version: Adds a version to the invocation. Must be a valid semver string. Defaults to None.
     :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
     :param Classification classification: The classification of the invocation. Defaults to FeatureClassification.Stable. Use Beta or Prototype if the invocation is unstable.
+    :param Bottleneck bottleneck: The bottleneck of the invocation. Defaults to Bottleneck.GPU. Use Network if the invocation is network-bound.
     """
 
     def wrapper(cls: Type[TBaseInvocation]) -> Type[TBaseInvocation]:
@@ -529,6 +545,8 @@ def invocation(
 
         if use_cache is not None:
             cls.model_fields["use_cache"].default = use_cache
+
+        cls.bottleneck = bottleneck
 
         # Add the invocation type to the model.
 
