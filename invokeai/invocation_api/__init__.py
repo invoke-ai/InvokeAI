@@ -7,6 +7,7 @@ TODO(psyche): Do we want to dogfood this?
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Bottleneck,
     Classification,
     invocation,
     invocation_output,
@@ -86,6 +87,7 @@ __all__ = [
     # invokeai.app.invocations.baseinvocation
     "BaseInvocation",
     "BaseInvocationOutput",
+    "Bottleneck",
     "Classification",
     "invocation",
     "invocation_output",
