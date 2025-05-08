@@ -18,6 +18,7 @@ import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
+import { $toastMap } from 'app/store/nanostores/toastMap';
 import { $whatsNew } from 'app/store/nanostores/whatsNew';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
@@ -32,6 +33,7 @@ import {
   DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES,
 } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import type { ToastConfig } from 'features/toast/toast';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useLayoutEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -59,6 +61,7 @@ interface Props extends PropsWithChildren {
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
   logo?: ReactNode;
+  toastMap?: Record<string, ToastConfig>;
   whatsNew?: ReactNode[];
   workflowCategories?: WorkflowCategory[];
   workflowTagCategories?: WorkflowTagCategory[];
@@ -87,6 +90,7 @@ const InvokeAIUI = ({
   socketOptions,
   isDebugging = false,
   logo,
+  toastMap,
   workflowCategories,
   workflowTagCategories,
   workflowSortOptions,
@@ -226,6 +230,16 @@ const InvokeAIUI = ({
       $logo.set(undefined);
     };
   }, [logo]);
+
+  useEffect(() => {
+    if (toastMap) {
+      $toastMap.set(toastMap);
+    }
+
+    return () => {
+      $toastMap.set(undefined);
+    };
+  }, [toastMap]);
 
   useEffect(() => {
     if (whatsNew) {
