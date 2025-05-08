@@ -5,8 +5,30 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { z } from 'zod';
 
-const usageErrorSubstring = 'usage allotment';
-const usageErrorCode = 'USAGE_LIMIT';
+const trialUsageErrorSubstring = 'usage allotment for the free trial';
+const trialUsageErrorCode = 'USAGE_LIMIT_TRIAL';
+
+const orgUsageErrorSubstring = 'organization has reached its predefined usage allotment';
+const orgUsageErrorCode = 'USAGE_LIMIT_ORG';
+
+const indieUsageErrorSubstring = 'usage allotment';
+const indieUsageErrorCode = 'USAGE_LIMIT_INDIE';
+
+//TODO make this dynamic with returned error codes instead of substring check
+const getErrorCode = (errorString?: string) => {
+  if (!errorString) {
+    return undefined;
+  }
+  if (errorString.includes(trialUsageErrorSubstring)) {
+    return trialUsageErrorCode;
+  }
+  if (errorString.includes(orgUsageErrorSubstring)) {
+    return orgUsageErrorCode;
+  }
+  if (errorString.includes(indieUsageErrorSubstring)) {
+    return indieUsageErrorCode;
+  }
+};
 
 const zRejectedForbiddenAction = z.object({
   payload: z.object({
@@ -36,11 +58,11 @@ export const authToastMiddleware: Middleware = () => (next) => (action) => {
         return next(action);
       }
       const toastMap = $toastMap.get();
-      const customToastConfig = toastMap?.[usageErrorCode]; //TODO: update using error code in response
-
       const customMessage = parsed.payload.data.detail !== 'Forbidden' ? parsed.payload.data.detail : undefined;
-      //TODO: remove substring check and just use error code
-      if (customMessage?.includes(usageErrorSubstring) && customToastConfig) {
+      const errorCode = getErrorCode(customMessage);
+      const customToastConfig = errorCode ? toastMap?.[errorCode] : undefined;
+
+      if (customToastConfig) {
         toast(customToastConfig);
       } else {
         toast({
