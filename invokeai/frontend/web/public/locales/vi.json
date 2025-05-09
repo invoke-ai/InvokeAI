@@ -243,9 +243,7 @@
         "systemInformation": "Thông Tin Hệ Thống",
         "model_withCount_other": "{{count}} model",
         "noOptions": "Không Có Lựa Chọn",
-        "noMatches": "Không Có Mục Phù Hợp",
-        "compact": "Kết Hợp",
-        "full": "Đầy Đủ"
+        "noMatches": "Không Có Mục Phù Hợp"
     },
     "prompt": {
         "addPromptTrigger": "Thêm Prompt Trigger",
