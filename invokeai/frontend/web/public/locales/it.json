@@ -2115,8 +2115,7 @@
                 "description": "Sfoca il livello selezionato.",
                 "blur_type": "Tipo di sfocatura",
                 "blur_radius": "Raggio",
-                "gaussian_type": "Gaussiana",
-                "box_type": ""
+                "gaussian_type": "Gaussiana"
             },
             "img_noise": {
                 "size": "Dimensione del rumore",
