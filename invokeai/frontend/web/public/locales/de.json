@@ -119,7 +119,17 @@
         "error_withCount_other": "{{count}} Fehler",
         "value": "Wert",
         "label": "Label",
-        "systemInformation": "Systeminformationen"
+        "systemInformation": "Systeminformationen",
+        "search": "Suche",
+        "clear": "Zurücksetzen",
+        "fullView": "Vollansicht",
+        "compactView": "Kompaktansicht",
+        "options_withCount_one": "{{count}} Option",
+        "options_withCount_other": "{{count}} Optionen",
+        "noOptions": "Keine Optionen",
+        "noMatches": "Keine Treffer",
+        "model_withCount_one": "{{count}} Modell",
+        "model_withCount_other": "{{count}} Modelle"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
