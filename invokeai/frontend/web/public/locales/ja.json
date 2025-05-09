@@ -120,8 +120,6 @@
         "saveChanges": "変更を保存",
         "error_withCount_other": "{{count}} 個のエラー",
         "noMatches": "合致しません",
-        "compact": "コンパクト",
-        "full": "すべて",
         "model_withCount_other": "{{count}}個のモデル",
         "noOptions": "オプションがありません",
         "search": "検索",

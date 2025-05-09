@@ -119,8 +119,6 @@
         "systemInformation": "Informazioni di sistema",
         "noMatches": "Nessuna corrispondenza",
         "noOptions": "Nessuna opzione",
-        "compact": "Compatto",
-        "full": "Completo",
         "model_withCount_one": "{{count}} modello",
         "model_withCount_many": "{{count}} modelli",
         "model_withCount_other": "{{count}} modelli",
