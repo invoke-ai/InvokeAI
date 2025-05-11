@@ -1913,6 +1913,7 @@
         "addInpaintMask": "Add $t(controlLayers.inpaintMask)",
         "addRegionalGuidance": "Add $t(controlLayers.regionalGuidance)",
         "addGlobalReferenceImage": "Add $t(controlLayers.globalReferenceImage)",
+        "addDenoiseLimit": "Add $t(controlLayers.denoiseLimit)",
         "rasterLayer": "Raster Layer",
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
@@ -2013,6 +2014,7 @@
         "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, <PullBboxButton>pull the bounding box into this layer</PullBboxButton>, or draw on the canvas to get started.",
         "referenceImageEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or <PullBboxButton>pull the bounding box into this layer</PullBboxButton> to get started.",
         "imageNoise": "Image Noise",
+        "denoiseLimit": "Denoise Limit",
         "warnings": {
             "problemsFound": "Problems found",
             "unsupportedModel": "layer not supported for selected base model",

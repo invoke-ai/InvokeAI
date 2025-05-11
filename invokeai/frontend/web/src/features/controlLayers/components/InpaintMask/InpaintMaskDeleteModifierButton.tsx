@@ -8,7 +8,7 @@ type Props = Omit<IconButtonProps, 'aria-label'> & {
   onDelete: () => void;
 };
 
-export const InpaintMaskDeleteNoiseButton = memo(({ onDelete, ...rest }: Props) => {
+export const InpaintMaskDeleteModifierButton = memo(({ onDelete, ...rest }: Props) => {
   const { t } = useTranslation();
   return (
     <IconButton
@@ -26,4 +26,4 @@ export const InpaintMaskDeleteNoiseButton = memo(({ onDelete, ...rest }: Props) 
   );
 });
 
-InpaintMaskDeleteNoiseButton.displayName = 'InpaintMaskDeleteNoiseButton';
+InpaintMaskDeleteModifierButton.displayName = 'InpaintMaskDeleteNoiseButton';

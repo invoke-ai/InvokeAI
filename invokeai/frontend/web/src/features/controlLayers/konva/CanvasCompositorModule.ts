@@ -447,9 +447,6 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     forceUpload?: boolean
   ): Promise<ImageDTO> => {
     assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
-
-    //const entityIdentifiers = adapters.map((adapter) => adapter.entityIdentifier);
-
     // Use a unique hash that includes the attribute name for caching
     const hash = this.getCompositeHash(adapters, { rect, attribute, grayscale: true });
     const cachedImageName = forceUpload ? undefined : this.manager.cache.imageNameCache.get(hash);
@@ -502,8 +499,6 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
       const data = imageData.data;
 
-      // Convert values to grayscale based on the specified attribute
-      // Get the attribute value with proper type checking
       const attributeValue = typeof adapter.state[attribute] === 'number' ? (adapter.state[attribute] as number) : 1.0; // Default to full strength if attribute is not a number
 
       // Process all pixels in the image data
@@ -511,7 +506,6 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         // Make sure we're accessing valid array indices
         if (i + 3 < data.length) {
           // Calculate grayscale value: white (255) for no mask, darker for stronger mask
-          // Scale according to the attribute value (higher attribute = darker pixels)
           let grayValue = 255; // Default to white for unmasked areas
           if ((data[i + 3] ?? 0) > 127) {
             grayValue = Math.max(0, Math.min(255, 255 - Math.round(255 * attributeValue)));
