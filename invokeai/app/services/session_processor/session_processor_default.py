@@ -126,7 +126,7 @@ class DefaultSessionRunner(SessionRunnerBase):
                 )
 
                 # Invoke the node
-                output = invocation.invoke_internal(context=context, services=self._services)
+                (output, memory_tracker) = invocation.invoke_internal(context=context, services=self._services)
                 # Save output and history
                 queue_item.session.complete(invocation.id, output)
 
