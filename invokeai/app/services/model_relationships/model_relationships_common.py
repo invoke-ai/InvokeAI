@@ -1,5 +1,6 @@
-from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from datetime import datetime
+
+from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
 class ModelRelationship(BaseModelExcludeNull):

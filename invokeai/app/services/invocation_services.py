@@ -27,7 +27,9 @@ if TYPE_CHECKING:
     from invokeai.app.services.invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from invokeai.app.services.model_images.model_images_base import ModelImageFileStorageBase
     from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
-    from invokeai.app.services.model_relationship_records.model_relationship_records_base import ModelRelationshipRecordStorageBase
+    from invokeai.app.services.model_relationship_records.model_relationship_records_base import (
+        ModelRelationshipRecordStorageBase,
+    )
     from invokeai.app.services.model_relationships.model_relationships_base import ModelRelationshipsServiceABC
     from invokeai.app.services.names.names_base import NameServiceBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
