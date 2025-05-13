@@ -8,7 +8,7 @@ import { atom } from 'nanostores';
 import type { CanvasRightPanelTabName, TabName, UIState } from './uiTypes';
 
 const initialUIState: UIState = {
-  _version: 3,
+  _version: 4,
   activeTab: 'canvas',
   activeTabCanvasRightPanel: 'gallery',
   shouldShowImageDetails: false,
@@ -81,6 +81,10 @@ const migrateUIState = (state: any): any => {
     state.activeTab = 'canvas';
     state._version = 3;
   }
+  if (state._version === 3) {
+    state.activeTab = 'simple';
+    state._version = 4;
+  }
   return state;
 };
 
@@ -91,12 +95,12 @@ export const uiPersistConfig: PersistConfig<UIState> = {
   persistDenylist: ['shouldShowImageDetails'],
 };
 
-const TABS_WITH_LEFT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as const;
+const TABS_WITH_LEFT_PANEL: TabName[] = ['simple', 'canvas', 'upscaling', 'workflows'] as const;
 export const LEFT_PANEL_MIN_SIZE_PX = 400;
 export const $isLeftPanelOpen = atom(true);
 export const selectWithLeftPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_LEFT_PANEL.includes(ui.activeTab));
 
-const TABS_WITH_RIGHT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as const;
+const TABS_WITH_RIGHT_PANEL: TabName[] = ['simple', 'canvas', 'upscaling', 'workflows'] as const;
 export const RIGHT_PANEL_MIN_SIZE_PX = 390;
 export const $isRightPanelOpen = atom(true);
 export const selectWithRightPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_RIGHT_PANEL.includes(ui.activeTab));

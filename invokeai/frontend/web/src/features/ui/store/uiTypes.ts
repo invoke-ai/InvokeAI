@@ -1,11 +1,11 @@
-export type TabName = 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
+export type TabName = 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue' | 'simple';
 export type CanvasRightPanelTabName = 'layers' | 'gallery';
 
 export interface UIState {
   /**
    * Slice schema version.
    */
-  _version: 3;
+  _version: 4;
   /**
    * The currently active tab.
    */

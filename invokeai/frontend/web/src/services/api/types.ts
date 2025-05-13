@@ -276,6 +276,15 @@ export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConf
   return config.type === 'embedding';
 };
 
+export const isSimpleTabModelConfig = (
+  config: AnyModelConfig
+): config is Extract<MainModelConfig, { base: 'chatgpt-4o' | 'flux' | 'sdxl' | 'sd-1' }> => {
+  return (
+    config.type === 'main' &&
+    (config.base === 'chatgpt-4o' || config.base === 'flux' || config.base === 'sdxl' || config.base === 'sd-1')
+  );
+};
+
 export type ModelInstallJob = S['ModelInstallJob'];
 export type ModelInstallStatus = S['InstallStatus'];
 

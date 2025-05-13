@@ -23,7 +23,7 @@ const zServerValidatedModelIdentifierField = zModelIdentifierField.refine(async 
   }
 });
 
-const zImageWithDims = z
+export const zImageWithDims = z
   .object({
     image_name: z.string(),
     width: z.number().int().positive(),
@@ -410,6 +410,7 @@ export const isImagen3AspectRatioID = (v: unknown): v is z.infer<typeof zImagen3
   zImagen3AspectRatioID.safeParse(v).success;
 
 export const zChatGPT4oAspectRatioID = z.enum(['3:2', '1:1', '2:3']);
+export type ChatGPT4oAspectRatioID = z.infer<typeof zChatGPT4oAspectRatioID>;
 export const isChatGPT4oAspectRatioID = (v: unknown): v is z.infer<typeof zChatGPT4oAspectRatioID> =>
   zChatGPT4oAspectRatioID.safeParse(v).success;
 

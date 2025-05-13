@@ -7,6 +7,7 @@ import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
 import QueueControls from 'features/queue/components/QueueControls';
+import { SimpleTabLeftPanel } from 'features/simpleGeneration/components/SimpleTabLeftPanel';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
@@ -165,7 +166,7 @@ const RightPanelContent = memo(() => {
   if (tab === 'canvas') {
     return <CanvasRightPanel />;
   }
-  if (tab === 'upscaling' || tab === 'workflows') {
+  if (tab === 'simple' || tab === 'upscaling' || tab === 'workflows') {
     return <GalleryPanelContent />;
   }
 
@@ -176,6 +177,9 @@ RightPanelContent.displayName = 'RightPanelContent';
 const LeftPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
+  if (tab === 'simple') {
+    return <SimpleTabLeftPanel />;
+  }
   if (tab === 'canvas') {
     return <ParametersPanelTextToImage />;
   }
@@ -197,6 +201,9 @@ const MainPanelContent = memo(() => {
     return <CanvasMainPanelContent />;
   }
   if (tab === 'upscaling') {
+    return <ImageViewer />;
+  }
+  if (tab === 'simple') {
     return <ImageViewer />;
   }
   if (tab === 'workflows') {

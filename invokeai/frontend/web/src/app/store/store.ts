@@ -23,6 +23,10 @@ import { workflowLibraryPersistConfig, workflowLibrarySlice } from 'features/nod
 import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
+import {
+  simpleGenerationPersistConfig,
+  simpleGenerationSlice,
+} from 'features/simpleGeneration/store/simpleGenerationSlice';
 import { stylePresetPersistConfig, stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
@@ -68,6 +72,7 @@ const allReducers = {
   [canvasStagingAreaSlice.name]: canvasStagingAreaSlice.reducer,
   [lorasSlice.name]: lorasSlice.reducer,
   [workflowLibrarySlice.name]: workflowLibrarySlice.reducer,
+  [simpleGenerationSlice.name]: simpleGenerationSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -113,6 +118,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [canvasStagingAreaPersistConfig.name]: canvasStagingAreaPersistConfig,
   [lorasPersistConfig.name]: lorasPersistConfig,
   [workflowLibraryPersistConfig.name]: workflowLibraryPersistConfig,
+  [simpleGenerationSlice.name]: simpleGenerationPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

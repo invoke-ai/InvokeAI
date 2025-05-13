@@ -29,6 +29,7 @@ import {
   isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
   isSigLipModelConfig,
+  isSimpleTabModelConfig,
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
@@ -59,6 +60,7 @@ const buildModelsHook =
     return [modelConfigs, result] as const;
   };
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
+export const useSimpleTabModels = buildModelsHook(isSimpleTabModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
