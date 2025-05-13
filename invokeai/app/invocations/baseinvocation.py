@@ -25,6 +25,7 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
+    cast,
 )
 
 import semver
@@ -521,9 +522,10 @@ def validate_field_default(
     if orig_default is NoDefaultSentinel:
         return
 
-    TempDefaultValidator = create_model(cls_name, **{field_name: (annotation, field_info)})
+    # To validate the default value, we can create a temporary pydantic model with the field we are validating as its
+    # only field. Then validate the default value against this temporary model.
+    TempDefaultValidator = cast(BaseModel, create_model(cls_name, **{field_name: (annotation, field_info)}))
 
-    # Validate the default value against the annotation
     try:
         TempDefaultValidator.model_validate({field_name: orig_default})
     except Exception as e:
@@ -631,15 +633,15 @@ def invocation(
         # not work. Instead, we have to create a new class with the type field and patch the original class with it.
 
         invocation_type_annotation = Literal[invocation_type]
-        invocation_type_field = Field(
-            title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
+
+        # Field() returns an instance of FieldInfo, but thanks to a pydantic implementation detail, it is _typed_ as Any.
+        # This cast makes the type annotation match the class's true type.
+        invocation_type_field_info = cast(
+            FieldInfo,
+            Field(title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}),
         )
 
-        # pydantic's Field function returns a FieldInfo, but they annotate it as returning a type so that type-checkers
-        # don't get confused by something like this:
-        # foo: str = Field() <-- this is a FieldInfo, not a str
-        # Unfortunately this means we need to use type: ignore here to avoid type-checker errors
-        fields["type"] = (invocation_type_annotation, invocation_type_field)  # type: ignore
+        fields["type"] = (invocation_type_annotation, invocation_type_field_info)
 
         # Validate the `invoke()` method is implemented
         if "invoke" in cls.__abstractmethods__:
@@ -662,7 +664,7 @@ def invocation(
             )
 
         docstring = cls.__doc__
-        new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)
+        new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)  # type: ignore
         new_class.__doc__ = docstring
 
         InvocationRegistry.register_invocation(new_class)
@@ -709,11 +711,15 @@ def invocation_output(
 
         # Add the output type to the model.
         output_type_annotation = Literal[output_type]
-        output_type_field = Field(
-            title="type", default=output_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
+
+        # Field() returns an instance of FieldInfo, but thanks to a pydantic implementation detail, it is _typed_ as Any.
+        # This cast makes the type annotation match the class's true type.
+        output_type_field_info = cast(
+            FieldInfo,
+            Field(title="type", default=output_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}),
         )
 
-        fields["type"] = (output_type_annotation, output_type_field)  # type: ignore
+        fields["type"] = (output_type_annotation, output_type_field_info)
 
         docstring = cls.__doc__
         new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)
