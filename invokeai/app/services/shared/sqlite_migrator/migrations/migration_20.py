@@ -2,8 +2,8 @@ import sqlite3
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
-class Migration20Callback:
 
+class Migration20Callback:
     def __call__(self, cursor: sqlite3.Cursor) -> None:
         cursor.execute(
             """

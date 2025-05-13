@@ -23,8 +23,10 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_images.model_images_default import ModelImageFileStorageDisk
 from invokeai.app.services.model_manager.model_manager_default import ModelManagerService
 from invokeai.app.services.model_records.model_records_sql import ModelRecordServiceSQL
+from invokeai.app.services.model_relationship_records.model_relationship_records_sqlite import (
+    SqliteModelRelationshipRecordStorage,
+)
 from invokeai.app.services.model_relationships.model_relationships_default import ModelRelationshipsService
-from invokeai.app.services.model_relationship_records.model_relationship_records_sqlite import SqliteModelRelationshipRecordStorage
 from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache

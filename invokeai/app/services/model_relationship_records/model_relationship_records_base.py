@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class ModelRelationshipRecordStorageBase(ABC):
     """Abstract base class for model-to-model relationship record storage."""
 

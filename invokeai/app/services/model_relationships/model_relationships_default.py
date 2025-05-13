@@ -1,6 +1,7 @@
-from invokeai.backend.model_manager.config import AnyModelConfig
-from .model_relationships_base import ModelRelationshipsServiceABC
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_relationships.model_relationships_base import ModelRelationshipsServiceABC
+from invokeai.backend.model_manager.config import AnyModelConfig
+
 
 class ModelRelationshipsService(ModelRelationshipsServiceABC):
     __invoker: Invoker

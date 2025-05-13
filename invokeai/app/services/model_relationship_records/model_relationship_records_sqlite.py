@@ -1,6 +1,10 @@
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 import sqlite3
-from invokeai.app.services.model_relationship_records.model_relationship_records_base import ModelRelationshipRecordStorageBase
+
+from invokeai.app.services.model_relationship_records.model_relationship_records_base import (
+    ModelRelationshipRecordStorageBase,
+)
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+
 
 class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
@@ -14,9 +18,9 @@ class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
         try:
             cursor = self._conn.cursor()
             cursor.execute(
-            "INSERT OR IGNORE INTO model_relationships (model_key_1, model_key_2) VALUES (?, ?)",
-            (a, b),
-        )
+                "INSERT OR IGNORE INTO model_relationships (model_key_1, model_key_2) VALUES (?, ?)",
+                (a, b),
+            )
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
@@ -27,17 +31,17 @@ class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
         try:
             cursor = self._conn.cursor()
             cursor.execute(
-            "DELETE FROM model_relationships WHERE model_key_1 = ? AND model_key_2 = ?",
-            (a, b),
-        )
+                "DELETE FROM model_relationships WHERE model_key_1 = ? AND model_key_2 = ?",
+                (a, b),
+            )
             self._conn.commit()
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
 
     def get_related_model_keys(self, model_key: str) -> list[str]:
-            cursor = self._conn.cursor()
-            cursor.execute(
+        cursor = self._conn.cursor()
+        cursor.execute(
             """
             SELECT model_key_2 FROM model_relationships WHERE model_key_1 = ?
             UNION
@@ -45,17 +49,18 @@ class SqliteModelRelationshipRecordStorage(ModelRelationshipRecordStorageBase):
             """,
             (model_key, model_key),
         )
-            return [row[0] for row in cursor.fetchall()]
+        return [row[0] for row in cursor.fetchall()]
 
     def get_related_model_keys_batch(self, model_keys: list[str]) -> list[str]:
-            cursor = self._conn.cursor()
+        cursor = self._conn.cursor()
 
-            key_list = ','.join('?' for _ in model_keys)
-            cursor.execute(f"""
+        key_list = ",".join("?" for _ in model_keys)
+        cursor.execute(
+            f"""
             SELECT model_key_2 FROM model_relationships WHERE model_key_1 IN ({key_list})
             UNION
             SELECT model_key_1 FROM model_relationships WHERE model_key_2 IN ({key_list})
             """,
-            model_keys + model_keys
+            model_keys + model_keys,
         )
-            return [row[0] for row in cursor.fetchall()]
+        return [row[0] for row in cursor.fetchall()]
