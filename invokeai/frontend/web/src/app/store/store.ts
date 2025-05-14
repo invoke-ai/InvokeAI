@@ -26,7 +26,7 @@ import { queueSlice } from 'features/queue/store/queueSlice';
 import {
   simpleGenerationPersistConfig,
   simpleGenerationSlice,
-} from 'features/simpleGeneration/store/simpleGenerationSlice';
+} from 'features/simpleGeneration/store/slice';
 import { stylePresetPersistConfig, stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';

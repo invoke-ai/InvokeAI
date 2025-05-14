@@ -1,7 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
-import { positivePromptChanged, selectPositivePrompt } from 'features/simpleGeneration/store/simpleGenerationSlice';
+import { positivePromptChanged, selectPositivePrompt } from 'features/simpleGeneration/store/slice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback } from 'react';
@@ -35,10 +35,11 @@ export const SimpleTabPositivePrompt = memo(() => {
         value={prompt}
         onChange={onChange}
         minH={40}
-        variant="outline"
+        variant="darkFilled"
+        borderTopWidth={24} // This prevents the prompt from being hidden behind the header
         paddingInlineEnd={10}
         paddingInlineStart={3}
-        paddingTop="24px"
+        paddingTop={0}
         paddingBottom={3}
       />
       <PromptLabel label={t('parameters.positivePromptPlaceholder')} />

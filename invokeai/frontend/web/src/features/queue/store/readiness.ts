@@ -30,10 +30,13 @@ import { getInvocationNodeErrors } from 'features/nodes/store/util/fieldValidato
 import type { WorkflowSettingsState } from 'features/nodes/store/workflowSettingsSlice';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
+import { getFLUXModels, getSD1Models, getSDXLModels } from 'features/nodes/util/graph/buildSimpleGraph';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
+import { selectSimpleGenerationSlice } from 'features/simpleGeneration/store/slice';
+import type { SimpleGenerationState } from 'features/simpleGeneration/store/types';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -42,7 +45,7 @@ import i18n from 'i18next';
 import { debounce, groupBy, upperFirst } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
+import { selectMainModelConfig, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { MainModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
@@ -89,9 +92,14 @@ const debouncedUpdateReasons = debounce(
     config: AppConfig,
     store: AppStore,
     isInPublishFlow: boolean,
-    areChatGPT4oModelsEnabled: boolean
+    areChatGPT4oModelsEnabled: boolean,
+    modelConfigsQuery: ReturnType<typeof selectModelConfigsQuery>,
+    simple: SimpleGenerationState
   ) => {
-    if (tab === 'canvas') {
+    if (tab === 'simple') {
+      const reasons = getReasonsWhyCannotEnqueueSimpleTab({ isConnected, simple, modelConfigsQuery });
+      $reasonsWhyCannotEnqueue.set(reasons);
+    } else if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
       const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
         isConnected,
@@ -143,6 +151,7 @@ export const useReadinessWatcher = () => {
   const nodes = useAppSelector(selectNodesSlice);
   const workflowSettings = useAppSelector(selectWorkflowSettingsSlice);
   const upscale = useAppSelector(selectUpscaleSlice);
+  const simple = useAppSelector(selectSimpleGenerationSlice);
   const config = useAppSelector(selectConfigSlice);
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
@@ -152,6 +161,7 @@ export const useReadinessWatcher = () => {
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const isInPublishFlow = useStore($isInPublishFlow);
+  const modelConfigsQuery = useAppSelector(selectModelConfigsQuery);
   const areChatGPT4oModelsEnabled = useFeatureStatus('chatGPT4oModels');
 
   useEffect(() => {
@@ -173,7 +183,9 @@ export const useReadinessWatcher = () => {
       config,
       store,
       isInPublishFlow,
-      areChatGPT4oModelsEnabled
+      areChatGPT4oModelsEnabled,
+      modelConfigsQuery,
+      simple
     );
   }, [
     store,
@@ -194,6 +206,8 @@ export const useReadinessWatcher = () => {
     workflowSettings,
     isInPublishFlow,
     areChatGPT4oModelsEnabled,
+    modelConfigsQuery,
+    simple,
   ]);
 };
 
@@ -324,6 +338,61 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     }
     if (!upscale.tileControlnetModel) {
       reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
+    }
+  }
+
+  return reasons;
+};
+
+const getReasonsWhyCannotEnqueueSimpleTab = (arg: {
+  isConnected: boolean;
+  simple: SimpleGenerationState;
+  modelConfigsQuery: ReturnType<typeof selectModelConfigsQuery>;
+}) => {
+  const { isConnected, simple, modelConfigsQuery } = arg;
+  const { model } = simple;
+  const reasons: Reason[] = [];
+
+  if (!isConnected) {
+    reasons.push(disconnectedReason(i18n.t));
+  }
+
+  if (model === 'flux') {
+    const models = getFLUXModels(modelConfigsQuery);
+    if (!models.flux) {
+      reasons.push({ content: 'FLUX is not installed' });
+    }
+    if (!models.t5Encoder) {
+      reasons.push({ content: 'T5 Encoder is not installed' });
+    }
+    if (!models.clipEmbed) {
+      reasons.push({ content: 'CLIP Embed is not installed' });
+    }
+    if (!models.clipVision) {
+      reasons.push({ content: 'CLIP Vision is not installed' });
+    }
+    if (!models.ipAdapter) {
+      reasons.push({ content: 'IP Adapter is not installed' });
+    }
+    if (!models.vae) {
+      reasons.push({ content: 'VAE is not installed' });
+    }
+  }
+
+  if (model === 'sdxl') {
+    const models = getSDXLModels(modelConfigsQuery);
+    if (!models.main) {
+      reasons.push({ content: 'Main SDXL model is not installed' });
+    }
+    if (!models.vae) {
+      reasons.push({ content: 'VAE is not installed' });
+    }
+  }
+
+  if (model === 'sd-1') {
+    const models = getSD1Models(modelConfigsQuery);
+    if (!models.main) {
+      reasons.push({ content: 'Main SDXL model is not installed' });
     }
   }
 

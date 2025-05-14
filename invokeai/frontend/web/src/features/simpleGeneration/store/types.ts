@@ -1,13 +1,18 @@
-import { zAspectRatioID, zImageWithDims } from 'features/controlLayers/store/types';
-import { zParameterModel } from 'features/parameters/types/parameterSchemas';
+import { zImageWithDims } from 'features/controlLayers/store/types';
+import { buildTypeGuard } from 'features/parameters/types/parameterSchemas';
+import { nanoid } from 'nanoid';
 import { z } from 'zod';
 
 const zLowMedHigh = z.enum(['low', 'med', 'high']);
 const zControlType = z.enum(['line', 'depth']);
+export const zAspectRatio = z.enum(['16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
+export type AspectRatio = z.infer<typeof zAspectRatio>;
+export const isAspectRatio = (val: unknown): val is AspectRatio => zAspectRatio.safeParse(val).success;
 
 const STARTING_IMAGE_TYPE = 'starting_image';
 const zStartingImage = z.object({
   type: z.literal(STARTING_IMAGE_TYPE).default(STARTING_IMAGE_TYPE),
+  id: z.string().default(nanoid),
   image: zImageWithDims.nullable().default(null),
   variation: zLowMedHigh.default('med'),
 });
@@ -17,6 +22,7 @@ export const getStartingImage = (overrides: Partial<Omit<StartingImage, 'type'>>
 const REFERENCE_IMAGE_TYPE = 'reference_image';
 const zReferenceImage = z.object({
   type: z.literal(REFERENCE_IMAGE_TYPE).default(REFERENCE_IMAGE_TYPE),
+  id: z.string().default(nanoid),
   image: zImageWithDims.nullable().default(null),
 });
 export type ReferenceImage = z.infer<typeof zReferenceImage>;
@@ -25,18 +31,21 @@ export const getReferenceImage = (overrides: Partial<Omit<ReferenceImage, 'type'
 const CONTROL_IMAGE_TYPE = 'control_image';
 const zControlImage = z.object({
   type: z.literal(CONTROL_IMAGE_TYPE).default(CONTROL_IMAGE_TYPE),
+  id: z.string().default(nanoid),
   control_type: zControlType.default('line'),
   image: zImageWithDims.nullable().default(null),
 });
 export type ControlImage = z.infer<typeof zControlImage>;
 export const getControlImage = (overrides: Partial<Omit<ControlImage, 'type'>>) => zControlImage.parse(overrides);
 
+const zModel = z.enum(['chatgpt-4o', 'flux', 'sdxl', 'sd-1']);
+export const isModel = buildTypeGuard(zModel);
+
 export const zSimpleGenerationState = z.object({
   _version: z.literal(1).default(1),
   positivePrompt: z.string().default(''),
-  negativePrompt: z.string().default(''),
-  model: zParameterModel.nullable().default(null),
-  aspectRatio: zAspectRatioID.default('1:1'),
+  model: zModel.default('flux'),
+  aspectRatio: zAspectRatio.default('1:1'),
   startingImage: zStartingImage.nullable().default(null),
   referenceImages: z.array(zReferenceImage).default(() => []),
   controlImage: zControlImage.nullable().default(null),

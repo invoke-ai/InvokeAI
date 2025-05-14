@@ -19,15 +19,6 @@ export const simpleGenerationSlice = createSlice({
       const { positivePrompt } = action.payload;
       state.positivePrompt = positivePrompt;
     },
-    negativePromptChanged: (
-      state,
-      action: PayloadAction<{
-        negativePrompt: SimpleGenerationState['negativePrompt'];
-      }>
-    ) => {
-      const { negativePrompt } = action.payload;
-      state.negativePrompt = negativePrompt;
-    },
     modelChanged: (
       state,
       action: PayloadAction<{
@@ -82,7 +73,6 @@ export const {
   aspectRatioChanged,
   controlImageChanged,
   modelChanged,
-  negativePromptChanged,
   positivePromptChanged,
   referenceImageChanged,
   startingImageChanged,
@@ -109,7 +99,7 @@ const createSliceSelector = <T>(selector: Selector<SimpleGenerationState, T>) =>
   createSelector(selectSimpleGenerationSlice, selector);
 
 export const selectPositivePrompt = createSliceSelector((slice) => slice.positivePrompt);
-export const selectNegativePrompt = createSliceSelector((slice) => slice.negativePrompt);
 export const selectModel = createSliceSelector((slice) => slice.model);
-export const selectModelKey = createSliceSelector((slice) => slice.model?.key);
+// export const selectModelBase = createSliceSelector((slice) => slice.model?.base);
+// export const selectModelKey = createSliceSelector((slice) => slice.model?.key);
 export const selectAspectRatio = createSliceSelector((slice) => slice.aspectRatio);

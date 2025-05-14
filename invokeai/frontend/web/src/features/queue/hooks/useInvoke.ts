@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import { useIsWorkflowEditorLocked } from 'features/nodes/hooks/useIsWorkflowEditorLocked';
+import { useEnqueueSimple } from 'features/queue/hooks/useEnqueueSimple';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
 import { $isReadyToEnqueue } from 'features/queue/store/readiness';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -21,6 +22,7 @@ export const useInvoke = () => {
   const isReady = useStore($isReadyToEnqueue);
   const isLocked = useIsWorkflowEditorLocked();
   const enqueueWorkflows = useEnqueueWorkflows();
+  const enqueueSimple = useEnqueueSimple();
 
   const [_, { isLoading }] = useEnqueueBatchMutation(enqueueMutationFixedCacheKeyOptions);
 
@@ -28,6 +30,15 @@ export const useInvoke = () => {
     async (prepend: boolean, isApiValidationRun: boolean) => {
       if (!isReady) {
         return;
+      }
+
+      if (tabName === 'simple') {
+        const result = await withResultAsync(() => enqueueSimple(prepend));
+        if (result.isErr()) {
+          log.error({ error: serializeError(result.error) }, 'Failed to enqueue batch');
+        } else {
+          log.debug(parseify(result.value), 'Enqueued batch');
+        }
       }
 
       if (tabName === 'workflows') {
@@ -51,7 +62,7 @@ export const useInvoke = () => {
 
       // Else we are not on a generation tab and should not queue
     },
-    [dispatch, enqueueWorkflows, isReady, tabName]
+    [dispatch, enqueueSimple, enqueueWorkflows, isReady, tabName]
   );
 
   const enqueueBack = useCallback(() => {

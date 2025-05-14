@@ -14,10 +14,11 @@ import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { typedMemo } from 'common/util/typedMemo';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
+import { isEqual } from 'lodash-es';
 import type { AnyStore, ReadableAtom, Task, WritableAtom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { StoreValues } from 'nanostores/computed';
-import type { ChangeEvent, MouseEventHandler, PropsWithChildren, RefObject } from 'react';
+import type { ChangeEvent, PropsWithChildren, RefObject } from 'react';
 import React, {
   createContext,
   useCallback,
@@ -198,11 +199,17 @@ type PickerProps<T extends object> = {
    * Whether the picker should be searchable. If true, renders a search input.
    */
   searchable?: boolean;
+  /**
+   * The default groups to enable. If omitted, all groups are disabled by default, meaning all groups and options
+   * are visible by default.
+   */
+  defaultEnabledGroups?: string[];
 };
 
 export type PickerContextState<T extends object> = {
   $optionsOrGroups: WritableAtom<OptionOrGroup<T>[]>;
   $groupStatusMap: WritableAtom<GroupStatusMap>;
+  defaultStatusMap: GroupStatusMap;
   $compactView: WritableAtom<boolean>;
   $activeOptionId: WritableAtom<string | undefined>;
   $filteredOptions: WritableAtom<OptionOrGroup<T>[]>;
@@ -217,6 +224,7 @@ export type PickerContextState<T extends object> = {
   $searchTerm: WritableAtom<string>;
   searchPlaceholder?: string;
   toggleGroup: (id: string) => void;
+  resetGroups: () => void;
   getOptionId: (option: T) => string;
   isMatch: (option: T, searchTerm: string) => boolean;
   getIsOptionDisabled?: (option: T) => boolean;
@@ -229,6 +237,7 @@ export type PickerContextState<T extends object> = {
   OptionComponent: React.ComponentType<{ option: T } & BoxProps>;
   NextToSearchBar?: React.ReactNode;
   searchable?: boolean;
+  defaultEnabledGroups?: string[];
 };
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -312,7 +321,7 @@ const flattenOptions = <T extends object>(options: OptionOrGroup<T>[]): T[] => {
 
 type GroupStatusMap = Record<string, boolean>;
 
-const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[]) => {
+const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[], defaultEnabledGroups?: string[]) => {
   const groupsWithOptions = useMemo(() => {
     const ids: string[] = [];
     for (const optionOrGroup of options) {
@@ -323,23 +332,41 @@ const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[]) => {
     return ids;
   }, [options]);
 
-  const [$groupStatusMap] = useState(atom<GroupStatusMap>({}));
+  const defaultStatusMap = useMemo(() => {
+    const map: GroupStatusMap = {};
+    if (!defaultEnabledGroups || defaultEnabledGroups.length === 0) {
+      for (const id of groupsWithOptions) {
+        map[id] = false;
+      }
+    } else {
+      for (const id of groupsWithOptions) {
+        map[id] = defaultEnabledGroups.includes(id);
+      }
+    }
+    return map;
+  }, [defaultEnabledGroups, groupsWithOptions]);
+
+  const [$groupStatusMap] = useState(atom<GroupStatusMap>(defaultStatusMap));
   const [$areAllGroupsDisabled] = useState(() =>
     computed($groupStatusMap, (groupStatusMap) => Object.values(groupStatusMap).every((status) => status === false))
   );
 
   useEffect(() => {
-    const groupStatusMap = $groupStatusMap.get();
-    const newMap: GroupStatusMap = {};
-    for (const id of groupsWithOptions) {
-      if (newMap[id] === undefined) {
-        newMap[id] = false;
-      } else if (groupStatusMap[id] !== undefined) {
-        newMap[id] = groupStatusMap[id];
-      }
-    }
-    $groupStatusMap.set(newMap);
-  }, [groupsWithOptions, $groupStatusMap]);
+    $groupStatusMap.set(defaultStatusMap);
+  }, [$groupStatusMap, defaultStatusMap]);
+
+  // useEffect(() => {
+  //   const groupStatusMap = $groupStatusMap.get();
+  //   const newMap: GroupStatusMap = {};
+  //   for (const id of groupsWithOptions) {
+  //     if (newMap[id] === undefined) {
+  //       newMap[id] = false;
+  //     } else if (groupStatusMap[id] !== undefined) {
+  //       newMap[id] = groupStatusMap[id];
+  //     }
+  //   }
+  //   $groupStatusMap.set(newMap);
+  // }, [groupsWithOptions, $groupStatusMap]);
 
   const toggleGroup = useCallback(
     (idToToggle: string) => {
@@ -354,7 +381,11 @@ const useTogglableGroups = <T extends object>(options: OptionOrGroup<T>[]) => {
     [$groupStatusMap, groupsWithOptions]
   );
 
-  return { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } as const;
+  const resetGroups = useCallback(() => {
+    $groupStatusMap.set(defaultStatusMap);
+  }, [$groupStatusMap, defaultStatusMap]);
+
+  return { $groupStatusMap, $areAllGroupsDisabled, toggleGroup, resetGroups, defaultStatusMap } as const;
 };
 
 const useKeyboardNavigation = <T extends object>() => {
@@ -511,10 +542,14 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     OptionComponent = DefaultOptionComponent,
     NextToSearchBar,
     searchable,
+    defaultEnabledGroups,
   } = props;
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup } = useTogglableGroups(optionsOrGroups);
+  const { $groupStatusMap, $areAllGroupsDisabled, toggleGroup, resetGroups, defaultStatusMap } = useTogglableGroups(
+    optionsOrGroups,
+    defaultEnabledGroups
+  );
   const $activeOptionId = useAtom(getFirstOptionId(optionsOrGroups, getOptionId));
   const $compactView = useAtom(true);
   const $optionsOrGroups = useAtom(optionsOrGroups);
@@ -576,11 +611,14 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
         NextToSearchBar,
         onClose,
         searchable,
+        defaultEnabledGroups,
         $areAllGroupsDisabled,
         $selectedItemId,
         $hasOptions,
         $hasFilteredOptions,
         $filteredOptionsCount,
+        resetGroups,
+        defaultStatusMap,
       }) satisfies PickerContextState<T>,
     [
       $optionsOrGroups,
@@ -604,11 +642,14 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
       NextToSearchBar,
       onClose,
       searchable,
+      defaultEnabledGroups,
       $areAllGroupsDisabled,
       $selectedItemId,
       $hasOptions,
       $hasFilteredOptions,
       $filteredOptionsCount,
+      resetGroups,
+      defaultStatusMap,
     ]
   );
 
@@ -807,8 +848,10 @@ const SearchInput = typedMemo(<T extends object>() => {
 });
 SearchInput.displayName = 'SearchInput';
 const GroupToggleButtons = typedMemo(<T extends object>() => {
-  const { $optionsOrGroups, $groupStatusMap, $areAllGroupsDisabled } = usePickerContext<T>();
+  const { $optionsOrGroups, $groupStatusMap, defaultStatusMap, resetGroups } = usePickerContext<T>();
   const { t } = useTranslation();
+  const groupStatusMap = useStore($groupStatusMap);
+  const isResetDisabled = useMemo(() => isEqual(defaultStatusMap, groupStatusMap), [defaultStatusMap, groupStatusMap]);
   const $groups = useComputed([$optionsOrGroups], (optionsOrGroups) => {
     const _groups: Group<T>[] = [];
     for (const optionOrGroup of optionsOrGroups) {
@@ -819,15 +862,6 @@ const GroupToggleButtons = typedMemo(<T extends object>() => {
     return _groups;
   });
   const groups = useStore($groups);
-  const areAllGroupsDisabled = useStore($areAllGroupsDisabled);
-
-  const onClick = useCallback<MouseEventHandler>(() => {
-    const newMap: GroupStatusMap = {};
-    for (const { id } of groups) {
-      newMap[id] = false;
-    }
-    $groupStatusMap.set(newMap);
-  }, [$groupStatusMap, groups]);
 
   if (!groups.length) {
     return null;
@@ -846,11 +880,11 @@ const GroupToggleButtons = typedMemo(<T extends object>() => {
         size="sm"
         variant="link"
         alignSelf="stretch"
-        onClick={onClick}
+        onClick={resetGroups}
         // When a focused element is disabled, it blurs. This closes the popover. Fake the disabled state to prevent this.
         // See: https://github.com/chakra-ui/chakra-ui/issues/7965
-        opacity={areAllGroupsDisabled ? 0.5 : undefined}
-        pointerEvents={areAllGroupsDisabled ? 'none' : undefined}
+        opacity={isResetDisabled ? 0.5 : undefined}
+        pointerEvents={isResetDisabled ? 'none' : undefined}
       />
     </Flex>
   );

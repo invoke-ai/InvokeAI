@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectModelKey } from 'features/controlLayers/store/paramsSlice';
+import { selectModelKey } from 'features/simpleGeneration/store/slice';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
 
 export const useSimpleTabModelConfig = () => {

@@ -36,6 +36,10 @@ export const InvokeButtonTooltip = ({ prepend, children, ...rest }: PropsWithChi
 const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const activeTab = useAppSelector(selectActiveTab);
 
+  if (activeTab === 'simple') {
+    return <SimpleTabTooltipContent prepend={prepend} />;
+  }
+
   if (activeTab === 'canvas') {
     return <CanvasTabTooltipContent prepend={prepend} />;
   }
@@ -51,6 +55,27 @@ const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   return null;
 });
 TooltipContent.displayName = 'TooltipContent';
+
+const SimpleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
+  const isReady = useStore($isReadyToEnqueue);
+  const reasons = useStore($reasonsWhyCannotEnqueue);
+
+  return (
+    <Flex flexDir="column" gap={1}>
+      <IsReadyText isReady={isReady} prepend={prepend} />
+      {/* <QueueCountPredictionSimpleOrUpscaleTab /> */}
+      {reasons.length > 0 && (
+        <>
+          <StyledDivider />
+          <ReasonsList reasons={reasons} />
+        </>
+      )}
+      <StyledDivider />
+      <AddingToText />
+    </Flex>
+  );
+});
+SimpleTabTooltipContent.displayName = 'SimpleTabTooltipContent';
 
 const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const isReady = useStore($isReadyToEnqueue);
