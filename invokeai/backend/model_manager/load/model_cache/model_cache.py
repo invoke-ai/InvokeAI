@@ -84,6 +84,7 @@ class CacheModelsClearedCallback(Protocol):
         models_cleared: int,
         bytes_requested: int,
         bytes_freed: int,
+        cache_snapshot: dict[str, CacheEntrySnapshot],
     ) -> None: ...
 
 
@@ -733,6 +734,7 @@ class ModelCache:
                     models_cleared=models_cleared,
                     bytes_requested=bytes_needed,
                     bytes_freed=ram_bytes_freed,
+                    cache_snapshot=self._get_cache_snapshot(),
                 )
             gc.collect()
 
