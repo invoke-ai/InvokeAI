@@ -60,7 +60,7 @@ class InvocationStatsServiceBase(ABC):
         pass
 
     @abstractmethod
-    def reset_stats(self):
+    def reset_stats(self, graph_execution_state_id: str) -> None:
         """Reset all stored statistics."""
         pass
 
