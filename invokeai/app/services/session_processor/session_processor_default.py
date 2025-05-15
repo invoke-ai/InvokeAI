@@ -210,7 +210,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             # we don't care about that - suppress the error.
             with suppress(GESStatsNotFoundError):
                 self._services.performance_statistics.log_stats(queue_item.session.id)
-                self._services.performance_statistics.reset_stats()
+                self._services.performance_statistics.reset_stats(queue_item.session.id)
 
             for callback in self._on_after_run_session_callbacks:
                 callback(queue_item=queue_item)
