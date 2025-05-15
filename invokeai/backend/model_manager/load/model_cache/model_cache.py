@@ -2,6 +2,7 @@ import gc
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from functools import wraps
 from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Protocol
@@ -54,11 +55,18 @@ def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+@dataclass
+class CacheEntrySnapshot:
+    cache_key: str
+    total_bytes: int
+    current_vram_bytes: int
+
+
 class CacheMissCallback(Protocol):
     def __call__(
         self,
         model_key: str,
-        cache_overview: dict[str, int],
+        cache_snapshot: dict[str, CacheEntrySnapshot],
     ) -> None: ...
 
 
@@ -66,7 +74,7 @@ class CacheHitCallback(Protocol):
     def __call__(
         self,
         model_key: str,
-        cache_overview: dict[str, int],
+        cache_snapshot: dict[str, CacheEntrySnapshot],
     ) -> None: ...
 
 
@@ -249,11 +257,16 @@ class ModelCache:
         )
 
     @synchronized
-    def _get_cache_overview(self) -> dict[str, int]:
-        overview: dict[str, int] = {}
-        for model_key, cache_entry in self._cached_models.items():
-            overview[model_key] = cache_entry.cached_model.total_bytes()
-            # Useful? cache_entry.cached_model.is_in_vram()
+    def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
+        overview: dict[str, CacheEntrySnapshot] = {}
+        for cache_key, cache_entry in self._cached_models.items():
+            total_bytes = cache_entry.cached_model.total_bytes()
+            current_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
+            overview[cache_key] = CacheEntrySnapshot(
+                cache_key=cache_key,
+                total_bytes=total_bytes,
+                current_vram_bytes=current_vram_bytes,
+            )
 
         return overview
 
@@ -271,7 +284,7 @@ class ModelCache:
                 self.stats.hits += 1
         else:
             for cb in self._on_cache_miss_callbacks:
-                cb(model_key=key, cache_overview=self._get_cache_overview())
+                cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
             if self.stats:
                 self.stats.misses += 1
             self._logger.debug(f"Cache miss: {key}")
@@ -294,7 +307,7 @@ class ModelCache:
 
         self._logger.debug(f"Cache hit: {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
         for cb in self._on_cache_hit_callbacks:
-            cb(model_key=key, cache_overview=self._get_cache_overview())
+            cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
         return cache_entry
 
     @synchronized
