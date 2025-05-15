@@ -1,7 +1,6 @@
 import { Box, Combobox, Flex, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { postProcessingModelChanged, selectPostProcessingModel } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -52,7 +51,6 @@ const ParamPostProcessingModel = () => {
             />
           </Box>
         </Tooltip>
-        <NavigateToModelManagerButton />
       </Flex>
     </FormControl>
   );

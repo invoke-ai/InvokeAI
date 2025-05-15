@@ -2,6 +2,7 @@ import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
+  ChatGPT4oModelFieldInputTemplate,
   CLIPEmbedModelFieldInputTemplate,
   CLIPGEmbedModelFieldInputTemplate,
   CLIPLEmbedModelFieldInputTemplate,
@@ -21,6 +22,7 @@ import type {
   ImageFieldCollectionInputTemplate,
   ImageFieldInputTemplate,
   ImageGeneratorFieldInputTemplate,
+  Imagen3ModelFieldInputTemplate,
   IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
@@ -585,6 +587,32 @@ const buildFluxReduxModelFieldInputTemplate: FieldInputTemplateBuilder<FluxRedux
   return template;
 };
 
+const buildImagen3ModelFieldInputTemplate: FieldInputTemplateBuilder<Imagen3ModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: Imagen3ModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
+const buildChatGPT4oModelFieldInputTemplate: FieldInputTemplateBuilder<ChatGPT4oModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: ChatGPT4oModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
 const buildBoardFieldInputTemplate: FieldInputTemplateBuilder<BoardFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -791,6 +819,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   ControlLoRAModelField: buildControlLoRAModelFieldInputTemplate,
   SigLipModelField: buildSigLipModelFieldInputTemplate,
   FluxReduxModelField: buildFluxReduxModelFieldInputTemplate,
+  Imagen3ModelField: buildImagen3ModelFieldInputTemplate,
+  ChatGPT4oModelField: buildChatGPT4oModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,

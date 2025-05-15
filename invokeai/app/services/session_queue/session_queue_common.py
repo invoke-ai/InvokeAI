@@ -257,6 +257,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
     api_output_fields: Optional[list[FieldIdentifier]] = Field(
         default=None, description="The nodes that were used as output from the API"
     )
+    credits: Optional[float] = Field(default=None, description="The total credits used for this queue item")
 
     @classmethod
     def queue_item_dto_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemDTO":

@@ -20,6 +20,14 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 FLUX_KOHYA_TRANSFORMER_KEY_REGEX = (
     r"lora_unet_(\w+_blocks)_(\d+)_(img_attn|img_mlp|img_mod|txt_attn|txt_mlp|txt_mod|linear1|linear2|modulation)_?(.*)"
 )
+
+# A regex pattern that matches all of the last layer keys in the Kohya FLUX LoRA format.
+# Example keys:
+#   lora_unet_final_layer_linear.alpha
+#   lora_unet_final_layer_linear.lora_down.weight
+#   lora_unet_final_layer_linear.lora_up.weight
+FLUX_KOHYA_LAST_LAYER_KEY_REGEX = r"lora_unet_final_layer_(linear|linear1|linear2)_?(.*)"
+
 # A regex pattern that matches all of the CLIP keys in the Kohya FLUX LoRA format.
 # Example keys:
 #   lora_te1_text_model_encoder_layers_0_mlp_fc1.alpha
@@ -44,6 +52,7 @@ def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> boo
     """
     return all(
         re.match(FLUX_KOHYA_TRANSFORMER_KEY_REGEX, k)
+        or re.match(FLUX_KOHYA_LAST_LAYER_KEY_REGEX, k)
         or re.match(FLUX_KOHYA_CLIP_KEY_REGEX, k)
         or re.match(FLUX_KOHYA_T5_KEY_REGEX, k)
         for k in state_dict.keys()
@@ -65,6 +74,9 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
     t5_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
     for layer_name, layer_state_dict in grouped_state_dict.items():
         if layer_name.startswith("lora_unet"):
+            # Skip the final layer. This is incompatible with current model definition.
+            if layer_name.startswith("lora_unet_final_layer"):
+                continue
             transformer_grouped_sd[layer_name] = layer_state_dict
         elif layer_name.startswith("lora_te1"):
             clip_grouped_sd[layer_name] = layer_state_dict

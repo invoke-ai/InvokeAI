@@ -232,6 +232,10 @@ export const isChatGPT4oModelConfig = (config: AnyModelConfig): config is ApiMod
   return config.type === 'main' && config.base === 'chatgpt-4o';
 };
 
+export const isImagen3ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+  return config.type === 'main' && config.base === 'imagen3';
+};
+
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
@@ -320,6 +324,9 @@ export type GetHFTokenStatusResponse =
   paths['/api/v2/models/hf_login']['get']['responses']['200']['content']['application/json'];
 export type SetHFTokenResponse = NonNullable<
   paths['/api/v2/models/hf_login']['post']['responses']['200']['content']['application/json']
+>;
+export type ResetHFTokenResponse = NonNullable<
+  paths['/api/v2/models/hf_login']['delete']['responses']['200']['content']['application/json']
 >;
 export type SetHFTokenArg = NonNullable<
   paths['/api/v2/models/hf_login']['post']['requestBody']['content']['application/json']

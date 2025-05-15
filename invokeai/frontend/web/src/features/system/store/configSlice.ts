@@ -22,6 +22,7 @@ const initialConfigState: AppConfig = {
   allowPrivateStylePresets: false,
   allowClientSideUpload: false,
   allowPublishWorkflows: false,
+  shouldShowCredits: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],
@@ -223,3 +224,4 @@ export const selectIsModelsTabDisabled = createConfigSelector((config) => config
 export const selectIsClientSideUploadEnabled = createConfigSelector((config) => config.allowClientSideUpload);
 export const selectAllowPublishWorkflows = createConfigSelector((config) => config.allowPublishWorkflows);
 export const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
+export const selectShouldShowCredits = createConfigSelector((config) => config.shouldShowCredits);

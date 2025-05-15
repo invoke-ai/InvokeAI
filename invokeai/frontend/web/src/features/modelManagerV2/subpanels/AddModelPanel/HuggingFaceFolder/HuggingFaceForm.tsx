@@ -1,11 +1,10 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetHFTokenStatusQuery, useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
+import { useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
 
 import { HFToken } from './HFToken';
 import { HuggingFaceResults } from './HuggingFaceResults';
@@ -16,7 +15,6 @@ export const HuggingFaceForm = memo(() => {
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
   const isHFTokenEnabled = useFeatureStatus('hfToken');
-  const { currentData } = useGetHFTokenStatusQuery(isHFTokenEnabled ? undefined : skipToken);
 
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModel();
@@ -68,7 +66,7 @@ export const HuggingFaceForm = memo(() => {
         <FormHelperText>{t('modelManager.huggingFaceHelper')}</FormHelperText>
         {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
       </FormControl>
-      {currentData !== 'valid' && <HFToken />}
+      {isHFTokenEnabled && <HFToken />}
       {data && data.urls && displayResults && <HuggingFaceResults results={data.urls} />}
     </Flex>
   );

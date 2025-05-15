@@ -5,6 +5,7 @@ import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $didStudioInit } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
+import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -17,6 +18,8 @@ import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
+import { $toastMap } from 'app/store/nanostores/toastMap';
+import { $whatsNew } from 'app/store/nanostores/whatsNew';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
@@ -30,6 +33,7 @@ import {
   DEFAULT_WORKFLOW_LIBRARY_TAG_CATEGORIES,
 } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import type { ToastConfig } from 'features/toast/toast';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useLayoutEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -46,6 +50,7 @@ interface Props extends PropsWithChildren {
   token?: string;
   config?: PartialAppConfig;
   customNavComponent?: ReactNode;
+  accountSettingsLink?: string;
   middleware?: Middleware[];
   projectId?: string;
   projectName?: string;
@@ -56,6 +61,8 @@ interface Props extends PropsWithChildren {
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
   logo?: ReactNode;
+  toastMap?: Record<string, ToastConfig>;
+  whatsNew?: ReactNode[];
   workflowCategories?: WorkflowCategory[];
   workflowTagCategories?: WorkflowTagCategory[];
   workflowSortOptions?: WorkflowSortOption[];
@@ -72,6 +79,7 @@ const InvokeAIUI = ({
   token,
   config,
   customNavComponent,
+  accountSettingsLink,
   middleware,
   projectId,
   projectName,
@@ -82,11 +90,13 @@ const InvokeAIUI = ({
   socketOptions,
   isDebugging = false,
   logo,
+  toastMap,
   workflowCategories,
   workflowTagCategories,
   workflowSortOptions,
   loggingOverrides,
   onClickGoToModelManager,
+  whatsNew,
 }: Props) => {
   useLayoutEffect(() => {
     /*
@@ -176,6 +186,16 @@ const InvokeAIUI = ({
   }, [customNavComponent]);
 
   useEffect(() => {
+    if (accountSettingsLink) {
+      $accountSettingsLink.set(accountSettingsLink);
+    }
+
+    return () => {
+      $accountSettingsLink.set(undefined);
+    };
+  }, [accountSettingsLink]);
+
+  useEffect(() => {
     if (openAPISchemaUrl) {
       $openAPISchemaUrl.set(openAPISchemaUrl);
     }
@@ -210,6 +230,26 @@ const InvokeAIUI = ({
       $logo.set(undefined);
     };
   }, [logo]);
+
+  useEffect(() => {
+    if (toastMap) {
+      $toastMap.set(toastMap);
+    }
+
+    return () => {
+      $toastMap.set(undefined);
+    };
+  }, [toastMap]);
+
+  useEffect(() => {
+    if (whatsNew) {
+      $whatsNew.set(whatsNew);
+    }
+
+    return () => {
+      $whatsNew.set(undefined);
+    };
+  }, [whatsNew]);
 
   useEffect(() => {
     if (onClickGoToModelManager) {

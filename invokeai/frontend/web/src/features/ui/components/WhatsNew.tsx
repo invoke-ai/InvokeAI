@@ -1,5 +1,7 @@
 import { ExternalLink, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { $whatsNew } from 'app/store/nanostores/whatsNew';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import type { ReactNode } from 'react';
@@ -17,8 +19,13 @@ export const WhatsNew = () => {
   const { t } = useTranslation();
   const { data } = useGetAppVersionQuery();
   const isLocal = useAppSelector(selectIsLocal);
+  const whatsNew = useStore($whatsNew);
 
   const items = useMemo<ReactNode[]>(() => {
+    if (whatsNew) {
+      return whatsNew;
+    }
+
     if (data?.highlights?.length) {
       return data.highlights.map((highlight, index) => <ListItem key={`${highlight}-${index}`}>{highlight}</ListItem>);
     }
@@ -32,7 +39,7 @@ export const WhatsNew = () => {
         <Trans i18nKey={key} components={components} />
       </ListItem>
     ));
-  }, [data?.highlights, t]);
+  }, [data?.highlights, t, whatsNew]);
 
   return (
     <Flex gap={4} flexDir="column">

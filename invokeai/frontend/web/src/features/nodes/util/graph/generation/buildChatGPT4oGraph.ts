@@ -6,14 +6,14 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
-import type { ImageField } from 'features/nodes/types/common';
+import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
   getBoardField,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { GraphBuilderReturn } from 'features/nodes/util/graph/types';
+import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { Equals } from 'tsafe';
@@ -24,7 +24,9 @@ const log = logger('system');
 export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
-  assert(generationMode === 'txt2img' || generationMode === 'img2img', t('toast.chatGPT4oIncompatibleGenerationMode'));
+  if (generationMode !== 'txt2img' && generationMode !== 'img2img') {
+    throw new UnsupportedGenerationModeError(t('toast.chatGPT4oIncompatibleGenerationMode'));
+  }
 
   log.debug({ generationMode }, 'Building GPT Image graph');
 
@@ -37,14 +39,15 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
   const { positivePrompt } = selectPresetModifiedPrompts(state);
 
   assert(model, 'No model found in state');
-  assert(model.base === 'chatgpt-4o', 'Model is not a FLUX model');
+  assert(model.base === 'chatgpt-4o', 'Model is not a ChatGPT 4o model');
 
   assert(isChatGPT4oAspectRatioID(bbox.aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
   const validRefImages = canvas.referenceImages.entities
     .filter((entity) => entity.isEnabled)
     .filter((entity) => isChatGPT4oReferenceImageConfig(entity.ipAdapter))
-    .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
+    .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
+    .toReversed(); // sends them in order they are displayed in the list
 
   let reference_images: ImageField[] | undefined = undefined;
 
@@ -67,12 +70,19 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'chatgpt_4o_generate_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+      model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
       aspect_ratio: bbox.aspectRatio.id,
       reference_images,
       use_cache: false,
       is_intermediate,
       board,
+    });
+    g.upsertMetadata({
+      positive_prompt: positivePrompt,
+      model: Graph.getModelMetadataField(model),
+      width: bbox.rect.width,
+      height: bbox.rect.height,
     });
     return {
       g,
@@ -91,6 +101,7 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'chatgpt_4o_edit_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+      model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
       aspect_ratio: bbox.aspectRatio.id,
       base_image: { image_name },
@@ -98,6 +109,12 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
       use_cache: false,
       is_intermediate,
       board,
+    });
+    g.upsertMetadata({
+      positive_prompt: positivePrompt,
+      model: Graph.getModelMetadataField(model),
+      width: bbox.rect.width,
+      height: bbox.rect.height,
     });
     return {
       g,

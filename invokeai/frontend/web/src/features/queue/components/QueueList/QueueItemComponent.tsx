@@ -7,10 +7,12 @@ import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
+import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
+import { useSelector } from 'react-redux';
 import type { SessionQueueItemDTO } from 'services/api/types';
 
 import { COLUMN_WIDTHS } from './constants';
@@ -62,6 +64,8 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
     return `${seconds}s`;
   }, [item]);
 
+  const shouldShowCredits = useSelector(selectShouldShowCredits);
+
   const isCanceled = useMemo(() => ['canceled', 'completed', 'failed'].includes(item.status), [item.status]);
   const isFailed = useMemo(() => ['canceled', 'failed'].includes(item.status), [item.status]);
   const isValidationRun = useMemo(() => item.is_api_validation_run === true, [item.is_api_validation_run]);
@@ -98,6 +102,11 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         <Flex w={COLUMN_WIDTHS.time} alignItems="center" flexShrink={0}>
           {executionTime || '-'}
         </Flex>
+        {shouldShowCredits && (
+          <Flex w={COLUMN_WIDTHS.credits} alignItems="center" flexShrink={0}>
+            {item.credits || '-'}
+          </Flex>
+        )}
         <Flex w={COLUMN_WIDTHS.batchId} flexShrink={0}>
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
             {item.batch_id}

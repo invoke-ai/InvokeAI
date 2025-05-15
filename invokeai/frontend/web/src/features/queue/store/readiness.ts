@@ -34,6 +34,7 @@ import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -87,7 +88,8 @@ const debouncedUpdateReasons = debounce(
     upscale: UpscaleState,
     config: AppConfig,
     store: AppStore,
-    isInPublishFlow: boolean
+    isInPublishFlow: boolean,
+    areChatGPT4oModelsEnabled: boolean
   ) => {
     if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
@@ -102,6 +104,7 @@ const debouncedUpdateReasons = debounce(
         canvasIsRasterizing,
         canvasIsCompositing,
         canvasIsSelectingObject,
+        areChatGPT4oModelsEnabled,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
@@ -149,6 +152,7 @@ export const useReadinessWatcher = () => {
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const isInPublishFlow = useStore($isInPublishFlow);
+  const areChatGPT4oModelsEnabled = useFeatureStatus('chatGPT4oModels');
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -168,7 +172,8 @@ export const useReadinessWatcher = () => {
       upscale,
       config,
       store,
-      isInPublishFlow
+      isInPublishFlow,
+      areChatGPT4oModelsEnabled
     );
   }, [
     store,
@@ -188,6 +193,7 @@ export const useReadinessWatcher = () => {
     upscale,
     workflowSettings,
     isInPublishFlow,
+    areChatGPT4oModelsEnabled,
   ]);
 };
 
@@ -335,6 +341,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsRasterizing: boolean;
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
+  areChatGPT4oModelsEnabled: boolean;
 }) => {
   const {
     isConnected,
@@ -347,6 +354,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsRasterizing,
     canvasIsCompositing,
     canvasIsSelectingObject,
+    areChatGPT4oModelsEnabled,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -477,6 +485,10 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
         });
       }
     }
+  }
+
+  if (model?.base === 'chatgpt-4o' && !areChatGPT4oModelsEnabled) {
+    reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
   }
 
   const enabledControlLayers = canvas.controlLayers.entities.filter((controlLayer) => controlLayer.isEnabled);

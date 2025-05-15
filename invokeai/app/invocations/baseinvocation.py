@@ -5,6 +5,8 @@ from __future__ import annotations
 import inspect
 import re
 import sys
+import types
+import typing
 import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -20,8 +22,10 @@ from typing import (
     Literal,
     Optional,
     Type,
+    TypedDict,
     TypeVar,
     Union,
+    cast,
 )
 
 import semver
@@ -72,6 +76,17 @@ class Classification(str, Enum, metaclass=MetaEnum):
     Special = "special"
 
 
+class Bottleneck(str, Enum, metaclass=MetaEnum):
+    """
+    The bottleneck of an invocation.
+    - `Network`: The invocation's execution is network-bound.
+    - `GPU`: The invocation's execution is GPU-bound.
+    """
+
+    Network = "network"
+    GPU = "gpu"
+
+
 class UIConfigBase(BaseModel):
     """
     Provides additional node configuration to the UI.
@@ -91,6 +106,11 @@ class UIConfigBase(BaseModel):
         validate_assignment=True,
         json_schema_serialization_defaults_required=True,
     )
+
+
+class OriginalModelField(TypedDict):
+    annotation: Any
+    field_info: FieldInfo
 
 
 class BaseInvocationOutput(BaseModel):
@@ -120,6 +140,9 @@ class BaseInvocationOutput(BaseModel):
     def get_type(cls) -> str:
         """Gets the invocation output's type, as provided by the `@invocation_output` decorator."""
         return cls.model_fields["type"].default
+
+    _original_model_fields: ClassVar[dict[str, OriginalModelField]] = {}
+    """The original model fields, before any modifications were made by the @invocation_output decorator."""
 
     model_config = ConfigDict(
         protected_namespaces=(),
@@ -241,6 +264,8 @@ class BaseInvocation(ABC, BaseModel):
         json_schema_extra={"field_kind": FieldKind.NodeAttribute},
     )
 
+    bottleneck: ClassVar[Bottleneck]
+
     UIConfig: ClassVar[UIConfigBase]
 
     model_config = ConfigDict(
@@ -250,6 +275,9 @@ class BaseInvocation(ABC, BaseModel):
         json_schema_serialization_defaults_required=False,
         coerce_numbers_to_str=True,
     )
+
+    _original_model_fields: ClassVar[dict[str, OriginalModelField]] = {}
+    """The original model fields, before any modifications were made by the @invocation decorator."""
 
 
 TBaseInvocation = TypeVar("TBaseInvocation", bound=BaseInvocation)
@@ -399,6 +427,7 @@ RESERVED_NODE_ATTRIBUTE_FIELD_NAMES = {
     "use_cache",
     "type",
     "workflow",
+    "bottleneck",
 }
 
 RESERVED_INPUT_FIELD_NAMES = {"metadata", "board"}
@@ -475,6 +504,48 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
     return None
 
 
+class NoDefaultSentinel:
+    pass
+
+
+def validate_field_default(
+    cls_name: str, field_name: str, invocation_type: str, annotation: Any, field_info: FieldInfo
+) -> None:
+    """Validates the default value of a field against its pydantic field definition."""
+
+    assert isinstance(field_info.json_schema_extra, dict), "json_schema_extra is not a dict"
+
+    # By the time we are doing this, we've already done some pydantic magic by overriding the original default value.
+    # We store the original default value in the json_schema_extra dict, so we can validate it here.
+    orig_default = field_info.json_schema_extra.get("orig_default", NoDefaultSentinel)
+
+    if orig_default is NoDefaultSentinel:
+        return
+
+    # To validate the default value, we can create a temporary pydantic model with the field we are validating as its
+    # only field. Then validate the default value against this temporary model.
+    TempDefaultValidator = cast(BaseModel, create_model(cls_name, **{field_name: (annotation, field_info)}))
+
+    try:
+        TempDefaultValidator.model_validate({field_name: orig_default})
+    except Exception as e:
+        raise InvalidFieldError(
+            f'Default value for field "{field_name}" on invocation "{invocation_type}" is invalid, {e}'
+        ) from e
+
+
+def is_optional(annotation: Any) -> bool:
+    """
+    Checks if the given annotation is optional (i.e. Optional[X], Union[X, None] or X | None).
+    """
+    origin = typing.get_origin(annotation)
+    # PEP 604 unions (int|None) have origin types.UnionType
+    is_union = origin is typing.Union or origin is types.UnionType
+    if not is_union:
+        return False
+    return any(arg is type(None) for arg in typing.get_args(annotation))
+
+
 def invocation(
     invocation_type: str,
     title: Optional[str] = None,
@@ -483,6 +554,7 @@ def invocation(
     version: Optional[str] = None,
     use_cache: Optional[bool] = True,
     classification: Classification = Classification.Stable,
+    bottleneck: Bottleneck = Bottleneck.GPU,
 ) -> Callable[[Type[TBaseInvocation]], Type[TBaseInvocation]]:
     """
     Registers an invocation.
@@ -494,6 +566,7 @@ def invocation(
     :param Optional[str] version: Adds a version to the invocation. Must be a valid semver string. Defaults to None.
     :param Optional[bool] use_cache: Whether or not to use the invocation cache. Defaults to True. The user may override this in the workflow editor.
     :param Classification classification: The classification of the invocation. Defaults to FeatureClassification.Stable. Use Beta or Prototype if the invocation is unstable.
+    :param Bottleneck bottleneck: The bottleneck of the invocation. Defaults to Bottleneck.GPU. Use Network if the invocation is network-bound.
     """
 
     def wrapper(cls: Type[TBaseInvocation]) -> Type[TBaseInvocation]:
@@ -506,6 +579,24 @@ def invocation(
         node_pack = cls.__module__.split(".")[0]
 
         validate_fields(cls.model_fields, invocation_type)
+
+        fields: dict[str, tuple[Any, FieldInfo]] = {}
+
+        for field_name, field_info in cls.model_fields.items():
+            annotation = field_info.annotation
+            assert annotation is not None, f"{field_name} on invocation {invocation_type} has no type annotation."
+            assert isinstance(field_info.json_schema_extra, dict), (
+                f"{field_name} on invocation {invocation_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            )
+
+            cls._original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
+
+            validate_field_default(cls.__name__, field_name, invocation_type, annotation, field_info)
+
+            if field_info.default is None and not is_optional(annotation):
+                annotation = annotation | None
+
+            fields[field_name] = (annotation, field_info)
 
         # Add OpenAPI schema extras
         uiconfig: dict[str, Any] = {}
@@ -530,6 +621,8 @@ def invocation(
         if use_cache is not None:
             cls.model_fields["use_cache"].default = use_cache
 
+        cls.bottleneck = bottleneck
+
         # Add the invocation type to the model.
 
         # You'd be tempted to just add the type field and rebuild the model, like this:
@@ -539,10 +632,16 @@ def invocation(
         # Unfortunately, because the `GraphInvocation` uses a forward ref in its `graph` field's annotation, this does
         # not work. Instead, we have to create a new class with the type field and patch the original class with it.
 
-        invocation_type_annotation = Literal[invocation_type]  # type: ignore
-        invocation_type_field = Field(
-            title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
+        invocation_type_annotation = Literal[invocation_type]
+
+        # Field() returns an instance of FieldInfo, but thanks to a pydantic implementation detail, it is _typed_ as Any.
+        # This cast makes the type annotation match the class's true type.
+        invocation_type_field_info = cast(
+            FieldInfo,
+            Field(title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}),
         )
+
+        fields["type"] = (invocation_type_annotation, invocation_type_field_info)
 
         # Validate the `invoke()` method is implemented
         if "invoke" in cls.__abstractmethods__:
@@ -565,17 +664,12 @@ def invocation(
             )
 
         docstring = cls.__doc__
-        cls = create_model(
-            cls.__qualname__,
-            __base__=cls,
-            __module__=cls.__module__,
-            type=(invocation_type_annotation, invocation_type_field),
-        )
-        cls.__doc__ = docstring
+        new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)  # type: ignore
+        new_class.__doc__ = docstring
 
-        InvocationRegistry.register_invocation(cls)
+        InvocationRegistry.register_invocation(new_class)
 
-        return cls
+        return new_class
 
     return wrapper
 
@@ -600,23 +694,39 @@ def invocation_output(
 
         validate_fields(cls.model_fields, output_type)
 
+        fields: dict[str, tuple[Any, FieldInfo]] = {}
+
+        for field_name, field_info in cls.model_fields.items():
+            annotation = field_info.annotation
+            assert annotation is not None, f"{field_name} on invocation output {output_type} has no type annotation."
+            assert isinstance(field_info.json_schema_extra, dict), (
+                f"{field_name} on invocation output {output_type} has a non-dict json_schema_extra, did you forget to use InputField?"
+            )
+
+            cls._original_model_fields[field_name] = OriginalModelField(annotation=annotation, field_info=field_info)
+
+            if field_info.default is not PydanticUndefined and is_optional(annotation):
+                annotation = annotation | None
+            fields[field_name] = (annotation, field_info)
+
         # Add the output type to the model.
-        output_type_annotation = Literal[output_type]  # type: ignore
-        output_type_field = Field(
-            title="type", default=output_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
+        output_type_annotation = Literal[output_type]
+
+        # Field() returns an instance of FieldInfo, but thanks to a pydantic implementation detail, it is _typed_ as Any.
+        # This cast makes the type annotation match the class's true type.
+        output_type_field_info = cast(
+            FieldInfo,
+            Field(title="type", default=output_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}),
         )
+
+        fields["type"] = (output_type_annotation, output_type_field_info)
 
         docstring = cls.__doc__
-        cls = create_model(
-            cls.__qualname__,
-            __base__=cls,
-            __module__=cls.__module__,
-            type=(output_type_annotation, output_type_field),
-        )
-        cls.__doc__ = docstring
+        new_class = create_model(cls.__qualname__, __base__=cls, __module__=cls.__module__, **fields)
+        new_class.__doc__ = docstring
 
-        InvocationRegistry.register_output(cls)
+        InvocationRegistry.register_output(new_class)
 
-        return cls
+        return new_class
 
     return wrapper

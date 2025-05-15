@@ -64,7 +64,6 @@ class ImageBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each image in the batch."""
 
     images: list[ImageField] = InputField(
-        default=[],
         min_length=1,
         description="The images to batch over",
     )
@@ -120,7 +119,6 @@ class StringBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each string in the batch."""
 
     strings: list[str] = InputField(
-        default=[],
         min_length=1,
         description="The strings to batch over",
     )
@@ -176,7 +174,6 @@ class IntegerBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each integer in the batch."""
 
     integers: list[int] = InputField(
-        default=[],
         min_length=1,
         description="The integers to batch over",
     )
@@ -230,7 +227,6 @@ class FloatBatchInvocation(BaseBatchInvocation):
     """Create a batched generation, where the workflow is executed once for each float in the batch."""
 
     floats: list[float] = InputField(
-        default=[],
         min_length=1,
         description="The floats to batch over",
     )
