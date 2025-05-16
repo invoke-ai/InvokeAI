@@ -6,7 +6,6 @@ import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocke
 import { entityReset } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback, useMemo } from 'react';
 
@@ -17,7 +16,6 @@ export function useCanvasResetLayerHotkey() {
   const isBusy = useCanvasIsBusy();
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isLocked = useEntityIsLocked(entityIdentifier);
-  const imageViewer = useImageViewer();
 
   const resetSelectedLayer = useCallback(() => {
     if (entityIdentifier === null || adapter === null) {
@@ -36,7 +34,7 @@ export function useCanvasResetLayerHotkey() {
     id: 'resetSelected',
     category: 'canvas',
     callback: resetSelectedLayer,
-    options: { enabled: isResetAllowed && !isBusy && !isLocked && !imageViewer.isOpen },
-    dependencies: [isResetAllowed, isBusy, isLocked, resetSelectedLayer, imageViewer.isOpen],
+    options: { enabled: isResetAllowed && !isBusy && !isLocked },
+    dependencies: [isResetAllowed, isBusy, isLocked, resetSelectedLayer],
   });
 }
