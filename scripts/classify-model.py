@@ -28,9 +28,9 @@ args = parser.parse_args()
 
 def classify_with_fallback(path: Path, hash_algo: HASHING_ALGORITHMS):
     try:
-        return ModelConfigBase.classify(path, hash_algo)
-    except InvalidModelConfigException:
         return ModelProbe.probe(path, hash_algo=hash_algo)
+    except InvalidModelConfigException:
+        return ModelConfigBase.classify(path, hash_algo)
 
 
 for path in args.model_path:
