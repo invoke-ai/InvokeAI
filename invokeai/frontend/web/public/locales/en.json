@@ -846,6 +846,8 @@
         "predictionType": "Prediction Type",
         "prune": "Prune",
         "pruneTooltip": "Prune finished imports from queue",
+        "relatedModels": "Related Models",
+        "showOnlyRelatedModels": "Related",
         "repo_id": "Repo ID",
         "repoVariant": "Repo Variant",
         "scanFolder": "Scan Folder",
