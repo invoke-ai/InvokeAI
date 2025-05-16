@@ -654,6 +654,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # Short-term fix: `classify` tests `matches` in the same order as the legacy probe.
         # Long-term fix: Improve `matches` to be more specific so that only one config matches
         #   any given model - eliminating ambiguity and removing reliance on order.
+        # After implementing either of these fixes, remove @pytest.mark.xfail from `test_regression_against_model_probe`
         try:
             return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
         except InvalidModelConfigException:
