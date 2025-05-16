@@ -11,7 +11,6 @@ import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import type { DndTargetState } from 'features/dnd/types';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,11 +31,8 @@ export const CanvasRightPanel = memo(() => {
   }, [activeTab]);
 
   const onClickViewerToggleButton = useCallback(() => {
-    if (activeTab !== 'gallery') {
-      dispatch(activeTabCanvasRightPanelChanged('gallery'));
-    }
-    imageViewer.toggle();
-  }, [imageViewer, activeTab, dispatch]);
+    imageViewer.open();
+  }, [imageViewer]);
 
   const onChangeTab = useCallback(
     (index: number) => {
@@ -49,20 +45,13 @@ export const CanvasRightPanel = memo(() => {
     [dispatch]
   );
 
-  useRegisteredHotkeys({
-    id: 'toggleViewer',
-    category: 'viewer',
-    callback: imageViewer.toggle,
-    dependencies: [imageViewer],
-  });
-
   return (
     <Tabs index={tabIndex} onChange={onChangeTab} w="full" h="full" display="flex" flexDir="column">
       <TabList alignItems="center">
         <PanelTabs />
         <Spacer />
         <Button size="sm" variant="ghost" onClick={onClickViewerToggleButton}>
-          {imageViewer.isOpen ? t('gallery.closeViewer') : t('gallery.openViewer')}
+          {t('gallery.openViewer')}
         </Button>
       </TabList>
       <TabPanels w="full" h="full">
