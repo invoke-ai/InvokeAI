@@ -26,7 +26,6 @@ import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasT
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { GatedImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -131,7 +130,6 @@ export const CanvasMainPanelContent = memo(() => {
         <CanvasManagerProviderGate>
           <CanvasDropArea />
         </CanvasManagerProviderGate>
-        <GatedImageViewer />
       </Flex>
     </FocusRegionWrapper>
   );
