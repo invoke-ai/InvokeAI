@@ -32,6 +32,7 @@ def classify_with_fallback(path: Path, hash_algo: HASHING_ALGORITHMS):
     except InvalidModelConfigException:
         return ModelConfigBase.classify(path, hash_algo)
 
+
 for path in args.model_path:
     try:
         config = classify_with_fallback(path, args.hash_algo)

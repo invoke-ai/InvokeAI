@@ -164,11 +164,7 @@ class ModelConfigBase(ABC, BaseModel):
         return concrete
 
     @staticmethod
-    def classify(
-        mod: str | Path | ModelOnDisk,
-        hash_algo: HASHING_ALGORITHMS = "blake3_single",
-        **overrides
-    ):
+    def classify(mod: str | Path | ModelOnDisk, hash_algo: HASHING_ALGORITHMS = "blake3_single", **overrides):
         """
         Returns the best matching ModelConfig instance from a model's file/folder path.
         Raises InvalidModelConfigException if no valid configuration is found.

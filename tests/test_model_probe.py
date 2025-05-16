@@ -261,13 +261,10 @@ def test_any_model_config_includes_all_config_classes():
 
 
 def test_config_uniquely_matches_model(datadir: Path):
-
     model_paths = ModelSearch().search(datadir / "stripped_models")
     for path in model_paths:
-
         mod = StrippedModelOnDisk(path)
-        matches = { cls for cls in ModelConfigBase.USING_CLASSIFY_API if cls.matches(mod) }
+        matches = {cls for cls in ModelConfigBase.USING_CLASSIFY_API if cls.matches(mod)}
         assert len(matches) <= 1, f"Model at path {path} matches multiple config classes: {matches}"
         if not matches:
             logger.warning(f"Model at path {path} does not match any config classes using classify API.")
-
