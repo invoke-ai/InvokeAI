@@ -13,6 +13,7 @@ from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
 class UNetIPAdapterData(TypedDict):
     ip_adapter: IPAdapter
     target_blocks: List[str]
+    negative_blocks: list[str] | None  # for style_precise
 
 
 class UNetAttentionPatcher:
@@ -39,13 +40,24 @@ class UNetAttentionPatcher:
                 for ip_adapter in self._ip_adapters:
                     ip_adapter_weights = ip_adapter["ip_adapter"].attn_weights.get_attention_processor_weights(idx)
                     skip = True
+                    negative = False
                     for block in ip_adapter["target_blocks"]:
                         if block in name:
                             skip = False
                             break
+                    # Check for negative_blocks (for style_precise)
+                    if ip_adapter.get("negative_blocks"):
+                        for block in ip_adapter["negative_blocks"]:
+                            if block in name:
+                                skip = False
+                                negative = True
+                                break
                     ip_adapter_attention_weights: IPAdapterAttentionWeights = IPAdapterAttentionWeights(
                         ip_adapter_weights=ip_adapter_weights, skip=skip
                     )
+                    # If negative, we invert the weights (implementation may vary, but this is a placeholder)
+                    if negative:
+                        ip_adapter_attention_weights.negative = True  # This flag would need to be handled downstream
                     ip_adapter_attention_weights_collection.append(ip_adapter_attention_weights)
 
                 attn_procs[name] = CustomAttnProcessor2_0(ip_adapter_attention_weights_collection)

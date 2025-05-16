@@ -14,6 +14,7 @@ from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import Reg
 class IPAdapterAttentionWeights:
     ip_adapter_weights: IPAttentionProcessorWeights
     skip: bool
+    negative: bool = False  # Default to False, set True for negative embedding
 
 
 class CustomAttnProcessor2_0(AttnProcessor2_0):
@@ -148,7 +149,8 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                 )
 
                 for ipa_index, ipa_embed in enumerate(regional_ip_data.image_prompt_embeds):
-                    ipa_weights = self._ip_adapter_attention_weights[ipa_index].ip_adapter_weights
+                    ipa_weights_obj = self._ip_adapter_attention_weights[ipa_index]
+                    ipa_weights = ipa_weights_obj.ip_adapter_weights
                     ipa_scale = regional_ip_data.scales[ipa_index]
                     ip_mask = ip_masks[0, ipa_index, ...]
 
@@ -161,7 +163,7 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
 
                     # Expected ip_hidden_state shape: (batch_size, num_ip_images, ip_seq_len, ip_image_embedding)
 
-                    if not self._ip_adapter_attention_weights[ipa_index].skip:
+                    if not ipa_weights_obj.skip:
                         ip_key = ipa_weights.to_k_ip(ip_hidden_states)
                         ip_value = ipa_weights.to_v_ip(ip_hidden_states)
 
@@ -187,6 +189,9 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                         ip_hidden_states = ip_hidden_states.to(query.dtype)
 
                         # Expected ip_hidden_states shape: (batch_size, query_seq_len, num_heads * head_dim)
+                        # Apply negative embedding if flagged
+                        if getattr(ipa_weights_obj, "negative", False):
+                            ipa_scale = -ipa_scale
                         hidden_states = hidden_states + ipa_scale * ip_hidden_states * ip_mask
             else:
                 # If IP-Adapter is not enabled, then regional_ip_data should not be passed in.
