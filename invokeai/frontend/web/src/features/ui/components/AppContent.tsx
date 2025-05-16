@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
 import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightPanel';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
-import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
+import { GalleryFocusRegion, GalleryPanelContent } from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
 import QueueControls from 'features/queue/components/QueueControls';
@@ -166,7 +166,11 @@ const RightPanelContent = memo(() => {
     return <CanvasRightPanel />;
   }
   if (tab === 'upscaling' || tab === 'workflows') {
-    return <GalleryPanelContent />;
+    return (
+      <GalleryFocusRegion>
+        <GalleryPanelContent />
+      </GalleryFocusRegion>
+    );
   }
 
   return null;

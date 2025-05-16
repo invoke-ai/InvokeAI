@@ -15,7 +15,7 @@ import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { HorizontalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
 import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-icons/pi';
@@ -37,7 +37,14 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
   display: 'flex',
 };
 
-const GalleryPanelContent = () => {
+export const GalleryFocusRegion = memo(({ children }: PropsWithChildren) => (
+  <FocusRegionWrapper region="gallery" sx={FOCUS_REGION_STYLES}>
+    {children}
+  </FocusRegionWrapper>
+));
+GalleryFocusRegion.displayName = 'GalleryFocusRegion';
+
+export const GalleryPanelContent = memo(() => {
   const { t } = useTranslation();
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const dispatch = useAppDispatch();
@@ -65,7 +72,7 @@ const GalleryPanelContent = () => {
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <FocusRegionWrapper region="gallery" sx={FOCUS_REGION_STYLES}>
+    <>
       <Flex alignItems="center" justifyContent="space-between" w="full">
         <Flex flexGrow={1} flexBasis={0}>
           <Button
@@ -114,8 +121,7 @@ const GalleryPanelContent = () => {
           <Gallery />
         </Panel>
       </PanelGroup>
-    </FocusRegionWrapper>
+    </>
   );
-};
-
-export default memo(GalleryPanelContent);
+});
+GalleryPanelContent.displayName = 'GalleryPanelContent';

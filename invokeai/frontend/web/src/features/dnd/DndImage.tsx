@@ -51,6 +51,7 @@ export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: DndImage.Props
           if ($imageViewer.get()) {
             $imageViewer.set(false);
           }
+          window.focus()
         },
         onDrop: () => {
           setIsDragging(false);

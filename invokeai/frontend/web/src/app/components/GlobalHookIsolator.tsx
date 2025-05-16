@@ -11,6 +11,7 @@ import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
 import { toggleImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
@@ -68,6 +69,8 @@ export const GlobalHookIsolator = memo(
       category: 'viewer',
       callback: toggleImageViewer,
     });
+
+    useGalleryHotkeys();
 
     return null;
   }

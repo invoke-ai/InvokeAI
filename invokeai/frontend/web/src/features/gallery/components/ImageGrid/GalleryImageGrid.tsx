@@ -3,7 +3,6 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { GallerySelectionCountTag } from 'features/gallery/components/ImageGrid/GallerySelectionCountTag';
-import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
 import {
   selectGalleryImageMinimumWidth,
   selectGalleryLimit,
@@ -20,7 +19,6 @@ import { GALLERY_GRID_CLASS_NAME } from './constants';
 import { GALLERY_IMAGE_CONTAINER_CLASS_NAME, GalleryImage } from './GalleryImage';
 
 const GalleryImageGrid = () => {
-  useGalleryHotkeys();
   const { t } = useTranslation();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const { hasImages, isLoading, isError } = useListImagesQuery(queryArgs, {
