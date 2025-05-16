@@ -1,0 +1,49 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "InvokeAI :: Backend",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "scripts/invokeai-web.py",
+      "args": [],
+      "justMyCode": true,
+      "env": {
+        "INVOKE_DEV_RELOAD": "1"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      }
+    },
+    {
+      "name": "InvokeAI :: Frontend",
+      "command": "pnpm dev",
+      "cwd": "${workspaceRoot}/invokeai/frontend/web",
+      "request": "launch",
+      "type": "node-terminal",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false
+      },
+      "serverReadyAction": {
+        "pattern": "(https?://localhost:[0-9]+)",
+        "uriFormat": "%s",
+        "action": "debugWithChrome",
+        "webRoot": "${workspaceFolder}/invokeai/frontend/web",
+        "killOnServerStop": true
+      }
+    }
+  ]
+}
