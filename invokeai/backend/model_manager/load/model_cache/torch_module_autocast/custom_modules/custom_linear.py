@@ -3,6 +3,7 @@ import copy
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_device import cast_to_device
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.cast_to_dtype import cast_to_dtype
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
@@ -79,6 +80,10 @@ class CustomLinear(torch.nn.Linear, CustomModuleMixin):
     def _autocast_forward(self, input: torch.Tensor) -> torch.Tensor:
         weight = cast_to_device(self.weight, input.device)
         bias = cast_to_device(self.bias, input.device)
+
+        weight = cast_to_dtype(weight, input.dtype)
+        bias = cast_to_dtype(bias, input.dtype)
+
         return torch.nn.functional.linear(input, weight, bias)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
