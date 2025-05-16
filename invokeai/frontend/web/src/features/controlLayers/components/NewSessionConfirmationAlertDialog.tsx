@@ -3,7 +3,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import {
   selectSystemShouldConfirmOnNewSession,
   shouldConfirmOnNewSessionToggled,
@@ -17,15 +16,13 @@ const [useNewCanvasSessionDialog] = buildUseBoolean(false);
 
 export const useNewGallerySession = () => {
   const dispatch = useAppDispatch();
-  const imageViewer = useImageViewer();
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const newSessionDialog = useNewGallerySessionDialog();
 
   const newGallerySessionImmediate = useCallback(() => {
     dispatch(newGallerySessionRequested());
-    imageViewer.open();
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
-  }, [dispatch, imageViewer]);
+  }, [dispatch]);
 
   const newGallerySessionWithDialog = useCallback(() => {
     if (shouldConfirmOnNewSession) {
@@ -40,15 +37,13 @@ export const useNewGallerySession = () => {
 
 export const useNewCanvasSession = () => {
   const dispatch = useAppDispatch();
-  const imageViewer = useImageViewer();
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const newSessionDialog = useNewCanvasSessionDialog();
 
   const newCanvasSessionImmediate = useCallback(() => {
     dispatch(newCanvasSessionRequested());
-    imageViewer.close();
     dispatch(activeTabCanvasRightPanelChanged('layers'));
-  }, [dispatch, imageViewer]);
+  }, [dispatch]);
 
   const newCanvasSessionWithDialog = useCallback(() => {
     if (shouldConfirmOnNewSession) {

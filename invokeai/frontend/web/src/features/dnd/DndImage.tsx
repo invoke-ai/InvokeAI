@@ -8,6 +8,7 @@ import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreview
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
+import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo, useEffect, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -47,6 +48,9 @@ export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: DndImage.Props
         getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
         onDragStart: () => {
           setIsDragging(true);
+          if ($imageViewer.get()) {
+            $imageViewer.set(false);
+          }
         },
         onDrop: () => {
           setIsDragging(false);

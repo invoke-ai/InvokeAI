@@ -2,7 +2,6 @@ import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, Tooltip, useShiftMo
 import { useAppSelector } from 'app/store/storeHooks';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCancelAllExceptCurrentQueueItemDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { useClearQueueDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
@@ -30,12 +29,11 @@ type Props = {
 const FloatingSidePanelButtons = ({ togglePanel }: Props) => {
   const { t } = useTranslation();
   const tab = useAppSelector(selectActiveTab);
-  const imageViewer = useImageViewer();
   const isCancelAndClearAllEnabled = useFeatureStatus('cancelAndClearAll');
 
   return (
     <Flex pos="absolute" transform="translate(0, -50%)" top="50%" insetInlineStart={2} direction="column" gap={2}>
-      {tab === 'canvas' && !imageViewer.isOpen && (
+      {tab === 'canvas' && (
         <CanvasManagerProviderGate>
           <ToolChooser />
         </CanvasManagerProviderGate>
