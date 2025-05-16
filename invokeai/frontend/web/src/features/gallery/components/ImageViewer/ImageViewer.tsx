@@ -1,4 +1,4 @@
-import { Box, IconButton, type SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, IconButton, type SystemStyleObject, useOutsideClick } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
@@ -9,7 +9,7 @@ import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewe
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
 import { selectHasImageToCompare } from 'features/gallery/store/gallerySelectors';
 import type { ReactNode } from 'react';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
@@ -43,7 +43,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
 
   return (
-    <FocusRegionWrapper region="viewer" sx={FOCUS_REGION_STYLES} layerStyle="first" {...useFocusRegionOptions}>
+    <FocusRegionWrapper region="viewer" sx={FOCUS_REGION_STYLES} {...useFocusRegionOptions}>
       {hasImageToCompare && <CompareToolbar />}
       {!hasImageToCompare && <ViewerToolbar closeButton={closeButton} />}
       <Box ref={containerRef} w="full" h="full" p={2} overflow="hidden">
@@ -57,17 +57,50 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
 
 ImageViewer.displayName = 'ImageViewer';
 
-export const GatedImageViewer = memo(() => {
+const imageViewerContainerSx: SystemStyleObject = {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  transition: 'opacity 0.15s ease',
+  opacity: 1,
+  pointerEvents: 'auto',
+  '&[data-hidden="true"]': {
+    opacity: 0,
+    pointerEvents: 'none',
+  },
+  backdropFilter: 'blur(10px) brightness(70%)',
+};
+
+const imageViewerModalSx: SystemStyleObject = {
+  position: 'absolute',
+  bg: 'base.800',
+  borderRadius: 'base',
+  top: 16,
+  right: 16,
+  bottom: 16,
+  left: 16,
+};
+
+export const ImageViewerModal = memo(() => {
+  const ref = useRef<HTMLDivElement>(null);
   const imageViewer = useImageViewer();
+  useOutsideClick({
+    ref,
+    handler: imageViewer.close,
+  });
 
-  if (!imageViewer.isOpen) {
-    return null;
-  }
-
-  return <ImageViewer closeButton={<ImageViewerCloseButton />} />;
+  return (
+    <Box sx={imageViewerContainerSx} data-hidden={!imageViewer.isOpen}>
+      <Box ref={ref} sx={imageViewerModalSx}>
+        <ImageViewer closeButton={<ImageViewerCloseButton />} />
+      </Box>
+    </Box>
+  );
 });
 
-GatedImageViewer.displayName = 'GatedImageViewer';
+ImageViewerModal.displayName = 'GatedImageViewer';
 
 const ImageViewerCloseButton = memo(() => {
   const { t } = useTranslation();
@@ -87,15 +120,3 @@ const ImageViewerCloseButton = memo(() => {
 });
 
 ImageViewerCloseButton.displayName = 'ImageViewerCloseButton';
-
-const GatedImageViewerCloseButton = memo(() => {
-  const imageViewer = useImageViewer();
-
-  if (!imageViewer.isOpen) {
-    return null;
-  }
-
-  return <ImageViewerCloseButton />;
-});
-
-GatedImageViewerCloseButton.displayName = 'GatedImageViewerCloseButton';
