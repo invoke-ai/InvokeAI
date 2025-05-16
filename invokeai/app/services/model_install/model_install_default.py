@@ -40,6 +40,7 @@ from invokeai.backend.model_manager.config import (
     InvalidModelConfigException,
 )
 from invokeai.backend.model_manager.legacy_probe import ModelProbe
+from invokeai.backend.model_manager.config import ModelConfigBase
 from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
@@ -646,14 +647,10 @@ class ModelInstallService(ModelInstallServiceBase):
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
 
-        return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)
-
-        # New model probe API is disabled pending resolution of issue caused by a change of the ordering of checks.
-        # See commit message for details.
-        # try:
-        #     return ModelConfigBase.classify(model_path=model_path, hash_algo=hash_algo, **fields)
-        # except InvalidModelConfigException:
-        #     return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
+        try:
+            return ModelProbe.probe(model_path=model_path, fields=fields, hash_algo=hash_algo)  # type: ignore
+        except InvalidModelConfigException:
+            return ModelConfigBase.classify(model_path, hash_algo, **fields)
 
     def _register(
         self, model_path: Path, config: Optional[ModelRecordChanges] = None, info: Optional[AnyModelConfig] = None

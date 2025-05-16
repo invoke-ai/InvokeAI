@@ -4,6 +4,7 @@ from typing import Any, Optional, TypeAlias
 import safetensors.torch
 import torch
 from picklescan.scanner import scan_file_path
+from safetensors import safe_open
 
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
@@ -35,11 +36,20 @@ class ModelOnDisk:
             return self.path.stat().st_size
         return sum(file.stat().st_size for file in self.path.rglob("*"))
 
-    def component_paths(self) -> set[Path]:
+    def weight_files(self) -> set[Path]:
         if self.path.is_file():
             return {self.path}
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
         return {f for f in self.path.rglob("*") if f.suffix in extensions}
+
+    def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
+        try:
+            with safe_open(self.path, framework="pt", device="cpu") as f:
+                metadata = f.metadata()
+                assert isinstance(metadata, dict)
+                return metadata
+        except Exception:
+            return {}
 
     def repo_variant(self) -> Optional[ModelRepoVariant]:
         if self.path.is_file():
@@ -64,18 +74,7 @@ class ModelOnDisk:
         if path in sd_cache:
             return sd_cache[path]
 
-        if not path:
-            components = list(self.component_paths())
-            match components:
-                case []:
-                    raise ValueError("No weight files found for this model")
-                case [p]:
-                    path = p
-                case ps if len(ps) >= 2:
-                    raise ValueError(
-                        f"Multiple weight files found for this model: {ps}. "
-                        f"Please specify the intended file using the 'path' argument"
-                    )
+        path = self.resolve_weight_file(path)
 
         with SilenceWarnings():
             if path.suffix.endswith((".ckpt", ".pt", ".pth", ".bin")):
@@ -94,3 +93,18 @@ class ModelOnDisk:
         state_dict = checkpoint.get("state_dict", checkpoint)
         sd_cache[path] = state_dict
         return state_dict
+
+    def resolve_weight_file(self, path: Optional[Path] = None) -> Path:
+        if not path:
+            weight_files = list(self.weight_files())
+            match weight_files:
+                case []:
+                    raise ValueError("No weight files found for this model")
+                case [p]:
+                    return p
+                case ps if len(ps) >= 2:
+                    raise ValueError(
+                        f"Multiple weight files found for this model: {ps}. "
+                        f"Please specify the intended file using the 'path' argument"
+                    )
+        return path
