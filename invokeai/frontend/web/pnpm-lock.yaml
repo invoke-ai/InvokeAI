@@ -30,8 +30,8 @@ dependencies:
     specifier: ^1.0.0
     version: 1.0.0(nanostores@1.0.1)(react@18.3.1)
   '@reduxjs/toolkit':
-    specifier: 2.7.0
-    version: 2.7.0(react-redux@9.2.0)(react@18.3.1)
+    specifier: 2.8.2
+    version: 2.8.2(react-redux@9.2.0)(react@18.3.1)
   '@roarr/browser-log-writer':
     specifier: ^1.3.0
     version: 1.3.0
@@ -2161,8 +2161,8 @@ packages:
       - supports-color
     dev: true
 
-  /@reduxjs/toolkit@2.7.0(react-redux@9.2.0)(react@18.3.1):
-    resolution: {integrity: sha512-XVwolG6eTqwV0N8z/oDlN93ITCIGIop6leXlGJI/4EKy+0POYkR+ABHRSdGXY+0MQvJBP8yAzh+EYFxTuvmBiQ==}
+  /@reduxjs/toolkit@2.8.2(react-redux@9.2.0)(react@18.3.1):
+    resolution: {integrity: sha512-MYlOhQ0sLdw4ud48FoC5w0dH9VfWQjtCjreKwYTT3l+r427qYC5Y8PihNutepr8XrNaBUDQo9khWUwQxZaqt5A==}
     peerDependencies:
       react: ^16.9.0 || ^17.0.0 || ^18 || ^19
       react-redux: ^7.2.1 || ^8.1.3 || ^9.0.0
