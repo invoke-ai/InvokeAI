@@ -70,7 +70,7 @@ export class CanvasToolModule extends CanvasModuleBase {
   /**
    * The currently selected tool.
    */
-  $tool = atom<Tool>('brush');
+  $tool = atom<Tool>('move');
   /**
    * A buffer for the currently selected tool. This is used to temporarily store the tool while the user is using any
    * hold-to-activate tools, like the view or color picker tools.
