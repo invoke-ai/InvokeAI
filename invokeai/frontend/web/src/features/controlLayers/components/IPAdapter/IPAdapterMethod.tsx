@@ -31,6 +31,16 @@ export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
         description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.styleDesc') : undefined,
       },
       {
+        label: t('controlLayers.ipAdapterMethod.styleStrong', { defaultValue: 'Style (Strong)' }),
+        value: 'style_strong',
+        description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.styleStrongDesc', { defaultValue: 'Targets all layers except composition.' }) : undefined,
+      },
+      {
+        label: t('controlLayers.ipAdapterMethod.stylePrecise', { defaultValue: 'Style (Precise)' }),
+        value: 'style_precise',
+        description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.stylePreciseDesc', { defaultValue: 'Targets style layer and sends negative to composition.' }) : undefined,
+      },
+      {
         label: t('controlLayers.ipAdapterMethod.composition'),
         value: 'composition',
         description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.compositionDesc') : undefined,

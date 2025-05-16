@@ -31,6 +31,7 @@ class IPAdapterField(BaseModel):
     image_encoder_model: ModelIdentifierField = Field(description="The name of the CLIP image encoder model.")
     weight: Union[float, List[float]] = Field(default=1, description="The weight given to the IP-Adapter.")
     target_blocks: List[str] = Field(default=[], description="The IP Adapter blocks to apply")
+    negative_blocks: Optional[List[str]] = Field(default=None, description="Blocks to apply negative embedding (used by style_precise)")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
@@ -94,7 +95,7 @@ class IPAdapterInvocation(BaseInvocation):
     weight: Union[float, List[float]] = InputField(
         default=1, description="The weight given to the IP-Adapter", title="Weight"
     )
-    method: Literal["full", "style", "composition"] = InputField(
+    method: Literal["full", "style", "composition", "style_strong", "style_precise"] = InputField(
         default="full", description="The method to apply the IP-Adapter"
     )
     begin_step_percent: float = InputField(
@@ -133,6 +134,7 @@ class IPAdapterInvocation(BaseInvocation):
 
         image_encoder_model = self.get_clip_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
 
+        negative_blocks = None
         if self.method == "style":
             if ip_adapter_info.base == "sd-1":
                 target_blocks = ["up_blocks.1"]
@@ -149,6 +151,24 @@ class IPAdapterInvocation(BaseInvocation):
                 raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "full":
             target_blocks = ["block"]
+        elif self.method == "style_strong":
+            if ip_adapter_info.base == "sd-1":
+                # Assume up_blocks.0, up_blocks.2, up_blocks.3 are valid for strong style
+                target_blocks = ["up_blocks.0", "up_blocks.2", "up_blocks.3"]
+            elif ip_adapter_info.base == "sdxl":
+                # Assume up_blocks.1.attentions.1, up_blocks.2.attentions.1, up_blocks.3.attentions.1 are valid
+                target_blocks = ["up_blocks.1.attentions.1", "up_blocks.2.attentions.1", "up_blocks.3.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "style_precise":
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.1"]
+                negative_blocks = ["down_blocks.2", "mid_block"]
+            elif ip_adapter_info.base == "sdxl":
+                target_blocks = ["up_blocks.0.attentions.1"]
+                negative_blocks = ["down_blocks.2.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         else:
             raise ValueError(f"Unexpected IP-Adapter method: '{self.method}'.")
 
@@ -159,6 +179,7 @@ class IPAdapterInvocation(BaseInvocation):
                 image_encoder_model=ModelIdentifierField.from_config(image_encoder_model),
                 weight=self.weight,
                 target_blocks=target_blocks,
+                negative_blocks=negative_blocks,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
                 mask=self.mask,
