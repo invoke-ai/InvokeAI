@@ -182,3 +182,45 @@ def generate_img_ids(h: int, w: int, batch_size: int, device: torch.device, dtyp
         img_ids.to(orig_dtype)
 
     return img_ids
+
+
+def prepare_multi_ip(img: torch.Tensor, ref_imgs: list[torch.Tensor]) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    """Generate universal rotary position embedding(UnoPE) for reference images.
+
+    Args:
+        img (torch.Tensor): latent image representation for denoising
+        ref_imgs (list[torch.Tensor]): list of reference images
+
+    Returns:
+        tuple[list[torch.Tensor], list[torch.Tensor]]: packed reference images and position embeddings
+    """
+    bs, c, h, w = img.shape
+
+    ref_img_ids: list[torch.Tensor] = []
+    ref_imgs_list: list[torch.Tensor] = []
+    pe_shift_w, pe_shift_h = w // 2, h // 2
+    for ref_img in ref_imgs:
+        _, _, ref_h1, ref_w1 = ref_img.shape
+        ref_img = rearrange(ref_img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
+        if ref_img.shape[0] == 1 and bs > 1:
+            ref_img = repeat(ref_img, "1 ... -> bs ...", bs=bs)
+        ref_img_ids1 = torch.zeros(ref_h1 // 2, ref_w1 // 2, 3)
+        # img id offsets its maximum values ​​in width and height respectively
+        h_offset = pe_shift_h
+        w_offset = pe_shift_w
+        ref_img_ids1[..., 1] = ref_img_ids1[..., 1] + torch.arange(ref_h1 // 2)[:, None] + h_offset
+        ref_img_ids1[..., 2] = ref_img_ids1[..., 2] + torch.arange(ref_w1 // 2)[None, :] + w_offset
+        ref_img_ids1 = repeat(ref_img_ids1, "h w c -> b (h w) c", b=bs)
+        ref_img_ids.append(ref_img_ids1)
+        ref_imgs_list.append(ref_img)
+
+        # Update pe shift
+        pe_shift_h += ref_h1 // 2
+        pe_shift_w += ref_w1 // 2
+
+    return (
+        # "img": img,
+        # "img_ids": img_ids.to(img.device),
+        ref_imgs_list,
+        [ref_img_id.to(img.device) for ref_img_id in ref_img_ids],
+    )
