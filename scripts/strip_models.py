@@ -18,12 +18,15 @@ import json
 import shutil
 import sys
 from pathlib import Path
+from typing import Optional
 
 import humanize
 import torch
 
-from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, StateDict
 from invokeai.backend.model_manager.search import ModelSearch
+
+METADATA_KEY = "metadata_key_for_stripped_models"
 
 
 def strip(v):
@@ -57,7 +60,20 @@ def dress(v):
 def load_stripped_model(path: Path, *args, **kwargs):
     with open(path, "r") as f:
         contents = json.load(f)
+        contents.pop(METADATA_KEY, None)
     return dress(contents)
+
+
+class StrippedModelOnDisk(ModelOnDisk):
+    def load_state_dict(self, path: Optional[Path] = None) -> StateDict:
+        path = self.resolve_weight_file(path)
+        return load_stripped_model(path)
+
+    def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
+        path = self.resolve_weight_file(path)
+        with open(path, "r") as f:
+            contents = json.load(f)
+        return contents.get(METADATA_KEY, {})
 
 
 def create_stripped_model(original_model_path: Path, stripped_model_path: Path) -> ModelOnDisk:
@@ -69,11 +85,14 @@ def create_stripped_model(original_model_path: Path, stripped_model_path: Path) 
     stripped = ModelOnDisk(stripped_model_path)
     print(f"Created clone of {original.name} at {stripped.path}")
 
-    for component_path in stripped.component_paths():
+    for component_path in stripped.weight_files():
         original_state_dict = stripped.load_state_dict(component_path)
+
         stripped_state_dict = strip(original_state_dict)  # type: ignore
+        metadata = stripped.metadata()
+        contents = {**stripped_state_dict, METADATA_KEY: metadata}
         with open(component_path, "w") as f:
-            json.dump(stripped_state_dict, f, indent=4)
+            json.dump(contents, f, indent=4)
 
     before_size = humanize.naturalsize(original.size())
     after_size = humanize.naturalsize(stripped.size())
