@@ -113,6 +113,7 @@ class IPAdapterData:
     weight: Union[float, List[float]] = 1.0
     begin_step_percent: float = 0.0
     end_step_percent: float = 1.0
+    method: str = 'full'
 
     def scale_for_step(self, step_index: int, total_steps: int) -> float:
         first_adapter_step = math.floor(self.begin_step_percent * total_steps)
