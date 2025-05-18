@@ -95,7 +95,7 @@ class IPAdapterInvocation(BaseInvocation):
     weight: Union[float, List[float]] = InputField(
         default=1, description="The weight given to the IP-Adapter", title="Weight"
     )
-    method: Literal["full", "style", "composition"] = InputField(
+    method: Literal["full", "style", "composition", "style_strong", "style_precise"] = InputField(
         default="full", description="The method to apply the IP-Adapter"
     )
     begin_step_percent: float = InputField(
@@ -133,12 +133,13 @@ class IPAdapterInvocation(BaseInvocation):
             image_encoder_model_name = image_encoder_starter_model.name
 
         image_encoder_model = self.get_clip_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
+        negative_blocks: List[str] = []
 
         if self.method == "style":
             if ip_adapter_info.base == "sd-1":
                 target_blocks = ["up_blocks.1"]
             elif ip_adapter_info.base == "sdxl":
-                target_blocks = ["up_blocks.0.attentions.1", "down_blocks.2.attentions.1"]
+                target_blocks = ["up_blocks.0.attentions.1"]
             else:
                 raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "composition":
@@ -146,6 +147,38 @@ class IPAdapterInvocation(BaseInvocation):
                 target_blocks = ["down_blocks.2", "mid_block"]
             elif ip_adapter_info.base == "sdxl":
                 target_blocks = ["down_blocks.2.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "style_precise":
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.1","down_blocks.2","mid_block"]
+            elif ip_adapter_info.base == "sdxl":
+                target_blocks = ["up_blocks.0.attentions.1","down_blocks.2.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "style_strong":
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.0", "up_blocks.1", "up_blocks.2", "down_blocks.0", "down_blocks.1"]
+            elif ip_adapter_info.base == "sdxl":
+                target_blocks = [
+                    "up_blocks.0.attentions.1",
+                    "up_blocks.1.attentions.1",
+                    "up_blocks.2.attentions.1",
+                    "up_blocks.0.attentions.2",
+                    "up_blocks.1.attentions.2",
+                    "up_blocks.2.attentions.2",
+                    "up_blocks.0.attentions.0",
+                    "up_blocks.1.attentions.0",
+                    "up_blocks.2.attentions.0",
+                    "down_blocks.0.attentions.0",
+                    "down_blocks.0.attentions.1",
+                    "down_blocks.0.attentions.2",
+                    "down_blocks.1.attentions.0",
+                    "down_blocks.1.attentions.1",
+                    "down_blocks.1.attentions.2",
+                    "down_blocks.2.attentions.0",
+                    "down_blocks.2.attentions.2",
+                ]
             else:
                 raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "full":

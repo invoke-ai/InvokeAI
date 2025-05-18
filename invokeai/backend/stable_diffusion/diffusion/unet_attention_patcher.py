@@ -12,8 +12,8 @@ from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
 
 class UNetIPAdapterData(TypedDict):
     ip_adapter: IPAdapter
-    target_blocks: List[str]
-    method: str
+    target_blocks: List[str]  # Blocks where IP-Adapter should be applied
+    method: str  # Style or other method type
 
 
 class UNetAttentionPatcher:
@@ -44,7 +44,7 @@ class UNetAttentionPatcher:
                     for block in ip_adapter["target_blocks"]:
                         if block in name:
                             skip = False
-                            negative = (ip_adapter["method"] == 'style' and block == "down_blocks.2.attentions.1")
+                            negative = (ip_adapter["method"] == 'style_precise' and block == "down_blocks.2.attentions.1")
                             break
                     ip_adapter_attention_weights: IPAdapterAttentionWeights = IPAdapterAttentionWeights(
                         ip_adapter_weights=ip_adapter_weights, skip=skip, negative=negative
