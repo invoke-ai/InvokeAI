@@ -31,7 +31,7 @@ class IPAdapterField(BaseModel):
     image_encoder_model: ModelIdentifierField = Field(description="The name of the CLIP image encoder model.")
     weight: Union[float, List[float]] = Field(default=1, description="The weight given to the IP-Adapter.")
     target_blocks: List[str] = Field(default=[], description="The IP Adapter blocks to apply")
-    method: str = Field(default='full', description="Weight apply method")
+    method: str = Field(default="full", description="Weight apply method")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
@@ -133,7 +133,6 @@ class IPAdapterInvocation(BaseInvocation):
             image_encoder_model_name = image_encoder_starter_model.name
 
         image_encoder_model = self.get_clip_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
-        negative_blocks: List[str] = []
 
         if self.method == "style":
             if ip_adapter_info.base == "sd-1":
@@ -151,9 +150,9 @@ class IPAdapterInvocation(BaseInvocation):
                 raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "style_precise":
             if ip_adapter_info.base == "sd-1":
-                target_blocks = ["up_blocks.1","down_blocks.2","mid_block"]
+                target_blocks = ["up_blocks.1", "down_blocks.2", "mid_block"]
             elif ip_adapter_info.base == "sdxl":
-                target_blocks = ["up_blocks.0.attentions.1","down_blocks.2.attentions.1"]
+                target_blocks = ["up_blocks.0.attentions.1", "down_blocks.2.attentions.1"]
             else:
                 raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "style_strong":
@@ -196,7 +195,7 @@ class IPAdapterInvocation(BaseInvocation):
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
                 mask=self.mask,
-                method=self.method
+                method=self.method,
             ),
         )
 
