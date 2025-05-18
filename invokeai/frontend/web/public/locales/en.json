@@ -2045,7 +2045,11 @@
             "style": "Style Only",
             "styleDesc": "Applies visual style (colors, textures) without considering its layout.",
             "composition": "Composition Only",
-            "compositionDesc": "Replicates layout & structure while ignoring the reference's style."
+            "compositionDesc": "Replicates layout & structure while ignoring the reference's style.",
+            "styleStrong": "Style Strong",
+            "styleStrongDesc": "Applies a strong visual style, with a slightly reduced composition influence.",
+            "stylePrecise": "Style Precise",
+            "stylePreciseDesc": "Applies a precise visual style, eliminating subject influence."
         },
         "fluxReduxImageInfluence": {
             "imageInfluence": "Image Influence",
