@@ -35,6 +35,16 @@ export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
         value: 'composition',
         description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.compositionDesc') : undefined,
       },
+      {
+        label: t('controlLayers.ipAdapterMethod.styleStrong'),
+        value: 'style_strong',
+        description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.styleStrongDesc') : undefined,
+      },
+      {
+        label: t('controlLayers.ipAdapterMethod.stylePrecise'),
+        value: 'style_precise',
+        description: shouldShowModelDescriptions ? t('controlLayers.ipAdapterMethod.stylePreciseDesc') : undefined,
+      },
     ],
     [t, shouldShowModelDescriptions]
   );

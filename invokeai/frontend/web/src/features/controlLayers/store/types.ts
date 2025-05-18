@@ -50,7 +50,7 @@ const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G', 'ViT-L']);
 export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
 export const isCLIPVisionModelV2 = (v: unknown): v is CLIPVisionModelV2 => zCLIPVisionModelV2.safeParse(v).success;
 
-const zIPMethodV2 = z.enum(['full', 'style', 'composition']);
+const zIPMethodV2 = z.enum(['full', 'style', 'composition', 'style_strong', 'style_precise']);
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
