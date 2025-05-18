@@ -9234,7 +9234,7 @@ export type components = {
              * @default full
              * @enum {string}
              */
-            method?: "full" | "style" | "composition";
+            method?:  "full" | "style" | "composition" | "style_strong" | "style_precise";
             /**
              * Begin Step Percent
              * @description When the IP-Adapter is first applied (% of total steps)
