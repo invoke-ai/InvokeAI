@@ -442,7 +442,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   getGrayscaleMaskCompositeImageDTO = async (
     adapters: CanvasEntityAdapterInpaintMask[],
     rect: Rect,
-    attribute: 'noiseLevel' = 'noiseLevel',
+    attribute: 'noiseLevel' | 'denoiseLimit' = 'noiseLevel',
     uploadOptions: SetOptional<Omit<UploadImageArg, 'file'>, 'image_category'> = { is_intermediate: true },
     forceUpload?: boolean
   ): Promise<ImageDTO> => {

@@ -62,10 +62,6 @@ export const addInpaint = async ({
   });
 
   const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
-  const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, rect, {
-    is_intermediate: true,
-    silent: true,
-  });
 
   // Get inpaint mask adapters that have noise settings
   const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== null);
@@ -84,6 +80,17 @@ export const addInpaint = async ({
       }
     );
   }
+
+  // Create a composite denoise limit mask
+  const maskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
+    inpaintMaskAdapters as CanvasEntityAdapterInpaintMask[], // denoise limit defaults to 1 for masks that don't have it
+    rect,
+    'denoiseLimit',
+    {
+      is_intermediate: true,
+      silent: true,
+    }
+  );
 
   const needsScaleBeforeProcessing = !isEqual(scaledSize, originalSize);
 
@@ -128,15 +135,10 @@ export const addInpaint = async ({
       g.addEdge(noiseNode, 'image', i2l, 'image');
     }
 
-    const alphaToMask = g.addNode({
-      id: getPrefixedId('alpha_to_mask'),
-      type: 'tomask',
-      image: { image_name: maskImage.image_name },
-      invert: !canvasSettings.preserveMask,
-    });
     const resizeMaskToScaledSize = g.addNode({
       id: getPrefixedId('resize_mask_to_scaled_size'),
       type: 'img_resize',
+      image: { image_name: maskImage.image_name },
       ...scaledSize,
     });
     const resizeImageToOriginalSize = g.addNode({
@@ -164,7 +166,6 @@ export const addInpaint = async ({
     });
 
     // Resize initial image and mask to scaled size, feed into to gradient mask
-    g.addEdge(alphaToMask, 'image', resizeMaskToScaledSize, 'image');
     g.addEdge(resizeImageToScaledSize, 'image', i2l, 'image');
 
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
@@ -230,12 +231,6 @@ export const addInpaint = async ({
       g.addEdge(noiseNode, 'image', i2l, 'image');
     }
 
-    const alphaToMask = g.addNode({
-      id: getPrefixedId('alpha_to_mask'),
-      type: 'tomask',
-      image: { image_name: maskImage.image_name },
-      invert: !canvasSettings.preserveMask,
-    });
     const createGradientMask = g.addNode({
       id: getPrefixedId('create_gradient_mask'),
       type: 'create_gradient_mask',
@@ -244,9 +239,9 @@ export const addInpaint = async ({
       edge_radius: params.canvasCoherenceEdgeSize,
       fp32,
       image: { image_name: initialImage.image_name },
+      mask: { image_name: maskImage.image_name },
     });
 
-    g.addEdge(alphaToMask, 'image', createGradientMask, 'mask');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
