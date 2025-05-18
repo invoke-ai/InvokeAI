@@ -44,7 +44,7 @@ class UNetAttentionPatcher:
                     for block in ip_adapter["target_blocks"]:
                         if block in name:
                             skip = False
-                            negative = ip_adapter["method"] == "style_precise" and block == "down_blocks.2.attentions.1"
+                            negative = ip_adapter["method"] == "style_precise" and (block == "down_blocks.2.attentions.1" or block == "down_blocks.2" or block == "mid_block")
                             break
                     ip_adapter_attention_weights: IPAdapterAttentionWeights = IPAdapterAttentionWeights(
                         ip_adapter_weights=ip_adapter_weights, skip=skip, negative=negative
