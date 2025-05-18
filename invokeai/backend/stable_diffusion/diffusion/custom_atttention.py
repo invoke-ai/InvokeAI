@@ -16,6 +16,7 @@ class IPAdapterAttentionWeights:
     skip: bool
     negative: bool
 
+
 class CustomAttnProcessor2_0(AttnProcessor2_0):
     """A custom implementation of AttnProcessor2_0 that supports additional Invoke features.
     This implementation is based on
@@ -134,7 +135,6 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         # End unmodified block from AttnProcessor2_0.
 
-
         # Apply IP-Adapter conditioning.
         if is_cross_attention:
             if self._ip_adapter_attention_weights:
@@ -165,7 +165,7 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                     if not self._ip_adapter_attention_weights[ipa_index].skip:
                         # apply the IP-Adapter weights to the negative embeds
                         if self._ip_adapter_attention_weights[ipa_index].negative:
-                            ip_hidden_states = torch.cat([ip_hidden_states[1], ip_hidden_states[0]*0], dim=0)
+                            ip_hidden_states = torch.cat([ip_hidden_states[1], ip_hidden_states[0] * 0], dim=0)
 
                         ip_key = ipa_weights.to_k_ip(ip_hidden_states)
                         ip_value = ipa_weights.to_v_ip(ip_hidden_states)

@@ -117,6 +117,7 @@ class IPAdapterData:
         end_step_percent: The percentage of steps at which to stop applying the IP-Adapter.
         method: The method to use for applying the IP-Adapter ('full', 'style', 'composition').
     """
+
     ip_adapter_model: IPAdapter
     ip_adapter_conditioning: IPAdapterConditioningInfo
     mask: torch.Tensor
@@ -125,7 +126,7 @@ class IPAdapterData:
     weight: Union[float, List[float]] = 1.0
     begin_step_percent: float = 0.0
     end_step_percent: float = 1.0
-    method: str = 'full'
+    method: str = "full"
 
     def scale_for_step(self, step_index: int, total_steps: int) -> float:
         first_adapter_step = math.floor(self.begin_step_percent * total_steps)
