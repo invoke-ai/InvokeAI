@@ -2042,13 +2042,13 @@
             "ipAdapterMethod": "Mode",
             "full": "Style and Composition",
             "fullDesc": "Applies visual style (colors, textures) & composition (layout, structure).",
-            "style": "Style Only",
-            "styleDesc": "Applies visual style (colors, textures) without considering its layout.",
+            "style": "Style (Simple)",
+            "styleDesc": "Applies visual style (colors, textures) without considering its layout. Previously called Style Only.",
             "composition": "Composition Only",
             "compositionDesc": "Replicates layout & structure while ignoring the reference's style.",
-            "styleStrong": "Style Strong",
+            "styleStrong": "Style (Strong)",
             "styleStrongDesc": "Applies a strong visual style, with a slightly reduced composition influence.",
-            "stylePrecise": "Style Precise",
+            "stylePrecise": "Style (Precise)",
             "stylePreciseDesc": "Applies a precise visual style, eliminating subject influence."
         },
         "fluxReduxImageInfluence": {
