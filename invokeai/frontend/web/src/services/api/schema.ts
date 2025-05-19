@@ -11165,9 +11165,12 @@ export type components = {
          */
         InputFieldJSONSchemaExtra: {
             input: components["schemas"]["Input"];
-            /** Orig Required */
-            orig_required: boolean;
             field_kind: components["schemas"]["FieldKind"];
+            /**
+             * Orig Required
+             * @default true
+             */
+            orig_required: boolean;
             /**
              * Default
              * @default null
