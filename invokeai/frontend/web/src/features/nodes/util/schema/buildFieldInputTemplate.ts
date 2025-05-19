@@ -682,7 +682,7 @@ const buildEnumFieldInputTemplate: FieldInputTemplateBuilder<EnumFieldInputTempl
     if (filteredAnyOf.length !== 1 || !isSchemaObject(firstAnyOf)) {
       options = [];
     } else {
-      options = firstAnyOf.enum ?? [];
+      options = firstAnyOf.const ? [firstAnyOf.const] : (firstAnyOf.enum ?? []);
     }
   } else if (schemaObject.const) {
     options = [schemaObject.const];
