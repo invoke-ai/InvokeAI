@@ -65,6 +65,8 @@ def mock_services() -> InvocationServices:
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
         workflow_thumbnails=None,  # type: ignore
+        model_relationship_records=None,  # type: ignore
+        model_relationships=None,  # type: ignore
     )
 
 
