@@ -1,0 +1,248 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Backend :: Install",
+      "type": "shell",
+      "command": "uv",
+      "args": [
+        "sync",
+        "--extra using-$(echo ${COMPUTE_DEVICE:-cpu})",
+        "--extra dev",
+        "--extra test",
+        "--extra docs"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "install"
+      }
+    },
+    {
+      "label": "Backend :: Linting :: Scan All",
+      "type": "shell",
+      "command": "ruff check",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "backend"
+      }
+    },
+    {
+      "label": "Backend :: Linting :: Fix All",
+      "type": "shell",
+      "command": "ruff check --fix",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "backend"
+      }
+    },
+    {
+      "label": "Backend :: Linting :: Format All",
+      "type": "shell",
+      "command": "ruff format",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "backend"
+      }
+    },
+    {
+      "label": "Backend :: Testing :: Unit Tests",
+      "type": "shell",
+      "command": "pytest",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceFolder}/tests"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": false,
+        "group": "backend"
+      }
+    },
+    {
+      "label": "Frontend :: Install",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["install", "--dir", "invokeai/frontend/web/"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "install"
+      }
+    },
+    {
+      "label": "Frontend :: Linting :: Scan All",
+      "type": "shell",
+      "command": "pnpm lint",
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "Frontend :: Linting :: Fix All",
+      "type": "shell",
+      "command": "pnpm fix",
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "Frontend :: Testing :: Unit Tests",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["test"],
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web/"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "Tooling :: OpenAPI :: Generate Types",
+      "dependsOn": ["tools/regenerate-openapi-definitions"],
+      "type": "shell",
+      "command": "pnpm typegen",
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "group": "frontend"
+      }
+    },
+    {
+      "label": "tools/regenerate-openapi-definitions",
+      "type": "shell",
+      "command": "python",
+      "args": ["../../../scripts/generate_openapi_schema.py"],
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "hide": true
+    },
+    {
+      "label": "Backend :: Testing :: Run Active File",
+      "type": "process",
+      "command": "pytest",
+      "args": ["${file}"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": "$python",
+      "group": {
+        "kind": "test",
+        "isDefault": "**/tests/**.py"
+      },
+      "presentation": {
+        "focus": true,
+        "clear": true,
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Backend :: Show Dependency Version",
+      "detail": "Print the currently installed version of a dependency",
+      "group": "build",
+      "type": "shell",
+      "command": "uv tree --depth 0 --package ${input:depName}",
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Backend :: Show Dependency Version (All)",
+      "detail": "Print the currently installed version of all dependencies",
+      "group": "build",
+      "type": "shell",
+      "command": "uv tree --depth 1",
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Frontend :: Show Dependency Version",
+      "detail": "Print the currently installed version of a dependency",
+      "group": "build",
+      "type": "process",
+      "command": "pnpm",
+      "args": ["list", "--fail-if-no-match", "${input:depName}"],
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Frontend :: Show Dependency Version (All)",
+      "detail": "Print the currently installed version of all dependencies",
+      "group": "build",
+      "type": "process",
+      "command": "pnpm",
+      "args": ["list", "--fail-if-no-match"],
+      "options": {
+        "cwd": "${workspaceFolder}/invokeai/frontend/web"
+      },
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "depName",
+      "type": "promptString",
+      "description": "Dependency name (e.g. torch, pytest, etc):"
+    }
+  ]
+}

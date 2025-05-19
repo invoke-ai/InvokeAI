@@ -1,0 +1,109 @@
+{
+  "name": "InvokeAI::Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "USERNAME": "node",
+      "PYTHON_VERSION": "3.12", // The python version which will be installed in the container
+      "INVOKEAI_ROOT": "/home/node/invokeai",
+      "INVOKEAI_SRC": "${containerWorkspaceFolder}"
+    }
+  },
+  "mounts": [
+    {
+      // Setup a volume for all dependencies (pnpm, pip, uv, etc.)
+      "type": "volume",
+      "source": "invokeai-dev-cache",
+      "target": "/home/node/.cache"
+    },
+    {
+      // Setup a volume for invokeai downloads cache
+      "type": "volume",
+      "source": "invokeai-downloads-cache",
+      "target": "/home/node/invokeai/models/.download_cache"
+    },
+    {
+      // Insert the devcontainers vscode launch config into the container
+      "type": "bind",
+      "source": "${localWorkspaceFolder}/.devcontainer/.vscode/launch.json",
+      "target": "${containerWorkspaceFolder}/.vscode/launch.json"
+    },
+    {
+      // Mount the custom-nodes folder at repo root to allow for easier custom-node development
+      "type": "bind",
+      "source": "${localWorkspaceFolder}/.devcontainer/mounts/custom-nodes",
+      "target": "/home/node/invokeai/nodes"
+    }
+  ],
+  "containerEnv": {
+    "UV_COMPILE_BYTECODE": "1",
+    "INVOKEAI_DEV_RELOAD": "true",
+    "UV_LINK_MODE": "symlink" // Using symlink because they are fast and always work, if you encounter issues after a cache purge, just rebuild the container.
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git-lfs": {},
+    "ghcr.io/devcontainers/features/github-cli": {}
+  },
+  "hostRequirements": {
+    "gpu": "optional",
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "10gb" // rough estimate of all dev packages & a handful of ai-models
+  },
+  "runArgs": [
+    "--env-file",
+    ".devcontainer/.env"
+    // "--userns=keep-id", // Uncomment if using podman instead of docker. (remove after next vscode-remote extension release: https://github.com/microsoft/vscode-remote-release/issues/10798#issuecomment-2826767753)
+    // "--device=nvidia.com/gpu=all", // Uncomment if using podman instead of docker.
+  ],
+  "initializeCommand": [".devcontainer/scripts/init"],
+  "onCreateCommand": "pnpm config --global set store-dir $XDG_CACHE_HOME/pnpm",
+  "updateContentCommand": "pnpm install --dir invokeai/frontend/web --prefer-offline",
+  "postAttachCommand": "uv sync --extra using-$(echo ${COMPUTE_DEVICE:-cpu}) --extra dev --extra test --extra docs",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/home/node/.venv/bin/python",
+        "python.analysis.typeCheckingMode": "standard",
+        "python.analysis.exclude": [
+          "**/node_modules",
+          "**/dist",
+          "**/build",
+          "${containerWorkspaceFolder}/invokeai/frontend/web"
+        ],
+        "python.analysis.extraPaths": [
+          "/home/node/invokeai/nodes",
+          "/home/node/.venv/lib",
+          "${containerWorkspaceFolder}"
+        ],
+        "python.testing.promptToConfigure": false,
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["--tb=line", "--no-header"], // makes the output of pytest more human readable and parseable by vscode
+        "files.autoSaveWhenNoErrors": true, // prevents auto-saving when there are errors in the code, makes hot-reloading more reliable by not flooding the tooling with errors which tend to break it.
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "always"
+        },
+        "ruff.linting.enabled": true
+      },
+      "extensions": [
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-slideshow",
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "esbenp.prettier-vscode",
+        "DavidAnson.vscode-markdownlint",
+        "antfu.vite",
+        "docker.docker",
+        "dbaeumer.vscode-eslint",
+        "vitest.explorer",
+        "tamasfe.even-better-toml",
+        "eamodio.gitlens"
+      ]
+    }
+  }
+}
