@@ -400,8 +400,8 @@ class InputFieldJSONSchemaExtra(BaseModel):
     """
 
     input: Input
-    orig_required: bool
     field_kind: FieldKind
+    orig_required: bool = True
     default: Optional[Any] = None
     orig_default: Optional[Any] = None
     ui_hidden: bool = False
@@ -498,7 +498,7 @@ def InputField(
     input: Input = Input.Any,
     ui_type: Optional[UIType] = None,
     ui_component: Optional[UIComponent] = None,
-    ui_hidden: bool = False,
+    ui_hidden: Optional[bool] = None,
     ui_order: Optional[int] = None,
     ui_choice_labels: Optional[dict[str, str]] = None,
 ) -> Any:
@@ -534,14 +534,19 @@ def InputField(
 
     json_schema_extra_ = InputFieldJSONSchemaExtra(
         input=input,
-        ui_type=ui_type,
-        ui_component=ui_component,
-        ui_hidden=ui_hidden,
-        ui_order=ui_order,
-        ui_choice_labels=ui_choice_labels,
         field_kind=FieldKind.Input,
-        orig_required=True,
     )
+
+    if ui_type is not None:
+        json_schema_extra_.ui_type = ui_type
+    if ui_component is not None:
+        json_schema_extra_.ui_component = ui_component
+    if ui_hidden is not None:
+        json_schema_extra_.ui_hidden = ui_hidden
+    if ui_order is not None:
+        json_schema_extra_.ui_order = ui_order
+    if ui_choice_labels is not None:
+        json_schema_extra_.ui_choice_labels = ui_choice_labels
 
     """
     There is a conflict between the typing of invocation definitions and the typing of an invocation's
@@ -614,7 +619,7 @@ def InputField(
 
     return Field(
         **provided_args,
-        json_schema_extra=json_schema_extra_.model_dump(exclude_none=True),
+        json_schema_extra=json_schema_extra_.model_dump(exclude_unset=True),
     )
 
 
