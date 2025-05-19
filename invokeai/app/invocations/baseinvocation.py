@@ -177,7 +177,7 @@ class BaseInvocation(ABC, BaseModel):
         return cls.model_fields["type"].default
 
     @classmethod
-    def get_output_annotation(cls) -> BaseInvocationOutput:
+    def get_output_annotation(cls) -> Type[BaseInvocationOutput]:
         """Gets the invocation's output annotation (i.e. the return annotation of its `invoke()` method)."""
         return signature(cls.invoke).return_annotation
 
@@ -209,7 +209,7 @@ class BaseInvocation(ABC, BaseModel):
         Internal invoke method, calls `invoke()` after some prep.
         Handles optional fields that are required to call `invoke()` and invocation cache.
         """
-        for field_name, field in self.model_fields.items():
+        for field_name, field in type(self).model_fields.items():
             if not field.json_schema_extra or callable(field.json_schema_extra):
                 # something has gone terribly awry, we should always have this and it should be a dict
                 continue
@@ -224,9 +224,9 @@ class BaseInvocation(ABC, BaseModel):
                 setattr(self, field_name, orig_default)
             if orig_required and orig_default is PydanticUndefined and getattr(self, field_name) is None:
                 if input_ == Input.Connection:
-                    raise RequiredConnectionException(self.model_fields["type"].default, field_name)
+                    raise RequiredConnectionException(type(self).model_fields["type"].default, field_name)
                 elif input_ == Input.Any:
-                    raise MissingInputException(self.model_fields["type"].default, field_name)
+                    raise MissingInputException(type(self).model_fields["type"].default, field_name)
 
         # skip node cache codepath if it's disabled
         if services.configuration.node_cache_size == 0:

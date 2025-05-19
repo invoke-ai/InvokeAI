@@ -148,7 +148,7 @@ class Batch(BaseModel):
                     node = cast(BaseInvocation, graph.get_node(batch_data.node_path))
                 except NodeNotFoundError:
                     raise NodeNotFoundError(f"Node {batch_data.node_path} not found in graph")
-                if batch_data.field_name not in node.model_fields:
+                if batch_data.field_name not in type(node).model_fields:
                     raise NodeNotFoundError(f"Field {batch_data.field_name} not found in node {batch_data.node_path}")
         return values
 
