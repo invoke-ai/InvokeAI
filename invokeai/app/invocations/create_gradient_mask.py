@@ -47,7 +47,7 @@ class GradientMaskOutput(BaseInvocationOutput):
 class CreateGradientMaskInvocation(BaseInvocation):
     """Creates mask for denoising model run."""
 
-    mask: ImageField= InputField(description="Image which will be masked", ui_order=1)
+    mask: ImageField = InputField(description="Image which will be masked", ui_order=1)
     edge_radius: int = InputField(
         default=16, ge=0, description="How far to blur/expand the edges of the mask", ui_order=2
     )
