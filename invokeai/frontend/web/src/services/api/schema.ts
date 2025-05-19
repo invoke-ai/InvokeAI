@@ -9164,6 +9164,12 @@ export type components = {
              */
             target_blocks?: string[];
             /**
+             * Method
+             * @description Weight apply method
+             * @default full
+             */
+            method?: string;
+            /**
              * Begin Step Percent
              * @description When the IP-Adapter is first applied (% of total steps)
              * @default 0
@@ -9234,7 +9240,7 @@ export type components = {
              * @default full
              * @enum {string}
              */
-            method?:  "full" | "style" | "style_strong" | "style_precise" | "composition";
+            method?: "full" | "style" | "composition" | "style_strong" | "style_precise";
             /**
              * Begin Step Percent
              * @description When the IP-Adapter is first applied (% of total steps)
@@ -9360,7 +9366,7 @@ export type components = {
              * @description Method to apply IP Weights with
              * @enum {string}
              */
-            method: "full" | "style" | "composition" | "style_strong" | "style_precise";
+            method: "full" | "style" | "composition";
             /**
              * Weight
              * @description The weight given to the IP-Adapter
