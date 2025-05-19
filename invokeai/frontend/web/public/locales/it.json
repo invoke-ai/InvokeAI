@@ -654,7 +654,9 @@
         "modelPickerFallbackNoModelsInstalled": "Nessun modello installato.",
         "modelPickerFallbackNoModelsInstalled2": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare i modelli.",
         "manageModels": "Gestione modelli",
-        "hfTokenReset": "Ripristino del gettone HF"
+        "hfTokenReset": "Ripristino del gettone HF",
+        "relatedModels": "Modelli correlati",
+        "showOnlyRelatedModels": "Correlati"
     },
     "parameters": {
         "images": "Immagini",
@@ -2008,7 +2010,11 @@
             "ipAdapterMethod": "Modalità",
             "fullDesc": "Applica lo stile visivo (colori, texture) e la composizione (disposizione, struttura).",
             "styleDesc": "Applica lo stile visivo (colori, texture) senza considerare la disposizione.",
-            "compositionDesc": "Replica disposizione e struttura ignorando lo stile di riferimento."
+            "compositionDesc": "Replica disposizione e struttura ignorando lo stile di riferimento.",
+            "styleStrong": "Stile (forte)",
+            "styleStrongDesc": "Applica uno stile visivo forte, con un'influenza sulla composizione leggermente ridotta.",
+            "stylePrecise": "Stile (preciso)",
+            "stylePreciseDesc": "Applica uno stile visivo preciso, eliminando l'influenza del soggetto."
         },
         "showingType": "Mostra {{type}}",
         "dynamicGrid": "Griglia dinamica",
