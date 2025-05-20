@@ -1161,7 +1161,7 @@ export const canvasSlice = createSlice({
       const { entityIdentifier } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
-        entity.denoiseLimit = 0.5; // Default denoise limit
+        entity.denoiseLimit = 1.0; // Default denoise limit
       }
     },
     inpaintMaskDenoiseLimitChanged: (
