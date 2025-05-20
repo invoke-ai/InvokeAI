@@ -1225,8 +1225,7 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="The image to add noise to")
     mask: Optional[ImageField] = InputField(
-        default=None, 
-        description="Optional mask determining where to apply noise (black=noise, white=no noise)"
+        default=None, description="Optional mask determining where to apply noise (black=noise, white=no noise)"
     )
     seed: int = InputField(
         default=0,
@@ -1271,23 +1270,23 @@ class ImageNoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         noise = Image.fromarray(noise.astype(numpy.uint8), mode="RGB").resize(
             (image.width, image.height), Image.Resampling.NEAREST
         )
-        
+
         # Create a noisy version of the input image
         noisy_image = Image.blend(image.convert("RGB"), noise, self.amount).convert("RGBA")
-        
+
         # Apply mask if provided
         if self.mask is not None:
             mask_image = context.images.get_pil(self.mask.image_name, mode="L")
-            
+
             if mask_image.size != image.size:
                 mask_image = mask_image.resize(image.size, Image.Resampling.LANCZOS)
-            
+
             result_image = image.copy()
             mask_image = ImageOps.invert(mask_image)
             result_image.paste(noisy_image, (0, 0), mask=mask_image)
         else:
             result_image = noisy_image
-        
+
         # Paste back the alpha channel from the original image
         result_image.putalpha(alpha)
 
