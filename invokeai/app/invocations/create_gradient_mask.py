@@ -8,6 +8,7 @@ from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
@@ -23,7 +24,6 @@ from invokeai.backend.model_manager import LoadedModel
 from invokeai.backend.model_manager.config import MainConfigBase
 from invokeai.backend.model_manager.taxonomy import ModelVariantType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 
 
 @invocation_output("gradient_mask_output")
@@ -87,8 +87,8 @@ class CreateGradientMaskInvocation(BaseInvocation):
         # Resize the mask_image. Makes the filter 64x faster and doesn't hurt quality in latent scale anyway
         mask_image = mask_image.resize(
             (
-            mask_image.width // LATENT_SCALE_FACTOR,
-            mask_image.height // LATENT_SCALE_FACTOR,
+                mask_image.width // LATENT_SCALE_FACTOR,
+                mask_image.height // LATENT_SCALE_FACTOR,
             ),
             resample=Image.Resampling.BILINEAR,
         )
@@ -96,11 +96,11 @@ class CreateGradientMaskInvocation(BaseInvocation):
         mask_np_orig = np.array(mask_image, dtype=np.float32)
 
         self.edge_radius = self.edge_radius // LATENT_SCALE_FACTOR  # scale the edge radius to match the mask size
-        
+
         if self.edge_radius > 0:
-            mask_np = 255 - mask_np_orig # invert so 0 is unmasked (higher values = higher denoise strength)
+            mask_np = 255 - mask_np_orig  # invert so 0 is unmasked (higher values = higher denoise strength)
             dilated_mask = mask_np.copy()
-            
+
             # Create kernel based on coherence mode
             if self.coherence_mode == "Box Blur":
                 # Create a circular distance kernel that fades from center outward
@@ -109,21 +109,23 @@ class CreateGradientMaskInvocation(BaseInvocation):
                 kernel = np.zeros((kernel_size, kernel_size), dtype=np.float32)
                 for i in range(kernel_size):
                     for j in range(kernel_size):
-                        dist = np.sqrt((i - center)**2 + (j - center)**2)
+                        dist = np.sqrt((i - center) ** 2 + (j - center) ** 2)
                         if dist <= self.edge_radius:
                             kernel[i, j] = 1.0 - (dist / self.edge_radius)
             else:  # Gaussian Blur or Staged
                 # Create a Gaussian kernel
                 kernel_size = self.edge_radius * 2 + 1
-                kernel = cv2.getGaussianKernel(kernel_size, self.edge_radius / 2.5) # 2.5 is a magic number (standard deviation capturing)
+                kernel = cv2.getGaussianKernel(
+                    kernel_size, self.edge_radius / 2.5
+                )  # 2.5 is a magic number (standard deviation capturing)
                 kernel = kernel * kernel.T  # Make 2D gaussian kernel
                 kernel = kernel / np.max(kernel)  # Normalize center to 1.0
-                
-                # Ensure values outside radius are 0 
+
+                # Ensure values outside radius are 0
                 center = self.edge_radius
                 for i in range(kernel_size):
                     for j in range(kernel_size):
-                        dist = np.sqrt((i - center)**2 + (j - center)**2)
+                        dist = np.sqrt((i - center) ** 2 + (j - center) ** 2)
                         if dist > self.edge_radius:
                             kernel[i, j] = 0
 
@@ -147,10 +149,10 @@ class CreateGradientMaskInvocation(BaseInvocation):
 
         else:
             dilated_mask = mask_np_orig.copy()
-        
-        #convert to tensor
+
+        # convert to tensor
         dilated_mask = np.clip(dilated_mask, 0, 255).astype(np.uint8)
-        mask_tensor = torch.tensor(dilated_mask, device=torch.device('cpu'))
+        mask_tensor = torch.tensor(dilated_mask, device=torch.device("cpu"))
 
         # binary mask for compositing
         expanded_mask = np.where((dilated_mask < 255), 0, 255)
@@ -163,7 +165,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
             resample=Image.Resampling.NEAREST,
         )
         expanded_image_dto = context.images.save(expanded_mask_image)
-        
+
         # restore the original mask size
         dilated_mask = Image.fromarray(dilated_mask.astype(np.uint8))
         dilated_mask = dilated_mask.resize(
@@ -211,21 +213,21 @@ class CreateGradientMaskInvocation(BaseInvocation):
         """
         h, w = kernel.shape
         pad_h, pad_w = h // 2, w // 2
-        
-        padded = torch.nn.functional.pad(image, (pad_w, pad_w, pad_h, pad_h), mode='constant', value=0)
+
+        padded = torch.nn.functional.pad(image, (pad_w, pad_w, pad_h, pad_h), mode="constant", value=0)
         result = torch.zeros_like(image)
-        
+
         # This looks like it's inside out, but it does the same thing and is more efficient
         for i in range(h):
             for j in range(w):
                 weight = kernel[i, j]
                 if weight <= 0:
                     continue
-                    
+
                 # Extract the region from padded tensor
-                region = padded[i:i+image.shape[0], j:j+image.shape[1]]
-                
+                region = padded[i : i + image.shape[0], j : j + image.shape[1]]
+
                 # Apply weight and update max
                 result = torch.maximum(result, region * weight)
-        
+
         return result
