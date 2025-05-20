@@ -10,20 +10,20 @@ readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
 license = { file = "LICENSE" }
-authors = [{ name = "The InvokeAI Project", email = "lincoln.stein@gmail.com" }]
+authors = [{ name = "Invoke", email = "support@invoke.ai" }]
 classifiers = [
-  'Development Status :: 4 - Beta',
+  'Development Status :: 5 - Production/Stable',
   'Environment :: GPU',
   'Environment :: GPU :: NVIDIA CUDA',
   'Environment :: MacOS X',
   'Intended Audience :: End Users/Desktop',
   'Intended Audience :: Developers',
-  'License :: OSI Approved :: MIT License',
+  'License :: OSI Approved :: Apache-2.0',
   'Operating System :: POSIX :: Linux',
   'Operating System :: MacOS',
   'Operating System :: Microsoft :: Windows',
   'Programming Language :: Python :: 3 :: Only',
-  'Programming Language :: Python :: 3.10',
+  'Programming Language :: Python :: 3.12',
   'Topic :: Artistic Software',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Application',
   'Topic :: Internet :: WWW/HTTP :: WSGI :: Server',
@@ -35,7 +35,7 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.0.2",
+  "compel==2.1.1",
   "diffusers[torch]==0.33.0",
   "gguf",
   "invisible-watermark==0.2.0",           # needed to install SDXL base and refiner using their repo_ids
