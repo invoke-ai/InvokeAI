@@ -19,6 +19,7 @@ class LoRALayer(LoRALayerBase):
         self.up = up
         self.mid = mid
         self.down = down
+        self.are_ranks_equal = up.shape[1] == down.shape[0]
 
     @classmethod
     def from_state_dict_values(
@@ -58,12 +59,42 @@ class LoRALayer(LoRALayerBase):
     def _rank(self) -> int:
         return self.down.shape[0]
 
+    def fuse_weights(self, up: torch.Tensor, down: torch.Tensor) -> torch.Tensor:
+        """
+        Fuse the weights of the up and down matrices of a LoRA layer with different ranks.
+
+        Since the Huggingface implementation of KQV projections are fused, when we convert to Kohya format
+        the LoRA weights have different ranks. This function handles the fusion of these differently sized
+        matrices.
+        """
+
+        fused_lora = torch.zeros((up.shape[0], down.shape[1]), device=down.device, dtype=down.dtype)
+        rank_diff = down.shape[0] / up.shape[1]
+
+        if rank_diff > 1:
+            rank_diff = down.shape[0] / up.shape[1]
+            w_down = down.chunk(int(rank_diff), dim=0)
+            for w_down_chunk in w_down:
+                fused_lora = fused_lora + (torch.mm(up, w_down_chunk))
+        else:
+            rank_diff = up.shape[1] / down.shape[0]
+            w_up = up.chunk(int(rank_diff), dim=0)
+            for w_up_chunk in w_up:
+                fused_lora = fused_lora + (torch.mm(w_up_chunk, down))
+
+        return fused_lora
+
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         if self.mid is not None:
             up = self.up.reshape(self.up.shape[0], self.up.shape[1])
             down = self.down.reshape(self.down.shape[0], self.down.shape[1])
             weight = torch.einsum("m n w h, i m, n j -> i j w h", self.mid, up, down)
         else:
+            # up matrix and down matrix have different ranks so we can't simply multiply them
+            if not self.are_ranks_equal:
+                weight = self.fuse_weights(self.up, self.down)
+                return weight
+
             weight = self.up.reshape(self.up.shape[0], -1) @ self.down.reshape(self.down.shape[0], -1)
 
         return weight

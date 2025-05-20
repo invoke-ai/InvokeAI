@@ -47,7 +47,7 @@ dependencies = [
   "safetensors",
   "sentencepiece",
   "spandrel",
-  "torch~=2.6.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
   "transformers",

@@ -22,7 +22,7 @@ export const QueueIterationsNumberInput = memo(() => {
         step={config.coarseStep}
         fineStep={config.fineStep}
         min={1}
-        max={999}
+        max={config.numberInputMax}
         onChange={handleChange}
         value={iterations}
         defaultValue={1}

@@ -33,6 +33,8 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   ControlLoRAModelField: undefined,
   SigLipModelField: undefined,
   FluxReduxModelField: undefined,
+  Imagen3ModelField: undefined,
+  ChatGPT4oModelField: undefined,
   FloatGeneratorField: undefined,
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,

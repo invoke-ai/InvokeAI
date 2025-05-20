@@ -10,7 +10,7 @@ def get_timestamp() -> int:
 
 
 def get_iso_timestamp() -> str:
-    return datetime.datetime.utcnow().isoformat()
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
 def get_datetime_from_iso_timestamp(iso_timestamp: str) -> datetime.datetime:

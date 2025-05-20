@@ -109,7 +109,7 @@ export const FullscreenDropzone = memo(() => {
 
       const autoAddBoardId = selectAutoAddBoardId(getState());
 
-      if (isClientSideUploadEnabled) {
+      if (isClientSideUploadEnabled && files.length > 1) {
         for (const [i, file] of files.entries()) {
           await clientSideUpload(file, i);
         }

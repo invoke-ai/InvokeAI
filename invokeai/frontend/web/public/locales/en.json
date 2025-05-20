@@ -268,6 +268,7 @@
         "status": "Status",
         "total": "Total",
         "time": "Time",
+        "credits": "Credits",
         "pending": "Pending",
         "in_progress": "In Progress",
         "completed": "Completed",
@@ -798,6 +799,7 @@
         "hfTokenUnableToVerify": "Unable to Verify HF Token",
         "hfTokenUnableToVerifyErrorMessage": "Unable to verify HuggingFace token. This is likely due to a network error. Please try again later.",
         "hfTokenSaved": "HF Token Saved",
+        "hfTokenReset": "HF Token Reset",
         "urlUnauthorizedErrorMessage": "You may need to configure an API token to access this model.",
         "urlUnauthorizedErrorMessage2": "Learn how here.",
         "imageEncoderModelId": "Image Encoder Model ID",
@@ -844,6 +846,8 @@
         "predictionType": "Prediction Type",
         "prune": "Prune",
         "pruneTooltip": "Prune finished imports from queue",
+        "relatedModels": "Related Models",
+        "showOnlyRelatedModels": "Related",
         "repo_id": "Repo ID",
         "repoVariant": "Repo Variant",
         "scanFolder": "Scan Folder",
@@ -2042,10 +2046,14 @@
             "ipAdapterMethod": "Mode",
             "full": "Style and Composition",
             "fullDesc": "Applies visual style (colors, textures) & composition (layout, structure).",
-            "style": "Style Only",
-            "styleDesc": "Applies visual style (colors, textures) without considering its layout.",
+            "style": "Style (Simple)",
+            "styleDesc": "Applies visual style (colors, textures) without considering its layout. Previously called Style Only.",
             "composition": "Composition Only",
-            "compositionDesc": "Replicates layout & structure while ignoring the reference's style."
+            "compositionDesc": "Replicates layout & structure while ignoring the reference's style.",
+            "styleStrong": "Style (Strong)",
+            "styleStrongDesc": "Applies a strong visual style, with a slightly reduced composition influence.",
+            "stylePrecise": "Style (Precise)",
+            "stylePreciseDesc": "Applies a precise visual style, eliminating subject influence."
         },
         "fluxReduxImageInfluence": {
             "imageInfluence": "Image Influence",
@@ -2415,8 +2423,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "CogView4: Support for CogView4 models in Canvas and Workflows.",
-            "Updated Dependencies: Invoke now runs on the latest version of its dependencies, including Python 3.12 and Pytorch 2.6.0."
+            "Nvidia 50xx GPUs: Invoke uses PyTorch 2.7.0, which is required for these GPUs.",
+            "Model Relationships: Link LoRAs to main models, and the LoRAs will show up first in the list."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",

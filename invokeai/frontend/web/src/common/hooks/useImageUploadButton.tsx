@@ -83,7 +83,7 @@ export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: Us
           }
         } else {
           let imageDTOs: ImageDTO[] = [];
-          if (isClientSideUploadEnabled) {
+          if (isClientSideUploadEnabled && files.length > 1) {
             imageDTOs = await Promise.all(files.map((file, i) => clientSideUpload(file, i)));
           } else {
             imageDTOs = await uploadImages(

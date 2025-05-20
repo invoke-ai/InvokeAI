@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
@@ -104,15 +104,29 @@ class IPAdapterConditioningInfo:
 
 @dataclass
 class IPAdapterData:
+    """Data class for IP-Adapter configuration.
+
+    Attributes:
+        ip_adapter_model: The IP-Adapter model to use.
+        ip_adapter_conditioning: The IP-Adapter conditioning data.
+        mask: The mask to apply to the IP-Adapter conditioning.
+        target_blocks: List of target attention block names to apply IP-Adapter to.
+        negative_blocks: List of target attention block names that should use negative attention.
+        weight: The weight to apply to the IP-Adapter conditioning.
+        begin_step_percent: The percentage of steps at which to start applying the IP-Adapter.
+        end_step_percent: The percentage of steps at which to stop applying the IP-Adapter.
+        method: The method to use for applying the IP-Adapter ('full', 'style', 'composition').
+    """
+
     ip_adapter_model: IPAdapter
     ip_adapter_conditioning: IPAdapterConditioningInfo
     mask: torch.Tensor
     target_blocks: List[str]
-
-    # Either a single weight applied to all steps, or a list of weights for each step.
+    negative_blocks: List[str] = field(default_factory=list)
     weight: Union[float, List[float]] = 1.0
     begin_step_percent: float = 0.0
     end_step_percent: float = 1.0
+    method: str = "full"
 
     def scale_for_step(self, step_index: int, total_steps: int) -> float:
         first_adapter_step = math.floor(self.begin_step_percent * total_steps)

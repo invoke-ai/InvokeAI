@@ -89,7 +89,7 @@ const debouncedUpdateReasons = debounce(
     config: AppConfig,
     store: AppStore,
     isInPublishFlow: boolean,
-    areApiModelsEnabled: boolean
+    areChatGPT4oModelsEnabled: boolean
   ) => {
     if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
@@ -104,7 +104,7 @@ const debouncedUpdateReasons = debounce(
         canvasIsRasterizing,
         canvasIsCompositing,
         canvasIsSelectingObject,
-        areApiModelsEnabled,
+        areChatGPT4oModelsEnabled,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
@@ -152,7 +152,7 @@ export const useReadinessWatcher = () => {
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const isInPublishFlow = useStore($isInPublishFlow);
-  const areApiModelsEnabled = useFeatureStatus('apiModels');
+  const areChatGPT4oModelsEnabled = useFeatureStatus('chatGPT4oModels');
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -173,7 +173,7 @@ export const useReadinessWatcher = () => {
       config,
       store,
       isInPublishFlow,
-      areApiModelsEnabled
+      areChatGPT4oModelsEnabled
     );
   }, [
     store,
@@ -193,7 +193,7 @@ export const useReadinessWatcher = () => {
     upscale,
     workflowSettings,
     isInPublishFlow,
-    areApiModelsEnabled,
+    areChatGPT4oModelsEnabled,
   ]);
 };
 
@@ -341,7 +341,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsRasterizing: boolean;
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
-  areApiModelsEnabled: boolean;
+  areChatGPT4oModelsEnabled: boolean;
 }) => {
   const {
     isConnected,
@@ -354,7 +354,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsRasterizing,
     canvasIsCompositing,
     canvasIsSelectingObject,
-    areApiModelsEnabled,
+    areChatGPT4oModelsEnabled,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -487,7 +487,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
-  if ((model?.base === 'imagen3' || model?.base === 'chatgpt-4o') && !areApiModelsEnabled) {
+  if (model?.base === 'chatgpt-4o' && !areChatGPT4oModelsEnabled) {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
   }
 

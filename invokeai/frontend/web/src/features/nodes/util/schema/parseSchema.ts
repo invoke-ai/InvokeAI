@@ -161,8 +161,15 @@ export const parseSchema = (
           fieldType.batch = true;
         }
 
-        const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
-        inputsAccumulator[propertyName] = fieldInputTemplate;
+        try {
+          const fieldInputTemplate = buildFieldInputTemplate(property, propertyName, fieldType);
+          inputsAccumulator[propertyName] = fieldInputTemplate;
+        } catch {
+          log.error(
+            { node: type, field: propertyName, schema: parseify(property) },
+            'Problem building input field template'
+          );
+        }
 
         return inputsAccumulator;
       },
@@ -226,9 +233,16 @@ export const parseSchema = (
           fieldType.batch = true;
         }
 
-        const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);
+        try {
+          const fieldOutputTemplate = buildFieldOutputTemplate(property, propertyName, fieldType);
+          outputsAccumulator[propertyName] = fieldOutputTemplate;
+        } catch {
+          log.error(
+            { node: type, field: propertyName, schema: parseify(property) },
+            'Problem building output field template'
+          );
+        }
 
-        outputsAccumulator[propertyName] = fieldOutputTemplate;
         return outputsAccumulator;
       },
       {} as Record<string, FieldOutputTemplate>

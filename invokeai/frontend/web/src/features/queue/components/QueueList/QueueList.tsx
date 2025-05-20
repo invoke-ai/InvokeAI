@@ -56,10 +56,15 @@ const QueueList = () => {
     return () => osInstance()?.destroy();
   }, [scroller, initialize, osInstance]);
 
-  const { data: listQueueItemsData, isLoading } = useListQueueItemsQuery({
-    cursor: listCursor,
-    priority: listPriority,
-  });
+  const { data: listQueueItemsData, isLoading } = useListQueueItemsQuery(
+    {
+      cursor: listCursor,
+      priority: listPriority,
+    },
+    {
+      refetchOnMountOrArgChange: true,
+    }
+  );
 
   const queueItems = useMemo(() => {
     if (!listQueueItemsData) {

@@ -73,9 +73,9 @@ class InvocationStatsService(InvocationStatsServiceBase):
             )
             self._stats[graph_execution_state_id].add_node_execution_stats(node_stats)
 
-    def reset_stats(self):
-        self._stats = {}
-        self._cache_stats = {}
+    def reset_stats(self, graph_execution_state_id: str) -> None:
+        self._stats.pop(graph_execution_state_id, None)
+        self._cache_stats.pop(graph_execution_state_id, None)
 
     def get_stats(self, graph_execution_state_id: str) -> InvocationStatsSummary:
         graph_stats_summary = self._get_graph_summary(graph_execution_state_id)

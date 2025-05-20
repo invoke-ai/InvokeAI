@@ -424,7 +424,7 @@ class Graph(BaseModel):
                 )
 
             # input fields are on the node
-            if edge.destination.field not in destination_node.model_fields:
+            if edge.destination.field not in type(destination_node).model_fields:
                 raise NodeFieldNotFoundError(
                     f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
                 )

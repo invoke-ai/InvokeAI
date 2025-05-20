@@ -29,6 +29,9 @@ from invokeai.backend.model_manager.legacy_probe import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.util.logging import InvokeAILogger
+from scripts.strip_models import StrippedModelOnDisk
+
+logger = InvokeAILogger.get_logger(__file__)
 
 
 @pytest.mark.parametrize(
@@ -156,7 +159,8 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
             pass
 
         try:
-            new_config = ModelConfigBase.classify(path, hash=fake_hash, key=fake_key)
+            stripped_mod = StrippedModelOnDisk(path)
+            new_config = ModelConfigBase.classify(stripped_mod, hash=fake_hash, key=fake_key)
         except InvalidModelConfigException:
             pass
 
@@ -165,10 +169,10 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
             assert legacy_config.model_dump_json() == new_config.model_dump_json()
 
         elif legacy_config:
-            assert type(legacy_config) in ModelConfigBase._USING_LEGACY_PROBE
+            assert type(legacy_config) in ModelConfigBase.USING_LEGACY_PROBE
 
         elif new_config:
-            assert type(new_config) in ModelConfigBase._USING_CLASSIFY_API
+            assert type(new_config) in ModelConfigBase.USING_CLASSIFY_API
 
         else:
             raise ValueError(f"Both probe and classify failed to classify model at path {path}.")
@@ -177,7 +181,6 @@ def test_regression_against_model_probe(datadir: Path, override_model_loading):
         configs_with_tests.add(config_type)
 
     untested_configs = ModelConfigBase.all_config_classes() - configs_with_tests - {MinimalConfigExample}
-    logger = InvokeAILogger.get_logger(__file__)
     logger.warning(f"Function test_regression_against_model_probe missing test case for: {untested_configs}")
 
 
@@ -255,3 +258,13 @@ def test_any_model_config_includes_all_config_classes():
 
     expected = set(ModelConfigBase.all_config_classes()) - {MinimalConfigExample}
     assert extracted == expected
+
+
+def test_config_uniquely_matches_model(datadir: Path):
+    model_paths = ModelSearch().search(datadir / "stripped_models")
+    for path in model_paths:
+        mod = StrippedModelOnDisk(path)
+        matches = {cls for cls in ModelConfigBase.USING_CLASSIFY_API if cls.matches(mod)}
+        assert len(matches) <= 1, f"Model at path {path} matches multiple config classes: {matches}"
+        if not matches:
+            logger.warning(f"Model at path {path} does not match any config classes using classify API.")

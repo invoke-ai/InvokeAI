@@ -371,7 +371,10 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         if use_ip_adapter or use_regional_prompting:
             ip_adapters: Optional[List[UNetIPAdapterData]] = (
-                [{"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks} for ipa in ip_adapter_data]
+                [
+                    {"ip_adapter": ipa.ip_adapter_model, "target_blocks": ipa.target_blocks, "method": ipa.method}
+                    for ipa in ip_adapter_data
+                ]
                 if use_ip_adapter
                 else None
             )

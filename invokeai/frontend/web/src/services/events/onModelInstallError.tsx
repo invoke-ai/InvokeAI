@@ -18,7 +18,7 @@ import { assert } from 'tsafe';
 const log = logger('events');
 const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 
-export const UNAUTHORIZED_TOAST_ID = getPrefixedId('unauthorized-toast');
+const UNAUTHORIZED_TOAST_ID = getPrefixedId('unauthorized-toast');
 const FORBIDDEN_TOAST_ID = getPrefixedId('forbidden-toast');
 
 const getHFTokenStatusToastTitle = (token_status: S['HFTokenStatus']) => {

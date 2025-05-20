@@ -13,6 +13,12 @@ from invokeai.backend.patches.layers.lora_layer import LoRALayer
 
 def linear_lora_forward(input: torch.Tensor, lora_layer: LoRALayer, lora_weight: float) -> torch.Tensor:
     """An optimized implementation of the residual calculation for a sidecar linear LoRALayer."""
+    # up matrix and down matrix have different ranks so we can't simply multiply them
+    if lora_layer.up.shape[1] != lora_layer.down.shape[0]:
+        x = torch.nn.functional.linear(input, lora_layer.get_weight(lora_weight), bias=lora_layer.bias)
+        x *= lora_weight * lora_layer.scale()
+        return x
+
     x = torch.nn.functional.linear(input, lora_layer.down)
     if lora_layer.mid is not None:
         x = torch.nn.functional.linear(x, lora_layer.mid)

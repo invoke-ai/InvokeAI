@@ -21,14 +21,14 @@ class IdealSizeOutput(BaseInvocationOutput):
     "ideal_size",
     title="Ideal Size - SD1.5, SDXL",
     tags=["latents", "math", "ideal_size"],
-    version="1.0.5",
+    version="1.0.6",
 )
 class IdealSizeInvocation(BaseInvocation):
     """Calculates the ideal size for generation to avoid duplication"""
 
     width: int = InputField(default=1024, description="Final image width")
     height: int = InputField(default=576, description="Final image height")
-    unet: UNetField = InputField(default=None, description=FieldDescriptions.unet)
+    unet: UNetField = InputField(description=FieldDescriptions.unet)
     multiplier: float = InputField(
         default=1.0,
         description="Amount to multiply the model's dimensions by when calculating the ideal size (may result in "

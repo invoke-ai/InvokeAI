@@ -31,6 +31,7 @@ class IPAdapterField(BaseModel):
     image_encoder_model: ModelIdentifierField = Field(description="The name of the CLIP image encoder model.")
     weight: Union[float, List[float]] = Field(default=1, description="The weight given to the IP-Adapter.")
     target_blocks: List[str] = Field(default=[], description="The IP Adapter blocks to apply")
+    method: str = Field(default="full", description="Weight apply method")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the IP-Adapter is first applied (% of total steps)"
     )
@@ -94,7 +95,7 @@ class IPAdapterInvocation(BaseInvocation):
     weight: Union[float, List[float]] = InputField(
         default=1, description="The weight given to the IP-Adapter", title="Weight"
     )
-    method: Literal["full", "style", "composition"] = InputField(
+    method: Literal["full", "style", "composition", "style_strong", "style_precise"] = InputField(
         default="full", description="The method to apply the IP-Adapter"
     )
     begin_step_percent: float = InputField(
@@ -147,6 +148,38 @@ class IPAdapterInvocation(BaseInvocation):
                 target_blocks = ["down_blocks.2.attentions.1"]
             else:
                 raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "style_precise":
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.1", "down_blocks.2", "mid_block"]
+            elif ip_adapter_info.base == "sdxl":
+                target_blocks = ["up_blocks.0.attentions.1", "down_blocks.2.attentions.1"]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
+        elif self.method == "style_strong":
+            if ip_adapter_info.base == "sd-1":
+                target_blocks = ["up_blocks.0", "up_blocks.1", "up_blocks.2", "down_blocks.0", "down_blocks.1"]
+            elif ip_adapter_info.base == "sdxl":
+                target_blocks = [
+                    "up_blocks.0.attentions.1",
+                    "up_blocks.1.attentions.1",
+                    "up_blocks.2.attentions.1",
+                    "up_blocks.0.attentions.2",
+                    "up_blocks.1.attentions.2",
+                    "up_blocks.2.attentions.2",
+                    "up_blocks.0.attentions.0",
+                    "up_blocks.1.attentions.0",
+                    "up_blocks.2.attentions.0",
+                    "down_blocks.0.attentions.0",
+                    "down_blocks.0.attentions.1",
+                    "down_blocks.0.attentions.2",
+                    "down_blocks.1.attentions.0",
+                    "down_blocks.1.attentions.1",
+                    "down_blocks.1.attentions.2",
+                    "down_blocks.2.attentions.0",
+                    "down_blocks.2.attentions.2",
+                ]
+            else:
+                raise ValueError(f"Unsupported IP-Adapter base type: '{ip_adapter_info.base}'.")
         elif self.method == "full":
             target_blocks = ["block"]
         else:
@@ -162,6 +195,7 @@ class IPAdapterInvocation(BaseInvocation):
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
                 mask=self.mask,
+                method=self.method,
             ),
         )
 

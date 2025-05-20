@@ -22,6 +22,7 @@ from invokeai.app.api.routers import (
     download_queue,
     images,
     model_manager,
+    model_relationships,
     session_queue,
     style_presets,
     utilities,
@@ -125,6 +126,7 @@ app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
+app.include_router(model_relationships.model_relationships_router, prefix="/api")
 app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")

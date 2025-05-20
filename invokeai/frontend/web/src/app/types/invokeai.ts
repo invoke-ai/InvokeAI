@@ -29,7 +29,7 @@ export type AppFeature =
   | 'hfToken'
   | 'retryQueueItem'
   | 'cancelAndClearAll'
-  | 'apiModels';
+  | 'chatGPT4oModels';
 /**
  * A disable-able Stable Diffusion feature
  */
@@ -84,6 +84,7 @@ export type AppConfig = {
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
   isLocal?: boolean;
+  shouldShowCredits: boolean;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];

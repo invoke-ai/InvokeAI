@@ -27,6 +27,10 @@ if TYPE_CHECKING:
     from invokeai.app.services.invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from invokeai.app.services.model_images.model_images_base import ModelImageFileStorageBase
     from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
+    from invokeai.app.services.model_relationship_records.model_relationship_records_base import (
+        ModelRelationshipRecordStorageBase,
+    )
+    from invokeai.app.services.model_relationships.model_relationships_base import ModelRelationshipsServiceABC
     from invokeai.app.services.names.names_base import NameServiceBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
@@ -54,6 +58,8 @@ class InvocationServices:
         logger: "Logger",
         model_images: "ModelImageFileStorageBase",
         model_manager: "ModelManagerServiceBase",
+        model_relationships: "ModelRelationshipsServiceABC",
+        model_relationship_records: "ModelRelationshipRecordStorageBase",
         download_queue: "DownloadQueueServiceBase",
         performance_statistics: "InvocationStatsServiceBase",
         session_queue: "SessionQueueBase",
@@ -81,6 +87,8 @@ class InvocationServices:
         self.logger = logger
         self.model_images = model_images
         self.model_manager = model_manager
+        self.model_relationships = model_relationships
+        self.model_relationship_records = model_relationship_records
         self.download_queue = download_queue
         self.performance_statistics = performance_statistics
         self.session_queue = session_queue

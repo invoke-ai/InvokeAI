@@ -3,6 +3,7 @@ export const COLUMN_WIDTHS = {
   statusBadge: '5.7rem',
   statusDot: 2,
   time: '4rem',
+  credits: '4rem',
   origin: '5rem',
   destination: '6rem',
   batchId: '5rem',

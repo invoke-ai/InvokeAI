@@ -608,6 +608,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     end_step_percent=single_ip_adapter.end_step_percent,
                     ip_adapter_conditioning=IPAdapterConditioningInfo(image_prompt_embeds, uncond_image_prompt_embeds),
                     mask=mask,
+                    method=single_ip_adapter.method,
                 )
             )
 

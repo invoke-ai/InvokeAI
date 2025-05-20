@@ -19,6 +19,7 @@ import {
   isFluxMainModelModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
+  isImagen3ModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
@@ -89,6 +90,8 @@ export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
 export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);
+export const useImagen3Models = buildModelsHook(isImagen3ModelConfig);
+export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
 
 // const buildModelsSelector =
 //   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>

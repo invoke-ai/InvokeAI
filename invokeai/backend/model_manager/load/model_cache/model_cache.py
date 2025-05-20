@@ -2,9 +2,10 @@ import gc
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from functools import wraps
 from logging import Logger
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 import psutil
 import torch
@@ -52,6 +53,39 @@ def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
             return method(self, *args, **kwargs)
 
     return wrapper
+
+
+@dataclass
+class CacheEntrySnapshot:
+    cache_key: str
+    total_bytes: int
+    current_vram_bytes: int
+
+
+class CacheMissCallback(Protocol):
+    def __call__(
+        self,
+        model_key: str,
+        cache_snapshot: dict[str, CacheEntrySnapshot],
+    ) -> None: ...
+
+
+class CacheHitCallback(Protocol):
+    def __call__(
+        self,
+        model_key: str,
+        cache_snapshot: dict[str, CacheEntrySnapshot],
+    ) -> None: ...
+
+
+class CacheModelsClearedCallback(Protocol):
+    def __call__(
+        self,
+        models_cleared: int,
+        bytes_requested: int,
+        bytes_freed: int,
+        cache_snapshot: dict[str, CacheEntrySnapshot],
+    ) -> None: ...
 
 
 class ModelCache:
@@ -144,6 +178,34 @@ class ModelCache:
         # - Requests to empty the cache from a separate thread
         self._lock = threading.RLock()
 
+        self._on_cache_hit_callbacks: set[CacheHitCallback] = set()
+        self._on_cache_miss_callbacks: set[CacheMissCallback] = set()
+        self._on_cache_models_cleared_callbacks: set[CacheModelsClearedCallback] = set()
+
+    def on_cache_hit(self, cb: CacheHitCallback) -> Callable[[], None]:
+        self._on_cache_hit_callbacks.add(cb)
+
+        def unsubscribe() -> None:
+            self._on_cache_hit_callbacks.discard(cb)
+
+        return unsubscribe
+
+    def on_cache_miss(self, cb: CacheHitCallback) -> Callable[[], None]:
+        self._on_cache_miss_callbacks.add(cb)
+
+        def unsubscribe() -> None:
+            self._on_cache_miss_callbacks.discard(cb)
+
+        return unsubscribe
+
+    def on_cache_models_cleared(self, cb: CacheModelsClearedCallback) -> Callable[[], None]:
+        self._on_cache_models_cleared_callbacks.add(cb)
+
+        def unsubscribe() -> None:
+            self._on_cache_models_cleared_callbacks.discard(cb)
+
+        return unsubscribe
+
     @property
     @synchronized
     def stats(self) -> Optional[CacheStats]:
@@ -196,6 +258,20 @@ class ModelCache:
         )
 
     @synchronized
+    def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
+        overview: dict[str, CacheEntrySnapshot] = {}
+        for cache_key, cache_entry in self._cached_models.items():
+            total_bytes = cache_entry.cached_model.total_bytes()
+            current_vram_bytes = cache_entry.cached_model.cur_vram_bytes()
+            overview[cache_key] = CacheEntrySnapshot(
+                cache_key=cache_key,
+                total_bytes=total_bytes,
+                current_vram_bytes=current_vram_bytes,
+            )
+
+        return overview
+
+    @synchronized
     def get(self, key: str, stats_name: Optional[str] = None) -> CacheRecord:
         """Retrieve a model from the cache.
 
@@ -208,6 +284,8 @@ class ModelCache:
             if self.stats:
                 self.stats.hits += 1
         else:
+            for cb in self._on_cache_miss_callbacks:
+                cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
             if self.stats:
                 self.stats.misses += 1
             self._logger.debug(f"Cache miss: {key}")
@@ -229,6 +307,8 @@ class ModelCache:
         self._cache_stack.append(key)
 
         self._logger.debug(f"Cache hit: {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
+        for cb in self._on_cache_hit_callbacks:
+            cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
         return cache_entry
 
     @synchronized
@@ -649,6 +729,13 @@ class ModelCache:
             # immediately when their reference count hits 0.
             if self.stats:
                 self.stats.cleared = models_cleared
+            for cb in self._on_cache_models_cleared_callbacks:
+                cb(
+                    models_cleared=models_cleared,
+                    bytes_requested=bytes_needed,
+                    bytes_freed=ram_bytes_freed,
+                    cache_snapshot=self._get_cache_snapshot(),
+                )
             gc.collect()
 
         TorchDevice.empty_cache()
