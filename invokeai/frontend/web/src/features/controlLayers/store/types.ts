@@ -71,7 +71,7 @@ const zRgbColor = z.object({
   b: z.number().int().min(0).max(255),
 });
 export type RgbColor = z.infer<typeof zRgbColor>;
-const zRgbaColor = zRgbColor.extend({
+export const zRgbaColor = zRgbColor.extend({
   a: z.number().min(0).max(1),
 });
 export type RgbaColor = z.infer<typeof zRgbaColor>;

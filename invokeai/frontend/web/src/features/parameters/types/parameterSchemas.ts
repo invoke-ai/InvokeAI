@@ -96,7 +96,7 @@ export type ParameterModel = z.infer<typeof zParameterModel>;
 // #endregion
 
 // #region SDXL Refiner Model
-const zParameterSDXLRefinerModel = zModelIdentifierField;
+export const zParameterSDXLRefinerModel = zModelIdentifierField;
 export type ParameterSDXLRefinerModel = z.infer<typeof zParameterSDXLRefinerModel>;
 // #endregion
 
@@ -188,7 +188,7 @@ export type ParameterSDXLRefinerStart = z.infer<typeof zParameterSDXLRefinerStar
 // #endregion
 
 // #region Mask Blur Method
-const zParameterMaskBlurMethod = z.enum(['box', 'gaussian']);
+export const [zParameterMaskBlurMethod, isParameterMaskBlurMethod] = buildParameter(z.enum(['box', 'gaussian']));
 export type ParameterMaskBlurMethod = z.infer<typeof zParameterMaskBlurMethod>;
 // #endregion
 
