@@ -975,13 +975,13 @@ class SaveImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Canvas Paste Back",
     tags=["image", "combine"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
 )
 class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Combines two images by using the mask provided. Intended for use on the Unified Canvas."""
 
     source_image: ImageField = InputField(description="The source image")
-    target_image: ImageField = InputField(default=None, description="The target image")
+    target_image: ImageField = InputField(description="The target image")
     mask: ImageField = InputField(
         description="The mask to use when pasting",
     )

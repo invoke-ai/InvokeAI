@@ -146,33 +146,35 @@ class ModelConfigBase(ABC, BaseModel):
     )
     usage_info: Optional[str] = Field(default=None, description="Usage information for this model")
 
-    _USING_LEGACY_PROBE: ClassVar[set] = set()
-    _USING_CLASSIFY_API: ClassVar[set] = set()
+    USING_LEGACY_PROBE: ClassVar[set] = set()
+    USING_CLASSIFY_API: ClassVar[set] = set()
     _MATCH_SPEED: ClassVar[MatchSpeed] = MatchSpeed.MED
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if issubclass(cls, LegacyProbeMixin):
-            ModelConfigBase._USING_LEGACY_PROBE.add(cls)
+            ModelConfigBase.USING_LEGACY_PROBE.add(cls)
         else:
-            ModelConfigBase._USING_CLASSIFY_API.add(cls)
+            ModelConfigBase.USING_CLASSIFY_API.add(cls)
 
     @staticmethod
     def all_config_classes():
-        subclasses = ModelConfigBase._USING_LEGACY_PROBE | ModelConfigBase._USING_CLASSIFY_API
+        subclasses = ModelConfigBase.USING_LEGACY_PROBE | ModelConfigBase.USING_CLASSIFY_API
         concrete = {cls for cls in subclasses if not isabstract(cls)}
         return concrete
 
     @staticmethod
-    def classify(model_path: Path, hash_algo: HASHING_ALGORITHMS = "blake3_single", **overrides):
+    def classify(mod: str | Path | ModelOnDisk, hash_algo: HASHING_ALGORITHMS = "blake3_single", **overrides):
         """
         Returns the best matching ModelConfig instance from a model's file/folder path.
         Raises InvalidModelConfigException if no valid configuration is found.
         Created to deprecate ModelProbe.probe
         """
-        candidates = ModelConfigBase._USING_CLASSIFY_API
+        if isinstance(mod, Path | str):
+            mod = ModelOnDisk(mod, hash_algo)
+
+        candidates = ModelConfigBase.USING_CLASSIFY_API
         sorted_by_match_speed = sorted(candidates, key=lambda cls: (cls._MATCH_SPEED, cls.__name__))
-        mod = ModelOnDisk(model_path, hash_algo)
 
         for config_cls in sorted_by_match_speed:
             try:

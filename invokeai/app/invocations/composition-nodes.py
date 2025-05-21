@@ -274,12 +274,12 @@ class InvokeAdjustImageHuePlusInvocation(BaseInvocation, WithMetadata, WithBoard
     title="Enhance Image",
     tags=["enhance", "image"],
     category="image",
-    version="1.2.0",
+    version="1.2.1",
 )
 class InvokeImageEnhanceInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Applies processing from PIL's ImageEnhance module. Originally created by @dwringer"""
 
-    image: ImageField = InputField(default=None, description="The image for which to apply processing")
+    image: ImageField = InputField(description="The image for which to apply processing")
     invert: bool = InputField(default=False, description="Whether to invert the image colors")
     color: float = InputField(ge=0, default=1.0, description="Color enhancement factor")
     contrast: float = InputField(ge=0, default=1.0, description="Contrast enhancement factor")
