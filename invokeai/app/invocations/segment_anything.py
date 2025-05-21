@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from PIL import Image
 from pydantic import BaseModel, Field
-from transformers import AutoModelForMaskGeneration, AutoProcessor
+from transformers import AutoProcessor
 from transformers.models.sam import SamModel
 from transformers.models.sam.processing_sam import SamProcessor
 
@@ -104,14 +104,13 @@ class SegmentAnythingInvocation(BaseInvocation):
 
     @staticmethod
     def _load_sam_model(model_path: Path):
-        sam_model = AutoModelForMaskGeneration.from_pretrained(
+        sam_model = SamModel.from_pretrained(
             model_path,
             local_files_only=True,
             # TODO(ryand): Setting the torch_dtype here doesn't work. Investigate whether fp16 is supported by the
             # model, and figure out how to make it work in the pipeline.
             # torch_dtype=TorchDevice.choose_torch_dtype(),
         )
-        assert isinstance(sam_model, SamModel)
 
         sam_processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
         assert isinstance(sam_processor, SamProcessor)
