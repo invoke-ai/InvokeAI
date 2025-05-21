@@ -70,7 +70,9 @@ import type {
   T2IAdapterConfig,
 } from './types';
 import {
+  DEFAULT_ASPECT_RATIO_CONFIG,
   getEntityIdentifier,
+  getInitialState,
   isChatGPT4oAspectRatioID,
   isFluxKontextAspectRatioID,
   isImagenAspectRatioID,
@@ -93,55 +95,9 @@ import {
   initialT2IAdapter,
 } from './util';
 
-/**
- * Gets a fresh canvas initial state with no references in memory to existing objects.
- */
-const getInitialState = (): CanvasState => {
-  const initialInpaintMaskState = getInpaintMaskState(getPrefixedId('inpaint_mask'));
-  const initialState: CanvasState = {
-    _version: 3,
-    selectedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-    bookmarkedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-    rasterLayers: {
-      isHidden: false,
-      entities: [],
-    },
-    controlLayers: {
-      isHidden: false,
-      entities: [],
-    },
-    inpaintMasks: {
-      isHidden: false,
-      entities: [initialInpaintMaskState],
-    },
-    regionalGuidance: {
-      isHidden: false,
-      entities: [],
-    },
-    referenceImages: { entities: [] },
-    bbox: {
-      rect: { x: 0, y: 0, width: 512, height: 512 },
-      aspectRatio: {
-        id: '1:1',
-        value: 1,
-        isLocked: false,
-      },
-      scaleMethod: 'auto',
-      scaledSize: {
-        width: 512,
-        height: 512,
-      },
-      modelBase: 'sd-1',
-    },
-  };
-  return initialState;
-};
-
-const initialState = getInitialState();
-
 export const canvasSlice = createSlice({
   name: 'canvas',
-  initialState,
+  initialState: getInitialState(),
   reducers: {
     // undoable canvas state
     //#region Raster layers
@@ -1409,7 +1365,7 @@ export const canvasSlice = createSlice({
         state.bbox.rect.width = width;
         state.bbox.rect.height = height;
       } else {
-        state.bbox.aspectRatio = deepClone(initialState.bbox.aspectRatio);
+        state.bbox.aspectRatio = deepClone(DEFAULT_ASPECT_RATIO_CONFIG);
         state.bbox.rect.width = optimalDimension;
         state.bbox.rect.height = optimalDimension;
       }
@@ -1975,7 +1931,7 @@ const migrate = (state: any): any => {
 
 export const canvasPersistConfig: PersistConfig<CanvasState> = {
   name: canvasSlice.name,
-  initialState,
+  initialState: getInitialState(),
   migrate,
   persistDenylist: [],
 };
