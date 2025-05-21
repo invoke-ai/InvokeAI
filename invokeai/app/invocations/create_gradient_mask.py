@@ -51,7 +51,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
 
     mask: ImageField = InputField(description="Image which will be masked", ui_order=1)
     edge_radius: int = InputField(
-        default=16, ge=0, description="How far to erode/expand the edges of the mask", ui_order=2
+        default=16, ge=0, description="How far to expand the edges of the mask", ui_order=2
     )
     coherence_mode: Literal["Gaussian Blur", "Box Blur", "Staged"] = InputField(default="Gaussian Blur", ui_order=3)
     minimum_denoise: float = InputField(
