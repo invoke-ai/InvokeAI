@@ -1,17 +1,16 @@
-import type { AppFeature } from 'app/types/invokeai';
 import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useCallback } from 'react';
 
-export const useIsModelDisabled = (feature: AppFeature) => {
-  const isEnabled = useFeatureStatus(feature);
+export const useIsModelDisabled = () => {
+  const isChatGPT4oHighEnabled = useFeatureStatus('chatGPT4oHigh');
 
-  const isModelDisabled = useCallback(
+  const isChatGPT4oHighModelDisabled = useCallback(
     (model: ParameterModel) => {
-      return model?.base === 'chatgpt-4o' && model.name.toLowerCase().includes('high') && !isEnabled;
+      return model?.base === 'chatgpt-4o' && model.name.toLowerCase().includes('high') && !isChatGPT4oHighEnabled;
     },
-    [isEnabled]
+    [isChatGPT4oHighEnabled]
   );
 
-  return isModelDisabled;
+  return { isChatGPT4oHighModelDisabled };
 };
