@@ -1,3 +1,4 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
@@ -62,3 +63,8 @@ export const selectComparisonImages = createMemoizedSelector(selectGallerySlice,
   const secondImage = gallerySlice.imageToCompare;
   return { firstImage, secondImage };
 });
+export const selectFirstImage = createSelector(
+  selectGallerySlice,
+  (gallerySlice) => gallerySlice.selection.slice(-1)[0] ?? null
+);
+export const selectImageToCompare = createSelector(selectGallerySlice, (gallerySlice) => gallerySlice.imageToCompare);

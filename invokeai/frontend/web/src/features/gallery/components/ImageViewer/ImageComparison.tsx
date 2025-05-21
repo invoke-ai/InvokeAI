@@ -1,42 +1,50 @@
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import type { Dimensions } from 'features/controlLayers/store/types';
-import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
+import type { ComparisonProps } from 'features/gallery/components/ImageViewer/common';
+import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
+import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewer/ImageComparisonDroppable';
 import { ImageComparisonHover } from 'features/gallery/components/ImageViewer/ImageComparisonHover';
 import { ImageComparisonSideBySide } from 'features/gallery/components/ImageViewer/ImageComparisonSideBySide';
 import { ImageComparisonSlider } from 'features/gallery/components/ImageViewer/ImageComparisonSlider';
 import { selectComparisonMode } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiImagesBold } from 'react-icons/pi';
+import { useMeasure } from 'react-use';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 
-type Props = {
-  containerDims: Dimensions;
-};
-
-export const ImageComparison = memo(({ containerDims }: Props) => {
-  const { t } = useTranslation();
+export const ImageComparisonContent = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
   const comparisonMode = useAppSelector(selectComparisonMode);
-  const { firstImage, secondImage } = useAppSelector(selectComparisonImages);
-
-  if (!firstImage || !secondImage) {
-    // Should rarely/never happen - we don't render this component unless we have images to compare
-    return <IAINoContentFallback label={t('gallery.selectAnImageToCompare')} icon={PiImagesBold} />;
-  }
 
   if (comparisonMode === 'slider') {
-    return <ImageComparisonSlider containerDims={containerDims} firstImage={firstImage} secondImage={secondImage} />;
+    return <ImageComparisonSlider firstImage={firstImage} secondImage={secondImage} containerDims={containerDims} />;
   }
 
   if (comparisonMode === 'side-by-side') {
     return (
-      <ImageComparisonSideBySide containerDims={containerDims} firstImage={firstImage} secondImage={secondImage} />
+      <ImageComparisonSideBySide firstImage={firstImage} secondImage={secondImage} containerDims={containerDims} />
     );
   }
 
   if (comparisonMode === 'hover') {
-    return <ImageComparisonHover containerDims={containerDims} firstImage={firstImage} secondImage={secondImage} />;
+    return <ImageComparisonHover firstImage={firstImage} secondImage={secondImage} containerDims={containerDims} />;
   }
+
+  assert<Equals<never, typeof comparisonMode>>(false);
 });
 
+ImageComparisonContent.displayName = 'ImageComparisonContent';
+
+export const ImageComparison = memo(({ firstImage, secondImage }: Omit<ComparisonProps, 'containerDims'>) => {
+  const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
+
+  return (
+    <Flex flexDir="column" w="full" h="full" position="relative">
+      <CompareToolbar />
+      <Box ref={containerRef} w="full" h="full" p={2} overflow="hidden">
+        <ImageComparisonContent firstImage={firstImage} secondImage={secondImage} containerDims={containerDims} />
+      </Box>
+      <ImageComparisonDroppable />
+    </Flex>
+  );
+});
 ImageComparison.displayName = 'ImageComparison';
