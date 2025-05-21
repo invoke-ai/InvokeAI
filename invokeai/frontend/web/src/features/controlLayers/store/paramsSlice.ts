@@ -1,8 +1,8 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
-import { type RgbaColor, zRgbaColor } from 'features/controlLayers/store/types';
+import type { ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import { getInitialParamsState } from 'features/controlLayers/store/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -20,92 +20,13 @@ import type {
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  zParameterCanvasCoherenceMode,
-  zParameterCFGRescaleMultiplier,
-  zParameterCFGScale,
-  zParameterCLIPEmbedModel,
-  zParameterCLIPGEmbedModel,
-  zParameterCLIPLEmbedModel,
-  zParameterControlLoRAModel,
-  zParameterGuidance,
-  zParameterMaskBlurMethod,
-  zParameterModel,
-  zParameterNegativePrompt,
-  zParameterNegativeStylePromptSDXL,
-  zParameterPositivePrompt,
-  zParameterPositiveStylePromptSDXL,
-  zParameterPrecision,
-  zParameterScheduler,
-  zParameterSDXLRefinerModel,
-  zParameterSeed,
-  zParameterSteps,
-  zParameterStrength,
-  zParameterT5EncoderModel,
-  zParameterVAEModel,
-} from 'features/parameters/types/parameterSchemas';
 import { clamp } from 'lodash-es';
-import { z } from 'zod';
 
 import { newSessionRequested } from './actions';
 
-const zParamsState = z.object({
-  maskBlur: z.number().default(16),
-  maskBlurMethod: zParameterMaskBlurMethod.default('box'),
-  canvasCoherenceMode: zParameterCanvasCoherenceMode.default('Gaussian Blur'),
-  canvasCoherenceMinDenoise: zParameterStrength.default(0),
-  canvasCoherenceEdgeSize: z.number().default(16),
-  infillMethod: z.string().default('lama'),
-  infillTileSize: z.number().default(32),
-  infillPatchmatchDownscaleSize: z.number().default(1),
-  infillColorValue: zRgbaColor.default({ r: 0, g: 0, b: 0, a: 1 }),
-  cfgScale: zParameterCFGScale.default(7.5),
-  cfgRescaleMultiplier: zParameterCFGRescaleMultiplier.default(0),
-  guidance: zParameterGuidance.default(4),
-  img2imgStrength: zParameterStrength.default(0.75),
-  optimizedDenoisingEnabled: z.boolean().default(true),
-  iterations: z.number().default(1),
-  scheduler: zParameterScheduler.default('dpmpp_3m_k'),
-  upscaleScheduler: zParameterScheduler.default('kdpm_2'),
-  upscaleCfgScale: zParameterCFGScale.default(2),
-  seed: zParameterSeed.default(0),
-  shouldRandomizeSeed: z.boolean().default(true),
-  steps: zParameterSteps.default(30),
-  model: zParameterModel.nullable().default(null),
-  vae: zParameterVAEModel.nullable().default(null),
-  vaePrecision: zParameterPrecision.default('fp32'),
-  fluxVAE: zParameterVAEModel.nullable().default(null),
-  seamlessXAxis: z.boolean().default(false),
-  seamlessYAxis: z.boolean().default(false),
-  clipSkip: z.number().default(0),
-  shouldUseCpuNoise: z.boolean().default(true),
-  positivePrompt: zParameterPositivePrompt.default(''),
-  negativePrompt: zParameterNegativePrompt.default(''),
-  positivePrompt2: zParameterPositiveStylePromptSDXL.default(''),
-  negativePrompt2: zParameterNegativeStylePromptSDXL.default(''),
-  shouldConcatPrompts: z.boolean().default(true),
-  refinerModel: zParameterSDXLRefinerModel.nullable().default(null),
-  refinerSteps: z.number().default(20),
-  refinerCFGScale: z.number().default(7.5),
-  refinerScheduler: zParameterScheduler.default('euler'),
-  refinerPositiveAestheticScore: z.number().default(6),
-  refinerNegativeAestheticScore: z.number().default(2.5),
-  refinerStart: z.number().default(0.8),
-  t5EncoderModel: zParameterT5EncoderModel.nullable().default(null),
-  clipEmbedModel: zParameterCLIPEmbedModel.nullable().default(null),
-  clipLEmbedModel: zParameterCLIPLEmbedModel.nullable().default(null),
-  clipGEmbedModel: zParameterCLIPGEmbedModel.nullable().default(null),
-  controlLora: zParameterControlLoRAModel.nullable().default(null),
-});
-
-export type ParamsState = z.infer<typeof zParamsState>;
-
-const INITIAL_STATE = zParamsState.parse({});
-const getInitialState = () => deepClone(INITIAL_STATE);
-
 export const paramsSlice = createSlice({
   name: 'params',
-  initialState: getInitialState(),
+  initialState: getInitialParamsState(),
   reducers: {
     setIterations: (state, action: PayloadAction<number>) => {
       state.iterations = action.payload;
@@ -273,7 +194,7 @@ export const paramsSlice = createSlice({
 const resetState = (state: ParamsState): ParamsState => {
   // When a new session is requested, we need to keep the current model selections, plus dependent state
   // like VAE precision. Everything else gets reset to default.
-  const newState = getInitialState();
+  const newState = getInitialParamsState();
   newState.model = state.model;
   newState.vae = state.vae;
   newState.fluxVAE = state.fluxVAE;
@@ -339,7 +260,7 @@ const migrate = (state: any): any => {
 
 export const paramsPersistConfig: PersistConfig<ParamsState> = {
   name: paramsSlice.name,
-  initialState: getInitialState(),
+  initialState: getInitialParamsState(),
   migrate,
   persistDenylist: [],
 };

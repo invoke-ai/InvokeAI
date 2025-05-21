@@ -4,9 +4,29 @@ import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchi
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import {
+  zParameterCanvasCoherenceMode,
+  zParameterCFGRescaleMultiplier,
+  zParameterCFGScale,
+  zParameterCLIPEmbedModel,
+  zParameterCLIPGEmbedModel,
+  zParameterCLIPLEmbedModel,
+  zParameterControlLoRAModel,
+  zParameterGuidance,
   zParameterImageDimension,
+  zParameterMaskBlurMethod,
+  zParameterModel,
   zParameterNegativePrompt,
+  zParameterNegativeStylePromptSDXL,
   zParameterPositivePrompt,
+  zParameterPositiveStylePromptSDXL,
+  zParameterPrecision,
+  zParameterScheduler,
+  zParameterSDXLRefinerModel,
+  zParameterSeed,
+  zParameterSteps,
+  zParameterStrength,
+  zParameterT5EncoderModel,
+  zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -467,6 +487,59 @@ const zBboxState = z.object({
   scaleMethod: zBoundingBoxScaleMethod,
   modelBase: zMainModelBase,
 });
+
+const zParamsState = z.object({
+  maskBlur: z.number().default(16),
+  maskBlurMethod: zParameterMaskBlurMethod.default('box'),
+  canvasCoherenceMode: zParameterCanvasCoherenceMode.default('Gaussian Blur'),
+  canvasCoherenceMinDenoise: zParameterStrength.default(0),
+  canvasCoherenceEdgeSize: z.number().default(16),
+  infillMethod: z.string().default('lama'),
+  infillTileSize: z.number().default(32),
+  infillPatchmatchDownscaleSize: z.number().default(1),
+  infillColorValue: zRgbaColor.default({ r: 0, g: 0, b: 0, a: 1 }),
+  cfgScale: zParameterCFGScale.default(7.5),
+  cfgRescaleMultiplier: zParameterCFGRescaleMultiplier.default(0),
+  guidance: zParameterGuidance.default(4),
+  img2imgStrength: zParameterStrength.default(0.75),
+  optimizedDenoisingEnabled: z.boolean().default(true),
+  iterations: z.number().default(1),
+  scheduler: zParameterScheduler.default('dpmpp_3m_k'),
+  upscaleScheduler: zParameterScheduler.default('kdpm_2'),
+  upscaleCfgScale: zParameterCFGScale.default(2),
+  seed: zParameterSeed.default(0),
+  shouldRandomizeSeed: z.boolean().default(true),
+  steps: zParameterSteps.default(30),
+  model: zParameterModel.nullable().default(null),
+  vae: zParameterVAEModel.nullable().default(null),
+  vaePrecision: zParameterPrecision.default('fp32'),
+  fluxVAE: zParameterVAEModel.nullable().default(null),
+  seamlessXAxis: z.boolean().default(false),
+  seamlessYAxis: z.boolean().default(false),
+  clipSkip: z.number().default(0),
+  shouldUseCpuNoise: z.boolean().default(true),
+  positivePrompt: zParameterPositivePrompt.default(''),
+  negativePrompt: zParameterNegativePrompt.default(''),
+  positivePrompt2: zParameterPositiveStylePromptSDXL.default(''),
+  negativePrompt2: zParameterNegativeStylePromptSDXL.default(''),
+  shouldConcatPrompts: z.boolean().default(true),
+  refinerModel: zParameterSDXLRefinerModel.nullable().default(null),
+  refinerSteps: z.number().default(20),
+  refinerCFGScale: z.number().default(7.5),
+  refinerScheduler: zParameterScheduler.default('euler'),
+  refinerPositiveAestheticScore: z.number().default(6),
+  refinerNegativeAestheticScore: z.number().default(2.5),
+  refinerStart: z.number().default(0.8),
+  t5EncoderModel: zParameterT5EncoderModel.nullable().default(null),
+  clipEmbedModel: zParameterCLIPEmbedModel.nullable().default(null),
+  clipLEmbedModel: zParameterCLIPLEmbedModel.nullable().default(null),
+  clipGEmbedModel: zParameterCLIPGEmbedModel.nullable().default(null),
+  controlLora: zParameterControlLoRAModel.nullable().default(null),
+});
+export type ParamsState = z.infer<typeof zParamsState>;
+const INITIAL_PARAMS_STATE = zParamsState.parse({});
+export const getInitialParamsState = () => deepClone(INITIAL_PARAMS_STATE);
+
 const zCanvasState = z.object({
   _version: z.literal(3).default(3),
   isSessionStarted: z.boolean().default(false),
@@ -518,7 +591,7 @@ export type CanvasState = z.infer<typeof zCanvasState>;
  * Gets a fresh canvas initial state with no references in memory to existing objects.
  */
 const CANVAS_INITIAL_STATE = zCanvasState.parse({});
-export const getInitialState = () => deepClone(CANVAS_INITIAL_STATE);
+export const getInitialCanvasState = () => deepClone(CANVAS_INITIAL_STATE);
 
 export const zCanvasMetadata = z.object({
   inpaintMasks: z.array(zCanvasInpaintMaskState),
