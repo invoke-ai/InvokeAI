@@ -1,3 +1,4 @@
+import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
@@ -419,50 +420,86 @@ export const isChatGPT4oAspectRatioID = (v: unknown): v is z.infer<typeof zChatG
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: unknown): v is AspectRatioID => zAspectRatioID.safeParse(v).success;
 
+const zAspectRatioConfig = z.object({
+  id: zAspectRatioID,
+  value: z.number().gt(0),
+  isLocked: z.boolean(),
+});
+type AspectRatioConfig = z.infer<typeof zAspectRatioConfig>;
+
+export const DEFAULT_ASPECT_RATIO_CONFIG: AspectRatioConfig = {
+  id: '1:1',
+  value: 1,
+  isLocked: false,
+};
+
+const zBboxState = z.object({
+  rect: z.object({
+    x: z.number().int(),
+    y: z.number().int(),
+    width: zParameterImageDimension,
+    height: zParameterImageDimension,
+  }),
+  aspectRatio: zAspectRatioConfig,
+  scaledSize: z.object({
+    width: zParameterImageDimension,
+    height: zParameterImageDimension,
+  }),
+  scaleMethod: zBoundingBoxScaleMethod,
+  modelBase: zMainModelBase,
+});
 const zCanvasState = z.object({
-  _version: z.literal(3),
-  selectedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
-  bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
-  inpaintMasks: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasInpaintMaskState),
-  }),
-  rasterLayers: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasRasterLayerState),
-  }),
-  controlLayers: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasControlLayerState),
-  }),
-  regionalGuidance: z.object({
-    isHidden: z.boolean(),
-    entities: z.array(zCanvasRegionalGuidanceState),
-  }),
-  referenceImages: z.object({
-    entities: z.array(zCanvasReferenceImageState),
-  }),
-  bbox: z.object({
-    rect: z.object({
-      x: z.number().int(),
-      y: z.number().int(),
-      width: zParameterImageDimension,
-      height: zParameterImageDimension,
-    }),
-    aspectRatio: z.object({
-      id: zAspectRatioID,
-      value: z.number().gt(0),
-      isLocked: z.boolean(),
-    }),
-    scaledSize: z.object({
-      width: zParameterImageDimension,
-      height: zParameterImageDimension,
-    }),
-    scaleMethod: zBoundingBoxScaleMethod,
-    modelBase: zMainModelBase,
+  _version: z.literal(3).default(3),
+  isSessionStarted: z.boolean().default(false),
+  selectedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
+  bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
+  inpaintMasks: z
+    .object({
+      isHidden: z.boolean(),
+      entities: z.array(zCanvasInpaintMaskState),
+    })
+    .default({ isHidden: false, entities: [] }),
+  rasterLayers: z
+    .object({
+      isHidden: z.boolean(),
+      entities: z.array(zCanvasRasterLayerState),
+    })
+    .default({ isHidden: false, entities: [] }),
+  controlLayers: z
+    .object({
+      isHidden: z.boolean(),
+      entities: z.array(zCanvasControlLayerState),
+    })
+    .default({ isHidden: false, entities: [] }),
+  regionalGuidance: z
+    .object({
+      isHidden: z.boolean(),
+      entities: z.array(zCanvasRegionalGuidanceState),
+    })
+    .default({ isHidden: false, entities: [] }),
+  referenceImages: z
+    .object({
+      entities: z.array(zCanvasReferenceImageState),
+    })
+    .default({ entities: [] }),
+  bbox: zBboxState.default({
+    rect: { x: 0, y: 0, width: 512, height: 512 },
+    aspectRatio: DEFAULT_ASPECT_RATIO_CONFIG,
+    scaleMethod: 'auto',
+    scaledSize: {
+      width: 512,
+      height: 512,
+    },
+    modelBase: 'sd-1',
   }),
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
+
+/**
+ * Gets a fresh canvas initial state with no references in memory to existing objects.
+ */
+const CANVAS_INITIAL_STATE = zCanvasState.parse({});
+export const getInitialState = () => deepClone(CANVAS_INITIAL_STATE);
 
 export const zCanvasMetadata = z.object({
   inpaintMasks: z.array(zCanvasInpaintMaskState),
