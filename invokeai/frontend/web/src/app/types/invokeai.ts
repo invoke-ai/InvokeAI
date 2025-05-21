@@ -29,7 +29,7 @@ export type AppFeature =
   | 'hfToken'
   | 'retryQueueItem'
   | 'cancelAndClearAll'
-  | 'chatGPT4oModels';
+  | 'chatGPT4oHigh';
 /**
  * A disable-able Stable Diffusion feature
  */
