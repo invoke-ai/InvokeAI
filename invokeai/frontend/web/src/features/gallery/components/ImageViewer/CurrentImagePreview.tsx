@@ -1,29 +1,23 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { selectLastSelectedImageName } from 'features/gallery/store/gallerySelectors';
 import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { $hasProgressImage, $isProgressFromCanvas } from 'services/events/stores';
 
 import { NoContentForViewer } from './NoContentForViewer';
 import ProgressImage from './ProgressImage';
 
-const CurrentImagePreview = () => {
+const CurrentImagePreview = ({ imageDTO }: { imageDTO?: ImageDTO }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
-  const imageName = useAppSelector(selectLastSelectedImageName);
-
-  const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
