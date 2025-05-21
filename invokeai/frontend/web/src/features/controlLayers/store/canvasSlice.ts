@@ -72,7 +72,7 @@ import type {
 import {
   DEFAULT_ASPECT_RATIO_CONFIG,
   getEntityIdentifier,
-  getInitialState,
+  getInitialCanvasState,
   isChatGPT4oAspectRatioID,
   isImagenAspectRatioID,
   isRenderableEntity,
@@ -95,7 +95,7 @@ import {
 
 export const canvasSlice = createSlice({
   name: 'canvas',
-  initialState: getInitialState(),
+  initialState: getInitialCanvasState(),
   reducers: {
     // undoable canvas state
     //#region Raster layers
@@ -1660,7 +1660,7 @@ export const canvasSlice = createSlice({
     },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
-      const initialState = getInitialState();
+      const initialState = getInitialCanvasState();
       state.rasterLayers = initialState.rasterLayers;
       state.controlLayers = initialState.controlLayers;
       state.inpaintMasks = initialState.inpaintMasks;
@@ -1724,7 +1724,7 @@ export const canvasSlice = createSlice({
 });
 
 const resetState = (state: CanvasState) => {
-  const newState = getInitialState();
+  const newState = getInitialCanvasState();
 
   // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
   // from the old state, then recalculate the bbox size & scaled size.
@@ -1840,7 +1840,7 @@ const migrate = (state: any): any => {
 
 export const canvasPersistConfig: PersistConfig<CanvasState> = {
   name: canvasSlice.name,
-  initialState: getInitialState(),
+  initialState: getInitialCanvasState(),
   migrate,
   persistDenylist: [],
 };
