@@ -153,7 +153,7 @@ export const useReadinessWatcher = () => {
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const isInPublishFlow = useStore($isInPublishFlow);
-  const isChatGPT4oHighModelDisabled = useIsModelDisabled('chatGPT4oHigh');
+  const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
 
   useEffect(() => {
     debouncedUpdateReasons(

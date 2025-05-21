@@ -11,7 +11,7 @@ export const DisabledModelWarning = () => {
   const model = useAppSelector(selectModel);
 
   const accountSettingsLink = useStore($accountSettingsLink);
-  const isChatGPT4oHighModelDisabled = useIsModelDisabled('chatGPT4oHigh');
+  const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
 
   if (!model || !isChatGPT4oHighModelDisabled(model)) {
     return null;
