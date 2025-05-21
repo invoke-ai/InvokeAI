@@ -30,6 +30,7 @@ type AddInpaintArg = {
   scaledSize: Dimensions;
   denoising_start: number;
   fp32: boolean;
+  seed: number;
 };
 
 export const addInpaint = async ({
@@ -45,6 +46,7 @@ export const addInpaint = async ({
   scaledSize,
   denoising_start,
   fp32,
+  seed,
 }: AddInpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
   denoise.denoising_start = denoising_start;
 
@@ -127,7 +129,7 @@ export const addInpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: Math.floor(Math.random() * 2147483647), // should this seed match the denoise latents seed?
+        seed: seed, //Math.floor(Math.random() * 2147483647), // should this seed match the denoise latents seed?
       });
 
       g.addEdge(resizeImageToScaledSize, 'image', noiseNode, 'image');
@@ -224,7 +226,7 @@ export const addInpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: Math.floor(Math.random() * 2147483647), // should this seed match the denoise latents seed?
+        seed: seed, // Math.floor(Math.random() * 2147483647), // should this seed match the denoise latents seed?
         mask: { image_name: noiseMaskImage.image_name },
       });
 
