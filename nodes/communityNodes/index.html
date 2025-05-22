@@ -1,0 +1,2792 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="mauwii">
+      
+      
+        <link rel="canonical" href="https://invoke-ai.github.io/InvokeAI/nodes/communityNodes/">
+      
+      
+        <link rel="prev" href="../defaultNodes/">
+      
+      
+        <link rel="next" href="../comfyToInvoke/">
+      
+      
+      <link rel="icon" href="../../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Community Nodes - Invoke</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","G-2X4JR4S4FB"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","G-2X4JR4S4FB",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=G-2X4JR4S4FB",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#community-nodes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Invoke" class="md-header__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Invoke
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Community Nodes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../installation/quick_start/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Installation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Workflows & Nodes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../features/low-vram/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../help/gettingStartedWithAI/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Help
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Invoke" class="md-nav__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    Invoke
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Detailed Requirements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/manual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Manual Install
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Docker
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/patchmatch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PatchMatch
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/legacy_scripts.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Legacy Scripts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Workflows & Nodes
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Workflows & Nodes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nodes Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../NODES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Workflow Editor Basics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../defaultNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    List of Default Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Community Nodes
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Community Nodes
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#adapters-linked-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adapters Linked Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#autostereogram-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Autostereogram Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#average-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      Average Images
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clean-image-artifacts-after-cut" class="md-nav__link">
+    <span class="md-ellipsis">
+      Clean Image Artifacts After Cut
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#close-color-mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      Close Color Mask
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clothing-mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      Clothing Mask
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contrast-limited-adaptive-histogram-equalization" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contrast Limited Adaptive Histogram Equalization
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depth-map-from-wavefront-obj" class="md-nav__link">
+    <span class="md-ellipsis">
+      Depth Map from Wavefront OBJ
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enhance-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enhance Detail
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#film-grain" class="md-nav__link">
+    <span class="md-ellipsis">
+      Film Grain
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generative-grammar-based-prompt-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Generative Grammar-Based Prompt Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpt2randompromptmaker" class="md-nav__link">
+    <span class="md-ellipsis">
+      GPT2RandomPromptMaker
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grid-to-gif" class="md-nav__link">
+    <span class="md-ellipsis">
+      Grid to Gif
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#halftone" class="md-nav__link">
+    <span class="md-ellipsis">
+      Halftone
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hand-refiner-with-meshgraphormer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Hand Refiner with MeshGraphormer
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-and-mask-composition-pack" class="md-nav__link">
+    <span class="md-ellipsis">
+      Image and Mask Composition Pack
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-dominant-color" class="md-nav__link">
+    <span class="md-ellipsis">
+      Image Dominant Color
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-to-character-art-image-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Image to Character Art Image Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-picker" class="md-nav__link">
+    <span class="md-ellipsis">
+      Image Picker
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-resize-plus" class="md-nav__link">
+    <span class="md-ellipsis">
+      Image Resize Plus
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#latent-upscale" class="md-nav__link">
+    <span class="md-ellipsis">
+      Latent Upscale
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#load-video-frame" class="md-nav__link">
+    <span class="md-ellipsis">
+      Load Video Frame
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#make-3d" class="md-nav__link">
+    <span class="md-ellipsis">
+      Make 3D
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mask-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mask Operations
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#match-histogram" class="md-nav__link">
+    <span class="md-ellipsis">
+      Match Histogram
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metadata-linked-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metadata Linked Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#negative-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative Image
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nightmare-promptgen" class="md-nav__link">
+    <span class="md-ellipsis">
+      Nightmare Promptgen
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ollama-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ollama Node
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-button-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      One Button Prompt
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oobabooga" class="md-nav__link">
+    <span class="md-ellipsis">
+      Oobabooga
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prompt-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prompt Tools
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remote-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      Remote Image
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#briaai-remove-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      BriaAI Remove Background
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remove-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      Remove Background
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retroize" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retroize
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stereogram-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Stereogram Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simple-skin-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      Simple Skin Detection
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#size-stepper-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Size Stepper Nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#text-font-to-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      Text font to Image
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thresholding" class="md-nav__link">
+    <span class="md-ellipsis">
+      Thresholding
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unsharp-mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      Unsharp Mask
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#xy-image-to-grid-and-images-to-grids-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      XY Image to Grid and Images to Grids nodes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-node-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Node Template
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disclaimer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Disclaimer
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#help" class="md-nav__link">
+    <span class="md-ellipsis">
+      Help
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comfyToInvoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ComfyUI to InvokeAI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../detailedNodes/faceTools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Facetool Node
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributingNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../NODES_MIGRATION_V3_V4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Migrating from v3 to v4
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../invocation-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Invocation API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Features
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/low-vram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Low VRAM mode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Database
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/dev-environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dev Environment
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Development
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/newContributorChecklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New Contributors
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/LOCAL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Local Development
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Testing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/frontend/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Frontend
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            Frontend
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/state-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    State Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Workflows - Design and Implementation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Documentation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/INVOCATIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/DOWNLOAD_QUEUE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Download Queue
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Translation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorials
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Help
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Help
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Diffusion Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/SAMPLER_CONVERGENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Sampler Convergence
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="community-nodes">Community Nodes<a class="headerlink" href="#community-nodes" title="Permanent link">#</a></h1>
+<p>These are nodes that have been developed by the community, for the community. If you're not sure what a node is, you can learn more about nodes <a href="../overview/">here</a>.</p>
+<p>If you'd like to submit a node for the community, please refer to the <a href="../contributingNodes/">node creation overview</a>.</p>
+<p>To use a node, add the node to the <code>nodes</code> folder found in your InvokeAI install location. </p>
+<p>The suggested method is to use <code>git clone</code> to clone the repository the node is found in. This allows for easy updates of the node in the future. </p>
+<p>If you'd prefer, you can also just download the whole node folder from the linked repository and add it to the <code>nodes</code> folder. </p>
+<p>To use a community workflow, download the <code>.json</code> node graph file and load it into Invoke AI via the <strong>Load Workflow</strong> button in the Workflow Editor. </p>
+<ul>
+<li>Community Nodes<ul>
+<li><a href="#adapters-linked-nodes">Adapters-Linked</a></li>
+<li><a href="#autostereogram-nodes">Autostereogram</a></li>
+<li><a href="#average-images">Average Images</a></li>
+<li><a href="#clean-image-artifacts-after-cut">Clean Image Artifacts After Cut</a></li>
+<li><a href="#close-color-mask">Close Color Mask</a> </li>
+<li><a href="#clothing-mask">Clothing Mask</a></li>
+<li><a href="#contrast-limited-adaptive-histogram-equalization">Contrast Limited Adaptive Histogram Equalization</a></li>
+<li><a href="#depth-map-from-wavefront-obj">Depth Map from Wavefront OBJ</a></li>
+<li><a href="#enhance-detail">Enhance Detail</a></li>
+<li><a href="#film-grain">Film Grain</a></li>
+<li><a href="#generative-grammar-based-prompt-nodes">Generative Grammar-Based Prompt Nodes</a></li>
+<li><a href="#gpt2randompromptmaker">GPT2RandomPromptMaker</a></li>
+<li><a href="#grid-to-gif">Grid to Gif</a></li>
+<li><a href="#halftone">Halftone</a></li>
+<li><a href="#hand-refiner-with-meshgraphormer">Hand Refiner with MeshGraphormer</a></li>
+<li><a href="#image-and-mask-composition-pack">Image and Mask Composition Pack</a></li>
+<li><a href="#image-dominant-color">Image Dominant Color</a></li>
+<li><a href="#image-to-character-art-image-nodes">Image to Character Art Image Nodes</a></li>
+<li><a href="#image-picker">Image Picker</a></li>
+<li><a href="#image-resize-plus">Image Resize Plus</a></li>
+<li><a href="#latent-upscale">Latent Upscale</a></li>
+<li><a href="#load-video-frame">Load Video Frame</a></li>
+<li><a href="#make-3d">Make 3D</a></li>
+<li><a href="#mask-operations">Mask Operations</a></li>
+<li><a href="#match-histogram">Match Histogram</a></li>
+<li><a href="#metadata-linked-nodes">Metadata-Linked</a></li>
+<li><a href="#negative-image">Negative Image</a></li>
+<li><a href="#nightmare-promptgen">Nightmare Promptgen</a></li>
+<li><a href="#ollama-node">Ollama</a></li>
+<li><a href="#one-button-prompt">One Button Prompt</a></li>
+<li><a href="#oobabooga">Oobabooga</a></li>
+<li><a href="#prompt-tools">Prompt Tools</a></li>
+<li><a href="#remote-image">Remote Image</a></li>
+<li><a href="#briaai-remove-background">BriaAI Background Remove</a></li>
+<li><a href="#remove-background">Remove Background</a>    </li>
+<li><a href="#retroize">Retroize</a></li>
+<li><a href="#stereogram-nodes">Stereogram</a></li>
+<li><a href="#size-stepper-nodes">Size Stepper Nodes</a></li>
+<li><a href="#simple-skin-detection">Simple Skin Detection</a></li>
+<li><a href="#text-font-to-image">Text font to Image</a></li>
+<li><a href="#thresholding">Thresholding</a></li>
+<li><a href="#unsharp-mask">Unsharp Mask</a></li>
+<li><a href="#xy-image-to-grid-and-images-to-grids-nodes">XY Image to Grid and Images to Grids nodes</a></li>
+</ul>
+</li>
+<li><a href="#example-node-template">Example Node Template</a></li>
+<li><a href="#disclaimer">Disclaimer</a></li>
+<li><a href="#help">Help</a></li>
+</ul>
+<hr />
+<h3 id="adapters-linked-nodes">Adapters Linked Nodes<a class="headerlink" href="#adapters-linked-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> A set of nodes for linked adapters (ControlNet, IP-Adaptor &amp; T2I-Adapter). This allows multiple adapters to be chained together without using a <code>collect</code> node which means it can be used inside an <code>iterate</code> node without any collecting on every iteration issues.</p>
+<ul>
+<li><code>ControlNet-Linked</code> - Collects ControlNet info to pass to other nodes.</li>
+<li><code>IP-Adapter-Linked</code> - Collects IP-Adapter info to pass to other nodes.</li>
+<li><code>T2I-Adapter-Linked</code> - Collects T2I-Adapter info to pass to other nodes.</li>
+</ul>
+<p>Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these. </p>
+<p><strong>Node Link:</strong> <a href="https://github.com/skunkworxdark/adapters-linked-nodes">https://github.com/skunkworxdark/adapters-linked-nodes</a></p>
+<hr />
+<h3 id="autostereogram-nodes">Autostereogram Nodes<a class="headerlink" href="#autostereogram-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Generate autostereogram images from a depth map. This is not a very practically useful node but more a 90s nostalgic indulgence as I used to love these images as a kid.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/skunkworxdark/autostereogram_nodes">https://github.com/skunkworxdark/autostereogram_nodes</a></p>
+<p><strong>Example Usage:</strong>
+</br>
+<img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider.png" width="200" /> -&gt; <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-depth.png" width="200" /> -&gt; <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-dots.png" width="200" /> <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-pattern.png" width="200" /></p>
+<hr />
+<h3 id="average-images">Average Images<a class="headerlink" href="#average-images" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This node takes in a collection of images of the same size and averages them as output. It converts everything to RGB mode first.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/JPPhoto/average-images-node">https://github.com/JPPhoto/average-images-node</a></p>
+<hr />
+<h3 id="clean-image-artifacts-after-cut">Clean Image Artifacts After Cut<a class="headerlink" href="#clean-image-artifacts-after-cut" title="Permanent link">#</a></h3>
+<p>Description: Removes residual artifacts after an image is separated from its background.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/clean-artifact-after-cut-node">https://github.com/VeyDlin/clean-artifact-after-cut-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/clean-artifact-after-cut-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="close-color-mask">Close Color Mask<a class="headerlink" href="#close-color-mask" title="Permanent link">#</a></h3>
+<p>Description: Generates a mask for images based on a closely matching color, useful for color-based selections.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/close-color-mask-node">https://github.com/VeyDlin/close-color-mask-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/close-color-mask-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="clothing-mask">Clothing Mask<a class="headerlink" href="#clothing-mask" title="Permanent link">#</a></h3>
+<p>Description: Employs a U2NET neural network trained for the segmentation of clothing items in images.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/clothing-mask-node">https://github.com/VeyDlin/clothing-mask-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/clothing-mask-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="contrast-limited-adaptive-histogram-equalization">Contrast Limited Adaptive Histogram Equalization<a class="headerlink" href="#contrast-limited-adaptive-histogram-equalization" title="Permanent link">#</a></h3>
+<p>Description: Enhances local image contrast using adaptive histogram equalization with contrast limiting.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/clahe-node">https://github.com/VeyDlin/clahe-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/clahe-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="depth-map-from-wavefront-obj">Depth Map from Wavefront OBJ<a class="headerlink" href="#depth-map-from-wavefront-obj" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Render depth maps from Wavefront .obj files (triangulated) using this simple 3D renderer utilizing numpy and matplotlib to compute and color the scene. There are simple parameters to change the FOV, camera position, and model orientation.</p>
+<p>To be imported, an .obj must use triangulated meshes, so make sure to enable that option if exporting from a 3D modeling program. This renderer makes each triangle a solid color based on its average depth, so it will cause anomalies if your .obj has large triangles. In Blender, the Remesh modifier can be helpful to subdivide a mesh into small pieces that work well given these limitations.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/dwringer/depth-from-obj-node">https://github.com/dwringer/depth-from-obj-node</a></p>
+<p><strong>Example Usage:</strong>
+</br><img src="https://raw.githubusercontent.com/dwringer/depth-from-obj-node/main/depth_from_obj_usage.jpg" width="500" /></p>
+<hr />
+<h3 id="enhance-detail">Enhance Detail<a class="headerlink" href="#enhance-detail" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> A single node that can enhance the detail in an image. Increase or decrease details in an image using a guided filter (as opposed to the typical Gaussian blur used by most sharpening filters.) Based on the <code>Enhance Detail</code> ComfyUI node from  <a href="https://github.com/spacepxl/ComfyUI-Image-Filters">https://github.com/spacepxl/ComfyUI-Image-Filters</a></p>
+<p><strong>Node Link:</strong> <a href="https://github.com/skunkworxdark/enhance-detail-node">https://github.com/skunkworxdark/enhance-detail-node</a></p>
+<p><strong>Example Usage:</strong>
+</br>
+<img src="https://raw.githubusercontent.com/skunkworxdark/enhance-detail-node/refs/heads/main/images/Comparison.png" /></p>
+<hr />
+<h3 id="film-grain">Film Grain<a class="headerlink" href="#film-grain" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This node adds a film grain effect to the input image based on the weights, seeds, and blur radii parameters. It works with RGB input images only.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/JPPhoto/film-grain-node">https://github.com/JPPhoto/film-grain-node</a></p>
+<hr />
+<h3 id="generative-grammar-based-prompt-nodes">Generative Grammar-Based Prompt Nodes<a class="headerlink" href="#generative-grammar-based-prompt-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This set of 3 nodes generates prompts from simple user-defined grammar rules (loaded from custom files - examples provided below). The prompts are made by recursively expanding a special template string, replacing nonterminal "parts-of-speech" until no nonterminal terms remain in the string.</p>
+<p>This includes 3 Nodes:
+- <em>Lookup Table from File</em> - loads a YAML file "prompt" section (or of a whole folder of YAML's) into a JSON-ified dictionary (Lookups output)
+- <em>Lookups Entry from Prompt</em> - places a single entry in a new Lookups output under the specified heading
+- <em>Prompt from Lookup Table</em> - uses a Collection of Lookups as grammar rules from which to randomly generate prompts.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/dwringer/generative-grammar-prompt-nodes">https://github.com/dwringer/generative-grammar-prompt-nodes</a></p>
+<p><strong>Example Usage:</strong>
+</br><img src="https://raw.githubusercontent.com/dwringer/generative-grammar-prompt-nodes/main/lookuptables_usage.jpg" width="500" /></p>
+<hr />
+<h3 id="gpt2randompromptmaker">GPT2RandomPromptMaker<a class="headerlink" href="#gpt2randompromptmaker" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> A node for InvokeAI utilizes the GPT-2 language model to generate random prompts based on a provided seed and context.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/mickr777/GPT2RandomPromptMaker">https://github.com/mickr777/GPT2RandomPromptMaker</a></p>
+<p><strong>Output Examples</strong> </p>
+<p>Generated Prompt: An enchanted weapon will be usable by any character regardless of their alignment.</p>
+<p><img src="https://github.com/mickr777/InvokeAI/assets/115216705/8496ba09-bcdd-4ff7-8076-ff213b6a1e4c" width="200" /></p>
+<hr />
+<h3 id="grid-to-gif">Grid to Gif<a class="headerlink" href="#grid-to-gif" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> One node that turns a grid image into an image collection, one node that turns an image collection into a gif.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/GridToGif.py">https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/GridToGif.py</a></p>
+<p><strong>Example Node Graph:</strong>  <a href="https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/Grid%20to%20Gif%20Example%20Workflow.json">https://github.com/mildmisery/invokeai-GridToGifNode/blob/main/Grid%20to%20Gif%20Example%20Workflow.json</a></p>
+<p><strong>Output Examples</strong> </p>
+<p><img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/input.png" width="300" />
+<img src="https://raw.githubusercontent.com/mildmisery/invokeai-GridToGifNode/main/output.gif" width="300" /></p>
+<hr />
+<h3 id="halftone">Halftone<a class="headerlink" href="#halftone" title="Permanent link">#</a></h3>
+<p><strong>Description</strong>: Halftone converts the source image to grayscale and then performs halftoning. CMYK Halftone converts the image to CMYK and applies a per-channel halftoning to make the source image look like a magazine or newspaper. For both nodes, you can specify angles and halftone dot spacing.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/JPPhoto/halftone-node">https://github.com/JPPhoto/halftone-node</a></p>
+<p><strong>Example</strong></p>
+<p>Input:</p>
+<p><img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/fd5efb9f-4355-4409-a1c2-c1ca99e0cab4" width="300" /></p>
+<p>Halftone Output:</p>
+<p><img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/7e606f29-e68f-4d46-b3d5-97f799a4ec2f" width="300" /></p>
+<p>CMYK Halftone Output:</p>
+<p><img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/c59c578f-db8e-4d66-8c66-2851752d75ea" width="300" /></p>
+<hr />
+<h3 id="hand-refiner-with-meshgraphormer">Hand Refiner with MeshGraphormer<a class="headerlink" href="#hand-refiner-with-meshgraphormer" title="Permanent link">#</a></h3>
+<p><strong>Description</strong>: Hand Refiner takes in your image and automatically generates a fixed depth map for the hands along with a mask of the hands region that will conveniently allow you to use them along with ControlNet to fix the wonky hands generated by Stable Diffusion</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/blessedcoolant/invoke_meshgraphormer">https://github.com/blessedcoolant/invoke_meshgraphormer</a></p>
+<p><strong>View</strong>
+<img src="https://raw.githubusercontent.com/blessedcoolant/invoke_meshgraphormer/main/assets/preview.jpg" /></p>
+<hr />
+<h3 id="image-and-mask-composition-pack">Image and Mask Composition Pack<a class="headerlink" href="#image-and-mask-composition-pack" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This is a pack of nodes for composing masks and images, including a simple text mask creator and both image and latent offset nodes. The offsets wrap around, so these can be used in conjunction with the Seamless node to progressively generate centered on different parts of the seamless tiling.</p>
+<p>This includes 15 Nodes:</p>
+<ul>
+<li><em>Adjust Image Hue Plus</em> - Rotate the hue of an image in one of several different color spaces.</li>
+<li><em>Blend Latents/Noise (Masked)</em> - Use a mask to blend part of one latents tensor [including Noise outputs] into another. Can be used to "renoise" sections during a multi-stage [masked] denoising process.</li>
+<li><em>Enhance Image</em> - Boost or reduce color saturation, contrast, brightness, sharpness, or invert colors of any image at any stage with this simple wrapper for pillow [PIL]'s ImageEnhance module.</li>
+<li><em>Equivalent Achromatic Lightness</em> - Calculates image lightness accounting for Helmholtz-Kohlrausch effect based on a method described by High, Green, and Nussbaum (2023).</li>
+<li><em>Text to Mask (Clipseg)</em> - Input a prompt and an image to generate a mask representing areas of the image matched by the prompt.</li>
+<li><em>Text to Mask Advanced (Clipseg)</em> - Output up to four prompt masks combined with logical "and", logical "or", or as separate channels of an RGBA image.</li>
+<li><em>Image Layer Blend</em> - Perform a layered blend of two images using alpha compositing. Opacity of top layer is selectable, with optional mask and several different blend modes/color spaces.</li>
+<li><em>Image Compositor</em> - Take a subject from an image with a flat backdrop and layer it on another image using a chroma key or flood select background removal.</li>
+<li><em>Image Dilate or Erode</em> - Dilate or expand a mask (or any image!). This is equivalent to an expand/contract operation.</li>
+<li><em>Image Value Thresholds</em> - Clip an image to pure black/white beyond specified thresholds.</li>
+<li><em>Offset Latents</em> - Offset a latents tensor in the vertical and/or horizontal dimensions, wrapping it around.</li>
+<li><em>Offset Image</em> - Offset an image in the vertical and/or horizontal dimensions, wrapping it around.</li>
+<li><em>Rotate/Flip Image</em> - Rotate an image in degrees clockwise/counterclockwise about its center, optionally resizing the image boundaries to fit, or flipping it about the vertical and/or horizontal axes.</li>
+<li><em>Shadows/Highlights/Midtones</em> - Extract three masks (with adjustable hard or soft thresholds) representing shadows, midtones, and highlights regions of an image.</li>
+<li><em>Text Mask (simple 2D)</em> - create and position a white on black (or black on white) line of text using any font locally available to Invoke.</li>
+</ul>
+<p><strong>Node Link:</strong> <a href="https://github.com/dwringer/composition-nodes">https://github.com/dwringer/composition-nodes</a></p>
+<p></br><img src="https://raw.githubusercontent.com/dwringer/composition-nodes/main/composition_pack_overview.jpg" width="500" /></p>
+<hr />
+<h3 id="image-dominant-color">Image Dominant Color<a class="headerlink" href="#image-dominant-color" title="Permanent link">#</a></h3>
+<p>Description: Identifies and extracts the dominant color from an image using k-means clustering.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/image-dominant-color-node">https://github.com/VeyDlin/image-dominant-color-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/image-dominant-color-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="image-to-character-art-image-nodes">Image to Character Art Image Nodes<a class="headerlink" href="#image-to-character-art-image-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Group of nodes to convert an input image into ascii/unicode art Image</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/mickr777/imagetoasciiimage">https://github.com/mickr777/imagetoasciiimage</a></p>
+<p><strong>Output Examples</strong></p>
+<p><img src="https://user-images.githubusercontent.com/115216705/271817646-8e061fcc-9a2c-4fa9-bcc7-c0f7b01e9056.png" width="300" /><img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/3c4990eb-2f42-46b9-90f9-0088b939dc6a" width="300" /></br>
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/fee7f800-a4a8-41e2-a66b-c66e4343307e" width="300" />
+<img src="https://github.com/mickr777/imagetoasciiimage/assets/115216705/1d9c1003-a45f-45c2-aac7-46470bb89330" width="300" /></p>
+<hr />
+<h3 id="image-picker">Image Picker<a class="headerlink" href="#image-picker" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This InvokeAI node takes in a collection of images and randomly chooses one. This can be useful when you have a number of poses to choose from for a ControlNet node, or a number of input images for another purpose.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/JPPhoto/image-picker-node">https://github.com/JPPhoto/image-picker-node</a></p>
+<hr />
+<h3 id="image-resize-plus">Image Resize Plus<a class="headerlink" href="#image-resize-plus" title="Permanent link">#</a></h3>
+<p>Description: Provides various image resizing options such as fill, stretch, fit, center, and crop.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/image-resize-plus-node">https://github.com/VeyDlin/image-resize-plus-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/image-resize-plus-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="latent-upscale">Latent Upscale<a class="headerlink" href="#latent-upscale" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This node uses a small (~2.4mb) model to upscale the latents used in a Stable Diffusion 1.5 or Stable Diffusion XL image generation, rather than the typical interpolation method, avoiding the traditional downsides of the latent upscale technique.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/gogurtenjoyer/latent-upscale">https://github.com/gogurtenjoyer/latent-upscale</a></p>
+<hr />
+<h3 id="load-video-frame">Load Video Frame<a class="headerlink" href="#load-video-frame" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This is a video frame image provider + indexer/video creation nodes for hooking up to iterators and ranges and ControlNets and such for invokeAI node experimentation. Think animation + ControlNet outputs.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/helix4u/load_video_frame">https://github.com/helix4u/load_video_frame</a></p>
+<p><strong>Output Example:</strong> 
+<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/refs/heads/main/_git_assets/dance1736978273.gif" width="500" /></p>
+<hr />
+<h3 id="make-3d">Make 3D<a class="headerlink" href="#make-3d" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Create compelling 3D stereo images from 2D originals.</p>
+<p><strong>Node Link:</strong> <a href="https://gitlab.com/srcrr/shift3d">https://gitlab.com/srcrr/shift3d/-/raw/main/make3d.py</a></p>
+<p><strong>Example Node Graph:</strong>  <a href="https://gitlab.com/srcrr/shift3d/-/raw/main/example-workflow.json?ref_type=heads&amp;inline=false">https://gitlab.com/srcrr/shift3d/-/raw/main/example-workflow.json?ref_type=heads&amp;inline=false</a></p>
+<p><strong>Output Examples</strong> </p>
+<p><img src="https://gitlab.com/srcrr/shift3d/-/raw/main/example-1.png" width="300" />
+<img src="https://gitlab.com/srcrr/shift3d/-/raw/main/example-2.png" width="300" /></p>
+<hr />
+<h3 id="mask-operations">Mask Operations<a class="headerlink" href="#mask-operations" title="Permanent link">#</a></h3>
+<p>Description: Offers logical operations (OR, SUB, AND) for combining and manipulating image masks.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/mask-operations-node">https://github.com/VeyDlin/mask-operations-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/mask-operations-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="match-histogram">Match Histogram<a class="headerlink" href="#match-histogram" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> An InvokeAI node to match a histogram from one image to another.  This is a bit like the <code>color correct</code> node in the main InvokeAI but this works in the YCbCr colourspace and can handle images of different sizes. Also does not require a mask input.
+- Option to only transfer luminance channel.
+- Option to save output as grayscale</p>
+<p>A good use case for this node is to normalize the colors of an image that has been through the tiled scaling workflow of my XYGrid Nodes. </p>
+<p>See full docs here: <a href="https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md">https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md</a></p>
+<p><strong>Node Link:</strong> <a href="https://github.com/skunkworxdark/match_histogram">https://github.com/skunkworxdark/match_histogram</a></p>
+<p><strong>Output Examples</strong> </p>
+<p><img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" /></p>
+<hr />
+<h3 id="metadata-linked-nodes">Metadata Linked Nodes<a class="headerlink" href="#metadata-linked-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> A set of nodes for Metadata. Collect Metadata from within an <code>iterate</code> node &amp; extract metadata from an image.</p>
+<ul>
+<li><code>Metadata Item Linked</code> - Allows collecting of metadata while within an iterate node with no need for a collect node or conversion to metadata node</li>
+<li><code>Metadata From Image</code> - Provides Metadata from an image</li>
+<li><code>Metadata To String</code> - Extracts a String value of a label from metadata</li>
+<li><code>Metadata To Integer</code> - Extracts an Integer value of a label from metadata</li>
+<li><code>Metadata To Float</code> - Extracts a Float value of a label from metadata</li>
+<li><code>Metadata To Scheduler</code> - Extracts a Scheduler value of a label from metadata</li>
+<li><code>Metadata To Bool</code> - Extracts Bool types from metadata</li>
+<li><code>Metadata To Model</code> - Extracts model types from metadata</li>
+<li><code>Metadata To SDXL Model</code> - Extracts SDXL model types from metadata</li>
+<li><code>Metadata To LoRAs</code> - Extracts Loras from metadata. </li>
+<li><code>Metadata To SDXL LoRAs</code> - Extracts SDXL Loras from metadata</li>
+<li><code>Metadata To ControlNets</code> - Extracts ControNets from metadata</li>
+<li><code>Metadata To IP-Adapters</code> - Extracts IP-Adapters from metadata</li>
+<li><code>Metadata To T2I-Adapters</code> - Extracts T2I-Adapters from metadata</li>
+<li><code>Denoise Latents + Metadata</code> - This is an inherited version of the existing <code>Denoise Latents</code> node but with a metadata input and output. </li>
+</ul>
+<p><strong>Node Link:</strong> <a href="https://github.com/skunkworxdark/metadata-linked-nodes">https://github.com/skunkworxdark/metadata-linked-nodes</a></p>
+<hr />
+<h3 id="negative-image">Negative Image<a class="headerlink" href="#negative-image" title="Permanent link">#</a></h3>
+<p>Description: Creates a negative version of an image, effective for visual effects and mask inversion.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/negative-image-node">https://github.com/VeyDlin/negative-image-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/negative-image-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="nightmare-promptgen">Nightmare Promptgen<a class="headerlink" href="#nightmare-promptgen" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Nightmare Prompt Generator - Uses a local text generation model to create unique imaginative (but usually nightmarish) prompts for InvokeAI. By default, it allows you to choose from some gpt-neo models I finetuned on over 2500 of my own InvokeAI prompts in Compel format, but you're able to add your own, as well. Offers support for replacing any troublesome words with a random choice from list you can also define.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/gogurtenjoyer/nightmare-promptgen">https://github.com/gogurtenjoyer/nightmare-promptgen</a></p>
+<hr />
+<h3 id="ollama-node">Ollama Node<a class="headerlink" href="#ollama-node" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Uses Ollama API to expand text prompts for text-to-image generation using local LLMs. Works great for expanding basic prompts into detailed natural language prompts for Flux. Also provides a toggle to unload the LLM model immediately after expanding, to free up VRAM for Invoke to continue the image generation workflow.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/Jonseed/Ollama-Node">https://github.com/Jonseed/Ollama-Node</a></p>
+<p><strong>Example Node Graph:</strong>  <a href="https://github.com/Jonseed/Ollama-Node/blob/main/Ollama-Node-Flux-example.json">https://github.com/Jonseed/Ollama-Node/blob/main/Ollama-Node-Flux-example.json</a></p>
+<p><strong>View:</strong> </p>
+<p><img alt="ollama node" src="https://raw.githubusercontent.com/Jonseed/Ollama-Node/a3e7cdc55e394cb89c1ea7ed54e106c212c85e8c/ollama-node-screenshot.png" /></p>
+<hr />
+<h3 id="one-button-prompt">One Button Prompt<a class="headerlink" href="#one-button-prompt" title="Permanent link">#</a></h3>
+<p><img src="https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/background.png" width="800" /></p>
+<p><strong>Description:</strong> an extensive suite of auto prompt generation and prompt helper nodes based on extensive logic. Get creative with the best prompt generator in the world. </p>
+<p>The main node generates interesting prompts based on a set of parameters. There are also some additional nodes such as Auto Negative Prompt, One Button Artify, Create Prompt Variant and other cool prompt toys to play around with.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI">https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI</a></p>
+<p><strong>Nodes:</strong></p>
+<p><img src="https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/OBP_nodes_invokeai.png" width="800" /></p>
+<hr />
+<h3 id="oobabooga">Oobabooga<a class="headerlink" href="#oobabooga" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> asks a local LLM running in Oobabooga's Text-Generation-Webui to write a prompt based on the user input.</p>
+<p><strong>Link:</strong> <a href="https://github.com/sammyf/oobabooga-node">https://github.com/sammyf/oobabooga-node</a></p>
+<p><strong>Example:</strong></p>
+<p>"describe a new mystical  creature in its natural environment"</p>
+<p><em>can return</em></p>
+<p>"The mystical creature I am describing to you is called the "Glimmerwing". It is a majestic, iridescent being that inhabits the depths of the most enchanted forests and glimmering lakes. Its body is covered in shimmering scales that reflect every color of the rainbow, and it has delicate, translucent wings that sparkle like diamonds in the sunlight. The Glimmerwing's home is a crystal-clear lake, surrounded by towering trees with leaves that shimmer like jewels. In this serene environment, the Glimmerwing spends its days swimming gracefully through the water, chasing schools of glittering fish and playing with the gentle ripples of the lake's surface.
+As the sun sets, the Glimmerwing perches on a branch of one of the trees, spreading its wings to catch the last rays of light. The creature's scales glow softly, casting a rainbow of colors across the forest floor. The Glimmerwing sings a haunting melody, its voice echoing through the stillness of the night air. Its song is said to have the power to heal the sick and bring peace to troubled souls. Those who are lucky enough to hear the Glimmerwing's song are forever changed by its beauty and grace."</p>
+<p><img src="https://github.com/sammyf/oobabooga-node/assets/42468608/cecdd820-93dd-4c35-abbf-607e001fb2ed" width="300" /></p>
+<p><strong>Requirement</strong></p>
+<p>a Text-Generation-Webui instance (might work remotely too, but I never tried it) and obviously InvokeAI 3.x</p>
+<p><strong>Note</strong></p>
+<p>This node works best with SDXL models, especially as the style can be described independently of the LLM's output.</p>
+<hr />
+<h3 id="prompt-tools">Prompt Tools<a class="headerlink" href="#prompt-tools" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> A set of InvokeAI nodes that add general prompt (string) manipulation tools.  Designed to accompany the <code>Prompts From File</code> node and other prompt generation nodes.</p>
+<ol>
+<li><code>Prompt To File</code> - saves a prompt or collection of prompts to a file. one per line. There is an append/overwrite option.</li>
+<li><code>PTFields Collect</code> - Converts image generation fields into a Json format string that can be passed to Prompt to file. </li>
+<li><code>PTFields Expand</code> - Takes Json string and converts it to individual generation parameters. This can be fed from the Prompts to file node.</li>
+<li><code>Prompt Strength</code> - Formats prompt with strength like the weighted format of compel </li>
+<li><code>Prompt Strength Combine</code> - Combines weighted prompts for .and()/.blend()</li>
+<li><code>CSV To Index String</code> - Gets a string from a CSV by index. Includes a Random index option</li>
+</ol>
+<p>The following Nodes are now included in v3.2 of Invoke and are no longer in this set of tools.<br>
+- <code>Prompt Join</code> -&gt; <code>String Join</code>
+- <code>Prompt Join Three</code> -&gt; <code>String Join Three</code>
+- <code>Prompt Replace</code> -&gt; <code>String Replace</code>
+- <code>Prompt Split Neg</code> -&gt; <code>String Split Neg</code></p>
+<p>See full docs here: <a href="https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md">https://github.com/skunkworxdark/Prompt-tools-nodes/edit/main/README.md</a></p>
+<p><strong>Node Link:</strong> <a href="https://github.com/skunkworxdark/Prompt-tools-nodes">https://github.com/skunkworxdark/Prompt-tools-nodes</a></p>
+<p><strong>Workflow Examples</strong> </p>
+<p><img src="https://raw.githubusercontent.com/skunkworxdark/prompt-tools/refs/heads/main/images/CSVToIndexStringNode.png"/></p>
+<hr />
+<h3 id="remote-image">Remote Image<a class="headerlink" href="#remote-image" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This is a pack of nodes to interoperate with other services, be they public websites or bespoke local servers. The pack consists of these nodes:</p>
+<ul>
+<li><em>Load Remote Image</em> - Lets you load remote images such as a realtime webcam image, an image of the day, or dynamically created images.</li>
+<li><em>Post Image to Remote Server</em> - Lets you upload an image to a remote server using an HTTP POST request, eg for storage, display or further processing.</li>
+</ul>
+<p><strong>Node Link:</strong> <a href="https://github.com/fieldOfView/InvokeAI-remote_image">https://github.com/fieldOfView/InvokeAI-remote_image</a></p>
+<hr />
+<h3 id="briaai-remove-background">BriaAI Remove Background<a class="headerlink" href="#briaai-remove-background" title="Permanent link">#</a></h3>
+<p><strong>Description</strong>: Implements one click background removal with BriaAI's new version 1.4 model which seems to be producing better results than any other previous background removal tool.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/blessedcoolant/invoke_bria_rmbg">https://github.com/blessedcoolant/invoke_bria_rmbg</a></p>
+<p><strong>View</strong>
+<img src="https://raw.githubusercontent.com/blessedcoolant/invoke_bria_rmbg/main/assets/preview.jpg" /></p>
+<hr />
+<h3 id="remove-background">Remove Background<a class="headerlink" href="#remove-background" title="Permanent link">#</a></h3>
+<p>Description: An integration of the rembg package to remove backgrounds from images using multiple U2NET models.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/remove-background-node">https://github.com/VeyDlin/remove-background-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/remove-background-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="retroize">Retroize<a class="headerlink" href="#retroize" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Retroize is a collection of nodes for InvokeAI to "Retroize" images. Any image can be given a fresh coat of retro paint with these nodes, either from your gallery or from within the graph itself. It includes nodes to pixelize, quantize, palettize, and ditherize images; as well as to retrieve palettes from existing images.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/Ar7ific1al/invokeai-retroizeinode/">https://github.com/Ar7ific1al/invokeai-retroizeinode/</a></p>
+<p><strong>Retroize Output Examples</strong></p>
+<p><img src="https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974" width="500" /></p>
+<hr />
+<h3 id="stereogram-nodes">Stereogram Nodes<a class="headerlink" href="#stereogram-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> A set of custom nodes for InvokeAI to create cross-view or parallel-view stereograms. Stereograms are 2D images that, when viewed properly, reveal a 3D scene. Check out <a href="https://www.reddit.com/r/CrossView/">r/crossview</a> for tutorials.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/simonfuhrmann/invokeai-stereo">https://github.com/simonfuhrmann/invokeai-stereo</a></p>
+<p><strong>Example Workflow and Output</strong>
+</br><img src="https://raw.githubusercontent.com/simonfuhrmann/invokeai-stereo/refs/heads/main/docs/example_promo_03.jpg" width="600" /></p>
+<hr />
+<h3 id="simple-skin-detection">Simple Skin Detection<a class="headerlink" href="#simple-skin-detection" title="Permanent link">#</a></h3>
+<p>Description: Detects skin in images based on predefined color thresholds.</p>
+<p>Node Link: <a href="https://github.com/VeyDlin/simple-skin-detection-node">https://github.com/VeyDlin/simple-skin-detection-node</a></p>
+<p>View:
+</br><img src="https://raw.githubusercontent.com/VeyDlin/simple-skin-detection-node/master/.readme/node.png" width="500" /></p>
+<hr />
+<h3 id="size-stepper-nodes">Size Stepper Nodes<a class="headerlink" href="#size-stepper-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This is a set of nodes for calculating the necessary size increments for doing upscaling workflows. Use the <em>Final Size &amp; Orientation</em> node to enter your full size dimensions and orientation (portrait/landscape/random), then plug that and your initial generation dimensions into the <em>Ideal Size Stepper</em> and get 1, 2, or 3 intermediate pairs of dimensions for upscaling. Note this does not output the initial size or full size dimensions: the 1, 2, or 3 outputs of this node are only the intermediate sizes.</p>
+<p>A third node is included, <em>Random Switch (Integers)</em>, which is just a generic version of Final Size with no orientation selection.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/dwringer/size-stepper-nodes">https://github.com/dwringer/size-stepper-nodes</a></p>
+<p><strong>Example Usage:</strong>
+</br><img src="https://raw.githubusercontent.com/dwringer/size-stepper-nodes/main/size_nodes_usage.jpg" width="500" /></p>
+<hr />
+<h3 id="text-font-to-image">Text font to Image<a class="headerlink" href="#text-font-to-image" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> text font to text image node for InvokeAI, download a font to use (or if in font cache uses it from there), the text is always resized to the image size, but can control that with padding, optional 2<sup>nd</sup> line</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/mickr777/textfontimage">https://github.com/mickr777/textfontimage</a></p>
+<p><strong>Output Examples</strong></p>
+<p><img src="https://github.com/mickr777/InvokeAI/assets/115216705/c21b0af3-d9c6-4c16-9152-846a23effd36" width="300" /></p>
+<p>Results after using the depth controlnet</p>
+<p><img src="https://github.com/mickr777/InvokeAI/assets/115216705/915f1a53-968e-43eb-aa61-07cd8f1a733a" width="300" />
+<img src="https://github.com/mickr777/InvokeAI/assets/115216705/821ef89e-8a60-44f5-b94e-471a9d8690cc" width="300" />
+<img src="https://github.com/mickr777/InvokeAI/assets/115216705/2befcb6d-49f4-4bfd-b5fc-1fee19274f89" width="300" /></p>
+<hr />
+<h3 id="thresholding">Thresholding<a class="headerlink" href="#thresholding" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This node generates masks for highlights, midtones, and shadows given an input image. You can optionally specify a blur for the lookup table used in making those masks from the source image.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/JPPhoto/thresholding-node">https://github.com/JPPhoto/thresholding-node</a></p>
+<p><strong>Examples</strong></p>
+<p>Input:</p>
+<p><img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/c88ada13-fb3d-484c-a4fe-947b44712632" width="300" /></p>
+<p>Highlights/Midtones/Shadows:</p>
+<p><img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/727021c1-36ff-4ec8-90c8-105e00de986d" width="300" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0b721bfc-f051-404e-b905-2f16b824ddfe" width="300" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/04c1297f-1c88-42b6-a7df-dd090b976286" width="300" /></p>
+<p>Highlights/Midtones/Shadows (with LUT blur enabled):</p>
+<p><img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/19aa718a-70c1-4668-8169-d68f4bd13771" width="300" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0a440e43-697f-4d17-82ee-f287467df0a5" width="300" />
+<img src="https://github.com/invoke-ai/InvokeAI/assets/34005131/0701fd0f-2ca7-4fe2-8613-2b52547bafce" width="300" /></p>
+<hr />
+<h3 id="unsharp-mask">Unsharp Mask<a class="headerlink" href="#unsharp-mask" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> Applies an unsharp mask filter to an image, preserving its alpha channel in the process.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/JPPhoto/unsharp-mask-node">https://github.com/JPPhoto/unsharp-mask-node</a></p>
+<hr />
+<h3 id="xy-image-to-grid-and-images-to-grids-nodes">XY Image to Grid and Images to Grids nodes<a class="headerlink" href="#xy-image-to-grid-and-images-to-grids-nodes" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> These nodes add the following to InvokeAI:
+- Generate grids of images from multiple input images
+- Create XY grid images with labels from parameters
+- Split images into overlapping tiles for processing (for super-resolution workflows)
+- Recombine image tiles into a single output image blending the seams </p>
+<p>The nodes include:
+1. <code>Images To Grids</code> - Combine multiple images into a grid of images
+2. <code>XYImage To Grid</code> - Take X &amp; Y params and creates a labeled image grid.
+3. <code>XYImage Tiles</code> - Super-resolution (embiggen) style tiled resizing
+4. <code>Image Tot XYImages</code> - Takes an image and cuts it up into a number of columns and rows.
+5. Multiple supporting nodes - Helper nodes for data wrangling and building <code>XYImage</code> collections</p>
+<p>See full docs here: <a href="https://github.com/skunkworxdark/XYGrid_nodes/edit/main/README.md">https://github.com/skunkworxdark/XYGrid_nodes/edit/main/README.md</a></p>
+<p><strong>Node Link:</strong> <a href="https://github.com/skunkworxdark/XYGrid_nodes">https://github.com/skunkworxdark/XYGrid_nodes</a></p>
+<p><strong>Output Examples</strong> </p>
+<p><img src="https://raw.githubusercontent.com/skunkworxdark/XYGrid_nodes/refs/heads/main/images/collage.png" /></p>
+<hr />
+<h3 id="example-node-template">Example Node Template<a class="headerlink" href="#example-node-template" title="Permanent link">#</a></h3>
+<p><strong>Description:</strong> This node allows you to do super cool things with InvokeAI.</p>
+<p><strong>Node Link:</strong> <a href="https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/app/invocations/prompt.py">https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/app/invocations/prompt.py</a></p>
+<p><strong>Example Workflow:</strong>  <a href="https://github.com/invoke-ai/InvokeAI/blob/docs/main/docs/workflows/Prompt_from_File.json">https://github.com/invoke-ai/InvokeAI/blob/docs/main/docs/workflows/Prompt_from_File.json</a></p>
+<p><strong>Output Examples</strong> </p>
+<p></br><img src="https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png" width="500" /></p>
+<h2 id="disclaimer">Disclaimer<a class="headerlink" href="#disclaimer" title="Permanent link">#</a></h2>
+<p>The nodes linked have been developed and contributed by members of the Invoke AI community. While we strive to ensure the quality and safety of these contributions, we do not guarantee the reliability or security of the nodes. If you have issues or concerns with any of the nodes below, please raise it on GitHub or in the Discord.</p>
+<h2 id="help">Help<a class="headerlink" href="#help" title="Permanent link">#</a></h2>
+<p>If you run into any issues with a node, please post in the <a href="https://discord.gg/ZmtBAhwWhy">InvokeAI Discord</a>. </p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="May 22, 2025 18:03:14">May 22, 2025</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="May 22, 2025 18:03:14">May 22, 2025</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2022-2024 InvokeAI Team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.tracking", "navigation.indexes", "navigation.path", "search.highlight", "search.suggest", "toc.integrate"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,5824 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="mauwii">
+      
+      
+        <link rel="canonical" href="https://invoke-ai.github.io/InvokeAI/contributing/MODEL_MANAGER/">
+      
+      
+        <link rel="prev" href="../INVOCATIONS/">
+      
+      
+        <link rel="next" href="../DOWNLOAD_QUEUE/">
+      
+      
+      <link rel="icon" href="../../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Model Manager v2 - Invoke</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","G-2X4JR4S4FB"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","G-2X4JR4S4FB",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=G-2X4JR4S4FB",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#introduction-to-the-model-manager-v2" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Invoke" class="md-header__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Invoke
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Model Manager v2
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../installation/quick_start/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Installation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../nodes/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Workflows & Nodes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../features/low-vram/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../help/gettingStartedWithAI/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Help
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Invoke" class="md-nav__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    Invoke
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Detailed Requirements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/manual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Manual Install
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Docker
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/patchmatch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PatchMatch
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/legacy_scripts.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Legacy Scripts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Workflows & Nodes
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Workflows & Nodes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nodes Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/NODES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Workflow Editor Basics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/defaultNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    List of Default Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/communityNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Community Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/comfyToInvoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ComfyUI to InvokeAI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/detailedNodes/faceTools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Facetool Node
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/contributingNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/NODES_MIGRATION_V3_V4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Migrating from v3 to v4
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/invocation-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Invocation API
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Features
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/low-vram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Low VRAM mode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Database
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dev Environment
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Development
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribution_guides/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribution_guides/newContributorChecklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New Contributors
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#location-of-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      Location of the Code
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-in-a-model-the-modelrecordservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      What's in a Model? The ModelRecordService
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What&#39;s in a Model? The ModelRecordService">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modelconfigbase" class="md-nav__link">
+    <span class="md-ellipsis">
+      ModelConfigBase
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkpointconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      CheckpointConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mainconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      MainConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onnxsd2config" class="md-nav__link">
+    <span class="md-ellipsis">
+      ONNXSD2Config
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-config-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Other config classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations-of-the-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Limitations of the Data Model
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-and-writing-model-configuration-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reading and Writing Model Configuration Records
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading and Writing Model Configuration Records">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-modelrecordservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a ModelRecordService
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetching-a-models-configuration-from-modelrecordservicebase" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fetching a Model's Configuration from ModelRecordServiceBase
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fetching a Model&#39;s Configuration from ModelRecordServiceBase">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_modelkey-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_model(key) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#existskey-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      exists(key) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search_by_pathpath-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_path(path) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search_by_namename-base-type-listanymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_name(name, base, type) -&gt; List[AnyModelConfig]
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all_models-listanymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      all_models() -&gt; List[AnyModelConfig]
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search_by_tagtags-listanymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_tag(tags) -&gt; List[AnyModelConfig]
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#version-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      version() -&gt; str
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_info_by_namename-base_model-model_type-modelconfigbase" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_info_by_name(name, base_model, model_type) -&gt; ModelConfigBase
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-model-configs-to-the-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      Writing model configs to the database
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing model configs to the database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add_modelkey-config-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      add_model(key, config) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update_modelkey-config-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      update_model(key, config) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initializing-the-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initializing the installer
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Initializing the installer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install_job-installerheuristic_importsource-config-access_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      install_job = installer.heuristic_import(source, [config], [access_token])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install_job-installerimport_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      install_job = installer.import_model()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#localmodelsource" class="md-nav__link">
+    <span class="md-ellipsis">
+      LocalModelSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#urlmodelsource" class="md-nav__link">
+    <span class="md-ellipsis">
+      URLModelSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hfmodelsource" class="md-nav__link">
+    <span class="md-ellipsis">
+      HFModelSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-the-install-job-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitoring the install job process
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitoring the install job process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_install_downloading" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_downloading
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_running" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_running
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_completed" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_completed
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_error" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_error
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_cancelled" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_cancelled
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#following-the-model-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      Following the model status
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-configuration-and-probing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model configuration and probing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-installer-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Other installer methods
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Other installer methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerwait_for_installstimeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.wait_for_installs([timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerwait_for_jobjob-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.wait_for_job(job, [timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerlist_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.list_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerget_job_by_sourcesource" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.get_job_by_source(source)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerget_job_by_idid" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.get_job_by_id(id)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installercancel_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.cancel_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerprune_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.prune_jobs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerapp_config-installerrecord_store-installerevent_bus" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.app_config, installer.record_store, installer.event_bus
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-installerregister_pathmodel_path-config-key-installerinstall_pathmodel_path-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      key = installer.register_path(model_path, config), key = installer.install_path(model_path, config)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerunregisterkey" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.unregister(key)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerdeletekey" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.delete(key)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerunconditionally_deletekey" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.unconditionally_delete(key)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-installerdownload_and_cacheremote_source-access_token-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      path = installer.download_and_cache(remote_source, [access_token], [timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerstartinvoker" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.start(invoker)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#get-on-line-the-download-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      Get on line: The Download Queue
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Get on line: The Download Queue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-job-for-every-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      A job for every task
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A job for every task">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#downloadjobpath" class="md-nav__link">
+    <span class="md-ellipsis">
+      DownloadJobPath
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloadjobremotesource" class="md-nav__link">
+    <span class="md-ellipsis">
+      DownloadJobRemoteSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloadjoburl" class="md-nav__link">
+    <span class="md-ellipsis">
+      DownloadJobURL
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-handlers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Event handlers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-download-queue-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a download queue object
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#submitting-a-download-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      Submitting a download job
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#job-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      Job control
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Job control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queuejoin" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.join()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuewait_for_jobjob-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.wait_for_job(job, [timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-queuelist_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = queue.list_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#job-queueid_to_jobint" class="md-nav__link">
+    <span class="md-ellipsis">
+      job = queue.id_to_job(int)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queueprune_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.prune_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuestart_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.start_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuepause_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.pause_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuecancel_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.cancel_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuestart_all_jobs-queuepause_all_jobs-queuecancel_all_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.start_all_jobs(), queue.pause_all_jobs(), queue.cancel_all_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#this-meta-be-good-model-metadata-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      This Meta be Good: Model Metadata Storage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="This Meta be Good: Model Metadata Storage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#structure-of-the-metadata-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Structure of the Metadata objects
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Structure of the Metadata objects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modelmetadatabase" class="md-nav__link">
+    <span class="md-ellipsis">
+      ModelMetadataBase
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#huggingfacemetadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      HuggingFaceMetadata
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anymodelrepometadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      AnyModelRepoMetadata
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetching-metadata-from-online-repos" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fetching Metadata from Online Repos
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fetching Metadata from Online Repos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#huggingfacemetadatafetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      HuggingFaceMetadataFetch
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadata-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metadata Storage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-lowdown-on-the-modelloadservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Lowdown on the ModelLoadService
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Lowdown on the ModelLoadService">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-modelloadservice-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a ModelLoadService object
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#load_modelmodel_config-submodel_type-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      load_model(model_config, [submodel_type], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_model_by_keykey-submodel-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_model_by_key(key, [submodel]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-loaded-model-in-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the Loaded Model in Inference
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emitting-model-loading-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      Emitting model loading events
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-model-loaders" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding Model Loaders
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adding Model Loaders">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conversion
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-modelmanagerservice-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      The ModelManagerService object
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The ModelManagerService object">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mmstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.store
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mminstall" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.install
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload_model_by_configmodel_config-submodel-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load_model_by_config(model_config, [submodel], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload_model_by_attrmodel_name-base_model-model_type-submodel-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load_model_by_attr(model_name, base_model, model_type, [submodel], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload_model_by_keykey-submodel-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load_model_by_key(key, [submodel], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invocation-context-model-manager-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Invocation Context Model Manager API
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Invocation Context Model Manager API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#contextdownload_and_cache_modelsource-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      context.download_and_cache_model(source) -&gt; Path
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contextload_local_modelmodel_path-loader-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      context.load_local_model(model_path, [loader]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contextload_remote_modelsource-loader-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      context.load_remote_model(source, [loader]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LOCAL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Local Development
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Testing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../frontend/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Frontend
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            Frontend
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend/state-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    State Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Workflows - Design and Implementation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribution_guides/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Documentation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../INVOCATIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#location-of-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      Location of the Code
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-in-a-model-the-modelrecordservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      What's in a Model? The ModelRecordService
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What&#39;s in a Model? The ModelRecordService">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modelconfigbase" class="md-nav__link">
+    <span class="md-ellipsis">
+      ModelConfigBase
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checkpointconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      CheckpointConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mainconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      MainConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#onnxsd2config" class="md-nav__link">
+    <span class="md-ellipsis">
+      ONNXSD2Config
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-config-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Other config classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limitations-of-the-data-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      Limitations of the Data Model
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-and-writing-model-configuration-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      Reading and Writing Model Configuration Records
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading and Writing Model Configuration Records">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-modelrecordservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a ModelRecordService
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetching-a-models-configuration-from-modelrecordservicebase" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fetching a Model's Configuration from ModelRecordServiceBase
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fetching a Model&#39;s Configuration from ModelRecordServiceBase">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_modelkey-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_model(key) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#existskey-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      exists(key) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search_by_pathpath-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_path(path) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search_by_namename-base-type-listanymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_name(name, base, type) -&gt; List[AnyModelConfig]
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all_models-listanymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      all_models() -&gt; List[AnyModelConfig]
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search_by_tagtags-listanymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_tag(tags) -&gt; List[AnyModelConfig]
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#version-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      version() -&gt; str
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_info_by_namename-base_model-model_type-modelconfigbase" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_info_by_name(name, base_model, model_type) -&gt; ModelConfigBase
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-model-configs-to-the-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      Writing model configs to the database
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing model configs to the database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#add_modelkey-config-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      add_model(key, config) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update_modelkey-config-anymodelconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      update_model(key, config) -&gt; AnyModelConfig
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model installation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initializing-the-installer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Initializing the installer
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Initializing the installer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install_job-installerheuristic_importsource-config-access_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      install_job = installer.heuristic_import(source, [config], [access_token])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install_job-installerimport_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      install_job = installer.import_model()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#localmodelsource" class="md-nav__link">
+    <span class="md-ellipsis">
+      LocalModelSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#urlmodelsource" class="md-nav__link">
+    <span class="md-ellipsis">
+      URLModelSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hfmodelsource" class="md-nav__link">
+    <span class="md-ellipsis">
+      HFModelSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring-the-install-job-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Monitoring the install job process
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitoring the install job process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model_install_downloading" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_downloading
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_running" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_running
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_completed" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_completed
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_error" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_error
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model_install_cancelled" class="md-nav__link">
+    <span class="md-ellipsis">
+      model_install_cancelled
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#following-the-model-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      Following the model status
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-configuration-and-probing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Model configuration and probing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-installer-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Other installer methods
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Other installer methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerwait_for_installstimeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.wait_for_installs([timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerwait_for_jobjob-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.wait_for_job(job, [timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerlist_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.list_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerget_job_by_sourcesource" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.get_job_by_source(source)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installerget_job_by_idid" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.get_job_by_id(id)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-installercancel_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = installer.cancel_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerprune_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.prune_jobs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerapp_config-installerrecord_store-installerevent_bus" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.app_config, installer.record_store, installer.event_bus
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-installerregister_pathmodel_path-config-key-installerinstall_pathmodel_path-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      key = installer.register_path(model_path, config), key = installer.install_path(model_path, config)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerunregisterkey" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.unregister(key)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerdeletekey" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.delete(key)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerunconditionally_deletekey" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.unconditionally_delete(key)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-installerdownload_and_cacheremote_source-access_token-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      path = installer.download_and_cache(remote_source, [access_token], [timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#installerstartinvoker" class="md-nav__link">
+    <span class="md-ellipsis">
+      installer.start(invoker)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#get-on-line-the-download-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      Get on line: The Download Queue
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Get on line: The Download Queue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-job-for-every-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      A job for every task
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A job for every task">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#downloadjobpath" class="md-nav__link">
+    <span class="md-ellipsis">
+      DownloadJobPath
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloadjobremotesource" class="md-nav__link">
+    <span class="md-ellipsis">
+      DownloadJobRemoteSource
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloadjoburl" class="md-nav__link">
+    <span class="md-ellipsis">
+      DownloadJobURL
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-handlers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Event handlers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-download-queue-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a download queue object
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#submitting-a-download-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      Submitting a download job
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#job-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      Job control
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Job control">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queuejoin" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.join()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuewait_for_jobjob-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.wait_for_job(job, [timeout])
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs-queuelist_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      jobs = queue.list_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#job-queueid_to_jobint" class="md-nav__link">
+    <span class="md-ellipsis">
+      job = queue.id_to_job(int)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queueprune_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.prune_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuestart_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.start_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuepause_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.pause_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuecancel_jobjob" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.cancel_job(job)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuestart_all_jobs-queuepause_all_jobs-queuecancel_all_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      queue.start_all_jobs(), queue.pause_all_jobs(), queue.cancel_all_jobs()
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#this-meta-be-good-model-metadata-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      This Meta be Good: Model Metadata Storage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="This Meta be Good: Model Metadata Storage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Usage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#structure-of-the-metadata-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      Structure of the Metadata objects
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Structure of the Metadata objects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modelmetadatabase" class="md-nav__link">
+    <span class="md-ellipsis">
+      ModelMetadataBase
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#huggingfacemetadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      HuggingFaceMetadata
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anymodelrepometadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      AnyModelRepoMetadata
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetching-metadata-from-online-repos" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fetching Metadata from Online Repos
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fetching Metadata from Online Repos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#huggingfacemetadatafetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      HuggingFaceMetadataFetch
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadata-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Metadata Storage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-lowdown-on-the-modelloadservice" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Lowdown on the ModelLoadService
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Lowdown on the ModelLoadService">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#creating-a-modelloadservice-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating a ModelLoadService object
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#load_modelmodel_config-submodel_type-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      load_model(model_config, [submodel_type], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_model_by_keykey-submodel-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_model_by_key(key, [submodel]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-loaded-model-in-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the Loaded Model in Inference
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emitting-model-loading-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      Emitting model loading events
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-model-loaders" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding Model Loaders
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adding Model Loaders">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conversion
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-modelmanagerservice-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      The ModelManagerService object
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The ModelManagerService object">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mmstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.store
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mminstall" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.install
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload_model_by_configmodel_config-submodel-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load_model_by_config(model_config, [submodel], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload_model_by_attrmodel_name-base_model-model_type-submodel-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load_model_by_attr(model_name, base_model, model_type, [submodel], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmload_model_by_keykey-submodel-context-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      mm.load_model_by_key(key, [submodel], [context]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invocation-context-model-manager-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      Invocation Context Model Manager API
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Invocation Context Model Manager API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#contextdownload_and_cache_modelsource-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      context.download_and_cache_model(source) -&gt; Path
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contextload_local_modelmodel_path-loader-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      context.load_local_model(model_path, [loader]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contextload_remote_modelsource-loader-loadedmodel" class="md-nav__link">
+    <span class="md-ellipsis">
+      context.load_remote_model(source, [loader]) -&gt; LoadedModel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOWNLOAD_QUEUE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Download Queue
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribution_guides/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Translation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribution_guides/tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorials
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Help
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Help
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Diffusion Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/SAMPLER_CONVERGENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Sampler Convergence
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="introduction-to-the-model-manager-v2">Introduction to the Model Manager V2<a class="headerlink" href="#introduction-to-the-model-manager-v2" title="Permanent link">#</a></h1>
+<p>The Model Manager is responsible for organizing the various machine
+learning models used by InvokeAI. It consists of a series of
+interdependent services that together handle the full lifecycle of a
+model. These are the:</p>
+<ul>
+<li>
+<p><em>ModelRecordServiceBase</em> Responsible for managing model metadata and
+  configuration information. Among other things, the record service
+  tracks the type of the model, its provenance, and where it can be
+  found on disk.</p>
+</li>
+<li>
+<p><em>ModelInstallServiceBase</em> A service for installing models to
+  disk. It uses <code>DownloadQueueServiceBase</code> to download models and
+  their metadata, and <code>ModelRecordServiceBase</code> to store that
+  information. It is also responsible for managing the InvokeAI
+  <code>models</code> directory and its contents.</p>
+</li>
+<li>
+<p><em>DownloadQueueServiceBase</em>
+  A multithreaded downloader responsible
+  for downloading models from a remote source to disk. The download
+  queue has special methods for downloading repo_id folders from
+  Hugging Face, as well as discriminating among model versions in
+  Civitai, but can be used for arbitrary content.</p>
+</li>
+<li>
+<p><em>ModelLoadServiceBase</em>
+  Responsible for loading a model from disk
+  into RAM and VRAM and getting it ready for inference.</p>
+</li>
+</ul>
+<h2 id="location-of-the-code">Location of the Code<a class="headerlink" href="#location-of-the-code" title="Permanent link">#</a></h2>
+<p>The four main services can be found in
+<code>invokeai/app/services</code> in the following directories:</p>
+<ul>
+<li><code>invokeai/app/services/model_records/</code></li>
+<li><code>invokeai/app/services/model_install/</code></li>
+<li><code>invokeai/app/services/downloads/</code></li>
+<li><code>invokeai/app/services/model_load/</code></li>
+</ul>
+<p>Code related to the FastAPI web API can be found in
+<code>invokeai/app/api/routers/model_manager_v2.py</code>.</p>
+<hr />
+<h2 id="whats-in-a-model-the-modelrecordservice">What's in a Model? The ModelRecordService<a class="headerlink" href="#whats-in-a-model-the-modelrecordservice" title="Permanent link">#</a></h2>
+<p>The <code>ModelRecordService</code> manages the model's metadata. It supports a
+hierarchy of pydantic metadata "config" objects, which become
+increasingly specialized to support particular model types.</p>
+<h3 id="modelconfigbase">ModelConfigBase<a class="headerlink" href="#modelconfigbase" title="Permanent link">#</a></h3>
+<p>All model metadata classes inherit from this pydantic class. it
+provides the following fields:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Field Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key</code></td>
+<td>str</td>
+<td>Unique identifier for the model</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>str</td>
+<td>Name of the model (not unique)</td>
+</tr>
+<tr>
+<td><code>model_type</code></td>
+<td>ModelType</td>
+<td>The type of the model</td>
+</tr>
+<tr>
+<td><code>model_format</code></td>
+<td>ModelFormat</td>
+<td>The format of the model (e.g. "diffusers"); also used as a Union discriminator</td>
+</tr>
+<tr>
+<td><code>base_model</code></td>
+<td>BaseModelType</td>
+<td>The base model that the model is compatible with</td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td>str</td>
+<td>Location of model on disk</td>
+</tr>
+<tr>
+<td><code>hash</code></td>
+<td>str</td>
+<td>Hash of the model</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>str</td>
+<td>Human-readable description of the model (optional)</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>str</td>
+<td>Model's source URL or repo id (optional)</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>key</code> is a unique 32-character random ID which was generated at
+install time. The <code>hash</code> field stores a hash of the model's
+contents at install time obtained by sampling several parts of the
+model's files using the <code>imohash</code> library. Over the course of the
+model's lifetime it may be transformed in various ways, such as
+changing its precision or converting it from a .safetensors to a
+diffusers model.</p>
+<p><code>ModelType</code>, <code>ModelFormat</code> and <code>BaseModelType</code> are string enums that
+are defined in <code>invokeai.backend.model_manager.config</code>. They are also
+imported by, and can be reexported from,
+<code>invokeai.app.services.model_manager.model_records</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>from invokeai.app.services.model_records import ModelType, ModelFormat, BaseModelType
+</code></pre></div>
+<p>The <code>path</code> field can be absolute or relative. If relative, it is taken
+to be relative to the <code>models_dir</code> setting in the user's
+<code>invokeai.yaml</code> file.</p>
+<h3 id="checkpointconfig">CheckpointConfig<a class="headerlink" href="#checkpointconfig" title="Permanent link">#</a></h3>
+<p>This adds support for checkpoint configurations, and adds the
+following field:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Field Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config</code></td>
+<td>str</td>
+<td>Path to the checkpoint's config file</td>
+</tr>
+</tbody>
+</table>
+<p><code>config</code> is the path to the checkpoint's config file. If relative, it
+is taken to be relative to the InvokeAI root directory
+(e.g. <code>configs/stable-diffusion/v1-inference.yaml</code>)</p>
+<h3 id="mainconfig">MainConfig<a class="headerlink" href="#mainconfig" title="Permanent link">#</a></h3>
+<p>This adds support for "main" Stable Diffusion models, and adds these
+fields:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Field Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vae</code></td>
+<td>str</td>
+<td>Path to a VAE to use instead of the burnt-in one</td>
+</tr>
+<tr>
+<td><code>variant</code></td>
+<td>ModelVariantType</td>
+<td>Model variant type, such as "inpainting"</td>
+</tr>
+</tbody>
+</table>
+<p><code>vae</code> can be an absolute or relative path. If relative, its base is
+taken to be the <code>models_dir</code> directory.</p>
+<p><code>variant</code> is an enumerated string class with values <code>normal</code>,
+<code>inpaint</code> and <code>depth</code>. If needed, it can be imported if needed from
+either <code>invokeai.app.services.model_records</code> or
+<code>invokeai.backend.model_manager.config</code>.</p>
+<h3 id="onnxsd2config">ONNXSD2Config<a class="headerlink" href="#onnxsd2config" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th><strong>Field Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prediction_type</code></td>
+<td>SchedulerPredictionType</td>
+<td>Scheduler prediction type to use, e.g. "epsilon"</td>
+</tr>
+<tr>
+<td><code>upcast_attention</code></td>
+<td>bool</td>
+<td>Model requires its attention module to be upcast</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>SchedulerPredictionType</code> enum can be imported from either
+<code>invokeai.app.services.model_records</code> or
+<code>invokeai.backend.model_manager.config</code>.</p>
+<h3 id="other-config-classes">Other config classes<a class="headerlink" href="#other-config-classes" title="Permanent link">#</a></h3>
+<p>There are a series of such classes each discriminated by their
+<code>ModelFormat</code>, including <code>LoRAConfig</code>, <code>IPAdapterConfig</code>, and so
+forth. These are rarely needed outside the model manager's internal
+code, but available in <code>invokeai.backend.model_manager.config</code> if
+needed. There is also a Union of all ModelConfig classes, called
+<code>AnyModelConfig</code> that can be imported from the same file.</p>
+<h3 id="limitations-of-the-data-model">Limitations of the Data Model<a class="headerlink" href="#limitations-of-the-data-model" title="Permanent link">#</a></h3>
+<p>The config hierarchy has a major limitation in its handling of the
+base model type. Each model can only be compatible with one base
+model, which breaks down in the event of models that are compatible
+with two or more base models. For example, SD-1 VAEs also work with
+SD-2 models. A partial workaround is to use <code>BaseModelType.Any</code>, which
+indicates that the model is compatible with any of the base
+models. This works OK for some models, such as the IP Adapter image
+encoders, but is an all-or-nothing proposition.</p>
+<h2 id="reading-and-writing-model-configuration-records">Reading and Writing Model Configuration Records<a class="headerlink" href="#reading-and-writing-model-configuration-records" title="Permanent link">#</a></h2>
+<p>The <code>ModelRecordService</code> provides the ability to retrieve model
+configuration records from SQL or YAML databases, update them, and
+write them back.</p>
+<p>A application-wide <code>ModelRecordService</code> is created during API
+initialization and can be retrieved within an invocation from the
+<code>InvocationContext</code> object:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>store = context.services.model_manager.store
+</code></pre></div>
+<p>or from elsewhere in the code by accessing
+<code>ApiDependencies.invoker.services.model_manager.store</code>.</p>
+<h3 id="creating-a-modelrecordservice">Creating a <code>ModelRecordService</code><a class="headerlink" href="#creating-a-modelrecordservice" title="Permanent link">#</a></h3>
+<p>To create a new <code>ModelRecordService</code> database or open an existing one,
+you can directly create either a <code>ModelRecordServiceSQL</code> or a
+<code>ModelRecordServiceFile</code> object:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>from invokeai.app.services.model_records import ModelRecordServiceSQL, ModelRecordServiceFile
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>store = ModelRecordServiceSQL.from_connection(connection, lock)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>store = ModelRecordServiceSQL.from_db_file(&#39;/path/to/sqlite_database.db&#39;)
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>store = ModelRecordServiceFile.from_db_file(&#39;/path/to/database.yaml&#39;)
+</code></pre></div>
+<p>The <code>from_connection()</code> form is only available from the
+<code>ModelRecordServiceSQL</code> class, and is used to manage records in a
+previously-opened SQLITE3 database using a <code>sqlite3.connection</code> object
+and a <code>threading.lock</code> object. It is intended for the specific use
+case of storing the record information in the main InvokeAI database,
+usually <code>databases/invokeai.db</code>.</p>
+<p>The <code>from_db_file()</code> methods can be used to open new connections to
+the named database files. If the file doesn't exist, it will be
+created and initialized.</p>
+<p>As a convenience, <code>ModelRecordServiceBase</code> offers two methods,
+<code>from_db_file</code> and <code>open</code>, which will return either a SQL or File
+implementation depending on the context. The former looks at the file
+extension to determine whether to open the file as a SQL database
+(".db") or as a file database (".yaml"). If the file exists, but is
+either the wrong type or does not contain the expected schema
+metainformation, then an appropriate <code>AssertionError</code> will be raised:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>store = ModelRecordServiceBase.from_db_file(&#39;/path/to/a/file.{yaml,db}&#39;)
+</code></pre></div>
+<p>The <code>ModelRecordServiceBase.open()</code> method is specifically designed
+for use in the InvokeAI web server. Its signature is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>def open(
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>       cls,
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    config: InvokeAIAppConfig,
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    conn: Optional[sqlite3.Connection] = None,
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    lock: Optional[threading.Lock] = None
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    ) -&gt; Union[ModelRecordServiceSQL, ModelRecordServiceFile]:
+</code></pre></div>
+<p>The way it works is as follows:</p>
+<ol>
+<li>Retrieve the value of the <code>model_config_db</code> option from the user's
+ <code>invokeai.yaml</code> config file.</li>
+<li>If <code>model_config_db</code> is <code>auto</code> (the default), then:</li>
+<li>Use the values of <code>conn</code> and <code>lock</code> to return a <code>ModelRecordServiceSQL</code> object
+  opened on the passed connection and lock.</li>
+<li>Open up a new connection to <code>databases/invokeai.db</code> if <code>conn</code>
+     and/or <code>lock</code> are missing (see note below).</li>
+<li>If <code>model_config_db</code> is a Path, then use <code>from_db_file</code>
+   to return the appropriate type of ModelRecordService.</li>
+<li>If <code>model_config_db</code> is None, then retrieve the legacy
+   <code>conf_path</code> option from <code>invokeai.yaml</code> and use the Path
+   indicated there. This will default to <code>configs/models.yaml</code>.</li>
+</ol>
+<p>So a typical startup pattern would be:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>import sqlite3
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>from invokeai.app.services.thread import lock
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>from invokeai.app.services.model_records import ModelRecordServiceBase
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>from invokeai.app.services.config import InvokeAIAppConfig
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>config = InvokeAIAppConfig.get_config()
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>db_conn = sqlite3.connect(config.db_path.as_posix(), check_same_thread=False)
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>store = ModelRecordServiceBase.open(config, db_conn, lock)
+</code></pre></div>
+<h3 id="fetching-a-models-configuration-from-modelrecordservicebase">Fetching a Model's Configuration from <code>ModelRecordServiceBase</code><a class="headerlink" href="#fetching-a-models-configuration-from-modelrecordservicebase" title="Permanent link">#</a></h3>
+<p>Configurations can be retrieved in several ways.</p>
+<h4 id="get_modelkey-anymodelconfig">get_model(key) -&gt; AnyModelConfig<a class="headerlink" href="#get_modelkey-anymodelconfig" title="Permanent link">#</a></h4>
+<p>The basic functionality is to call the record store object's
+<code>get_model()</code> method with the desired model's unique key. It returns
+the appropriate subclass of ModelConfigBase:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>model_conf = store.get_model(&#39;f13dd932c0c35c22dcb8d6cda4203764&#39;)
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>print(model_conf.path)
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>&gt;&gt; &#39;/tmp/models/ckpts/v1-5-pruned-emaonly.safetensors&#39;
+</code></pre></div>
+<p>If the key is unrecognized, this call raises an
+<code>UnknownModelException</code>.</p>
+<h4 id="existskey-anymodelconfig">exists(key) -&gt; AnyModelConfig<a class="headerlink" href="#existskey-anymodelconfig" title="Permanent link">#</a></h4>
+<p>Returns True if a model with the given key exists in the databsae.</p>
+<h4 id="search_by_pathpath-anymodelconfig">search_by_path(path) -&gt; AnyModelConfig<a class="headerlink" href="#search_by_pathpath-anymodelconfig" title="Permanent link">#</a></h4>
+<p>Returns the configuration of the model whose path is <code>path</code>. The path
+is matched using a simple string comparison and won't correctly match
+models referred to by different paths (e.g. using symbolic links).</p>
+<h4 id="search_by_namename-base-type-listanymodelconfig">search_by_name(name, base, type) -&gt; List[AnyModelConfig]<a class="headerlink" href="#search_by_namename-base-type-listanymodelconfig" title="Permanent link">#</a></h4>
+<p>This method searches for models that match some combination of <code>name</code>,
+<code>BaseType</code> and <code>ModelType</code>. Calling without any arguments will return
+all the models in the database.</p>
+<h4 id="all_models-listanymodelconfig">all_models() -&gt; List[AnyModelConfig]<a class="headerlink" href="#all_models-listanymodelconfig" title="Permanent link">#</a></h4>
+<p>Return all the model configs in the database. Exactly equivalent to
+calling <code>search_by_name()</code> with no arguments.</p>
+<h4 id="search_by_tagtags-listanymodelconfig">search_by_tag(tags) -&gt; List[AnyModelConfig]<a class="headerlink" href="#search_by_tagtags-listanymodelconfig" title="Permanent link">#</a></h4>
+<p><code>tags</code> is a list of strings. This method returns a list of model
+configs that contain all of the given tags. Examples:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a># find all models that are marked as both SFW and as generating
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a># background scenery
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>configs = store.search_by_tag([&#39;sfw&#39;, &#39;scenery&#39;])
+</code></pre></div>
+<p>Note that only tags are not searchable in this way. Other fields can
+be searched using a filter:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>commercializable_models = [x for x in store.all_models() \
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>                           if x.license.contains(&#39;allowCommercialUse=Sell&#39;)]
+</code></pre></div>
+<h4 id="version-str">version() -&gt; str<a class="headerlink" href="#version-str" title="Permanent link">#</a></h4>
+<p>Returns the version of the database, currently at <code>3.2</code></p>
+<h4 id="model_info_by_namename-base_model-model_type-modelconfigbase">model_info_by_name(name, base_model, model_type) -&gt; ModelConfigBase<a class="headerlink" href="#model_info_by_namename-base_model-model_type-modelconfigbase" title="Permanent link">#</a></h4>
+<p>This method exists to ease the transition from the previous version of
+the model manager, in which <code>get_model()</code> took the three arguments
+shown above. This looks for a unique model identified by name, base
+model and model type and returns it.</p>
+<p>The method will generate a <code>DuplicateModelException</code> if there are more
+than one models that share the same type, base and name. While
+unlikely, it is certainly possible to have a situation in which the
+user had added two models with the same name, base and type, one
+located at path <code>/foo/my_model</code> and the other at <code>/bar/my_model</code>. It
+is strongly recommended to search for models using <code>search_by_name()</code>,
+which can return multiple results, and then to select the desired
+model and pass its key to <code>get_model()</code>.</p>
+<h3 id="writing-model-configs-to-the-database">Writing model configs to the database<a class="headerlink" href="#writing-model-configs-to-the-database" title="Permanent link">#</a></h3>
+<p>Several methods allow you to create and update stored model config
+records.</p>
+<h4 id="add_modelkey-config-anymodelconfig">add_model(key, config) -&gt; AnyModelConfig<a class="headerlink" href="#add_modelkey-config-anymodelconfig" title="Permanent link">#</a></h4>
+<p>Given a key and a configuration, this will add the model's
+configuration record to the database. <code>config</code> can either be a subclass of
+<code>ModelConfigBase</code> (i.e. any class listed in <code>AnyModelConfig</code>), or a
+<code>dict</code> of key/value pairs. In the latter case, the correct
+configuration class will be picked by Pydantic's discriminated union
+mechanism.</p>
+<p>If successful, the method will return the appropriate subclass of
+<code>ModelConfigBase</code>. It will raise a <code>DuplicateModelException</code> if a
+model with the same key is already in the database, or an
+<code>InvalidModelConfigException</code> if a dict was passed and Pydantic
+experienced a parse or validation error.</p>
+<h3 id="update_modelkey-config-anymodelconfig">update_model(key, config) -&gt; AnyModelConfig<a class="headerlink" href="#update_modelkey-config-anymodelconfig" title="Permanent link">#</a></h3>
+<p>Given a key and a configuration, this will update the model
+configuration record in the database. <code>config</code> can be either a
+instance of <code>ModelConfigBase</code>, or a sparse <code>dict</code> containing the
+fields to be updated. This will return an <code>AnyModelConfig</code> on success,
+or raise <code>InvalidModelConfigException</code> or <code>UnknownModelException</code>
+exceptions on failure.</p>
+<hr />
+<h2 id="model-installation">Model installation<a class="headerlink" href="#model-installation" title="Permanent link">#</a></h2>
+<p>The <code>ModelInstallService</code> class implements the
+<code>ModelInstallServiceBase</code> abstract base class, and provides a one-stop
+shop for all your model install needs. It provides the following
+functionality:</p>
+<ul>
+<li>
+<p>Registering a model config record for a model already located on the
+  local filesystem, without moving it or changing its path.</p>
+</li>
+<li>
+<p>Installing a model alreadiy located on the local filesystem, by
+  moving it into the InvokeAI root directory under the
+  <code>models</code> folder (or wherever config parameter <code>models_dir</code>
+  specifies).</p>
+</li>
+<li>
+<p>Probing of models to determine their type, base type and other key
+  information.</p>
+</li>
+<li>
+<p>Interface with the InvokeAI event bus to provide status updates on
+  the download, installation and registration process.</p>
+</li>
+<li>
+<p>Downloading a model from an arbitrary URL and installing it in
+  <code>models_dir</code>.</p>
+</li>
+<li>
+<p>Special handling for HuggingFace repo_ids to recursively download
+  the contents of the repository, paying attention to alternative
+  variants such as fp16.</p>
+</li>
+<li>
+<p>Saving tags and other metadata about the model into the invokeai database
+  when fetching from a repo that provides that type of information,
+  (currently only HuggingFace).</p>
+</li>
+</ul>
+<h3 id="initializing-the-installer">Initializing the installer<a class="headerlink" href="#initializing-the-installer" title="Permanent link">#</a></h3>
+<p>A default installer is created at InvokeAI api startup time and stored
+in <code>ApiDependencies.invoker.services.model_install</code> and can
+also be retrieved from an invocation's <code>context</code> argument with
+<code>context.services.model_install</code>.</p>
+<p>In the event you wish to create a new installer, you may use the
+following initialization pattern:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>from invokeai.app.services.config import get_config
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>from invokeai.app.services.model_records import ModelRecordServiceSQL
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>from invokeai.app.services.model_install import ModelInstallService
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>from invokeai.app.services.download import DownloadQueueService
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>from invokeai.backend.util.logging import InvokeAILogger
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>config = get_config()
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>logger = InvokeAILogger.get_logger(config=config)
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>db = SqliteDatabase(config.db_path, logger)
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>record_store = ModelRecordServiceSQL(db, logger)
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>queue = DownloadQueueService()
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>queue.start()
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>installer = ModelInstallService(app_config=config,
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>                                record_store=record_store,
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>                                download_queue=queue
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>                                )
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>installer.start()
+</code></pre></div>
+<p>The full form of <code>ModelInstallService()</code> takes the following
+required parameters:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Argument</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app_config</code></td>
+<td>InvokeAIAppConfig</td>
+<td>InvokeAI app configuration object</td>
+</tr>
+<tr>
+<td><code>record_store</code></td>
+<td>ModelRecordServiceBase</td>
+<td>Config record storage database</td>
+</tr>
+<tr>
+<td><code>download_queue</code></td>
+<td>DownloadQueueServiceBase</td>
+<td>Download queue object</td>
+</tr>
+<tr>
+<td><code>session</code></td>
+<td>Optional[requests.Session]</td>
+<td>Swap in a different Session object (usually for debugging)</td>
+</tr>
+</tbody>
+</table>
+<p>Once initialized, the installer will provide the following methods:</p>
+<h4 id="install_job-installerheuristic_importsource-config-access_token">install_job = installer.heuristic_import(source, [config], [access_token])<a class="headerlink" href="#install_job-installerheuristic_importsource-config-access_token" title="Permanent link">#</a></h4>
+<p>This is a simplified interface to the installer which takes a source
+string, an optional model configuration dictionary and an optional
+access token.</p>
+<p>The <code>source</code> is a string that can be any of these forms</p>
+<ol>
+<li>A path on the local filesystem (<code>C:\\users\\fred\\model.safetensors</code>)</li>
+<li>A Url pointing to a single downloadable model file (<code>https://civitai.com/models/58390/detail-tweaker-lora-lora</code>)</li>
+<li>A HuggingFace repo_id with any of the following formats:</li>
+<li><code>model/name</code> -- entire model</li>
+<li><code>model/name:fp32</code> -- entire model, using the fp32 variant</li>
+<li><code>model/name:fp16:vae</code> -- vae submodel, using the fp16 variant</li>
+<li><code>model/name::vae</code> -- vae submodel, using default precision</li>
+<li><code>model/name:fp16:path/to/model.safetensors</code> -- an individual model file, fp16 variant</li>
+<li><code>model/name::path/to/model.safetensors</code> -- an individual model file, default variant</li>
+</ol>
+<p>Note that by specifying a relative path to the top of the HuggingFace
+repo, you can download and install arbitrary models files.</p>
+<p>The variant, if not provided, will be automatically filled in with
+<code>fp32</code> if the user has requested full precision, and <code>fp16</code>
+otherwise. If a variant that does not exist is requested, then the
+method will install whatever HuggingFace returns as its default
+revision.</p>
+<p><code>config</code> is an optional dict of values that will override the
+autoprobed values for model type, base, scheduler prediction type, and
+so forth. See <a href="#model-configuration-and-probing">Model configuration and
+probing</a> for details.</p>
+<p><code>access_token</code> is an optional access token for accessing resources
+that need authentication.</p>
+<p>The method will return a <code>ModelInstallJob</code>. This object is discussed
+at length in the following section.</p>
+<h4 id="install_job-installerimport_model">install_job = installer.import_model()<a class="headerlink" href="#install_job-installerimport_model" title="Permanent link">#</a></h4>
+<p>The <code>import_model()</code> method is the core of the installer. The
+following illustrates basic usage:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>from invokeai.app.services.model_install import (
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a> LocalModelSource,
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a> HFModelSource,
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a> URLModelSource,
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>)
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>source1 = LocalModelSource(path=&#39;/opt/models/sushi.safetensors&#39;)   # a local safetensors file
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>source2 = LocalModelSource(path=&#39;/opt/models/sushi_diffusers&#39;)     # a local diffusers folder
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>source3 = HFModelSource(repo_id=&#39;runwayml/stable-diffusion-v1-5&#39;)  # a repo_id
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>source4 = HFModelSource(repo_id=&#39;runwayml/stable-diffusion-v1-5&#39;, subfolder=&#39;vae&#39;)  # a subfolder within a repo_id
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>source5 = HFModelSource(repo_id=&#39;runwayml/stable-diffusion-v1-5&#39;, variant=&#39;fp16&#39;)   # a named variant of a HF model
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>source6 = HFModelSource(repo_id=&#39;runwayml/stable-diffusion-v1-5&#39;, subfolder=&#39;OrangeMix/OrangeMix1.ckpt&#39;)   # path to an individual model file
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>source7 = URLModelSource(url=&#39;https://civitai.com/api/download/models/63006&#39;)       # model located at a URL
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>source8 = URLModelSource(url=&#39;https://civitai.com/api/download/models/63006&#39;, access_token=&#39;letmein&#39;) # with an access token
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>for source in [source1, source2, source3, source4, source5, source6, source7]:
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>   install_job = installer.install_model(source)
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>source2job = installer.wait_for_installs(timeout=120)
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a>for source in sources:
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a>    job = source2job[source]
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a> if job.complete:
+<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a>  model_config = job.config_out
+<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a>  model_key = model_config.key
+<a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a>  print(f&quot;{source} installed as {model_key}&quot;)
+<a id="__codelineno-10-28" name="__codelineno-10-28" href="#__codelineno-10-28"></a> elif job.errored:
+<a id="__codelineno-10-29" name="__codelineno-10-29" href="#__codelineno-10-29"></a>     print(f&quot;{source}: {job.error_type}.\nStack trace:\n{job.error}&quot;)
+</code></pre></div>
+<p>As shown here, the <code>import_model()</code> method accepts a variety of
+sources, including local safetensors files, local diffusers folders,
+HuggingFace repo_ids with and without a subfolder designation,
+Civitai model URLs and arbitrary URLs that point to checkpoint files
+(but not to folders).</p>
+<p>Each call to <code>import_model()</code> return a <code>ModelInstallJob</code> job,
+an object which tracks the progress of the install.</p>
+<p>If a remote model is requested, the model's files are downloaded in
+parallel across a multiple set of threads using the download
+queue. During the download process, the <code>ModelInstallJob</code> is updated
+to provide status and progress information. After the files (if any)
+are downloaded, the remainder of the installation runs in a single
+serialized background thread. These are the model probing, file
+copying, and config record database update steps.</p>
+<p>Multiple install jobs can be queued up. You may block until all
+install jobs are completed (or errored) by calling the
+<code>wait_for_installs()</code> method as shown in the code
+example. <code>wait_for_installs()</code> will return a <code>dict</code> that maps the
+requested source to its job. This object can be interrogated
+to determine its status. If the job errored out, then the error type
+and details can be recovered from <code>job.error_type</code> and <code>job.error</code>.</p>
+<p>The full list of arguments to <code>import_model()</code> is as follows:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Argument</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source</code></td>
+<td>ModelSource</td>
+<td>None</td>
+<td>The source of the model, Path, URL or repo_id</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>Dict[str, Any]</td>
+<td>None</td>
+<td>Override all or a portion of model's probed attributes</td>
+</tr>
+</tbody>
+</table>
+<p>The next few sections describe the various types of ModelSource that
+can be passed to <code>import_model()</code>.</p>
+<p><code>config</code> can be used to override all or a portion of the configuration
+attributes returned by the model prober. See the section below for
+details.</p>
+<h4 id="localmodelsource">LocalModelSource<a class="headerlink" href="#localmodelsource" title="Permanent link">#</a></h4>
+<p>This is used for a model that is located on a locally-accessible Posix
+filesystem, such as a local disk or networked fileshare.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Argument</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code></td>
+<td>str</td>
+<td>Path</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>inplace</code></td>
+<td>bool</td>
+<td>False</td>
+<td>If set, the model file(s) will be left in their location; otherwise they will be copied into the InvokeAI root's <code>models</code> directory</td>
+</tr>
+</tbody>
+</table>
+<h4 id="urlmodelsource">URLModelSource<a class="headerlink" href="#urlmodelsource" title="Permanent link">#</a></h4>
+<p>This is used for a single-file model that is accessible via a URL. The
+fields are:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Argument</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td>AnyHttpUrl</td>
+<td>None</td>
+<td>The URL for the model file.</td>
+</tr>
+<tr>
+<td><code>access_token</code></td>
+<td>str</td>
+<td>None</td>
+<td>An access token needed to gain access to this file.</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>AnyHttpUrl</code> class can be imported from <code>pydantic.networks</code>.</p>
+<p>Ordinarily, no metadata is retrieved from these sources. However,
+there is special-case code in the installer that looks for HuggingFace
+and fetches the corresponding model metadata from the corresponding repo.</p>
+<h4 id="hfmodelsource">HFModelSource<a class="headerlink" href="#hfmodelsource" title="Permanent link">#</a></h4>
+<p>HuggingFace has the most complicated <code>ModelSource</code> structure:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Argument</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>repo_id</code></td>
+<td>str</td>
+<td>None</td>
+<td>The ID of the desired model.</td>
+</tr>
+<tr>
+<td><code>variant</code></td>
+<td>ModelRepoVariant</td>
+<td>ModelRepoVariant('fp16')</td>
+<td>The desired variant.</td>
+</tr>
+<tr>
+<td><code>subfolder</code></td>
+<td>Path</td>
+<td>None</td>
+<td>Look for the model in a subfolder of the repo.</td>
+</tr>
+<tr>
+<td><code>access_token</code></td>
+<td>str</td>
+<td>None</td>
+<td>An access token needed to gain access to a subscriber's-only model.</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>repo_id</code> is the repository ID, such as <code>stabilityai/sdxl-turbo</code>.</p>
+<p>The <code>variant</code> is one of the various diffusers formats that HuggingFace
+supports and is used to pick out from the hodgepodge of files that in
+a typical HuggingFace repository the particular components needed for
+a complete diffusers model. <code>ModelRepoVariant</code> is an enum that can be
+imported from <code>invokeai.backend.model_manager</code> and has the following
+values:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Name</strong></th>
+<th><strong>String Value</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ModelRepoVariant.DEFAULT</td>
+<td>"default"</td>
+</tr>
+<tr>
+<td>ModelRepoVariant.FP16</td>
+<td>"fp16"</td>
+</tr>
+<tr>
+<td>ModelRepoVariant.FP32</td>
+<td>"fp32"</td>
+</tr>
+<tr>
+<td>ModelRepoVariant.ONNX</td>
+<td>"onnx"</td>
+</tr>
+<tr>
+<td>ModelRepoVariant.OPENVINO</td>
+<td>"openvino"</td>
+</tr>
+<tr>
+<td>ModelRepoVariant.FLAX</td>
+<td>"flax"</td>
+</tr>
+</tbody>
+</table>
+<p>You can also pass the string forms to <code>variant</code> directly. Note that
+InvokeAI may not be able to load and run all variants. At the current
+time, specifying <code>ModelRepoVariant.DEFAULT</code> will retrieve model files
+that are unqualified, e.g. <code>pytorch_model.safetensors</code> rather than
+<code>pytorch_model.fp16.safetensors</code>. These are usually the 32-bit
+safetensors forms of the model.</p>
+<p>If <code>subfolder</code> is specified, then the requested model resides in a
+subfolder of the main model repository. This is typically used to
+fetch and install VAEs.</p>
+<p>Some models require you to be registered with HuggingFace and logged
+in. To download these files, you must provide an
+<code>access_token</code>. Internally, if no access token is provided, then
+<code>HfFolder.get_token()</code> will be called to fill it in with the cached
+one.</p>
+<h4 id="monitoring-the-install-job-process">Monitoring the install job process<a class="headerlink" href="#monitoring-the-install-job-process" title="Permanent link">#</a></h4>
+<p>When you create an install job with <code>import_model()</code>, it launches the
+download and installation process in the background and returns a
+<code>ModelInstallJob</code> object for monitoring the process.</p>
+<p>The <code>ModelInstallJob</code> class has the following structure:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Attribute</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>int</code></td>
+<td>Integer ID for this job</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>InstallStatus</code></td>
+<td>An enum of [<code>waiting</code>, <code>downloading</code>, <code>running</code>, <code>completed</code>, <code>error</code> and <code>cancelled</code>]</td>
+</tr>
+<tr>
+<td><code>config_in</code></td>
+<td><code>dict</code></td>
+<td>Overriding configuration values provided by the caller</td>
+</tr>
+<tr>
+<td><code>config_out</code></td>
+<td><code>AnyModelConfig</code></td>
+<td>After successful completion, contains the configuration record written to the database</td>
+</tr>
+<tr>
+<td><code>inplace</code></td>
+<td><code>boolean</code></td>
+<td>True if the caller asked to install the model in place using its local path</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>ModelSource</code></td>
+<td>The local path, remote URL or repo_id of the model to be installed</td>
+</tr>
+<tr>
+<td><code>local_path</code></td>
+<td><code>Path</code></td>
+<td>If a remote model, holds the path of the model after it is downloaded; if a local model, same as <code>source</code></td>
+</tr>
+<tr>
+<td><code>error_type</code></td>
+<td><code>str</code></td>
+<td>Name of the exception that led to an error status</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>str</code></td>
+<td>Traceback of the error</td>
+</tr>
+</tbody>
+</table>
+<p>If the <code>event_bus</code> argument was provided, events will also be
+broadcast to the InvokeAI event bus. The events will appear on the bus
+as an event of type <code>EventServiceBase.model_event</code>, a timestamp and
+the following event names:</p>
+<h5 id="model_install_downloading"><code>model_install_downloading</code><a class="headerlink" href="#model_install_downloading" title="Permanent link">#</a></h5>
+<p>For remote models only, <code>model_install_downloading</code> events will be issued at regular
+intervals as the download progresses. The event's payload contains the
+following keys:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Key</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source</code></td>
+<td>str</td>
+<td>String representation of the requested source</td>
+</tr>
+<tr>
+<td><code>local_path</code></td>
+<td>str</td>
+<td>String representation of the path to the downloading model (usually a temporary directory)</td>
+</tr>
+<tr>
+<td><code>bytes</code></td>
+<td>int</td>
+<td>How many bytes downloaded so far</td>
+</tr>
+<tr>
+<td><code>total_bytes</code></td>
+<td>int</td>
+<td>Total size of all the files that make up the model</td>
+</tr>
+<tr>
+<td><code>parts</code></td>
+<td>List[Dict]</td>
+<td>Information on the progress of the individual files that make up the model</td>
+</tr>
+</tbody>
+</table>
+<p>The parts is a list of dictionaries that give information on each of
+the components pieces of the download. The dictionary's keys are
+<code>source</code>, <code>local_path</code>, <code>bytes</code> and <code>total_bytes</code>, and correspond to
+the like-named keys in the main event.</p>
+<p>Note that downloading events will not be issued for local models, and
+that downloading events occur <em>before</em> the running event.</p>
+<h5 id="model_install_running"><code>model_install_running</code><a class="headerlink" href="#model_install_running" title="Permanent link">#</a></h5>
+<p><code>model_install_running</code> is issued when all the required downloads have completed (if applicable) and the
+model probing, copying and registration process has now started.</p>
+<p>The payload will contain the key <code>source</code>.</p>
+<h5 id="model_install_completed"><code>model_install_completed</code><a class="headerlink" href="#model_install_completed" title="Permanent link">#</a></h5>
+<p><code>model_install_completed</code> is issued once at the end of a successful
+installation. The payload will contain the keys <code>source</code>,
+<code>total_bytes</code> and <code>key</code>, where <code>key</code> is the ID under which the model
+has been registered.</p>
+<h5 id="model_install_error"><code>model_install_error</code><a class="headerlink" href="#model_install_error" title="Permanent link">#</a></h5>
+<p><code>model_install_error</code> is emitted if the installation process fails for
+some reason. The payload will contain the keys <code>source</code>, <code>error_type</code>
+and <code>error</code>. <code>error_type</code> is a short message indicating the nature of
+the error, and <code>error</code> is the long traceback to help debug the
+problem.</p>
+<h5 id="model_install_cancelled"><code>model_install_cancelled</code><a class="headerlink" href="#model_install_cancelled" title="Permanent link">#</a></h5>
+<p><code>model_install_cancelled</code> is issued if the model installation is
+cancelled, or if one or more of its files' downloads are
+cancelled. The payload will contain <code>source</code>.</p>
+<h5 id="following-the-model-status">Following the model status<a class="headerlink" href="#following-the-model-status" title="Permanent link">#</a></h5>
+<p>You may poll the <code>ModelInstallJob</code> object returned by <code>import_model()</code>
+to ascertain the state of the install. The job status can be read from
+the job's <code>status</code> attribute, an <code>InstallStatus</code> enum which has the
+enumerated values <code>WAITING</code>, <code>DOWNLOADING</code>, <code>RUNNING</code>, <code>COMPLETED</code>,
+<code>ERROR</code> and <code>CANCELLED</code>.</p>
+<p>For convenience, install jobs also provided the following boolean
+properties: <code>waiting</code>, <code>downloading</code>, <code>running</code>, <code>complete</code>, <code>errored</code>
+and <code>cancelled</code>, as well as <code>in_terminal_state</code>. The last will return
+True if the job is in the complete, errored or cancelled states.</p>
+<h4 id="model-configuration-and-probing">Model configuration and probing<a class="headerlink" href="#model-configuration-and-probing" title="Permanent link">#</a></h4>
+<p>The install service uses the <code>invokeai.backend.model_manager.probe</code>
+module during import to determine the model's type, base type, and
+other configuration parameters. Among other things, it assigns a
+default name and description for the model based on probed
+fields.</p>
+<p>When downloading remote models is implemented, additional
+configuration information, such as list of trigger terms, will be
+retrieved from the HuggingFace and Civitai model repositories.</p>
+<p>The probed values can be overriden by providing a dictionary in the
+optional <code>config</code> argument passed to <code>import_model()</code>. You may provide
+overriding values for any of the model's configuration
+attributes. Here is an example of setting the
+<code>SchedulerPredictionType</code> and <code>name</code> for an sd-2 model:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>install_job = installer.import_model(
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>               source=HFModelSource(repo_id=&#39;stabilityai/stable-diffusion-2-1&#39;,variant=&#39;fp32&#39;),
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>      config=dict(
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>            prediction_type=SchedulerPredictionType(&#39;v_prediction&#39;)
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>      name=&#39;stable diffusion 2 base model&#39;,
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>            )
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>       )
+</code></pre></div>
+<h3 id="other-installer-methods">Other installer methods<a class="headerlink" href="#other-installer-methods" title="Permanent link">#</a></h3>
+<p>This section describes additional methods provided by the installer class.</p>
+<h4 id="jobs-installerwait_for_installstimeout">jobs = installer.wait_for_installs([timeout])<a class="headerlink" href="#jobs-installerwait_for_installstimeout" title="Permanent link">#</a></h4>
+<p>Block until all pending installs are completed or errored and then
+returns a list of completed jobs. The optional <code>timeout</code> argument will
+return from the call if jobs aren't completed in the specified
+time. An argument of 0 (the default) will block indefinitely.</p>
+<h4 id="jobs-installerwait_for_jobjob-timeout">jobs = installer.wait_for_job(job, [timeout])<a class="headerlink" href="#jobs-installerwait_for_jobjob-timeout" title="Permanent link">#</a></h4>
+<p>Like <code>wait_for_installs()</code>, but block until a specific job has
+completed or errored, and then return the job.  The optional <code>timeout</code>
+argument will return from the call if the job doesn't complete in the
+specified time. An argument of 0 (the default) will block
+indefinitely.</p>
+<h4 id="jobs-installerlist_jobs">jobs = installer.list_jobs()<a class="headerlink" href="#jobs-installerlist_jobs" title="Permanent link">#</a></h4>
+<p>Return a list of all active and complete <code>ModelInstallJobs</code>.</p>
+<h4 id="jobs-installerget_job_by_sourcesource">jobs = installer.get_job_by_source(source)<a class="headerlink" href="#jobs-installerget_job_by_sourcesource" title="Permanent link">#</a></h4>
+<p>Return a list of <code>ModelInstallJob</code> corresponding to the indicated
+model source.</p>
+<h4 id="jobs-installerget_job_by_idid">jobs = installer.get_job_by_id(id)<a class="headerlink" href="#jobs-installerget_job_by_idid" title="Permanent link">#</a></h4>
+<p>Return a list of <code>ModelInstallJob</code> corresponding to the indicated
+model id.</p>
+<h4 id="jobs-installercancel_jobjob">jobs = installer.cancel_job(job)<a class="headerlink" href="#jobs-installercancel_jobjob" title="Permanent link">#</a></h4>
+<p>Cancel the indicated job.</p>
+<h4 id="installerprune_jobs">installer.prune_jobs<a class="headerlink" href="#installerprune_jobs" title="Permanent link">#</a></h4>
+<p>Remove jobs that are in a terminal state (i.e. complete, errored or
+cancelled) from the job list returned by <code>list_jobs()</code> and
+<code>get_job()</code>.</p>
+<h4 id="installerapp_config-installerrecord_store-installerevent_bus">installer.app_config, installer.record_store, installer.event_bus<a class="headerlink" href="#installerapp_config-installerrecord_store-installerevent_bus" title="Permanent link">#</a></h4>
+<p>Properties that provide access to the installer's <code>InvokeAIAppConfig</code>,
+<code>ModelRecordServiceBase</code> and <code>EventServiceBase</code> objects.</p>
+<h4 id="key-installerregister_pathmodel_path-config-key-installerinstall_pathmodel_path-config">key = installer.register_path(model_path, config), key = installer.install_path(model_path, config)<a class="headerlink" href="#key-installerregister_pathmodel_path-config-key-installerinstall_pathmodel_path-config" title="Permanent link">#</a></h4>
+<p>These methods bypass the download queue and directly register or
+install the model at the indicated path, returning the unique ID for
+the installed model.</p>
+<p>Both methods accept a Path object corresponding to a checkpoint or
+diffusers folder, and an optional dict of config attributes to use to
+override the values derived from model probing.</p>
+<p>The difference between <code>register_path()</code> and <code>install_path()</code> is that
+the former creates a model configuration record without changing the
+location of the model in the filesystem. The latter makes a copy of
+the model inside the InvokeAI models directory before registering
+it.</p>
+<h4 id="installerunregisterkey">installer.unregister(key)<a class="headerlink" href="#installerunregisterkey" title="Permanent link">#</a></h4>
+<p>This will remove the model config record for the model at key, and is
+equivalent to <code>installer.record_store.del_model(key)</code></p>
+<h4 id="installerdeletekey">installer.delete(key)<a class="headerlink" href="#installerdeletekey" title="Permanent link">#</a></h4>
+<p>This is similar to <code>unregister()</code> but has the additional effect of
+conditionally deleting the underlying model file(s) if they reside
+within the InvokeAI models directory</p>
+<h4 id="installerunconditionally_deletekey">installer.unconditionally_delete(key)<a class="headerlink" href="#installerunconditionally_deletekey" title="Permanent link">#</a></h4>
+<p>This method is similar to <code>unregister()</code>, but also unconditionally
+deletes the corresponding model weights file(s), regardless of whether
+they are inside or outside the InvokeAI models hierarchy.</p>
+<h4 id="path-installerdownload_and_cacheremote_source-access_token-timeout">path = installer.download_and_cache(remote_source, [access_token], [timeout])<a class="headerlink" href="#path-installerdownload_and_cacheremote_source-access_token-timeout" title="Permanent link">#</a></h4>
+<p>This utility routine will download the model file located at source,
+cache it, and return the path to the cached file. It does not attempt
+to determine the model type, probe its configuration values, or
+register it with the models database.</p>
+<p>You may provide an access token if the remote source requires
+authorization. The call will block indefinitely until the file is
+completely downloaded, cancelled or raises an error of some sort. If
+you provide a timeout (in seconds), the call will raise a
+<code>TimeoutError</code> exception if the download hasn't completed in the
+specified period.</p>
+<p>You may use this mechanism to request any type of file, not just a
+model. The file will be stored in a subdirectory of
+<code>INVOKEAI_ROOT/models/.cache</code>. If the requested file is found in the
+cache, its path will be returned without redownloading it.</p>
+<p>Be aware that the models cache is cleared of infrequently-used files
+and directories at regular intervals when the size of the cache
+exceeds the value specified in Invoke's <code>convert_cache</code> configuration
+variable.</p>
+<h4 id="installerstartinvoker">installer.start(invoker)<a class="headerlink" href="#installerstartinvoker" title="Permanent link">#</a></h4>
+<p>The <code>start</code> method is called by the API intialization routines when
+the API starts up. Its effect is to call <code>sync_to_config()</code> to
+synchronize the model record store database with what's currently on
+disk.</p>
+<hr />
+<h2 id="get-on-line-the-download-queue">Get on line: The Download Queue<a class="headerlink" href="#get-on-line-the-download-queue" title="Permanent link">#</a></h2>
+<p>InvokeAI can download arbitrary files using a multithreaded background
+download queue. Internally, the download queue is used for installing
+models located at remote locations. The queue is implemented by the
+<code>DownloadQueueService</code> defined in
+<code>invokeai.app.services.download_manager</code>. However, most of the
+implementation is spread out among several files in
+<code>invokeai/backend/model_manager/download/*</code></p>
+<p>A default download queue is located in
+<code>ApiDependencies.invoker.services.download_queue</code>. However, you can
+create additional instances if you need to isolate your queue from the
+main one.</p>
+<h3 id="a-job-for-every-task">A job for every task<a class="headerlink" href="#a-job-for-every-task" title="Permanent link">#</a></h3>
+<p>The queue operates on a series of download job objects. These objects
+specify the source and destination of the download, and keep track of
+the progress of the download. Jobs come in a variety of shapes and
+colors as they are progressively specialized for particular download
+task.</p>
+<p>The basic job is the <code>DownloadJobBase</code>, a pydantic object with the
+following fields:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Field</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>int</td>
+<td></td>
+<td>Job ID, an integer &gt;= 0</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>int</td>
+<td>10</td>
+<td>Job priority. Lower priorities run before higher priorities</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>str</td>
+<td></td>
+<td>Where to download from (specialized types used in subclasses)</td>
+</tr>
+<tr>
+<td><code>destination</code></td>
+<td>Path</td>
+<td></td>
+<td>Where to download to</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>DownloadJobStatus</td>
+<td>Idle</td>
+<td>Job's status (see below)</td>
+</tr>
+<tr>
+<td><code>event_handlers</code></td>
+<td>List[DownloadEventHandler]</td>
+<td></td>
+<td>Event handlers (see below)</td>
+</tr>
+<tr>
+<td><code>job_started</code></td>
+<td>float</td>
+<td></td>
+<td>Timestamp for when the job started running</td>
+</tr>
+<tr>
+<td><code>job_ended</code></td>
+<td>float</td>
+<td></td>
+<td>Timestamp for when the job completed or errored out</td>
+</tr>
+<tr>
+<td><code>job_sequence</code></td>
+<td>int</td>
+<td></td>
+<td>A counter that is incremented each time a model is dequeued</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>Exception</td>
+<td></td>
+<td>A copy of the Exception that caused an error during download</td>
+</tr>
+</tbody>
+</table>
+<p>When you create a job, you can assign it a <code>priority</code>. If multiple
+jobs are queued, the job with the lowest priority runs first. (Don't
+blame me! The Unix developers came up with this convention.)</p>
+<p>Every job has a <code>source</code> and a <code>destination</code>. <code>source</code> is a string in
+the base class, but subclassses redefine it more specifically.</p>
+<p>The <code>destination</code> must be the Path to a file or directory on the local
+filesystem. If the Path points to a new or existing file, then the
+source will be stored under that filename. If the Path ponts to an
+existing directory, then the downloaded file will be stored inside the
+directory, usually using the name assigned to it at the remote site in
+the <code>content-disposition</code> http field.</p>
+<p>When the job is submitted, it is assigned a numeric <code>id</code>. The id can
+then be used to control the job, such as starting, stopping and
+cancelling its download.</p>
+<p>The <code>status</code> field is updated by the queue to indicate where the job
+is in its lifecycle. Values are defined in the string enum
+<code>DownloadJobStatus</code>, a symbol available from
+<code>invokeai.app.services.download_manager</code>. Possible values are:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Value</strong></th>
+<th><strong>String Value</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IDLE</code></td>
+<td>idle</td>
+<td>Job created, but not submitted to the queue</td>
+</tr>
+<tr>
+<td><code>ENQUEUED</code></td>
+<td>enqueued</td>
+<td>Job is patiently waiting on the queue</td>
+</tr>
+<tr>
+<td><code>RUNNING</code></td>
+<td>running</td>
+<td>Job is running!</td>
+</tr>
+<tr>
+<td><code>PAUSED</code></td>
+<td>paused</td>
+<td>Job was paused and can be restarted</td>
+</tr>
+<tr>
+<td><code>COMPLETED</code></td>
+<td>completed</td>
+<td>Job has finished its work without an error</td>
+</tr>
+<tr>
+<td><code>ERROR</code></td>
+<td>error</td>
+<td>Job encountered an error and will not run again</td>
+</tr>
+<tr>
+<td><code>CANCELLED</code></td>
+<td>cancelled</td>
+<td>Job was cancelled and will not run (again)</td>
+</tr>
+</tbody>
+</table>
+<p><code>job_started</code>, <code>job_ended</code> and <code>job_sequence</code> indicate when the job
+was started (using a python timestamp), when it completed, and the
+order in which it was taken off the queue. These are mostly used for
+debugging and performance testing.</p>
+<p>In case of an error, the Exception that caused the error will be
+placed in the <code>error</code> field, and the job's status will be set to
+<code>DownloadJobStatus.ERROR</code>.</p>
+<p>After an error occurs, any partially downloaded files will be deleted
+from disk, unless <code>preserve_partial_downloads</code> was set to True at job
+creation time (or set to True any time before the error
+occurred). Note that since all InvokeAI model install operations
+involve downloading files to a temporary directory that has a limited
+lifetime, this flag is not used by the model installer.</p>
+<p>There are a series of subclasses of <code>DownloadJobBase</code> that provide
+support for specific types of downloads. These are:</p>
+<h4 id="downloadjobpath">DownloadJobPath<a class="headerlink" href="#downloadjobpath" title="Permanent link">#</a></h4>
+<p>This subclass redefines <code>source</code> to be a filesystem Path. It is used
+to move a file or directory from the <code>source</code> to the <code>destination</code>
+paths in the background using a uniform event-based infrastructure.</p>
+<h4 id="downloadjobremotesource">DownloadJobRemoteSource<a class="headerlink" href="#downloadjobremotesource" title="Permanent link">#</a></h4>
+<p>This subclass adds the following fields to the job:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Field</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bytes</code></td>
+<td>int</td>
+<td>0</td>
+<td>bytes downloaded so far</td>
+</tr>
+<tr>
+<td><code>total_bytes</code></td>
+<td>int</td>
+<td>0</td>
+<td>total size to download</td>
+</tr>
+<tr>
+<td><code>access_token</code></td>
+<td>Any</td>
+<td>None</td>
+<td>an authorization token to present to the remote source</td>
+</tr>
+</tbody>
+</table>
+<p>The job will start out with 0/0 in its bytes/total_bytes fields. Once
+it starts running, <code>total_bytes</code> will be populated from information
+provided in the HTTP download header (if available), and the number of
+bytes downloaded so far will be progressively incremented.</p>
+<h4 id="downloadjoburl">DownloadJobURL<a class="headerlink" href="#downloadjoburl" title="Permanent link">#</a></h4>
+<p>This is a subclass of <code>DownloadJobBase</code>. It redefines <code>source</code> to be a
+Pydantic <code>AnyHttpUrl</code> object, which enforces URL validation checking
+on the field.</p>
+<p>Note that the installer service defines an additional subclass of
+<code>DownloadJobRemoteSource</code> that accepts HuggingFace repo_ids in
+addition to URLs. This is discussed later in this document.</p>
+<h3 id="event-handlers">Event handlers<a class="headerlink" href="#event-handlers" title="Permanent link">#</a></h3>
+<p>While a job is being downloaded, the queue will emit events at
+periodic intervals. A typical series of events during a successful
+download session will look like this:</p>
+<ul>
+<li>enqueued</li>
+<li>running</li>
+<li>running</li>
+<li>running</li>
+<li>completed</li>
+</ul>
+<p>There will be a single enqueued event, followed by one or more running
+events, and finally one <code>completed</code>, <code>error</code> or <code>cancelled</code>
+events.</p>
+<p>It is possible for a caller to pause download temporarily, in which
+case the events may look something like this:</p>
+<ul>
+<li>enqueued</li>
+<li>running</li>
+<li>running</li>
+<li>paused</li>
+<li>running</li>
+<li>completed</li>
+</ul>
+<p>The download queue logs when downloads start and end (unless <code>quiet</code>
+is set to True at initialization time) but doesn't log any progress
+events. You will probably want to be alerted to events during the
+download job and provide more user feedback. In order to intercept and
+respond to events you may install a series of one or more event
+handlers in the job. Whenever the job's status changes, the chain of
+event handlers is traversed and executed in the same thread that the
+download job is running in.</p>
+<p>Event handlers have the signature <code>Callable[["DownloadJobBase"],
+None]</code>, i.e.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>def handler(job: DownloadJobBase):
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>   pass
+</code></pre></div>
+<p>A typical handler will examine <code>job.status</code> and decide if there's
+something to be done. This can include cancelling or erroring the job,
+but more typically is used to report on the job status to the user
+interface or to perform certain actions on successful completion of
+the job.</p>
+<p>Event handlers can be attached to a job at creation time. In addition,
+you can create a series of default handlers that are attached to the
+queue object itself. These handlers will be executed for each job
+after the job's own handlers (if any) have run.</p>
+<p>During a download, running events are issued every time roughly 1% of
+the file is transferred. This is to provide just enough granularity to
+update a tqdm progress bar smoothly.</p>
+<p>Handlers can be added to a job after the fact using the job's
+<code>add_event_handler</code> method:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>job.add_event_handler(my_handler)
+</code></pre></div>
+<p>All handlers can be cleared using the job's <code>clear_event_handlers()</code>
+method. Note that it might be a good idea to pause the job before
+altering its handlers.</p>
+<h3 id="creating-a-download-queue-object">Creating a download queue object<a class="headerlink" href="#creating-a-download-queue-object" title="Permanent link">#</a></h3>
+<p>The <code>DownloadQueueService</code> constructor takes the following arguments:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Argument</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_handlers</code></td>
+<td>List[DownloadEventHandler]</td>
+<td>[]</td>
+<td>Event handlers</td>
+</tr>
+<tr>
+<td><code>max_parallel_dl</code></td>
+<td>int</td>
+<td>5</td>
+<td>Maximum number of simultaneous downloads allowed</td>
+</tr>
+<tr>
+<td><code>requests_session</code></td>
+<td>requests.sessions.Session</td>
+<td>None</td>
+<td>An alternative requests Session object to use for the download</td>
+</tr>
+<tr>
+<td><code>quiet</code></td>
+<td>bool</td>
+<td>False</td>
+<td>Do work quietly without issuing log messages</td>
+</tr>
+</tbody>
+</table>
+<p>A typical initialization sequence will look like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>from invokeai.app.services.download_manager import DownloadQueueService
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>def log_download_event(job: DownloadJobBase):
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a> logger.info(f&#39;job={job.id}: status={job.status}&#39;)
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>queue = DownloadQueueService(
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>       event_handlers=[log_download_event]
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>        )
+</code></pre></div>
+<p>Event handlers can be provided to the queue at initialization time as
+shown in the example. These will be automatically appended to the
+handler list for any job that is submitted to this queue.</p>
+<p><code>max_parallel_dl</code> sets the number of simultaneous active downloads
+that are allowed. The default of five has not been benchmarked in any
+way, but seems to give acceptable performance.</p>
+<p><code>requests_session</code> can be used to provide a <code>requests</code> module Session
+object that will be used to stream remote URLs to disk. This facility
+was added for use in the module's unit tests to simulate a remote web
+server, but may be useful in other contexts.</p>
+<p><code>quiet</code> will prevent the queue from issuing any log messages at the
+INFO or higher levels.</p>
+<h3 id="submitting-a-download-job">Submitting a download job<a class="headerlink" href="#submitting-a-download-job" title="Permanent link">#</a></h3>
+<p>You can submit a download job to the queue either by creating the job
+manually and passing it to the queue's <code>submit_download_job()</code> method,
+or using the <code>create_download_job()</code> method, which will do the same
+thing on your behalf.</p>
+<p>To use the former method, follow this example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>job = DownloadJobRemoteSource(
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>         source=&#39;http://www.civitai.com/models/13456&#39;,
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>   destination=&#39;/tmp/models/&#39;,
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>   event_handlers=[my_handler1, my_handler2], # if desired
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>   )
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>queue.submit_download_job(job, start=True)
+</code></pre></div>
+<p><code>submit_download_job()</code> takes just two arguments: the job to submit,
+and a flag indicating whether to immediately start the job (defaulting
+to True). If you choose not to start the job immediately, you can
+start it later by calling the queue's <code>start_job()</code> or
+<code>start_all_jobs()</code> methods, which are described later.</p>
+<p>To have the queue create the job for you, follow this example instead:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>job = queue.create_download_job(
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>         source=&#39;http://www.civitai.com/models/13456&#39;,
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>   destdir=&#39;/tmp/models/&#39;,
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>   filename=&#39;my_model.safetensors&#39;,
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>   event_handlers=[my_handler1, my_handler2], # if desired
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>   start=True,
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a> )
+</code></pre></div>
+<p>The <code>filename</code> argument forces the downloader to use the specified
+name for the file rather than the name provided by the remote source,
+and is equivalent to manually specifying a destination of
+`/tmp/models/my_model.safetensors' in the submitted job.</p>
+<p>Here is the full list of arguments that can be provided to
+<code>create_download_job()</code>:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Argument</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source</code></td>
+<td>Union[str, Path, AnyHttpUrl]</td>
+<td></td>
+<td>Download remote or local source</td>
+</tr>
+<tr>
+<td><code>destdir</code></td>
+<td>Path</td>
+<td></td>
+<td>Destination directory for downloaded file</td>
+</tr>
+<tr>
+<td><code>filename</code></td>
+<td>Path</td>
+<td>None</td>
+<td>Filename for downloaded file</td>
+</tr>
+<tr>
+<td><code>start</code></td>
+<td>bool</td>
+<td>True</td>
+<td>Enqueue the job immediately</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td>int</td>
+<td>10</td>
+<td>Starting priority for this job</td>
+</tr>
+<tr>
+<td><code>access_token</code></td>
+<td>str</td>
+<td>None</td>
+<td>Authorization token for this resource</td>
+</tr>
+<tr>
+<td><code>event_handlers</code></td>
+<td>List[DownloadEventHandler]</td>
+<td>[]</td>
+<td>Event handlers for this job</td>
+</tr>
+</tbody>
+</table>
+<p>Internally, <code>create_download_job()</code> has a little bit of internal logic
+that looks at the type of the source and selects the right subclass of
+<code>DownloadJobBase</code> to create and enqueue.</p>
+<p><strong>TODO</strong>: move this logic into its own method for overriding in
+subclasses.</p>
+<h3 id="job-control">Job control<a class="headerlink" href="#job-control" title="Permanent link">#</a></h3>
+<p>Prior to completion, jobs can be controlled with a series of queue
+method calls. Do not attempt to modify jobs by directly writing to
+their fields, as this is likely to lead to unexpected results.</p>
+<p>Any method that accepts a job argument may raise an
+<code>UnknownJobIDException</code> if the job has not yet been submitted to the
+queue or was not created by this queue.</p>
+<h4 id="queuejoin">queue.join()<a class="headerlink" href="#queuejoin" title="Permanent link">#</a></h4>
+<p>This method will block until all the active jobs in the queue have
+reached a terminal state (completed, errored or cancelled).</p>
+<h4 id="queuewait_for_jobjob-timeout">queue.wait_for_job(job, [timeout])<a class="headerlink" href="#queuewait_for_jobjob-timeout" title="Permanent link">#</a></h4>
+<p>This method will block until the indicated job has reached a terminal
+state (completed, errored or cancelled). If the optional timeout is
+provided, the call will block for at most timeout seconds, and raise a
+TimeoutError otherwise.</p>
+<h4 id="jobs-queuelist_jobs">jobs = queue.list_jobs()<a class="headerlink" href="#jobs-queuelist_jobs" title="Permanent link">#</a></h4>
+<p>This will return a list of all jobs, including ones that have not yet
+been enqueued and those that have completed or errored out.</p>
+<h4 id="job-queueid_to_jobint">job = queue.id_to_job(int)<a class="headerlink" href="#job-queueid_to_jobint" title="Permanent link">#</a></h4>
+<p>This method allows you to recover a submitted job using its ID.</p>
+<h4 id="queueprune_jobs">queue.prune_jobs()<a class="headerlink" href="#queueprune_jobs" title="Permanent link">#</a></h4>
+<p>Remove completed and errored jobs from the job list.</p>
+<h4 id="queuestart_jobjob">queue.start_job(job)<a class="headerlink" href="#queuestart_jobjob" title="Permanent link">#</a></h4>
+<p>If the job was submitted with <code>start=False</code>, then it can be started
+using this method.</p>
+<h4 id="queuepause_jobjob">queue.pause_job(job)<a class="headerlink" href="#queuepause_jobjob" title="Permanent link">#</a></h4>
+<p>This will temporarily pause the job, if possible. It can later be
+restarted and pick up where it left off using <code>queue.start_job()</code>.</p>
+<h4 id="queuecancel_jobjob">queue.cancel_job(job)<a class="headerlink" href="#queuecancel_jobjob" title="Permanent link">#</a></h4>
+<p>This will cancel the job if possible and clean up temporary files and
+other resources that it might have been using.</p>
+<h4 id="queuestart_all_jobs-queuepause_all_jobs-queuecancel_all_jobs">queue.start_all_jobs(), queue.pause_all_jobs(), queue.cancel_all_jobs()<a class="headerlink" href="#queuestart_all_jobs-queuepause_all_jobs-queuecancel_all_jobs" title="Permanent link">#</a></h4>
+<p>This will start/pause/cancel all jobs that have been submitted to the
+queue and have not yet reached a terminal state.</p>
+<hr />
+<h2 id="this-meta-be-good-model-metadata-storage">This Meta be Good: Model Metadata Storage<a class="headerlink" href="#this-meta-be-good-model-metadata-storage" title="Permanent link">#</a></h2>
+<p>The modules found under <code>invokeai.backend.model_manager.metadata</code>
+provide a straightforward API for fetching model metadatda from online
+repositories. Currently only HuggingFace is supported. However, the
+modules are easily extended for additional repos, provided that they
+have defined APIs for metadata access.</p>
+<p>Metadata comprises any descriptive information that is not essential
+for getting the model to run. For example "author" is metadata, while
+"type", "base" and "format" are not. The latter fields are part of the
+model's config, as defined in <code>invokeai.backend.model_manager.config</code>.</p>
+<h3 id="example-usage">Example Usage<a class="headerlink" href="#example-usage" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>from invokeai.backend.model_manager.metadata import (
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>   AnyModelRepoMetadata,
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>)
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a># to access the initialized sql database
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>from invokeai.app.api.dependencies import ApiDependencies
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>hf = HuggingFaceMetadataFetch()
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a># fetch the metadata
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>model_metadata = hf.from_id(&quot;&lt;repo_id&gt;&quot;)
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>assert isinstance(model_metadata, HuggingFaceMetadata)
+</code></pre></div>
+<h3 id="structure-of-the-metadata-objects">Structure of the Metadata objects<a class="headerlink" href="#structure-of-the-metadata-objects" title="Permanent link">#</a></h3>
+<p>There is a short class hierarchy of Metadata objects, all of which
+descend from the Pydantic <code>BaseModel</code>.</p>
+<h4 id="modelmetadatabase"><code>ModelMetadataBase</code><a class="headerlink" href="#modelmetadatabase" title="Permanent link">#</a></h4>
+<p>This is the common base class for metadata:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Field Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>str</td>
+<td>Repository's name for the model</td>
+</tr>
+<tr>
+<td><code>author</code></td>
+<td>str</td>
+<td>Model's author</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>Set[str]</td>
+<td>Model tags</td>
+</tr>
+</tbody>
+</table>
+<p>Note that the model config record also has a <code>name</code> field. It is
+intended that the config record version be locally customizable, while
+the metadata version is read-only. However, enforcing this is expected
+to be part of the business logic.</p>
+<p>Descendents of the base add additional fields.</p>
+<h4 id="huggingfacemetadata"><code>HuggingFaceMetadata</code><a class="headerlink" href="#huggingfacemetadata" title="Permanent link">#</a></h4>
+<p>This descends from <code>ModelMetadataBase</code> and adds the following fields:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Field Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>Literal["huggingface"]</td>
+<td>Used for the discriminated union of metadata classes</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>str</td>
+<td>HuggingFace repo_id</td>
+</tr>
+<tr>
+<td><code>tag_dict</code></td>
+<td>Dict[str, Any]</td>
+<td>A dictionary of tag/value pairs provided in addition to <code>tags</code></td>
+</tr>
+<tr>
+<td><code>last_modified</code></td>
+<td>datetime</td>
+<td>Date of last commit of this model to the repo</td>
+</tr>
+<tr>
+<td><code>files</code></td>
+<td>List[Path]</td>
+<td>List of the files in the model repo</td>
+</tr>
+</tbody>
+</table>
+<h4 id="anymodelrepometadata"><code>AnyModelRepoMetadata</code><a class="headerlink" href="#anymodelrepometadata" title="Permanent link">#</a></h4>
+<p>This is a discriminated Union of <code>HuggingFaceMetadata</code>.</p>
+<h3 id="fetching-metadata-from-online-repos">Fetching Metadata from Online Repos<a class="headerlink" href="#fetching-metadata-from-online-repos" title="Permanent link">#</a></h3>
+<p>The <code>HuggingFaceMetadataFetch</code> class will
+retrieve metadata from its corresponding repository and return
+<code>AnyModelRepoMetadata</code> objects. Their base class
+<code>ModelMetadataFetchBase</code> is an abstract class that defines two
+methods: <code>from_url()</code> and <code>from_id()</code>. The former accepts the type of
+model URLs that the user will try to cut and paste into the model
+import form. The latter accepts a string ID in the format recognized
+by the repository of choice. Both methods return an
+<code>AnyModelRepoMetadata</code>.</p>
+<p>The base class also has a class method <code>from_json()</code> which will take
+the JSON representation of a <code>ModelMetadata</code> object, validate it, and
+return the corresponding <code>AnyModelRepoMetadata</code> object.</p>
+<p>When initializing one of the metadata fetching classes, you may
+provide a <code>requests.Session</code> argument. This allows you to customize
+the low-level HTTP fetch requests and is used, for instance, in the
+testing suite to avoid hitting the internet.</p>
+<p>The HuggingFace fetcher subclass add additional repo-specific fetching methods:</p>
+<h4 id="huggingfacemetadatafetch">HuggingFaceMetadataFetch<a class="headerlink" href="#huggingfacemetadatafetch" title="Permanent link">#</a></h4>
+<p>This overrides its base class <code>from_json()</code> method to return a
+<code>HuggingFaceMetadata</code> object directly.</p>
+<h3 id="metadata-storage">Metadata Storage<a class="headerlink" href="#metadata-storage" title="Permanent link">#</a></h3>
+<p>The <code>ModelConfigBase</code> stores this response in the <code>source_api_response</code> field
+as a JSON blob.</p>
+<hr />
+<h2 id="the-lowdown-on-the-modelloadservice">The Lowdown on the ModelLoadService<a class="headerlink" href="#the-lowdown-on-the-modelloadservice" title="Permanent link">#</a></h2>
+<p>The <code>ModelLoadService</code> is responsible for loading a named model into
+memory so that it can be used for inference. Despite the fact that it
+does a lot under the covers, it is very straightforward to use.</p>
+<p>An application-wide model loader is created at API initialization time
+and stored in
+<code>ApiDependencies.invoker.services.model_loader</code>. However, you can
+create alternative instances if you wish.</p>
+<h3 id="creating-a-modelloadservice-object">Creating a ModelLoadService object<a class="headerlink" href="#creating-a-modelloadservice-object" title="Permanent link">#</a></h3>
+<p>The class is defined in
+<code>invokeai.app.services.model_load</code>. It is initialized with
+an InvokeAIAppConfig object, from which it gets configuration
+information such as the user's desired GPU and precision, and with a
+previously-created <code>ModelRecordServiceBase</code> object, from which it
+loads the requested model's configuration information.</p>
+<p>Here is a typical initialization pattern:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>from invokeai.app.services.config import InvokeAIAppConfig
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>from invokeai.app.services.model_load import ModelLoadService, ModelLoaderRegistry
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>config = InvokeAIAppConfig.get_config()
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>ram_cache = ModelCache(
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a> max_cache_size=config.ram_cache_size, max_vram_cache_size=config.vram_cache_size, logger=logger
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>)
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>convert_cache = ModelConvertCache(
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a> cache_path=config.models_convert_cache_path, max_size=config.convert_cache_size
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>)
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>loader = ModelLoadService(
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a> app_config=config,
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a> ram_cache=ram_cache,
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a> convert_cache=convert_cache,
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a> registry=ModelLoaderRegistry
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a>)
+</code></pre></div>
+<h3 id="load_modelmodel_config-submodel_type-context-loadedmodel">load_model(model_config, [submodel_type], [context]) -&gt; LoadedModel<a class="headerlink" href="#load_modelmodel_config-submodel_type-context-loadedmodel" title="Permanent link">#</a></h3>
+<p>The <code>load_model()</code> method takes an <code>AnyModelConfig</code> returned by
+<code>ModelRecordService.get_model()</code> and returns the corresponding loaded
+model.  It loads the model into memory, gets the model ready for use,
+and returns a <code>LoadedModel</code> object.</p>
+<p>The optional second argument, <code>subtype</code> is a <code>SubModelType</code> string
+enum, such as "vae". It is mandatory when used with a main model, and
+is used to select which part of the main model to load.</p>
+<p>The optional third argument, <code>context</code> can be provided by
+an invocation to trigger model load event reporting. See below for
+details.</p>
+<p>The returned <code>LoadedModel</code> object contains a copy of the configuration
+record returned by the model record <code>get_model()</code> method, as well as
+the in-memory loaded model:</p>
+<table>
+<thead>
+<tr>
+<th><strong>Attribute Name</strong></th>
+<th><strong>Type</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config</code></td>
+<td>AnyModelConfig</td>
+<td>A copy of the model's configuration record for retrieving base type, etc.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>AnyModel</td>
+<td>The instantiated model (details below)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="get_model_by_keykey-submodel-loadedmodel">get_model_by_key(key, [submodel]) -&gt; LoadedModel<a class="headerlink" href="#get_model_by_keykey-submodel-loadedmodel" title="Permanent link">#</a></h3>
+<p>The <code>get_model_by_key()</code> method will retrieve the model using its
+unique database key. For example:</p>
+<p>loaded_model = loader.get_model_by_key('f13dd932c0c35c22dcb8d6cda4203764', SubModelType('vae'))</p>
+<p><code>get_model_by_key()</code> may raise any of the following exceptions:</p>
+<ul>
+<li><code>UnknownModelException</code>   -- key not in database</li>
+<li><code>ModelNotFoundException</code>  -- key in database but model not found at path</li>
+<li><code>NotImplementedException</code> -- the loader doesn't know how to load this type of model</li>
+</ul>
+<h3 id="using-the-loaded-model-in-inference">Using the Loaded Model in Inference<a class="headerlink" href="#using-the-loaded-model-in-inference" title="Permanent link">#</a></h3>
+<p><code>LoadedModel</code> acts as a context manager. The context loads the model
+into the execution device (e.g. VRAM on CUDA systems), locks the model
+in the execution device for the duration of the context, and returns
+the model. Use it like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>loaded_model_= loader.get_model_by_key(&#39;f13dd932c0c35c22dcb8d6cda4203764&#39;, SubModelType(&#39;vae&#39;))
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>with loaded_model as vae:
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a> image = vae.decode(latents)[0]
+</code></pre></div>
+<p>The object returned by the LoadedModel context manager is an
+<code>AnyModel</code>, which is a Union of <code>ModelMixin</code>, <code>torch.nn.Module</code>,
+<code>IAIOnnxRuntimeModel</code>, <code>IPAdapter</code>, <code>IPAdapterPlus</code>, and
+<code>EmbeddingModelRaw</code>. <code>ModelMixin</code> is the base class of all diffusers
+models, <code>EmbeddingModelRaw</code> is used for LoRA and TextualInversion
+models. The others are obvious.</p>
+<p>In addition, you may call <code>LoadedModel.model_on_device()</code>, a context
+manager that returns a tuple of the model's state dict in CPU and the
+model itself in VRAM. It is used to optimize the LoRA patching and
+unpatching process:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>loaded_model_= loader.get_model_by_key(&#39;f13dd932c0c35c22dcb8d6cda4203764&#39;, SubModelType(&#39;vae&#39;))
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>with loaded_model.model_on_device() as (state_dict, vae):
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a> image = vae.decode(latents)[0]
+</code></pre></div>
+<p>Since not all models have state dicts, the <code>state_dict</code> return value
+can be None.</p>
+<h3 id="emitting-model-loading-events">Emitting model loading events<a class="headerlink" href="#emitting-model-loading-events" title="Permanent link">#</a></h3>
+<p>When the <code>context</code> argument is passed to <code>load_model_*()</code>, it will
+retrieve the invocation event bus from the passed <code>InvocationContext</code>
+object to emit events on the invocation bus. The two events are
+"model_load_started" and "model_load_completed". Both carry the
+following payload:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>payload=dict(
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a> queue_id=queue_id,
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a> queue_item_id=queue_item_id,
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a> queue_batch_id=queue_batch_id,
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a> graph_execution_state_id=graph_execution_state_id,
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a> model_key=model_key,
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a> submodel_type=submodel,
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a> hash=model_info.hash,
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a> location=str(model_info.location),
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a> precision=str(model_info.precision),
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>)
+</code></pre></div>
+<h3 id="adding-model-loaders">Adding Model Loaders<a class="headerlink" href="#adding-model-loaders" title="Permanent link">#</a></h3>
+<p>Model loaders are small classes that inherit from the <code>ModelLoader</code>
+base class. They typically implement one method <code>_load_model()</code> whose
+signature is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>def _load_model(
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    self,
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>    model_path: Path,
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>    model_variant: Optional[ModelRepoVariant] = None,
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    submodel_type: Optional[SubModelType] = None,
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>) -&gt; AnyModel:
+</code></pre></div>
+<p><code>_load_model()</code> will be passed the path to the model on disk, an
+optional repository variant (used by the diffusers loaders to select,
+e.g.  the <code>fp16</code> variant, and an optional submodel_type for main and
+onnx models.</p>
+<p>To install a new loader, place it in
+<code>invokeai/backend/model_manager/load/model_loaders</code>. Inherit from
+<code>ModelLoader</code> and use the <code>@ModelLoaderRegistry.register()</code> decorator to
+indicate what type of models the loader can handle.</p>
+<p>Here is a complete example from <code>generic_diffusers.py</code>, which is able
+to load several different diffusers types:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>from pathlib import Path
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>from typing import Optional
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>from invokeai.backend.model_manager import (
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>    AnyModel,
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>    BaseModelType,
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    ModelFormat,
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    ModelRepoVariant,
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>    ModelType,
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>    SubModelType,
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>)
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>from .. import ModelLoader, ModelLoaderRegistry
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
+<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a>@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T2IAdapter, format=ModelFormat.Diffusers)
+<a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a>class GenericDiffusersLoader(ModelLoader):
+<a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a>    &quot;&quot;&quot;Class to load simple diffusers models.&quot;&quot;&quot;
+<a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a>
+<a id="__codelineno-23-20" name="__codelineno-23-20" href="#__codelineno-23-20"></a>    def _load_model(
+<a id="__codelineno-23-21" name="__codelineno-23-21" href="#__codelineno-23-21"></a>        self,
+<a id="__codelineno-23-22" name="__codelineno-23-22" href="#__codelineno-23-22"></a>        model_path: Path,
+<a id="__codelineno-23-23" name="__codelineno-23-23" href="#__codelineno-23-23"></a>        model_variant: Optional[ModelRepoVariant] = None,
+<a id="__codelineno-23-24" name="__codelineno-23-24" href="#__codelineno-23-24"></a>        submodel_type: Optional[SubModelType] = None,
+<a id="__codelineno-23-25" name="__codelineno-23-25" href="#__codelineno-23-25"></a>    ) -&gt; AnyModel:
+<a id="__codelineno-23-26" name="__codelineno-23-26" href="#__codelineno-23-26"></a>        model_class = self._get_hf_load_class(model_path)
+<a id="__codelineno-23-27" name="__codelineno-23-27" href="#__codelineno-23-27"></a>        if submodel_type is not None:
+<a id="__codelineno-23-28" name="__codelineno-23-28" href="#__codelineno-23-28"></a>            raise Exception(f&quot;There are no submodels in models of type {model_class}&quot;)
+<a id="__codelineno-23-29" name="__codelineno-23-29" href="#__codelineno-23-29"></a>        variant = model_variant.value if model_variant else None
+<a id="__codelineno-23-30" name="__codelineno-23-30" href="#__codelineno-23-30"></a>        result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)  # type: ignore
+<a id="__codelineno-23-31" name="__codelineno-23-31" href="#__codelineno-23-31"></a>        return result
+</code></pre></div>
+<p>Note that a loader can register itself to handle several different
+model types. An exception will be raised if more than one loader tries
+to register the same model type.</p>
+<h4 id="conversion">Conversion<a class="headerlink" href="#conversion" title="Permanent link">#</a></h4>
+<p>Some models require conversion to diffusers format before they can be
+loaded. These loaders should override two additional methods:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>_needs_conversion(self, config: AnyModelConfig, model_path: Path, dest_path: Path) -&gt; bool
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>_convert_model(self, config: AnyModelConfig, model_path: Path, output_path: Path) -&gt; Path:
+</code></pre></div>
+<p>The first method accepts the model configuration, the path to where
+the unmodified model is currently installed, and a proposed
+destination for the converted model. This method returns True if the
+model needs to be converted. It typically does this by comparing the
+last modification time of the original model file to the modification
+time of the converted model. In some cases you will also want to check
+the modification date of the configuration record, in the event that
+the user has changed something like the scheduler prediction type that
+will require the model to be re-converted. See <code>controlnet.py</code> for an
+example of this logic.</p>
+<p>The second method accepts the model configuration, the path to the
+original model on disk, and the desired output path for the converted
+model. It does whatever it needs to do to get the model into diffusers
+format, and returns the Path of the resulting model. (The path should
+ordinarily be the same as <code>output_path</code>.)</p>
+<h2 id="the-modelmanagerservice-object">The ModelManagerService object<a class="headerlink" href="#the-modelmanagerservice-object" title="Permanent link">#</a></h2>
+<p>For convenience, the API provides a <code>ModelManagerService</code> object which
+gives a single point of access to the major model manager
+services. This object is created at initialization time and can be
+found in the global <code>ApiDependencies.invoker.services.model_manager</code>
+object, or in <code>context.services.model_manager</code> from within an
+invocation.</p>
+<p>In the examples below, we have retrieved the manager using:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>mm = ApiDependencies.invoker.services.model_manager
+</code></pre></div>
+<p>The following properties and methods will be available:</p>
+<h3 id="mmstore">mm.store<a class="headerlink" href="#mmstore" title="Permanent link">#</a></h3>
+<p>This retrieves the <code>ModelRecordService</code> associated with the
+manager. Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>configs = mm.store.get_model_by_attr(name=&#39;stable-diffusion-v1-5&#39;)
+</code></pre></div>
+<h3 id="mminstall">mm.install<a class="headerlink" href="#mminstall" title="Permanent link">#</a></h3>
+<p>This retrieves the <code>ModelInstallService</code> associated with the manager.
+Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>job = mm.install.heuristic_import(`https://civitai.com/models/58390/detail-tweaker-lora-lora`)
+</code></pre></div>
+<h3 id="mmload">mm.load<a class="headerlink" href="#mmload" title="Permanent link">#</a></h3>
+<p>This retrieves the <code>ModelLoaderService</code> associated with the manager. Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>configs = mm.store.get_model_by_attr(name=&#39;stable-diffusion-v1-5&#39;)
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>assert len(configs) &gt; 0
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>loaded_model = mm.load.load_model(configs[0])
+</code></pre></div>
+<p>The model manager also offers a few convenience shortcuts for loading
+models:</p>
+<h3 id="mmload_model_by_configmodel_config-submodel-context-loadedmodel">mm.load_model_by_config(model_config, [submodel], [context]) -&gt; LoadedModel<a class="headerlink" href="#mmload_model_by_configmodel_config-submodel-context-loadedmodel" title="Permanent link">#</a></h3>
+<p>Same as <code>mm.load.load_model()</code>.</p>
+<h3 id="mmload_model_by_attrmodel_name-base_model-model_type-submodel-context-loadedmodel">mm.load_model_by_attr(model_name, base_model, model_type, [submodel], [context]) -&gt; LoadedModel<a class="headerlink" href="#mmload_model_by_attrmodel_name-base_model-model_type-submodel-context-loadedmodel" title="Permanent link">#</a></h3>
+<p>This accepts the combination of the model's name, type and base, which
+it passes to the model record config store for retrieval. If a unique
+model config is found, this method returns a <code>LoadedModel</code>. It can
+raise the following exceptions:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>UnknownModelException -- model with these attributes not known
+<a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a>NotImplementedException -- the loader doesn&#39;t know how to load this type of model
+<a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>ValueError -- more than one model matches this combination of base/type/name
+</code></pre></div>
+<h3 id="mmload_model_by_keykey-submodel-context-loadedmodel">mm.load_model_by_key(key, [submodel], [context]) -&gt; LoadedModel<a class="headerlink" href="#mmload_model_by_keykey-submodel-context-loadedmodel" title="Permanent link">#</a></h3>
+<p>This method takes a model key, looks it up using the
+<code>ModelRecordServiceBase</code> object in <code>mm.store</code>, and passes the returned
+model configuration to <code>load_model_by_config()</code>.  It may raise a
+<code>NotImplementedException</code>.</p>
+<h2 id="invocation-context-model-manager-api">Invocation Context Model Manager API<a class="headerlink" href="#invocation-context-model-manager-api" title="Permanent link">#</a></h2>
+<p>Within invocations, the following methods are available from the
+<code>InvocationContext</code> object:</p>
+<h3 id="contextdownload_and_cache_modelsource-path">context.download_and_cache_model(source) -&gt; Path<a class="headerlink" href="#contextdownload_and_cache_modelsource-path" title="Permanent link">#</a></h3>
+<p>This method accepts a <code>source</code> of a remote model, downloads and caches
+it locally, and then returns a Path to the local model. The source can
+be a direct download URL or a HuggingFace repo_id.</p>
+<p>In the case of HuggingFace repo_id, the following variants are
+recognized:</p>
+<ul>
+<li>stabilityai/stable-diffusion-v4           -- default model</li>
+<li>stabilityai/stable-diffusion-v4:fp16      -- fp16 variant</li>
+<li>stabilityai/stable-diffusion-v4:fp16:vae  -- the fp16 vae subfolder</li>
+<li>stabilityai/stable-diffusion-v4:onnx:vae  -- the onnx variant vae subfolder</li>
+</ul>
+<p>You can also point at an arbitrary individual file within a repo_id
+directory using this syntax:</p>
+<ul>
+<li>stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors</li>
+</ul>
+<h3 id="contextload_local_modelmodel_path-loader-loadedmodel">context.load_local_model(model_path, [loader]) -&gt; LoadedModel<a class="headerlink" href="#contextload_local_modelmodel_path-loader-loadedmodel" title="Permanent link">#</a></h3>
+<p>This method loads a local model from the indicated path, returning a
+<code>LoadedModel</code>. The optional loader is a Callable that accepts a Path
+to the object, and returns a <code>AnyModel</code> object. If no loader is
+provided, then the method will use <code>torch.load()</code> for a .ckpt or .bin
+checkpoint file, <code>safetensors.torch.load_file()</code> for a safetensors
+checkpoint file, or <code>cls.from_pretrained()</code> for a directory that looks
+like a diffusers directory.</p>
+<h3 id="contextload_remote_modelsource-loader-loadedmodel">context.load_remote_model(source, [loader]) -&gt; LoadedModel<a class="headerlink" href="#contextload_remote_modelsource-loader-loadedmodel" title="Permanent link">#</a></h3>
+<p>This method accepts a <code>source</code> of a remote model, downloads and caches
+it locally, loads it, and returns a <code>LoadedModel</code>. The source can be a
+direct download URL or a HuggingFace repo_id.</p>
+<p>In the case of HuggingFace repo_id, the following variants are
+recognized:</p>
+<ul>
+<li>stabilityai/stable-diffusion-v4           -- default model</li>
+<li>stabilityai/stable-diffusion-v4:fp16      -- fp16 variant</li>
+<li>stabilityai/stable-diffusion-v4:fp16:vae  -- the fp16 vae subfolder</li>
+<li>stabilityai/stable-diffusion-v4:onnx:vae  -- the onnx variant vae subfolder</li>
+</ul>
+<p>You can also point at an arbitrary individual file within a repo_id
+directory using this syntax:</p>
+<ul>
+<li>stabilityai/stable-diffusion-v4::/checkpoints/sd4.safetensors</li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="May 22, 2025 18:03:14">May 22, 2025</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="May 22, 2025 18:03:14">May 22, 2025</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2022-2024 InvokeAI Team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.tracking", "navigation.indexes", "navigation.path", "search.highlight", "search.suggest", "toc.integrate"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>

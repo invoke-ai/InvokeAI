@@ -1,0 +1,5843 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="mauwii">
+      
+      
+        <link rel="canonical" href="https://invoke-ai.github.io/InvokeAI/nodes/invocation-api/">
+      
+      
+        <link rel="prev" href="../NODES_MIGRATION_V3_V4/">
+      
+      
+        <link rel="next" href="../../configuration/">
+      
+      
+      <link rel="icon" href="../../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.14">
+    
+    
+      
+        <title>Invocation API - Invoke</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","G-2X4JR4S4FB"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","G-2X4JR4S4FB",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=G-2X4JR4S4FB",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#invocation-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Invoke" class="md-header__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Invoke
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Invocation API
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../installation/quick_start/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Installation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Workflows & Nodes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../features/low-vram/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../help/gettingStartedWithAI/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Help
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Invoke" class="md-nav__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    Invoke
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Installation
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Quick Start
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Detailed Requirements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/manual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Manual Install
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Docker
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/patchmatch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    PatchMatch
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Models
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/legacy_scripts.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Legacy Scripts
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Workflows & Nodes
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Workflows & Nodes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nodes Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../NODES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Workflow Editor Basics
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../defaultNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    List of Default Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../communityNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Community Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comfyToInvoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ComfyUI to InvokeAI
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../detailedNodes/faceTools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Facetool Node
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributingNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Contributing Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../NODES_MIGRATION_V3_V4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Migrating from v3 to v4
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Invocation API
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Invocation API
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#mixins" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mixins
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mixins">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#withmetadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      WithMetadata
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#withboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      WithBoard
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.InvocationContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      InvocationContext
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ImagesInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      ImagesInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ImagesInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_dto" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_dto
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_metadata
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_path
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_pil" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_pil
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.save" class="md-nav__link">
+    <span class="md-ellipsis">
+      save
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.TensorsInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      TensorsInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TensorsInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.TensorsInterface.load" class="md-nav__link">
+    <span class="md-ellipsis">
+      load
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.TensorsInterface.save" class="md-nav__link">
+    <span class="md-ellipsis">
+      save
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ConditioningInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      ConditioningInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ConditioningInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ConditioningInterface.load" class="md-nav__link">
+    <span class="md-ellipsis">
+      load
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ConditioningInterface.save" class="md-nav__link">
+    <span class="md-ellipsis">
+      save
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      ModelsInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ModelsInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.download_and_cache_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      download_and_cache_model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      exists
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.get_absolute_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_absolute_path
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.get_config" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_config
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load" class="md-nav__link">
+    <span class="md-ellipsis">
+      load
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_by_attrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      load_by_attrs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_local_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      load_local_model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_remote_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      load_remote_model
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_attrs" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_attrs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      search_by_path
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.LoggerInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      LoggerInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LoggerInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.debug" class="md-nav__link">
+    <span class="md-ellipsis">
+      debug
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.error" class="md-nav__link">
+    <span class="md-ellipsis">
+      error
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.info" class="md-nav__link">
+    <span class="md-ellipsis">
+      info
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.warning" class="md-nav__link">
+    <span class="md-ellipsis">
+      warning
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ConfigInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      ConfigInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ConfigInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.ConfigInterface.get" class="md-nav__link">
+    <span class="md-ellipsis">
+      get
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.UtilInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      UtilInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UtilInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.UtilInterface.flux_step_callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      flux_step_callback
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.UtilInterface.is_canceled" class="md-nav__link">
+    <span class="md-ellipsis">
+      is_canceled
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.UtilInterface.sd_step_callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      sd_step_callback
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.UtilInterface.signal_progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      signal_progress
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.BoardsInterface" class="md-nav__link">
+    <span class="md-ellipsis">
+      BoardsInterface
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BoardsInterface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.add_image_to_board" class="md-nav__link">
+    <span class="md-ellipsis">
+      add_image_to_board
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.create" class="md-nav__link">
+    <span class="md-ellipsis">
+      create
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_all
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_all_image_names_for_board" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_all_image_names_for_board
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_dto" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_dto
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Configuration
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Features
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/low-vram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Low VRAM mode
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Database
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Contributing
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Code of Conduct
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/dev-environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Dev Environment
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Development
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/newContributorChecklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New Contributors
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/LOCAL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Local Development
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Testing
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/frontend/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    Frontend
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            Frontend
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/state-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    State Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Workflows - Design and Implementation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Documentation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/INVOCATIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Nodes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/DOWNLOAD_QUEUE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Download Queue
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Translation
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Tutorials
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Help
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Help
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Diffusion Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/SAMPLER_CONVERGENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Sampler Convergence
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    FAQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="invocation-api">Invocation API<a class="headerlink" href="#invocation-api" title="Permanent link">#</a></h1>
+<p>Each invocation's <code>invoke</code> method is provided a single arg - the Invocation Context.</p>
+<p>This object provides an API the invocation can use to interact with application services, for example:</p>
+<ul>
+<li>Saving images</li>
+<li>Logging messages</li>
+<li>Loading models</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyInvocation</span><span class="p">(</span><span class="n">BaseInvocation</span><span class="p">):</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  <span class="o">...</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  <span class="k">def</span><span class="w"> </span><span class="nf">invoke</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">InvocationContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ImageOutput</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>      <span class="c1"># Load an image</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>      <span class="n">image_pil</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">get_pil</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">image_name</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>      <span class="c1"># Do something to the image</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>      <span class="n">output_image</span> <span class="o">=</span> <span class="n">do_something_cool</span><span class="p">(</span><span class="n">image_pil</span><span class="p">)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>      <span class="c1"># Save the image</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>      <span class="n">image_dto</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">images</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">output_image</span><span class="p">)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      <span class="c1"># Log a message</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>      <span class="n">context</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Did something cool, image saved!&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>      <span class="c1"># Return the output</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>      <span class="k">return</span> <span class="n">ImageOutput</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">image_dto</span><span class="p">)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>      <span class="o">...</span>
+</code></pre></div>
+<p>The full API is documented below.</p>
+<h2 id="mixins">Mixins<a class="headerlink" href="#mixins" title="Permanent link">#</a></h2>
+<p>Two important mixins are provided to facilitate working with metadata and gallery boards.</p>
+<h3 id="withmetadata"><code>WithMetadata</code><a class="headerlink" href="#withmetadata" title="Permanent link">#</a></h3>
+<p>Inherit from this class (in addition to <code>BaseInvocation</code>) to add a <code>metadata</code> input to your node. When you do this, you can access the metadata dict from <code>self.metadata</code> in the <code>invoke()</code> function.</p>
+<p>The dict will be populated via the node's input, and you can add any metadata you'd like to it. When you call <code>context.images.save()</code>, if the metadata dict has any data, it be automatically embedded in the image.</p>
+<h3 id="withboard"><code>WithBoard</code><a class="headerlink" href="#withboard" title="Permanent link">#</a></h3>
+<p>Inherit from this class (in addition to <code>BaseInvocation</code>) to add a <code>board</code> input to your node. This renders as a drop-down to select a board. The user's selection will be accessible from <code>self.board</code> in the <code>invoke()</code> function.</p>
+<p>When you call <code>context.images.save()</code>, if a board was selected, the image will added to that board as it is saved.</p>
+<!-- prettier-ignore-start -->
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.InvocationContext" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">InvocationContext</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.InvocationContext" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Provides access to various services and data for the current invocation.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.images">images</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ImagesInterface (invokeai.app.services.shared.invocation_context.ImagesInterface)" href="#invokeai.app.services.shared.invocation_context.ImagesInterface">ImagesInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Methods to save, get and update images and their metadata.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.tensors">tensors</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TensorsInterface (invokeai.app.services.shared.invocation_context.TensorsInterface)" href="#invokeai.app.services.shared.invocation_context.TensorsInterface">TensorsInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Methods to save and get tensors, including image, noise, masks, and masked images.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.conditioning">conditioning</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConditioningInterface (invokeai.app.services.shared.invocation_context.ConditioningInterface)" href="#invokeai.app.services.shared.invocation_context.ConditioningInterface">ConditioningInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Methods to save and get conditioning data.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.models">models</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ModelsInterface (invokeai.app.services.shared.invocation_context.ModelsInterface)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface">ModelsInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Methods to check if a model exists, get a model, and get a model's info.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.logger">logger</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="LoggerInterface (invokeai.app.services.shared.invocation_context.LoggerInterface)" href="#invokeai.app.services.shared.invocation_context.LoggerInterface">LoggerInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The app logger.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.config">config</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ConfigInterface (invokeai.app.services.shared.invocation_context.ConfigInterface)" href="#invokeai.app.services.shared.invocation_context.ConfigInterface">ConfigInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The app config.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.util">util</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="UtilInterface (invokeai.app.services.shared.invocation_context.UtilInterface)" href="#invokeai.app.services.shared.invocation_context.UtilInterface">UtilInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Utility methods, including a method to check if an invocation was canceled and step callbacks.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="invokeai.app.services.shared.invocation_context.InvocationContext.boards">boards</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="BoardsInterface (invokeai.app.services.shared.invocation_context.BoardsInterface)" href="#invokeai.app.services.shared.invocation_context.BoardsInterface">BoardsInterface</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Methods to interact with boards.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.ImagesInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ImagesInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ImagesInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_dto (invokeai.app.services.shared.invocation_context.ImagesInterface.get_dto)" href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_dto">get_dto</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets an image as an ImageDTO object.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_metadata (invokeai.app.services.shared.invocation_context.ImagesInterface.get_metadata)" href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_metadata">get_metadata</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets an image's metadata, if it has any.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_path (invokeai.app.services.shared.invocation_context.ImagesInterface.get_path)" href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_path">get_path</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets the internal path to an image or thumbnail.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_pil (invokeai.app.services.shared.invocation_context.ImagesInterface.get_pil)" href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_pil">get_pil</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets an image as a PIL Image object. This method returns a copy of the image.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="save (invokeai.app.services.shared.invocation_context.ImagesInterface.save)" href="#invokeai.app.services.shared.invocation_context.ImagesInterface.save">save</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Saves an image, returning its DTO.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ImagesInterface.get_dto" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_dto</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_dto" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_dto</span><span class="p">(</span><span class="n">image_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.app.services.images.images_common.ImageDTO">ImageDTO</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets an image as an ImageDTO object.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>image_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the image to get.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.app.services.images.images_common.ImageDTO">ImageDTO</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The image as an ImageDTO object.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ImagesInterface.get_metadata" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_metadata</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_metadata" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_metadata</span><span class="p">(</span><span class="n">image_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="invokeai.app.invocations.fields.MetadataField">MetadataField</span></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets an image's metadata, if it has any.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>image_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the image to get the metadata for.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="invokeai.app.invocations.fields.MetadataField">MetadataField</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The image's metadata, if it has any.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ImagesInterface.get_path" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_path</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_path" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_path</span><span class="p">(</span><span class="n">image_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">thumbnail</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets the internal path to an image or thumbnail.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>image_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the image to get the path of.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>thumbnail</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Get the path of the thumbnail instead of the full image</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The local path of the image or thumbnail.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ImagesInterface.get_pil" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_pil</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.get_pil" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_pil</span><span class="p">(</span><span class="n">image_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="n"><span title="invokeai.app.invocations.constants.IMAGE_MODES">IMAGE_MODES</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="PIL.Image.Image">Image</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets an image as a PIL Image object. This method returns a copy of the image.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>image_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the image to get.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>mode</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.app.invocations.constants.IMAGE_MODES">IMAGE_MODES</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The color mode to convert the image to. If None, the original mode is used.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="PIL.Image.Image">Image</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The image as a PIL Image object.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ImagesInterface.save" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">save</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ImagesInterface.save" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">save</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n"><span title="PIL.Image.Image">Image</span></span><span class="p">,</span> <span class="n">board_id</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">image_category</span><span class="p">:</span> <span class="n"><span title="invokeai.app.services.image_records.image_records_common.ImageCategory">ImageCategory</span></span> <span class="o">=</span> <span class="n"><span title="invokeai.app.services.image_records.image_records_common.ImageCategory.GENERAL">GENERAL</span></span><span class="p">,</span> <span class="n">metadata</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="invokeai.app.invocations.fields.MetadataField">MetadataField</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.app.services.images.images_common.ImageDTO">ImageDTO</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Saves an image, returning its DTO.</p>
+<p>If the current queue item has a workflow or metadata, it is automatically saved with the image.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>image</code>
+            </td>
+            <td>
+                  <code><span title="PIL.Image.Image">Image</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The image to save, as a PIL image.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>board_id</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The board ID to add the image to, if it should be added. It the invocation             inherits from <code>WithBoard</code>, that board will be used automatically. <strong>Use this only if             you want to override or provide a board manually!</strong></p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>image_category</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.app.services.image_records.image_records_common.ImageCategory">ImageCategory</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The category of the image. Only the GENERAL category is added             to the gallery.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="invokeai.app.services.image_records.image_records_common.ImageCategory.GENERAL">GENERAL</span></code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>metadata</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="invokeai.app.invocations.fields.MetadataField">MetadataField</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The metadata to save with the image, if it should have any. If the             invocation inherits from <code>WithMetadata</code>, that metadata will be used automatically.             <strong>Use this only if you want to override or provide metadata manually!</strong></p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.app.services.images.images_common.ImageDTO">ImageDTO</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The saved image DTO.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.TensorsInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">TensorsInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.TensorsInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="load (invokeai.app.services.shared.invocation_context.TensorsInterface.load)" href="#invokeai.app.services.shared.invocation_context.TensorsInterface.load">load</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Loads a tensor by name. This method returns a copy of the tensor.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="save (invokeai.app.services.shared.invocation_context.TensorsInterface.save)" href="#invokeai.app.services.shared.invocation_context.TensorsInterface.save">save</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Saves a tensor, returning its name.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.TensorsInterface.load" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">load</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.TensorsInterface.load" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="torch.Tensor">Tensor</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Loads a tensor by name. This method returns a copy of the tensor.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the tensor to load.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The tensor.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.TensorsInterface.save" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">save</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.TensorsInterface.save" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">save</span><span class="p">(</span><span class="n">tensor</span><span class="p">:</span> <span class="n"><span title="torch.Tensor">Tensor</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Saves a tensor, returning its name.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>tensor</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The tensor to save.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the saved tensor.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.ConditioningInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ConditioningInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ConditioningInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="load (invokeai.app.services.shared.invocation_context.ConditioningInterface.load)" href="#invokeai.app.services.shared.invocation_context.ConditioningInterface.load">load</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Loads conditioning data by name. This method returns a copy of the conditioning data.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="save (invokeai.app.services.shared.invocation_context.ConditioningInterface.save)" href="#invokeai.app.services.shared.invocation_context.ConditioningInterface.save">save</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Saves a conditioning data object, returning its name.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ConditioningInterface.load" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">load</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ConditioningInterface.load" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.backend.stable_diffusion.diffusion.conditioning_data.ConditioningFieldData">ConditioningFieldData</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Loads conditioning data by name. This method returns a copy of the conditioning data.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the conditioning data to load.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.backend.stable_diffusion.diffusion.conditioning_data.ConditioningFieldData">ConditioningFieldData</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The conditioning data.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ConditioningInterface.save" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">save</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ConditioningInterface.save" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">save</span><span class="p">(</span><span class="n">conditioning_data</span><span class="p">:</span> <span class="n"><span title="invokeai.backend.stable_diffusion.diffusion.conditioning_data.ConditioningFieldData">ConditioningFieldData</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Saves a conditioning data object, returning its name.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>conditioning_data</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.backend.stable_diffusion.diffusion.conditioning_data.ConditioningFieldData">ConditioningFieldData</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The conditioning data to save.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the saved conditioning data.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.ModelsInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ModelsInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+        <p>Common API for loading, downloading and managing models.</p>
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="download_and_cache_model (invokeai.app.services.shared.invocation_context.ModelsInterface.download_and_cache_model)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.download_and_cache_model">download_and_cache_model</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Download the model file located at source to the models cache and return its Path.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="exists (invokeai.app.services.shared.invocation_context.ModelsInterface.exists)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.exists">exists</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Check if a model exists.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_absolute_path (invokeai.app.services.shared.invocation_context.ModelsInterface.get_absolute_path)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.get_absolute_path">get_absolute_path</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets the absolute path for a given model config or path.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_config (invokeai.app.services.shared.invocation_context.ModelsInterface.get_config)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.get_config">get_config</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Get a model's config.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="load (invokeai.app.services.shared.invocation_context.ModelsInterface.load)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load">load</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Load a model.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="load_by_attrs (invokeai.app.services.shared.invocation_context.ModelsInterface.load_by_attrs)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_by_attrs">load_by_attrs</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Load a model by its attributes.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="load_local_model (invokeai.app.services.shared.invocation_context.ModelsInterface.load_local_model)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_local_model">load_local_model</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Load the model file located at the indicated path</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="load_remote_model (invokeai.app.services.shared.invocation_context.ModelsInterface.load_remote_model)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_remote_model">load_remote_model</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Download, cache, and load the model file located at the indicated URL or repo_id.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="search_by_attrs (invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_attrs)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_attrs">search_by_attrs</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Search for models by attributes.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="search_by_path (invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_path)" href="#invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_path">search_by_path</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Search for models by path.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.download_and_cache_model" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">download_and_cache_model</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.download_and_cache_model" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">download_and_cache_model</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="n"><span title="pydantic.networks.AnyHttpUrl">AnyHttpUrl</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Download the model file located at source to the models cache and return its Path.</p>
+<p>This can be used to single-file install models and other resources of arbitrary types
+which should not get registered with the database. If the model is already
+installed, the cached path will be returned. Otherwise it will be downloaded.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>source</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pydantic.networks.AnyHttpUrl">AnyHttpUrl</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A URL that points to the model, or a huggingface repo_id.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the downloaded model</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.exists" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">exists</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.exists" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">exists</span><span class="p">(</span><span class="n">identifier</span><span class="p">:</span> <span class="n"><span title="typing.Union">Union</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="invokeai.app.invocations.model.ModelIdentifierField">ModelIdentifierField</span></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n"><span title="bool">bool</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if a model exists.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>identifier</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="invokeai.app.invocations.model.ModelIdentifierField">ModelIdentifierField</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The key or ModelField representing the model.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>True if the model exists, False if not.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.get_absolute_path" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_absolute_path</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.get_absolute_path" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_absolute_path</span><span class="p">(</span><span class="n">config_or_path</span><span class="p">:</span> <span class="n"><span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span></span> <span class="o">|</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets the absolute path for a given model config or path.</p>
+<p>For example, if the model's path is <code>flux/main/FLUX Dev.safetensors</code>, and the models path is
+<code>/home/username/InvokeAI/models</code>, this method will return
+<code>/home/username/InvokeAI/models/flux/main/FLUX Dev.safetensors</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>config_or_path</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span> | <span title="pathlib.Path">Path</span> | <span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The model config or path.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The absolute path to the model.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.get_config" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_config</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.get_config" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_config</span><span class="p">(</span><span class="n">identifier</span><span class="p">:</span> <span class="n"><span title="typing.Union">Union</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="invokeai.app.invocations.model.ModelIdentifierField">ModelIdentifierField</span></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Get a model's config.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>identifier</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="invokeai.app.invocations.model.ModelIdentifierField">ModelIdentifierField</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The key or ModelField representing the model.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The model's config.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.load" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">load</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load</span><span class="p">(</span><span class="n">identifier</span><span class="p">:</span> <span class="n"><span title="typing.Union">Union</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="invokeai.app.invocations.model.ModelIdentifierField">ModelIdentifierField</span></span><span class="p">],</span> <span class="n">submodel_type</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="invokeai.backend.model_manager.taxonomy.SubModelType">SubModelType</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.backend.model_manager.load.load_base.LoadedModel">LoadedModel</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Load a model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>identifier</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="str">str</span>, <span title="invokeai.app.invocations.model.ModelIdentifierField">ModelIdentifierField</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The key or ModelField representing the model.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>submodel_type</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="invokeai.backend.model_manager.taxonomy.SubModelType">SubModelType</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The submodel of the model to get.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.backend.model_manager.load.load_base.LoadedModel">LoadedModel</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An object representing the loaded model.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.load_by_attrs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">load_by_attrs</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_by_attrs" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load_by_attrs</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">base</span><span class="p">:</span> <span class="n"><span title="invokeai.backend.model_manager.taxonomy.BaseModelType">BaseModelType</span></span><span class="p">,</span> <span class="nb">type</span><span class="p">:</span> <span class="n"><span title="invokeai.backend.model_manager.taxonomy.ModelType">ModelType</span></span><span class="p">,</span> <span class="n">submodel_type</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="invokeai.backend.model_manager.taxonomy.SubModelType">SubModelType</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.backend.model_manager.load.load_base.LoadedModel">LoadedModel</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Load a model by its attributes.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the model.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>base</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.backend.model_manager.taxonomy.BaseModelType">BaseModelType</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The models' base type, e.g. <code>BaseModelType.StableDiffusion1</code>, <code>BaseModelType.StableDiffusionXL</code>, etc.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>type</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.backend.model_manager.taxonomy.ModelType">ModelType</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type of the model, e.g. <code>ModelType.Main</code>, <code>ModelType.Vae</code>, etc.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>submodel_type</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="invokeai.backend.model_manager.taxonomy.SubModelType">SubModelType</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The type of submodel to load, e.g. <code>SubModelType.UNet</code>, <code>SubModelType.TextEncoder</code>, etc. Only main</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.backend.model_manager.load.load_base.LoadedModel">LoadedModel</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An object representing the loaded model.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.load_local_model" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">load_local_model</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_local_model" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load_local_model</span><span class="p">(</span><span class="n">model_path</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span><span class="p">,</span> <span class="n">loader</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="typing.Callable">Callable</span></span><span class="p">[[</span><span class="n"><span title="pathlib.Path">Path</span></span><span class="p">],</span> <span class="n"><span title="invokeai.backend.model_manager.taxonomy.AnyModel">AnyModel</span></span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.backend.model_manager.load.load_base.LoadedModelWithoutConfig">LoadedModelWithoutConfig</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Load the model file located at the indicated path</p>
+<p>If a loader callable is provided, it will be invoked to load the model. Otherwise,
+<code>safetensors.torch.load_file()</code> or <code>torch.load()</code> will be called to load the model.</p>
+<p>Be aware that the LoadedModelWithoutConfig object has no <code>config</code> attribute</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A model Path</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loader</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Callable">Callable</span>[[<span title="pathlib.Path">Path</span>], <span title="invokeai.backend.model_manager.taxonomy.AnyModel">AnyModel</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A Callable that expects a Path and returns a dict[str|int, Any]</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.backend.model_manager.load.load_base.LoadedModelWithoutConfig">LoadedModelWithoutConfig</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A LoadedModelWithoutConfig object.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.load_remote_model" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">load_remote_model</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.load_remote_model" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load_remote_model</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="n"><span title="pydantic.networks.AnyHttpUrl">AnyHttpUrl</span></span><span class="p">,</span> <span class="n">loader</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="typing.Callable">Callable</span></span><span class="p">[[</span><span class="n"><span title="pathlib.Path">Path</span></span><span class="p">],</span> <span class="n"><span title="invokeai.backend.model_manager.taxonomy.AnyModel">AnyModel</span></span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.backend.model_manager.load.load_base.LoadedModelWithoutConfig">LoadedModelWithoutConfig</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Download, cache, and load the model file located at the indicated URL or repo_id.</p>
+<p>If the model is already downloaded, it will be loaded from the cache.</p>
+<p>If the a loader callable is provided, it will be invoked to load the model. Otherwise,
+<code>safetensors.torch.load_file()</code> or <code>torch.load()</code> will be called to load the model.</p>
+<p>Be aware that the LoadedModelWithoutConfig object has no <code>config</code> attribute</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>source</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pydantic.networks.AnyHttpUrl">AnyHttpUrl</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A URL or huggingface repoid.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>loader</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="typing.Callable">Callable</span>[[<span title="pathlib.Path">Path</span>], <span title="invokeai.backend.model_manager.taxonomy.AnyModel">AnyModel</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A Callable that expects a Path and returns a dict[str|int, Any]</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.backend.model_manager.load.load_base.LoadedModelWithoutConfig">LoadedModelWithoutConfig</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A LoadedModelWithoutConfig object.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_attrs" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">search_by_attrs</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_attrs" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">search_by_attrs</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">base</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="invokeai.backend.model_manager.taxonomy.BaseModelType">BaseModelType</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="invokeai.backend.model_manager.taxonomy.ModelType">ModelType</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="n"><span title="typing.Optional">Optional</span></span><span class="p">[</span><span class="n"><span title="invokeai.backend.model_manager.taxonomy.ModelFormat">ModelFormat</span></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Search for models by attributes.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name to search for (exact match).</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>base</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="invokeai.backend.model_manager.taxonomy.BaseModelType">BaseModelType</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The base to search for, e.g. <code>BaseModelType.StableDiffusion1</code>, <code>BaseModelType.StableDiffusionXL</code>, etc.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>type</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="invokeai.backend.model_manager.taxonomy.ModelType">ModelType</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type type of model to search for, e.g. <code>ModelType.Main</code>, <code>ModelType.Vae</code>, etc.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>format</code>
+            </td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="invokeai.backend.model_manager.taxonomy.ModelFormat">ModelFormat</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The format of model to search for, e.g. <code>ModelFormat.Checkpoint</code>, <code>ModelFormat.Diffusers</code>, etc.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A list of models that match the attributes.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_path" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">search_by_path</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ModelsInterface.search_by_path" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">search_by_path</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Search for models by path.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The path to search for.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="invokeai.backend.model_manager.config.AnyModelConfig">AnyModelConfig</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A list of models that match the path.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.LoggerInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">LoggerInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.LoggerInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="debug (invokeai.app.services.shared.invocation_context.LoggerInterface.debug)" href="#invokeai.app.services.shared.invocation_context.LoggerInterface.debug">debug</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs a debug message.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="error (invokeai.app.services.shared.invocation_context.LoggerInterface.error)" href="#invokeai.app.services.shared.invocation_context.LoggerInterface.error">error</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs an error message.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="info (invokeai.app.services.shared.invocation_context.LoggerInterface.info)" href="#invokeai.app.services.shared.invocation_context.LoggerInterface.info">info</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs an info message.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="warning (invokeai.app.services.shared.invocation_context.LoggerInterface.warning)" href="#invokeai.app.services.shared.invocation_context.LoggerInterface.warning">warning</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Logs a warning message.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.LoggerInterface.debug" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">debug</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.debug" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">debug</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs a debug message.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The message to log.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.LoggerInterface.error" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">error</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.error" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">error</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs an error message.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The message to log.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.LoggerInterface.info" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">info</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.info" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">info</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs an info message.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The message to log.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.LoggerInterface.warning" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">warning</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.LoggerInterface.warning" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">warning</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Logs a warning message.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The message to log.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.ConfigInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ConfigInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ConfigInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get (invokeai.app.services.shared.invocation_context.ConfigInterface.get)" href="#invokeai.app.services.shared.invocation_context.ConfigInterface.get">get</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets the app's config.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.ConfigInterface.get" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.ConfigInterface.get" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="invokeai.app.services.config.config_default.InvokeAIAppConfig" href="../../configuration/#invokeai.app.services.config.config_default.InvokeAIAppConfig">InvokeAIAppConfig</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets the app's config.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="invokeai.app.services.config.config_default.InvokeAIAppConfig" href="../../configuration/#invokeai.app.services.config.config_default.InvokeAIAppConfig">InvokeAIAppConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The app's config.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.UtilInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">UtilInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.UtilInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="flux_step_callback (invokeai.app.services.shared.invocation_context.UtilInterface.flux_step_callback)" href="#invokeai.app.services.shared.invocation_context.UtilInterface.flux_step_callback">flux_step_callback</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The step callback emits a progress event with the current step, the total number of</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="is_canceled (invokeai.app.services.shared.invocation_context.UtilInterface.is_canceled)" href="#invokeai.app.services.shared.invocation_context.UtilInterface.is_canceled">is_canceled</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Checks if the current session has been canceled.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="sd_step_callback (invokeai.app.services.shared.invocation_context.UtilInterface.sd_step_callback)" href="#invokeai.app.services.shared.invocation_context.UtilInterface.sd_step_callback">sd_step_callback</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The step callback emits a progress event with the current step, the total number of</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="signal_progress (invokeai.app.services.shared.invocation_context.UtilInterface.signal_progress)" href="#invokeai.app.services.shared.invocation_context.UtilInterface.signal_progress">signal_progress</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Signals the progress of some long-running invocation. The progress is displayed in the UI.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.UtilInterface.flux_step_callback" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">flux_step_callback</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.UtilInterface.flux_step_callback" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">flux_step_callback</span><span class="p">(</span><span class="n">intermediate_state</span><span class="p">:</span> <span class="n"><span title="invokeai.backend.stable_diffusion.diffusers_pipeline.PipelineIntermediateState">PipelineIntermediateState</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The step callback emits a progress event with the current step, the total number of
+steps, a preview image, and some other internal metadata.</p>
+<p>This should be called after each denoising step.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>intermediate_state</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.backend.stable_diffusion.diffusers_pipeline.PipelineIntermediateState">PipelineIntermediateState</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The intermediate state of the diffusion pipeline.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.UtilInterface.is_canceled" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">is_canceled</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.UtilInterface.is_canceled" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">is_canceled</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="bool">bool</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Checks if the current session has been canceled.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>True if the current session has been canceled, False if not.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.UtilInterface.sd_step_callback" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">sd_step_callback</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.UtilInterface.sd_step_callback" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">sd_step_callback</span><span class="p">(</span><span class="n">intermediate_state</span><span class="p">:</span> <span class="n"><span title="invokeai.backend.stable_diffusion.diffusers_pipeline.PipelineIntermediateState">PipelineIntermediateState</span></span><span class="p">,</span> <span class="n">base_model</span><span class="p">:</span> <span class="n"><span title="invokeai.backend.model_manager.taxonomy.BaseModelType">BaseModelType</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The step callback emits a progress event with the current step, the total number of
+steps, a preview image, and some other internal metadata.</p>
+<p>This should be called after each denoising step.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>intermediate_state</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.backend.stable_diffusion.diffusers_pipeline.PipelineIntermediateState">PipelineIntermediateState</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The intermediate state of the diffusion pipeline.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>base_model</code>
+            </td>
+            <td>
+                  <code><span title="invokeai.backend.model_manager.taxonomy.BaseModelType">BaseModelType</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The base model for the current denoising step.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.UtilInterface.signal_progress" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">signal_progress</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.UtilInterface.signal_progress" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">signal_progress</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">percentage</span><span class="p">:</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n"><span title="PIL.Image.Image">Image</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">image_size</span><span class="p">:</span> <span class="n"><span title="tuple">tuple</span></span><span class="p">[</span><span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n"><span title="int">int</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Signals the progress of some long-running invocation. The progress is displayed in the UI.</p>
+<p>If a percentage is provided, the UI will display a progress bar and automatically append the percentage to the
+message. You should not include the percentage in the message.</p>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">total_steps</span> <span class="o">=</span> <span class="mi">10</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">total_steps</span><span class="p">):</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">percentage</span> <span class="o">=</span> <span class="n">i</span> <span class="o">/</span> <span class="p">(</span><span class="n">total_steps</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">context</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">signal_progress</span><span class="p">(</span><span class="s2">&quot;Doing something cool&quot;</span><span class="p">,</span> <span class="n">percentage</span><span class="p">)</span>
+</code></pre></div>
+</details>        <p>If an image is provided, the UI will display it. If your image should be displayed at a different size, provide
+a tuple of <code>(width, height)</code> for the <code>image_size</code> parameter. The image will be displayed at the specified size
+in the UI.</p>
+<p>For example, SD denoising progress images are &#8539; the size of the original image, so you'd do this to ensure the
+image is displayed at the correct size:
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Calculate the output size of the image (8x the progress image&#39;s size)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">width</span> <span class="o">=</span> <span class="n">progress_image</span><span class="o">.</span><span class="n">width</span> <span class="o">*</span> <span class="mi">8</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">height</span> <span class="o">=</span> <span class="n">progress_image</span><span class="o">.</span><span class="n">height</span> <span class="o">*</span> <span class="mi">8</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Signal the progress with the image and output size</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">signal_progress</span><span class="p">(</span><span class="s2">&quot;Denoising&quot;</span><span class="p">,</span> <span class="n">percentage</span><span class="p">,</span> <span class="n">progress_image</span><span class="p">,</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">))</span>
+</code></pre></div></p>
+<p>If your progress image is very large, consider downscaling it to reduce the payload size and provide the original
+size to the <code>image_size</code> parameter. The PIL <code>thumbnail</code> method is useful for this, as it maintains the aspect
+ratio of the image:
+    <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># `thumbnail` modifies the image in-place, so we need to first make a copy</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">thumbnail_image</span> <span class="o">=</span> <span class="n">progress_image</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Resize the image to a maximum of 256x256 pixels, maintaining the aspect ratio</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">thumbnail_image</span><span class="o">.</span><span class="n">thumbnail</span><span class="p">((</span><span class="mi">256</span><span class="p">,</span> <span class="mi">256</span><span class="p">))</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Signal the progress with the thumbnail, passing the original size</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">signal_progress</span><span class="p">(</span><span class="s2">&quot;Denoising&quot;</span><span class="p">,</span> <span class="n">percentage</span><span class="p">,</span> <span class="n">thumbnail</span><span class="p">,</span> <span class="n">progress_image</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+</code></pre></div></p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>message</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A message describing the current status. Do not include the percentage in this message.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>percentage</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The current percentage completion for the process. Omit for indeterminate progress.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>image</code>
+            </td>
+            <td>
+                  <code><span title="PIL.Image.Image">Image</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An optional image to display.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>image_size</code>
+            </td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The optional size of the image to display. If omitted, the image will be displayed at its
+original size.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="invokeai.app.services.shared.invocation_context.BoardsInterface" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">BoardsInterface</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.BoardsInterface" class="headerlink" title="Permanent link">#</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Methods:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="add_image_to_board (invokeai.app.services.shared.invocation_context.BoardsInterface.add_image_to_board)" href="#invokeai.app.services.shared.invocation_context.BoardsInterface.add_image_to_board">add_image_to_board</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Adds an image to a board.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="create (invokeai.app.services.shared.invocation_context.BoardsInterface.create)" href="#invokeai.app.services.shared.invocation_context.BoardsInterface.create">create</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Creates a board.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_all (invokeai.app.services.shared.invocation_context.BoardsInterface.get_all)" href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_all">get_all</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets all boards.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_all_image_names_for_board (invokeai.app.services.shared.invocation_context.BoardsInterface.get_all_image_names_for_board)" href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_all_image_names_for_board">get_all_image_names_for_board</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets all image names for a board.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="get_dto (invokeai.app.services.shared.invocation_context.BoardsInterface.get_dto)" href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_dto">get_dto</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Gets a board DTO.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.BoardsInterface.add_image_to_board" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">add_image_to_board</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.add_image_to_board" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">add_image_to_board</span><span class="p">(</span><span class="n">board_id</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">image_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Adds an image to a board.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>board_id</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The ID of the board to add the image to.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>image_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the image to add to the board.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.BoardsInterface.create" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">create</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.create" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">create</span><span class="p">(</span><span class="n">board_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.app.services.boards.boards_common.BoardDTO">BoardDTO</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Creates a board.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>board_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the board to create.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.app.services.boards.boards_common.BoardDTO">BoardDTO</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The created board DTO.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.BoardsInterface.get_all" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_all</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_all" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_all</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="invokeai.app.services.boards.boards_common.BoardDTO">BoardDTO</span></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets all boards.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="invokeai.app.services.boards.boards_common.BoardDTO">BoardDTO</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A list of all boards.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.BoardsInterface.get_all_image_names_for_board" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_all_image_names_for_board</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_all_image_names_for_board" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_all_image_names_for_board</span><span class="p">(</span><span class="n">board_id</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets all image names for a board.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>board_id</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The ID of the board to get the image names for.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A list of all image names for the board.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="invokeai.app.services.shared.invocation_context.BoardsInterface.get_dto" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_dto</span>
+
+
+<a href="#invokeai.app.services.shared.invocation_context.BoardsInterface.get_dto" class="headerlink" title="Permanent link">#</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_dto</span><span class="p">(</span><span class="n">board_id</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="invokeai.app.services.boards.boards_common.BoardDTO">BoardDTO</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Gets a board DTO.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>board_id</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The ID of the board to get.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="invokeai.app.services.boards.boards_common.BoardDTO">BoardDTO</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The board DTO.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><!-- prettier-ignore-end -->
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="May 22, 2025 18:03:14">May 22, 2025</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="May 22, 2025 18:03:14">May 22, 2025</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2022-2024 InvokeAI Team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.tracking", "navigation.indexes", "navigation.path", "search.highlight", "search.suggest", "toc.integrate"], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.13a4f30d.min.js"></script>
+      
+    
+  </body>
+</html>
