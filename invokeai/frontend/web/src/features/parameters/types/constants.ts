@@ -120,3 +120,8 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'unipc', label: 'UniPC' },
   { value: 'unipc_k', label: 'UniPC Karras' },
 ];
+
+/**
+ * List of base models that make API requests
+ */
+export const API_BASE_MODELS = ['imagen3', 'imagen4', 'chatgpt-4o'];
