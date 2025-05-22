@@ -179,6 +179,7 @@ export const buildSD3Graph = async (state: RootState, manager: CanvasManager): P
       scaledSize,
       denoising_start,
       fp32: false,
+      seed,
     });
     g.upsertMetadata({ generation_mode: 'sd3_outpaint' });
   } else {

@@ -428,9 +428,8 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   };
 
   /**
-   * Creates and uploads a grayscale representation of the noise masks or any other attribute.
-   * This produces an image with a white background where the mask is represented by dark values
-   * rather than transparency.
+   * Creates and uploads a grayscale representation of the inpaint mask image noise or denoise limit values.
+   * This produces an image with a white background where the mask is represented by dark values.
    *
    * @param adapters The adapters for the canvas entities to composite
    * @param rect The region to include in the rasterized image
@@ -505,16 +504,17 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       for (let i = 0; i < data.length; i += 4) {
         // Make sure we're accessing valid array indices
         if (i + 3 < data.length) {
+          // input has transparency
           // Calculate grayscale value: white (255) for no mask, darker for stronger mask
           let grayValue = 255; // Default to white for unmasked areas
           if ((data[i + 3] ?? 0) > 127) {
             grayValue = Math.max(0, Math.min(255, 255 - Math.round(255 * attributeValue)));
           }
 
-          data[i] = grayValue; // R of current pixel
-          data[i + 1] = grayValue; // G of current pixel
-          data[i + 2] = grayValue; // B of current pixel
-          data[i + 3] = 255; // A of current pixel (fully opaque)
+          data[i] = grayValue; // R
+          data[i + 1] = grayValue; // G
+          data[i + 2] = grayValue; // B
+          data[i + 3] = 255; // A (output is fully opaque)
         }
       }
 
