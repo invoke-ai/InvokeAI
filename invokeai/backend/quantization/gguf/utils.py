@@ -5,7 +5,8 @@ from typing import Callable, Optional, Union
 import gguf
 import torch
 
-TORCH_COMPATIBLE_QTYPES = {None, gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16}
+# should not be a Set until this is resolved: https://github.com/pytorch/pytorch/issues/145761
+TORCH_COMPATIBLE_QTYPES = [None, gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16]
 
 # K Quants #
 QK_K = 256
