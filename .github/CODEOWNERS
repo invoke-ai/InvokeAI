@@ -6,7 +6,7 @@
 /mkdocs.yml @lstein @blessedcoolant @hipsterusername @psychedelicious
 
 # nodes
-/invokeai/app/ @blessedcoolant @psychedelicious @brandonrising @hipsterusername @jazzhaiku
+/invokeai/app/ @blessedcoolant @psychedelicious @hipsterusername @jazzhaiku
 
 # installation and configuration
 /pyproject.toml  @lstein @blessedcoolant @hipsterusername
@@ -19,10 +19,9 @@
 
 # web ui
 /invokeai/frontend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
-/invokeai/backend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
 
 # generation, model management, postprocessing
-/invokeai/backend  @lstein @blessedcoolant @brandonrising @hipsterusername @jazzhaiku
+/invokeai/backend  @lstein @blessedcoolant @hipsterusername @jazzhaiku @psychedelicious @maryhipp 
 
 # front ends
 /invokeai/frontend/CLI @lstein @hipsterusername

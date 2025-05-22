@@ -19,6 +19,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
     case 'sd-3':
     case 'cogview4':
     case 'imagen3':
+    case 'imagen4':
     case 'chatgpt-4o':
     default:
       return 1024;

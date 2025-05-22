@@ -11,6 +11,7 @@ import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildC
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildImagen3Graph } from 'features/nodes/util/graph/generation/buildImagen3Graph';
+import { buildImagen4Graph } from 'features/nodes/util/graph/generation/buildImagen4Graph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
@@ -54,6 +55,8 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
             return await buildCogView4Graph(state, manager);
           case 'imagen3':
             return await buildImagen3Graph(state, manager);
+          case 'imagen4':
+            return await buildImagen4Graph(state, manager);
           case 'chatgpt-4o':
             return await buildChatGPT4oGraph(state, manager);
           default:

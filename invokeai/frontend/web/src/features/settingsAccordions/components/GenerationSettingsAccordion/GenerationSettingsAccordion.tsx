@@ -4,13 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import {
-  selectIsChatGTP4o,
-  selectIsCogView4,
-  selectIsFLUX,
-  selectIsImagen3,
-  selectIsSD3,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectIsCogView4, selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
@@ -20,6 +14,8 @@ import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { DisabledModelWarning } from 'features/parameters/components/MainModel/DisabledModelWarning';
 import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
 import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
+import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
+import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -40,12 +36,8 @@ export const GenerationSettingsAccordion = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
-  const isImagen3 = useAppSelector(selectIsImagen3);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
 
-  const isApiModel = useMemo(() => {
-    return isImagen3 || isChatGPT4o;
-  }, [isImagen3, isChatGPT4o]);
+  const isApiModel = useIsApiModel();
 
   const isUpscaling = useMemo(() => {
     return activeTabName === 'upscaling';
@@ -56,7 +48,7 @@ export const GenerationSettingsAccordion = memo(() => {
         const enabledLoRAsCount = loras.loras.filter((l) => l.isEnabled).length;
         const loraTabBadges = enabledLoRAsCount ? [`${enabledLoRAsCount} ${t('models.concepts')}`] : EMPTY_ARRAY;
         const accordionBadges =
-          modelConfig?.base === 'imagen3' || modelConfig?.base === 'chatgpt-4o'
+          modelConfig && API_BASE_MODELS.includes(modelConfig.base)
             ? [modelConfig.name]
             : modelConfig
               ? [modelConfig.name, modelConfig.base]

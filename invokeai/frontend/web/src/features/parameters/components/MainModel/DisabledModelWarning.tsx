@@ -2,23 +2,18 @@ import { Flex, Link, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $accountSettingsLink } from 'app/store/nanostores/accountSettingsLink';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectIsChatGTP4o, selectModel } from 'features/controlLayers/store/paramsSlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { useMemo } from 'react';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
+import { useIsModelDisabled } from 'features/parameters/hooks/useIsModelDisabled';
 import { Trans, useTranslation } from 'react-i18next';
 
 export const DisabledModelWarning = () => {
   const { t } = useTranslation();
   const model = useAppSelector(selectModel);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
-  const areChatGPT4oModelsEnabled = useFeatureStatus('chatGPT4oModels');
+
   const accountSettingsLink = useStore($accountSettingsLink);
+  const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
 
-  const isModelDisabled = useMemo(() => {
-    return isChatGPT4o && !areChatGPT4oModelsEnabled;
-  }, [isChatGPT4o, areChatGPT4oModelsEnabled]);
-
-  if (!isModelDisabled) {
+  if (!model || !isChatGPT4oHighModelDisabled(model)) {
     return null;
   }
 

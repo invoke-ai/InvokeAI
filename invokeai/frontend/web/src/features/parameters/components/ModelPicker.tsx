@@ -21,7 +21,7 @@ import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallMode
 import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
-import { MODEL_TYPE_MAP, MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
+import { API_BASE_MODELS, MODEL_TYPE_MAP, MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -59,28 +59,28 @@ const NoOptionsFallback = memo(() => {
 NoOptionsFallback.displayName = 'NoOptionsFallback';
 
 const getGroupIDFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (API_BASE_MODELS.includes(modelConfig.base)) {
     return 'api';
   }
   return modelConfig.base;
 };
 
 const getGroupNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (API_BASE_MODELS.includes(modelConfig.base)) {
     return 'External API';
   }
   return MODEL_TYPE_MAP[modelConfig.base];
 };
 
 const getGroupShortNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (API_BASE_MODELS.includes(modelConfig.base)) {
     return 'api';
   }
   return MODEL_TYPE_SHORT_MAP[modelConfig.base];
 };
 
 const getGroupColorSchemeFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (API_BASE_MODELS.includes(modelConfig.base)) {
     return 'pink';
   }
   return BASE_COLOR_MAP[modelConfig.base];

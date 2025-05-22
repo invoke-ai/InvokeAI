@@ -20,14 +20,14 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildImagen3Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
+export const buildImagen4Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
   const generationMode = await manager.compositor.getGenerationMode();
 
   if (generationMode !== 'txt2img') {
-    throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'Imagen3' }));
+    throw new UnsupportedGenerationModeError(t('toast.imagenIncompatibleGenerationMode', { model: 'Imagen4' }));
   }
 
-  log.debug({ generationMode }, 'Building Imagen3 graph');
+  log.debug({ generationMode }, 'Building Imagen4 graph');
 
   const canvas = selectCanvasSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
@@ -36,26 +36,26 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
   const model = selectMainModelConfig(state);
 
-  assert(model, 'No model found for Imagen3 graph');
-  assert(model.base === 'imagen3', 'Imagen3 graph requires Imagen3 model');
-  assert(isImagenAspectRatioID(bbox.aspectRatio.id), 'Imagen3 does not support this aspect ratio');
-  assert(positivePrompt.length > 0, 'Imagen3 requires positive prompt to have at least one character');
+  assert(model, 'No model found for Imagen4 graph');
+  assert(model.base === 'imagen4', 'Imagen4 graph requires Imagen4 model');
+  assert(isImagenAspectRatioID(bbox.aspectRatio.id), 'Imagen4 does not support this aspect ratio');
+  assert(positivePrompt.length > 0, 'Imagen4 requires positive prompt to have at least one character');
 
   const is_intermediate = canvasSettings.sendToCanvas;
   const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
 
   if (generationMode === 'txt2img') {
-    const g = new Graph(getPrefixedId('imagen3_txt2img_graph'));
-    const imagen3 = g.addNode({
+    const g = new Graph(getPrefixedId('imagen4_txt2img_graph'));
+    const imagen4 = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'google_imagen3_generate_image',
+      type: 'google_imagen4_generate_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       aspect_ratio: bbox.aspectRatio.id,
       enhance_prompt: true,
-      // When enhance_prompt is true, Imagen3 will return a new image every time, ignoring the seed.
+      // When enhance_prompt is true, Imagen4 will return a new image every time, ignoring the seed.
       use_cache: false,
       is_intermediate,
       board,
@@ -69,10 +69,10 @@ export const buildImagen3Graph = async (state: RootState, manager: CanvasManager
     });
     return {
       g,
-      seedFieldIdentifier: { nodeId: imagen3.id, fieldName: 'seed' },
-      positivePromptFieldIdentifier: { nodeId: imagen3.id, fieldName: 'positive_prompt' },
+      seedFieldIdentifier: { nodeId: imagen4.id, fieldName: 'seed' },
+      positivePromptFieldIdentifier: { nodeId: imagen4.id, fieldName: 'positive_prompt' },
     };
   }
 
-  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for Imagen3');
+  assert<Equals<typeof generationMode, never>>(false, 'Invalid generation mode for Imagen4');
 };

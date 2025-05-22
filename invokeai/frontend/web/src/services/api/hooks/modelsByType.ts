@@ -20,6 +20,7 @@ import {
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isImagen3ModelConfig,
+  isImagen4ModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
@@ -91,6 +92,7 @@ export const useRegionalReferenceImageModels = buildModelsHook(
 );
 export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);
 export const useImagen3Models = buildModelsHook(isImagen3ModelConfig);
+export const useImagen4Models = buildModelsHook(isImagen4ModelConfig);
 export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
 
 // const buildModelsSelector =

@@ -31,10 +31,11 @@ import type { WorkflowSettingsState } from 'features/nodes/store/workflowSetting
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
+import { useIsModelDisabled } from 'features/parameters/hooks/useIsModelDisabled';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -89,7 +90,7 @@ const debouncedUpdateReasons = debounce(
     config: AppConfig,
     store: AppStore,
     isInPublishFlow: boolean,
-    areChatGPT4oModelsEnabled: boolean
+    isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean
   ) => {
     if (tab === 'canvas') {
       const model = selectMainModelConfig(store.getState());
@@ -104,7 +105,7 @@ const debouncedUpdateReasons = debounce(
         canvasIsRasterizing,
         canvasIsCompositing,
         canvasIsSelectingObject,
-        areChatGPT4oModelsEnabled,
+        isChatGPT4oHighModelDisabled,
       });
       $reasonsWhyCannotEnqueue.set(reasons);
     } else if (tab === 'workflows') {
@@ -152,7 +153,7 @@ export const useReadinessWatcher = () => {
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const isInPublishFlow = useStore($isInPublishFlow);
-  const areChatGPT4oModelsEnabled = useFeatureStatus('chatGPT4oModels');
+  const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
 
   useEffect(() => {
     debouncedUpdateReasons(
@@ -173,7 +174,7 @@ export const useReadinessWatcher = () => {
       config,
       store,
       isInPublishFlow,
-      areChatGPT4oModelsEnabled
+      isChatGPT4oHighModelDisabled
     );
   }, [
     store,
@@ -193,7 +194,7 @@ export const useReadinessWatcher = () => {
     upscale,
     workflowSettings,
     isInPublishFlow,
-    areChatGPT4oModelsEnabled,
+    isChatGPT4oHighModelDisabled,
   ]);
 };
 
@@ -341,7 +342,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsRasterizing: boolean;
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
-  areChatGPT4oModelsEnabled: boolean;
+  isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
 }) => {
   const {
     isConnected,
@@ -354,7 +355,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsRasterizing,
     canvasIsCompositing,
     canvasIsSelectingObject,
-    areChatGPT4oModelsEnabled,
+    isChatGPT4oHighModelDisabled,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -487,7 +488,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
-  if (model?.base === 'chatgpt-4o' && !areChatGPT4oModelsEnabled) {
+  if (model && isChatGPT4oHighModelDisabled(model)) {
     reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
   }
 

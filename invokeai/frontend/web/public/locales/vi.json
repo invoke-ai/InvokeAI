@@ -789,7 +789,9 @@
         "modelPickerFallbackNoModelsInstalled2": "Nhấp vào <LinkComponent>Trình Quản Lý Model</LinkComponent> để tải.",
         "modelPickerFallbackNoModelsInstalled": "Không Có Sẵn Model.",
         "manageModels": "Quản Lý Model",
-        "hfTokenReset": "Làm Mới HF Token"
+        "hfTokenReset": "Làm Mới HF Token",
+        "relatedModels": "Model Liên Quan",
+        "showOnlyRelatedModels": "Liên Quan"
     },
     "metadata": {
         "guidance": "Hướng Dẫn",
@@ -1715,12 +1717,16 @@
         "fitBboxToLayers": "Xếp Vừa Hộp Giới Hạn Vào Layer",
         "ipAdapterMethod": {
             "full": "Phong Cách Và Thành Phần",
-            "style": "Chỉ Lấy Phong Cách",
+            "style": "Phong Cách (Đơn Giản)",
             "composition": "Chỉ Lấy Thành Phần",
             "ipAdapterMethod": "Cách Thức",
             "compositionDesc": "Áp dụng cách trình bày và bỏ qua phong cách mẫu.",
             "fullDesc": "Áp dụng phong cách trực quan (màu, cấu tạo) & thành phần (cách trình bày).",
-            "styleDesc": "Áp dụng phong cách trực quan (màu, cấu tạo) và bỏ qua cách trình bày."
+            "styleDesc": "Áp dụng phong cách trực quan (màu, cấu tạo) và bỏ qua cách trình bày. Tên trước đây là Chỉ Lấy Phong Cách.",
+            "styleStrong": "Phong Cách (Mạnh Mẽ)",
+            "styleStrongDesc": "Áp dụng cách trình bày mạnh mẽ, với một chút giảm nhẹ ảnh hưởng lên thành phần.",
+            "stylePrecise": "Phong Cách (Chính Xác)",
+            "stylePreciseDesc": "Áp dụng cách trình bày chính xác, loại bỏ các chủ thể ảnh hưởng."
         },
         "deletePrompt": "Xoá Lệnh",
         "rasterLayer": "Layer Dạng Raster",
@@ -2243,7 +2249,6 @@
         "problemUnpublishingWorkflowDescription": "Có vấn đề khi ngừng đăng tải workflow. Vui lòng thử lại sau.",
         "workflowUnpublished": "Workflow Đã Được Ngừng Đăng Tải",
         "problemUnpublishingWorkflow": "Có Vấn Đề Khi Ngừng Đăng Tải Workflow",
-        "imagen3IncompatibleGenerationMode": "Google Imagen3 chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint."
     },
     "ui": {
@@ -2426,8 +2431,8 @@
         "watchRecentReleaseVideos": "Xem Video Phát Hành Mới Nhất",
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
-            "CogView4: Hỗ trợ model CogView4 ở Canvas và Workflow.",
-            "Cập nhật Dependency: Invoke bây giờ sẽ chạy trên phiên bản mới nhất của các dependency của nó, bao gồm Python 3.12 và Pytorch 2.6.0"
+            "Nvidia 50xx GPUs: Invoke sử dụng PyTorch 2.7.0, thứ tối quan trọng cho những GPU trên.",
+            "Mối Quan Hệ Model: Kết nối LoRA với model chính, và LoRA đó sẽ được hiển thị đầu danh sách."
         ]
     },
     "upsell": {

@@ -62,6 +62,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     FluxReduxModel = "FluxReduxModelField"
     LlavaOnevisionModel = "LLaVAModelField"
     Imagen3Model = "Imagen3ModelField"
+    Imagen4Model = "Imagen4ModelField"
     ChatGPT4oModel = "ChatGPT4oModelField"
     # endregion
 

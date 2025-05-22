@@ -252,6 +252,10 @@ const zImagen3ModelFieldType = zFieldTypeBase.extend({
   name: z.literal('Imagen3ModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zImagen4ModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('Imagen4ModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zChatGPT4oModelFieldType = zFieldTypeBase.extend({
   name: z.literal('ChatGPT4oModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -307,6 +311,7 @@ const zStatefulFieldType = z.union([
   zSigLipModelFieldType,
   zFluxReduxModelFieldType,
   zImagen3ModelFieldType,
+  zImagen4ModelFieldType,
   zChatGPT4oModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
@@ -347,6 +352,7 @@ const modelFieldTypeNames = [
   zSigLipModelFieldType.shape.name.value,
   zFluxReduxModelFieldType.shape.name.value,
   zImagen3ModelFieldType.shape.name.value,
+  zImagen4ModelFieldType.shape.name.value,
   zChatGPT4oModelFieldType.shape.name.value,
   // Stateless model fields
   'UNetField',
@@ -1207,6 +1213,24 @@ export const isImagen3ModelFieldInputTemplate =
   buildTemplateTypeGuard<Imagen3ModelFieldInputTemplate>('Imagen3ModelField');
 // #endregion
 
+// #region Imagen4ModelField
+export const zImagen4ModelFieldValue = zModelIdentifierField.optional();
+const zImagen4ModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zImagen4ModelFieldValue,
+});
+const zImagen4ModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zImagen4ModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zImagen4ModelFieldValue,
+});
+export type Imagen4ModelFieldValue = z.infer<typeof zImagen4ModelFieldValue>;
+export type Imagen4ModelFieldInputInstance = z.infer<typeof zImagen4ModelFieldInputInstance>;
+export type Imagen4ModelFieldInputTemplate = z.infer<typeof zImagen4ModelFieldInputTemplate>;
+export const isImagen4ModelFieldInputInstance = buildInstanceTypeGuard(zImagen4ModelFieldInputInstance);
+export const isImagen4ModelFieldInputTemplate =
+  buildTemplateTypeGuard<Imagen4ModelFieldInputTemplate>('Imagen4ModelField');
+// #endregion
+
 // #region ChatGPT4oModelField
 export const zChatGPT4oModelFieldValue = zModelIdentifierField.optional();
 const zChatGPT4oModelFieldInputInstance = zFieldInputInstanceBase.extend({
@@ -1857,6 +1881,7 @@ export const zStatefulFieldValue = z.union([
   zSigLipModelFieldValue,
   zFluxReduxModelFieldValue,
   zImagen3ModelFieldValue,
+  zImagen4ModelFieldValue,
   zChatGPT4oModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
@@ -1949,6 +1974,7 @@ const zStatefulFieldInputTemplate = z.union([
   zSigLipModelFieldInputTemplate,
   zFluxReduxModelFieldInputTemplate,
   zImagen3ModelFieldInputTemplate,
+  zImagen4ModelFieldInputTemplate,
   zChatGPT4oModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,

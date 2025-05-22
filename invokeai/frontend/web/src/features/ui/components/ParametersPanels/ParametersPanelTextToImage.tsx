@@ -2,13 +2,9 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import {
-  selectIsChatGTP4o,
-  selectIsCogView4,
-  selectIsImagen3,
-  selectIsSDXL,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
+import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
@@ -19,7 +15,7 @@ import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePr
 import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePresetSlice';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
@@ -29,13 +25,9 @@ const overlayScrollbarsStyles: CSSProperties = {
 const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
-  const isImagen3 = useAppSelector(selectIsImagen3);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
-  const isApiModel = useMemo(() => {
-    return isImagen3 || isChatGPT4o;
-  }, [isImagen3, isChatGPT4o]);
+  const isApiModel = useIsApiModel();
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>

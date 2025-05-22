@@ -14,6 +14,7 @@ export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
   flux: 'FLUX',
   cogview4: 'CogView4',
   imagen3: 'Imagen3',
+  imagen4: 'Imagen4',
   'chatgpt-4o': 'ChatGPT 4o',
 };
 
@@ -30,6 +31,7 @@ export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
   flux: 'FLUX',
   cogview4: 'CogView4',
   imagen3: 'Imagen3',
+  imagen4: 'Imagen4',
   'chatgpt-4o': 'ChatGPT 4o',
 };
 
@@ -70,6 +72,10 @@ export const CLIP_SKIP_MAP: Record<BaseModelType, { maxClip: number; markers: nu
     markers: [],
   },
   imagen3: {
+    maxClip: 0,
+    markers: [],
+  },
+  imagen4: {
     maxClip: 0,
     markers: [],
   },
@@ -114,3 +120,8 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'unipc', label: 'UniPC' },
   { value: 'unipc_k', label: 'UniPC Karras' },
 ];
+
+/**
+ * List of base models that make API requests
+ */
+export const API_BASE_MODELS = ['imagen3', 'imagen4', 'chatgpt-4o'];

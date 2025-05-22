@@ -123,6 +123,7 @@ const NODE_TYPE_PUBLISH_DENYLIST = [
   'metadata_to_t2i_adapters',
   'google_imagen3_generate',
   'google_imagen3_edit',
+  'google_imagen4_generate',
   'chatgpt_create_image',
   'chatgpt_edit_image',
 ];

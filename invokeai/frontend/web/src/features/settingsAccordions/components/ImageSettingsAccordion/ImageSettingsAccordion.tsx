@@ -3,13 +3,7 @@ import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-a
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  selectIsChatGTP4o,
-  selectIsFLUX,
-  selectIsImagen3,
-  selectIsSD3,
-  selectParamsSlice,
-} from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX, selectIsSD3, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectScaleMethod } from 'features/controlLayers/store/selectors';
 import { ParamOptimizedDenoisingToggle } from 'features/parameters/components/Advanced/ParamOptimizedDenoisingToggle';
 import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
@@ -17,9 +11,10 @@ import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth
 import BboxScaleMethod from 'features/parameters/components/Bbox/BboxScaleMethod';
 import { BboxSettings } from 'features/parameters/components/Bbox/BboxSettings';
 import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
+import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectBadges = createMemoizedSelector([selectCanvasSlice, selectParamsSlice], (canvas, params) => {
@@ -65,12 +60,7 @@ export const ImageSettingsAccordion = memo(() => {
   });
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
-  const isImagen3 = useAppSelector(selectIsImagen3);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
-
-  const isApiModel = useMemo(() => {
-    return isImagen3 || isChatGPT4o;
-  }, [isImagen3, isChatGPT4o]);
+  const isApiModel = useIsApiModel();
 
   return (
     <StandaloneAccordion

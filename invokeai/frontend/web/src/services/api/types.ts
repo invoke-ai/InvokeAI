@@ -236,6 +236,10 @@ export const isImagen3ModelConfig = (config: AnyModelConfig): config is ApiModel
   return config.type === 'main' && config.base === 'imagen3';
 };
 
+export const isImagen4ModelConfig = (config: AnyModelConfig): config is ApiModelConfig => {
+  return config.type === 'main' && config.base === 'imagen4';
+};
+
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
