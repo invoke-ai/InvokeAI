@@ -32,6 +32,7 @@ import {
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
+import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { isEqual, merge } from 'lodash-es';
@@ -1745,7 +1746,7 @@ export const canvasSlice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
-        if (base === 'imagen3' || base === 'chatgpt-4o' || base === 'imagen4') {
+        if (API_BASE_MODELS.includes(base)) {
           state.bbox.aspectRatio.isLocked = true;
           state.bbox.aspectRatio.value = 1;
           state.bbox.aspectRatio.id = '1:1';

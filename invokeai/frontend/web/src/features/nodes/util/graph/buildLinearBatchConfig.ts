@@ -52,7 +52,11 @@ export const prepareLinearUIBatch = (arg: {
       count: prompts.length * iterations,
       // Imagen3's support for seeded generation is iffy, we are just not going too use it in linear UI generations.
       start:
-        model.base === 'imagen3' ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX) : shouldRandomizeSeed ? undefined : seed,
+        model.base === 'imagen3' || model.base === 'imagen4'
+          ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
+          : shouldRandomizeSeed
+            ? undefined
+            : seed,
     });
 
     firstBatchDatumList.push({
@@ -74,7 +78,11 @@ export const prepareLinearUIBatch = (arg: {
       count: iterations,
       // Imagen3's support for seeded generation is iffy, we are just not going too use in in linear UI generations.
       start:
-        model.base === 'imagen3' ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX) : shouldRandomizeSeed ? undefined : seed,
+        model.base === 'imagen3' || model.base === 'imagen4'
+          ? randomInt(NUMPY_RAND_MIN, NUMPY_RAND_MAX)
+          : shouldRandomizeSeed
+            ? undefined
+            : seed,
     });
 
     secondBatchDatumList.push({
