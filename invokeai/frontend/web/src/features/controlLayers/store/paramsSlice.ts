@@ -21,6 +21,8 @@ import type {
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { clamp } from 'lodash-es';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 import { newSessionRequested } from './actions';
 
@@ -335,3 +337,24 @@ export const selectRefinerNegativeAestheticScore = createParamsSelector(
 export const selectRefinerScheduler = createParamsSelector((params) => params.refinerScheduler);
 export const selectRefinerStart = createParamsSelector((params) => params.refinerStart);
 export const selectRefinerSteps = createParamsSelector((params) => params.refinerSteps);
+
+export const selectMainModelConfig = createSelector(
+  selectModelConfigsQuery,
+  selectParamsSlice,
+  (modelConfigs, { model }) => {
+    if (!modelConfigs.data) {
+      return null;
+    }
+    if (!model) {
+      return null;
+    }
+    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key);
+    if (!modelConfig) {
+      return null;
+    }
+    if (!isNonRefinerMainModelConfig(modelConfig)) {
+      return null;
+    }
+    return modelConfig;
+  }
+);

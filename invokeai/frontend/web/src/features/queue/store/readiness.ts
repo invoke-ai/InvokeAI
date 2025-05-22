@@ -8,7 +8,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig,selectParamsSlice  } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
 import {
@@ -42,7 +42,6 @@ import i18n from 'i18next';
 import { debounce, groupBy, upperFirst } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
 import type { MainModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 

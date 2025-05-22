@@ -1,7 +1,6 @@
 import type { EntityState } from '@reduxjs/toolkit';
-import { createEntityAdapter, createSelector } from '@reduxjs/toolkit';
+import { createEntityAdapter } from '@reduxjs/toolkit';
 import { getSelectorsOptions } from 'app/store/createMemoizedSelector';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import queryString from 'query-string';
 import type { operations, paths } from 'services/api/schema';
 import type {
@@ -11,7 +10,6 @@ import type {
   SetHFTokenArg,
   SetHFTokenResponse,
 } from 'services/api/types';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
 import type { Param0 } from 'tsafe';
 
 import type { ApiTagDescription } from '..';
@@ -326,23 +324,4 @@ export const {
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();
-export const selectMainModelConfig = createSelector(
-  selectModelConfigsQuery,
-  selectParamsSlice,
-  (modelConfigs, { model }) => {
-    if (!modelConfigs.data) {
-      return null;
-    }
-    if (!model) {
-      return null;
-    }
-    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key);
-    if (!modelConfig) {
-      return null;
-    }
-    if (!isNonRefinerMainModelConfig(modelConfig)) {
-      return null;
-    }
-    return modelConfig;
-  }
-);
+
