@@ -50,9 +50,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
     """Creates mask for denoising."""
 
     mask: ImageField = InputField(description="Image which will be masked", ui_order=1)
-    edge_radius: int = InputField(
-        default=16, ge=0, description="How far to expand the edges of the mask", ui_order=2
-    )
+    edge_radius: int = InputField(default=16, ge=0, description="How far to expand the edges of the mask", ui_order=2)
     coherence_mode: Literal["Gaussian Blur", "Box Blur", "Staged"] = InputField(default="Gaussian Blur", ui_order=3)
     minimum_denoise: float = InputField(
         default=0.0, ge=0, le=1, description="Minimum denoise level for the coherence region", ui_order=4
