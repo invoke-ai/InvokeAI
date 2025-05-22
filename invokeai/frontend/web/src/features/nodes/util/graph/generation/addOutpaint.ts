@@ -86,10 +86,6 @@ export const addOutpaint = async ({
     );
   }
 
-  // const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, bbox.rect, {
-  //   is_intermediate: true,
-  //   silent: true,
-  // });
   // Create a composite denoise limit mask
   const maskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
     inpaintMaskAdapters as CanvasEntityAdapterInpaintMask[], // denoise limit defaults to 1 for masks that don't have it
@@ -107,14 +103,6 @@ export const addOutpaint = async ({
 
   if (needsScaleBeforeProcessing) {
     // Scale before processing requires some resizing
-
-    // Combine the inpaint mask and the initial image's alpha channel into a single mask
-    // const maskAlphaToMask = g.addNode({
-    //   id: getPrefixedId('alpha_to_mask'),
-    //   type: 'tomask',
-    //   image: { image_name: maskImage.image_name },
-    //   invert: !canvasSettings.preserveMask,
-    // });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),
       type: 'tomask',
@@ -125,7 +113,6 @@ export const addOutpaint = async ({
       type: 'mask_combine',
       mask1: { image_name: maskImage.image_name },
     });
-    // g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
 
     // Resize the combined and initial image to the scaled size
@@ -251,12 +238,6 @@ export const addOutpaint = async ({
       type: i2lNodeType,
       ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
     });
-    // const maskAlphaToMask = g.addNode({
-    //   id: getPrefixedId('mask_alpha_to_mask'),
-    //   type: 'tomask',
-    //   image: { image_name: maskImage.image_name },
-    //   invert: !canvasSettings.preserveMask,
-    // });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),
       type: 'tomask',
@@ -276,7 +257,6 @@ export const addOutpaint = async ({
       fp32,
       image: { image_name: initialImage.image_name },
     });
-    // g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
     g.addEdge(maskCombine, 'image', createGradientMask, 'mask');
 
