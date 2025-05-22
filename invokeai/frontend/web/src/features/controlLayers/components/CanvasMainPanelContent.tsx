@@ -26,7 +26,7 @@ import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasT
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectIsSessionStarted } from 'features/controlLayers/store/selectors';
+import { selectIsCanvasEmpty, selectIsSessionStarted } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -51,8 +51,9 @@ MenuContent.displayName = 'MenuContent';
 
 export const CanvasMainPanelContent = memo(() => {
   const isSessionStarted = useAppSelector(selectIsSessionStarted);
+  const isCanvasEmpty = useAppSelector(selectIsCanvasEmpty);
 
-  if (!isSessionStarted) {
+  if (!isSessionStarted && isCanvasEmpty) {
     return <CanvasNoSession />;
   }
 
