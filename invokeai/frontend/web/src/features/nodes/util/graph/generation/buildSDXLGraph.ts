@@ -222,6 +222,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
       scaledSize,
       denoising_start,
       fp32,
+      seed,
     });
     g.upsertMetadata({ generation_mode: 'sdxl_outpaint' });
   } else {

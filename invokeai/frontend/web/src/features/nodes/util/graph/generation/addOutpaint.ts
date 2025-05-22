@@ -1,10 +1,11 @@
 import type { RootState } from 'app/store/store';
+import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { Dimensions } from 'features/controlLayers/store/types';
+import type { Dimensions, Rect } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getInfill, isMainModelWithoutUnet } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
@@ -30,6 +31,7 @@ type AddOutpaintArg = {
   scaledSize: Dimensions;
   denoising_start: number;
   fp32: boolean;
+  seed: number;
 };
 
 export const addOutpaint = async ({
@@ -45,6 +47,7 @@ export const addOutpaint = async ({
   scaledSize,
   denoising_start,
   fp32,
+  seed,
 }: AddOutpaintArg): Promise<Invocation<'invokeai_img_blend' | 'apply_mask_to_image'>> => {
   denoise.denoising_start = denoising_start;
 
@@ -61,10 +64,42 @@ export const addOutpaint = async ({
   });
 
   const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
-  const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, bbox.rect, {
-    is_intermediate: true,
-    silent: true,
-  });
+
+  // Make sure bbox.rect is defined, use an empty rect if it's not
+  const rect: Rect = canvas.bbox?.rect ?? getEmptyRect();
+
+  // Get inpaint mask adapters that have noise settings
+  const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== null);
+
+  // Create a composite noise mask if we have any adapters with noise settings
+  let noiseMaskImage = null;
+  if (noiseMaskAdapters.length > 0) {
+    // Use the grayscale mask composite method with proper typing
+    noiseMaskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
+      noiseMaskAdapters as CanvasEntityAdapterInpaintMask[],
+      rect,
+      'noiseLevel',
+      {
+        is_intermediate: true,
+        silent: true,
+      }
+    );
+  }
+
+  // const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, bbox.rect, {
+  //   is_intermediate: true,
+  //   silent: true,
+  // });
+  // Create a composite denoise limit mask
+  const maskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
+    inpaintMaskAdapters as CanvasEntityAdapterInpaintMask[], // denoise limit defaults to 1 for masks that don't have it
+    rect,
+    'denoiseLimit',
+    {
+      is_intermediate: true,
+      silent: true,
+    }
+  );
 
   const infill = getInfill(g, params);
 
@@ -74,12 +109,12 @@ export const addOutpaint = async ({
     // Scale before processing requires some resizing
 
     // Combine the inpaint mask and the initial image's alpha channel into a single mask
-    const maskAlphaToMask = g.addNode({
-      id: getPrefixedId('alpha_to_mask'),
-      type: 'tomask',
-      image: { image_name: maskImage.image_name },
-      invert: !canvasSettings.preserveMask,
-    });
+    // const maskAlphaToMask = g.addNode({
+    //   id: getPrefixedId('alpha_to_mask'),
+    //   type: 'tomask',
+    //   image: { image_name: maskImage.image_name },
+    //   invert: !canvasSettings.preserveMask,
+    // });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),
       type: 'tomask',
@@ -88,8 +123,9 @@ export const addOutpaint = async ({
     const maskCombine = g.addNode({
       id: getPrefixedId('mask_combine'),
       type: 'mask_combine',
+      mask1: { image_name: maskImage.image_name },
     });
-    g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
+    // g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
 
     // Resize the combined and initial image to the scaled size
@@ -134,7 +170,32 @@ export const addOutpaint = async ({
       ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
     });
 
-    g.addEdge(infill, 'image', i2l, 'image');
+    // If we have a noise mask, apply it to the input image before i2l conversion
+    if (noiseMaskImage) {
+      // Resize the noise mask to match the scaled size
+      const resizeNoiseMaskToScaledSize = g.addNode({
+        id: getPrefixedId('resize_noise_mask_to_scaled_size'),
+        type: 'img_resize',
+        image: { image_name: noiseMaskImage.image_name },
+        ...scaledSize,
+      });
+
+      // Add noise to the scaled image using the mask
+      const noiseNode = g.addNode({
+        type: 'img_noise',
+        id: getPrefixedId('add_inpaint_noise'),
+        noise_type: 'gaussian',
+        amount: 1.0, // the mask controls the actual intensity
+        noise_color: true,
+        seed: seed,
+      });
+
+      g.addEdge(resizeNoiseMaskToScaledSize, 'image', noiseNode, 'mask');
+      g.addEdge(infill, 'image', noiseNode, 'image');
+      g.addEdge(noiseNode, 'image', i2l, 'image');
+    } else {
+      g.addEdge(infill, 'image', i2l, 'image');
+    }
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
 
@@ -190,12 +251,12 @@ export const addOutpaint = async ({
       type: i2lNodeType,
       ...(i2lNodeType === 'i2l' ? { fp32 } : {}),
     });
-    const maskAlphaToMask = g.addNode({
-      id: getPrefixedId('mask_alpha_to_mask'),
-      type: 'tomask',
-      image: { image_name: maskImage.image_name },
-      invert: !canvasSettings.preserveMask,
-    });
+    // const maskAlphaToMask = g.addNode({
+    //   id: getPrefixedId('mask_alpha_to_mask'),
+    //   type: 'tomask',
+    //   image: { image_name: maskImage.image_name },
+    //   invert: !canvasSettings.preserveMask,
+    // });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),
       type: 'tomask',
@@ -204,6 +265,7 @@ export const addOutpaint = async ({
     const maskCombine = g.addNode({
       id: getPrefixedId('mask_combine'),
       type: 'mask_combine',
+      mask1: { image_name: maskImage.image_name },
     });
     const createGradientMask = g.addNode({
       id: getPrefixedId('create_gradient_mask'),
@@ -214,10 +276,30 @@ export const addOutpaint = async ({
       fp32,
       image: { image_name: initialImage.image_name },
     });
-    g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
+    // g.addEdge(maskAlphaToMask, 'image', maskCombine, 'mask1');
     g.addEdge(initialImageAlphaToMask, 'image', maskCombine, 'mask2');
     g.addEdge(maskCombine, 'image', createGradientMask, 'mask');
-    g.addEdge(infill, 'image', i2l, 'image');
+
+    // If we have a noise mask, apply it to the input image before i2l conversion
+    if (noiseMaskImage) {
+      // Add noise to the scaled image using the mask
+      const noiseNode = g.addNode({
+        type: 'img_noise',
+        id: getPrefixedId('add_inpaint_noise'),
+        image: initialImage.image_name ? { image_name: initialImage.image_name } : undefined,
+        noise_type: 'gaussian',
+        amount: 1.0, // the mask controls the actual intensity
+        noise_color: true,
+        seed: seed,
+        mask: { image_name: noiseMaskImage.image_name },
+      });
+
+      g.addEdge(infill, 'image', noiseNode, 'image');
+      g.addEdge(noiseNode, 'image', i2l, 'image');
+    } else {
+      g.addEdge(infill, 'image', i2l, 'image');
+    }
+
     g.addEdge(i2l, 'latents', denoise, 'latents');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');

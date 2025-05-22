@@ -129,7 +129,7 @@ export const addInpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed, //Math.floor(Math.random() * 2147483647), // should this seed match the denoise latents seed?
+        seed: seed,
       });
 
       g.addEdge(resizeImageToScaledSize, 'image', noiseNode, 'image');
@@ -226,7 +226,7 @@ export const addInpaint = async ({
         noise_type: 'gaussian',
         amount: 1.0, // the mask controls the actual intensity
         noise_color: true,
-        seed: seed, // Math.floor(Math.random() * 2147483647), // should this seed match the denoise latents seed?
+        seed: seed,
         mask: { image_name: noiseMaskImage.image_name },
       });
 

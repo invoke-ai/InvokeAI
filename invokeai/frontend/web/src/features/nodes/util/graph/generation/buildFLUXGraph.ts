@@ -229,6 +229,7 @@ export const buildFLUXGraph = async (state: RootState, manager: CanvasManager): 
       scaledSize,
       denoising_start,
       fp32: false,
+      seed,
     });
     g.upsertMetadata({ generation_mode: 'flux_outpaint' });
   } else {
