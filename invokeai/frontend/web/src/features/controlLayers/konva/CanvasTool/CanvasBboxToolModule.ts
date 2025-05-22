@@ -8,6 +8,7 @@ import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, Tool } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import Konva from 'konva';
 import { noop } from 'lodash-es';
 import { atom } from 'nanostores';
