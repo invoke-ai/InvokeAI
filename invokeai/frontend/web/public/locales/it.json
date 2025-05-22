@@ -883,7 +883,6 @@
         "problemUnpublishingWorkflow": "Problema durante l'annullamento della pubblicazione del flusso di lavoro",
         "problemUnpublishingWorkflowDescription": "Si è verificato un problema durante l'annullamento della pubblicazione del flusso di lavoro. Riprova.",
         "workflowUnpublished": "Flusso di lavoro non pubblicato",
-        "imagen3IncompatibleGenerationMode": "Google Imagen3 supporta solo la conversione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supporta solo la conversione da testo a immagine e da immagine a immagine. Utilizza altri modelli per le attività di Inpainting e Outpainting."
     },
     "accessibility": {

@@ -872,7 +872,6 @@
         "problemDeletingWorkflow": "ワークフローが削除された問題",
         "imageNotLoadedDesc": "画像を見つけられません",
         "parameterNotSetDesc": "{{parameter}}を呼び出せません",
-        "imagen3IncompatibleGenerationMode": "Google Imagen3 はテキストから画像への生成のみをサポートしています.画像から画像,インペインティング,アウトペインティングのタスクには他のモデルをご利用ください.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4oは,テキストから画像への生成と画像から画像への生成のみをサポートしています.インペインティングおよび,アウトペインティングタスクには他のモデルを使用してください."
     },
     "accessibility": {
