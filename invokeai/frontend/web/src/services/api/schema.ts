@@ -5573,7 +5573,7 @@ export type components = {
         };
         /**
          * Create Gradient Mask
-         * @description Creates mask for denoising model run.
+         * @description Creates mask for denoising.
          */
         CreateGradientMaskInvocation: {
             /**
@@ -5600,7 +5600,7 @@ export type components = {
             mask?: components["schemas"]["ImageField"] | null;
             /**
              * Edge Radius
-             * @description How far to blur/expand the edges of the mask
+             * @description How far to expand the edges of the mask
              * @default 16
              */
             edge_radius?: number;
