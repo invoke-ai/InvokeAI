@@ -12,6 +12,7 @@ import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChec
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
+import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
@@ -27,8 +28,11 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildCogView4Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
-  const generationMode = await manager.compositor.getGenerationMode();
+export const buildCogView4Graph = async (
+  state: RootState,
+  manager?: CanvasManager | null
+): Promise<GraphBuilderReturn> => {
+  const generationMode = await getGenerationMode(manager);
   log.debug({ generationMode }, 'Building CogView4 graph');
 
   const params = selectParamsSlice(state);
@@ -109,6 +113,7 @@ export const buildCogView4Graph = async (state: RootState, manager: CanvasManage
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'cogview4_txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager, 'Need manager to do img2img');
     canvasOutput = await addImageToImage({
       g,
       manager,
@@ -124,6 +129,7 @@ export const buildCogView4Graph = async (state: RootState, manager: CanvasManage
     });
     g.upsertMetadata({ generation_mode: 'cogview4_img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager, 'Need manager to do inpaint');
     canvasOutput = await addInpaint({
       state,
       g,
@@ -141,6 +147,7 @@ export const buildCogView4Graph = async (state: RootState, manager: CanvasManage
     });
     g.upsertMetadata({ generation_mode: 'cogview4_inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager, 'Need manager to do outpaint');
     canvasOutput = await addOutpaint({
       state,
       g,

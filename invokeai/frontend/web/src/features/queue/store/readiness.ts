@@ -2,13 +2,13 @@ import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/nanostores/store';
-import { $true } from 'app/store/nanostores/util';
+import { $false } from 'app/store/nanostores/util';
 import type { AppDispatch, AppStore } from 'app/store/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectMainModelConfig,selectParamsSlice  } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
 import {
@@ -145,11 +145,11 @@ export const useReadinessWatcher = () => {
   const config = useAppSelector(selectConfigSlice);
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
-  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
-  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
-  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
-  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $true);
-  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
+  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $false);
+  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $false);
+  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $false);
+  const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $false);
+  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
   const isInPublishFlow = useStore($isInPublishFlow);
   const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
 
