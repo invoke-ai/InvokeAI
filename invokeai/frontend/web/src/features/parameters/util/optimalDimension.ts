@@ -1,4 +1,3 @@
-import type { MainModelBase } from 'features/nodes/types/common';
 import type { BaseModelType } from 'services/api/types';
 
 /**
@@ -115,7 +114,7 @@ export const getIsSizeTooLarge = (width: number, height: number, optimalDimensio
  * @param optimalDimension The optimal dimension
  * @returns Whether the current width and height needs to be resized to the optimal dimension
  */
-export const getIsSizeOptimal = (width: number, height: number, modelBase: MainModelBase): boolean => {
-  const optimalDimension = getOptimalDimension(modelBase);
+export const getIsSizeOptimal = (width: number, height: number, base?: BaseModelType): boolean => {
+  const optimalDimension = getOptimalDimension(base);
   return !getIsSizeTooSmall(width, height, optimalDimension) && !getIsSizeTooLarge(width, height, optimalDimension);
 };

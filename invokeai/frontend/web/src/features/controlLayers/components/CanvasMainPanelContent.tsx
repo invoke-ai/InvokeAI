@@ -26,6 +26,7 @@ import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasT
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsSessionStarted } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -36,7 +37,7 @@ const FOCUS_REGION_STYLES: SystemStyleObject = {
   height: 'full',
 };
 
-const MenuContent = () => {
+const MenuContent = memo(() => {
   return (
     <CanvasManagerProviderGate>
       <MenuList>
@@ -45,9 +46,31 @@ const MenuContent = () => {
       </MenuList>
     </CanvasManagerProviderGate>
   );
-};
+});
+MenuContent.displayName = 'MenuContent';
 
 export const CanvasMainPanelContent = memo(() => {
+  const isSessionStarted = useAppSelector(selectIsSessionStarted);
+
+  if (!isSessionStarted) {
+    return <CanvasNoSession />;
+  }
+
+  return <CanvasActiveSession />;
+});
+
+CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
+
+const CanvasNoSession = memo(() => {
+  return (
+    <Flex w="full" h="full" alignItems="center" justifyContent="center">
+      FRESH CANVAS is fresh when: - No control layers - No inpaint masks - No regions - No Raster Layers
+    </Flex>
+  );
+});
+CanvasNoSession.displayName = 'CanvasNoSession';
+
+const CanvasActiveSession = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
 
@@ -134,5 +157,4 @@ export const CanvasMainPanelContent = memo(() => {
     </FocusRegionWrapper>
   );
 });
-
-CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
+CanvasActiveSession.displayName = 'ActiveCanvasContent';
