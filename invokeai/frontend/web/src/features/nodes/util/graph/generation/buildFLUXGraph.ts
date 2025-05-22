@@ -28,7 +28,7 @@ import {
   UnsupportedGenerationModeError,
 } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';

@@ -18,7 +18,7 @@ import { upperFirst } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWarningBold } from 'react-icons/pi';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 

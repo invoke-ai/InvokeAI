@@ -33,7 +33,7 @@ import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
-import { selectMainModelConfig } from 'services/api/endpoints/models';
+import { selectMainModelConfig } from '../store/paramsSlice';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
