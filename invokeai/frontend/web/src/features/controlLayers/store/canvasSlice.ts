@@ -1885,11 +1885,7 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const syncScaledSize = (state: CanvasState) => {
-  if (
-    state.bbox.modelBase === 'imagen3' ||
-    state.bbox.modelBase === 'chatgpt-4o' ||
-    state.bbox.modelBase === 'imagen4'
-  ) {
+  if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
     // Imagen3 has fixed sizes. Scaled bbox is not supported.
     return;
   }

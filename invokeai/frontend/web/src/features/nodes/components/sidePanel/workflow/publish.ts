@@ -124,7 +124,6 @@ const NODE_TYPE_PUBLISH_DENYLIST = [
   'google_imagen3_generate',
   'google_imagen3_edit',
   'google_imagen4_generate',
-  'google_imagen4_edit',
   'chatgpt_create_image',
   'chatgpt_edit_image',
 ];
