@@ -154,6 +154,7 @@ export const buildCogView4Graph = async (state: RootState, manager: CanvasManage
       scaledSize,
       denoising_start,
       fp32: false,
+      seed,
     });
     g.upsertMetadata({ generation_mode: 'cogview4_outpaint' });
   } else {
