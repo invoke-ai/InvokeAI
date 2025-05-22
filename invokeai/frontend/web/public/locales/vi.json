@@ -2249,7 +2249,6 @@
         "problemUnpublishingWorkflowDescription": "Có vấn đề khi ngừng đăng tải workflow. Vui lòng thử lại sau.",
         "workflowUnpublished": "Workflow Đã Được Ngừng Đăng Tải",
         "problemUnpublishingWorkflow": "Có Vấn Đề Khi Ngừng Đăng Tải Workflow",
-        "imagen3IncompatibleGenerationMode": "Google Imagen3 chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint.",
         "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint."
     },
     "ui": {
