@@ -236,7 +236,7 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
     if (tool !== 'bbox') {
       return NO_ANCHORS;
     }
-    if (API_BASE_MODELS.includes(model?.base)) {
+    if (model?.base && API_BASE_MODELS.includes(model.base)) {
       // The bbox is not resizable in these modes
       return NO_ANCHORS;
     }
