@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { type ParamsState, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import type { CanvasState } from 'features/controlLayers/store/types';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
