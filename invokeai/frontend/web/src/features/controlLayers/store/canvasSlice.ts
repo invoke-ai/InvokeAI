@@ -1100,7 +1100,7 @@ export const canvasSlice = createSlice({
       const { entityIdentifier } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
-        entity.noiseLevel = 0.1; // Default noise level
+        entity.noiseLevel = 0.15; // Default noise level
       }
     },
     inpaintMaskNoiseChanged: (
