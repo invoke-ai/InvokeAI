@@ -59,28 +59,28 @@ const NoOptionsFallback = memo(() => {
 NoOptionsFallback.displayName = 'NoOptionsFallback';
 
 const getGroupIDFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3' || modelConfig.base === 'imagen4') {
     return 'api';
   }
   return modelConfig.base;
 };
 
 const getGroupNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3' || modelConfig.base === 'imagen4') {
     return 'External API';
   }
   return MODEL_TYPE_MAP[modelConfig.base];
 };
 
 const getGroupShortNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3' || modelConfig.base === 'imagen4') {
     return 'api';
   }
   return MODEL_TYPE_SHORT_MAP[modelConfig.base];
 };
 
 const getGroupColorSchemeFromModelConfig = (modelConfig: AnyModelConfig): string => {
-  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3') {
+  if (modelConfig.base === 'chatgpt-4o' || modelConfig.base === 'imagen3' || modelConfig.base === 'imagen4') {
     return 'pink';
   }
   return BASE_COLOR_MAP[modelConfig.base];

@@ -40,6 +40,7 @@ import type {
   ImageFieldValue,
   ImageGeneratorFieldValue,
   Imagen3ModelFieldValue,
+  Imagen4ModelFieldValue,
   IntegerFieldCollectionValue,
   IntegerFieldValue,
   IntegerGeneratorFieldValue,
@@ -80,6 +81,7 @@ import {
   zImageFieldValue,
   zImageGeneratorFieldValue,
   zImagen3ModelFieldValue,
+  zImagen4ModelFieldValue,
   zIntegerFieldCollectionValue,
   zIntegerFieldValue,
   zIntegerGeneratorFieldValue,
@@ -519,6 +521,9 @@ export const nodesSlice = createSlice({
     fieldImagen3ModelValueChanged: (state, action: FieldValueAction<Imagen3ModelFieldValue>) => {
       fieldValueReducer(state, action, zImagen3ModelFieldValue);
     },
+    fieldImagen4ModelValueChanged: (state, action: FieldValueAction<Imagen4ModelFieldValue>) => {
+      fieldValueReducer(state, action, zImagen4ModelFieldValue);
+    },
     fieldChatGPT4oModelValueChanged: (state, action: FieldValueAction<ChatGPT4oModelFieldValue>) => {
       fieldValueReducer(state, action, zChatGPT4oModelFieldValue);
     },
@@ -690,6 +695,7 @@ export const {
   fieldSigLipModelValueChanged,
   fieldFluxReduxModelValueChanged,
   fieldImagen3ModelValueChanged,
+  fieldImagen4ModelValueChanged,
   fieldChatGPT4oModelValueChanged,
   fieldFloatGeneratorValueChanged,
   fieldIntegerGeneratorValueChanged,

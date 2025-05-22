@@ -68,7 +68,7 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagen3AspectRatioID, isRenderableEntity } from './types';
+import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagenAspectRatioID, isRenderableEntity } from './types';
 import {
   converters,
   getControlLayerState,
@@ -1236,7 +1236,10 @@ export const canvasSlice = createSlice({
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
-      } else if (state.bbox.modelBase === 'imagen3' && isImagen3AspectRatioID(id)) {
+      } else if (
+        (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'imagen4') &&
+        isImagenAspectRatioID(id)
+      ) {
         // Imagen3 has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
         if (id === '16:9') {
           state.bbox.rect.width = 1408;
@@ -1742,7 +1745,7 @@ export const canvasSlice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
-        if (base === 'imagen3' || base === 'chatgpt-4o') {
+        if (base === 'imagen3' || base === 'chatgpt-4o' || base === 'imagen4') {
           state.bbox.aspectRatio.isLocked = true;
           state.bbox.aspectRatio.value = 1;
           state.bbox.aspectRatio.id = '1:1';
@@ -1881,7 +1884,11 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const syncScaledSize = (state: CanvasState) => {
-  if (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'chatgpt-4o') {
+  if (
+    state.bbox.modelBase === 'imagen3' ||
+    state.bbox.modelBase === 'chatgpt-4o' ||
+    state.bbox.modelBase === 'imagen4'
+  ) {
     // Imagen3 has fixed sizes. Scaled bbox is not supported.
     return;
   }

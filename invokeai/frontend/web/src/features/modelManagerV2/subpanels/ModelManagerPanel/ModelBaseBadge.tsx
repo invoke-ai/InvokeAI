@@ -17,6 +17,7 @@ export const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   flux: 'gold',
   cogview4: 'red',
   imagen3: 'pink',
+  imagen4: 'pink',
   'chatgpt-4o': 'pink',
 };
 

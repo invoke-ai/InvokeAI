@@ -6,6 +6,7 @@ import {
   selectIsChatGTP4o,
   selectIsCogView4,
   selectIsImagen3,
+  selectIsImagen4,
   selectIsSDXL,
 } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
@@ -30,12 +31,13 @@ const ParametersPanelTextToImage = () => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isImagen3 = useAppSelector(selectIsImagen3);
+  const isImagen4 = useAppSelector(selectIsImagen4);
   const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   const isApiModel = useMemo(() => {
-    return isImagen3 || isChatGPT4o;
-  }, [isImagen3, isChatGPT4o]);
+    return isImagen3 || isChatGPT4o || isImagen4;
+  }, [isImagen3, isChatGPT4o, isImagen4]);
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
