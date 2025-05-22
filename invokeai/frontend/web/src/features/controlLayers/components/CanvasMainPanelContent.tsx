@@ -1,13 +1,6 @@
-import {
-  ContextMenu,
-  Flex,
-  IconButton,
-  Menu,
-  MenuButton,
-  MenuList,
-  type SystemStyleObject,
-} from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Button, ContextMenu, Flex, IconButton, Image, Menu, MenuButton, MenuList, Text } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
@@ -24,7 +17,13 @@ import { StagingAreaToolbar } from 'features/controlLayers/components/StagingAre
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { newCanvasSessionRequested } from 'features/controlLayers/store/actions';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
+import {
+  selectIsStaging,
+  selectSelectedImage,
+  selectStagedImages,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectIsCanvasEmpty, selectIsSessionStarted } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
@@ -53,7 +52,11 @@ export const CanvasMainPanelContent = memo(() => {
   const isCanvasEmpty = useAppSelector(selectIsCanvasEmpty);
 
   if (!isSessionStarted && isCanvasEmpty) {
-    return <CanvasNoSession />;
+    return <NoActiveSession />;
+  }
+
+  if (isSessionStarted && isCanvasEmpty) {
+    return <SimpleActiveSession />;
   }
 
   return <CanvasActiveSession />;
@@ -61,14 +64,64 @@ export const CanvasMainPanelContent = memo(() => {
 
 CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
 
-const CanvasNoSession = memo(() => {
+const NoActiveSession = memo(() => {
+  const dispatch = useAppDispatch();
+  const newSesh = useCallback(() => {
+    dispatch(newCanvasSessionRequested());
+  }, [dispatch]);
   return (
-    <Flex w="full" h="full" alignItems="center" justifyContent="center">
-      FRESH CANVAS is fresh when: - No control layers - No inpaint masks - No regions - No Raster Layers
+    <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
+      <Text fontSize="lg" fontWeight="bold">
+        No Active Session
+      </Text>
+      <Button display="flex" flexDir="column" gap={2} p={8} minH={0} minW={0} onClick={newSesh}>
+        <Text>New Canvas Session</Text>
+        <Text>- New Canvas Session</Text>
+        <Text>- 1 Inpaint mask layer added</Text>
+      </Button>
+      <Flex flexDir="column" gap={2} p={8} border="dashed yellow 2px">
+        <Text>Generate with Starting Image</Text>
+        <Text>- New Canvas Session</Text>
+        <Text>- Dropped image as raster layer</Text>
+        <Text>- Bbox resized</Text>
+      </Flex>
+      <Flex flexDir="column" gap={2} p={8} border="dashed yellow 2px">
+        <Text>Generate with Control Image</Text>
+        <Text>- New Canvas Session</Text>
+        <Text>- Dropped image as control layer</Text>
+        <Text>- Bbox resized</Text>
+      </Flex>
+      <Flex flexDir="column" gap={2} p={8} border="dashed yellow 2px">
+        <Text>Edit Image</Text>
+        <Text>- New Canvas Session</Text>
+        <Text>- Dropped image as raster layer</Text>
+        <Text>- Bbox resized</Text>
+        <Text>- 1 Inpaint mask layer added</Text>
+      </Flex>
     </Flex>
   );
 });
-CanvasNoSession.displayName = 'CanvasNoSession';
+NoActiveSession.displayName = 'NoActiveSession';
+
+const SimpleActiveSession = memo(() => {
+  const isStaging = useAppSelector(selectIsStaging);
+  const selectedImage = useAppSelector(selectSelectedImage);
+  const stagedImages = useAppSelector(selectStagedImages);
+  return (
+    <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
+      <Text fontSize="lg" fontWeight="bold">
+        Simple Session (staging view) {isStaging && 'STAGING'}
+      </Text>
+      {selectedImage && <Image src={selectedImage.imageDTO.image_url} />}
+      <Flex gap={2} maxW="full" overflow='scroll'>
+        {stagedImages.map(({ imageDTO }) => (
+          <Image key={imageDTO.image_name} maxW={108} src={imageDTO.thumbnail_url} />
+        ))}
+      </Flex>
+    </Flex>
+  );
+});
+SimpleActiveSession.displayName = 'SimpleActiveSession';
 
 const CanvasActiveSession = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);

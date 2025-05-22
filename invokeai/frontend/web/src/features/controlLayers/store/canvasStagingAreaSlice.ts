@@ -97,6 +97,10 @@ export const selectSelectedImage = createSelector(
   [selectCanvasStagingAreaSlice, selectStagedImageIndex],
   (stagingArea, index) => stagingArea.stagedImages[index] ?? null
 );
+export const selectStagedImages = createSelector(
+  selectCanvasStagingAreaSlice,
+  (stagingArea) => stagingArea.stagedImages
+);
 export const selectImageCount = createSelector(
   selectCanvasStagingAreaSlice,
   (stagingArea) => stagingArea.stagedImages.length
