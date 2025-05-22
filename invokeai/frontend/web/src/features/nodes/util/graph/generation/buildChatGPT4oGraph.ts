@@ -3,10 +3,12 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
+import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
@@ -15,14 +17,16 @@ import {
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
-import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
-  const generationMode = await manager.compositor.getGenerationMode();
+export const buildChatGPT4oGraph = async (
+  state: RootState,
+  manager?: CanvasManager | null
+): Promise<GraphBuilderReturn> => {
+  const generationMode = await getGenerationMode(manager);
 
   if (generationMode !== 'txt2img' && generationMode !== 'img2img') {
     throw new UnsupportedGenerationModeError(t('toast.chatGPT4oIncompatibleGenerationMode'));
@@ -91,6 +95,7 @@ export const buildChatGPT4oGraph = async (state: RootState, manager: CanvasManag
   }
 
   if (generationMode === 'img2img') {
+    assert(manager, 'Need manager to do img2img');
     const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
     const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, {
       is_intermediate: true,
