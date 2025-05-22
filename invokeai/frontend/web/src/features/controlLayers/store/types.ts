@@ -540,48 +540,40 @@ export type ParamsState = z.infer<typeof zParamsState>;
 const INITIAL_PARAMS_STATE = zParamsState.parse({});
 export const getInitialParamsState = () => deepClone(INITIAL_PARAMS_STATE);
 
+const zInpaintMasks = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasInpaintMaskState),
+});
+const zRasterLayers = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasRasterLayerState),
+});
+const zControlLayers = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasControlLayerState),
+});
+const zRegionalGuidance = z.object({
+  isHidden: z.boolean(),
+  entities: z.array(zCanvasRegionalGuidanceState),
+});
+const zReferenceImages = z.object({
+  entities: z.array(zCanvasReferenceImageState),
+});
 const zCanvasState = z.object({
   _version: z.literal(3).default(3),
   isSessionStarted: z.boolean().default(false),
   selectedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
   bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
-  inpaintMasks: z
-    .object({
-      isHidden: z.boolean(),
-      entities: z.array(zCanvasInpaintMaskState),
-    })
-    .default({ isHidden: false, entities: [] }),
-  rasterLayers: z
-    .object({
-      isHidden: z.boolean(),
-      entities: z.array(zCanvasRasterLayerState),
-    })
-    .default({ isHidden: false, entities: [] }),
-  controlLayers: z
-    .object({
-      isHidden: z.boolean(),
-      entities: z.array(zCanvasControlLayerState),
-    })
-    .default({ isHidden: false, entities: [] }),
-  regionalGuidance: z
-    .object({
-      isHidden: z.boolean(),
-      entities: z.array(zCanvasRegionalGuidanceState),
-    })
-    .default({ isHidden: false, entities: [] }),
-  referenceImages: z
-    .object({
-      entities: z.array(zCanvasReferenceImageState),
-    })
-    .default({ entities: [] }),
+  inpaintMasks: zInpaintMasks.default({ isHidden: false, entities: [] }),
+  rasterLayers: zRasterLayers.default({ isHidden: false, entities: [] }),
+  controlLayers: zControlLayers.default({ isHidden: false, entities: [] }),
+  regionalGuidance: zRegionalGuidance.default({ isHidden: false, entities: [] }),
+  referenceImages: zReferenceImages.default({ entities: [] }),
   bbox: zBboxState.default({
     rect: { x: 0, y: 0, width: 512, height: 512 },
     aspectRatio: DEFAULT_ASPECT_RATIO_CONFIG,
     scaleMethod: 'auto',
-    scaledSize: {
-      width: 512,
-      height: 512,
-    },
+    scaledSize: { width: 512, height: 512 },
     modelBase: 'sd-1',
   }),
 });
