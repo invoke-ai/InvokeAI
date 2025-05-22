@@ -2005,11 +2005,11 @@
         "stagingOnCanvas": "Genera immagini nella",
         "ipAdapterMethod": {
             "full": "Stile e Composizione",
-            "style": "Solo Stile",
+            "style": "Stile (semplice)",
             "composition": "Solo Composizione",
             "ipAdapterMethod": "Modalità",
             "fullDesc": "Applica lo stile visivo (colori, texture) e la composizione (disposizione, struttura).",
-            "styleDesc": "Applica lo stile visivo (colori, texture) senza considerare la disposizione.",
+            "styleDesc": "Applica lo stile visivo (colori, texture) senza considerare la disposizione. Precedentemente chiamato \"Solo stile\".",
             "compositionDesc": "Replica disposizione e struttura ignorando lo stile di riferimento.",
             "styleStrong": "Stile (forte)",
             "styleStrongDesc": "Applica uno stile visivo forte, con un'influenza sulla composizione leggermente ridotta.",
@@ -2445,8 +2445,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "CogView4: supporto per i modelli CogView4 in Tela e Flussi di lavoro.",
-            "Dipendenze aggiornate: Invoke ora funziona con l'ultima versione delle sue dipendenze, tra cui Python 3.12 e Pytorch 2.6.0."
+            "GPU Nvidia 50xx: Invoke utilizza PyTorch 2.7.0, necessario per queste GPU.",
+            "Relazioni tra modelli: collega i LoRA ai modelli principali e i LoRA verranno visualizzati per primi nell'elenco."
         ]
     },
     "system": {
