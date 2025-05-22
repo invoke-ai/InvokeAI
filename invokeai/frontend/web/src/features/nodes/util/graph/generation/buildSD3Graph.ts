@@ -3,7 +3,7 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig,selectParamsSlice  } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -11,6 +11,7 @@ import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChec
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
+import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
@@ -19,15 +20,14 @@ import {
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildSD3Graph = async (state: RootState, manager: CanvasManager): Promise<GraphBuilderReturn> => {
-  const generationMode = await manager.compositor.getGenerationMode();
+export const buildSD3Graph = async (state: RootState, manager?: CanvasManager | null): Promise<GraphBuilderReturn> => {
+  const generationMode = await getGenerationMode(manager);
   log.debug({ generationMode }, 'Building SD3 graph');
 
   const model = selectMainModelConfig(state);
@@ -134,6 +134,7 @@ export const buildSD3Graph = async (state: RootState, manager: CanvasManager): P
     canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
     g.upsertMetadata({ generation_mode: 'sd3_txt2img' });
   } else if (generationMode === 'img2img') {
+    assert(manager, 'Need manager to do img2img');
     canvasOutput = await addImageToImage({
       g,
       manager,
@@ -149,6 +150,7 @@ export const buildSD3Graph = async (state: RootState, manager: CanvasManager): P
     });
     g.upsertMetadata({ generation_mode: 'sd3_img2img' });
   } else if (generationMode === 'inpaint') {
+    assert(manager, 'Need manager to do inpaint');
     canvasOutput = await addInpaint({
       state,
       g,
@@ -166,6 +168,7 @@ export const buildSD3Graph = async (state: RootState, manager: CanvasManager): P
     });
     g.upsertMetadata({ generation_mode: 'sd3_inpaint' });
   } else if (generationMode === 'outpaint') {
+    assert(manager, 'Need manager to do outpaint');
     canvasOutput = await addOutpaint({
       state,
       g,

@@ -35,7 +35,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const { prepend } = action.payload;
 
       const manager = $canvasManager.get();
-      assert(manager, 'No canvas manager');
+      // assert(manager, 'No canvas manager');
 
       const model = state.params.model;
       assert(model, 'No model found in state');
@@ -90,7 +90,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
 
-      const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
+      // const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
 
       const prepareBatchResult = withResult(() =>
         prepareLinearUIBatch({
@@ -100,7 +100,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
           seedFieldIdentifier,
           positivePromptFieldIdentifier,
           origin: 'canvas',
-          destination,
+          destination: 'canvas',
         })
       );
 
