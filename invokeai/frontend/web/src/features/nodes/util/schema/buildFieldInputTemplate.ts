@@ -23,6 +23,7 @@ import type {
   ImageFieldInputTemplate,
   ImageGeneratorFieldInputTemplate,
   Imagen3ModelFieldInputTemplate,
+  Imagen4ModelFieldInputTemplate,
   IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
@@ -600,6 +601,18 @@ const buildImagen3ModelFieldInputTemplate: FieldInputTemplateBuilder<Imagen3Mode
   return template;
 };
 
+const buildImagen4ModelFieldInputTemplate: FieldInputTemplateBuilder<Imagen4ModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: Imagen4ModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
 const buildChatGPT4oModelFieldInputTemplate: FieldInputTemplateBuilder<ChatGPT4oModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -820,6 +833,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   SigLipModelField: buildSigLipModelFieldInputTemplate,
   FluxReduxModelField: buildFluxReduxModelFieldInputTemplate,
   Imagen3ModelField: buildImagen3ModelFieldInputTemplate,
+  Imagen4ModelField: buildImagen4ModelFieldInputTemplate,
   ChatGPT4oModelField: buildChatGPT4oModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,

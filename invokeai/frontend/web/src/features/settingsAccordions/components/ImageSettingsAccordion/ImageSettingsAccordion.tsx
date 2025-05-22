@@ -7,6 +7,7 @@ import {
   selectIsChatGTP4o,
   selectIsFLUX,
   selectIsImagen3,
+  selectIsImagen4,
   selectIsSD3,
   selectParamsSlice,
 } from 'features/controlLayers/store/paramsSlice';
@@ -67,10 +68,10 @@ export const ImageSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isImagen3 = useAppSelector(selectIsImagen3);
   const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
-
+  const isImagen4 = useAppSelector(selectIsImagen4);
   const isApiModel = useMemo(() => {
-    return isImagen3 || isChatGPT4o;
-  }, [isImagen3, isChatGPT4o]);
+    return isImagen3 || isChatGPT4o || isImagen4;
+  }, [isImagen3, isChatGPT4o, isImagen4]);
 
   return (
     <StandaloneAccordion
