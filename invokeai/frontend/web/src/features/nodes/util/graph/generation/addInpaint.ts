@@ -135,6 +135,8 @@ export const addInpaint = async ({
       g.addEdge(resizeImageToScaledSize, 'image', noiseNode, 'image');
       g.addEdge(resizeNoiseMaskToScaledSize, 'image', noiseNode, 'mask');
       g.addEdge(noiseNode, 'image', i2l, 'image');
+    } else {
+      g.addEdge(resizeImageToScaledSize, 'image', i2l, 'image');
     }
 
     const resizeMaskToScaledSize = g.addNode({
@@ -167,9 +169,8 @@ export const addInpaint = async ({
       fade_size_px: params.maskBlur,
     });
 
-    // Resize initial image and mask to scaled size, feed into to gradient mask
-    g.addEdge(resizeImageToScaledSize, 'image', i2l, 'image');
-
+    g.addEdge(i2l, 'latents', denoise, 'latents');
+    g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
     if (!isMainModelWithoutUnet(modelLoader)) {
       g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
