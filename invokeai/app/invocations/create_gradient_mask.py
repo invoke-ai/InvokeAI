@@ -178,8 +178,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
 
         # stack the mask as a tensor, repeating 4 times on dimmension 1
         dilated_mask_tensor = image_resized_to_grid_as_tensor(dilated_mask, normalize=False)
-        dilated_mask_tensor = dilated_mask_tensor.repeat(1, 4, 1, 1)
-        mask_name = context.tensors.save(tensor=dilated_mask_tensor)
+        mask_name = context.tensors.save(tensor=dilated_mask_tensor.unsqueeze(0))
 
         masked_latents_name = None
         if self.unet is not None and self.vae is not None and self.image is not None:
