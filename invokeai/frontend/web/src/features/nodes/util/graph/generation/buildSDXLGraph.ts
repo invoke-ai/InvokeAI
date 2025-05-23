@@ -323,9 +323,9 @@ export const buildSDXLGraph = async (state: RootState, manager?: CanvasManager |
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
-    is_intermediate,
+    is_intermediate: true,
     use_cache: false,
-    board,
+    board: undefined,
   });
 
   g.setMetadataReceivingNode(canvasOutput);
