@@ -2,7 +2,7 @@ import { Checkbox, ConfirmationAlertDialog, Flex, FormControl, FormLabel, Text }
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
-import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
+import { newAdvancedCanvasSessionRequested, newSimpleCanvasSessionRequested } from 'features/controlLayers/store/actions';
 import {
   selectSystemShouldConfirmOnNewSession,
   shouldConfirmOnNewSessionToggled,
@@ -20,7 +20,7 @@ export const useNewGallerySession = () => {
   const newSessionDialog = useNewGallerySessionDialog();
 
   const newGallerySessionImmediate = useCallback(() => {
-    dispatch(newGallerySessionRequested());
+    dispatch(newSimpleCanvasSessionRequested());
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
 
@@ -41,7 +41,7 @@ export const useNewCanvasSession = () => {
   const newSessionDialog = useNewCanvasSessionDialog();
 
   const newCanvasSessionImmediate = useCallback(() => {
-    dispatch(newCanvasSessionRequested());
+    dispatch(newAdvancedCanvasSessionRequested());
     dispatch(activeTabCanvasRightPanelChanged('layers'));
   }, [dispatch]);
 

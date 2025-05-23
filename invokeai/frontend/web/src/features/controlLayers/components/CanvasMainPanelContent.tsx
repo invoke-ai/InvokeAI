@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, ContextMenu, Flex, IconButton, Image, Menu, MenuButton, MenuList, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
@@ -17,17 +18,32 @@ import { StagingAreaToolbar } from 'features/controlLayers/components/StagingAre
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { newCanvasSessionRequested } from 'features/controlLayers/store/actions';
+import { canvasReset, newAdvancedCanvasSessionRequested } from 'features/controlLayers/store/actions';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
+  selectCanvasSessionType,
   selectIsStaging,
   selectSelectedImage,
+  selectStagedImageIndex,
   selectStagedImages,
+  stagingAreaImageSelected,
+  stagingAreaImageStaged,
+  stagingAreaNextStagedImageSelected,
+  stagingAreaPrevStagedImageSelected,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectIsCanvasEmpty, selectIsSessionStarted } from 'features/controlLayers/store/selectors';
-import { memo, useCallback } from 'react';
+import { isImageField, type ProgressImage } from 'features/nodes/types/common';
+import { isCanvasOutputEvent } from 'features/nodes/util/graph/graphBuilderUtils';
+import type { Atom } from 'nanostores';
+import { atom } from 'nanostores';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
-import { assert } from 'tsafe';
+import { getImageDTOSafe } from 'services/api/endpoints/images';
+import type { ImageDTO, S } from 'services/api/types';
+import { $socket } from 'services/events/stores';
+import type { Equals } from 'tsafe';
+import { assert, objectEntries } from 'tsafe';
 
 import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvocationProgress';
 
@@ -49,22 +65,21 @@ const MenuContent = memo(() => {
 MenuContent.displayName = 'MenuContent';
 
 export const CanvasMainPanelContent = memo(() => {
-  const isCanvasEmpty = useAppSelector(selectIsCanvasEmpty);
-  const isSessionStarted = useAppSelector(selectIsSessionStarted);
+  const sessionType = useAppSelector(selectCanvasSessionType);
 
-  if (!isSessionStarted) {
+  if (sessionType === null) {
     return <NoActiveSession />;
   }
 
-  if (isSessionStarted && isCanvasEmpty) {
+  if (sessionType === 'simple') {
     return <SimpleActiveSession />;
   }
 
-  if (isSessionStarted && !isCanvasEmpty) {
+  if (sessionType === 'advanced') {
     return <CanvasActiveSession />;
   }
 
-  assert(false);
+  assert<Equals<never, typeof sessionType>>(false, 'Unexpected sessionType');
 });
 
 CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
@@ -72,7 +87,7 @@ CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
 const NoActiveSession = memo(() => {
   const dispatch = useAppDispatch();
   const newSesh = useCallback(() => {
-    dispatch(newCanvasSessionRequested());
+    dispatch(newAdvancedCanvasSessionRequested());
   }, [dispatch]);
   return (
     <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
@@ -107,25 +122,188 @@ const NoActiveSession = memo(() => {
   );
 });
 NoActiveSession.displayName = 'NoActiveSession';
+
+type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
+
 const SimpleActiveSession = memo(() => {
+  const dispatch = useAppDispatch();
   const isStaging = useAppSelector(selectIsStaging);
-  const selectedImage = useAppSelector(selectSelectedImage);
-  const stagedImages = useAppSelector(selectStagedImages);
+  const socket = useStore($socket);
+  const [$progressImage] = useState(() => atom<EphemeralProgressImage | null>(null));
+
+  useEffect(() => {
+    if (!socket) {
+      return;
+    }
+    const onInvocationProgress = (event: S['InvocationProgressEvent']) => {
+      if (!event) {
+        return;
+      }
+      if (event.origin !== 'canvas') {
+        return;
+      }
+      if (!event.image) {
+        return;
+      }
+      $progressImage.set({ sessionId: event.session_id, image: event.image });
+    };
+    const onInvocationComplete = async (event: S['InvocationCompleteEvent']) => {
+      const progressImage = $progressImage.get();
+      if (!progressImage) {
+        return;
+      }
+      if (progressImage.sessionId !== event.session_id) {
+        return;
+      }
+      if (!isCanvasOutputEvent(event)) {
+        return;
+      }
+      let imageDTO: ImageDTO | null = null;
+      for (const [_name, value] of objectEntries(event.result)) {
+        if (isImageField(value)) {
+          imageDTO = await getImageDTOSafe(value.image_name);
+          break;
+        }
+      }
+      if (!imageDTO) {
+        return;
+      }
+      flushSync(() => {
+        dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+      });
+      $progressImage.set(null);
+    };
+
+    const onQueueItemStatusChanged = (event: S['QueueItemStatusChangedEvent']) => {
+      const progressImage = $progressImage.get();
+      if (!progressImage) {
+        return;
+      }
+      if (progressImage.sessionId !== event.session_id) {
+        return;
+      }
+      if (event.status !== 'canceled' && event.status !== 'failed') {
+        return;
+      }
+      $progressImage.set(null);
+    };
+    console.log('SUB session preview image listeners');
+    socket.on('invocation_progress', onInvocationProgress);
+    socket.on('invocation_complete', onInvocationComplete);
+    socket.on('queue_item_status_changed', onQueueItemStatusChanged);
+
+    return () => {
+      console.log('UNSUB session preview image listeners');
+      socket.off('invocation_progress', onInvocationProgress);
+      socket.off('invocation_complete', onInvocationComplete);
+      socket.off('queue_item_status_changed', onQueueItemStatusChanged);
+    };
+  }, [$progressImage, dispatch, socket]);
+
+  const onReset = useCallback(() => {
+    dispatch(canvasReset());
+  }, [dispatch]);
+
+  const selectNext = useCallback(() => {
+    dispatch(stagingAreaNextStagedImageSelected());
+  }, [dispatch]);
+
+  useHotkeys(['right'], selectNext, { preventDefault: true }, [selectNext]);
+
+  const selectPrev = useCallback(() => {
+    dispatch(stagingAreaPrevStagedImageSelected());
+  }, [dispatch]);
+
+  useHotkeys(['left'], selectPrev, { preventDefault: true }, [selectPrev]);
+
   return (
     <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
-      <Text fontSize="lg" fontWeight="bold">
-        Simple Session (staging view) {isStaging && 'STAGING'}
-      </Text>
-      {selectedImage && <Image src={selectedImage.imageDTO.image_url} />}
-      <Flex gap={2} maxW="full" overflow="scroll">
-        {stagedImages.map(({ imageDTO }) => (
-          <Image key={imageDTO.image_name} maxW={108} src={imageDTO.thumbnail_url} />
-        ))}
+      <Flex>
+        <Text fontSize="lg" fontWeight="bold">
+          Simple Session (staging view) {isStaging && 'STAGING'}
+        </Text>
+        <Button onClick={onReset}>reset</Button>
       </Flex>
+      <SelectedImage $progressImage={$progressImage} />
+      <SessionImages />
     </Flex>
   );
 });
 SimpleActiveSession.displayName = 'SimpleActiveSession';
+
+const SelectedImage = memo(({ $progressImage }: { $progressImage: Atom<EphemeralProgressImage | null> }) => {
+  const progressImage = useStore($progressImage);
+  const selectedImage = useAppSelector(selectSelectedImage);
+
+  if (progressImage) {
+    return (
+      <Flex alignItems="center" justifyContent="center" minH={0} minW={0}>
+        <Image
+          objectFit="contain"
+          maxH="full"
+          maxW="full"
+          src={progressImage.image.dataURL}
+          width={progressImage.image.width}
+          height={progressImage.image.height}
+        />
+      </Flex>
+    );
+  }
+
+  if (selectedImage) {
+    return (
+      <Flex alignItems="center" justifyContent="center" minH={0} minW={0}>
+        <Image
+          objectFit="contain"
+          maxH="full"
+          maxW="full"
+          src={selectedImage.imageDTO.image_url}
+          width={selectedImage.imageDTO.width}
+          height={selectedImage.imageDTO.height}
+        />
+      </Flex>
+    );
+  }
+
+  return <Text>No images</Text>;
+});
+SelectedImage.displayName = 'SelectedImage';
+
+const SessionImages = memo(() => {
+  const stagedImages = useAppSelector(selectStagedImages);
+  return (
+    <Flex gap={2} h={108} maxW="full" overflow="scroll">
+      {stagedImages.map(({ imageDTO }, index) => (
+        <SessionImage key={imageDTO.image_name} index={index} imageDTO={imageDTO} />
+      ))}
+    </Flex>
+  );
+});
+SessionImages.displayName = 'SessionImages';
+
+const sx = {
+  '&[data-is-selected="false"]': {
+    opacity: 0.5,
+  },
+} satisfies SystemStyleObject;
+const SessionImage = memo(({ index, imageDTO }: { index: number; imageDTO: ImageDTO }) => {
+  const dispatch = useAppDispatch();
+  const selectedImageIndex = useAppSelector(selectStagedImageIndex);
+  const onClick = useCallback(() => {
+    dispatch(stagingAreaImageSelected({ index }));
+  }, [dispatch, index]);
+  return (
+    <Image
+      maxW={108}
+      src={imageDTO.image_url}
+      fallbackSrc={imageDTO.thumbnail_url}
+      onClick={onClick}
+      data-is-selected={selectedImageIndex === index}
+      sx={sx}
+    />
+  );
+});
+SessionImage.displayName = 'SessionImage';
 
 const CanvasActiveSession = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);

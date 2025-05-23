@@ -9,7 +9,7 @@ import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/contr
 import { canvasPersistConfig, canvasSlice, canvasUndoableConfig } from 'features/controlLayers/store/canvasSlice';
 import {
   canvasStagingAreaPersistConfig,
-  canvasStagingAreaSlice,
+  canvasSessionSlice,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
@@ -65,7 +65,7 @@ const allReducers = {
   [stylePresetSlice.name]: stylePresetSlice.reducer,
   [paramsSlice.name]: paramsSlice.reducer,
   [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
-  [canvasStagingAreaSlice.name]: canvasStagingAreaSlice.reducer,
+  [canvasSessionSlice.name]: canvasSessionSlice.reducer,
   [lorasSlice.name]: lorasSlice.reducer,
   [workflowLibrarySlice.name]: workflowLibrarySlice.reducer,
 };

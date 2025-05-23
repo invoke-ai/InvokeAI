@@ -9,6 +9,18 @@ export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
 export const $isConnected = atom<boolean>(false);
 export const $lastProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
 export const $progressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
+export const $canvasProgressImage = computed($lastProgressEvent, (event) => {
+  if (!event) {
+    return null;
+  }
+  if (event.origin !== 'canvas') {
+    return null;
+  }
+  if (!event.image) {
+    return null;
+  }
+  return event.image;
+});
 export const $hasProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));
 export const $isProgressFromCanvas = computed($lastProgressEvent, (val) => val?.destination === 'canvas');
 export const $invocationProgressMessage = computed($lastProgressEvent, (val) => {
