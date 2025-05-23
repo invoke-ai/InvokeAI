@@ -28,6 +28,7 @@ import {
 import { selectIsCanvasEmpty, selectIsSessionStarted } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
+import { assert } from 'tsafe';
 
 import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvocationProgress';
 
@@ -49,10 +50,10 @@ const MenuContent = memo(() => {
 MenuContent.displayName = 'MenuContent';
 
 export const CanvasMainPanelContent = memo(() => {
-  const isSessionStarted = useAppSelector(selectIsSessionStarted);
   const isCanvasEmpty = useAppSelector(selectIsCanvasEmpty);
+  const isSessionStarted = useAppSelector(selectIsSessionStarted);
 
-  if (!isSessionStarted && isCanvasEmpty) {
+  if (!isSessionStarted) {
     return <NoActiveSession />;
   }
 
@@ -60,7 +61,11 @@ export const CanvasMainPanelContent = memo(() => {
     return <SimpleActiveSession />;
   }
 
-  return <CanvasActiveSession />;
+  if (isSessionStarted && !isCanvasEmpty) {
+    return <CanvasActiveSession />;
+  }
+
+  assert(false);
 });
 
 CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
@@ -103,7 +108,6 @@ const NoActiveSession = memo(() => {
   );
 });
 NoActiveSession.displayName = 'NoActiveSession';
-
 const SimpleActiveSession = memo(() => {
   const isStaging = useAppSelector(selectIsStaging);
   const selectedImage = useAppSelector(selectSelectedImage);
@@ -114,7 +118,7 @@ const SimpleActiveSession = memo(() => {
         Simple Session (staging view) {isStaging && 'STAGING'}
       </Text>
       {selectedImage && <Image src={selectedImage.imageDTO.image_url} />}
-      <Flex gap={2} maxW="full" overflow='scroll'>
+      <Flex gap={2} maxW="full" overflow="scroll">
         {stagedImages.map(({ imageDTO }) => (
           <Image key={imageDTO.image_name} maxW={108} src={imageDTO.thumbnail_url} />
         ))}

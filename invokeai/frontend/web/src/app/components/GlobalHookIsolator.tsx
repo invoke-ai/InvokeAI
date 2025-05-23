@@ -21,7 +21,10 @@ import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useEffect } from 'react';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
+import { useGetQueueCountsByDestinationQuery } from 'services/api/endpoints/queue';
 import { useSocketIO } from 'services/events/useSocketIO';
+
+const queueCountArg = { destination: 'canvas' };
 
 /**
  * GlobalHookIsolator is a logical component that runs global hooks in an isolated component, so that they do not
@@ -40,6 +43,10 @@ export const GlobalHookIsolator = memo(
     useGlobalHotkeys();
     useGetOpenAPISchemaQuery();
     useSyncLoggingConfig();
+
+    // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
+    // and/or in progress canvas sessions.
+    useGetQueueCountsByDestinationQuery(queueCountArg);
 
     useEffect(() => {
       i18n.changeLanguage(language);
