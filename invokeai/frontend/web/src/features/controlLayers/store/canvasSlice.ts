@@ -7,8 +7,8 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   canvasReset,
-  newCanvasSessionRequested,
-  newGallerySessionRequested,
+  newAdvancedCanvasSessionRequested,
+  newSimpleCanvasSessionRequested,
 } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
@@ -1769,12 +1769,11 @@ export const canvasSlice = createSlice({
         syncScaledSize(state);
       }
     });
-    builder.addCase(newGallerySessionRequested, (state) => {
+    builder.addCase(newSimpleCanvasSessionRequested, (state) => {
       return resetState(state);
     });
-    builder.addCase(newCanvasSessionRequested, (state) => {
+    builder.addCase(newAdvancedCanvasSessionRequested, (state) => {
       const newState = resetState(state);
-      newState.isSessionStarted = true;
       return newState;
     });
   },

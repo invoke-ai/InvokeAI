@@ -1,7 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
+import { newAdvancedCanvasSessionRequested, newSimpleCanvasSessionRequested } from 'features/controlLayers/store/actions';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
 type CanvasSettingsState = {
@@ -158,10 +158,10 @@ export const canvasSettingsSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(newGallerySessionRequested, (state) => {
+    builder.addCase(newSimpleCanvasSessionRequested, (state) => {
       state.sendToCanvas = false;
     });
-    builder.addCase(newCanvasSessionRequested, (state) => {
+    builder.addCase(newAdvancedCanvasSessionRequested, (state) => {
       state.sendToCanvas = true;
     });
   },
