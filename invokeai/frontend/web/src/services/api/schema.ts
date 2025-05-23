@@ -9366,7 +9366,7 @@ export type components = {
              * @description Method to apply IP Weights with
              * @enum {string}
              */
-            method: "full" | "style" | "composition";
+            method: "full" | "style" | "composition" | "style_strong" | "style_precise";
             /**
              * Weight
              * @description The weight given to the IP-Adapter
