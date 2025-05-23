@@ -409,7 +409,6 @@ export const selectCanvasMetadata = createSelector(
   }
 );
 
-export const selectIsSessionStarted = createCanvasSelector(({ isSessionStarted }) => isSessionStarted);
 export const selectIsCanvasEmpty = createCanvasSelector(
   ({ controlLayers, inpaintMasks, rasterLayers, regionalGuidance }) => {
     // Check it all manually - could use lodash isEqual, but this selector will be called very often!

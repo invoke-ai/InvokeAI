@@ -8,7 +8,7 @@ import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePreset
 import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { pick } from 'lodash-es';
 import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
-import type { Invocation } from 'services/api/types';
+import type { Invocation, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type { MainModelLoaderNodes } from './types';
@@ -133,4 +133,8 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
     modelLoader.type === 'sd3_model_loader' ||
     modelLoader.type === 'cogview4_model_loader'
   );
+};
+
+export const isCanvasOutputEvent = (data: S['InvocationCompleteEvent']) => {
+  return data.invocation_source_id.split(':')[0] === CANVAS_OUTPUT_PREFIX;
 };
