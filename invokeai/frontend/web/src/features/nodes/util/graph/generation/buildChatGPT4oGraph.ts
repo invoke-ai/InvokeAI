@@ -79,8 +79,8 @@ export const buildChatGPT4oGraph = async (
       aspect_ratio: bbox.aspectRatio.id,
       reference_images,
       use_cache: false,
-      is_intermediate,
-      board,
+      is_intermediate: true,
+      board: undefined,
     });
     g.upsertMetadata({
       positive_prompt: positivePrompt,
@@ -112,8 +112,8 @@ export const buildChatGPT4oGraph = async (
       base_image: { image_name },
       reference_images,
       use_cache: false,
-      is_intermediate,
-      board,
+      is_intermediate: true,
+      board: undefined,
     });
     g.upsertMetadata({
       positive_prompt: positivePrompt,

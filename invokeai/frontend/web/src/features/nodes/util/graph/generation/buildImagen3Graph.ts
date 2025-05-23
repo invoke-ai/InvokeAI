@@ -61,8 +61,8 @@ export const buildImagen3Graph = async (
       enhance_prompt: true,
       // When enhance_prompt is true, Imagen3 will return a new image every time, ignoring the seed.
       use_cache: false,
-      is_intermediate,
-      board,
+      is_intermediate: true,
+      board: undefined,
     });
     g.upsertMetadata({
       positive_prompt: positivePrompt,
