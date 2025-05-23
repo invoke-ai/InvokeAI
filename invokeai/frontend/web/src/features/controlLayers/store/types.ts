@@ -561,7 +561,6 @@ const zReferenceImages = z.object({
 });
 const zCanvasState = z.object({
   _version: z.literal(3).default(3),
-  isSessionStarted: z.boolean().default(false),
   selectedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
   bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
   inpaintMasks: zInpaintMasks.default({ isHidden: false, entities: [] }),
