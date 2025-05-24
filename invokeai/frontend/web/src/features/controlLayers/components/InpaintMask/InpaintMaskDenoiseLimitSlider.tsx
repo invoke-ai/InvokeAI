@@ -46,7 +46,7 @@ export const InpaintMaskDenoiseLimitSlider = memo(() => {
       <Flex justifyContent="space-between" w="full" alignItems="center">
         <Text fontSize="sm">{t('controlLayers.denoiseLimit')}</Text>
         <Flex alignItems="center" gap={1}>
-          <Text fontSize="sm">{Math.round(denoiseLimit * 100)}%</Text>
+          <Text fontSize="sm">{denoiseLimit.toFixed(2)}</Text>
           <InpaintMaskDeleteModifierButton onDelete={onDeleteDenoiseLimit} />
         </Flex>
       </Flex>
