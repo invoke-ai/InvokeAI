@@ -6,6 +6,8 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
   inpaintMaskAdded,
+  inpaintMaskDenoiseLimitAdded,
+  inpaintMaskNoiseAdded,
   rasterLayerAdded,
   referenceImageAdded,
   rgAdded,
@@ -220,6 +222,24 @@ export const useAddRegionalGuidanceNegativePrompt = (entityIdentifier: CanvasEnt
   }, [dispatch, entityIdentifier]);
 
   return runc;
+};
+
+export const useAddInpaintMaskNoise = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(inpaintMaskNoiseAdded({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
+
+  return func;
+};
+
+export const useAddInpaintMaskDenoiseLimit = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) => {
+  const dispatch = useAppDispatch();
+  const func = useCallback(() => {
+    dispatch(inpaintMaskDenoiseLimitAdded({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
+
+  return func;
 };
 
 export const buildSelectValidRegionalGuidanceActions = (

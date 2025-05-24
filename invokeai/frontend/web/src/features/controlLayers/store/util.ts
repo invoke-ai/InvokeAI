@@ -199,6 +199,8 @@ export const getInpaintMaskState = (
       style: 'diagonal',
       color: getInpaintMaskFillColor(),
     },
+    noiseLevel: null,
+    denoiseLimit: null,
   };
   merge(entityState, overrides);
   return entityState;

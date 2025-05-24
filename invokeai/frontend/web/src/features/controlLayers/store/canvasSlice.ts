@@ -1096,6 +1096,30 @@ export const canvasSlice = createSlice({
       state.inpaintMasks.entities = [data];
       state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
     },
+    inpaintMaskNoiseAdded: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.noiseLevel = 0.15; // Default noise level
+      }
+    },
+    inpaintMaskNoiseChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ noiseLevel: number }, 'inpaint_mask'>>
+    ) => {
+      const { entityIdentifier, noiseLevel } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.noiseLevel = noiseLevel;
+      }
+    },
+    inpaintMaskNoiseDeleted: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.noiseLevel = null;
+      }
+    },
     inpaintMaskConvertedToRegionalGuidance: {
       reducer: (
         state,
@@ -1133,6 +1157,30 @@ export const canvasSlice = createSlice({
       ) => ({
         payload: { ...payload, newId: getPrefixedId('regional_guidance') },
       }),
+    },
+    inpaintMaskDenoiseLimitAdded: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.denoiseLimit = 1.0; // Default denoise limit
+      }
+    },
+    inpaintMaskDenoiseLimitChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ denoiseLimit: number }, 'inpaint_mask'>>
+    ) => {
+      const { entityIdentifier, denoiseLimit } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.denoiseLimit = denoiseLimit;
+      }
+    },
+    inpaintMaskDenoiseLimitDeleted: (state, action: PayloadAction<EntityIdentifierPayload<void, 'inpaint_mask'>>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity && entity.type === 'inpaint_mask') {
+        entity.denoiseLimit = null;
+      }
     },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
@@ -1869,6 +1917,12 @@ export const {
   // Inpaint mask
   inpaintMaskAdded,
   inpaintMaskConvertedToRegionalGuidance,
+  inpaintMaskNoiseAdded,
+  inpaintMaskNoiseChanged,
+  inpaintMaskNoiseDeleted,
+  inpaintMaskDenoiseLimitAdded,
+  inpaintMaskDenoiseLimitChanged,
+  inpaintMaskDenoiseLimitDeleted,
   // inpaintMaskRecalled,
 } = canvasSlice.actions;
 

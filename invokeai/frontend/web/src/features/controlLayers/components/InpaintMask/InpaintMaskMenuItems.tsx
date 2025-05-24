@@ -7,6 +7,7 @@ import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/component
 import { CanvasEntityMenuItemsMergeDown } from 'features/controlLayers/components/common/CanvasEntityMenuItemsMergeDown';
 import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
+import { InpaintMaskMenuItemsAddModifiers } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsAddModifiers';
 import { InpaintMaskMenuItemsConvertToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsConvertToSubMenu';
 import { InpaintMaskMenuItemsCopyToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsCopyToSubMenu';
 import { memo } from 'react';
@@ -19,6 +20,8 @@ export const InpaintMaskMenuItems = memo(() => {
         <CanvasEntityMenuItemsDuplicate />
         <CanvasEntityMenuItemsDelete asIcon />
       </IconMenuItemGroup>
+      <MenuDivider />
+      <InpaintMaskMenuItemsAddModifiers />
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
       <MenuDivider />

@@ -198,6 +198,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
       scaledSize,
       denoising_start,
       fp32: vaePrecision === 'fp32',
+      seed,
     });
     g.upsertMetadata({ generation_mode: 'inpaint' });
   } else if (generationMode === 'outpaint') {
@@ -214,6 +215,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
       scaledSize,
       denoising_start,
       fp32,
+      seed,
     });
     g.upsertMetadata({ generation_mode: 'outpaint' });
   } else {
