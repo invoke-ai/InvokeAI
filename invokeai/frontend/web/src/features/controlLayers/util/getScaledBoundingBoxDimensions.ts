@@ -1,7 +1,11 @@
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { MainModelBase } from 'features/nodes/types/common';
-import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import {
+  getGridSize,
+  getOptimalDimension,
+  isInSDXLTrainingDimensions,
+} from 'features/parameters/util/optimalDimension';
 
 /**
  * Scales the bounding box dimensions to the optimal dimension. The optimal dimensions should be the trained dimension
@@ -10,6 +14,11 @@ import { getGridSize, getOptimalDimension } from 'features/parameters/util/optim
  * @param modelBase The base model
  */
 export const getScaledBoundingBoxDimensions = (dimensions: Dimensions, modelBase: MainModelBase): Dimensions => {
+  // Special cases: Return original if SDXL and in training dimensions
+  if (modelBase === 'sdxl' && isInSDXLTrainingDimensions(dimensions.width, dimensions.height)) {
+    return { ...dimensions };
+  }
+
   const optimalDimension = getOptimalDimension(modelBase);
   const gridSize = getGridSize(modelBase);
   const width = roundToMultiple(dimensions.width, gridSize);
