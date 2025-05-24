@@ -26,6 +26,40 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
   }
 };
 
+const SDXL_TRAINING_DIMENSIONS: [number, number][] = [
+  [512, 2048],
+  [512, 1984],
+  [512, 1920],
+  [512, 1856],
+  [576, 1792],
+  [576, 1728],
+  [576, 1664],
+  [640, 1600],
+  [640, 1536],
+  [704, 1472],
+  [704, 1408],
+  [704, 1344],
+  [768, 1344],
+  [768, 1280],
+  [832, 1216],
+  [832, 1152],
+  [896, 1152],
+  [896, 1088],
+  [960, 1088],
+  [960, 1024],
+  [1024, 1024],
+];
+
+/**
+ * Checks if the given width and height are in the SDXL training dimensions.
+ * @param width The width to check
+ * @param height The height to check
+ * @returns Whether the width and height are in the SDXL training dimensions (order agnostic)
+ */
+export const isInSDXLTrainingDimensions = (width: number, height: number): boolean => {
+  return SDXL_TRAINING_DIMENSIONS.some(([w, h]) => (w === width && h === height) || (w === height && h === width));
+};
+
 /**
  * Gets the grid size for a given base model. For Flux, the grid size is 16, otherwise it is 8.
  * - sd-1, sd-2, sdxl: 8
