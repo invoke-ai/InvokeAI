@@ -3,9 +3,10 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { usePullBboxIntoLayer } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { replaceCanvasEntityObjectsWithImage } from 'features/imageActions/actions';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Trans } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
 
@@ -23,27 +24,33 @@ export const ControlLayerSettingsEmptyState = memo(() => {
   const onClickGalleryButton = useCallback(() => {
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
+  const pullBboxIntoLayer = usePullBboxIntoLayer(entityIdentifier);
+
+  const components = useMemo(
+    () => ({
+      UploadButton: (
+        <Button
+          isDisabled={isBusy}
+          size="sm"
+          variant="link"
+          color="base.300"
+          {...uploadApi.getUploadButtonProps()}
+        />
+      ),
+      GalleryButton: (
+        <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
+      ),
+      PullBboxButton: (
+        <Button onClick={pullBboxIntoLayer} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
+      ),
+    }),
+    [isBusy, onClickGalleryButton, pullBboxIntoLayer, uploadApi]
+  );
 
   return (
     <Flex flexDir="column" gap={3} position="relative" w="full" p={4}>
       <Text textAlign="center" color="base.300">
-        <Trans
-          i18nKey="controlLayers.controlLayerEmptyState"
-          components={{
-            UploadButton: (
-              <Button
-                isDisabled={isBusy}
-                size="sm"
-                variant="link"
-                color="base.300"
-                {...uploadApi.getUploadButtonProps()}
-              />
-            ),
-            GalleryButton: (
-              <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
-            ),
-          }}
-        />
+        <Trans i18nKey="controlLayers.controlLayerEmptyState" components={components} />
       </Text>
       <input {...uploadApi.getUploadInputProps()} />
     </Flex>
