@@ -1,5 +1,4 @@
 import type { RootState } from 'app/store/store';
-import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
@@ -15,7 +14,7 @@ import type {
   VaeSourceNodes,
 } from 'features/nodes/util/graph/types';
 import { isEqual } from 'lodash-es';
-import type { Invocation } from 'services/api/types';
+import type { ImageDTO, Invocation } from 'services/api/types';
 
 type AddInpaintArg = {
   state: RootState;
@@ -68,23 +67,17 @@ export const addInpaint = async ({
   const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== undefined);
 
   // Create a composite noise mask if we have any adapters with noise settings
-  let noiseMaskImage = null;
+  let noiseMaskImage: ImageDTO | null = null;
   if (noiseMaskAdapters.length > 0) {
-    // Use the grayscale mask composite method with proper typing
-    noiseMaskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
-      noiseMaskAdapters as CanvasEntityAdapterInpaintMask[],
-      rect,
-      'noiseLevel',
-      {
-        is_intermediate: true,
-        silent: true,
-      }
-    );
+    noiseMaskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(noiseMaskAdapters, rect, 'noiseLevel', {
+      is_intermediate: true,
+      silent: true,
+    });
   }
 
   // Create a composite denoise limit mask
   const maskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
-    inpaintMaskAdapters as CanvasEntityAdapterInpaintMask[], // denoise limit defaults to 1 for masks that don't have it
+    inpaintMaskAdapters, // denoise limit defaults to 1 for masks that don't have it
     rect,
     'denoiseLimit',
     {
