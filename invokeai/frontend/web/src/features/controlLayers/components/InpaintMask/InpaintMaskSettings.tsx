@@ -1,4 +1,4 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { InpaintMaskAddButtons } from 'features/controlLayers/components/InpaintMask/InpaintMaskAddButtons';
@@ -9,25 +9,35 @@ import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/s
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
-const buildSelectFlags = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) =>
-  createMemoizedSelector(selectCanvasSlice, (canvas) => {
+const buildSelectHasDenoiseLimit = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) =>
+  createSelector(selectCanvasSlice, (canvas) => {
     const entity = selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings');
-    return {
-      hasNoiseLevel: entity.noiseLevel !== undefined,
-      hasDenoiseLimit: entity.denoiseLimit !== undefined,
-    };
+    return entity.denoiseLimit !== undefined;
+  });
+
+const buildSelectHasNoiseLevel = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>) =>
+  createSelector(selectCanvasSlice, (canvas) => {
+    const entity = selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings');
+    return entity.noiseLevel !== undefined;
   });
 
 export const InpaintMaskSettings = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('inpaint_mask');
-  const selectFlags = useMemo(() => buildSelectFlags(entityIdentifier), [entityIdentifier]);
-  const flags = useAppSelector(selectFlags);
+  const selectHasDenoiseLimit = useMemo(() => buildSelectHasDenoiseLimit(entityIdentifier), [entityIdentifier]);
+  const selectHasNoiseLevel = useMemo(() => buildSelectHasNoiseLevel(entityIdentifier), [entityIdentifier]);
+
+  const hasDenoiseLimit = useAppSelector(selectHasDenoiseLimit);
+  const hasNoiseLevel = useAppSelector(selectHasNoiseLevel);
+
+  if (!hasNoiseLevel && !hasDenoiseLimit) {
+    return null;
+  }
 
   return (
     <CanvasEntitySettingsWrapper>
-      {!flags.hasNoiseLevel && !flags.hasDenoiseLimit && <InpaintMaskAddButtons />}
-      {flags.hasNoiseLevel && <InpaintMaskNoiseSlider />}
-      {flags.hasDenoiseLimit && <InpaintMaskDenoiseLimitSlider />}
+      {!hasNoiseLevel && !hasDenoiseLimit && <InpaintMaskAddButtons />}
+      {hasNoiseLevel && <InpaintMaskNoiseSlider />}
+      {hasDenoiseLimit && <InpaintMaskDenoiseLimitSlider />}
     </CanvasEntitySettingsWrapper>
   );
 });
