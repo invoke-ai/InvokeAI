@@ -883,7 +883,8 @@
         "problemUnpublishingWorkflow": "Problema durante l'annullamento della pubblicazione del flusso di lavoro",
         "problemUnpublishingWorkflowDescription": "Si è verificato un problema durante l'annullamento della pubblicazione del flusso di lavoro. Riprova.",
         "workflowUnpublished": "Flusso di lavoro non pubblicato",
-        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supporta solo la conversione da testo a immagine e da immagine a immagine. Utilizza altri modelli per le attività di Inpainting e Outpainting."
+        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o supporta solo la conversione da testo a immagine e da immagine a immagine. Utilizza altri modelli per le attività di Inpainting e Outpainting.",
+        "imagenIncompatibleGenerationMode": "Google {{model}} supporta solo la generazione da testo a immagine. Utilizza altri modelli per le attività di conversione da immagine a immagine, inpainting e outpainting."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -2295,7 +2296,7 @@
         "replaceCurrent": "Sostituisci corrente",
         "mergeDown": "Unire in basso",
         "mergingLayers": "Unione dei livelli",
-        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello oppure disegna sulla tela per iniziare.",
+        "controlLayerEmptyState": "<UploadButton>Carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton> su questo livello, <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> oppure disegna sulla tela per iniziare.",
         "useImage": "Usa immagine",
         "resetGenerationSettings": "Ripristina impostazioni di generazione",
         "referenceImageEmptyState": "Per iniziare, <UploadButton>carica un'immagine</UploadButton>, trascina un'immagine dalla <GalleryButton>galleria</GalleryButton>, oppure <PullBboxButton>trascina il riquadro di delimitazione in questo livello</PullBboxButton> su questo livello.",
@@ -2445,7 +2446,8 @@
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
             "GPU Nvidia 50xx: Invoke utilizza PyTorch 2.7.0, necessario per queste GPU.",
-            "Relazioni tra modelli: collega i LoRA ai modelli principali e i LoRA verranno visualizzati per primi nell'elenco."
+            "Relazioni tra modelli: collega i LoRA ai modelli principali e i LoRA verranno visualizzati per primi nell'elenco.",
+            "Adattatore IP: nuovi metodi Style (Strong) e Style (Precise) per i modelli SDXL e SD1.5."
         ]
     },
     "system": {
