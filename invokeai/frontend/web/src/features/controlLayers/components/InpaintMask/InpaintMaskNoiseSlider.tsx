@@ -34,7 +34,7 @@ export const InpaintMaskNoiseSlider = memo(() => {
     dispatch(inpaintMaskNoiseDeleted({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
-  if (noiseLevel === null) {
+  if (noiseLevel === undefined) {
     return null;
   }
 

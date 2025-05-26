@@ -37,7 +37,7 @@ export const InpaintMaskDenoiseLimitSlider = memo(() => {
     dispatch(inpaintMaskDenoiseLimitDeleted({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
-  if (denoiseLimit === null) {
+  if (denoiseLimit === undefined) {
     return null;
   }
 

@@ -498,7 +498,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
       const data = imageData.data;
 
-      const attributeValue = typeof adapter.state[attribute] === 'number' ? (adapter.state[attribute] as number) : 1.0; // Default to full strength if attribute is not a number
+      const attributeValue = typeof adapter.state[attribute] === 'number' ? (adapter.state[attribute] as number) : 1.0; // Default to full strength if attribute is undefined
 
       // Process all pixels in the image data
       for (let i = 0; i < data.length; i += 4) {

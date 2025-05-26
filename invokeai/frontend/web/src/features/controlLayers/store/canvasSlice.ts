@@ -1117,7 +1117,7 @@ export const canvasSlice = createSlice({
       const { entityIdentifier } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
-        entity.noiseLevel = null;
+        entity.noiseLevel = undefined;
       }
     },
     inpaintMaskConvertedToRegionalGuidance: {
@@ -1179,7 +1179,7 @@ export const canvasSlice = createSlice({
       const { entityIdentifier } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (entity && entity.type === 'inpaint_mask') {
-        entity.denoiseLimit = null;
+        entity.denoiseLimit = undefined;
       }
     },
     //#region BBox

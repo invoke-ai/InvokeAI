@@ -13,8 +13,8 @@ const buildSelectFlags = (entityIdentifier: CanvasEntityIdentifier<'inpaint_mask
   createMemoizedSelector(selectCanvasSlice, (canvas) => {
     const entity = selectEntityOrThrow(canvas, entityIdentifier, 'InpaintMaskSettings');
     return {
-      hasNoiseLevel: entity.noiseLevel !== null,
-      hasDenoiseLimit: entity.denoiseLimit !== null,
+      hasNoiseLevel: entity.noiseLevel !== undefined,
+      hasDenoiseLimit: entity.denoiseLimit !== undefined,
     };
   });
 

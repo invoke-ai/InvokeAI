@@ -66,7 +66,7 @@ export const addInpaint = async ({
   const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
 
   // Get inpaint mask adapters that have noise settings
-  const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== null);
+  const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== undefined);
 
   // Create a composite noise mask if we have any adapters with noise settings
   let noiseMaskImage = null;
