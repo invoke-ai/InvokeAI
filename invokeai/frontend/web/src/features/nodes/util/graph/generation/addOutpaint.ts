@@ -1,11 +1,11 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { Dimensions, Rect } from 'features/controlLayers/store/types';
+import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getInfill, isMainModelWithoutUnet } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
@@ -65,8 +65,7 @@ export const addOutpaint = async ({
 
   const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
 
-  // Make sure bbox.rect is defined, use an empty rect if it's not
-  const rect: Rect = canvas.bbox?.rect ?? getEmptyRect();
+  const { rect } = canvas.bbox;
 
   // Get inpaint mask adapters that have noise settings
   const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== undefined);
