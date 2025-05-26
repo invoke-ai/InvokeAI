@@ -69,7 +69,7 @@ export const addOutpaint = async ({
   const rect: Rect = canvas.bbox?.rect ?? getEmptyRect();
 
   // Get inpaint mask adapters that have noise settings
-  const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== null);
+  const noiseMaskAdapters = inpaintMaskAdapters.filter((adapter) => adapter.state.noiseLevel !== undefined);
 
   // Create a composite noise mask if we have any adapters with noise settings
   let noiseMaskImage = null;
