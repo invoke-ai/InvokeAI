@@ -29,13 +29,7 @@ export const ControlLayerSettingsEmptyState = memo(() => {
   const components = useMemo(
     () => ({
       UploadButton: (
-        <Button
-          isDisabled={isBusy}
-          size="sm"
-          variant="link"
-          color="base.300"
-          {...uploadApi.getUploadButtonProps()}
-        />
+        <Button isDisabled={isBusy} size="sm" variant="link" color="base.300" {...uploadApi.getUploadButtonProps()} />
       ),
       GalleryButton: (
         <Button onClick={onClickGalleryButton} isDisabled={isBusy} size="sm" variant="link" color="base.300" />
