@@ -1,11 +1,11 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { Dimensions, Rect } from 'features/controlLayers/store/types';
+import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isMainModelWithoutUnet } from 'features/nodes/util/graph/graphBuilderUtils';
 import type {
@@ -54,8 +54,7 @@ export const addInpaint = async ({
   const canvasSettings = selectCanvasSettingsSlice(state);
   const canvas = selectCanvasSlice(state);
 
-  // Make sure bbox.rect is defined, use an empty rect if it's not
-  const rect: Rect = canvas.bbox?.rect ?? getEmptyRect();
+  const { rect } = canvas.bbox;
 
   const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
   const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, rect, {
