@@ -1,5 +1,5 @@
 # continuous integration
-/.github/workflows/  @lstein @blessedcoolant @hipsterusername @ebr @jazzhaiku
+/.github/workflows/  @lstein @blessedcoolant @hipsterusername @ebr @jazzhaiku @psychedelicious
 
 # documentation
 /docs/ @lstein @blessedcoolant @hipsterusername @psychedelicious
@@ -9,13 +9,13 @@
 /invokeai/app/ @blessedcoolant @psychedelicious @hipsterusername @jazzhaiku
 
 # installation and configuration
-/pyproject.toml  @lstein @blessedcoolant @hipsterusername
-/docker/  @lstein @blessedcoolant @hipsterusername @ebr
-/scripts/ @ebr @lstein @hipsterusername
-/installer/ @lstein @ebr @hipsterusername
-/invokeai/assets @lstein @ebr @hipsterusername
-/invokeai/configs @lstein @hipsterusername
-/invokeai/version @lstein @blessedcoolant @hipsterusername
+/pyproject.toml  @lstein @blessedcoolant @psychedelicious @hipsterusername
+/docker/  @lstein @blessedcoolant @psychedelicious @hipsterusername @ebr
+/scripts/ @ebr @lstein @psychedelicious @hipsterusername
+/installer/ @lstein @ebr @psychedelicious @hipsterusername
+/invokeai/assets @lstein @ebr @psychedelicious @hipsterusername
+/invokeai/configs @lstein @psychedelicious @hipsterusername
+/invokeai/version @lstein @blessedcoolant @psychedelicious @hipsterusername
 
 # web ui
 /invokeai/frontend @blessedcoolant @psychedelicious @lstein @maryhipp @hipsterusername
@@ -24,8 +24,8 @@
 /invokeai/backend  @lstein @blessedcoolant @hipsterusername @jazzhaiku @psychedelicious @maryhipp 
 
 # front ends
-/invokeai/frontend/CLI @lstein @hipsterusername
-/invokeai/frontend/install @lstein @ebr @hipsterusername
-/invokeai/frontend/merge @lstein @blessedcoolant @hipsterusername
-/invokeai/frontend/training @lstein @blessedcoolant @hipsterusername
+/invokeai/frontend/CLI @lstein @psychedelicious @hipsterusername
+/invokeai/frontend/install @lstein @ebr @psychedelicious @hipsterusername
+/invokeai/frontend/merge @lstein @blessedcoolant @psychedelicious @hipsterusername
+/invokeai/frontend/training @lstein @blessedcoolant @psychedelicious @hipsterusername
 /invokeai/frontend/web @psychedelicious @blessedcoolant @maryhipp @hipsterusername
