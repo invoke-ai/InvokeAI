@@ -119,9 +119,8 @@ export const addFLUXFill = async ({
     });
     g.addEdge(maskCombine, 'image', expandMask, 'mask');
 
-    // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
-    // to canvas but not outputting only masked regions
-    if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
+    // Do the paste back if we are not outputting only masked regions
+    if (!canvasSettings.outputOnlyMaskedRegions) {
       const imageLayerBlend = g.addNode({
         type: 'invokeai_img_blend',
         id: getPrefixedId('image_layer_blend'),
@@ -178,9 +177,8 @@ export const addFLUXFill = async ({
     });
     g.addEdge(maskCombine, 'image', expandMask, 'mask');
 
-    // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
-    // to canvas but not outputting only masked regions
-    if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
+    // Do the paste back if we are not outputting only masked regions
+    if (!canvasSettings.outputOnlyMaskedRegions) {
       const imageLayerBlend = g.addNode({
         type: 'invokeai_img_blend',
         id: getPrefixedId('image_layer_blend'),

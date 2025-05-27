@@ -5,11 +5,8 @@ import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/uti
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import {
-  canvasReset,
-  newAdvancedCanvasSessionRequested,
-  newSimpleCanvasSessionRequested,
-} from 'features/controlLayers/store/actions';
+import { canvasReset } from 'features/controlLayers/store/actions';
+import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -1769,13 +1766,7 @@ export const canvasSlice = createSlice({
         syncScaledSize(state);
       }
     });
-    builder.addCase(newSimpleCanvasSessionRequested, (state) => {
-      return resetState(state);
-    });
-    builder.addCase(newAdvancedCanvasSessionRequested, (state) => {
-      const newState = resetState(state);
-      return newState;
-    });
+    builder.addCase(canvasSessionStarted, (state) => resetState(state));
   },
 });
 
