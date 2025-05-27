@@ -3,6 +3,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
+# This script checks the classifiers in a pyproject.toml file against the official Trove classifier list.
+# If the classifiers are invalid, PyPI will reject the package upload.
+
 # Step 1: Get pyproject.toml path from args
 if len(sys.argv) != 2:
     print(f"Usage: {sys.argv[0]} path/to/pyproject.toml", file=sys.stderr)
