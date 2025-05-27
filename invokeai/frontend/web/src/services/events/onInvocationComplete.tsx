@@ -7,12 +7,13 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { isCanvasOutputEvent } from 'features/nodes/util/graph/graphBuilderUtils';
+import { flushSync } from 'react-dom';
 import type { ApiTagDescription } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
-import { $lastProgressEvent } from 'services/events/stores';
+import { $lastCanvasProgressImage, $lastProgressEvent } from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -176,7 +177,11 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       return;
     }
 
-    dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+    flushSync(() => {
+      dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+    });
+
+    $lastCanvasProgressImage.set(null);
   };
 
   const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
