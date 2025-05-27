@@ -1,10 +1,12 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { isCanvasOutputEvent } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ApiTagDescription } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
@@ -163,26 +165,18 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
   };
 
   const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
-    const imageDTOs = await getResultImageDTOs(data);
+    if (!isCanvasOutputEvent(data)) {
+      return;
+    }
 
     // We expect only a single image in the canvas output
-    const imageDTO = imageDTOs[0];
+    const imageDTO = (await getResultImageDTOs(data))[0];
+
     if (!imageDTO) {
       return;
     }
 
-    if (data.destination === 'canvas') {
-      // TODO(psyche): Can/should we let canvas handle this itself?
-      // if (isCanvasOutputEvent(data)) {
-      //   if (data.result.type === 'image_output') {
-      //     dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-      //   }
-      //   addImagesToGallery(data, [imageDTO]);
-      // }
-    } else if (!imageDTO.is_intermediate) {
-      // Desintaion is gallery
-      addImagesToGallery(data, [imageDTO]);
-    }
+    dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
   };
 
   const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {

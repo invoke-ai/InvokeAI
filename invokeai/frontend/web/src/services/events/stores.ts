@@ -8,21 +8,28 @@ export const $socket = atom<AppSocket | null>(null);
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
 export const $isConnected = atom<boolean>(false);
 export const $lastProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
-export const $progressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
-export const $canvasProgressImage = computed($lastProgressEvent, (event) => {
+$lastProgressEvent.subscribe((event) => {
   if (!event) {
-    return null;
+    return;
   }
-  if (event.origin !== 'canvas') {
-    return null;
+  switch (event.destination) {
+    case 'workflows':
+      $lastWorkflowsProgressEvent.set(event);
+      break;
+    case 'upscaling':
+      $lastUpscalingProgressEvent.set(event);
+      break;
+    case 'canvas':
+      $lastCanvasProgressEvent.set(event);
+      break;
   }
-  if (!event.image) {
-    return null;
-  }
-  return event.image;
 });
+export const $lastCanvasProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
+export const $lastWorkflowsProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
+export const $lastUpscalingProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
+
+export const $progressImage = computed($lastProgressEvent, (val) => val?.image ?? null);
 export const $hasProgressImage = computed($lastProgressEvent, (val) => Boolean(val?.image));
-export const $isProgressFromCanvas = computed($lastProgressEvent, (val) => val?.destination === 'canvas');
 export const $invocationProgressMessage = computed($lastProgressEvent, (val) => {
   if (!val) {
     return null;

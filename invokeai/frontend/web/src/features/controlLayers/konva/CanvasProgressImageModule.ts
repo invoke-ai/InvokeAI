@@ -85,6 +85,8 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
       if (data.destination !== 'canvas') {
         return;
       }
+
+      // The staging area module handles _completed_ events. Only care about failed or canceled here.
       if (data.status === 'failed' || data.status === 'canceled') {
         this.$lastProgressEvent.set(null);
         this.$hasActiveGeneration.set(false);

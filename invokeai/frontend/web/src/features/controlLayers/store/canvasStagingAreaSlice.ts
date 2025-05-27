@@ -1,11 +1,7 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import {
-  canvasReset,
-  newAdvancedCanvasSessionRequested,
-  newSimpleCanvasSessionRequested,
-} from 'features/controlLayers/store/actions';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 
@@ -15,15 +11,17 @@ type CanvasStagingAreaState = {
   selectedImageIndex: number;
 };
 
-const initialState: CanvasStagingAreaState = {
+const INITIAL_STATE: CanvasStagingAreaState = {
   sessionType: null,
   images: [],
   selectedImageIndex: 0,
 };
 
+const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
+
 export const canvasSessionSlice = createSlice({
   name: 'canvasSession',
-  initialState,
+  initialState: getInitialState(),
   reducers: {
     stagingAreaImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
       const { stagingAreaImage } = action.payload;
@@ -49,25 +47,15 @@ export const canvasSessionSlice = createSlice({
       state.images = [];
       state.selectedImageIndex = 0;
     },
-    canvasSessionStarted: (state, action: PayloadAction<{ sessionType: CanvasStagingAreaState['sessionType'] }>) => {
+    canvasSessionStarted: (_, action: PayloadAction<{ sessionType: CanvasStagingAreaState['sessionType'] }>) => {
       const { sessionType } = action.payload;
+      const state = getInitialState();
       state.sessionType = sessionType;
-      state.images = [];
-      state.selectedImageIndex = 0;
+      return state;
     },
   },
   extraReducers(builder) {
-    builder.addCase(canvasReset, () => deepClone(initialState));
-    builder.addCase(newSimpleCanvasSessionRequested, () => {
-      const state = deepClone(initialState);
-      state.sessionType === 'simple';
-      return state;
-    });
-    builder.addCase(newAdvancedCanvasSessionRequested, () => {
-      const state = deepClone(initialState);
-      state.sessionType === 'advanced';
-      return state;
-    });
+    builder.addCase(canvasReset, () => getInitialState());
   },
 });
 
@@ -88,7 +76,7 @@ const migrate = (state: any): any => {
 
 export const canvasStagingAreaPersistConfig: PersistConfig<CanvasStagingAreaState> = {
   name: canvasSessionSlice.name,
-  initialState,
+  initialState: getInitialState(),
   migrate,
   persistDenylist: [],
 };

@@ -2,8 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectMainModelConfig,selectParamsSlice  } from 'features/controlLayers/store/paramsSlice';
+import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -15,7 +14,6 @@ import { getGenerationMode } from 'features/nodes/util/graph/generation/getGener
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   CANVAS_OUTPUT_PREFIX,
-  getBoardField,
   getSizes,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
@@ -35,7 +33,6 @@ export const buildSD3Graph = async (state: RootState, manager?: CanvasManager | 
   assert(model.base === 'sd-3');
 
   const params = selectParamsSlice(state);
-  const canvasSettings = selectCanvasSettingsSlice(state);
   const canvas = selectCanvasSlice(state);
 
   const { bbox } = canvas;
@@ -197,13 +194,7 @@ export const buildSD3Graph = async (state: RootState, manager?: CanvasManager | 
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  // This image will be staged, should not be saved to the gallery or added to a board.
-  const is_intermediate = canvasSettings.sendToCanvas;
-  const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
-
-  if (!canvasSettings.sendToCanvas) {
-    g.upsertMetadata(selectCanvasMetadata(state));
-  }
+  g.upsertMetadata(selectCanvasMetadata(state));
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
