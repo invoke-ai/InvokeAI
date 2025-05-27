@@ -2,18 +2,13 @@ import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isImagenAspectRatioID } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  CANVAS_OUTPUT_PREFIX,
-  getBoardField,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { CANVAS_OUTPUT_PREFIX, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
@@ -34,7 +29,6 @@ export const buildImagen4Graph = async (
   log.debug({ generationMode }, 'Building Imagen4 graph');
 
   const canvas = selectCanvasSlice(state);
-  const canvasSettings = selectCanvasSettingsSlice(state);
 
   const { bbox } = canvas;
   const { positivePrompt, negativePrompt } = selectPresetModifiedPrompts(state);
@@ -44,9 +38,6 @@ export const buildImagen4Graph = async (
   assert(model.base === 'imagen4', 'Imagen4 graph requires Imagen4 model');
   assert(isImagenAspectRatioID(bbox.aspectRatio.id), 'Imagen4 does not support this aspect ratio');
   assert(positivePrompt.length > 0, 'Imagen4 requires positive prompt to have at least one character');
-
-  const is_intermediate = canvasSettings.sendToCanvas;
-  const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
 
   if (generationMode === 'txt2img') {
     const g = new Graph(getPrefixedId('imagen4_txt2img_graph'));
@@ -70,7 +61,9 @@ export const buildImagen4Graph = async (
       width: bbox.rect.width,
       height: bbox.rect.height,
       model: Graph.getModelMetadataField(model),
+      ...selectCanvasMetadata(state),
     });
+
     return {
       g,
       seedFieldIdentifier: { nodeId: imagen4.id, fieldName: 'seed' },

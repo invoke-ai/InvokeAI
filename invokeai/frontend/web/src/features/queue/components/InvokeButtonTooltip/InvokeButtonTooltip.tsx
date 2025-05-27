@@ -2,7 +2,6 @@ import type { TooltipProps } from '@invoke-ai/ui-library';
 import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -237,32 +236,14 @@ StyledDivider.displayName = 'StyledDivider';
 
 const AddingToText = memo(() => {
   const { t } = useTranslation();
-  const sendToCanvas = useAppSelector(selectSendToCanvas);
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAddBoardName = useBoardName(autoAddBoardId);
 
-  const addingTo = useMemo(() => {
-    if (sendToCanvas) {
-      return t('controlLayers.stagingOnCanvas');
-    }
-    return t('parameters.invoke.addingImagesTo');
-  }, [sendToCanvas, t]);
-
-  const destination = useMemo(() => {
-    if (sendToCanvas) {
-      return t('queue.canvas');
-    }
-    if (autoAddBoardName) {
-      return autoAddBoardName;
-    }
-    return t('boards.uncategorized');
-  }, [autoAddBoardName, sendToCanvas, t]);
-
   return (
     <Text fontStyle="oblique 10deg">
-      {addingTo}{' '}
+      {t('parameters.invoke.addingImagesTo')}{' '}
       <Text as="span" fontWeight="semibold">
-        {destination}
+        {autoAddBoardName || t('boards.uncategorized')}
       </Text>
     </Text>
   );

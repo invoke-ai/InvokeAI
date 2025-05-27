@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { newSessionRequested } from 'features/controlLayers/store/actions';
+import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ParameterHRFMethod, ParameterStrength } from 'features/parameters/types/parameterSchemas';
 
 interface HRFState {
@@ -34,7 +34,7 @@ export const hrfSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addMatcher(newSessionRequested, () => {
+    builder.addCase(canvasSessionStarted, () => {
       return deepClone(initialHRFState);
     });
   },
