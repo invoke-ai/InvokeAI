@@ -1,7 +1,6 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import { getInitialParamsState } from 'features/controlLayers/store/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
@@ -24,7 +23,6 @@ import type {
 import { clamp } from 'lodash-es';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
-
 
 export const paramsSlice = createSlice({
   name: 'params',
@@ -187,9 +185,6 @@ export const paramsSlice = createSlice({
       state.canvasCoherenceMinDenoise = action.payload;
     },
     paramsReset: (state) => resetState(state),
-  },
-  extraReducers(builder) {
-    builder.addCase(canvasSessionStarted, (state) => resetState(state));
   },
 });
 

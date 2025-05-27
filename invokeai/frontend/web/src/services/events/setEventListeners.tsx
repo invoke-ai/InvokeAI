@@ -30,7 +30,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from 'services/events
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent } from './stores';
+import { $lastCanvasProgressEvent, $lastProgressEvent } from './stores';
 
 const log = logger('events');
 
@@ -427,6 +427,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+
+      if (data.origin === 'canvas') {
+        $lastCanvasProgressEvent.set(null);
+      }
 
       // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
       const validationRunData = $validationRunData.get();
