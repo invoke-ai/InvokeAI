@@ -13,6 +13,7 @@ If you'd prefer, you can also just download the whole node folder from the linke
 To use a community workflow, download the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
+    + [Anamorphic Tools](#anamorphic-tools)
     + [Adapters-Linked](#adapters-linked-nodes)
     + [Autostereogram](#autostereogram-nodes)
     + [Average Images](#average-images)
@@ -20,9 +21,12 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [Close Color Mask](#close-color-mask) 
     + [Clothing Mask](#clothing-mask)
     + [Contrast Limited Adaptive Histogram Equalization](#contrast-limited-adaptive-histogram-equalization)
+    + [Curves](#curves)
     + [Depth Map from Wavefront OBJ](#depth-map-from-wavefront-obj)
     + [Enhance Detail](#enhance-detail)
     + [Film Grain](#film-grain)
+    + [Flip Pose](#flip-pose)
+    + [Flux Ideal Size](#flux-ideal-size)
     + [Generative Grammar-Based Prompt Nodes](#generative-grammar-based-prompt-nodes)
     + [GPT2RandomPromptMaker](#gpt2randompromptmaker)
     + [Grid to Gif](#grid-to-gif)
@@ -60,6 +64,13 @@ To use a community workflow, download the `.json` node graph file and load it in
 - [Disclaimer](#disclaimer)
 - [Help](#help)
 
+
+--------------------------------
+### Anamorphic Tools
+
+**Description:** A set of nodes to perform anamorphic modifications to images, like lens blur, streaks, spherical distortion, and vignetting.
+
+**Node Link:** https://github.com/JPPhoto/anamorphic-tools
 
 --------------------------------
 ### Adapters Linked Nodes
@@ -133,6 +144,13 @@ View:
 </br><img src="https://raw.githubusercontent.com/VeyDlin/clahe-node/master/.readme/node.png" width="500" />
 
 --------------------------------
+### Curves
+
+**Description:** Adjust an image's curve based on a user-defined string.
+
+**Node Link:** https://github.com/JPPhoto/curves-node
+
+--------------------------------
 ### Depth Map from Wavefront OBJ
 
 **Description:** Render depth maps from Wavefront .obj files (triangulated) using this simple 3D renderer utilizing numpy and matplotlib to compute and color the scene. There are simple parameters to change the FOV, camera position, and model orientation.
@@ -161,6 +179,20 @@ To be imported, an .obj must use triangulated meshes, so make sure to enable tha
 **Description:** This node adds a film grain effect to the input image based on the weights, seeds, and blur radii parameters. It works with RGB input images only.
 
 **Node Link:** https://github.com/JPPhoto/film-grain-node
+
+--------------------------------
+### Flip Pose
+
+**Description:** This node will flip an openpose image horizontally, recoloring it to make sure that it isn't facing the wrong direction. Note that it does not work with openpose hands.
+
+**Node Link:** https://github.com/JPPhoto/flip-pose-node
+
+--------------------------------
+### Flux Ideal Size
+
+**Description:** This node returns an ideal size to use for the first stage of a Flux image generation pipeline. Generating at the right size helps limit duplication and odd subject placement.
+
+**Node Link:** https://github.com/JPPhoto/flux-ideal-size
 
 --------------------------------
 ### Generative Grammar-Based Prompt Nodes
