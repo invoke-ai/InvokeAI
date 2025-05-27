@@ -38,6 +38,10 @@ echo -e "${BGREEN}HEAD${RESET}:"
 git_show HEAD
 echo
 
+echo "Checking pyproject classifiers..."
+python3 ./check_classifiers.py ../pyproject.toml
+echo
+
 # ---------------------- FRONTEND ----------------------
 
 pushd ../invokeai/frontend/web >/dev/null
