@@ -6,7 +6,7 @@ import type { Coordinate, Dimensions, Rect, StageAttrs } from 'features/controlL
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 
 type CanvasStageModuleConfig = {
@@ -65,6 +65,7 @@ export class CanvasStageModule extends CanvasModuleBase {
     height: 0,
     scale: 0,
   });
+  $scale = computed(this.$stageAttrs, (attrs) => attrs.scale);
 
   subscriptions = new Set<() => void>();
   resizeObserver: ResizeObserver | null = null;
