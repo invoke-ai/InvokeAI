@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   $shift,
   CompositeSlider,
@@ -16,7 +17,6 @@ import { useStore } from '@nanostores/react';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { snapToNearest } from 'features/controlLayers/konva/util';
 import { round } from 'lodash-es';
-import { computed } from 'nanostores';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { PiCaretDownBold, PiMagnifyingGlassMinusBold, PiMagnifyingGlassPlusBold } from 'react-icons/pi';
@@ -68,9 +68,16 @@ const sliderDefaultValue = mapRawValueToSliderValue(100);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
+const inputFieldSx = {
+  paddingInlineEnd: 7,
+  _focusVisible: {
+    zIndex: 0,
+  },
+} satisfies SystemStyleObject;
+
 export const CanvasToolbarScale = memo(() => {
   const canvasManager = useCanvasManager();
-  const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
+  const scale = useStore(canvasManager.stage.$scale);
   const [localScale, setLocalScale] = useState(scale * 100);
 
   const onChangeSlider = useCallback(
@@ -132,7 +139,7 @@ export const CanvasToolbarScale = memo(() => {
             onKeyDown={onKeyDown}
             clampValueOnBlur={false}
           >
-            <NumberInputField paddingInlineEnd={7} title="" _focusVisible={{ zIndex: 0 }} />
+            <NumberInputField title="" sx={inputFieldSx} />
             <PopoverTrigger>
               <IconButton
                 aria-label="open-slider"
@@ -171,16 +178,17 @@ CanvasToolbarScale.displayName = 'CanvasToolbarScale';
 
 const SCALE_SNAPS = [0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 5, 7.5, 10, 15, 20];
 
-const ZoomOutButton = () => {
+const ZoomOutButton = memo(() => {
   const canvasManager = useCanvasManager();
-  const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
+  const scale = useStore(canvasManager.stage.$scale);
   const onClick = useCallback(() => {
+    const scale = canvasManager.stage.$scale.get();
     const nextScale =
       SCALE_SNAPS.slice()
         .reverse()
         .find((snap) => snap < scale) ?? canvasManager.stage.config.MIN_SCALE;
     canvasManager.stage.setScale(Math.max(nextScale, canvasManager.stage.config.MIN_SCALE));
-  }, [canvasManager.stage, scale]);
+  }, [canvasManager.stage]);
 
   return (
     <IconButton
@@ -192,15 +200,17 @@ const ZoomOutButton = () => {
       isDisabled={scale <= canvasManager.stage.config.MIN_SCALE}
     />
   );
-};
+});
+ZoomOutButton.displayName = 'ZoomOutButton';
 
-const ZoomInButton = () => {
+const ZoomInButton = memo(() => {
   const canvasManager = useCanvasManager();
-  const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
+  const scale = useStore(canvasManager.stage.$scale);
   const onClick = useCallback(() => {
+    const scale = canvasManager.stage.$scale.get();
     const nextScale = SCALE_SNAPS.find((snap) => snap > scale) ?? canvasManager.stage.config.MAX_SCALE;
     canvasManager.stage.setScale(Math.min(nextScale, canvasManager.stage.config.MAX_SCALE));
-  }, [canvasManager.stage, scale]);
+  }, [canvasManager.stage]);
 
   return (
     <IconButton
@@ -212,4 +222,5 @@ const ZoomInButton = () => {
       isDisabled={scale >= canvasManager.stage.config.MAX_SCALE}
     />
   );
-};
+});
+ZoomInButton.displayName = 'ZoomInButton';
