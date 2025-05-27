@@ -69,7 +69,7 @@ jobs:
 
       - name: check pypi classifiers
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv run scripts/check_classifiers.py ./pyproject.toml
+        run: uv run --no-project scripts/check_classifiers.py ./pyproject.toml
 
       - name: ruff check
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
