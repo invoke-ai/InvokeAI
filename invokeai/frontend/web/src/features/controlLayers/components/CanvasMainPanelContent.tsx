@@ -29,23 +29,17 @@ import {
   selectStagedImageIndex,
   selectStagedImages,
   stagingAreaImageSelected,
-  stagingAreaImageStaged,
   stagingAreaNextStagedImageSelected,
   stagingAreaPrevStagedImageSelected,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { isImageField, type ProgressImage } from 'features/nodes/types/common';
-import { isCanvasOutputEvent } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { Atom } from 'nanostores';
-import { atom } from 'nanostores';
-import { memo, useCallback, useEffect, useState } from 'react';
-import { flushSync } from 'react-dom';
+import type { ProgressImage } from 'features/nodes/types/common';
+import { memo, useCallback, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
-import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
-import { $socket } from 'services/events/stores';
+import { $lastCanvasProgressImage, $socket } from 'services/events/stores';
 import type { Equals } from 'tsafe';
-import { assert, objectEntries } from 'tsafe';
+import { assert } from 'tsafe';
 
 import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvocationProgress';
 
@@ -131,53 +125,14 @@ const SimpleActiveSession = memo(() => {
   const dispatch = useAppDispatch();
   const isStaging = useAppSelector(selectIsStaging);
   const socket = useStore($socket);
-  const [$progressImage] = useState(() => atom<EphemeralProgressImage | null>(null));
 
   useEffect(() => {
     if (!socket) {
       return;
     }
-    const onInvocationProgress = (event: S['InvocationProgressEvent']) => {
-      if (!event) {
-        return;
-      }
-      if (event.origin !== 'canvas') {
-        return;
-      }
-      if (!event.image) {
-        return;
-      }
-      $progressImage.set({ sessionId: event.session_id, image: event.image });
-    };
-    const onInvocationComplete = async (event: S['InvocationCompleteEvent']) => {
-      const progressImage = $progressImage.get();
-      if (!progressImage) {
-        return;
-      }
-      if (progressImage.sessionId !== event.session_id) {
-        return;
-      }
-      if (!isCanvasOutputEvent(event)) {
-        return;
-      }
-      let imageDTO: ImageDTO | null = null;
-      for (const [_name, value] of objectEntries(event.result)) {
-        if (isImageField(value)) {
-          imageDTO = await getImageDTOSafe(value.image_name);
-          break;
-        }
-      }
-      if (!imageDTO) {
-        return;
-      }
-      flushSync(() => {
-        dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-      });
-      $progressImage.set(null);
-    };
 
     const onQueueItemStatusChanged = (event: S['QueueItemStatusChangedEvent']) => {
-      const progressImage = $progressImage.get();
+      const progressImage = $lastCanvasProgressImage.get();
       if (!progressImage) {
         return;
       }
@@ -187,20 +142,16 @@ const SimpleActiveSession = memo(() => {
       if (event.status !== 'canceled' && event.status !== 'failed') {
         return;
       }
-      $progressImage.set(null);
+      $lastCanvasProgressImage.set(null);
     };
     console.log('SUB session preview image listeners');
-    socket.on('invocation_progress', onInvocationProgress);
-    socket.on('invocation_complete', onInvocationComplete);
     socket.on('queue_item_status_changed', onQueueItemStatusChanged);
 
     return () => {
       console.log('UNSUB session preview image listeners');
-      socket.off('invocation_progress', onInvocationProgress);
-      socket.off('invocation_complete', onInvocationComplete);
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [$progressImage, dispatch, socket]);
+  }, [dispatch, socket]);
 
   const onReset = useCallback(() => {
     dispatch(canvasReset());
@@ -226,15 +177,15 @@ const SimpleActiveSession = memo(() => {
         </Text>
         <Button onClick={onReset}>reset</Button>
       </Flex>
-      <SelectedImage $progressImage={$progressImage} />
+      <SelectedImage />
       <SessionImages />
     </Flex>
   );
 });
 SimpleActiveSession.displayName = 'SimpleActiveSession';
 
-const SelectedImage = memo(({ $progressImage }: { $progressImage: Atom<EphemeralProgressImage | null> }) => {
-  const progressImage = useStore($progressImage);
+const SelectedImage = memo(() => {
+  const progressImage = useStore($lastCanvasProgressImage);
   const selectedImage = useAppSelector(selectSelectedImage);
 
   if (progressImage) {
