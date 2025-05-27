@@ -122,7 +122,7 @@ export const CanvasToolbarScale = memo(() => {
   return (
     <Flex alignItems="center">
       <ZoomOutButton />
-      <Popover>
+      <Popover isLazy lazyBehavior="unmount">
         <PopoverAnchor>
           <NumberInput
             variant="outline"
