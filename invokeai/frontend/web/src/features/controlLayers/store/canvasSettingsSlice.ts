@@ -1,7 +1,6 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { newAdvancedCanvasSessionRequested, newSimpleCanvasSessionRequested } from 'features/controlLayers/store/actions';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
 type CanvasSettingsState = {
@@ -34,11 +33,6 @@ type CanvasSettingsState = {
    * The color to use when drawing lines or filling shapes.
    */
   color: RgbaColor;
-  /**
-   * Whether to send generated images to canvas staging area. When disabled, generated images will be sent directly to
-   * the gallery.
-   */
-  sendToCanvas: boolean;
   /**
    * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
    *
@@ -89,7 +83,6 @@ const initialState: CanvasSettingsState = {
   eraserWidth: 50,
   invertScrollForToolWidth: false,
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
-  sendToCanvas: false,
   outputOnlyMaskedRegions: true,
   autoProcess: true,
   snapToGrid: true,
@@ -126,9 +119,6 @@ export const canvasSettingsSlice = createSlice({
     settingsInvertScrollForToolWidthChanged: (state, action: PayloadAction<boolean>) => {
       state.invertScrollForToolWidth = action.payload;
     },
-    settingsSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
-      state.sendToCanvas = action.payload;
-    },
     settingsOutputOnlyMaskedRegionsToggled: (state) => {
       state.outputOnlyMaskedRegions = !state.outputOnlyMaskedRegions;
     },
@@ -157,14 +147,6 @@ export const canvasSettingsSlice = createSlice({
       state.pressureSensitivity = !state.pressureSensitivity;
     },
   },
-  extraReducers(builder) {
-    builder.addCase(newSimpleCanvasSessionRequested, (state) => {
-      state.sendToCanvas = false;
-    });
-    builder.addCase(newAdvancedCanvasSessionRequested, (state) => {
-      state.sendToCanvas = true;
-    });
-  },
 });
 
 export const {
@@ -175,7 +157,6 @@ export const {
   settingsEraserWidthChanged,
   settingsColorChanged,
   settingsInvertScrollForToolWidthChanged,
-  settingsSendToCanvasChanged,
   settingsOutputOnlyMaskedRegionsToggled,
   settingsAutoProcessToggled,
   settingsSnapToGridToggled,
@@ -212,7 +193,6 @@ export const selectBboxOverlay = createCanvasSettingsSelector((settings) => sett
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
 export const selectAutoProcess = createCanvasSettingsSelector((settings) => settings.autoProcess);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
-export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
 export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
   (canvasSettings) => canvasSettings.showProgressOnCanvas
 );
