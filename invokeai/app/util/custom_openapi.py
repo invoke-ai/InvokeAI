@@ -12,6 +12,9 @@ from invokeai.app.invocations.fields import InputFieldJSONSchemaExtra, OutputFie
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.events.events_common import EventBase
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger()
 
 
 def move_defs_to_top_level(openapi_schema: dict[str, Any], component_schema: dict[str, Any]) -> None:
@@ -84,6 +87,12 @@ def get_openapi_func(
             invocation_type = invocation.get_type()
             invocation_output_map_properties[invocation_type] = json_schema["output"]
             invocation_output_map_required.append(invocation_type)
+
+            output_annotation = invocation.get_output_annotation()
+            if output_annotation not in InvocationRegistry.get_output_classes():
+                logger.warning(
+                    f'Invocation "{invocation_type}"\' has unregistered output class {output_annotation.__name__} (did you forget @invocation_output?)'
+                )
 
         # Add the output map to the schema
         openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
