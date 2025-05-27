@@ -19,9 +19,10 @@ import { StagingAreaToolbar } from 'features/controlLayers/components/StagingAre
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { canvasReset, newAdvancedCanvasSessionRequested } from 'features/controlLayers/store/actions';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
+  canvasSessionStarted,
   selectCanvasSessionType,
   selectIsStaging,
   selectSelectedImage,
@@ -88,7 +89,7 @@ CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
 const NoActiveSession = memo(() => {
   const dispatch = useAppDispatch();
   const newSesh = useCallback(() => {
-    dispatch(newAdvancedCanvasSessionRequested());
+    dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
   }, [dispatch]);
   return (
     <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
