@@ -241,11 +241,7 @@ export class CanvasStageModule extends CanvasModuleBase {
    * Constrains a scale to be within the valid range
    */
   constrainScale = (scale: number): number => {
-    // Round to 2 decimal places to avoid floating point precision issues
-    const rounded = Math.round(scale * 100) / 100;
-    const clamped = clamp(rounded, this.config.MIN_SCALE, this.config.MAX_SCALE);
-
-    return clamped;
+    return clamp(scale, this.config.MIN_SCALE, this.config.MAX_SCALE);
   };
 
   /**
@@ -264,8 +260,8 @@ export class CanvasStageModule extends CanvasModuleBase {
     const deltaX = (_center.x - x) / oldScale;
     const deltaY = (_center.y - y) / oldScale;
 
-    const newX = Math.floor(_center.x - deltaX * newScale);
-    const newY = Math.floor(_center.y - deltaY * newScale);
+    const newX = _center.x - deltaX * newScale;
+    const newY = _center.y - deltaY * newScale;
 
     this.konva.stage.setAttrs({
       x: newX,
