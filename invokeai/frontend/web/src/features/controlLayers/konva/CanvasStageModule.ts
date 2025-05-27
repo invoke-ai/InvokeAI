@@ -26,6 +26,14 @@ type CanvasStageModuleConfig = {
    * The padding in pixels to use when fitting the layers to the stage.
    */
   FIT_LAYERS_TO_STAGE_PADDING_PX: number;
+  /**
+   * The snap points for the scale of the canvas.
+   */
+  SCALE_SNAP_POINTS: number[];
+  /**
+   * The tolerance for snapping the scale of the canvas, as a fraction of the scale.
+   */
+  SCALE_SNAP_TOLERANCE: number;
 };
 
 const DEFAULT_CONFIG: CanvasStageModuleConfig = {
@@ -33,6 +41,8 @@ const DEFAULT_CONFIG: CanvasStageModuleConfig = {
   MAX_SCALE: 20,
   SCALE_FACTOR: 0.9995,
   FIT_LAYERS_TO_STAGE_PADDING_PX: 48,
+  SCALE_SNAP_POINTS: [0.25, 0.5, 0.75, 1.5, 2, 3, 4, 5],
+  SCALE_SNAP_TOLERANCE: 0.05,
 };
 
 export class CanvasStageModule extends CanvasModuleBase {
@@ -234,19 +244,6 @@ export class CanvasStageModule extends CanvasModuleBase {
     const rounded = Math.round(scale * 100) / 100;
     const clamped = clamp(rounded, this.config.MIN_SCALE, this.config.MAX_SCALE);
 
-    // Snap to 100% (scale = 1.0) with a more generous tolerance
-    if (Math.abs(clamped - 1) < 0.05) {
-      return 1;
-    }
-
-    // Snap to other common zoom levels for better UX
-    const commonScales = [0.25, 0.5, 0.75, 1.5, 2, 3, 4, 5];
-    for (const commonScale of commonScales) {
-      if (Math.abs(clamped - commonScale) < 0.03) {
-        return commonScale;
-      }
-    }
-
     return clamped;
   };
 
@@ -255,18 +252,19 @@ export class CanvasStageModule extends CanvasModuleBase {
    * @param scale The new scale to set
    * @param center The center of the stage to zoom in/out on
    */
-  setScale = (scale: number, center: Coordinate = this.getCenter(true)): void => {
+  setScale = (scale: number, center?: Coordinate): void => {
     this.log.trace('Setting scale');
+    const _center = center ?? this.getCenter(true);
     const newScale = this.constrainScale(scale);
 
     const { x, y } = this.getPosition();
     const oldScale = this.getScale();
 
-    const deltaX = (center.x - x) / oldScale;
-    const deltaY = (center.y - y) / oldScale;
+    const deltaX = (_center.x - x) / oldScale;
+    const deltaY = (_center.y - y) / oldScale;
 
-    const newX = Math.floor(center.x - deltaX * newScale);
-    const newY = Math.floor(center.y - deltaY * newScale);
+    const newX = Math.floor(_center.x - deltaX * newScale);
+    const newY = Math.floor(_center.y - deltaY * newScale);
 
     this.konva.stage.setAttrs({
       x: newX,
@@ -288,12 +286,14 @@ export class CanvasStageModule extends CanvasModuleBase {
     // We need the absolute cursor position - not the scaled position
     const cursorPos = this.konva.stage.getPointerPosition();
 
-    if (cursorPos) {
-      // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
-      const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
-      const scale = this.manager.stage.getScale() * this.config.SCALE_FACTOR ** delta;
-      this.manager.stage.setScale(scale, cursorPos);
+    if (!cursorPos) {
+      return;
     }
+
+    // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
+    const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
+    const scale = this.manager.stage.getScale() * this.config.SCALE_FACTOR ** delta;
+    this.manager.stage.setScale(scale, cursorPos);
   };
 
   onStagePointerDown = (e: KonvaEventObject<PointerEvent>) => {
