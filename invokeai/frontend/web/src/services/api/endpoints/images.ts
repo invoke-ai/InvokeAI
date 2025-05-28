@@ -270,11 +270,14 @@ export const imagesApi = api.injectEndpoints({
       },
     }),
     uploadImage: build.mutation<ImageDTO, UploadImageArg>({
-      query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
+      query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata, resize_to }) => {
         const formData = new FormData();
         formData.append('file', file);
         if (metadata) {
           formData.append('metadata', JSON.stringify(metadata));
+        }
+        if (resize_to) {
+          formData.append('resize_to', JSON.stringify(resize_to));
         }
         return {
           url: buildImagesUrl('upload'),
