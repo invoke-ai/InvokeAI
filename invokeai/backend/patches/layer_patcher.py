@@ -1,3 +1,4 @@
+import re
 from contextlib import contextmanager
 from typing import Dict, Iterable, Optional, Tuple
 
@@ -7,6 +8,7 @@ from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
+from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
@@ -23,6 +25,7 @@ class LayerPatcher:
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
         force_direct_patching: bool = False,
         force_sidecar_patching: bool = False,
+        suppress_warning_layers: Optional[re.Pattern] = None,
     ):
         """Apply 'smart' model patching that chooses whether to use direct patching or a sidecar wrapper for each
         module.
@@ -44,6 +47,7 @@ class LayerPatcher:
                     dtype=dtype,
                     force_direct_patching=force_direct_patching,
                     force_sidecar_patching=force_sidecar_patching,
+                    suppress_warning_layers=suppress_warning_layers,
                 )
 
             yield
@@ -70,6 +74,7 @@ class LayerPatcher:
         dtype: torch.dtype,
         force_direct_patching: bool,
         force_sidecar_patching: bool,
+        suppress_warning_layers: Optional[re.Pattern] = None,
     ):
         """Apply a single LoRA patch to a model using the 'smart' patching strategy that chooses whether to use direct
         patching or a sidecar wrapper for each module.
@@ -89,9 +94,17 @@ class LayerPatcher:
             if not layer_key.startswith(prefix):
                 continue
 
-            module_key, module = LayerPatcher._get_submodule(
-                model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
-            )
+            try:
+                module_key, module = LayerPatcher._get_submodule(
+                    model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
+                )
+            except AttributeError:
+                if suppress_warning_layers and suppress_warning_layers.search(layer_key):
+                    pass
+                else:
+                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                    logger.warning("Failed to find module for LoRA layer key: %s", layer_key)
+                continue
 
             # Decide whether to use direct patching or a sidecar patch.
             # Direct patching is preferred, because it results in better runtime speed.
