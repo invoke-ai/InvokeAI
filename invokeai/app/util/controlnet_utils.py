@@ -290,7 +290,8 @@ def heuristic_resize_fast(np_img: np.ndarray, size: tuple[int, int]) -> np.ndarr
 
         # threshold and skeletonize to recover clean single-pixel edges
         _, bw = cv2.threshold(nms, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        skel = cv2.ximgproc.thinning(bw)
+        # thinningType: 0=Zhang-Suen, 1=Guo-Hall
+        skel = cv2.ximgproc.thinning(bw, thinningType=1)
         out = cv2.cvtColor(skel, cv2.COLOR_GRAY2BGR)
 
     elif gray_img:
