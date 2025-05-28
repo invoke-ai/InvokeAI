@@ -230,7 +230,9 @@ def heuristic_resize(np_img: np.ndarray[Any, Any], size: tuple[int, int]) -> np.
     return resized
 
 
-# Kernels that preserve local maxima in horizontal, vertical, and diagonal directions
+# precompute common kernels
+_KERNEL3 = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+# directional masks for NMS
 _DIRS = [
     np.array([[0, 0, 0], [1, 1, 1], [0, 0, 0]], np.uint8),
     np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]], np.uint8),
@@ -241,76 +243,71 @@ _DIRS = [
 
 def heuristic_resize_fast(np_img: np.ndarray, size: tuple[int, int]) -> np.ndarray:
     h, w = np_img.shape[:2]
-    # return immediately if already at target size
+    # early exit
     if (w, h) == size:
         return np_img
 
-    # separate alpha channel so we can resize color and mask independently
+    # separate alpha channel
     img = np_img
     alpha = None
     if img.ndim == 3 and img.shape[2] == 4:
         alpha, img = img[:, :, 3], img[:, :, :3]
 
-    # include corner pixels plus random subset for reliable type detection
-    flat = img.reshape(-1, img.shape[-1] if img.ndim == 3 else 1)
+    # build small sample for unique‐color & binary detection
+    flat = img.reshape(-1, img.shape[-1])
     N = flat.shape[0]
-    corners = np.array([img[0, 0], img[0, w - 1], img[h - 1, 0], img[h - 1, w - 1]]).reshape(-1, flat.shape[1])
-    idx = np.random.choice(N, min(N, 100_000), replace=False)
-    samp = np.vstack((corners, flat[idx]))
+    # include four corners to avoid missing extreme values
+    corners = np.vstack([img[0, 0], img[0, w - 1], img[h - 1, 0], img[h - 1, w - 1]])
+    cnt = min(N, 100_000)
+    samp = np.vstack([corners, flat[np.random.choice(N, cnt, replace=False)]])
     uc = np.unique(samp, axis=0).shape[0]
     vmin, vmax = samp.min(), samp.max()
 
-    # determine image type for best resizing strategy
-    is_bin = uc == 2 and vmin < 16 and vmax > 240
-    gray_img = (img.ndim == 2) or (
-        img.ndim == 3 and np.all(samp[:, 0] == samp[:, 1]) and np.all(samp[:, 1] == samp[:, 2])
-    )
-    is_seg = 2 < uc < 200
+    # detect binary edge map & one‐pixel‐edge case
+    is_binary = uc == 2 and vmin < 16 and vmax > 240
+    one_pixel_edge = False
+    if is_binary:
+        # single gray conversion
+        gray0 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        grad = cv2.morphologyEx(gray0, cv2.MORPH_GRADIENT, _KERNEL3)
+        cnt_edge = cv2.countNonZero(grad)
+        cnt_all = cv2.countNonZero((gray0 > 127).astype(np.uint8))
+        one_pixel_edge = (2 * cnt_edge) > cnt_all
 
-    # choose interpolation: nearest for segmentation, area for down, cubic for up
+    # choose interp for color/seg/grayscale
     area_new, area_old = size[0] * size[1], w * h
-    if is_seg:
+    if 2 < uc < 200:  # segmentation map
         interp = cv2.INTER_NEAREST
     elif area_new < area_old:
         interp = cv2.INTER_AREA
     else:
         interp = cv2.INTER_CUBIC
 
-    if is_bin:
-        # use cubic to minimize aliasing on diagonal edges
-        tmp = cv2.resize(img, size, interpolation=cv2.INTER_CUBIC)
-        gray0 = cv2.cvtColor(tmp, cv2.COLOR_BGR2GRAY)
+    # single resize pass on RGB
+    resized = cv2.resize(img, size, interpolation=interp)
 
-        # directional non-maximum suppression to keep only true edge pixels
-        nms = np.zeros_like(gray0)
+    if is_binary:
+        # convert to gray & apply NMS via C++ dilate
+        gray_r = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+        nms = np.zeros_like(gray_r)
         for K in _DIRS:
-            d = cv2.dilate(gray0, K)
-            mask = d == gray0
-            nms[mask] = gray0[mask]
+            d = cv2.dilate(gray_r, K)
+            mask = d == gray_r
+            nms[mask] = gray_r[mask]
 
-        # threshold and skeletonize to recover clean single-pixel edges
+        # threshold + thinning if needed
         _, bw = cv2.threshold(nms, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        # thinningType: 0=Zhang-Suen, 1=Guo-Hall
-        skel = cv2.ximgproc.thinning(bw, thinningType=1)
-        out = cv2.cvtColor(skel, cv2.COLOR_GRAY2BGR)
+        out_bin = cv2.ximgproc.thinning(bw) if one_pixel_edge else bw
+        # restore 3 channels
+        resized = np.stack([out_bin] * 3, axis=2)
 
-    elif gray_img:
-        # keep operations in one channel to preserve intensity exactly
-        gray0 = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        rz = cv2.resize(gray0, size, interpolation=interp)
-        out = cv2.cvtColor(rz, cv2.COLOR_GRAY2BGR)
-
-    else:
-        # color image or segmentation: straightforward resize
-        out = cv2.resize(img, size, interpolation=interp)
-
-    # restore alpha mask using the same interpolation for consistency
+    # restore alpha with same interp as RGB for consistency
     if alpha is not None:
         am = cv2.resize(alpha, size, interpolation=interp)
         am = (am > 127).astype(np.uint8) * 255
-        out = np.dstack((out, am))
+        resized = np.dstack((resized, am))
 
-    return out
+    return resized
 
 
 ###########################################################################
