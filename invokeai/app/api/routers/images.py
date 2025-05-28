@@ -1,7 +1,6 @@
 import io
 import json
 import traceback
-from time import time
 from typing import Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
@@ -92,11 +91,9 @@ async def upload_image(
             raise HTTPException(status_code=400, detail="Invalid resize_to format")
 
         try:
-            start_time = time()
             np_image = pil_to_np(pil_image)
             np_image = heuristic_resize_fast(np_image, (resize_dims.width, resize_dims.height))
             pil_image = np_to_pil(np_image)
-            print("resize took seconds: ", time() - start_time)
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to resize image")
 
