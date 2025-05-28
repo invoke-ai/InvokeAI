@@ -22,7 +22,11 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, heuristic_resize
+from invokeai.app.util.controlnet_utils import (
+    CONTROLNET_MODE_VALUES,
+    CONTROLNET_RESIZE_VALUES,
+    heuristic_resize_fast,
+)
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 
 
@@ -109,7 +113,7 @@ class ControlNetInvocation(BaseInvocation):
     title="Heuristic Resize",
     tags=["image, controlnet"],
     category="image",
-    version="1.0.1",
+    version="1.1.1",
     classification=Classification.Prototype,
 )
 class HeuristicResizeInvocation(BaseInvocation):
@@ -122,7 +126,7 @@ class HeuristicResizeInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
         np_img = pil_to_np(image)
-        np_resized = heuristic_resize(np_img, (self.width, self.height))
+        np_resized = heuristic_resize_fast(np_img, (self.width, self.height))
         resized = np_to_pil(np_resized)
         image_dto = context.images.save(image=resized)
         return ImageOutput.build(image_dto)

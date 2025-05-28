@@ -230,6 +230,88 @@ def heuristic_resize(np_img: np.ndarray[Any, Any], size: tuple[int, int]) -> np.
     return resized
 
 
+# Kernels that preserve local maxima in horizontal, vertical, and diagonal directions
+_DIRS = [
+    np.array([[0, 0, 0], [1, 1, 1], [0, 0, 0]], np.uint8),
+    np.array([[0, 1, 0], [0, 1, 0], [0, 1, 0]], np.uint8),
+    np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], np.uint8),
+    np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]], np.uint8),
+]
+
+
+def heuristic_resize_fast(np_img: np.ndarray, size: tuple[int, int]) -> np.ndarray:
+    h, w = np_img.shape[:2]
+    # return immediately if already at target size
+    if (w, h) == size:
+        return np_img
+
+    # separate alpha channel so we can resize color and mask independently
+    img = np_img
+    alpha = None
+    if img.ndim == 3 and img.shape[2] == 4:
+        alpha, img = img[:, :, 3], img[:, :, :3]
+
+    # include corner pixels plus random subset for reliable type detection
+    flat = img.reshape(-1, img.shape[-1] if img.ndim == 3 else 1)
+    N = flat.shape[0]
+    corners = np.array([img[0, 0], img[0, w - 1], img[h - 1, 0], img[h - 1, w - 1]]).reshape(-1, flat.shape[1])
+    idx = np.random.choice(N, min(N, 100_000), replace=False)
+    samp = np.vstack((corners, flat[idx]))
+    uc = np.unique(samp, axis=0).shape[0]
+    vmin, vmax = samp.min(), samp.max()
+
+    # determine image type for best resizing strategy
+    is_bin = uc == 2 and vmin < 16 and vmax > 240
+    gray_img = (img.ndim == 2) or (
+        img.ndim == 3 and np.all(samp[:, 0] == samp[:, 1]) and np.all(samp[:, 1] == samp[:, 2])
+    )
+    is_seg = 2 < uc < 200
+
+    # choose interpolation: nearest for segmentation, area for down, cubic for up
+    area_new, area_old = size[0] * size[1], w * h
+    if is_seg:
+        interp = cv2.INTER_NEAREST
+    elif area_new < area_old:
+        interp = cv2.INTER_AREA
+    else:
+        interp = cv2.INTER_CUBIC
+
+    if is_bin:
+        # use cubic to minimize aliasing on diagonal edges
+        tmp = cv2.resize(img, size, interpolation=cv2.INTER_CUBIC)
+        gray0 = cv2.cvtColor(tmp, cv2.COLOR_BGR2GRAY)
+
+        # directional non-maximum suppression to keep only true edge pixels
+        nms = np.zeros_like(gray0)
+        for K in _DIRS:
+            d = cv2.dilate(gray0, K)
+            mask = d == gray0
+            nms[mask] = gray0[mask]
+
+        # threshold and skeletonize to recover clean single-pixel edges
+        _, bw = cv2.threshold(nms, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        skel = cv2.ximgproc.thinning(bw)
+        out = cv2.cvtColor(skel, cv2.COLOR_GRAY2BGR)
+
+    elif gray_img:
+        # keep operations in one channel to preserve intensity exactly
+        gray0 = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        rz = cv2.resize(gray0, size, interpolation=interp)
+        out = cv2.cvtColor(rz, cv2.COLOR_GRAY2BGR)
+
+    else:
+        # color image or segmentation: straightforward resize
+        out = cv2.resize(img, size, interpolation=interp)
+
+    # restore alpha mask using the same interpolation for consistency
+    if alpha is not None:
+        am = cv2.resize(alpha, size, interpolation=interp)
+        am = (am > 127).astype(np.uint8) * 255
+        out = np.dstack((out, am))
+
+    return out
+
+
 ###########################################################################
 # Copied from detectmap_proc method in scripts/detectmap_proc.py in Mikubill/sd-webui-controlnet
 #    modified for InvokeAI
@@ -244,7 +326,7 @@ def np_img_resize(
     np_img = normalize_image_channel_count(np_img)
 
     if resize_mode == "just_resize":  # RESIZE
-        np_img = heuristic_resize(np_img, (w, h))
+        np_img = heuristic_resize_fast(np_img, (w, h))
         np_img = clone_contiguous(np_img)
         return np_img_to_torch(np_img, device), np_img
 
@@ -265,7 +347,7 @@ def np_img_resize(
             # Inpaint hijack
             high_quality_border_color[3] = 255
         high_quality_background = np.tile(high_quality_border_color[None, None], [h, w, 1])
-        np_img = heuristic_resize(np_img, (safeint(old_w * k), safeint(old_h * k)))
+        np_img = heuristic_resize_fast(np_img, (safeint(old_w * k), safeint(old_h * k)))
         new_h, new_w, _ = np_img.shape
         pad_h = max(0, (h - new_h) // 2)
         pad_w = max(0, (w - new_w) // 2)
@@ -275,7 +357,7 @@ def np_img_resize(
         return np_img_to_torch(np_img, device), np_img
     else:  # resize_mode == "crop_resize"  (INNER_FIT)
         k = max(k0, k1)
-        np_img = heuristic_resize(np_img, (safeint(old_w * k), safeint(old_h * k)))
+        np_img = heuristic_resize_fast(np_img, (safeint(old_w * k), safeint(old_h * k)))
         new_h, new_w, _ = np_img.shape
         pad_h = max(0, (new_h - h) // 2)
         pad_w = max(0, (new_w - w) // 2)
