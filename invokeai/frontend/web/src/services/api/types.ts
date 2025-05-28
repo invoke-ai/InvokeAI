@@ -1,3 +1,4 @@
+import type { Dimensions } from 'features/controlLayers/store/types';
 import type { components, paths } from 'services/api/schema';
 import type { JsonObject, SetRequired } from 'type-fest';
 
@@ -373,6 +374,10 @@ export type UploadImageArg = {
    * Whether this is the first upload of a batch (used when displaying user feedback with toasts - ignored if the upload is silent)
    */
   isFirstUploadOfBatch?: boolean;
+  /**
+   * If provided, the uploaded image will resized to the given dimensions.
+   */
+  resize_to?: Dimensions;
 };
 
 export type ImageUploadEntryResponse = S['ImageUploadEntry'];
