@@ -19,9 +19,9 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusySafe();
 
-  const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
+  const onClickNewCanvasWithRasterLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
-    newCanvasFromImage({ imageDTO, withResize: false, type: 'raster_layer', dispatch, getState });
+    await newCanvasFromImage({ imageDTO, withResize: false, type: 'raster_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -31,9 +31,9 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, imageViewer, store, t]);
 
-  const onClickNewCanvasWithControlLayerFromImage = useCallback(() => {
+  const onClickNewCanvasWithControlLayerFromImage = useCallback(async () => {
     const { dispatch, getState } = store;
-    newCanvasFromImage({ imageDTO, withResize: false, type: 'control_layer', dispatch, getState });
+    await newCanvasFromImage({ imageDTO, withResize: false, type: 'control_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -43,9 +43,9 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, imageViewer, store, t]);
 
-  const onClickNewCanvasWithRasterLayerFromImageWithResize = useCallback(() => {
+  const onClickNewCanvasWithRasterLayerFromImageWithResize = useCallback(async () => {
     const { dispatch, getState } = store;
-    newCanvasFromImage({ imageDTO, withResize: true, type: 'raster_layer', dispatch, getState });
+    await newCanvasFromImage({ imageDTO, withResize: true, type: 'raster_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -55,9 +55,9 @@ export const ImageMenuItemNewCanvasFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, imageViewer, store, t]);
 
-  const onClickNewCanvasWithControlLayerFromImageWithResize = useCallback(() => {
+  const onClickNewCanvasWithControlLayerFromImageWithResize = useCallback(async () => {
     const { dispatch, getState } = store;
-    newCanvasFromImage({ imageDTO, withResize: true, type: 'control_layer', dispatch, getState });
+    await newCanvasFromImage({ imageDTO, withResize: true, type: 'control_layer', dispatch, getState });
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
