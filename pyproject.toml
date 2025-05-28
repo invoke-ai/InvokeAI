@@ -43,7 +43,7 @@ dependencies = [
   "numpy<2.0.0",
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
-  "opencv-python==4.9.0.80",
+  "opencv-contrib-python",
   "safetensors",
   "sentencepiece",
   "spandrel",
