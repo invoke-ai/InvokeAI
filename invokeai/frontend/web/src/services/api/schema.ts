@@ -2724,6 +2724,11 @@ export type components = {
              */
             file: Blob;
             /**
+             * Resize To
+             * @description Dimensions to resize the image to, must be stringified JSON array of 2 integers
+             */
+            resize_to?: string | null;
+            /**
              * Metadata
              * @description The metadata to associate with the image, must be a stringified JSON dict
              */
