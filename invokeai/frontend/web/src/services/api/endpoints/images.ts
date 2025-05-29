@@ -160,6 +160,42 @@ export const imagesApi = api.injectEndpoints({
         return [];
       },
     }),
+    deleteUncategorizedImages: build.mutation<components['schemas']['DeleteImagesFromListResult'], void>({
+      query: () => ({ url: buildImagesUrl('uncategorized'), method: 'DELETE' }),
+      invalidatesTags: (result) => {
+        if (result && result.deleted_images.length > 0) {
+          const boardId = 'none';
+
+          const tags: ApiTagDescription[] = [
+            {
+              type: 'ImageList',
+              id: getListImagesUrl({
+                board_id: boardId,
+                categories: IMAGE_CATEGORIES,
+              }),
+            },
+            {
+              type: 'ImageList',
+              id: getListImagesUrl({
+                board_id: boardId,
+                categories: ASSETS_CATEGORIES,
+              }),
+            },
+            {
+              type: 'Board',
+              id: boardId,
+            },
+            {
+              type: 'BoardImagesTotal',
+              id: boardId,
+            },
+          ];
+
+          return tags;
+        }
+        return [];
+      },
+    }),
     /**
      * Change an image's `is_intermediate` property.
      */
@@ -566,6 +602,7 @@ export const {
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
   useDeleteBoardAndImagesMutation,
+  useDeleteUncategorizedImagesMutation,
   useDeleteBoardMutation,
   useStarImagesMutation,
   useUnstarImagesMutation,

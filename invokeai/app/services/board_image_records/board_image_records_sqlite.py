@@ -98,9 +98,18 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 FROM images
                 LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1
+                """
+
+        # Handle board_id filter
+        if board_id == "none":
+            stmt += """--sql
+                AND board_images.board_id IS NULL
+                """
+        else:
+            stmt += """--sql
                 AND board_images.board_id = ?
                 """
-        params.append(board_id)
+            params.append(board_id)
 
         # Add the category filter
         if categories is not None:

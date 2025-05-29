@@ -7,8 +7,10 @@ import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiDownloadBold, PiPlusBold } from 'react-icons/pi';
+import { PiDownloadBold, PiPlusBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
+
+import { $boardToDelete } from './DeleteBoardModal';
 
 type Props = {
   children: ContextMenuProps<HTMLDivElement>['children'];
@@ -33,6 +35,10 @@ const NoBoardBoardContextMenu = ({ children }: Props) => {
     bulkDownload({ image_names: [], board_id: 'none' });
   }, [bulkDownload]);
 
+  const setUncategorizedImagesAsToBeDeleted = useCallback(() => {
+    $boardToDelete.set('none');
+  }, []);
+
   const renderMenuFunc = useCallback(
     () => (
       <MenuList visibility="visible">
@@ -47,10 +53,26 @@ const NoBoardBoardContextMenu = ({ children }: Props) => {
               {t('boards.downloadBoard')}
             </MenuItem>
           )}
+          <MenuItem
+            color="error.300"
+            icon={<PiTrashSimpleBold />}
+            onClick={setUncategorizedImagesAsToBeDeleted}
+            isDestructive
+          >
+            {t('boards.deleteAllUncategorizedImages')}
+          </MenuItem>
         </MenuGroup>
       </MenuList>
     ),
-    [autoAssignBoardOnClick, handleBulkDownload, handleSetAutoAdd, isBulkDownloadEnabled, isSelectedForAutoAdd, t]
+    [
+      autoAssignBoardOnClick,
+      handleBulkDownload,
+      handleSetAutoAdd,
+      isBulkDownloadEnabled,
+      isSelectedForAutoAdd,
+      t,
+      setUncategorizedImagesAsToBeDeleted,
+    ]
   );
 
   return <ContextMenu renderMenu={renderMenuFunc}>{children}</ContextMenu>;
