@@ -395,6 +395,29 @@ async def delete_images_from_list(
         raise HTTPException(status_code=500, detail="Failed to delete images")
 
 
+@images_router.delete(
+    "/uncategorized", operation_id="delete_uncategorized_images", response_model=DeleteImagesFromListResult
+)
+async def delete_uncategorized_images() -> DeleteImagesFromListResult:
+    """Deletes all images that are uncategorized"""
+
+    image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
+        board_id="none", categories=None, is_intermediate=None
+    )
+
+    try:
+        deleted_images: list[str] = []
+        for image_name in image_names:
+            try:
+                ApiDependencies.invoker.services.images.delete(image_name)
+                deleted_images.append(image_name)
+            except Exception:
+                pass
+        return DeleteImagesFromListResult(deleted_images=deleted_images)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to delete images")
+
+
 class ImagesUpdatedFromListResult(BaseModel):
     updated_image_names: list[str] = Field(description="The image names that were updated")
 
