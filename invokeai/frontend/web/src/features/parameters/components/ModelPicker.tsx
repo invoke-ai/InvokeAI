@@ -12,7 +12,8 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { $onClickGoToModelManager } from 'app/store/nanostores/onClickGoToModelManager';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { Group, PickerContextState } from 'common/components/Picker/Picker';
 import { buildGroup, getRegex, Picker, usePickerContext } from 'common/components/Picker/Picker';
 import { useDisclosure } from 'common/hooks/useBoolean';
@@ -22,6 +23,7 @@ import { BASE_COLOR_MAP } from 'features/modelManagerV2/subpanels/ModelManagerPa
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
 import { API_BASE_MODELS, MODEL_TYPE_MAP, MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
+import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -32,12 +34,23 @@ import type { AnyModelConfig, BaseModelType } from 'services/api/types';
 const getOptionId = (modelConfig: AnyModelConfig) => modelConfig.key;
 
 const ModelManagerLink = memo((props: ButtonProps) => {
+  const onClickGoToModelManager = useStore($onClickGoToModelManager);
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('models'));
     $installModelsTab.set(3);
   }, [dispatch]);
-  return <Button size="sm" flexGrow={0} variant="link" color="base.200" onClick={onClick} {...props} />;
+
+  return (
+    <Button
+      size="sm"
+      flexGrow={0}
+      variant="link"
+      color="base.200"
+      onClick={onClickGoToModelManager ?? onClick}
+      {...props}
+    />
+  );
 });
 ModelManagerLink.displayName = 'ModelManagerLink';
 
@@ -47,12 +60,17 @@ const components = {
 
 const NoOptionsFallback = memo(() => {
   const { t } = useTranslation();
+  const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
+  const onClickGoToModelManager = useStore($onClickGoToModelManager);
+
   return (
     <Flex flexDir="column" gap={4} alignItems="center">
       <Text color="base.200">{t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
-      <Text color="base.200">
-        <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
-      </Text>
+      {(!isModelsTabDisabled || onClickGoToModelManager) && (
+        <Text color="base.200">
+          <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
+        </Text>
+      )}
     </Flex>
   );
 });
