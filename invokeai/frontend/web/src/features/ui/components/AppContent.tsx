@@ -1,7 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
-import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightPanel';
+import { selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
@@ -161,11 +161,9 @@ AppContent.displayName = 'AppContent';
 
 const RightPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
+  const sessionType = useAppSelector(selectCanvasSessionType);
 
-  if (tab === 'canvas') {
-    return <CanvasRightPanel />;
-  }
-  if (tab === 'upscaling' || tab === 'workflows') {
+  if (tab === 'upscaling' || tab === 'workflows' || tab === 'canvas') {
     return <GalleryPanelContent />;
   }
 
