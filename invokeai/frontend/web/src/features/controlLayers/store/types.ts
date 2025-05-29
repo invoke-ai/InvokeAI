@@ -1,6 +1,7 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
+import type { ProgressImage} from 'features/nodes/types/common';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import {
@@ -422,10 +423,12 @@ export type LoRA = {
 };
 
 export type StagingAreaImage = {
+  sessionId: string;
   imageDTO: ImageDTO;
   offsetX: number;
   offsetY: number;
 };
+export type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
 export const zAspectRatioID = z.enum(['Free', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
 

@@ -1,8 +1,21 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Button, ContextMenu, Flex, IconButton, Image, Menu, MenuButton, MenuList, Text } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ContextMenu,
+  Flex,
+  Heading,
+  IconButton,
+  Image,
+  Menu,
+  MenuButton,
+  MenuList,
+  Text,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
 import { CanvasAlertsSendingToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
@@ -32,13 +45,17 @@ import {
   stagingAreaNextStagedImageSelected,
   stagingAreaPrevStagedImageSelected,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { newCanvasFromImage } from 'features/imageActions/actions';
 import type { ProgressImage } from 'features/nodes/types/common';
-import { memo, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
+import { Trans, useTranslation } from 'react-i18next';
+import { PiDotsThreeOutlineVerticalFill, PiUploadBold } from 'react-icons/pi';
 import type { ImageDTO, S } from 'services/api/types';
 import { $lastCanvasProgressImage, $socket } from 'services/events/stores';
-import type { Equals } from 'tsafe';
+import type { Equals, Param0 } from 'tsafe';
 import { assert } from 'tsafe';
 
 import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvocationProgress';
@@ -80,44 +97,189 @@ export const CanvasMainPanelContent = memo(() => {
 
 CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
 
+const generateWithStartingImageDndTargetData = newCanvasFromImageDndTarget.getData({
+  type: 'raster_layer',
+  withResize: true,
+});
+const generateWithStartingImageAndInpaintMaskDndTargetData = newCanvasFromImageDndTarget.getData({
+  type: 'raster_layer',
+  withInpaintMask: true,
+});
+const generateWithControlImageDndTargetData = newCanvasFromImageDndTarget.getData({
+  type: 'control_layer',
+  withResize: true,
+});
+
 const NoActiveSession = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const newSesh = useCallback(() => {
     dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
   }, [dispatch]);
+
   return (
     <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
-      <Text fontSize="lg" fontWeight="bold">
-        No Active Session
-      </Text>
-      <Button display="flex" flexDir="column" gap={2} p={8} minH={0} minW={0} onClick={newSesh}>
-        <Text>New Canvas Session</Text>
-        <Text>- New Canvas Session</Text>
-        <Text>- 1 Inpaint mask layer added</Text>
+      <Heading>Get Started with Invoke</Heading>
+      <Button variant="ghost" onClick={newSesh}>
+        Start a new Canvas Session
       </Button>
-      <Flex flexDir="column" gap={2} p={8} border="dashed yellow 2px">
-        <Text>Generate with Starting Image</Text>
-        <Text>- New Canvas Session</Text>
-        <Text>- Dropped image as raster layer</Text>
-        <Text>- Bbox resized</Text>
-      </Flex>
-      <Flex flexDir="column" gap={2} p={8} border="dashed yellow 2px">
-        <Text>Generate with Control Image</Text>
-        <Text>- New Canvas Session</Text>
-        <Text>- Dropped image as control layer</Text>
-        <Text>- Bbox resized</Text>
-      </Flex>
-      <Flex flexDir="column" gap={2} p={8} border="dashed yellow 2px">
-        <Text>Edit Image</Text>
-        <Text>- New Canvas Session</Text>
-        <Text>- Dropped image as raster layer</Text>
-        <Text>- Bbox resized</Text>
-        <Text>- 1 Inpaint mask layer added</Text>
+      <Text>or</Text>
+      <Flex flexDir="column" maxW={512}>
+        <GenerateWithStartingImage />
+        <GenerateWithControlImage />
+        <GenerateWithStartingImageAndInpaintMask />
       </Flex>
     </Flex>
   );
 });
 NoActiveSession.displayName = 'NoActiveSession';
+
+const GenerateWithStartingImage = memo(() => {
+  const { t } = useTranslation();
+  const { getState, dispatch } = useAppStore();
+  const useImageUploadButtonOptions = useMemo<Param0<typeof useImageUploadButton>>(
+    () => ({
+      onUpload: (imageDTO: ImageDTO) => {
+        newCanvasFromImage({ imageDTO, type: 'raster_layer', withResize: true, getState, dispatch });
+      },
+      allowMultiple: false,
+    }),
+    [dispatch, getState]
+  );
+  const uploadApi = useImageUploadButton(useImageUploadButtonOptions);
+  const components = useMemo(
+    () => ({
+      UploadButton: (
+        <Button
+          size="sm"
+          variant="link"
+          color="base.300"
+          {...uploadApi.getUploadButtonProps()}
+          rightIcon={<PiUploadBold />}
+        />
+      ),
+    }),
+    [uploadApi]
+  );
+
+  return (
+    <Flex position="relative" flexDir="column">
+      <Text fontSize="lg" fontWeight="semibold">
+        Generate with a Starting Image
+      </Text>
+      <Text color="base.300">Regenerate the starting image using the model (Image to Image).</Text>
+      <Text color="base.300">
+        <Trans i18nKey="controlLayers.uploadOrDragAnImage" components={components} />
+        <input {...uploadApi.getUploadInputProps()} />
+      </Text>
+      <DndDropTarget
+        dndTarget={newCanvasFromImageDndTarget}
+        dndTargetData={generateWithStartingImageDndTargetData}
+        label="Drop"
+      />
+    </Flex>
+  );
+});
+GenerateWithStartingImage.displayName = 'GenerateWithStartingImage';
+
+const GenerateWithControlImage = memo(() => {
+  const { t } = useTranslation();
+  const { getState, dispatch } = useAppStore();
+  const useImageUploadButtonOptions = useMemo<Param0<typeof useImageUploadButton>>(
+    () => ({
+      onUpload: (imageDTO: ImageDTO) => {
+        newCanvasFromImage({ imageDTO, type: 'control_layer', withResize: true, getState, dispatch });
+      },
+      allowMultiple: false,
+    }),
+    [dispatch, getState]
+  );
+  const uploadApi = useImageUploadButton(useImageUploadButtonOptions);
+  const components = useMemo(
+    () => ({
+      UploadButton: (
+        <Button
+          size="sm"
+          variant="link"
+          color="base.300"
+          {...uploadApi.getUploadButtonProps()}
+          rightIcon={<PiUploadBold />}
+        />
+      ),
+    }),
+    [uploadApi]
+  );
+
+  return (
+    <Flex position="relative" flexDir="column">
+      <Text fontSize="lg" fontWeight="semibold">
+        Generate with a Control Image
+      </Text>
+      <Text color="base.300">
+        Generate a new image using the control image to guide the structure and composition (Text to Image with
+        Control).
+      </Text>
+      <Text color="base.300">
+        <Trans i18nKey="controlLayers.uploadOrDragAnImage" components={components} />
+        <input {...uploadApi.getUploadInputProps()} />
+      </Text>
+      <DndDropTarget
+        dndTarget={newCanvasFromImageDndTarget}
+        dndTargetData={generateWithControlImageDndTargetData}
+        label="Drop"
+      />
+    </Flex>
+  );
+});
+GenerateWithControlImage.displayName = 'GenerateWithControlImage';
+
+const GenerateWithStartingImageAndInpaintMask = memo(() => {
+  const { t } = useTranslation();
+  const { getState, dispatch } = useAppStore();
+  const useImageUploadButtonOptions = useMemo<Param0<typeof useImageUploadButton>>(
+    () => ({
+      onUpload: (imageDTO: ImageDTO) => {
+        newCanvasFromImage({ imageDTO, type: 'raster_layer', withInpaintMask: true, getState, dispatch });
+      },
+      allowMultiple: false,
+    }),
+    [dispatch, getState]
+  );
+  const uploadApi = useImageUploadButton(useImageUploadButtonOptions);
+  const components = useMemo(
+    () => ({
+      UploadButton: (
+        <Button
+          size="sm"
+          variant="link"
+          color="base.300"
+          {...uploadApi.getUploadButtonProps()}
+          rightIcon={<PiUploadBold />}
+        />
+      ),
+    }),
+    [uploadApi]
+  );
+
+  return (
+    <Flex position="relative" flexDir="column">
+      <Text fontSize="lg" fontWeight="semibold">
+        Edit Image
+      </Text>
+      <Text color="base.300">Edit the image by regenerating parts of it (Inpaint).</Text>
+      <Text color="base.300">
+        <Trans i18nKey="controlLayers.uploadOrDragAnImage" components={components} />
+        <input {...uploadApi.getUploadInputProps()} />
+      </Text>
+      <DndDropTarget
+        dndTarget={newCanvasFromImageDndTarget}
+        dndTargetData={generateWithStartingImageAndInpaintMaskDndTargetData}
+        label="Drop"
+      />
+    </Flex>
+  );
+});
+GenerateWithStartingImageAndInpaintMask.displayName = 'GenerateWithStartingImageAndInpaintMask';
 
 type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
@@ -213,6 +375,9 @@ const SelectedImage = memo(() => {
           src={selectedImage.imageDTO.image_url}
           width={selectedImage.imageDTO.width}
           height={selectedImage.imageDTO.height}
+          onLoad={() => {
+            console.log('onload');
+          }}
         />
       </Flex>
     );
