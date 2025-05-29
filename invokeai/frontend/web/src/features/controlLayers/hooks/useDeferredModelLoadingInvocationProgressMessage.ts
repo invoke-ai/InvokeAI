@@ -1,11 +1,11 @@
 import { useStore } from '@nanostores/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { $invocationProgressMessage } from 'services/events/stores';
+import { $lastProgressMessage } from 'services/events/stores';
 
 export const useDeferredModelLoadingInvocationProgressMessage = () => {
   const { t } = useTranslation();
-  const invocationProgressMessage = useStore($invocationProgressMessage);
+  const invocationProgressMessage = useStore($lastProgressMessage);
   const [delayedMessage, setDelayedMessage] = useState<string | null>(null);
 
   useEffect(() => {

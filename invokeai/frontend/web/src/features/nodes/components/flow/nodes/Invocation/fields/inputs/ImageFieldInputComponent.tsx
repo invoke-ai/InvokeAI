@@ -2,7 +2,7 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { UploadImageButton } from 'common/hooks/useImageUploadButton';
+import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import type { SetNodeImageFieldImageDndTargetData } from 'features/dnd/dnd';
 import { setNodeImageFieldImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -66,7 +66,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   return (
     <Flex position="relative" className={NO_DRAG_CLASS} w="full" h={32} alignItems="stretch">
       {!imageDTO && (
-        <UploadImageButton
+        <UploadImageIconButton
           w="full"
           h="auto"
           isError={fieldTemplate.required && !field.value}

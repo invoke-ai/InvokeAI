@@ -11,7 +11,7 @@ import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
-import { $hasProgressImage } from 'services/events/stores';
+import { $hasLastProgressImage } from 'services/events/stores';
 
 import { NoContentForViewer } from './NoContentForViewer';
 import ProgressImage from './ProgressImage';
@@ -86,7 +86,7 @@ const CurrentImagePreview = ({ imageDTO }: { imageDTO?: ImageDTO }) => {
 export default memo(CurrentImagePreview);
 
 const ImageContent = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
-  const hasProgressImage = useStore($hasProgressImage);
+  const hasProgressImage = useStore($hasLastProgressImage);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
   if (hasProgressImage && shouldShowProgressInViewer) {
