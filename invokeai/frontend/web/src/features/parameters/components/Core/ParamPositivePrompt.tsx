@@ -14,7 +14,9 @@ import {
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useCallback, useRef } from 'react';
+import { positivePromptBoxHeightChanged, selectPositivePromptBoxHeight } from 'features/ui/store/uiSlice';
+import { debounce } from 'lodash-es';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
@@ -25,6 +27,7 @@ export const ParamPositivePrompt = memo(() => {
   const baseModel = useAppSelector(selectBase);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+  const positivePromptBoxHeight = useAppSelector(selectPositivePromptBoxHeight);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -49,6 +52,45 @@ export const ParamPositivePrompt = memo(() => {
     textareaRef: textareaRef,
     onChange: handleChange,
   });
+
+  // Add debounced resize observer to detect height changes
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    let currentHeight = textarea.offsetHeight;
+
+    const debouncedHeightUpdate = debounce((newHeight: number) => {
+      dispatch(positivePromptBoxHeightChanged(newHeight));
+    }, 150);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const newHeight = (entry.target as HTMLTextAreaElement).offsetHeight;
+        if (newHeight !== currentHeight) {
+          currentHeight = newHeight;
+          debouncedHeightUpdate(newHeight);
+        }
+      }
+    });
+
+    resizeObserver.observe(textarea);
+    return () => {
+      resizeObserver.disconnect();
+      debouncedHeightUpdate.cancel();
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = `${positivePromptBoxHeight}px`;
+  }, [positivePromptBoxHeight]);
 
   const focus: HotkeyCallback = useCallback(
     (e) => {
@@ -75,7 +117,6 @@ export const ParamPositivePrompt = memo(() => {
           ref={textareaRef}
           value={prompt}
           onChange={onChange}
-          minH={40}
           onKeyDown={onKeyDown}
           variant="darkFilled"
           borderTopWidth={24} // This prevents the prompt from being hidden behind the header
@@ -83,6 +124,7 @@ export const ParamPositivePrompt = memo(() => {
           paddingInlineStart={3}
           paddingTop={0}
           paddingBottom={3}
+          resize="vertical"
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />

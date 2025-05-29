@@ -16,6 +16,7 @@ const initialUIState: UIState = {
   accordions: {},
   expanders: {},
   shouldShowNotificationV2: true,
+  positivePromptBoxHeight: 40,
 };
 
 export const uiSlice = createSlice({
@@ -45,6 +46,9 @@ export const uiSlice = createSlice({
     shouldShowNotificationChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowNotificationV2 = action.payload;
     },
+    positivePromptBoxHeightChanged: (state, action: PayloadAction<number>) => {
+      state.positivePromptBoxHeight = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(workflowLoaded, (state) => {
@@ -64,6 +68,7 @@ export const {
   accordionStateChanged,
   expanderStateChanged,
   shouldShowNotificationChanged,
+  positivePromptBoxHeightChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
@@ -100,3 +105,5 @@ const TABS_WITH_RIGHT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as
 export const RIGHT_PANEL_MIN_SIZE_PX = 390;
 export const $isRightPanelOpen = atom(true);
 export const selectWithRightPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_RIGHT_PANEL.includes(ui.activeTab));
+
+export const selectPositivePromptBoxHeight = createSelector(selectUiSlice, (ui) => ui.positivePromptBoxHeight);
