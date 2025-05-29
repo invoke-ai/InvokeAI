@@ -9,6 +9,7 @@ import {
   Menu,
   MenuButton,
   MenuList,
+  Spacer,
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
@@ -47,14 +48,14 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { DndImage } from 'features/dnd/DndImage';
 import { newCanvasFromImage } from 'features/imageActions/actions';
-import type { ProgressImage } from 'features/nodes/types/common';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiDotsThreeOutlineVerticalFill, PiUploadBold } from 'react-icons/pi';
-import type { ImageDTO, S } from 'services/api/types';
-import { $lastCanvasProgressImage, $socket } from 'services/events/stores';
+import type { ImageDTO } from 'services/api/types';
+import { $lastCanvasProgressImage } from 'services/events/stores';
 import type { Equals, Param0 } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -281,39 +282,9 @@ const GenerateWithStartingImageAndInpaintMask = memo(() => {
 });
 GenerateWithStartingImageAndInpaintMask.displayName = 'GenerateWithStartingImageAndInpaintMask';
 
-type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
-
 const SimpleActiveSession = memo(() => {
   const dispatch = useAppDispatch();
   const isStaging = useAppSelector(selectIsStaging);
-  const socket = useStore($socket);
-
-  useEffect(() => {
-    if (!socket) {
-      return;
-    }
-
-    const onQueueItemStatusChanged = (event: S['QueueItemStatusChangedEvent']) => {
-      const progressImage = $lastCanvasProgressImage.get();
-      if (!progressImage) {
-        return;
-      }
-      if (progressImage.sessionId !== event.session_id) {
-        return;
-      }
-      if (event.status !== 'canceled' && event.status !== 'failed') {
-        return;
-      }
-      $lastCanvasProgressImage.set(null);
-    };
-    console.log('SUB session preview image listeners');
-    socket.on('queue_item_status_changed', onQueueItemStatusChanged);
-
-    return () => {
-      console.log('UNSUB session preview image listeners');
-      socket.off('queue_item_status_changed', onQueueItemStatusChanged);
-    };
-  }, [dispatch, socket]);
 
   const onReset = useCallback(() => {
     dispatch(canvasReset());
@@ -332,7 +303,7 @@ const SimpleActiveSession = memo(() => {
   useHotkeys(['left'], selectPrev, { preventDefault: true }, [selectPrev]);
 
   return (
-    <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
+    <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center" gap={2}>
       <Flex>
         <Text fontSize="lg" fontWeight="bold">
           Simple Session (staging view) {isStaging && 'STAGING'}
@@ -352,14 +323,13 @@ const SelectedImage = memo(() => {
 
   if (progressImage) {
     return (
-      <Flex alignItems="center" justifyContent="center" minH={0} minW={0}>
+      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
         <Image
           objectFit="contain"
           maxH="full"
           maxW="full"
           src={progressImage.image.dataURL}
           width={progressImage.image.width}
-          height={progressImage.image.height}
         />
       </Flex>
     );
@@ -367,18 +337,8 @@ const SelectedImage = memo(() => {
 
   if (selectedImage) {
     return (
-      <Flex alignItems="center" justifyContent="center" minH={0} minW={0}>
-        <Image
-          objectFit="contain"
-          maxH="full"
-          maxW="full"
-          src={selectedImage.imageDTO.image_url}
-          width={selectedImage.imageDTO.width}
-          height={selectedImage.imageDTO.height}
-          onLoad={() => {
-            console.log('onload');
-          }}
-        />
+      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
+        <DndImage imageDTO={selectedImage.imageDTO} />
       </Flex>
     );
   }
@@ -391,15 +351,26 @@ const SessionImages = memo(() => {
   const stagedImages = useAppSelector(selectStagedImages);
   return (
     <Flex gap={2} h={108} maxW="full" overflow="scroll">
+      <Spacer />
       {stagedImages.map(({ imageDTO }, index) => (
         <SessionImage key={imageDTO.image_name} index={index} imageDTO={imageDTO} />
       ))}
+      <Spacer />
     </Flex>
   );
 });
 SessionImages.displayName = 'SessionImages';
 
 const sx = {
+  objectFit: 'contain',
+  maxW: 'full',
+  maxH: 'full',
+  w: 'min-content',
+  borderRadius: 'base',
+  cursor: 'grab',
+  '&[data-is-dragging=true]': {
+    opacity: 0.3,
+  },
   '&[data-is-selected="false"]': {
     opacity: 0.5,
   },
@@ -411,10 +382,9 @@ const SessionImage = memo(({ index, imageDTO }: { index: number; imageDTO: Image
     dispatch(stagingAreaImageSelected({ index }));
   }, [dispatch, index]);
   return (
-    <Image
-      maxW={108}
-      src={imageDTO.image_url}
-      fallbackSrc={imageDTO.thumbnail_url}
+    <DndImage
+      imageDTO={imageDTO}
+      asThumbnail
       onClick={onClick}
       data-is-selected={selectedImageIndex === index}
       sx={sx}
