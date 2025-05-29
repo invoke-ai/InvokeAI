@@ -1,6 +1,6 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { UploadImageButton } from 'common/hooks/useImageUploadButton';
+import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import type { SetUpscaleInitialImageDndTargetData } from 'features/dnd/dnd';
 import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -34,7 +34,7 @@ export const UpscaleInitialImage = () => {
   return (
     <Flex justifyContent="flex-start">
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
-        {!imageDTO && <UploadImageButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
+        {!imageDTO && <UploadImageIconButton w="full" h="full" isError={!imageDTO} onUpload={onUpload} fontSize={36} />}
         {imageDTO && (
           <>
             <DndImage imageDTO={imageDTO} />
