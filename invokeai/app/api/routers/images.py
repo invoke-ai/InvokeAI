@@ -1,13 +1,13 @@
 import io
 import json
 import traceback
-from typing import Optional
+from typing import ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from PIL import Image
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
@@ -30,9 +30,17 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 IMAGE_MAX_AGE = 31536000
 
 
-class Dimensions(BaseModel):
-    width: int = Field(...)
-    height: int = Field(...)
+class ResizeToDimensions(BaseModel):
+    width: int = Field(..., gt=0)
+    height: int = Field(..., gt=0)
+
+    MAX_SIZE: ClassVar[int] = 4096 * 4096
+
+    @model_validator(mode="after")
+    def validate_total_output_size(self):
+        if self.width * self.height > self.MAX_SIZE:
+            raise ValueError(f"Max total output size for resizing is {self.MAX_SIZE} pixels")
+        return self
 
 
 @images_router.post(
@@ -56,8 +64,8 @@ async def upload_image(
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
     resize_to: Optional[str] = Body(
         default=None,
-        description="Dimensions to resize the image to, must be stringified JSON array of 2 integers",
-        example="[1024,1024]",
+        description=f"Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: {ResizeToDimensions.MAX_SIZE}",
+        example='"[1024,1024]"',
     ),
     metadata: Optional[str] = Body(
         default=None,
@@ -86,9 +94,9 @@ async def upload_image(
     if resize_to:
         try:
             dims = json.loads(resize_to)
-            resize_dims = Dimensions(**dims)
+            resize_dims = ResizeToDimensions(**dims)
         except Exception:
-            raise HTTPException(status_code=400, detail="Invalid resize_to format")
+            raise HTTPException(status_code=400, detail="Invalid resize_to format or size")
 
         try:
             np_image = pil_to_np(pil_image)
