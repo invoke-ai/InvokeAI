@@ -11,6 +11,7 @@ import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
   createNewCanvasEntityFromImage,
+  newCanvasFromImage,
   removeImagesFromBoard,
   replaceCanvasEntityObjectsWithImage,
   setComparisonImage,
@@ -343,7 +344,35 @@ export const newCanvasEntityFromImageDndTarget: DndTarget<
     createNewCanvasEntityFromImage({ type, imageDTO, dispatch, getState });
   },
 };
+//#endregion
 
+//#region New Canvas from Image
+const _newCanvas = buildTypeAndKey('new-canvas-entity-from-image');
+type NewCanvasFromImageDndTargetData = DndData<
+  typeof _newCanvas.type,
+  typeof _newCanvas.key,
+  {
+    type: CanvasEntityType | 'regional_guidance_with_reference_image';
+    withResize?: boolean;
+    withInpaintMask?: boolean;
+  }
+>;
+export const newCanvasFromImageDndTarget: DndTarget<NewCanvasFromImageDndTargetData, SingleImageDndSourceData> = {
+  ..._newCanvas,
+  typeGuard: buildTypeGuard(_newCanvas.key),
+  getData: buildGetData(_newCanvas.key, _newCanvas.type),
+  isValid: ({ sourceData }) => {
+    if (!singleImageDndSource.typeGuard(sourceData)) {
+      return false;
+    }
+    return true;
+  },
+  handler: ({ sourceData, targetData, dispatch, getState }) => {
+    const { type, withResize } = targetData.payload;
+    const { imageDTO } = sourceData.payload;
+    newCanvasFromImage({ type, imageDTO, dispatch, getState, withResize });
+  },
+};
 //#endregion
 
 //#region Replace Canvas Entity Objects With Image
@@ -471,6 +500,7 @@ export const dndTargets = [
   replaceCanvasEntityObjectsWithImageDndTarget,
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
+  newCanvasFromImageDndTarget,
   // Single or Multiple Image
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,

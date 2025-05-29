@@ -8,8 +8,8 @@ import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasPersistConfig, canvasSlice, canvasUndoableConfig } from 'features/controlLayers/store/canvasSlice';
 import {
-  canvasStagingAreaPersistConfig,
   canvasSessionSlice,
+  canvasStagingAreaPersistConfig,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
