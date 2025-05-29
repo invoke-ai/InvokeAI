@@ -458,6 +458,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
       if (data.origin === 'canvas') {
         $lastCanvasProgressEvent.set(null);
+        if (status === 'canceled' || status === 'failed') {
+          $lastCanvasProgressImage.set(null);
+        }
       }
 
       // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
