@@ -30,7 +30,15 @@ import type { ClientToServerEvents, ServerToClientEvents } from 'services/events
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastCanvasProgressEvent, $lastProgressEvent } from './stores';
+import {
+  $lastCanvasProgressEvent,
+  $lastCanvasProgressImage,
+  $lastProgressEvent,
+  $lastUpscalingProgressEvent,
+  $lastUpscalingProgressImage,
+  $lastWorkflowsProgressEvent,
+  $lastWorkflowsProgressImage,
+} from './stores';
 
 const log = logger('events');
 
@@ -92,7 +100,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_progress', (data) => {
-    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
+    const { invocation_source_id, invocation, session_id, image, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -107,7 +115,27 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     $lastProgressEvent.set(data);
 
+    if (origin === 'canvas') {
+      $lastCanvasProgressEvent.set(data);
+      if (image) {
+        $lastCanvasProgressImage.set({ sessionId: session_id, image });
+      }
+    }
+
+    if (origin === 'upscaling') {
+      $lastUpscalingProgressEvent.set(data);
+      if (image) {
+        $lastUpscalingProgressImage.set({ sessionId: session_id, image });
+      }
+    }
+
     if (origin === 'workflows') {
+      $lastWorkflowsProgressEvent.set(data);
+
+      if (image) {
+        $lastWorkflowsProgressImage.set({ sessionId: session_id, image });
+      }
+
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;

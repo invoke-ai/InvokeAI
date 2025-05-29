@@ -10,6 +10,9 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
+import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
@@ -43,6 +46,7 @@ const GalleryPanelContent = () => {
   const dispatch = useAppDispatch();
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+  const sessionType = useAppSelector(selectCanvasSessionType);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
@@ -55,6 +59,30 @@ const GalleryPanelContent = () => {
     []
   );
   const boardsListPanel = usePanel(boardsListPanelOptions);
+
+  const galleryPanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      id: 'gallery-panel',
+      minSizePx: 128,
+      defaultSizePx: 256,
+      imperativePanelGroupRef,
+      panelGroupDirection: 'vertical',
+    }),
+    []
+  );
+  const galleryPanel = usePanel(galleryPanelOptions);
+
+  const canvasLayersPanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      id: 'canvas-layers-panel',
+      minSizePx: 128,
+      defaultSizePx: 256,
+      imperativePanelGroupRef,
+      panelGroupDirection: 'vertical',
+    }),
+    []
+  );
+  const canvasLayersPanel = usePanel(canvasLayersPanelOptions);
 
   const handleClickBoardSearch = useCallback(() => {
     if (boardSearchText.length) {
@@ -98,7 +126,7 @@ const GalleryPanelContent = () => {
       </Flex>
 
       <PanelGroup ref={imperativePanelGroupRef} direction="vertical" autoSaveId="boards-list-panel">
-        <Panel collapsible {...boardsListPanel.panelProps}>
+        <Panel order={0} id="boards-panel" collapsible {...boardsListPanel.panelProps}>
           <Flex flexDir="column" w="full" h="full">
             <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>
               <Box w="full" pt={2}>
@@ -109,10 +137,20 @@ const GalleryPanelContent = () => {
             <BoardsListWrapper />
           </Flex>
         </Panel>
-        <HorizontalResizeHandle id="gallery-panel-handle" {...boardsListPanel.resizeHandleProps} />
-        <Panel id="gallery-wrapper-panel" minSize={20}>
+        <HorizontalResizeHandle id="boards-list-to-gallery-panel-handle" {...boardsListPanel.resizeHandleProps} />
+        <Panel order={1} id="gallery-wrapper-panel" collapsible {...galleryPanel.panelProps}>
           <Gallery />
         </Panel>
+        {sessionType === 'advanced' && (
+          <>
+            <HorizontalResizeHandle id="gallery-panel-to-layers-handle" {...galleryPanel.resizeHandleProps} />
+            <Panel order={2} id="canvas-layers-panel" collapsible {...canvasLayersPanel.panelProps}>
+              <CanvasManagerProviderGate>
+                <CanvasLayersPanelContent />
+              </CanvasManagerProviderGate>
+            </Panel>
+          </>
+        )}
       </PanelGroup>
     </FocusRegionWrapper>
   );
