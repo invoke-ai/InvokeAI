@@ -1,12 +1,3 @@
-import uvicorn
-
-from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
-from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
-from invokeai.backend.util.logging import InvokeAILogger
-from invokeai.frontend.cli.arg_parser import InvokeAIArgs
-
-
 def get_app():
     """Import the app and event loop. We wrap this in a function to more explicitly control when it happens, because
     importing from api_app does a bunch of stuff - it's more like calling a function than importing a module.
@@ -18,8 +9,19 @@ def get_app():
 
 def run_app() -> None:
     """The main entrypoint for the app."""
-    # Parse the CLI arguments.
+    from invokeai.frontend.cli.arg_parser import InvokeAIArgs
+
+    # Parse the CLI arguments before doing anything else, which ensures CLI args correctly override settings from other
+    # sources like `invokeai.yaml` or env vars.
     InvokeAIArgs.parse_args()
+
+    import uvicorn
+
+    from invokeai.app.invocations.baseinvocation import InvocationRegistry
+    from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
+    from invokeai.app.services.config.config_default import get_config
+    from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
+    from invokeai.backend.util.logging import InvokeAILogger
 
     # Load config.
     app_config = get_config()
@@ -65,6 +67,15 @@ def run_app() -> None:
     # invocations module. The ordering here is implicit, but important - we want to load custom nodes after all the
     # core nodes have been imported so that we can catch when a custom node clobbers a core node.
     load_custom_nodes(custom_nodes_path=app_config.custom_nodes_path, logger=logger)
+
+    # Check all invocations and ensure their outputs are registered.
+    for invocation in InvocationRegistry.get_invocation_classes():
+        invocation_type = invocation.get_type()
+        output_annotation = invocation.get_output_annotation()
+        if output_annotation not in InvocationRegistry.get_output_classes():
+            logger.warning(
+                f'Invocation "{invocation_type}" has unregistered output class "{output_annotation.__name__}"'
+            )
 
     if app_config.dev_reload:
         # load_custom_nodes seems to bypass jurrigged's import sniffer, so be sure to call it *after* they're already
