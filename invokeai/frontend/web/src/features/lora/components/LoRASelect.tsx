@@ -71,6 +71,7 @@ const LoRASelect = () => {
         allowEmpty
         placeholder={placeholder}
         getIsOptionDisabled={getIsDisabled}
+        noOptionsText={t('models.noLoRAsInstalled')}
       />
     </FormControl>
   );
