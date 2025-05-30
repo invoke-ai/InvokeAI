@@ -13,8 +13,8 @@ import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermar
 import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
-  CANVAS_OUTPUT_PREFIX,
   getSizes,
+  selectCanvasOutputFields,
   selectPresetModifiedPrompts,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
@@ -196,12 +196,7 @@ export const buildSD3Graph = async (state: RootState, manager?: CanvasManager | 
 
   g.upsertMetadata(selectCanvasMetadata(state));
 
-  g.updateNode(canvasOutput, {
-    id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
-    is_intermediate: true,
-    use_cache: false,
-    board: undefined,
-  });
+  g.updateNode(canvasOutput, selectCanvasOutputFields(state));
 
   g.setMetadataReceivingNode(canvasOutput);
   return {
