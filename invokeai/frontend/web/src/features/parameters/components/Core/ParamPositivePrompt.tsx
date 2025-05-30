@@ -1,5 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import { positivePromptChanged, selectBase, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
@@ -14,12 +15,16 @@ import {
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { positivePromptBoxHeightChanged, selectPositivePromptBoxHeight } from 'features/ui/store/uiSlice';
-import { debounce } from 'lodash-es';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
+
+const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
+  trackWidth: false,
+  trackHeight: true,
+  initialHeight: 120,
+};
 
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
@@ -27,7 +32,9 @@ export const ParamPositivePrompt = memo(() => {
   const baseModel = useAppSelector(selectBase);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
-  const positivePromptBoxHeight = useAppSelector(selectPositivePromptBoxHeight);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -39,7 +46,6 @@ export const ParamPositivePrompt = memo(() => {
     },
   });
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(
     (v: string) => {
@@ -52,45 +58,6 @@ export const ParamPositivePrompt = memo(() => {
     textareaRef: textareaRef,
     onChange: handleChange,
   });
-
-  // Add debounced resize observer to detect height changes
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      return;
-    }
-
-    let currentHeight = textarea.offsetHeight;
-
-    const debouncedHeightUpdate = debounce((newHeight: number) => {
-      dispatch(positivePromptBoxHeightChanged(newHeight));
-    }, 150);
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const newHeight = (entry.target as HTMLTextAreaElement).offsetHeight;
-        if (newHeight !== currentHeight) {
-          currentHeight = newHeight;
-          debouncedHeightUpdate(newHeight);
-        }
-      }
-    });
-
-    resizeObserver.observe(textarea);
-    return () => {
-      resizeObserver.disconnect();
-      debouncedHeightUpdate.cancel();
-    };
-  }, [dispatch]);
-
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      return;
-    }
-
-    textarea.style.height = `${positivePromptBoxHeight}px`;
-  }, [positivePromptBoxHeight]);
 
   const focus: HotkeyCallback = useCallback(
     (e) => {
@@ -125,6 +92,7 @@ export const ParamPositivePrompt = memo(() => {
           paddingTop={0}
           paddingBottom={3}
           resize="vertical"
+          minH={28}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />

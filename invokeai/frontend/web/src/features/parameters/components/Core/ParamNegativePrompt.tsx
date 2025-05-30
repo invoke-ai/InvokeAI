@@ -1,5 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import { negativePromptChanged, selectNegativePrompt } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
@@ -15,11 +16,19 @@ import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
+const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
+  trackWidth: false,
+  trackHeight: true,
+};
+
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector(selectNegativePrompt);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  usePersistedTextAreaSize('negative_prompt', textareaRef, persistOptions);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
@@ -31,7 +40,6 @@ export const ParamNegativePrompt = memo(() => {
     },
   });
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
