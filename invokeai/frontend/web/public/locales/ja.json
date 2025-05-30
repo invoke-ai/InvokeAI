@@ -652,7 +652,9 @@
         "filterModels": "フィルターモデル",
         "modelPickerFallbackNoModelsInstalled": "モデルがインストールされていません.",
         "manageModels": "モデル管理",
-        "hfTokenReset": "ハギングフェイストークンリセット"
+        "hfTokenReset": "ハギングフェイストークンリセット",
+        "relatedModels": "関連のあるモデル",
+        "showOnlyRelatedModels": "関連している"
     },
     "parameters": {
         "images": "画像",
@@ -872,7 +874,8 @@
         "problemDeletingWorkflow": "ワークフローが削除された問題",
         "imageNotLoadedDesc": "画像を見つけられません",
         "parameterNotSetDesc": "{{parameter}}を呼び出せません",
-        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4oは,テキストから画像への生成と画像から画像への生成のみをサポートしています.インペインティングおよび,アウトペインティングタスクには他のモデルを使用してください."
+        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4oは,テキストから画像への生成と画像から画像への生成のみをサポートしています.インペインティングおよび,アウトペインティングタスクには他のモデルを使用してください.",
+        "imagenIncompatibleGenerationMode": "Google {{model}} はテキストから画像への変換のみをサポートしています. 画像から画像への変換, インペインティング,アウトペインティングのタスクには他のモデルを使用してください."
     },
     "accessibility": {
         "invokeProgressBar": "進捗バー",
@@ -1246,7 +1249,8 @@
         "paramRatio": {
             "heading": "縦横比",
             "paragraphs": [
-                "生成された画像の縦横比。"
+                "生成された画像の縦横比。",
+                "SD1.5 モデルの場合は 512x512 に相当する画像サイズ (ピクセル数) が推奨され, SDXL モデルの場合は 1024x1024 に相当するサイズが推奨されます."
             ]
         },
         "regionalGuidanceAndReferenceImage": {
@@ -1321,7 +1325,11 @@
             "heading": "高さ"
         },
         "paramSteps": {
-            "heading": "ステップ"
+            "heading": "ステップ",
+            "paragraphs": [
+                "各生成で実行されるステップの数.",
+                "通常, ステップ数が多いほど, より高品質な画像が作成されますが生成時間も長くなります."
+            ]
         },
         "ipAdapterMethod": {
             "heading": "モード",
@@ -1330,7 +1338,11 @@
             ]
         },
         "paramSeed": {
-            "heading": "シード"
+            "heading": "シード",
+            "paragraphs": [
+                "生成に使用する始動ノイズを制御します.",
+                "同じ生成設定で同一の結果を生成するには, 「ランダム」オプションを無効にします."
+            ]
         },
         "paramIterations": {
             "heading": "生成回数"
@@ -1345,10 +1357,16 @@
             "heading": "幅"
         },
         "lora": {
-            "heading": "LoRA"
+            "heading": "LoRA",
+            "paragraphs": [
+                "ベースモデルと組み合わせて使用する軽量モデル."
+            ]
         },
         "loraWeight": {
-            "heading": "重み"
+            "heading": "重み",
+            "paragraphs": [
+                "LoRA の重み. 重みを大きくすると, 最終的な画像への影響が大きくなります."
+            ]
         },
         "patchmatchDownScaleSize": {
             "heading": "Downscale"
@@ -1437,7 +1455,8 @@
             "heading": "ダイナミックプロンプト",
             "paragraphs": [
                 "ダイナミック プロンプトは,単一のプロンプトを複数のプロンプトに解析します.",
-                "基本的な構文は「{赤|緑|青}のボール」です.これにより,「赤いボール」「緑のボール」「青いボール」という3つのプロンプトが生成されます."
+                "基本的な構文は「{赤|緑|青}のボール」です.これにより,「赤いボール」「緑のボール」「青いボール」という3つのプロンプトが生成されます.",
+                "1 つのプロンプト内で構文を何度でも使用できますが, 生成されるプロンプトの数を Max Prompts 設定で制限するようにしてください."
             ]
         },
         "controlNetResizeMode": {
@@ -1456,6 +1475,41 @@
             "heading": "コントロールモード",
             "paragraphs": [
                 "プロンプトまたは コントロールネットのいずれかを重視します."
+            ]
+        },
+        "noiseUseCPU": {
+            "paragraphs": [
+                "CPU または GPU でノイズを生成するかどうかを制御します.",
+                "CPU ノイズを有効にすると, 特定のシードによってどのマシンでも同じ画像が生成されます.",
+                "CPU ノイズを有効にしてもパフォーマンスに影響はありません."
+            ],
+            "heading": "CPUノイズを使用する"
+        },
+        "dynamicPromptsMaxPrompts": {
+            "heading": "最大プロンプト",
+            "paragraphs": [
+                "ダイナミック プロンプトによって生成できるプロンプトの数を制限します."
+            ]
+        },
+        "dynamicPromptsSeedBehaviour": {
+            "paragraphs": [
+                "プロンプトを生成するときにシードがどのように使用されるかを制御します.",
+                "反復ごとに固有のシードを使用します. 単一のシードでプロンプトのバリエーションを試す場合に使用します.",
+                "たとえば, プロンプトが 5 つある場合, 各画像は同じシードを使用します.",
+                "「画像ごと」では, 画像ごとに固有のシード値が使用されます. これにより、より多くのバリエーションが得られます."
+            ],
+            "heading": "シード行動"
+        },
+        "imageFit": {
+            "paragraphs": [
+                "初期画像の幅と高さを出力画像に合わせてサイズ変更します. 有効にすることをお勧めします."
+            ],
+            "heading": "初期画像を出力サイズに合わせる"
+        },
+        "infillMethod": {
+            "heading": "充填方法",
+            "paragraphs": [
+                "アウトペインティングまたはインペインティングのプロセス中に埋め込む方法."
             ]
         }
     },
