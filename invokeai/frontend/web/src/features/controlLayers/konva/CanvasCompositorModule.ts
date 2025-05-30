@@ -442,12 +442,13 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     adapters: CanvasEntityAdapterInpaintMask[],
     rect: Rect,
     attribute: 'noiseLevel' | 'denoiseLimit' = 'noiseLevel',
+    invertMask: boolean = false,
     uploadOptions: SetOptional<Omit<UploadImageArg, 'file'>, 'image_category'> = { is_intermediate: true },
     forceUpload?: boolean
   ): Promise<ImageDTO> => {
     assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
     // Use a unique hash that includes the attribute name for caching
-    const hash = this.getCompositeHash(adapters, { rect, attribute, grayscale: true });
+    const hash = this.getCompositeHash(adapters, { rect, attribute, invertMask, grayscale: true });
     const cachedImageName = forceUpload ? undefined : this.manager.cache.imageNameCache.get(hash);
 
     let imageDTO: ImageDTO | null = null;
@@ -507,7 +508,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
           // input has transparency
           // Calculate grayscale value: white (255) for no mask, darker for stronger mask
           let grayValue = 255; // Default to white for unmasked areas
-          if ((data[i + 3] ?? 0) > 127) {
+          if (invertMask ? (data[i + 3] ?? 0) < 128 : (data[i + 3] ?? 0) > 127) {
             grayValue = Math.max(0, Math.min(255, 255 - Math.round(255 * attributeValue)));
           }
 

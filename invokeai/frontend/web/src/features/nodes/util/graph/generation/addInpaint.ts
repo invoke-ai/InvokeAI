@@ -69,10 +69,16 @@ export const addInpaint = async ({
   // Create a composite noise mask if we have any adapters with noise settings
   let noiseMaskImage: ImageDTO | null = null;
   if (noiseMaskAdapters.length > 0) {
-    noiseMaskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(noiseMaskAdapters, rect, 'noiseLevel', {
-      is_intermediate: true,
-      silent: true,
-    });
+    noiseMaskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
+      noiseMaskAdapters,
+      rect,
+      'noiseLevel',
+      canvasSettings.preserveMask,
+      {
+        is_intermediate: true,
+        silent: true,
+      }
+    );
   }
 
   // Create a composite denoise limit mask
@@ -80,6 +86,7 @@ export const addInpaint = async ({
     inpaintMaskAdapters, // denoise limit defaults to 1 for masks that don't have it
     rect,
     'denoiseLimit',
+    canvasSettings.preserveMask,
     {
       is_intermediate: true,
       silent: true,
