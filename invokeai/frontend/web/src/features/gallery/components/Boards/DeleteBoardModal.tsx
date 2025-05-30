@@ -147,12 +147,13 @@ const DeleteBoardModal = () => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>
-                {boardToDelete !== 'none' &&
-                  (boardToDelete.is_private
+              {boardToDelete !== 'none' && (
+                <Text>
+                  {boardToDelete.is_private
                     ? t('boards.deletedPrivateBoardsCannotbeRestored')
-                    : t('boards.deletedBoardsCannotbeRestored'))}
-              </Text>
+                    : t('boards.deletedBoardsCannotbeRestored')}
+                </Text>
+              )}
               <Text>{t('gallery.deleteImagePermanent')}</Text>
             </Flex>
           </AlertDialogBody>
