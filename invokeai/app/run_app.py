@@ -32,9 +32,9 @@ def run_app() -> None:
         configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
 
     # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
-    from invokeai.backend.util.devices import TorchDevice
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
     from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
+    from invokeai.backend.util.devices import TorchDevice
 
     torch_device_name = TorchDevice.get_torch_device_name()
     logger.info(f"Using torch device: {torch_device_name}")
