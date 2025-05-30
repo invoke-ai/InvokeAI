@@ -2345,7 +2345,11 @@
             "lowest": "Il più basso",
             "medium": "Medio",
             "highest": "La più alta"
-        }
+        },
+        "denoiseLimit": "Limite di riduzione del rumore",
+        "addImageNoise": "Aggiungi $t(controlLayers.imageNoise)",
+        "addDenoiseLimit": "Aggiungi $t(controlLayers.denoiseLimit)",
+        "imageNoise": "Rumore dell'immagine"
     },
     "ui": {
         "tabs": {
