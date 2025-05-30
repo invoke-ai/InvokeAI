@@ -1,11 +1,11 @@
-import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useRelatedGroupedModelCombobox } from 'common/hooks/useRelatedGroupedModelCombobox';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
@@ -20,14 +20,17 @@ const LoRASelect = () => {
   const addedLoRAs = useAppSelector(selectLoRAs);
   const currentBaseModel = useAppSelector(selectBase);
 
-  const getIsDisabled = (model: LoRAModelConfig): boolean => {
-    const isCompatible = currentBaseModel === model.base;
-    const isAdded = Boolean(addedLoRAs.find((lora) => lora.model.key === model.key));
-    const hasMainModel = Boolean(currentBaseModel);
-    return !hasMainModel || !isCompatible || isAdded;
-  };
+  const getIsDisabled = useCallback(
+    (model: LoRAModelConfig): boolean => {
+      const isCompatible = currentBaseModel === model.base;
+      const isAdded = Boolean(addedLoRAs.find((lora) => lora.model.key === model.key));
+      const hasMainModel = Boolean(currentBaseModel);
+      return !hasMainModel || !isCompatible || isAdded;
+    },
+    [addedLoRAs, currentBaseModel]
+  );
 
-  const _onChange = useCallback(
+  const onChange = useCallback(
     (model: LoRAModelConfig | null) => {
       if (!model) {
         return;
@@ -37,10 +40,10 @@ const LoRASelect = () => {
     [dispatch]
   );
 
-  const { options, onChange } = useRelatedGroupedModelCombobox({
+  const { options } = useRelatedGroupedModelCombobox({
     modelConfigs,
     getIsDisabled,
-    onChange: _onChange,
+    onChange,
   });
 
   const placeholder = useMemo(() => {
@@ -55,28 +58,22 @@ const LoRASelect = () => {
     return t('models.addLora');
   }, [isLoading, options.length, t]);
 
-  const noOptionsMessage = useCallback(() => t('models.noMatchingLoRAs'), [t]);
-
   return (
-    <FormControl isDisabled={!options.length} gap={2}>
+    <FormControl gap={2}>
       <InformationalPopover feature="lora">
         <FormLabel>{t('models.concepts')} </FormLabel>
       </InformationalPopover>
-      <Combobox
-        placeholder={placeholder}
-        value={null}
-        options={options}
-        noOptionsMessage={noOptionsMessage}
+      <ModelPicker
+        modelConfigs={modelConfigs}
         onChange={onChange}
-        data-testid="add-lora"
-        sx={selectStyles}
+        grouped
+        selectedModelConfig={undefined}
+        allowEmpty
+        placeholder={placeholder}
+        getIsOptionDisabled={getIsDisabled}
       />
     </FormControl>
   );
 };
 
 export default memo(LoRASelect);
-
-const selectStyles: ChakraProps['sx'] = {
-  w: 'full',
-};
