@@ -8,7 +8,7 @@ import { isImagenAspectRatioID } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { CANVAS_OUTPUT_PREFIX, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
@@ -44,16 +44,13 @@ export const buildImagen4Graph = async (
     const imagen4 = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'google_imagen4_generate_image',
-      id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       aspect_ratio: bbox.aspectRatio.id,
-      enhance_prompt: true,
       // When enhance_prompt is true, Imagen4 will return a new image every time, ignoring the seed.
-      use_cache: false,
-      is_intermediate: true,
-      board: undefined,
+      enhance_prompt: true,
+      ...selectCanvasOutputFields(state),
     });
     g.upsertMetadata({
       positive_prompt: positivePrompt,
