@@ -15,7 +15,6 @@ import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { SizedSkeletonLoader } from 'features/gallery/components/ImageGrid/SizedSkeletonLoader';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEventHandler } from 'react';
@@ -235,7 +234,6 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           <Image
             ref={ref}
             src={imageDTO.thumbnail_url}
-            fallback={<SizedSkeletonLoader width={imageDTO.width} height={imageDTO.height} />}
             w={imageDTO.width}
             objectFit="contain"
             maxW="full"
