@@ -17,8 +17,6 @@ def run_app() -> None:
 
     import uvicorn
 
-    from invokeai.app.invocations.baseinvocation import InvocationRegistry
-    from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
     from invokeai.app.services.config.config_default import get_config
     from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
     from invokeai.backend.util.logging import InvokeAILogger
@@ -35,6 +33,8 @@ def run_app() -> None:
 
     # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
     from invokeai.backend.util.devices import TorchDevice
+    from invokeai.app.invocations.baseinvocation import InvocationRegistry
+    from invokeai.app.invocations.load_custom_nodes import load_custom_nodes
 
     torch_device_name = TorchDevice.get_torch_device_name()
     logger.info(f"Using torch device: {torch_device_name}")
