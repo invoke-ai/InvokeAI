@@ -9,7 +9,7 @@ import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/va
 import { type ImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { getGenerationMode } from 'features/nodes/util/graph/generation/getGenerationMode';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { CANVAS_OUTPUT_PREFIX, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { type GraphBuilderReturn, UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { t } from 'i18next';
 import type { Equals } from 'tsafe';
@@ -64,14 +64,11 @@ export const buildChatGPT4oGraph = async (
     const gptImage = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'chatgpt_4o_generate_image',
-      id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
       aspect_ratio: bbox.aspectRatio.id,
       reference_images,
-      use_cache: false,
-      is_intermediate: true,
-      board: undefined,
+      ...selectCanvasOutputFields(state),
     });
     g.upsertMetadata({
       positive_prompt: positivePrompt,
@@ -96,15 +93,12 @@ export const buildChatGPT4oGraph = async (
     const gptImage = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
       type: 'chatgpt_4o_edit_image',
-      id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
       aspect_ratio: bbox.aspectRatio.id,
       base_image: { image_name },
       reference_images,
-      use_cache: false,
-      is_intermediate: true,
-      board: undefined,
+      ...selectCanvasOutputFields(state),
     });
     g.upsertMetadata({
       positive_prompt: positivePrompt,
