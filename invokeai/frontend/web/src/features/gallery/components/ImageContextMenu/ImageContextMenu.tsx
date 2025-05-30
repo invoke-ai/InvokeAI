@@ -7,6 +7,7 @@ import MultipleSelectionMenuItems from 'features/gallery/components/ImageContext
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
 import { map } from 'nanostores';
+import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -43,7 +44,7 @@ const onClose = () => {
  * Map of elements to image DTOs. This is used to determine which image DTO to show the context menu for, depending on
  * the target of the context menu or long press event.
  */
-const elToImageMap = new Map<HTMLDivElement, ImageDTO>();
+const elToImageMap = new Map<HTMLElement, ImageDTO>();
 
 /**
  * Given a target node, find the first registered parent element that contains the target node and return the imageDTO
@@ -59,17 +60,20 @@ const getImageDTOFromMap = (target: Node): ImageDTO | undefined => {
  * @param imageDTO The image DTO to register the context menu for.
  * @param targetRef The ref of the target element that should trigger the context menu.
  */
-export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: HTMLDivElement | null) => {
+export const useImageContextMenu = (imageDTO: ImageDTO | undefined, ref: RefObject<HTMLElement>) => {
   useEffect(() => {
-    if (!targetRef || !imageDTO) {
+    if (!imageDTO) {
       return;
     }
-    const el = targetRef;
+    const el = ref.current;
+    if (!el) {
+      return;
+    }
     elToImageMap.set(el, imageDTO);
     return () => {
       elToImageMap.delete(el);
     };
-  }, [imageDTO, targetRef]);
+  }, [imageDTO, ref]);
 };
 
 /**

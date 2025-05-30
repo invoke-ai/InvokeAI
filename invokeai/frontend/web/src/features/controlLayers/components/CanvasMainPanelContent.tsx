@@ -50,7 +50,7 @@ import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { newCanvasFromImage } from 'features/imageActions/actions';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiDotsThreeOutlineVerticalFill, PiUploadBold } from 'react-icons/pi';
@@ -283,7 +283,9 @@ const GenerateWithStartingImageAndInpaintMask = memo(() => {
 GenerateWithStartingImageAndInpaintMask.displayName = 'GenerateWithStartingImageAndInpaintMask';
 
 const SimpleActiveSession = memo(() => {
-  const dispatch = useAppDispatch();
+  const { getState, dispatch } = useAppStore();
+  const selectedImage = useAppSelector(selectSelectedImage);
+
   const isStaging = useAppSelector(selectIsStaging);
 
   const onReset = useCallback(() => {
@@ -302,13 +304,64 @@ const SimpleActiveSession = memo(() => {
 
   useHotkeys(['left'], selectPrev, { preventDefault: true }, [selectPrev]);
 
+  const vary = useCallback(() => {
+    if (!selectedImage) {
+      return;
+    }
+    newCanvasFromImage({
+      imageDTO: selectedImage.imageDTO,
+      type: 'raster_layer',
+      withResize: true,
+      getState,
+      dispatch,
+    });
+  }, [dispatch, getState, selectedImage]);
+
+  const useAsControl = useCallback(() => {
+    if (!selectedImage) {
+      return;
+    }
+    newCanvasFromImage({
+      imageDTO: selectedImage.imageDTO,
+      type: 'control_layer',
+      withResize: true,
+      getState,
+      dispatch,
+    });
+  }, [dispatch, getState, selectedImage]);
+
+  const edit = useCallback(() => {
+    if (!selectedImage) {
+      return;
+    }
+    newCanvasFromImage({
+      imageDTO: selectedImage.imageDTO,
+      type: 'raster_layer',
+      withInpaintMask: true,
+      getState,
+      dispatch,
+    });
+  }, [dispatch, getState, selectedImage]);
+
   return (
     <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center" gap={2}>
       <Flex>
         <Text fontSize="lg" fontWeight="bold">
           Simple Session (staging view) {isStaging && 'STAGING'}
         </Text>
-        <Button onClick={onReset}>reset</Button>
+        <Spacer />
+        <Button onClick={onReset}>Start Over</Button>
+      </Flex>
+      <Flex gap={2}>
+        <Button onClick={vary} tooltip="Vary the image using Image to Image">
+          Vary
+        </Button>
+        <Button onClick={useAsControl} tooltip="Use this image to control a new Text to Image generation">
+          Use as Control
+        </Button>
+        <Button onClick={edit} tooltip="Edit parts of this image with Inpainting">
+          Edit
+        </Button>
       </Flex>
       <SelectedImage />
       <SessionImages />
@@ -343,7 +396,11 @@ const SelectedImage = memo(() => {
     );
   }
 
-  return <Text>No images</Text>;
+  return (
+    <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
+      <Text>No images</Text>
+    </Flex>
+  );
 });
 SelectedImage.displayName = 'SelectedImage';
 
@@ -360,6 +417,8 @@ const SessionImages = memo(() => {
   );
 });
 SessionImages.displayName = 'SessionImages';
+
+const getStagingImageId = (imageDTO: ImageDTO) => `staging-image-${imageDTO.image_name}`;
 
 const sx = {
   objectFit: 'contain',
@@ -381,8 +440,14 @@ const SessionImage = memo(({ index, imageDTO }: { index: number; imageDTO: Image
   const onClick = useCallback(() => {
     dispatch(stagingAreaImageSelected({ index }));
   }, [dispatch, index]);
+  useEffect(() => {
+    if (selectedImageIndex === index) {
+      document.getElementById(getStagingImageId(imageDTO))?.scrollIntoView();
+    }
+  }, [imageDTO, index, selectedImageIndex]);
   return (
     <DndImage
+      id={getStagingImageId(imageDTO)}
       imageDTO={imageDTO}
       asThumbnail
       onClick={onClick}
