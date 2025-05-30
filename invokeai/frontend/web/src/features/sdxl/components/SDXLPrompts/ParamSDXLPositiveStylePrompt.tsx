@@ -1,5 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
 import { positivePrompt2Changed, selectPositivePrompt2 } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
@@ -9,10 +10,17 @@ import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
+  trackWidth: false,
+  trackHeight: true,
+};
+
 export const ParamSDXLPositiveStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector(selectPositivePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  usePersistedTextAreaSize('positive_style_prompt', textareaRef, persistOptions);
+
   const { t } = useTranslation();
   const handleChange = useCallback(
     (v: string) => {
