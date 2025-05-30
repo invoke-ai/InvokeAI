@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Button,
+  ButtonGroup,
   ContextMenu,
   Flex,
   Heading,
@@ -33,12 +34,10 @@ import { StagingAreaToolbar } from 'features/controlLayers/components/StagingAre
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { canvasReset } from 'features/controlLayers/store/actions';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   canvasSessionStarted,
   selectCanvasSessionType,
-  selectIsStaging,
   selectSelectedImage,
   selectStagedImageIndex,
   selectStagedImages,
@@ -46,6 +45,7 @@ import {
   stagingAreaNextStagedImageSelected,
   stagingAreaPrevStagedImageSelected,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import type { EphemeralProgressImage } from 'features/controlLayers/store/types';
 import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
@@ -286,10 +286,12 @@ const SimpleActiveSession = memo(() => {
   const { getState, dispatch } = useAppStore();
   const selectedImage = useAppSelector(selectSelectedImage);
 
-  const isStaging = useAppSelector(selectIsStaging);
+  const startOver = useCallback(() => {
+    dispatch(canvasSessionStarted({ sessionType: null }));
+  }, [dispatch]);
 
-  const onReset = useCallback(() => {
-    dispatch(canvasReset());
+  const goAdvanced = useCallback(() => {
+    dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
   }, [dispatch]);
 
   const selectNext = useCallback(() => {
@@ -304,96 +306,34 @@ const SimpleActiveSession = memo(() => {
 
   useHotkeys(['left'], selectPrev, { preventDefault: true }, [selectPrev]);
 
-  const vary = useCallback(() => {
-    if (!selectedImage) {
-      return;
-    }
-    newCanvasFromImage({
-      imageDTO: selectedImage.imageDTO,
-      type: 'raster_layer',
-      withResize: true,
-      getState,
-      dispatch,
-    });
-  }, [dispatch, getState, selectedImage]);
-
-  const useAsControl = useCallback(() => {
-    if (!selectedImage) {
-      return;
-    }
-    newCanvasFromImage({
-      imageDTO: selectedImage.imageDTO,
-      type: 'control_layer',
-      withResize: true,
-      getState,
-      dispatch,
-    });
-  }, [dispatch, getState, selectedImage]);
-
-  const edit = useCallback(() => {
-    if (!selectedImage) {
-      return;
-    }
-    newCanvasFromImage({
-      imageDTO: selectedImage.imageDTO,
-      type: 'raster_layer',
-      withInpaintMask: true,
-      getState,
-      dispatch,
-    });
-  }, [dispatch, getState, selectedImage]);
-
   return (
     <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center" gap={2}>
-      <Flex>
+      <Flex w="full">
         <Text fontSize="lg" fontWeight="bold">
-          Simple Session (staging view) {isStaging && 'STAGING'}
+          Generations from this Session
         </Text>
         <Spacer />
-        <Button onClick={onReset}>Start Over</Button>
-      </Flex>
-      <Flex gap={2}>
-        <Button onClick={vary} tooltip="Vary the image using Image to Image">
-          Vary
-        </Button>
-        <Button onClick={useAsControl} tooltip="Use this image to control a new Text to Image generation">
-          Use as Control
-        </Button>
-        <Button onClick={edit} tooltip="Edit parts of this image with Inpainting">
-          Edit
+        <Button size="sm" onClick={startOver}>
+          Start Over
         </Button>
       </Flex>
-      <SelectedImage />
+      <SelectedImageOrProgressImage />
       <SessionImages />
     </Flex>
   );
 });
 SimpleActiveSession.displayName = 'SimpleActiveSession';
 
-const SelectedImage = memo(() => {
+const SelectedImageOrProgressImage = memo(() => {
   const progressImage = useStore($lastCanvasProgressImage);
   const selectedImage = useAppSelector(selectSelectedImage);
 
   if (progressImage) {
-    return (
-      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
-        <Image
-          objectFit="contain"
-          maxH="full"
-          maxW="full"
-          src={progressImage.image.dataURL}
-          width={progressImage.image.width}
-        />
-      </Flex>
-    );
+    return <ProgressImage progressImage={progressImage} />;
   }
 
   if (selectedImage) {
-    return (
-      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
-        <DndImage imageDTO={selectedImage.imageDTO} />
-      </Flex>
-    );
+    return <SelectedImage imageDTO={selectedImage.imageDTO} />;
   }
 
   return (
@@ -402,12 +342,80 @@ const SelectedImage = memo(() => {
     </Flex>
   );
 });
+SelectedImageOrProgressImage.displayName = 'SelectedImageOrProgressImage';
+
+const SelectedImage = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+  const { getState, dispatch } = useAppStore();
+
+  const vary = useCallback(() => {
+    newCanvasFromImage({
+      imageDTO,
+      type: 'raster_layer',
+      withResize: true,
+      getState,
+      dispatch,
+    });
+  }, [dispatch, getState, imageDTO]);
+
+  const useAsControl = useCallback(() => {
+    newCanvasFromImage({
+      imageDTO,
+      type: 'control_layer',
+      withResize: true,
+      getState,
+      dispatch,
+    });
+  }, [dispatch, getState, imageDTO]);
+
+  const edit = useCallback(() => {
+    newCanvasFromImage({
+      imageDTO,
+      type: 'raster_layer',
+      withInpaintMask: true,
+      getState,
+      dispatch,
+    });
+  }, [dispatch, getState, imageDTO]);
+  return (
+    <Flex position="relative" alignItems="center" justifyContent="center" minH={0} minW={0} h="full" w="full">
+      <DndImage imageDTO={imageDTO} />
+      <Flex position="absolute" gap={2} top={2} translateX="50%">
+        <ButtonGroup isAttached={false} size="sm">
+          <Button onClick={vary} tooltip="Vary the image using Image to Image">
+            Vary
+          </Button>
+          <Button onClick={useAsControl} tooltip="Use this image to control a new Text to Image generation">
+            Use as Control
+          </Button>
+          <Button onClick={edit} tooltip="Edit parts of this image with Inpainting">
+            Edit
+          </Button>
+        </ButtonGroup>
+      </Flex>
+    </Flex>
+  );
+});
 SelectedImage.displayName = 'SelectedImage';
+
+const ProgressImage = memo(({ progressImage }: { progressImage: EphemeralProgressImage }) => {
+  return (
+    <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
+      <Image
+        objectFit="contain"
+        maxH="full"
+        maxW="full"
+        src={progressImage.image.dataURL}
+        width={progressImage.image.width}
+      />
+    </Flex>
+  );
+});
+ProgressImage.displayName = 'ProgressImage';
 
 const SessionImages = memo(() => {
   const stagedImages = useAppSelector(selectStagedImages);
   return (
-    <Flex gap={2} h={108} maxW="full" overflow="scroll">
+    <Flex position="relative" gap={2} h={108} maxW="full" overflow="scroll">
       <Spacer />
       {stagedImages.map(({ imageDTO }, index) => (
         <SessionImage key={imageDTO.image_name} index={index} imageDTO={imageDTO} />
@@ -442,6 +450,7 @@ const SessionImage = memo(({ index, imageDTO }: { index: number; imageDTO: Image
   }, [dispatch, index]);
   useEffect(() => {
     if (selectedImageIndex === index) {
+      // this doesn't work when the DndImage is in a popover... why
       document.getElementById(getStagingImageId(imageDTO))?.scrollIntoView();
     }
   }, [imageDTO, index, selectedImageIndex]);
