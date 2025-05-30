@@ -11,7 +11,7 @@ from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_ut
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
-def is_state_dict_likely_in_aitoolkit_format(state_dict: dict[str, Any], metadata: dict[str, Any]) -> bool:
+def is_state_dict_likely_in_aitoolkit_format(state_dict: dict[str, Any], metadata: dict[str, Any] = None) -> bool:
     if metadata:
         software = json.loads(metadata.get("software", "{}"))
         return software.get("name") == "ai-toolkit"
@@ -19,7 +19,7 @@ def is_state_dict_likely_in_aitoolkit_format(state_dict: dict[str, Any], metadat
     return any("diffusion_model" == k.split(".", 1)[0] for k in state_dict.keys())
 
 
-def lora_model_from_aitoolkit_state_dict(state_dict: dict[str, torch.Tensor]) -> ModelPatchRaw:
+def lora_model_from_flux_aitoolkit_state_dict(state_dict: dict[str, torch.Tensor]) -> ModelPatchRaw:
     # Group keys by layer.
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = defaultdict(dict)
     for key, value in state_dict.items():
