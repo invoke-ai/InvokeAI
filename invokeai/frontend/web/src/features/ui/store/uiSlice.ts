@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { newSessionRequested } from 'features/controlLayers/store/actions';
+import type { Dimensions } from 'features/controlLayers/store/types';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { atom } from 'nanostores';
 
@@ -15,8 +16,8 @@ const initialUIState: UIState = {
   shouldShowProgressInViewer: true,
   accordions: {},
   expanders: {},
+  textAreaSizes: {},
   shouldShowNotificationV2: true,
-  positivePromptBoxHeight: 40,
 };
 
 export const uiSlice = createSlice({
@@ -43,11 +44,12 @@ export const uiSlice = createSlice({
       const { id, isOpen } = action.payload;
       state.expanders[id] = isOpen;
     },
+    textAreaSizesStateChanged: (state, action: PayloadAction<{ id: string; size: Partial<Dimensions> }>) => {
+      const { id, size } = action.payload;
+      state.textAreaSizes[id] = size;
+    },
     shouldShowNotificationChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowNotificationV2 = action.payload;
-    },
-    positivePromptBoxHeightChanged: (state, action: PayloadAction<number>) => {
-      state.positivePromptBoxHeight = action.payload;
     },
   },
   extraReducers(builder) {
@@ -68,7 +70,7 @@ export const {
   accordionStateChanged,
   expanderStateChanged,
   shouldShowNotificationChanged,
-  positivePromptBoxHeightChanged,
+  textAreaSizesStateChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
@@ -105,5 +107,3 @@ const TABS_WITH_RIGHT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as
 export const RIGHT_PANEL_MIN_SIZE_PX = 390;
 export const $isRightPanelOpen = atom(true);
 export const selectWithRightPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_RIGHT_PANEL.includes(ui.activeTab));
-
-export const selectPositivePromptBoxHeight = createSelector(selectUiSlice, (ui) => ui.positivePromptBoxHeight);

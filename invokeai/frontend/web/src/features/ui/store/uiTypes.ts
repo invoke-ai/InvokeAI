@@ -1,3 +1,5 @@
+import type { Dimensions } from 'features/controlLayers/store/types';
+
 export type TabName = 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
 export type CanvasRightPanelTabName = 'layers' | 'gallery';
 
@@ -31,11 +33,11 @@ export interface UIState {
    */
   expanders: Record<string, boolean>;
   /**
+   * The size of textareas. The key is the id of the text area, and the value is an object representing its width and/or height.
+   */
+  textAreaSizes: Record<string, Partial<Dimensions>>;
+  /**
    * Whether or not to show the user the open notification. Bump version to reset users who may have closed previous version.
    */
   shouldShowNotificationV2: boolean;
-  /**
-   * The height of the positive prompt box.
-   */
-  positivePromptBoxHeight: number;
 }
