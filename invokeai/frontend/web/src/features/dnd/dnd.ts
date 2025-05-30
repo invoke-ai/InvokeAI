@@ -368,9 +368,8 @@ export const newCanvasFromImageDndTarget: DndTarget<NewCanvasFromImageDndTargetD
     return true;
   },
   handler: ({ sourceData, targetData, dispatch, getState }) => {
-    const { type, withResize } = targetData.payload;
     const { imageDTO } = sourceData.payload;
-    newCanvasFromImage({ type, imageDTO, dispatch, getState, withResize });
+    newCanvasFromImage({ imageDTO, dispatch, getState, ...targetData.payload });
   },
 };
 //#endregion
