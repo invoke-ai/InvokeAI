@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
+  Box,
   Button,
   ButtonGroup,
   ContextMenu,
@@ -40,12 +41,10 @@ import {
   selectCanvasSessionType,
   selectSelectedImage,
   selectStagedImageIndex,
-  selectStagedImages,
   stagingAreaImageSelected,
   stagingAreaNextStagedImageSelected,
   stagingAreaPrevStagedImageSelected,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import type { EphemeralProgressImage } from 'features/controlLayers/store/types';
 import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
@@ -55,7 +54,8 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiDotsThreeOutlineVerticalFill, PiUploadBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
-import { $lastCanvasProgressImage } from 'services/events/stores';
+import type { ProgressAndResult } from 'services/events/stores';
+import { $progressImages, useMapSelector } from 'services/events/stores';
 import type { Equals, Param0 } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -288,6 +288,7 @@ const SimpleActiveSession = memo(() => {
 
   const startOver = useCallback(() => {
     dispatch(canvasSessionStarted({ sessionType: null }));
+    $progressImages.set({});
   }, [dispatch]);
 
   const goAdvanced = useCallback(() => {
@@ -325,15 +326,10 @@ const SimpleActiveSession = memo(() => {
 SimpleActiveSession.displayName = 'SimpleActiveSession';
 
 const SelectedImageOrProgressImage = memo(() => {
-  const progressImage = useStore($lastCanvasProgressImage);
   const selectedImage = useAppSelector(selectSelectedImage);
 
-  if (progressImage) {
-    return <ProgressImage progressImage={progressImage} />;
-  }
-
   if (selectedImage) {
-    return <SelectedImage imageDTO={selectedImage.imageDTO} />;
+    return <FullSizeImage sessionId={selectedImage.sessionId} />;
   }
 
   return (
@@ -397,36 +393,107 @@ const SelectedImage = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
 });
 SelectedImage.displayName = 'SelectedImage';
 
-const ProgressImage = memo(({ progressImage }: { progressImage: EphemeralProgressImage }) => {
+const FullSizeImage = memo(({ sessionId }: { sessionId: string }) => {
+  const _progressImage = useMapSelector(sessionId, $progressImages);
+
+  if (!_progressImage) {
+    return (
+      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
+        <Text>Pending</Text>
+      </Flex>
+    );
+  }
+
+  if (_progressImage.resultImage) {
+    return <SelectedImage imageDTO={_progressImage.resultImage} />;
+  }
+
+  if (_progressImage.progressImage) {
+    return (
+      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
+        <Image
+          objectFit="contain"
+          maxH="full"
+          maxW="full"
+          src={_progressImage.progressImage.dataURL}
+          width={_progressImage.progressImage.width}
+        />
+      </Flex>
+    );
+  }
+
   return (
     <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
-      <Image
-        objectFit="contain"
-        maxH="full"
-        maxW="full"
-        src={progressImage.image.dataURL}
-        width={progressImage.image.width}
-      />
+      <Text>No progress yet</Text>
     </Flex>
   );
 });
-ProgressImage.displayName = 'ProgressImage';
+FullSizeImage.displayName = 'FullSizeImage';
 
 const SessionImages = memo(() => {
-  const stagedImages = useAppSelector(selectStagedImages);
+  const progressImages = useStore($progressImages);
   return (
     <Flex position="relative" gap={2} h={108} maxW="full" overflow="scroll">
       <Spacer />
-      {stagedImages.map(({ imageDTO }, index) => (
-        <SessionImage key={imageDTO.image_name} index={index} imageDTO={imageDTO} />
-      ))}
+      {Object.values(progressImages).map((data, index) => {
+        if (data.type === 'staged') {
+          return <SessionImage key={data.sessionId} index={index} data={data} />;
+        } else {
+          return <ProgressImagePreview key={data.sessionId} index={index} data={data} />;
+        }
+      })}
       <Spacer />
     </Flex>
   );
 });
 SessionImages.displayName = 'SessionImages';
 
-const getStagingImageId = (imageDTO: ImageDTO) => `staging-image-${imageDTO.image_name}`;
+const ProgressImagePreview = ({ index, data }: { index: number; data: ProgressAndResult }) => {
+  const dispatch = useAppDispatch();
+  const selectedImageIndex = useAppSelector(selectStagedImageIndex);
+  const onClick = useCallback(() => {
+    dispatch(stagingAreaImageSelected({ index }));
+  }, [dispatch, index]);
+
+  useEffect(() => {
+    if (selectedImageIndex === index) {
+      // this doesn't work when the DndImage is in a popover... why
+      document.getElementById(getStagingImageId(data.sessionId))?.scrollIntoView();
+    }
+  }, [data.sessionId, index, selectedImageIndex]);
+
+  if (data.resultImage) {
+    return (
+      <Image
+        id={getStagingImageId(data.sessionId)}
+        objectFit="contain"
+        maxH="full"
+        maxW="full"
+        src={data.resultImage.thumbnail_url}
+        width={data.resultImage.width}
+        onClick={onClick}
+      />
+    );
+  }
+
+  if (data.progressImage) {
+    return (
+      <Image
+        id={getStagingImageId(data.sessionId)}
+        objectFit="contain"
+        maxH="full"
+        maxW="full"
+        src={data.progressImage.dataURL}
+        width={data.progressImage.width}
+        onClick={onClick}
+      />
+    );
+  }
+
+  return <Box id={getStagingImageId(data.sessionId)} bg="blue" h="full" w={108} borderWidth={1} onClick={onClick} />;
+};
+
+const getStagingImageId = (session_id: string) => `staging-image-${session_id}`;
 
 const sx = {
   objectFit: 'contain',
@@ -442,7 +509,7 @@ const sx = {
     opacity: 0.5,
   },
 } satisfies SystemStyleObject;
-const SessionImage = memo(({ index, imageDTO }: { index: number; imageDTO: ImageDTO }) => {
+const SessionImage = memo(({ index, data }: { index: number; data: ProgressAndResult }) => {
   const dispatch = useAppDispatch();
   const selectedImageIndex = useAppSelector(selectStagedImageIndex);
   const onClick = useCallback(() => {
@@ -451,17 +518,19 @@ const SessionImage = memo(({ index, imageDTO }: { index: number; imageDTO: Image
   useEffect(() => {
     if (selectedImageIndex === index) {
       // this doesn't work when the DndImage is in a popover... why
-      document.getElementById(getStagingImageId(imageDTO))?.scrollIntoView();
+      document.getElementById(getStagingImageId(data.sessionId))?.scrollIntoView();
     }
-  }, [imageDTO, index, selectedImageIndex]);
+  }, [data.sessionId, index, selectedImageIndex]);
   return (
     <DndImage
-      id={getStagingImageId(imageDTO)}
-      imageDTO={imageDTO}
+      id={getStagingImageId(data.sessionId)}
+      imageDTO={data.imageDTO}
       asThumbnail
       onClick={onClick}
       data-is-selected={selectedImageIndex === index}
+      w={data.imageDTO.width}
       sx={sx}
+      borderWidth={1}
     />
   );
 });
