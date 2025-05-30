@@ -438,9 +438,15 @@ export type LoRA = {
 };
 
 export type StagingAreaImage = {
+  type: 'staged';
+  sessionId: string;
   imageDTO: ImageDTO;
   offsetX: number;
   offsetY: number;
+};
+export type StagingAreaProgressImage = {
+  type: 'progress';
+  sessionId: string;
 };
 export type EphemeralProgressImage = { sessionId: string; image: ProgressImage };
 
