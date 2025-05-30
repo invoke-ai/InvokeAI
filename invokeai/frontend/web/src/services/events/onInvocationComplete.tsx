@@ -13,7 +13,11 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
-import { $lastCanvasProgressImage, $lastProgressEvent } from 'services/events/stores';
+import {
+  $lastCanvasProgressImage,
+  $lastProgressEvent,
+  $progressImages,
+} from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
@@ -184,8 +188,19 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     }
 
     flushSync(() => {
-      dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+      dispatch(
+        stagingAreaImageStaged({
+          stagingAreaImage: { type: 'staged', sessionId: data.session_id, imageDTO, offsetX: 0, offsetY: 0 },
+        })
+      );
     });
+
+    const progressData = $progressImages.get()[data.session_id];
+    if (progressData) {
+      $progressImages.setKey(data.session_id, { ...progressData, isFinished: true, resultImage: imageDTO });
+    } else {
+      $progressImages.setKey(data.session_id, { sessionId: data.session_id, isFinished: true, resultImage: imageDTO });
+    }
 
     $lastCanvasProgressImage.set(null);
   };

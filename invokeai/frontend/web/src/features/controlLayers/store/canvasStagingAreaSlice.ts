@@ -2,12 +2,12 @@ import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolki
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import type { StagingAreaImage } from 'features/controlLayers/store/types';
+import type { StagingAreaImage, StagingAreaProgressImage } from 'features/controlLayers/store/types';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 
 type CanvasStagingAreaState = {
   sessionType: 'simple' | 'advanced' | null;
-  images: StagingAreaImage[];
+  images: (StagingAreaImage | StagingAreaProgressImage)[];
   selectedImageIndex: number;
 };
 
@@ -25,8 +25,28 @@ export const canvasSessionSlice = createSlice({
   reducers: {
     stagingAreaImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
       const { stagingAreaImage } = action.payload;
-      state.images.push(stagingAreaImage);
-      state.selectedImageIndex = state.images.length - 1;
+      let didReplace = false;
+      const newImages = [];
+      for (const i of state.images) {
+        if (i.sessionId === stagingAreaImage.sessionId) {
+          newImages.push(stagingAreaImage);
+          didReplace = true;
+        } else {
+          newImages.push(i);
+        }
+      }
+      if (!didReplace) {
+        newImages.push(stagingAreaImage);
+      }
+      state.images = newImages;
+    },
+    stagingAreaGenerationStarted: (state, action: PayloadAction<{ sessionId: string }>) => {
+      const { sessionId } = action.payload;
+      state.images.push({ type: 'progress', sessionId });
+    },
+    stagingAreaGenerationFinished: (state, action: PayloadAction<{ sessionId: string }>) => {
+      const { sessionId } = action.payload;
+      state.images = state.images.filter((data) => data.sessionId !== sessionId);
     },
     stagingAreaImageSelected: (state, action: PayloadAction<{ index: number }>) => {
       const { index } = action.payload;
@@ -61,6 +81,8 @@ export const canvasSessionSlice = createSlice({
 
 export const {
   stagingAreaImageStaged,
+  stagingAreaGenerationStarted,
+  stagingAreaGenerationFinished,
   stagingAreaStagedImageDiscarded,
   stagingAreaReset,
   stagingAreaImageSelected,
