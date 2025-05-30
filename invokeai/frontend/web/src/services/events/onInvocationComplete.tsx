@@ -23,9 +23,14 @@ const log = logger('events');
 const nodeTypeDenylist = ['load_image', 'image'];
 
 export const buildOnInvocationComplete = (getState: () => RootState, dispatch: AppDispatch) => {
-  const addImagesToGallery = (data: S['InvocationCompleteEvent'], imageDTOs: ImageDTO[]) => {
+  const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
+      return;
+    }
+
+    const imageDTOs = await getResultImageDTOs(data);
+    if (imageDTOs.length === 0) {
       return;
     }
 
@@ -161,14 +166,15 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       upsertExecutionState(nes.nodeId, nes);
     }
 
-    const imageDTOs = await getResultImageDTOs(data);
-    addImagesToGallery(data, imageDTOs);
+    await addImagesToGallery(data);
   };
 
   const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
     if (!isCanvasOutputEvent(data)) {
       return;
     }
+
+    await addImagesToGallery(data);
 
     // We expect only a single image in the canvas output
     const imageDTO = (await getResultImageDTOs(data))[0];
@@ -185,8 +191,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
   };
 
   const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
-    const imageDTOs = await getResultImageDTOs(data);
-    addImagesToGallery(data, imageDTOs);
+    await addImagesToGallery(data);
   };
 
   return async (data: S['InvocationCompleteEvent']) => {
