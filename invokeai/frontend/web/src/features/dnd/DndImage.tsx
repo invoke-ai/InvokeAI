@@ -9,7 +9,7 @@ import { createSingleImageDragPreview, setSingleImageDragPreview } from 'feature
 import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { memo, useEffect, useRef, useState } from 'react';
+import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 const sx = {
@@ -23,69 +23,68 @@ const sx = {
   },
 } satisfies SystemStyleObject;
 
-/* eslint-disable-next-line @typescript-eslint/no-namespace */
-export namespace DndImage {
-  export interface Props extends ImageProps {
-    imageDTO: ImageDTO;
-    asThumbnail?: boolean;
-  }
-}
+type Props = {
+  imageDTO: ImageDTO;
+  asThumbnail?: boolean;
+} & ImageProps;
 
-export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: DndImage.Props) => {
-  const store = useAppStore();
-  const [isDragging, setIsDragging] = useState(false);
-  const ref = useRef<HTMLImageElement>(null);
-  const [dragPreviewState, setDragPreviewState] = useState<DndDragPreviewSingleImageState | null>(null);
+export const DndImage = memo(
+  forwardRef(({ imageDTO, asThumbnail, ...rest }: Props, forwardedRef) => {
+    const store = useAppStore();
+    const [isDragging, setIsDragging] = useState(false);
+    const ref = useRef<HTMLImageElement>(null);
+    useImperativeHandle(forwardedRef, () => ref.current!, []);
+    const [dragPreviewState, setDragPreviewState] = useState<DndDragPreviewSingleImageState | null>(null);
 
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) {
-      return;
-    }
-    return combine(
-      firefoxDndFix(element),
-      draggable({
-        element,
-        getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
-        onDragStart: () => {
-          setIsDragging(true);
-          if ($imageViewer.get()) {
-            $imageViewer.set(false);
-          }
-        },
-        onDrop: () => {
-          setIsDragging(false);
-        },
-        onGenerateDragPreview: (args) => {
-          if (singleImageDndSource.typeGuard(args.source.data)) {
-            setSingleImageDragPreview({
-              singleImageDndData: args.source.data,
-              onGenerateDragPreviewArgs: args,
-              setDragPreviewState,
-            });
-          }
-        },
-      })
+    useEffect(() => {
+      const element = ref.current;
+      if (!element) {
+        return;
+      }
+      return combine(
+        firefoxDndFix(element),
+        draggable({
+          element,
+          getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
+          onDragStart: () => {
+            setIsDragging(true);
+            if ($imageViewer.get()) {
+              $imageViewer.set(false);
+            }
+          },
+          onDrop: () => {
+            setIsDragging(false);
+          },
+          onGenerateDragPreview: (args) => {
+            if (singleImageDndSource.typeGuard(args.source.data)) {
+              setSingleImageDragPreview({
+                singleImageDndData: args.source.data,
+                onGenerateDragPreviewArgs: args,
+                setDragPreviewState,
+              });
+            }
+          },
+        })
+      );
+    }, [forwardedRef, imageDTO, store]);
+
+    useImageContextMenu(imageDTO, ref);
+
+    return (
+      <>
+        <Image
+          role="button"
+          ref={ref}
+          src={asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
+          fallbackSrc={asThumbnail ? undefined : imageDTO.thumbnail_url}
+          w={imageDTO.width}
+          sx={sx}
+          data-is-dragging={isDragging}
+          {...rest}
+        />
+        {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
+      </>
     );
-  }, [imageDTO, store]);
-
-  useImageContextMenu(imageDTO, ref);
-
-  return (
-    <>
-      <Image
-        role="button"
-        ref={ref}
-        src={asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
-        fallbackSrc={asThumbnail ? undefined : imageDTO.thumbnail_url}
-        w={imageDTO.width}
-        sx={sx}
-        data-is-dragging={isDragging}
-        {...rest}
-      />
-      {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
-    </>
-  );
-});
-
+  })
+);
 DndImage.displayName = 'DndImage';
