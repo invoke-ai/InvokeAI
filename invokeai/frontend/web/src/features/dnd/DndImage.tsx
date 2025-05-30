@@ -9,7 +9,7 @@ import { createSingleImageDragPreview, setSingleImageDragPreview } from 'feature
 import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 const sx = {
@@ -34,10 +34,11 @@ export namespace DndImage {
 export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: DndImage.Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
-  const [element, ref] = useState<HTMLImageElement | null>(null);
+  const ref = useRef<HTMLImageElement>(null);
   const [dragPreviewState, setDragPreviewState] = useState<DndDragPreviewSingleImageState | null>(null);
 
   useEffect(() => {
+    const element = ref.current;
     if (!element) {
       return;
     }
@@ -66,9 +67,9 @@ export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: DndImage.Props
         },
       })
     );
-  }, [imageDTO, element, store]);
+  }, [imageDTO, store]);
 
-  useImageContextMenu(imageDTO, element);
+  useImageContextMenu(imageDTO, ref);
 
   return (
     <>
