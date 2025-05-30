@@ -1,7 +1,7 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
-import { Box, Button, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Tab } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -15,8 +15,9 @@ import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
-export const CanvasRightPanel = memo(() => {
+export const CanvasRightPanelStacked = memo(() => {
   const { t } = useTranslation();
   const activeTab = useAppSelector(selectActiveTabCanvasRightPanel);
   const imageViewer = useImageViewer();
@@ -46,29 +47,21 @@ export const CanvasRightPanel = memo(() => {
   );
 
   return (
-    <Tabs index={tabIndex} onChange={onChangeTab} w="full" h="full" display="flex" flexDir="column">
-      <TabList alignItems="center">
-        <PanelTabs />
-        <Spacer />
-        <Button size="sm" variant="ghost" onClick={onClickViewerToggleButton}>
-          {t('gallery.openViewer')}
-        </Button>
-      </TabList>
-      <TabPanels w="full" h="full">
-        <TabPanel w="full" h="full" p={0} pt={3}>
-          <CanvasManagerProviderGate>
-            <CanvasLayersPanelContent />
-          </CanvasManagerProviderGate>
-        </TabPanel>
-        <TabPanel w="full" h="full" p={0} pt={3}>
-          <GalleryPanelContent />
-        </TabPanel>
-      </TabPanels>
-    </Tabs>
+    <PanelGroup direction="vertical">
+      <Panel>
+        <GalleryPanelContent />
+      </Panel>
+      <PanelResizeHandle />
+      <Panel>
+        <CanvasManagerProviderGate>
+          <CanvasLayersPanelContent />
+        </CanvasManagerProviderGate>
+      </Panel>
+    </PanelGroup>
   );
 });
 
-CanvasRightPanel.displayName = 'CanvasRightPanel';
+CanvasRightPanelStacked.displayName = 'CanvasRightPanelStacked';
 
 const PanelTabs = memo(() => {
   const { t } = useTranslation();

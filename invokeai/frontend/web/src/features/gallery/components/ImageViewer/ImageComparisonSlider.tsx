@@ -21,6 +21,7 @@ const HANDLE_LEFT_INITIAL_PX = `calc(${INITIAL_POS} - ${HANDLE_HITBOX / 2}px)`;
 
 export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
   const comparisonFit = useAppSelector(selectComparisonFit);
+
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
   // How wide the first image is

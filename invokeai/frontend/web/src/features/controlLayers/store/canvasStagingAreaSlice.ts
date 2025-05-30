@@ -2,60 +2,94 @@ import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolki
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import type { StagingAreaImage } from 'features/controlLayers/store/types';
+import type { StagingAreaImage, StagingAreaProgressImage } from 'features/controlLayers/store/types';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 
-import { newSessionRequested } from './actions';
-
 type CanvasStagingAreaState = {
-  stagedImages: StagingAreaImage[];
-  selectedStagedImageIndex: number;
+  sessionType: 'simple' | 'advanced' | null;
+  images: (StagingAreaImage | StagingAreaProgressImage)[];
+  selectedImageIndex: number;
 };
 
-const initialState: CanvasStagingAreaState = {
-  stagedImages: [],
-  selectedStagedImageIndex: 0,
+const INITIAL_STATE: CanvasStagingAreaState = {
+  sessionType: null,
+  images: [],
+  selectedImageIndex: 0,
 };
 
-export const canvasStagingAreaSlice = createSlice({
-  name: 'canvasStagingArea',
-  initialState,
+const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
+
+export const canvasSessionSlice = createSlice({
+  name: 'canvasSession',
+  initialState: getInitialState(),
   reducers: {
     stagingAreaImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
       const { stagingAreaImage } = action.payload;
-      state.stagedImages.push(stagingAreaImage);
-      state.selectedStagedImageIndex = state.stagedImages.length - 1;
+      let didReplace = false;
+      const newImages = [];
+      for (const i of state.images) {
+        if (i.sessionId === stagingAreaImage.sessionId) {
+          newImages.push(stagingAreaImage);
+          didReplace = true;
+        } else {
+          newImages.push(i);
+        }
+      }
+      if (!didReplace) {
+        newImages.push(stagingAreaImage);
+      }
+      state.images = newImages;
+    },
+    stagingAreaGenerationStarted: (state, action: PayloadAction<{ sessionId: string }>) => {
+      const { sessionId } = action.payload;
+      state.images.push({ type: 'progress', sessionId });
+    },
+    stagingAreaGenerationFinished: (state, action: PayloadAction<{ sessionId: string }>) => {
+      const { sessionId } = action.payload;
+      state.images = state.images.filter((data) => data.sessionId !== sessionId);
+    },
+    stagingAreaImageSelected: (state, action: PayloadAction<{ index: number }>) => {
+      const { index } = action.payload;
+      state.selectedImageIndex = index;
     },
     stagingAreaNextStagedImageSelected: (state) => {
-      state.selectedStagedImageIndex = (state.selectedStagedImageIndex + 1) % state.stagedImages.length;
+      state.selectedImageIndex = (state.selectedImageIndex + 1) % state.images.length;
     },
     stagingAreaPrevStagedImageSelected: (state) => {
-      state.selectedStagedImageIndex =
-        (state.selectedStagedImageIndex - 1 + state.stagedImages.length) % state.stagedImages.length;
+      state.selectedImageIndex = (state.selectedImageIndex - 1 + state.images.length) % state.images.length;
     },
     stagingAreaStagedImageDiscarded: (state, action: PayloadAction<{ index: number }>) => {
       const { index } = action.payload;
-      state.stagedImages.splice(index, 1);
-      state.selectedStagedImageIndex = Math.min(state.selectedStagedImageIndex, state.stagedImages.length - 1);
+      state.images.splice(index, 1);
+      state.selectedImageIndex = Math.min(state.selectedImageIndex, state.images.length - 1);
     },
     stagingAreaReset: (state) => {
-      state.stagedImages = [];
-      state.selectedStagedImageIndex = 0;
+      state.images = [];
+      state.selectedImageIndex = 0;
+    },
+    canvasSessionStarted: (_, action: PayloadAction<{ sessionType: CanvasStagingAreaState['sessionType'] }>) => {
+      const { sessionType } = action.payload;
+      const state = getInitialState();
+      state.sessionType = sessionType;
+      return state;
     },
   },
   extraReducers(builder) {
-    builder.addCase(canvasReset, () => deepClone(initialState));
-    builder.addMatcher(newSessionRequested, () => deepClone(initialState));
+    builder.addCase(canvasReset, () => getInitialState());
   },
 });
 
 export const {
   stagingAreaImageStaged,
+  stagingAreaGenerationStarted,
+  stagingAreaGenerationFinished,
   stagingAreaStagedImageDiscarded,
   stagingAreaReset,
+  stagingAreaImageSelected,
   stagingAreaNextStagedImageSelected,
   stagingAreaPrevStagedImageSelected,
-} = canvasStagingAreaSlice.actions;
+  canvasSessionStarted,
+} = canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
@@ -63,13 +97,13 @@ const migrate = (state: any): any => {
 };
 
 export const canvasStagingAreaPersistConfig: PersistConfig<CanvasStagingAreaState> = {
-  name: canvasStagingAreaSlice.name,
-  initialState,
+  name: canvasSessionSlice.name,
+  initialState: getInitialState(),
   migrate,
   persistDenylist: [],
 };
 
-export const selectCanvasStagingAreaSlice = (s: RootState) => s.canvasStagingArea;
+export const selectCanvasStagingAreaSlice = (s: RootState) => s[canvasSessionSlice.name];
 
 /**
  * Selects if we should be staging images. This is true if:
@@ -80,7 +114,7 @@ export const selectIsStaging = createSelector(
   selectCanvasQueueCounts,
   selectCanvasStagingAreaSlice,
   ({ data }, staging) => {
-    if (staging.stagedImages.length > 0) {
+    if (staging.images.length > 0) {
       return true;
     }
     if (!data) {
@@ -91,13 +125,18 @@ export const selectIsStaging = createSelector(
 );
 export const selectStagedImageIndex = createSelector(
   selectCanvasStagingAreaSlice,
-  (stagingArea) => stagingArea.selectedStagedImageIndex
+  (stagingArea) => stagingArea.selectedImageIndex
 );
 export const selectSelectedImage = createSelector(
   [selectCanvasStagingAreaSlice, selectStagedImageIndex],
-  (stagingArea, index) => stagingArea.stagedImages[index] ?? null
+  (stagingArea, index) => stagingArea.images[index] ?? null
 );
+export const selectStagedImages = createSelector(selectCanvasStagingAreaSlice, (stagingArea) => stagingArea.images);
 export const selectImageCount = createSelector(
   selectCanvasStagingAreaSlice,
-  (stagingArea) => stagingArea.stagedImages.length
+  (stagingArea) => stagingArea.images.length
+);
+export const selectCanvasSessionType = createSelector(
+  selectCanvasStagingAreaSlice,
+  (canvasSession) => canvasSession.sessionType
 );

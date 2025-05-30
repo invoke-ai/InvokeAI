@@ -1,7 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { UploadImageButton } from 'common/hooks/useImageUploadButton';
+import { UploadImageIconButton } from 'common/hooks/useImageUploadButton';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import type { setGlobalReferenceImageDndTarget, setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -51,7 +51,7 @@ export const IPAdapterImagePreview = memo(
     return (
       <Flex position="relative" w="full" h="full" alignItems="center" data-error={!imageDTO && !image?.image_name}>
         {!imageDTO && (
-          <UploadImageButton
+          <UploadImageIconButton
             w="full"
             h="full"
             isError={!imageDTO && !image?.image_name}

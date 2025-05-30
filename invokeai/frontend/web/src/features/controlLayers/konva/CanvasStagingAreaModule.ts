@@ -78,7 +78,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     const { x, y } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 
-    this.selectedImage = stagingArea.stagedImages[stagingArea.selectedStagedImageIndex] ?? null;
+    this.selectedImage = stagingArea.images[stagingArea.selectedImageIndex] ?? null;
     this.konva.group.position({ x, y });
 
     if (this.selectedImage) {

@@ -6,29 +6,35 @@ import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } fro
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { CANVAS_OUTPUT_PREFIX } from 'features/nodes/util/graph/graphBuilderUtils';
+import { isCanvasOutputEvent } from 'features/nodes/util/graph/graphBuilderUtils';
+import { flushSync } from 'react-dom';
 import type { ApiTagDescription } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
-import { $lastProgressEvent } from 'services/events/stores';
+import {
+  $lastCanvasProgressImage,
+  $lastProgressEvent,
+  $progressImages,
+} from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
-const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
-  return data.invocation_source_id.split(':')[0] === CANVAS_OUTPUT_PREFIX;
-};
-
 const nodeTypeDenylist = ['load_image', 'image'];
 
 export const buildOnInvocationComplete = (getState: () => RootState, dispatch: AppDispatch) => {
-  const addImagesToGallery = (data: S['InvocationCompleteEvent'], imageDTOs: ImageDTO[]) => {
+  const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
+      return;
+    }
+
+    const imageDTOs = await getResultImageDTOs(data);
+    if (imageDTOs.length === 0) {
       return;
     }
 
@@ -164,36 +170,43 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       upsertExecutionState(nes.nodeId, nes);
     }
 
-    const imageDTOs = await getResultImageDTOs(data);
-    addImagesToGallery(data, imageDTOs);
+    await addImagesToGallery(data);
   };
 
   const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
-    const imageDTOs = await getResultImageDTOs(data);
+    if (!isCanvasOutputEvent(data)) {
+      return;
+    }
+
+    await addImagesToGallery(data);
 
     // We expect only a single image in the canvas output
-    const imageDTO = imageDTOs[0];
+    const imageDTO = (await getResultImageDTOs(data))[0];
+
     if (!imageDTO) {
       return;
     }
 
-    if (data.destination === 'canvas') {
-      // TODO(psyche): Can/should we let canvas handle this itself?
-      if (isCanvasOutputNode(data)) {
-        if (data.result.type === 'image_output') {
-          dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-        }
-        addImagesToGallery(data, [imageDTO]);
-      }
-    } else if (!imageDTO.is_intermediate) {
-      // Desintaion is gallery
-      addImagesToGallery(data, [imageDTO]);
+    flushSync(() => {
+      dispatch(
+        stagingAreaImageStaged({
+          stagingAreaImage: { type: 'staged', sessionId: data.session_id, imageDTO, offsetX: 0, offsetY: 0 },
+        })
+      );
+    });
+
+    const progressData = $progressImages.get()[data.session_id];
+    if (progressData) {
+      $progressImages.setKey(data.session_id, { ...progressData, isFinished: true, resultImage: imageDTO });
+    } else {
+      $progressImages.setKey(data.session_id, { sessionId: data.session_id, isFinished: true, resultImage: imageDTO });
     }
+
+    $lastCanvasProgressImage.set(null);
   };
 
   const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
-    const imageDTOs = await getResultImageDTOs(data);
-    addImagesToGallery(data, imageDTOs);
+    await addImagesToGallery(data);
   };
 
   return async (data: S['InvocationCompleteEvent']) => {

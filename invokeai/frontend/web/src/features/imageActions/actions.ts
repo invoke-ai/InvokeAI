@@ -2,9 +2,9 @@ import type { AppDispatch, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { selectDefaultIPAdapter, selectDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset } from 'features/controlLayers/store/actions';
 import {
   bboxChangedFromCanvas,
+  canvasClearHistory,
   controlLayerAdded,
   entityRasterized,
   inpaintMaskAdded,
@@ -14,6 +14,7 @@ import {
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -146,10 +147,11 @@ export const newCanvasFromImage = async (arg: {
   imageDTO: ImageDTO;
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
   withResize?: boolean;
+  withInpaintMask?: boolean;
   dispatch: AppDispatch;
   getState: () => RootState;
 }) => {
-  const { type, imageDTO, withResize = false, dispatch, getState } = arg;
+  const { type, imageDTO, withResize = false, withInpaintMask = false, dispatch, getState } = arg;
   const state = getState();
 
   const base = selectBboxModelBase(state);
@@ -182,10 +184,14 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
         position: { x, y },
       } satisfies Partial<CanvasRasterLayerState>;
-      dispatch(canvasReset());
+      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'control_layer': {
@@ -195,10 +201,14 @@ export const newCanvasFromImage = async (arg: {
         position: { x, y },
         controlAdapter: deepClone(initialControlNet),
       } satisfies Partial<CanvasControlLayerState>;
-      dispatch(canvasReset());
+      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(controlLayerAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'inpaint_mask': {
@@ -207,10 +217,14 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
         position: { x, y },
       } satisfies Partial<CanvasInpaintMaskState>;
-      dispatch(canvasReset());
+      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'regional_guidance': {
@@ -219,25 +233,37 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
         position: { x, y },
       } satisfies Partial<CanvasRegionalGuidanceState>;
-      dispatch(canvasReset());
+      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rgAdded({ overrides, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'reference_image': {
       const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      dispatch(canvasReset());
+      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
       dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     case 'regional_guidance_with_reference_image': {
       const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
-      dispatch(canvasReset());
+      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
+      if (withInpaintMask) {
+        dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
+      }
+      dispatch(canvasClearHistory());
       break;
     }
     default:

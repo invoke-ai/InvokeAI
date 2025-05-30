@@ -5,7 +5,8 @@ import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/uti
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset, newSessionRequested } from 'features/controlLayers/store/actions';
+import { canvasReset } from 'features/controlLayers/store/actions';
+import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -69,7 +70,14 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagenAspectRatioID, isRenderableEntity } from './types';
+import {
+  DEFAULT_ASPECT_RATIO_CONFIG,
+  getEntityIdentifier,
+  getInitialCanvasState,
+  isChatGPT4oAspectRatioID,
+  isImagenAspectRatioID,
+  isRenderableEntity,
+} from './types';
 import {
   converters,
   getControlLayerState,
@@ -86,55 +94,9 @@ import {
   initialT2IAdapter,
 } from './util';
 
-/**
- * Gets a fresh canvas initial state with no references in memory to existing objects.
- */
-const getInitialState = (): CanvasState => {
-  const initialInpaintMaskState = getInpaintMaskState(getPrefixedId('inpaint_mask'));
-  const initialState: CanvasState = {
-    _version: 3,
-    selectedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-    bookmarkedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-    rasterLayers: {
-      isHidden: false,
-      entities: [],
-    },
-    controlLayers: {
-      isHidden: false,
-      entities: [],
-    },
-    inpaintMasks: {
-      isHidden: false,
-      entities: [initialInpaintMaskState],
-    },
-    regionalGuidance: {
-      isHidden: false,
-      entities: [],
-    },
-    referenceImages: { entities: [] },
-    bbox: {
-      rect: { x: 0, y: 0, width: 512, height: 512 },
-      aspectRatio: {
-        id: '1:1',
-        value: 1,
-        isLocked: false,
-      },
-      scaleMethod: 'auto',
-      scaledSize: {
-        width: 512,
-        height: 512,
-      },
-      modelBase: 'sd-1',
-    },
-  };
-  return initialState;
-};
-
-const initialState = getInitialState();
-
 export const canvasSlice = createSlice({
   name: 'canvas',
-  initialState,
+  initialState: getInitialCanvasState(),
   reducers: {
     // undoable canvas state
     //#region Raster layers
@@ -145,10 +107,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRasterLayerState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
 
         state.rasterLayers.entities.push(entityState);
@@ -159,13 +122,20 @@ export const canvasSlice = createSlice({
           );
         }
 
+        const entityIdentifier = getEntityIdentifier(entityState);
+
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload: {
         overrides?: Partial<CanvasRasterLayerState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
@@ -298,10 +268,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasControlLayerState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getControlLayerState(id, overrides);
 
@@ -312,14 +283,20 @@ export const canvasSlice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload: {
         overrides?: Partial<CanvasControlLayerState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('control_layer') },
@@ -585,18 +562,32 @@ export const canvasSlice = createSlice({
     referenceImageAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }>
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasReferenceImageState>;
+          isSelected?: boolean;
+          isBookmarked?: boolean;
+        }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, isBookmarked } = action.payload;
         const entityState = getReferenceImageState(id, overrides);
 
         state.referenceImages.entities.push(entityState);
+        const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
-      prepare: (payload?: { overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }) => ({
+      prepare: (payload?: {
+        overrides?: Partial<CanvasReferenceImageState>;
+        isSelected?: boolean;
+        isBookmarked?: boolean;
+      }) => ({
         payload: { ...payload, id: getPrefixedId('reference_image') },
       }),
     },
@@ -763,10 +754,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRegionalGuidanceState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getRegionalGuidanceState(id, overrides);
 
@@ -777,14 +769,20 @@ export const canvasSlice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload?: {
         overrides?: Partial<CanvasRegionalGuidanceState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('regional_guidance') },
@@ -1064,10 +1062,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasInpaintMaskState>;
           isSelected?: boolean;
+          isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
+        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getInpaintMaskState(id, overrides);
 
@@ -1078,14 +1077,20 @@ export const canvasSlice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
+          state.selectedEntityIdentifier = entityIdentifier;
+        }
+
+        if (isBookmarked) {
+          state.bookmarkedEntityIdentifier = entityIdentifier;
         }
       },
       prepare: (payload?: {
         overrides?: Partial<CanvasInpaintMaskState>;
         isSelected?: boolean;
+        isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
       }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
@@ -1367,7 +1372,7 @@ export const canvasSlice = createSlice({
         state.bbox.rect.width = width;
         state.bbox.rect.height = height;
       } else {
-        state.bbox.aspectRatio = deepClone(initialState.bbox.aspectRatio);
+        state.bbox.aspectRatio = deepClone(DEFAULT_ASPECT_RATIO_CONFIG);
         state.bbox.rect.width = optimalDimension;
         state.bbox.rect.height = optimalDimension;
       }
@@ -1747,7 +1752,7 @@ export const canvasSlice = createSlice({
     },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
-      const initialState = getInitialState();
+      const initialState = getInitialCanvasState();
       state.rasterLayers = initialState.rasterLayers;
       state.controlLayers = initialState.controlLayers;
       state.inpaintMasks = initialState.inpaintMasks;
@@ -1804,14 +1809,12 @@ export const canvasSlice = createSlice({
         syncScaledSize(state);
       }
     });
-    builder.addMatcher(newSessionRequested, (state) => {
-      return resetState(state);
-    });
+    builder.addCase(canvasSessionStarted, (state) => resetState(state));
   },
 });
 
 const resetState = (state: CanvasState) => {
-  const newState = getInitialState();
+  const newState = getInitialCanvasState();
 
   // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
   // from the old state, then recalculate the bbox size & scaled size.
@@ -1933,7 +1936,7 @@ const migrate = (state: any): any => {
 
 export const canvasPersistConfig: PersistConfig<CanvasState> = {
   name: canvasSlice.name,
-  initialState,
+  initialState: getInitialCanvasState(),
   migrate,
   persistDenylist: [],
 };

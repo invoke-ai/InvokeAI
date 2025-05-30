@@ -9,6 +9,9 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import {
+  stagingAreaGenerationStarted,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
   $isInPublishFlow,
   $outputNodeId,
   $validationRunData,
@@ -30,7 +33,16 @@ import type { ClientToServerEvents, ServerToClientEvents } from 'services/events
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent } from './stores';
+import {
+  $lastCanvasProgressEvent,
+  $lastCanvasProgressImage,
+  $lastProgressEvent,
+  $lastUpscalingProgressEvent,
+  $lastUpscalingProgressImage,
+  $lastWorkflowsProgressEvent,
+  $lastWorkflowsProgressImage,
+  $progressImages,
+} from './stores';
 
 const log = logger('events');
 
@@ -92,7 +104,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_progress', (data) => {
-    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
+    const { invocation_source_id, invocation, session_id, image, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -107,7 +119,36 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     $lastProgressEvent.set(data);
 
+    if (data.image) {
+      const progressData = $progressImages.get()[session_id];
+      if (progressData) {
+        $progressImages.setKey(session_id, { ...progressData, progressImage: data.image });
+      } else {
+        $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false, progressImage: data.image });
+      }
+    }
+
+    if (origin === 'canvas') {
+      $lastCanvasProgressEvent.set(data);
+      if (image) {
+        $lastCanvasProgressImage.set({ sessionId: session_id, image });
+      }
+    }
+
+    if (origin === 'upscaling') {
+      $lastUpscalingProgressEvent.set(data);
+      if (image) {
+        $lastUpscalingProgressImage.set({ sessionId: session_id, image });
+      }
+    }
+
     if (origin === 'workflows') {
+      $lastWorkflowsProgressEvent.set(data);
+
+      if (image) {
+        $lastWorkflowsProgressImage.set({ sessionId: session_id, image });
+      }
+
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;
@@ -404,6 +445,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         clone.outputs = [];
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
+      if (data.origin === 'canvas') {
+        store.dispatch(stagingAreaGenerationStarted({ sessionId: session_id }));
+        $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
+      }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
@@ -427,6 +472,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+      $progressImages.setKey(session_id, undefined);
 
       // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
       const validationRunData = $validationRunData.get();

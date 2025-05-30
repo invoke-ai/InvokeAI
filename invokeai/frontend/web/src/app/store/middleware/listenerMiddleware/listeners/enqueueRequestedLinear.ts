@@ -5,6 +5,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
+import { canvasSessionStarted, selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
@@ -34,7 +35,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const { prepend } = action.payload;
 
       const manager = $canvasManager.get();
-      assert(manager, 'No canvas manager');
+      // assert(manager, 'No canvas manager');
 
       const model = state.params.model;
       assert(model, 'No model found in state');
@@ -87,7 +88,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
 
-      const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
+      // const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
 
       const prepareBatchResult = withResult(() =>
         prepareLinearUIBatch({
@@ -97,7 +98,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
           seedFieldIdentifier,
           positivePromptFieldIdentifier,
           origin: 'canvas',
-          destination,
+          destination: 'canvas',
         })
       );
 
@@ -112,6 +113,9 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       try {
         await req.unwrap();
+        if (!selectCanvasSessionType(state)) {
+          dispatch(canvasSessionStarted({ sessionType: 'simple' }));
+        }
         log.debug(parseify({ batchConfig: prepareBatchResult.value }), 'Enqueued batch');
       } catch (error) {
         log.error({ error: serializeError(error as Error) }, 'Failed to enqueue batch');

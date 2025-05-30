@@ -36,9 +36,9 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
 import {
   modelConfigsAdapterSelectors,
-  selectMainModelConfig,
   selectModelConfigsQuery,
 } from 'services/api/endpoints/models';
+import { selectMainModelConfig } from '../store/paramsSlice';
 import type {
   ControlLoRAModelConfig,
   ControlNetModelConfig,
