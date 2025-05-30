@@ -9,6 +9,9 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import {
+  stagingAreaGenerationStarted,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
   $isInPublishFlow,
   $outputNodeId,
   $validationRunData,
@@ -38,6 +41,7 @@ import {
   $lastUpscalingProgressImage,
   $lastWorkflowsProgressEvent,
   $lastWorkflowsProgressImage,
+  $progressImages,
 } from './stores';
 
 const log = logger('events');
@@ -114,6 +118,15 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.trace({ data } as JsonObject, _message);
 
     $lastProgressEvent.set(data);
+
+    if (data.image) {
+      const progressData = $progressImages.get()[session_id];
+      if (progressData) {
+        $progressImages.setKey(session_id, { ...progressData, progressImage: data.image });
+      } else {
+        $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false, progressImage: data.image });
+      }
+    }
 
     if (origin === 'canvas') {
       $lastCanvasProgressEvent.set(data);
@@ -432,6 +445,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         clone.outputs = [];
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
+      if (data.origin === 'canvas') {
+        store.dispatch(stagingAreaGenerationStarted({ sessionId: session_id }));
+        $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
+      }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       if (status === 'failed' && error_type) {
         const isLocal = getState().config.isLocal ?? true;
@@ -455,13 +472,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
-
-      if (data.origin === 'canvas') {
-        $lastCanvasProgressEvent.set(null);
-        if (status === 'canceled' || status === 'failed') {
-          $lastCanvasProgressImage.set(null);
-        }
-      }
+      $progressImages.setKey(session_id, undefined);
 
       // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
       const validationRunData = $validationRunData.get();
