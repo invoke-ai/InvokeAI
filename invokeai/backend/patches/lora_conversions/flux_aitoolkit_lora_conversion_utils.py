@@ -5,9 +5,8 @@ from typing import Any
 import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
-from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
-    lora_layers_from_flux_diffusers_grouped_state_dict,
-)
+from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
@@ -34,8 +33,8 @@ def lora_model_from_flux_aitoolkit_state_dict(state_dict: dict[str, torch.Tensor
         else:
             raise ValueError(f"Layer '{layer_name}' does not match the expected pattern for FLUX LoRA weights.")
 
-    layers: dict[str, BaseLayerPatch] = lora_layers_from_flux_diffusers_grouped_state_dict(
-        transformer_grouped_sd, alpha=None
-    )
+    layers: dict[str, BaseLayerPatch] = {}
+    for layer_key, layer_state_dict in transformer_grouped_sd.items():
+        layers[FLUX_LORA_TRANSFORMER_PREFIX + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
 
     return ModelPatchRaw(layers=layers)
