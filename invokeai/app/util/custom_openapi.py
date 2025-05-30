@@ -88,12 +88,6 @@ def get_openapi_func(
             invocation_output_map_properties[invocation_type] = json_schema["output"]
             invocation_output_map_required.append(invocation_type)
 
-            output_annotation = invocation.get_output_annotation()
-            if output_annotation not in InvocationRegistry.get_output_classes():
-                logger.warning(
-                    f'Invocation "{invocation_type}"\' has unregistered output class {output_annotation.__name__} (did you forget @invocation_output?)'
-                )
-
         # Add the output map to the schema
         openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
             "type": "object",

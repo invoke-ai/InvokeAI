@@ -643,6 +643,16 @@ def invocation(
 
         fields["type"] = (invocation_type_annotation, invocation_type_field_info)
 
+        # Invocation outputs must be registered using the @invocation_output decorator, but it is possible that the
+        # output is registered _after_ this invocation is registered. It depends on module import ordering.
+        #
+        # We can only confirm the output for an invocation is registered after all modules are imported. There's
+        # only really one good time to do that - during application startup, in `run_app.py`, after loading all
+        # custom nodes.
+        #
+        # We can still do some basic validation here - ensure the invoke method is defined and returns an instance
+        # of BaseInvocationOutput.
+
         # Validate the `invoke()` method is implemented
         if "invoke" in cls.__abstractmethods__:
             raise ValueError(f'Invocation "{invocation_type}" must implement the "invoke" method')
