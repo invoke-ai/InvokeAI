@@ -11,10 +11,12 @@ from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_ut
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
     state_dict_keys as flux_onetrainer_state_dict_keys,
 )
+from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_aitoolkit_format import (
+    state_dict_keys as flux_aitoolkit_state_dict_keys,
+)
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_diffusers_format import (
     state_dict_keys as flux_diffusers_state_dict_keys,
 )
-from tests.backend.patches.lora_conversions.lora_state_dicts.flux_lora_aitoolkit_format import state_dict_keys as flux_aitoolkit_state_dict_keys
 from tests.backend.patches.lora_conversions.lora_state_dicts.utils import keys_to_mock_state_dict
 
 
@@ -46,15 +48,12 @@ def test_flux_aitoolkit_transformer_state_dict_is_in_invoke_format():
     model_keys = set(model.state_dict().keys())
 
     for converted_key_prefix in converted_key_prefixes:
-        assert any(model_key.startswith(converted_key_prefix) for model_key in model_keys), f"'{converted_key_prefix}' did not match any model keys."
+        assert any(
+            model_key.startswith(converted_key_prefix) for model_key in model_keys
+        ), f"'{converted_key_prefix}' did not match any model keys."
 
 
 def test_lora_model_from_flux_aitoolkit_state_dict():
     state_dict = keys_to_mock_state_dict(flux_aitoolkit_state_dict_keys)
 
-    lora_model = lora_model_from_flux_aitoolkit_state_dict(state_dict)
-
-    # Assert that the lora_model has the expected layers.
-    # lora_model_keys = set(lora_model.layers.keys())
-    # lora_model_keys = {k.replace(".", "_") for k in lora_model_keys}
-    # assert lora_model_keys == expected_layer_keys
+    assert lora_model_from_flux_aitoolkit_state_dict(state_dict)
