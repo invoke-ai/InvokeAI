@@ -17,7 +17,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
-    SessionQueueItemDTO,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
@@ -127,8 +126,19 @@ class SessionQueueBase(ABC):
         priority: int,
         cursor: Optional[int] = None,
         status: Optional[QUEUE_ITEM_STATUS] = None,
-    ) -> CursorPaginatedResults[SessionQueueItemDTO]:
+        destination: Optional[str] = None,
+    ) -> CursorPaginatedResults[SessionQueueItem]:
         """Gets a page of session queue items"""
+        pass
+
+    @abstractmethod
+    def list_all_queue_items(
+        self,
+        queue_id: str,
+        status: Optional[QUEUE_ITEM_STATUS] = None,
+        destination: Optional[str] = None,
+    ) -> list[SessionQueueItem]:
+        """Gets all queue items that match the given parameters"""
         pass
 
     @abstractmethod

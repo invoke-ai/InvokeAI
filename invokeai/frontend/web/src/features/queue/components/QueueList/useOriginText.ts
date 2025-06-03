@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import type { SessionQueueItemDTO } from 'services/api/types';
+import type { S } from 'services/api/types';
 
-export const useOriginText = (origin: SessionQueueItemDTO['origin']) => {
+export const useOriginText = (origin: S['SessionQueueItem']['origin']) => {
   const { t } = useTranslation();
 
   if (origin === 'generation') {
