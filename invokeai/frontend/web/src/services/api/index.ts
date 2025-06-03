@@ -56,6 +56,7 @@ const tagTypes = [
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
 export const LIST_TAG = 'LIST';
+export const LIST_ALL_TAG = 'LIST_ALL';
 
 const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
   const baseUrl = $baseUrl.get();
