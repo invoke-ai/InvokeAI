@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
@@ -43,21 +43,13 @@ import { StagingAreaToolbar } from 'features/controlLayers/components/StagingAre
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { loadImage } from 'features/controlLayers/konva/util';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import {
-  canvasSessionStarted,
-  selectCanvasSessionType,
-  selectSelectedImage,
-  selectStagedImageIndex,
-  stagingAreaImageSelected,
-  stagingAreaNextStagedImageSelected,
-  stagingAreaPrevStagedImageSelected,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionStarted, selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { newCanvasFromImage } from 'features/imageActions/actions';
-import type { ProgressImage } from 'features/nodes/types/common';
 import { isImageField } from 'features/nodes/types/common';
 import { isCanvasOutputNodeId } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ChangeEvent } from 'react';
@@ -65,11 +57,10 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiDotsThreeOutlineVerticalFill, PiUploadBold } from 'react-icons/pi';
-import { getImageDTOSafe, useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useListAllQueueItemsQuery } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
-import type { ProgressAndResult } from 'services/events/stores';
-import { $progressImages, $socket, useMapSelector } from 'services/events/stores';
+import { $socket, setProgress, useProgressData } from 'services/events/stores';
 import type { Equals, Param0 } from 'tsafe';
 import { assert, objectEntries } from 'tsafe';
 
@@ -100,7 +91,7 @@ export const CanvasMainPanelContent = memo(() => {
   }
 
   if (sessionType === 'simple') {
-    return <SimpleActiveSession />;
+    return <StagingArea />;
   }
 
   if (sessionType === 'advanced') {
@@ -296,48 +287,6 @@ const GenerateWithStartingImageAndInpaintMask = memo(() => {
 });
 GenerateWithStartingImageAndInpaintMask.displayName = 'GenerateWithStartingImageAndInpaintMask';
 
-const SimpleActiveSession = memo(() => {
-  const { getState, dispatch } = useAppStore();
-  const selectedImage = useAppSelector(selectSelectedImage);
-
-  const startOver = useCallback(() => {
-    dispatch(canvasSessionStarted({ sessionType: null }));
-    $progressImages.set({});
-  }, [dispatch]);
-
-  const goAdvanced = useCallback(() => {
-    dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
-  }, [dispatch]);
-
-  const selectNext = useCallback(() => {
-    dispatch(stagingAreaNextStagedImageSelected());
-  }, [dispatch]);
-
-  useHotkeys(['right'], selectNext, { preventDefault: true }, [selectNext]);
-
-  const selectPrev = useCallback(() => {
-    dispatch(stagingAreaPrevStagedImageSelected());
-  }, [dispatch]);
-
-  useHotkeys(['left'], selectPrev, { preventDefault: true }, [selectPrev]);
-
-  return (
-    <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center" gap={2}>
-      <Flex w="full">
-        <Text fontSize="lg" fontWeight="bold">
-          Generations
-        </Text>
-        <Spacer />
-        <Button size="sm" variant="ghost" onClick={startOver}>
-          Start Over
-        </Button>
-      </Flex>
-      <StagingArea />
-    </Flex>
-  );
-});
-SimpleActiveSession.displayName = 'SimpleActiveSession';
-
 const scrollIndicatorSx = {
   opacity: 0,
   '&[data-visible="true"]': {
@@ -346,6 +295,7 @@ const scrollIndicatorSx = {
 } satisfies SystemStyleObject;
 
 const StagingArea = memo(() => {
+  const dispatch = useAppDispatch();
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [autoSwitch, setAutoSwitch] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -358,21 +308,15 @@ const StagingArea = memo(() => {
       items.length > 0 && selectedItemId !== null ? items.find(({ item_id }) => item_id === selectedItemId) : null,
     [items, selectedItemId]
   );
+  const selectedItemIndex = useMemo(
+    () =>
+      items.length > 0 && selectedItemId !== null ? items.findIndex(({ item_id }) => item_id === selectedItemId) : null,
+    [items, selectedItemId]
+  );
 
-  useEffect(() => {
-    if (items.length === 0) {
-      setSelectedItemId(null);
-      return;
-    }
-    if (selectedItem === null && items.length > 0) {
-      setSelectedItemId(items[0]?.item_id ?? null);
-      return;
-    }
-    if (selectedItemId === null || items.find((item) => item.item_id === selectedItemId) === undefined) {
-      return;
-    }
-    document.getElementById(`queue-item-status-card-${selectedItemId}`)?.scrollIntoView();
-  }, [items, selectedItem, selectedItemId]);
+  const startOver = useCallback(() => {
+    dispatch(canvasSessionStarted({ sessionType: null }));
+  }, [dispatch]);
 
   useEffect(() => {
     const el = scrollableRef.current;
@@ -393,12 +337,30 @@ const StagingArea = memo(() => {
     };
   }, []);
 
-  const onSelectItem = useCallback((item: S['SessionQueueItem']) => {
-    setSelectedItemId(item.item_id);
-    if (item.status !== 'in_progress') {
-      setAutoSwitch(false);
+  const onSelectItemId = useCallback((item_id: number | null) => {
+    setSelectedItemId(item_id);
+    if (item_id !== null) {
+      document.getElementById(getCardId(item_id))?.scrollIntoView();
     }
   }, []);
+
+  const onChangeAutoSwitch = useCallback((autoSwitch: boolean) => {
+    setAutoSwitch(autoSwitch);
+  }, []);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      onSelectItemId(null);
+      return;
+    }
+    if (selectedItem === null && items.length > 0) {
+      onSelectItemId(items[0]?.item_id ?? null);
+      return;
+    }
+    if (selectedItemId === null || items.find((item) => item.item_id === selectedItemId) === undefined) {
+      return;
+    }
+  }, [items, onSelectItemId, selectedItem, selectedItemId]);
 
   const onNext = useCallback(() => {
     if (selectedItemId === null) {
@@ -410,8 +372,8 @@ const StagingArea = memo(() => {
     if (!nextItem) {
       return;
     }
-    setSelectedItemId(nextItem.item_id);
-  }, [items, selectedItemId]);
+    onSelectItemId(nextItem.item_id);
+  }, [items, onSelectItemId, selectedItemId]);
   const onPrev = useCallback(() => {
     if (selectedItemId === null) {
       return;
@@ -422,8 +384,8 @@ const StagingArea = memo(() => {
     if (!prevItem) {
       return;
     }
-    setSelectedItemId(prevItem.item_id);
-  }, [items, selectedItemId]);
+    onSelectItemId(prevItem.item_id);
+  }, [items, onSelectItemId, selectedItemId]);
 
   useHotkeys('left', onPrev);
   useHotkeys('right', onNext);
@@ -443,7 +405,7 @@ const StagingArea = memo(() => {
         return;
       }
       if (data.status === 'in_progress') {
-        setSelectedItemId(data.item_id);
+        onSelectItemId(data.item_id);
       }
     };
 
@@ -452,35 +414,70 @@ const StagingArea = memo(() => {
     return () => {
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [autoSwitch, socket]);
+  }, [autoSwitch, onSelectItemId, socket]);
 
-  const onChangeAutoSwitch = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+  const _onChangeAutoSwitch = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setAutoSwitch(e.target.checked);
   }, []);
 
+  useEffect(() => {
+    if (!socket) {
+      return;
+    }
+    const onProgress = (data: S['InvocationProgressEvent']) => {
+      if (data.destination !== 'canvas') {
+        return;
+      }
+      setProgress(data);
+    };
+    socket.on('invocation_progress', onProgress);
+
+    return () => {
+      socket.off('invocation_progress', onProgress);
+    };
+  }, [socket]);
+
   return (
-    <Flex position="relative" flexDir="column" gap={2} w="full" h="full" minW={0} minH={0}>
-      <Flex w="full" h="full" alignItems="center" justifyContent="center" minW={0} minH={0}>
-        {selectedItem && <QueueItemStatusCard item={selectedItem} minW={0} minH={0} h="full" isSelected={false} />}
-        {!selectedItem && <Text>No queued generations</Text>}
+    <Flex flexDir="column" gap={2} w="full" h="full" minW={0} minH={0}>
+      <Flex w="full" alignItems="center">
+        <Text fontSize="lg" fontWeight="bold">
+          Generations
+        </Text>
+        <Spacer />
+        <Button size="sm" variant="ghost" onClick={startOver}>
+          Start Over
+        </Button>
       </Flex>
-      <FormControl position="absolute" top={2} right={2} w="min-content">
-        <FormLabel m={0}>Auto-switch</FormLabel>
-        <Switch size="sm" isChecked={autoSwitch} onChange={onChangeAutoSwitch} />
-      </FormControl>
-      <Flex position="relative" w="full" maxW="full">
-        <Flex ref={scrollableRef} gap={2} h={108} maxW="full" overflowX="scroll" flexShrink={0}>
+      <Flex position="relative" w="full" h="full" maxH="full" alignItems="center" justifyContent="center" minH={0}>
+        <Flex alignItems="center" justifyContent="center" w="full" h="full" objectFit="contain">
+          {selectedItem && selectedItemIndex !== null && (
+            <QueueItemCard
+              item={selectedItem}
+              number={selectedItemIndex + 1}
+              isSelected={false}
+              onSelectItemId={onSelectItemId}
+              onChangeAutoSwitch={onChangeAutoSwitch}
+              size="full"
+            />
+          )}
+          {!selectedItem && <Text>No queued generations</Text>}
+        </Flex>
+        <FormControl position="absolute" top={2} right={2} w="min-content">
+          <FormLabel m={0}>Auto-switch</FormLabel>
+          <Switch size="sm" isChecked={autoSwitch} onChange={_onChangeAutoSwitch} />
+        </FormControl>
+      </Flex>
+      <Flex position="relative" maxW="full" h={108} justifyContent="center">
+        <Flex ref={scrollableRef} gap={2} maxW="full" overflowX="scroll" flexShrink={0}>
           {items.map((item, i) => (
-            <QueueItemStatusCard
-              id={`queue-item-status-card-${item.item_id}`}
+            <QueueItemCard
               key={item.item_id}
               item={item}
               number={i + 1}
-              onSelectItem={onSelectItem}
               isSelected={selectedItemId === item.item_id}
-              w={108}
-              h={108}
-              flexShrink={0}
+              onSelectItemId={onSelectItemId}
+              onChangeAutoSwitch={onChangeAutoSwitch}
+              size="mini"
             />
           ))}
         </Flex>
@@ -514,103 +511,110 @@ const StagingArea = memo(() => {
 });
 StagingArea.displayName = 'StagingArea';
 
-const IMAGE_DTO_ERROR = Symbol('IMAGE_DTO_ERROR');
-
-const useOutputImageDTO = (item: S['SessionQueueItem']) => {
-  const [imageDTO, setImageDTO] = useState<ImageDTO | typeof IMAGE_DTO_ERROR | null>(null);
-  const syncImageDTO = useCallback(async (item: S['SessionQueueItem']) => {
-    const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
-      isCanvasOutputNodeId(nodeId)
-    )?.[1][0];
-    const output = nodeId ? item.session.results[nodeId] : undefined;
-
-    if (!output) {
-      return setImageDTO(null);
-    }
-
-    for (const [_name, value] of objectEntries(output)) {
-      if (isImageField(value)) {
-        const imageDTO = await getImageDTOSafe(value.image_name);
-        if (imageDTO) {
-          setImageDTO(imageDTO);
-          $progressImages.setKey(item.session_id, undefined);
-          return;
-        }
-      }
-    }
-
-    setImageDTO(IMAGE_DTO_ERROR);
-  }, []);
-  useEffect(() => {
-    syncImageDTO(item);
-  }, [item, syncImageDTO]);
-
-  return imageDTO;
+const queueItemStatusCardMiniSx = {
+  cursor: 'pointer',
+  pos: 'relative',
+  borderWidth: 1,
+  borderRadius: 'base',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  aspectRatio: '1/1',
+  maxH: 'full',
+  maxW: 'full',
+  '&[data-selected="true"]': {
+    borderColor: 'invokeBlue.300',
+  },
+  '&[data-size="mini"]': {
+    flexShrink: 0,
+  },
 };
 
-const QueueItemStatusCard = memo(
-  ({
-    item,
-    isSelected,
-    number,
-    onSelectItem,
-    ...rest
-  }: {
-    item: S['SessionQueueItem'];
-    isSelected: boolean;
-    number?: number;
-    onSelectItem?: (item: S['SessionQueueItem']) => void;
-  } & FlexProps) => {
+const getCardId = (item_id: number) => `queue-item-status-card-${item_id}`;
+
+type QueueItemStatusCardMiniProps = {
+  item: S['SessionQueueItem'];
+  isSelected: boolean;
+  number: number;
+  onSelectItemId: (item_id: number) => void;
+  onChangeAutoSwitch: (autoSwitch: boolean) => void;
+  size: 'mini' | 'full';
+};
+
+const QueueItemCard = memo(
+  ({ item, isSelected, number, onSelectItemId, onChangeAutoSwitch, size }: QueueItemStatusCardMiniProps) => {
+    const [isImageLoaded, setIsImageLoaded] = useState(false);
+
+    const outputImageName = useMemo(() => {
+      const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
+        isCanvasOutputNodeId(nodeId)
+      )?.[1][0];
+      const output = nodeId ? item.session.results[nodeId] : undefined;
+
+      if (!output) {
+        return null;
+      }
+
+      for (const [_name, value] of objectEntries(output)) {
+        if (isImageField(value)) {
+          return value.image_name;
+        }
+      }
+
+      return null;
+    }, [item.session.results, item.session.source_prepared_mapping]);
+
+    const { currentData: imageDTO } = useGetImageDTOQuery(outputImageName ?? skipToken);
+
+    useEffect(() => {
+      if (imageDTO) {
+        loadImage(imageDTO.thumbnail_url, true).then(() => {
+          setIsImageLoaded(true);
+        });
+      }
+    }, [imageDTO, item.session_id]);
+
     const onClick = useCallback(() => {
-      onSelectItem?.(item);
-    }, [item, onSelectItem]);
+      onSelectItemId(item.item_id);
+    }, [item.item_id, onSelectItemId]);
+
+    const onDoubleClick = useCallback(() => {
+      onChangeAutoSwitch(item.status === 'in_progress');
+    }, [item.status, onChangeAutoSwitch]);
+
+    if (imageDTO && isImageLoaded) {
+      return (
+        <Flex id={getCardId(item.item_id)} sx={queueItemStatusCardMiniSx} data-selected={isSelected} data-size={size}>
+          <DndImage imageDTO={imageDTO} onClick={onClick} onDoubleClick={onDoubleClick} />
+          <Text position="absolute" top={0} left={1} pointerEvents="none" userSelect="none">{`#${number}`}</Text>
+          {size === 'full' && (
+            <Flex position="absolute" top={2} right={2}>
+              <ImageActions imageDTO={imageDTO} />
+            </Flex>
+          )}
+        </Flex>
+      );
+    }
+
     return (
       <Flex
-        role="button"
-        pos="relative"
-        borderWidth={1}
-        borderRadius="base"
-        alignItems="center"
-        justifyContent="center"
-        overflow="hidden"
+        id={getCardId(item.item_id)}
+        sx={queueItemStatusCardMiniSx}
+        data-selected={isSelected}
+        data-size={size}
         onClick={onClick}
-        aspectRatio="1/1"
-        borderColor={isSelected ? 'invokeBlue.300' : undefined}
-        {...rest}
+        onDoubleClick={onDoubleClick}
       >
-        <QueueItemStatusCardContent item={item} />
-        {number !== undefined && <Text position="absolute" top={0} left={1}>{`#${number}`}</Text>}
+        <InProgressContent item={item} />
+        <Text position="absolute" top={0} left={1} pointerEvents="none" userSelect="none">{`#${number}`}</Text>
       </Flex>
     );
   }
 );
-QueueItemStatusCard.displayName = 'QueueItemStatusCard';
+QueueItemCard.displayName = 'QueueItemStatusCard';
 
-const QueueItemStatusCardContent = memo(({ item }: { item: S['SessionQueueItem'] }) => {
-  const socket = useStore($socket);
-  const [progressEvent, setProgressEvent] = useState<S['InvocationProgressEvent'] | null>(null);
-  const [progressImage, setProgressImage] = useState<ProgressImage | null>(null);
-  useEffect(() => {
-    if (!socket) {
-      return;
-    }
-    const onProgress = (data: S['InvocationProgressEvent']) => {
-      if (data.session_id !== item.session_id) {
-        return;
-      }
-      setProgressEvent(data);
-      if (data.image) {
-        setProgressImage(data.image);
-      }
-    };
-    socket.on('invocation_progress', onProgress);
-
-    return () => {
-      socket.off('invocation_progress', onProgress);
-    };
-  }, [item.session_id, socket]);
-
-  const imageDTO = useOutputImageDTO(item);
+const InProgressContent = memo(({ item }: { item: S['SessionQueueItem'] }) => {
+  const { progressEvent, progressImage } = useProgressData(item.session_id);
 
   if (item.status === 'pending') {
     return (
@@ -633,17 +637,8 @@ const QueueItemStatusCardContent = memo(({ item }: { item: S['SessionQueueItem']
       </Text>
     );
   }
-  if (item.status === 'in_progress' || !imageDTO) {
-    if (!progressImage) {
-      return (
-        <>
-          <Text fontWeight="semibold" color="invokeBlue.300">
-            In Progress
-          </Text>
-          <ProgressCircle data={progressEvent} />
-        </>
-      );
-    }
+
+  if (progressImage) {
     return (
       <>
         <Image objectFit="contain" maxH="full" maxW="full" src={progressImage.dataURL} width={progressImage.width} />
@@ -651,8 +646,16 @@ const QueueItemStatusCardContent = memo(({ item }: { item: S['SessionQueueItem']
       </>
     );
   }
-  if (item.status === 'completed' && imageDTO && imageDTO !== IMAGE_DTO_ERROR) {
-    return <Image objectFit="contain" maxH="full" maxW="full" src={imageDTO.image_url} width={imageDTO.width} />;
+
+  if (item.status === 'in_progress') {
+    return (
+      <>
+        <Text fontWeight="semibold" color="invokeBlue.300">
+          In Progress
+        </Text>
+        <ProgressCircle data={progressEvent} />
+      </>
+    );
   }
 
   if (item.status === 'completed') {
@@ -664,7 +667,7 @@ const QueueItemStatusCardContent = memo(({ item }: { item: S['SessionQueueItem']
   }
   assert<Equals<never, typeof item.status>>(false);
 });
-QueueItemStatusCardContent.displayName = 'QueueItemStatusCardContent';
+InProgressContent.displayName = 'InProgressContent';
 
 const circleStyles: SystemStyleObject = {
   circle: {
@@ -676,7 +679,7 @@ const circleStyles: SystemStyleObject = {
   right: 2,
 };
 
-const ProgressCircle = ({ data }: { data?: S['InvocationProgressEvent'] | null }) => {
+const ProgressCircle = memo(({ data }: { data?: S['InvocationProgressEvent'] | null }) => {
   return (
     <Tooltip label={data?.message ?? 'Generating'}>
       <CircularProgress
@@ -689,52 +692,10 @@ const ProgressCircle = ({ data }: { data?: S['InvocationProgressEvent'] | null }
       />
     </Tooltip>
   );
-};
+});
 ProgressCircle.displayName = 'ProgressCircle';
 
-const QueueItemResultCard = memo(({ item }: { item: S['SessionQueueItem'] }) => {
-  const imageName = useMemo(() => {
-    const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
-      isCanvasOutputNodeId(nodeId)
-    )?.[1][0];
-    const output = nodeId ? item.session.results[nodeId] : undefined;
-    if (!output) {
-      return;
-    }
-
-    for (const [_name, value] of objectEntries(output)) {
-      if (isImageField(value)) {
-        return value.image_name;
-      }
-    }
-  }, [item]);
-
-  const { data: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
-
-  if (!imageDTO) {
-    return <Text>Unknown output type</Text>;
-  }
-
-  return <Image objectFit="contain" maxH="full" maxW="full" src={imageDTO.image_url} width={imageDTO.width} />;
-});
-QueueItemResultCard.displayName = 'QueueItemResultCard';
-
-const SelectedImageOrProgressImage = memo(() => {
-  const selectedImage = useAppSelector(selectSelectedImage);
-
-  if (selectedImage) {
-    return <FullSizeImage sessionId={selectedImage.sessionId} />;
-  }
-
-  return (
-    <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
-      <Text>No images</Text>
-    </Flex>
-  );
-});
-SelectedImageOrProgressImage.displayName = 'SelectedImageOrProgressImage';
-
-const SelectedImage = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+const ImageActions = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const { getState, dispatch } = useAppStore();
 
   const vary = useCallback(() => {
@@ -767,168 +728,20 @@ const SelectedImage = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
     });
   }, [dispatch, getState, imageDTO]);
   return (
-    <Flex position="relative" alignItems="center" justifyContent="center" minH={0} minW={0} h="full" w="full">
-      <DndImage imageDTO={imageDTO} />
-      <Flex position="absolute" gap={2} top={2} translateX="50%">
-        <ButtonGroup isAttached={false} size="sm">
-          <Button onClick={vary} tooltip="Vary the image using Image to Image">
-            Vary
-          </Button>
-          <Button onClick={useAsControl} tooltip="Use this image to control a new Text to Image generation">
-            Use as Control
-          </Button>
-          <Button onClick={edit} tooltip="Edit parts of this image with Inpainting">
-            Edit
-          </Button>
-        </ButtonGroup>
-      </Flex>
-    </Flex>
+    <ButtonGroup isAttached={false} size="sm">
+      <Button onClick={vary} tooltip="Vary the image using Image to Image">
+        Vary
+      </Button>
+      <Button onClick={useAsControl} tooltip="Use this image to control a new Text to Image generation">
+        Use as Control
+      </Button>
+      <Button onClick={edit} tooltip="Edit parts of this image with Inpainting">
+        Edit
+      </Button>
+    </ButtonGroup>
   );
 });
-SelectedImage.displayName = 'SelectedImage';
-
-const FullSizeImage = memo(({ sessionId }: { sessionId: string }) => {
-  const _progressImage = useMapSelector(sessionId, $progressImages);
-
-  if (!_progressImage) {
-    return (
-      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
-        <Text>Pending</Text>
-      </Flex>
-    );
-  }
-
-  if (_progressImage.resultImage) {
-    return <SelectedImage imageDTO={_progressImage.resultImage} />;
-  }
-
-  if (_progressImage.progressImage) {
-    return (
-      <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
-        <Image
-          objectFit="contain"
-          maxH="full"
-          maxW="full"
-          src={_progressImage.progressImage.dataURL}
-          width={_progressImage.progressImage.width}
-        />
-      </Flex>
-    );
-  }
-
-  return (
-    <Flex alignItems="center" justifyContent="center" minH={0} minW={0} h="full">
-      <Text>No progress yet</Text>
-    </Flex>
-  );
-});
-FullSizeImage.displayName = 'FullSizeImage';
-
-const SessionImages = memo(() => {
-  const progressImages = useStore($progressImages);
-  return (
-    <Flex position="relative" gap={2} h={108} maxW="full" overflow="scroll">
-      <Spacer />
-      {Object.values(progressImages).map((data, index) => {
-        if (data.type === 'staged') {
-          return <SessionImage key={data.sessionId} index={index} data={data} />;
-        } else {
-          return <ProgressImagePreview key={data.sessionId} index={index} data={data} />;
-        }
-      })}
-      <Spacer />
-    </Flex>
-  );
-});
-SessionImages.displayName = 'SessionImages';
-
-const ProgressImagePreview = ({ index, data }: { index: number; data: ProgressAndResult }) => {
-  const dispatch = useAppDispatch();
-  const selectedImageIndex = useAppSelector(selectStagedImageIndex);
-  const onClick = useCallback(() => {
-    dispatch(stagingAreaImageSelected({ index }));
-  }, [dispatch, index]);
-
-  useEffect(() => {
-    if (selectedImageIndex === index) {
-      // this doesn't work when the DndImage is in a popover... why
-      document.getElementById(getStagingImageId(data.sessionId))?.scrollIntoView();
-    }
-  }, [data.sessionId, index, selectedImageIndex]);
-
-  if (data.resultImage) {
-    return (
-      <Image
-        id={getStagingImageId(data.sessionId)}
-        objectFit="contain"
-        maxH="full"
-        maxW="full"
-        src={data.resultImage.thumbnail_url}
-        width={data.resultImage.width}
-        onClick={onClick}
-      />
-    );
-  }
-
-  if (data.progressImage) {
-    return (
-      <Image
-        id={getStagingImageId(data.sessionId)}
-        objectFit="contain"
-        maxH="full"
-        maxW="full"
-        src={data.progressImage.dataURL}
-        width={data.progressImage.width}
-        onClick={onClick}
-      />
-    );
-  }
-
-  return <Box id={getStagingImageId(data.sessionId)} bg="blue" h="full" w={108} borderWidth={1} onClick={onClick} />;
-};
-
-const getStagingImageId = (session_id: string) => `staging-image-${session_id}`;
-
-const sx = {
-  objectFit: 'contain',
-  maxW: 'full',
-  maxH: 'full',
-  w: 'min-content',
-  borderRadius: 'base',
-  cursor: 'grab',
-  '&[data-is-dragging=true]': {
-    opacity: 0.3,
-  },
-  '&[data-is-selected="false"]': {
-    opacity: 0.5,
-  },
-} satisfies SystemStyleObject;
-const SessionImage = memo(({ index, data }: { index: number; data: ProgressAndResult }) => {
-  const dispatch = useAppDispatch();
-  const selectedImageIndex = useAppSelector(selectStagedImageIndex);
-  const onClick = useCallback(() => {
-    dispatch(stagingAreaImageSelected({ index }));
-  }, [dispatch, index]);
-  useEffect(() => {
-    if (selectedImageIndex === index) {
-      // this doesn't work when the DndImage is in a popover... why
-      document.getElementById(getStagingImageId(data.sessionId))?.scrollIntoView();
-    }
-  }, [data.sessionId, index, selectedImageIndex]);
-  return (
-    <DndImage
-      id={getStagingImageId(data.sessionId)}
-      imageDTO={data.imageDTO}
-      asThumbnail
-      onClick={onClick}
-      data-is-selected={selectedImageIndex === index}
-      w={data.imageDTO.width}
-      sx={sx}
-      borderWidth={1}
-    />
-  );
-});
-SessionImage.displayName = 'SessionImage';
+ImageActions.displayName = 'ImageActions';
 
 const CanvasActiveSession = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
