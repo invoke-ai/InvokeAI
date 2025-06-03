@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { Components, ItemContent } from 'react-virtuoso';
 import { Virtuoso } from 'react-virtuoso';
 import { queueItemsAdapterSelectors, useListQueueItemsQuery } from 'services/api/endpoints/queue';
-import type { SessionQueueItemDTO } from 'services/api/types';
+import type { S } from 'services/api/types';
 
 import QueueItemComponent from './QueueItemComponent';
 import QueueListComponent from './QueueListComponent';
@@ -24,13 +24,13 @@ import type { ListContext } from './types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TableVirtuosoScrollerRef = (ref: HTMLElement | Window | null) => any;
 
-const computeItemKey = (index: number, item: SessionQueueItemDTO): number => item.item_id;
+const computeItemKey = (index: number, item: S['SessionQueueItem']): number => item.item_id;
 
-const components: Components<SessionQueueItemDTO, ListContext> = {
+const components: Components<S['SessionQueueItem'], ListContext> = {
   List: QueueListComponent,
 };
 
-const itemContent: ItemContent<SessionQueueItemDTO, ListContext> = (index, item, context) => (
+const itemContent: ItemContent<S['SessionQueueItem'], ListContext> = (index, item, context) => (
   <QueueItemComponent index={index} item={item} context={context} />
 );
 
@@ -114,7 +114,7 @@ const QueueList = () => {
     <Flex w="full" h="full" flexDir="column">
       <QueueListHeader />
       <Flex ref={rootRef} w="full" h="full" alignItems="center" justifyContent="center">
-        <Virtuoso<SessionQueueItemDTO, ListContext>
+        <Virtuoso<S['SessionQueueItem'], ListContext>
           data={queueItems}
           endReached={handleLoadMore}
           scrollerRef={setScroller as TableVirtuosoScrollerRef}

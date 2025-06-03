@@ -8,9 +8,7 @@ import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import {
-  stagingAreaGenerationStarted,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { stagingAreaGenerationStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   $isInPublishFlow,
   $outputNodeId,
@@ -25,7 +23,7 @@ import { forEach, isNil, round } from 'lodash-es';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
-import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
+import { queueApi } from 'services/api/endpoints/queue';
 import { workflowsApi } from 'services/api/endpoints/workflows';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError } from 'services/events/onModelInstallError';
@@ -383,24 +381,24 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
 
-    // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
-    dispatch(
-      queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
-        queueItemsAdapter.updateOne(draft, {
-          id: String(item_id),
-          changes: {
-            status,
-            started_at,
-            updated_at: updated_at ?? undefined,
-            completed_at: completed_at ?? undefined,
-            error_type,
-            error_message,
-            error_traceback,
-            credits,
-          },
-        });
-      })
-    );
+    // // Update this specific queue item in the list of queue items (this is the queue item DTO, without the session)
+    // dispatch(
+    //   queueApi.util.updateQueryData('listQueueItems', undefined, (draft) => {
+    //     queueItemsAdapter.updateOne(draft, {
+    //       id: String(item_id),
+    //       changes: {
+    //         status,
+    //         started_at,
+    //         updated_at: updated_at ?? undefined,
+    //         completed_at: completed_at ?? undefined,
+    //         error_type,
+    //         error_message,
+    //         error_traceback,
+    //         credits,
+    //       },
+    //     });
+    //   })
+    // );
 
     // Optimistic update of the queue status. We prefer to do an optimistic update over tag invalidation due to the
     // frequency of `queue_item_status_changed` events.
@@ -426,6 +424,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       'NextSessionQueueItem',
       'InvocationCacheStatus',
       { type: 'SessionQueueItem', id: item_id },
+      { type: 'SessionQueueItem', id: LIST_TAG },
     ];
     if (destination) {
       tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });

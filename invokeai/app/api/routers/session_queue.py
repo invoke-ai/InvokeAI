@@ -20,7 +20,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
-    SessionQueueItemDTO,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
@@ -68,7 +67,7 @@ async def enqueue_batch(
     "/{queue_id}/list",
     operation_id="list_queue_items",
     responses={
-        200: {"model": CursorPaginatedResults[SessionQueueItemDTO]},
+        200: {"model": CursorPaginatedResults[SessionQueueItem]},
     },
 )
 async def list_queue_items(
@@ -77,11 +76,38 @@ async def list_queue_items(
     status: Optional[QUEUE_ITEM_STATUS] = Query(default=None, description="The status of items to fetch"),
     cursor: Optional[int] = Query(default=None, description="The pagination cursor"),
     priority: int = Query(default=0, description="The pagination cursor priority"),
-) -> CursorPaginatedResults[SessionQueueItemDTO]:
-    """Gets all queue items (without graphs)"""
+    destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
+) -> CursorPaginatedResults[SessionQueueItem]:
+    """Gets cursor-paginated queue items"""
 
     return ApiDependencies.invoker.services.session_queue.list_queue_items(
-        queue_id=queue_id, limit=limit, status=status, cursor=cursor, priority=priority
+        queue_id=queue_id,
+        limit=limit,
+        status=status,
+        cursor=cursor,
+        priority=priority,
+        destination=destination,
+    )
+
+
+@session_queue_router.get(
+    "/{queue_id}/all",
+    operation_id="list_all_queue_items",
+    responses={
+        200: {"model": list[SessionQueueItem]},
+    },
+)
+async def list_all_queue_items(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    status: Optional[QUEUE_ITEM_STATUS] = Query(default=None, description="The status of items to fetch"),
+    destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
+) -> list[SessionQueueItem]:
+    """Gets all queue items"""
+
+    return ApiDependencies.invoker.services.session_queue.list_all_queue_items(
+        queue_id=queue_id,
+        status=status,
+        destination=destination,
     )
 
 
