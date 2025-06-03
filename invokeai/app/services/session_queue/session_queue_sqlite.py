@@ -24,7 +24,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
-    SessionQueueItemDTO,
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
     ValueToInsertTuple,
@@ -543,26 +542,12 @@ class SqliteSessionQueue(SessionQueueBase):
         priority: int,
         cursor: Optional[int] = None,
         status: Optional[QUEUE_ITEM_STATUS] = None,
-    ) -> CursorPaginatedResults[SessionQueueItemDTO]:
+        destination: Optional[str] = None,
+    ) -> CursorPaginatedResults[SessionQueueItem]:
         cursor_ = self._conn.cursor()
         item_id = cursor
         query = """--sql
-            SELECT item_id,
-                status,
-                priority,
-                field_values,
-                error_type,
-                error_message,
-                error_traceback,
-                created_at,
-                updated_at,
-                completed_at,
-                started_at,
-                session_id,
-                batch_id,
-                queue_id,
-                origin,
-                destination
+            SELECT *
             FROM session_queue
             WHERE queue_id = ?
         """
@@ -573,6 +558,12 @@ class SqliteSessionQueue(SessionQueueBase):
                 AND status = ?
                 """
             params.append(status)
+
+        if destination is not None:
+            query += """---sql
+                AND destination = ?
+            """
+            params.append(destination)
 
         if item_id is not None:
             query += """--sql
@@ -589,13 +580,51 @@ class SqliteSessionQueue(SessionQueueBase):
         params.append(limit + 1)
         cursor_.execute(query, params)
         results = cast(list[sqlite3.Row], cursor_.fetchall())
-        items = [SessionQueueItemDTO.queue_item_dto_from_dict(dict(result)) for result in results]
+        items = [SessionQueueItem.queue_item_from_dict(dict(result)) for result in results]
         has_more = False
         if len(items) > limit:
             # remove the extra item
             items.pop()
             has_more = True
         return CursorPaginatedResults(items=items, limit=limit, has_more=has_more)
+
+    def list_all_queue_items(
+        self,
+        queue_id: str,
+        status: Optional[QUEUE_ITEM_STATUS] = None,
+        destination: Optional[str] = None,
+    ) -> list[SessionQueueItem]:
+        """Gets all queue items that match the given parameters"""
+        cursor_ = self._conn.cursor()
+        query = """--sql
+            SELECT *
+            FROM session_queue
+            WHERE queue_id = ?
+        """
+        params: list[Union[str, int]] = [queue_id]
+
+        if status is not None:
+            query += """--sql
+                AND status = ?
+                """
+            params.append(status)
+
+        if destination is not None:
+            query += """---sql
+                AND destination = ?
+            """
+            params.append(destination)
+
+        query += """--sql
+            ORDER BY
+                priority DESC,
+                item_id ASC
+            ;
+            """
+        cursor_.execute(query, params)
+        results = cast(list[sqlite3.Row], cursor_.fetchall())
+        items = [SessionQueueItem.queue_item_from_dict(dict(result)) for result in results]
+        return items
 
     def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
         cursor = self._conn.cursor()

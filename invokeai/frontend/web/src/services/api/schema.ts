@@ -1153,9 +1153,29 @@ export type paths = {
         };
         /**
          * List Queue Items
-         * @description Gets all queue items (without graphs)
+         * @description Gets cursor-paginated queue items
          */
         get: operations["list_queue_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Queue Items
+         * @description Gets all queue items
+         */
+        get: operations["list_all_queue_items"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5786,8 +5806,8 @@ export type components = {
              */
             type: "crop_latents";
         };
-        /** CursorPaginatedResults[SessionQueueItemDTO] */
-        CursorPaginatedResults_SessionQueueItemDTO_: {
+        /** CursorPaginatedResults[SessionQueueItem] */
+        CursorPaginatedResults_SessionQueueItem_: {
             /**
              * Limit
              * @description Limit of items to get
@@ -5802,7 +5822,7 @@ export type components = {
              * Items
              * @description Items
              */
-            items: components["schemas"]["SessionQueueItemDTO"][];
+            items: components["schemas"]["SessionQueueItem"][];
         };
         /**
          * OpenCV Inpaint
@@ -8808,47 +8828,47 @@ export type components = {
              * Id
              * @description The id of the execution state
              */
-            id?: string;
+            id: string;
             /** @description The graph being executed */
             graph: components["schemas"]["Graph"];
             /** @description The expanded graph of activated and executed nodes */
-            execution_graph?: components["schemas"]["Graph"];
+            execution_graph: components["schemas"]["Graph"];
             /**
              * Executed
              * @description The set of node ids that have been executed
              */
-            executed?: string[];
+            executed: string[];
             /**
              * Executed History
              * @description The list of node ids that have been executed, in order of execution
              */
-            executed_history?: string[];
+            executed_history: string[];
             /**
              * Results
              * @description The results of node executions
              */
-            results?: {
+            results: {
                 [key: string]: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"];
             };
             /**
              * Errors
              * @description Errors raised when executing nodes
              */
-            errors?: {
+            errors: {
                 [key: string]: string;
             };
             /**
              * Prepared Source Mapping
              * @description The map of prepared nodes to original graph nodes
              */
-            prepared_source_mapping?: {
+            prepared_source_mapping: {
                 [key: string]: string;
             };
             /**
              * Source Prepared Mapping
              * @description The map of original graph nodes to prepared nodes
              */
-            source_prepared_mapping?: {
+            source_prepared_mapping: {
                 [key: string]: string[];
             };
         };
@@ -19103,7 +19123,10 @@ export type components = {
              */
             total: number;
         };
-        /** SessionQueueItem */
+        /**
+         * SessionQueueItem
+         * @description Session queue item without the full graph. Used for serialization.
+         */
         SessionQueueItem: {
             /**
              * Item Id
@@ -19205,16 +19228,6 @@ export type components = {
              */
             published_workflow_id?: string | null;
             /**
-             * Api Input Fields
-             * @description The fields that were used as input to the API
-             */
-            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
-             * Api Output Fields
-             * @description The nodes that were used as output from the API
-             */
-            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
              * Credits
              * @description The total credits used for this queue item
              */
@@ -19223,123 +19236,6 @@ export type components = {
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
             workflow?: components["schemas"]["WorkflowWithoutID"] | null;
-        };
-        /** SessionQueueItemDTO */
-        SessionQueueItemDTO: {
-            /**
-             * Item Id
-             * @description The identifier of the session queue item
-             */
-            item_id: number;
-            /**
-             * Status
-             * @description The status of this queue item
-             * @default pending
-             * @enum {string}
-             */
-            status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
-            /**
-             * Priority
-             * @description The priority of this queue item
-             * @default 0
-             */
-            priority: number;
-            /**
-             * Batch Id
-             * @description The ID of the batch associated with this queue item
-             */
-            batch_id: string;
-            /**
-             * Origin
-             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results.
-             */
-            origin?: string | null;
-            /**
-             * Destination
-             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results
-             */
-            destination?: string | null;
-            /**
-             * Session Id
-             * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
-             */
-            session_id: string;
-            /**
-             * Error Type
-             * @description The error type if this queue item errored
-             */
-            error_type?: string | null;
-            /**
-             * Error Message
-             * @description The error message if this queue item errored
-             */
-            error_message?: string | null;
-            /**
-             * Error Traceback
-             * @description The error traceback if this queue item errored
-             */
-            error_traceback?: string | null;
-            /**
-             * Created At
-             * @description When this queue item was created
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * @description When this queue item was updated
-             */
-            updated_at: string;
-            /**
-             * Started At
-             * @description When this queue item was started
-             */
-            started_at?: string | null;
-            /**
-             * Completed At
-             * @description When this queue item was completed
-             */
-            completed_at?: string | null;
-            /**
-             * Queue Id
-             * @description The id of the queue with which this item is associated
-             */
-            queue_id: string;
-            /**
-             * Field Values
-             * @description The field values that were used for this queue item
-             */
-            field_values?: components["schemas"]["NodeFieldValue"][] | null;
-            /**
-             * Retried From Item Id
-             * @description The item_id of the queue item that this item was retried from
-             */
-            retried_from_item_id?: number | null;
-            /**
-             * Is Api Validation Run
-             * @description Whether this queue item is an API validation run.
-             * @default false
-             */
-            is_api_validation_run?: boolean;
-            /**
-             * Published Workflow Id
-             * @description The ID of the published workflow associated with this queue item
-             */
-            published_workflow_id?: string | null;
-            /**
-             * Api Input Fields
-             * @description The fields that were used as input to the API
-             */
-            api_input_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
-             * Api Output Fields
-             * @description The nodes that were used as output from the API
-             */
-            api_output_fields?: components["schemas"]["FieldIdentifier"][] | null;
-            /**
-             * Credits
-             * @description The total credits used for this queue item
-             */
-            credits?: number | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
@@ -24460,6 +24356,8 @@ export interface operations {
                 cursor?: number | null;
                 /** @description The pagination cursor priority */
                 priority?: number;
+                /** @description The destination of queue items to fetch */
+                destination?: string | null;
             };
             header?: never;
             path: {
@@ -24476,7 +24374,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItemDTO_"];
+                    "application/json": components["schemas"]["CursorPaginatedResults_SessionQueueItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_queue_items: {
+        parameters: {
+            query?: {
+                /** @description The status of items to fetch */
+                status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
+                /** @description The destination of queue items to fetch */
+                destination?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItem"][];
                 };
             };
             /** @description Validation Error */

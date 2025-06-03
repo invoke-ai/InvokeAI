@@ -7,6 +7,7 @@ from typing import Any, Optional, TypeVar, Union, get_args, get_origin, get_type
 import networkx as nx
 from pydantic import (
     BaseModel,
+    ConfigDict,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
     ValidationError,
@@ -785,6 +786,22 @@ class GraphExecutionState(BaseModel):
     source_prepared_mapping: dict[str, set[str]] = Field(
         description="The map of original graph nodes to prepared nodes",
         default_factory=dict,
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "required": [
+                "id",
+                "graph",
+                "execution_graph",
+                "executed",
+                "executed_history",
+                "results",
+                "errors",
+                "prepared_source_mapping",
+                "source_prepared_mapping",
+            ]
+        }
     )
 
     @field_validator("graph")

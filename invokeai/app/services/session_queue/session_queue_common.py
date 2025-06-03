@@ -207,7 +207,7 @@ class FieldIdentifier(BaseModel):
     field_name: str = Field(description="The name of the field")
 
 
-class SessionQueueItemWithoutGraph(BaseModel):
+class SessionQueueItem(BaseModel):
     """Session queue item without the full graph. Used for serialization."""
 
     item_id: int = Field(description="The identifier of the session queue item")
@@ -251,42 +251,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
         default=None,
         description="The ID of the published workflow associated with this queue item",
     )
-    api_input_fields: Optional[list[FieldIdentifier]] = Field(
-        default=None, description="The fields that were used as input to the API"
-    )
-    api_output_fields: Optional[list[FieldIdentifier]] = Field(
-        default=None, description="The nodes that were used as output from the API"
-    )
     credits: Optional[float] = Field(default=None, description="The total credits used for this queue item")
-
-    @classmethod
-    def queue_item_dto_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemDTO":
-        # must parse these manually
-        queue_item_dict["field_values"] = get_field_values(queue_item_dict)
-        return SessionQueueItemDTO(**queue_item_dict)
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "required": [
-                "item_id",
-                "status",
-                "batch_id",
-                "queue_id",
-                "session_id",
-                "priority",
-                "session_id",
-                "created_at",
-                "updated_at",
-            ]
-        }
-    )
-
-
-class SessionQueueItemDTO(SessionQueueItemWithoutGraph):
-    pass
-
-
-class SessionQueueItem(SessionQueueItemWithoutGraph):
     session: GraphExecutionState = Field(description="The fully-populated session to be executed")
     workflow: Optional[WorkflowWithoutID] = Field(
         default=None, description="The workflow associated with this queue item"
