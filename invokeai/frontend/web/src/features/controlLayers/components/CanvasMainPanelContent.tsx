@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import type { ButtonGroupProps, SystemStyleObject, TextProps } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
@@ -26,6 +26,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
+import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
@@ -63,7 +64,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useListAllQueueItemsQuery } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import type { ProgressData } from 'services/events/stores';
-import { $socket, clearProgressEvent, setProgress, useHasProgressImage, useProgressData } from 'services/events/stores';
+import { $socket, clearProgressImage, setProgress, useHasProgressImage, useProgressData } from 'services/events/stores';
 import type { Equals, Param0 } from 'tsafe';
 import { assert, objectEntries } from 'tsafe';
 
@@ -464,9 +465,6 @@ const StagingArea = memo(() => {
       if (data.status === 'in_progress' && autoSwitch) {
         onSelectItemId(data.item_id);
       }
-      if (data.status === 'completed' || data.status === 'canceled' || data.status === 'failed') {
-        clearProgressEvent(ctx.$progressData, data.session_id);
-      }
     };
 
     socket.on('queue_item_status_changed', onQueueItemStatusChanged);
@@ -512,6 +510,7 @@ const StagingArea = memo(() => {
         <Flex alignItems="center" justifyContent="center" w="full" h="full" objectFit="contain">
           {selectedItem && selectedItemIndex !== null && (
             <QueueItemCard
+              key={`${selectedItem.item_id}-full`}
               item={selectedItem}
               number={selectedItemIndex + 1}
               isSelected={false}
@@ -531,7 +530,7 @@ const StagingArea = memo(() => {
         <Flex ref={scrollableRef} gap={2} maxW="full" overflowX="scroll">
           {items.map((item, i) => (
             <QueueItemCard
-              key={item.item_id}
+              key={`${item.item_id}-mini`}
               item={item}
               number={i + 1}
               isSelected={selectedItemId === item.item_id}
@@ -574,22 +573,22 @@ StagingArea.displayName = 'StagingArea';
 const queueItemCardSx = {
   cursor: 'pointer',
   pos: 'relative',
-  borderWidth: 1,
-  borderRadius: 'base',
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
-  aspectRatio: '1/1',
+  h: 'full',
   maxH: 'full',
   maxW: 'full',
-  '&[data-selected="true"]': {
-    borderColor: 'invokeBlue.300',
-  },
+  minW: 0,
+  minH: 0,
   '&[data-size="mini"]': {
+    borderWidth: 1,
+    borderRadius: 'base',
+    '&[data-selected="true"]': {
+      borderColor: 'invokeBlue.300',
+    },
+    aspectRatio: '1/1',
     flexShrink: 0,
-  },
-  '&[data-size="full"]&[data-has-progress-image="false"]': {
-    w: 1024,
   },
 };
 
@@ -607,7 +606,6 @@ type QueueItemStatusCardMiniProps = {
 const QueueItemCard = memo(
   ({ item, isSelected, number, onSelectItemId, onChangeAutoSwitch, size }: QueueItemStatusCardMiniProps) => {
     const ctx = useStagingContext();
-    const [isImageLoaded, setIsImageLoaded] = useState(false);
     const hasProgressImage = useHasProgressImage(ctx.$progressData, item.session_id);
 
     const outputImageName = useMemo(() => {
@@ -631,24 +629,6 @@ const QueueItemCard = memo(
 
     const { currentData: imageDTO } = useGetImageDTOQuery(outputImageName ?? skipToken);
 
-    const syncIsReady = useCallback(async () => {
-      if (!imageDTO) {
-        setIsImageLoaded(false);
-        return;
-      }
-      try {
-        const _ = await loadImage(size === 'mini' ? imageDTO.thumbnail_url : imageDTO.image_url, true);
-        setIsImageLoaded(true);
-        return;
-      } catch {
-        setIsImageLoaded(false);
-      }
-    }, [imageDTO, size]);
-
-    useEffect(() => {
-      syncIsReady();
-    }, [syncIsReady]);
-
     const onClick = useCallback(() => {
       onSelectItemId(item.item_id);
     }, [item.item_id, onSelectItemId]);
@@ -657,22 +637,38 @@ const QueueItemCard = memo(
       onChangeAutoSwitch(item.status === 'in_progress');
     }, [item.status, onChangeAutoSwitch]);
 
-    if (imageDTO && isImageLoaded) {
+    const syncIsReady = useCallback(async () => {
+      if (!imageDTO) {
+        return;
+      }
+      try {
+        await loadImage(imageDTO.image_url, true);
+        clearProgressImage(ctx.$progressData, item.session_id);
+        return;
+      } catch {
+        // noop
+      }
+    }, [ctx.$progressData, imageDTO, item.session_id]);
+
+    useEffect(() => {
+      syncIsReady();
+    }, [syncIsReady]);
+
+    if (imageDTO && !hasProgressImage) {
       return (
         <Flex id={getCardId(item.item_id)} sx={queueItemCardSx} data-selected={isSelected} data-size={size}>
-          <DndImage imageDTO={imageDTO} onClick={onClick} onDoubleClick={onDoubleClick} asThumbnail={size === 'mini'} />
-          <Text
-            position="absolute"
-            top={0}
-            left={1}
-            pointerEvents="none"
-            userSelect="none"
-            filter={DROP_SHADOW}
-          >{`#${number}`}</Text>
+          <DndImage
+            imageDTO={imageDTO}
+            onClick={size === 'mini' ? onClick : undefined}
+            onDoubleClick={size === 'mini' ? onDoubleClick : undefined}
+            asThumbnail={size === 'mini'}
+          />
+          {size === 'mini' && <ItemNumber number={number} position="absolute" top={0} left={1} />}
           {size === 'full' && (
-            <Flex position="absolute" top={2} right={2}>
-              <ImageActions imageDTO={imageDTO} />
-            </Flex>
+            <>
+              <ItemNumber number={number} position="absolute" top={1} left={2} />
+              <ImageActions imageDTO={imageDTO} position="absolute" top={2} right={2} />
+            </>
           )}
         </Flex>
       );
@@ -689,15 +685,13 @@ const QueueItemCard = memo(
         onDoubleClick={onDoubleClick}
       >
         <InProgressContent item={item} />
-        <Text
-          position="absolute"
-          top={0}
-          left={1}
-          pointerEvents="none"
-          userSelect="none"
-          filter={DROP_SHADOW}
-        >{`#${number}`}</Text>
-        {size === 'full' && <ProgressMessage key={item.session_id} session_id={item.session_id} />}
+        {size === 'mini' && <ItemNumber number={number} position="absolute" top={0} left={1} />}
+        {size === 'full' && (
+          <>
+            <ItemNumber number={number} position="absolute" top={1} left={2} />
+            <ProgressMessage session_id={item.session_id} position="absolute" bottom={1} left={2} />
+          </>
+        )}
       </Flex>
     );
   }
@@ -712,14 +706,19 @@ const getMessage = (data: S['InvocationProgressEvent']) => {
   return message;
 };
 
-const ProgressMessage = memo(({ session_id }: { session_id: string }) => {
+const ItemNumber = memo(({ number, ...rest }: { number: number } & TextProps) => {
+  return <Text pointerEvents="none" userSelect="none" filter={DROP_SHADOW} {...rest}>{`#${number}`}</Text>;
+});
+ItemNumber.displayName = 'ItemNumber';
+
+const ProgressMessage = memo(({ session_id, ...rest }: { session_id: string } & TextProps) => {
   const { $progressData } = useStagingContext();
   const { progressEvent } = useProgressData($progressData, session_id);
   if (!progressEvent) {
     return null;
   }
   return (
-    <Text position="absolute" bottom={2} left={2} pointerEvents="none" userSelect="none" filter={DROP_SHADOW}>
+    <Text pointerEvents="none" userSelect="none" filter={DROP_SHADOW} {...rest}>
       {getMessage(progressEvent)}
     </Text>
   );
@@ -755,7 +754,14 @@ const InProgressContent = memo(({ item }: { item: S['SessionQueueItem'] }) => {
   if (progressImage) {
     return (
       <>
-        <Image objectFit="contain" maxH="full" maxW="full" src={progressImage.dataURL} width={progressImage.width} />
+        <Image
+          objectFit="contain"
+          maxH="full"
+          maxW="full"
+          src={progressImage.dataURL}
+          width={progressImage.width}
+          height={progressImage.height}
+        />
         <ProgressCircle data={progressEvent} />
       </>
     );
@@ -773,11 +779,7 @@ const InProgressContent = memo(({ item }: { item: S['SessionQueueItem'] }) => {
   }
 
   if (item.status === 'completed') {
-    return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="error.300">
-        Unable to get image
-      </Text>
-    );
+    return <IAINoContentFallbackWithSpinner />;
   }
   assert<Equals<never, typeof item.status>>(false);
 });
@@ -809,7 +811,7 @@ const ProgressCircle = memo(({ data }: { data?: S['InvocationProgressEvent'] | n
 });
 ProgressCircle.displayName = 'ProgressCircle';
 
-const ImageActions = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+const ImageActions = memo(({ imageDTO, ...rest }: { imageDTO: ImageDTO } & ButtonGroupProps) => {
   const { getState, dispatch } = useAppStore();
 
   const vary = useCallback(() => {
@@ -842,7 +844,7 @@ const ImageActions = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
     });
   }, [dispatch, getState, imageDTO]);
   return (
-    <ButtonGroup isAttached={false} size="sm">
+    <ButtonGroup isAttached={false} size="sm" {...rest}>
       <Button onClick={vary} tooltip="Vary the image using Image to Image">
         Vary
       </Button>
