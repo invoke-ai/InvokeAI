@@ -1,7 +1,6 @@
 import type { EphemeralProgressImage } from 'features/controlLayers/store/types';
 import type { ProgressImage } from 'features/nodes/types/common';
 import { round } from 'lodash-es';
-import type { MapStore } from 'nanostores';
 import { atom, computed, map } from 'nanostores';
 import { useEffect, useState } from 'react';
 import type { ImageDTO, S } from 'services/api/types';
@@ -21,18 +20,69 @@ export type ProgressAndResult = {
 };
 export const $progressImages = map({} as Record<string, ProgressAndResult>);
 
-export const useMapSelector = <T extends object>(id: string, map: MapStore<Record<string, T>>): T | undefined => {
-  const [value, setValue] = useState<T | undefined>();
+type ProgressData = {
+  sessionId: string;
+  progressEvent: S['InvocationProgressEvent'] | null;
+  progressImage: ProgressImage | null;
+};
+
+export const $progressData = atom<Record<string, ProgressData>>({});
+
+export const useProgressData = (sessionId: string): ProgressData => {
+  const [value, setValue] = useState<ProgressData>({ sessionId, progressEvent: null, progressImage: null });
   useEffect(() => {
-    const unsub = map.subscribe((data) => {
-      setValue(data[id]);
+    const unsub = $progressData.subscribe((data) => {
+      const progressData = data[sessionId];
+      if (!progressData) {
+        return;
+      }
+      setValue(progressData);
     });
     return () => {
       unsub();
     };
-  }, [id, map]);
+  }, [sessionId]);
 
   return value;
+};
+
+export const setProgress = (data: S['InvocationProgressEvent']) => {
+  const progressData = $progressData.get();
+  const current = progressData[data.session_id];
+  if (current) {
+    const next = { ...current };
+    next.progressEvent = data;
+    if (data.image) {
+      next.progressImage = data.image;
+    }
+    $progressData.set({
+      ...progressData,
+      [data.session_id]: next,
+    });
+  } else {
+    $progressData.set({
+      ...progressData,
+      [data.session_id]: {
+        sessionId: data.session_id,
+        progressEvent: data,
+        progressImage: data.image ?? null,
+      },
+    });
+  }
+};
+
+export const clearProgressImage = (sessionId: string) => {
+  const progressData = $progressData.get();
+  const current = progressData[sessionId];
+  if (!current) {
+    return;
+  }
+  const next = { ...current };
+  next.progressImage = null;
+  $progressData.set({
+    ...progressData,
+    [sessionId]: next,
+  });
 };
 
 export const $lastCanvasProgressEvent = atom<S['InvocationProgressEvent'] | null>(null);
