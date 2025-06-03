@@ -1,22 +1,18 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { isCanvasOutputEvent } from 'features/nodes/util/graph/graphBuilderUtils';
-import { flushSync } from 'react-dom';
 import type { ApiTagDescription } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
 import {
-  $lastCanvasProgressImage,
   $lastProgressEvent,
-  $progressImages,
 } from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
@@ -180,29 +176,29 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
 
     await addImagesToGallery(data);
 
-    // We expect only a single image in the canvas output
-    const imageDTO = (await getResultImageDTOs(data))[0];
+    // // We expect only a single image in the canvas output
+    // const imageDTO = (await getResultImageDTOs(data))[0];
 
-    if (!imageDTO) {
-      return;
-    }
+    // if (!imageDTO) {
+    //   return;
+    // }
 
-    flushSync(() => {
-      dispatch(
-        stagingAreaImageStaged({
-          stagingAreaImage: { type: 'staged', sessionId: data.session_id, imageDTO, offsetX: 0, offsetY: 0 },
-        })
-      );
-    });
+    // flushSync(() => {
+    //   dispatch(
+    //     stagingAreaImageStaged({
+    //       stagingAreaImage: { type: 'staged', sessionId: data.session_id, imageDTO, offsetX: 0, offsetY: 0 },
+    //     })
+    //   );
+    // });
 
-    const progressData = $progressImages.get()[data.session_id];
-    if (progressData) {
-      $progressImages.setKey(data.session_id, { ...progressData, isFinished: true, resultImage: imageDTO });
-    } else {
-      $progressImages.setKey(data.session_id, { sessionId: data.session_id, isFinished: true, resultImage: imageDTO });
-    }
+    // const progressData = $progressImages.get()[data.session_id];
+    // if (progressData) {
+    //   $progressImages.setKey(data.session_id, { ...progressData, isFinished: true, resultImage: imageDTO });
+    // } else {
+    //   $progressImages.setKey(data.session_id, { sessionId: data.session_id, isFinished: true, resultImage: imageDTO });
+    // }
 
-    $lastCanvasProgressImage.set(null);
+    // $lastCanvasProgressImage.set(null);
   };
 
   const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
