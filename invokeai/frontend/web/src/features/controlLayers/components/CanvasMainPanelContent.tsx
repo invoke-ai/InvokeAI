@@ -66,7 +66,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiDotsThreeOutlineVerticalFill, PiUploadBold } from 'react-icons/pi';
 import { getImageDTOSafe, useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { queueItemsAdapterSelectors, useListQueueItemsQuery } from 'services/api/endpoints/queue';
+import { useListAllQueueItemsQuery } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import type { ProgressAndResult } from 'services/events/stores';
 import { $progressImages, $socket, useMapSelector } from 'services/events/stores';
@@ -351,17 +351,12 @@ const StagingArea = memo(() => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollableRef = useRef<HTMLDivElement>(null);
-  const { data } = useListQueueItemsQuery({ destination: 'canvas' });
-  const items = useMemo(() => {
-    if (!data) {
-      return EMPTY_ARRAY;
-    }
-    return queueItemsAdapterSelectors.selectAll(data);
-  }, [data]);
+  const { data } = useListAllQueueItemsQuery({ destination: 'canvas' });
+  const items = useMemo(() => data?.filter(({ status }) => status !== 'canceled') ?? EMPTY_ARRAY, [data]);
   const selectedItem = useMemo(
     () =>
-      data && selectedItemId !== null ? queueItemsAdapterSelectors.selectById(data, String(selectedItemId)) : null,
-    [data, selectedItemId]
+      items.length > 0 && selectedItemId !== null ? items.find(({ item_id }) => item_id === selectedItemId) : null,
+    [items, selectedItemId]
   );
 
   useEffect(() => {
