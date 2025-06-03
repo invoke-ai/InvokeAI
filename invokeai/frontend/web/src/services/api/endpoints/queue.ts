@@ -5,9 +5,10 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import { listParamsReset } from 'features/queue/store/queueSlice';
 import queryString from 'query-string';
 import type { components, paths } from 'services/api/schema';
+import type { S } from 'services/api/types';
 
 import type { ApiTagDescription } from '..';
-import { api, buildV1Url } from '..';
+import { api, buildV1Url, LIST_TAG } from '..';
 
 /**
  * Builds an endpoint URL for the queue router
@@ -35,7 +36,7 @@ export type SessionQueueItemStatus = NonNullable<
   NonNullable<paths['/api/v1/queue/{queue_id}/list']['get']['parameters']['query']>['status']
 >;
 
-export const queueItemsAdapter = createEntityAdapter<components['schemas']['SessionQueueItemDTO'], string>({
+export const queueItemsAdapter = createEntityAdapter<S['SessionQueueItem'], string>({
   selectId: (queueItem) => String(queueItem.item_id),
   sortComparer: (a, b) => {
     // Sort by priority in descending order
@@ -388,10 +389,10 @@ export const queueApi = api.injectEndpoints({
       invalidatesTags: ['CurrentSessionQueueItem', 'NextSessionQueueItem', 'QueueCountsByDestination'],
     }),
     listQueueItems: build.query<
-      EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
+      EntityState<S['SessionQueueItem'], string> & {
         has_more: boolean;
       },
-      { cursor?: number; priority?: number } | undefined
+      { cursor?: number; priority?: number; destination?: string } | undefined
     >({
       query: (queryArgs) => ({
         url: getListQueueItemsUrl(queryArgs),
@@ -400,20 +401,20 @@ export const queueApi = api.injectEndpoints({
       serializeQueryArgs: () => {
         return buildQueueUrl('list');
       },
-      transformResponse: (response: components['schemas']['CursorPaginatedResults_SessionQueueItemDTO_']) =>
-        queueItemsAdapter.addMany(
+      transformResponse: (response: components['schemas']['CursorPaginatedResults_SessionQueueItem_']) =>
+        queueItemsAdapter.upsertMany(
           queueItemsAdapter.getInitialState({
             has_more: response.has_more,
           }),
           response.items
         ),
       merge: (cache, response) => {
-        queueItemsAdapter.addMany(cache, queueItemsAdapterSelectors.selectAll(response));
+        queueItemsAdapter.upsertMany(cache, queueItemsAdapterSelectors.selectAll(response));
         cache.has_more = response.has_more;
       },
       forceRefetch: ({ currentArg, previousArg }) => currentArg !== previousArg,
       keepUnusedDataFor: 60 * 5, // 5 minutes
-      providesTags: ['FetchOnReconnect'],
+      providesTags: ['FetchOnReconnect', { type: 'SessionQueueItem', id: LIST_TAG }],
     }),
     getQueueCountsByDestination: build.query<
       paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['responses']['200']['content']['application/json'],
