@@ -20,7 +20,7 @@ export const useNewGallerySession = () => {
   const newSessionDialog = useNewGallerySessionDialog();
 
   const newGallerySessionImmediate = useCallback(() => {
-    dispatch(canvasSessionStarted({ sessionType: null }));
+    dispatch(canvasSessionStarted({ sessionType: 'simple' }));
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
 

@@ -1,17 +1,20 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import type { StagingAreaImage, StagingAreaProgressImage } from 'features/controlLayers/store/types';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 
 type CanvasStagingAreaState = {
+  session: { type: 'simple'; id: string } | { type: 'advanced'; id: string } | null;
   sessionType: 'simple' | 'advanced' | null;
   images: (StagingAreaImage | StagingAreaProgressImage)[];
   selectedImageIndex: number;
 };
 
 const INITIAL_STATE: CanvasStagingAreaState = {
+  session: null,
   sessionType: null,
   images: [],
   selectedImageIndex: 0,
@@ -23,6 +26,10 @@ export const canvasSessionSlice = createSlice({
   name: 'canvasSession',
   initialState: getInitialState(),
   reducers: {
+    sessionChanged: (state, action: PayloadAction<{ session: CanvasStagingAreaState['session'] }>) => {
+      const { session } = action.payload;
+      state.session = session;
+    },
     stagingAreaImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
       const { stagingAreaImage } = action.payload;
       let didReplace = false;
@@ -67,11 +74,19 @@ export const canvasSessionSlice = createSlice({
       state.images = [];
       state.selectedImageIndex = 0;
     },
-    canvasSessionStarted: (_, action: PayloadAction<{ sessionType: CanvasStagingAreaState['sessionType'] }>) => {
-      const { sessionType } = action.payload;
-      const state = getInitialState();
-      state.sessionType = sessionType;
-      return state;
+    canvasSessionStarted: {
+      reducer: (state, action: PayloadAction<{ session: CanvasStagingAreaState['session'] }>) => {
+        const { session } = action.payload;
+        state.session = session;
+      },
+      prepare: (payload: { sessionType: 'simple' | 'advanced' }) => ({
+        payload: {
+          session: {
+            type: payload.sessionType,
+            id: getPrefixedId(`canvas:${payload.sessionType}`),
+          },
+        },
+      }),
     },
   },
   extraReducers(builder) {
@@ -80,6 +95,7 @@ export const canvasSessionSlice = createSlice({
 });
 
 export const {
+  sessionChanged,
   stagingAreaImageStaged,
   stagingAreaGenerationStarted,
   stagingAreaGenerationFinished,
@@ -139,4 +155,8 @@ export const selectImageCount = createSelector(
 export const selectCanvasSessionType = createSelector(
   selectCanvasStagingAreaSlice,
   (canvasSession) => canvasSession.sessionType
+);
+export const selectCanvasSession = createSelector(
+  selectCanvasStagingAreaSlice,
+  (canvasSession) => canvasSession.session
 );
