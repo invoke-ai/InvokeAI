@@ -8,7 +8,6 @@ import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { stagingAreaGenerationStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   $isInPublishFlow,
   $outputNodeId,
@@ -397,8 +396,8 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         $nodeExecutionStates.setKey(clone.nodeId, clone);
       });
       if (data.origin === 'canvas') {
-        store.dispatch(stagingAreaGenerationStarted({ sessionId: session_id }));
-        $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
+        // store.dispatch(stagingAreaGenerationStarted({ sessionId: session_id }));
+        // $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false });
       }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       if (status === 'failed' && error_type) {
@@ -423,7 +422,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
-      $progressImages.setKey(session_id, undefined);
+      // $progressImages.setKey(session_id, undefined);
 
       // When a validation run is completed, we want to clear the validation run batch ID & set the workflow as published
       const validationRunData = $validationRunData.get();

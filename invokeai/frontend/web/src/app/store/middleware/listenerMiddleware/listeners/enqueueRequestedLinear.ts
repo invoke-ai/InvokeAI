@@ -5,7 +5,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
-import { canvasSessionStarted, selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionStarted, selectCanvasSession } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
@@ -31,6 +31,11 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
     actionCreator: enqueueRequestedCanvas,
     effect: async (action, { getState, dispatch }) => {
       log.debug('Enqueue requested');
+
+      if (!selectCanvasSession(getState())) {
+        dispatch(canvasSessionStarted({ sessionType: 'simple' }));
+      }
+
       const state = getState();
       const { prepend } = action.payload;
 
@@ -88,7 +93,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
 
-      // const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
+      const destination = state.canvasSession.session?.id ?? 'canvas';
 
       const prepareBatchResult = withResult(() =>
         prepareLinearUIBatch({
@@ -98,7 +103,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
           seedFieldIdentifier,
           positivePromptFieldIdentifier,
           origin: 'canvas',
-          destination: 'canvas',
+          destination,
         })
       );
 
@@ -113,9 +118,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       try {
         await req.unwrap();
-        if (!selectCanvasSessionType(state)) {
-          dispatch(canvasSessionStarted({ sessionType: 'simple' }));
-        }
         log.debug(parseify({ batchConfig: prepareBatchResult.value }), 'Enqueued batch');
       } catch (error) {
         log.error({ error: serializeError(error as Error) }, 'Failed to enqueue batch');
