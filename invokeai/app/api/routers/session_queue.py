@@ -91,7 +91,7 @@ async def list_queue_items(
 
 
 @session_queue_router.get(
-    "/{queue_id}/all",
+    "/{queue_id}/list_all",
     operation_id="list_all_queue_items",
     responses={
         200: {"model": list[SessionQueueItem]},
