@@ -1164,7 +1164,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/queue/{queue_id}/all": {
+    "/api/v1/queue/{queue_id}/list_all": {
         parameters: {
             query?: never;
             header?: never;

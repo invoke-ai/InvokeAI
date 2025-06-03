@@ -13,7 +13,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Components, ItemContent } from 'react-virtuoso';
 import { Virtuoso } from 'react-virtuoso';
-import { queueItemsAdapterSelectors, useListQueueItemsQuery } from 'services/api/endpoints/queue';
+import { useListQueueItemsQuery } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
 
 import QueueItemComponent from './QueueItemComponent';
@@ -70,7 +70,7 @@ const QueueList = () => {
     if (!listQueueItemsData) {
       return [];
     }
-    return queueItemsAdapterSelectors.selectAll(listQueueItemsData);
+    return listQueueItemsData.items;
   }, [listQueueItemsData]);
 
   const handleLoadMore = useCallback(() => {
