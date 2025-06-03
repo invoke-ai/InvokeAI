@@ -13,7 +13,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
-import type { SessionQueueItemDTO } from 'services/api/types';
+import type { S } from 'services/api/types';
 
 import { COLUMN_WIDTHS } from './constants';
 import QueueItemDetail from './QueueItemDetail';
@@ -23,7 +23,7 @@ const selectedStyles = { bg: 'base.700' };
 
 type InnerItemProps = {
   index: number;
-  item: SessionQueueItemDTO;
+  item: S['SessionQueueItem'];
   context: ListContext;
 };
 
@@ -155,7 +155,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
       </Flex>
 
       <Collapse in={isOpen} transition={transition} unmountOnExit={true}>
-        <QueueItemDetail queueItemDTO={item} />
+        <QueueItemDetail queueItem={item} />
       </Collapse>
     </Flex>
   );

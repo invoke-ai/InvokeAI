@@ -12,23 +12,19 @@ import type { ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
-import { useGetQueueItemQuery } from 'services/api/endpoints/queue';
-import type { SessionQueueItemDTO } from 'services/api/types';
+import type { S } from 'services/api/types';
 
 type Props = {
-  queueItemDTO: SessionQueueItemDTO;
+  queueItem: S['SessionQueueItem'];
 };
 
-const QueueItemComponent = ({ queueItemDTO }: Props) => {
-  const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
+const QueueItemComponent = ({ queueItem }: Props) => {
+  const { session_id, batch_id, item_id, origin, destination } = queueItem;
   const { t } = useTranslation();
   const isRetryEnabled = useFeatureStatus('retryQueueItem');
   const { cancelBatch, isLoading: isLoadingCancelBatch, isCanceled: isBatchCanceled } = useCancelBatch(batch_id);
-
   const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } = useCancelQueueItem(item_id);
   const { retryQueueItem, isLoading: isLoadingRetryQueueItem } = useRetryQueueItem(item_id);
-
-  const { data: queueItem } = useGetQueueItemQuery(item_id);
 
   const originText = useOriginText(origin);
   const destinationText = useDestinationText(destination);

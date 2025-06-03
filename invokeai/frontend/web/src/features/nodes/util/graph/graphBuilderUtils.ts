@@ -159,6 +159,8 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
   );
 };
 
+export const isCanvasOutputNodeId = (nodeId: string) => nodeId.split(':')[0] === CANVAS_OUTPUT_PREFIX;
+
 export const isCanvasOutputEvent = (data: S['InvocationCompleteEvent']) => {
-  return data.invocation_source_id.split(':')[0] === CANVAS_OUTPUT_PREFIX;
+  return isCanvasOutputNodeId(data.invocation_source_id);
 };
