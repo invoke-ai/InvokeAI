@@ -135,7 +135,6 @@ class SessionQueueBase(ABC):
     def list_all_queue_items(
         self,
         queue_id: str,
-        status: Optional[QUEUE_ITEM_STATUS] = None,
         destination: Optional[str] = None,
     ) -> list[SessionQueueItem]:
         """Gets all queue items that match the given parameters"""
