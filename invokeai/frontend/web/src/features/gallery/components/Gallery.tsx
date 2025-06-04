@@ -18,12 +18,12 @@ import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useG
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { CSSProperties } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
+import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
@@ -46,7 +46,7 @@ const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '10
 const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
 const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 
-export const Gallery = () => {
+export const Gallery = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const galleryView = useAppSelector(selectGalleryView);
@@ -116,4 +116,5 @@ export const Gallery = () => {
       <GalleryPagination />
     </Flex>
   );
-};
+});
+Gallery.displayName = 'Gallery';

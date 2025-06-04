@@ -17,7 +17,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const BoardsListWrapper = () => {
+export const BoardsListWrapper = memo(() => {
   const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
   const [os, osRef] = useState<OverlayScrollbarsComponentRef | null>(null);
   useEffect(() => {
@@ -54,5 +54,6 @@ const BoardsListWrapper = () => {
       </Box>
     </Box>
   );
-};
-export default memo(BoardsListWrapper);
+});
+
+BoardsListWrapper.displayName = 'BoardsListWrapper';
