@@ -36,7 +36,7 @@ export const QueueActionsMenuButton = memo(() => {
 
   return (
     <>
-      <Menu placement="bottom-end">
+      <Menu placement="bottom-end" isLazy lazyBehavior="unmount">
         <MenuButton ref={ref} as={IconButton} size="lg" aria-label="Queue Actions Menu" icon={<PiListBold />} />
         <MenuList>
           <MenuGroup title={t('common.new')}>
