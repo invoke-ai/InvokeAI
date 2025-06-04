@@ -313,11 +313,29 @@ const GenerateWithStartingImageAndInpaintMask = memo(() => {
 });
 GenerateWithStartingImageAndInpaintMask.displayName = 'GenerateWithStartingImageAndInpaintMask';
 
-const scrollIndicatorSx = {
+const scrollIndicatorBaseSx = {
   opacity: 0,
+  position: 'absolute',
+  w: 16,
+  h: 'full',
+  transitionProperty: 'opacity',
+  transitionDuration: '0.3s',
+  pointerEvents: 'none',
   '&[data-visible="true"]': {
     opacity: 1,
   },
+} satisfies SystemStyleObject;
+
+const scrollIndicatorLeftSx = {
+  ...scrollIndicatorBaseSx,
+  left: 0,
+  bg: 'linear-gradient(to right, var(--invoke-colors-base-900), transparent)',
+} satisfies SystemStyleObject;
+
+const scrollIndicatorRightSx = {
+  ...scrollIndicatorBaseSx,
+  right: 0,
+  bg: 'linear-gradient(to left, var(--invoke-colors-base-900), transparent)',
 } satisfies SystemStyleObject;
 
 type StagingContextValue = {
@@ -341,72 +359,11 @@ const useStagingContext = () => {
   return ctx;
 };
 
-const StagingArea = memo(() => {
-  const ctx = useStagingContext();
-  const dispatch = useAppDispatch();
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const [autoSwitch, setAutoSwitch] = useState(true);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const scrollableRef = useRef<HTMLDivElement>(null);
-  const { data } = useListAllQueueItemsQuery({ destination: ctx.session.id });
-  const items = useMemo(() => data?.filter(({ status }) => status !== 'canceled') ?? EMPTY_ARRAY, [data]);
-  const selectedItem = useMemo(
-    () =>
-      items.length > 0 && selectedItemId !== null ? items.find(({ item_id }) => item_id === selectedItemId) : null,
-    [items, selectedItemId]
-  );
-  const selectedItemIndex = useMemo(
-    () =>
-      items.length > 0 && selectedItemId !== null ? items.findIndex(({ item_id }) => item_id === selectedItemId) : null,
-    [items, selectedItemId]
-  );
-
-  const startOver = useCallback(() => {
-    dispatch(canvasSessionStarted({ sessionType: 'simple' }));
-  }, [dispatch]);
-
-  useEffect(() => {
-    const el = scrollableRef.current;
-    if (!el) {
-      return;
-    }
-    const onScroll = () => {
-      const { scrollLeft, scrollWidth, clientWidth } = el;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft + clientWidth < scrollWidth);
-    };
-    el.addEventListener('scroll', onScroll);
-    const observer = new ResizeObserver(onScroll);
-    observer.observe(el);
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      observer.disconnect();
-    };
-  }, []);
-
-  const onSelectItemId = useCallback((item_id: number | null) => {
-    setSelectedItemId(item_id);
-    if (item_id !== null) {
-      document.getElementById(getCardId(item_id))?.scrollIntoView();
-    }
-  }, []);
-
-  const onChangeAutoSwitch = useCallback((autoSwitch: boolean) => {
-    setAutoSwitch(autoSwitch);
-  }, []);
-
-  useEffect(() => {
-    if (items.length === 0) {
-      onSelectItemId(null);
-      return;
-    }
-    if (selectedItemId === null && items.length > 0) {
-      onSelectItemId(items[0]?.item_id ?? null);
-      return;
-    }
-  }, [items, onSelectItemId, selectedItem, selectedItemId]);
-
+const useStagingAreaKeyboardNav = (
+  items: S['SessionQueueItem'][],
+  selectedItemId: number | null,
+  onSelectItemId: (item_id: number) => void
+) => {
   const onNext = useCallback(() => {
     if (selectedItemId === null) {
       return;
@@ -451,6 +408,78 @@ const StagingArea = memo(() => {
   useHotkeys('right', onNext, { preventDefault: true });
   useHotkeys('meta+left', onFirst, { preventDefault: true });
   useHotkeys('meta+right', onLast, { preventDefault: true });
+};
+
+const LIST_ALL_OPTIONS = {
+  selectFromResult: ({ data }) => {
+    if (!data) {
+      return { items: EMPTY_ARRAY };
+    }
+    return { items: data.filter(({ status }) => status !== 'canceled') };
+  },
+} satisfies Parameters<typeof useListAllQueueItemsQuery>[1];
+
+const StagingArea = memo(() => {
+  const ctx = useStagingContext();
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [autoSwitch, setAutoSwitch] = useState(true);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const scrollableRef = useRef<HTMLDivElement>(null);
+  const { items } = useListAllQueueItemsQuery({ destination: ctx.session.id }, LIST_ALL_OPTIONS);
+  const selectedItem = useMemo(
+    () =>
+      items.length > 0 && selectedItemId !== null ? items.find(({ item_id }) => item_id === selectedItemId) : null,
+    [items, selectedItemId]
+  );
+  const selectedItemIndex = useMemo(
+    () =>
+      items.length > 0 && selectedItemId !== null ? items.findIndex(({ item_id }) => item_id === selectedItemId) : null,
+    [items, selectedItemId]
+  );
+
+  useEffect(() => {
+    const el = scrollableRef.current;
+    if (!el) {
+      return;
+    }
+    const onScroll = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth);
+    };
+    el.addEventListener('scroll', onScroll);
+    const observer = new ResizeObserver(onScroll);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+    };
+  }, []);
+
+  const onSelectItemId = useCallback((item_id: number | null) => {
+    setSelectedItemId(item_id);
+    if (item_id !== null) {
+      document.getElementById(getCardId(item_id))?.scrollIntoView();
+    }
+  }, []);
+
+  useStagingAreaKeyboardNav(items, selectedItemId, onSelectItemId);
+
+  const onChangeAutoSwitch = useCallback((autoSwitch: boolean) => {
+    setAutoSwitch(autoSwitch);
+  }, []);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      onSelectItemId(null);
+      return;
+    }
+    if (selectedItemId === null && items.length > 0) {
+      onSelectItemId(items[0]?.item_id ?? null);
+      return;
+    }
+  }, [items, onSelectItemId, selectedItem, selectedItemId]);
 
   const socket = useStore($socket);
   useEffect(() => {
@@ -497,29 +526,17 @@ const StagingArea = memo(() => {
 
   return (
     <Flex flexDir="column" gap={2} w="full" h="full" minW={0} minH={0}>
-      <Flex w="full" alignItems="center">
-        <Text fontSize="lg" fontWeight="bold">
-          Generations
-        </Text>
-        <Spacer />
-        <Button size="sm" variant="ghost" onClick={startOver}>
-          Start Over
-        </Button>
-      </Flex>
+      <StagingAreaHeader />
       <Flex position="relative" w="full" h="full" maxH="full" alignItems="center" justifyContent="center" minH={0}>
         <Flex alignItems="center" justifyContent="center" w="full" h="full" objectFit="contain">
           {selectedItem && selectedItemIndex !== null && (
-            <QueueItemCard
+            <FullSizeQueueItem
               key={`${selectedItem.item_id}-full`}
               item={selectedItem}
               number={selectedItemIndex + 1}
-              isSelected={false}
-              onSelectItemId={onSelectItemId}
-              onChangeAutoSwitch={onChangeAutoSwitch}
-              size="full"
             />
           )}
-          {!selectedItem && <Text>No queued generations</Text>}
+          {!selectedItem && <Text>No generation selected</Text>}
         </Flex>
         <FormControl position="absolute" top={2} right={2} w="min-content">
           <FormLabel m={0}>Auto-switch</FormLabel>
@@ -529,48 +546,46 @@ const StagingArea = memo(() => {
       <Flex position="relative" maxW="full" w="full" h={108}>
         <Flex ref={scrollableRef} gap={2} maxW="full" overflowX="scroll">
           {items.map((item, i) => (
-            <QueueItemCard
+            <MiniQueueItem
               key={`${item.item_id}-mini`}
               item={item}
               number={i + 1}
               isSelected={selectedItemId === item.item_id}
               onSelectItemId={onSelectItemId}
               onChangeAutoSwitch={onChangeAutoSwitch}
-              size="mini"
             />
           ))}
         </Flex>
-        <Box
-          position="absolute"
-          sx={scrollIndicatorSx}
-          left={0}
-          w={16}
-          h="full"
-          bg="linear-gradient(to right, var(--invoke-colors-base-900), transparent)"
-          data-visible={canScrollLeft}
-          transitionProperty="opacity"
-          transitionDuration="0.3s"
-          pointerEvents="none"
-        />
-        <Box
-          position="absolute"
-          sx={scrollIndicatorSx}
-          right={0}
-          w={16}
-          h="full"
-          bg="linear-gradient(to left, var(--invoke-colors-base-900), transparent)"
-          data-visible={canScrollRight}
-          transitionProperty="opacity"
-          transitionDuration="0.3s"
-          pointerEvents="none"
-        />
+        <Box sx={scrollIndicatorLeftSx} data-visible={canScrollLeft} />
+        <Box sx={scrollIndicatorRightSx} data-visible={canScrollRight} />
       </Flex>
     </Flex>
   );
 });
 StagingArea.displayName = 'StagingArea';
 
-const queueItemCardSx = {
+const StagingAreaHeader = memo(() => {
+  const dispatch = useAppDispatch();
+
+  const startOver = useCallback(() => {
+    dispatch(canvasSessionStarted({ sessionType: 'simple' }));
+  }, [dispatch]);
+
+  return (
+    <Flex w="full" alignItems="center">
+      <Text fontSize="lg" fontWeight="bold">
+        Generations
+      </Text>
+      <Spacer />
+      <Button size="sm" variant="ghost" onClick={startOver}>
+        Start Over
+      </Button>
+    </Flex>
+  );
+});
+StagingAreaHeader.displayName = 'StagingAreaHeader';
+
+const miniQueueItemSx = {
   cursor: 'pointer',
   pos: 'relative',
   alignItems: 'center',
@@ -581,122 +596,154 @@ const queueItemCardSx = {
   maxW: 'full',
   minW: 0,
   minH: 0,
-  '&[data-size="mini"]': {
-    borderWidth: 1,
-    borderRadius: 'base',
-    '&[data-selected="true"]': {
-      borderColor: 'invokeBlue.300',
-    },
-    aspectRatio: '1/1',
-    flexShrink: 0,
+  borderWidth: 1,
+  borderRadius: 'base',
+  '&[data-selected="true"]': {
+    borderColor: 'invokeBlue.300',
   },
+  aspectRatio: '1/1',
+  flexShrink: 0,
 };
 
 const getCardId = (item_id: number) => `queue-item-status-card-${item_id}`;
 
-type QueueItemStatusCardMiniProps = {
-  item: S['SessionQueueItem'];
-  isSelected: boolean;
-  number: number;
-  onSelectItemId: (item_id: number) => void;
-  onChangeAutoSwitch: (autoSwitch: boolean) => void;
-  size: 'mini' | 'full';
-};
+const useOutputImageDTO = (item: S['SessionQueueItem']) => {
+  const ctx = useStagingContext();
 
-const QueueItemCard = memo(
-  ({ item, isSelected, number, onSelectItemId, onChangeAutoSwitch, size }: QueueItemStatusCardMiniProps) => {
-    const ctx = useStagingContext();
-    const hasProgressImage = useHasProgressImage(ctx.$progressData, item.session_id);
+  const outputImageName = useMemo(() => {
+    const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
+      isCanvasOutputNodeId(nodeId)
+    )?.[1][0];
+    const output = nodeId ? item.session.results[nodeId] : undefined;
 
-    const outputImageName = useMemo(() => {
-      const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
-        isCanvasOutputNodeId(nodeId)
-      )?.[1][0];
-      const output = nodeId ? item.session.results[nodeId] : undefined;
-
-      if (!output) {
-        return null;
-      }
-
-      for (const [_name, value] of objectEntries(output)) {
-        if (isImageField(value)) {
-          return value.image_name;
-        }
-      }
-
+    if (!output) {
       return null;
-    }, [item.session.results, item.session.source_prepared_mapping]);
+    }
 
-    const { currentData: imageDTO } = useGetImageDTOQuery(outputImageName ?? skipToken);
-
-    const onClick = useCallback(() => {
-      onSelectItemId(item.item_id);
-    }, [item.item_id, onSelectItemId]);
-
-    const onDoubleClick = useCallback(() => {
-      onChangeAutoSwitch(item.status === 'in_progress');
-    }, [item.status, onChangeAutoSwitch]);
-
-    const syncIsReady = useCallback(async () => {
-      if (!imageDTO) {
-        return;
+    for (const [_name, value] of objectEntries(output)) {
+      if (isImageField(value)) {
+        return value.image_name;
       }
+    }
+
+    return null;
+  }, [item.session.results, item.session.source_prepared_mapping]);
+
+  const { currentData: imageDTO } = useGetImageDTOQuery(outputImageName ?? skipToken);
+
+  const preloadOutputImageAndClearProgress = useCallback(
+    async (imageDTO: ImageDTO) => {
       try {
         await loadImage(imageDTO.image_url, true);
         clearProgressImage(ctx.$progressData, item.session_id);
         return;
       } catch {
-        // noop
+        // noop - but should we do something? means image failed to load...
       }
-    }, [ctx.$progressData, imageDTO, item.session_id]);
+    },
+    [ctx.$progressData, item.session_id]
+  );
 
-    useEffect(() => {
-      syncIsReady();
-    }, [syncIsReady]);
-
-    if (imageDTO && !hasProgressImage) {
-      return (
-        <Flex id={getCardId(item.item_id)} sx={queueItemCardSx} data-selected={isSelected} data-size={size}>
-          <DndImage
-            imageDTO={imageDTO}
-            onClick={size === 'mini' ? onClick : undefined}
-            onDoubleClick={size === 'mini' ? onDoubleClick : undefined}
-            asThumbnail={size === 'mini'}
-          />
-          {size === 'mini' && <ItemNumber number={number} position="absolute" top={0} left={1} />}
-          {size === 'full' && (
-            <>
-              <ItemNumber number={number} position="absolute" top={1} left={2} />
-              <ImageActions imageDTO={imageDTO} position="absolute" top={2} right={2} />
-            </>
-          )}
-        </Flex>
-      );
+  useEffect(() => {
+    if (!imageDTO) {
+      return;
     }
+    if (!ctx.$progressData.get()[item.session_id]?.progressImage) {
+      return;
+    }
+    preloadOutputImageAndClearProgress(imageDTO);
+  }, [ctx.$progressData, imageDTO, item.session_id, preloadOutputImageAndClearProgress]);
 
+  return imageDTO;
+};
+
+type MiniQueueItemProps = {
+  item: S['SessionQueueItem'];
+  number: number;
+  isSelected: boolean;
+  onSelectItemId: (item_id: number) => void;
+  onChangeAutoSwitch: (autoSwitch: boolean) => void;
+};
+
+const MiniQueueItem = memo(({ item, isSelected, number, onSelectItemId, onChangeAutoSwitch }: MiniQueueItemProps) => {
+  const ctx = useStagingContext();
+  const hasProgressImage = useHasProgressImage(ctx.$progressData, item.session_id);
+  const imageDTO = useOutputImageDTO(item);
+
+  const onClick = useCallback(() => {
+    onSelectItemId(item.item_id);
+  }, [item.item_id, onSelectItemId]);
+
+  const onDoubleClick = useCallback(() => {
+    onChangeAutoSwitch(item.status === 'in_progress');
+  }, [item.status, onChangeAutoSwitch]);
+
+  if (imageDTO && !hasProgressImage) {
     return (
-      <Flex
-        id={getCardId(item.item_id)}
-        sx={queueItemCardSx}
-        data-selected={isSelected}
-        data-size={size}
-        data-has-progress-image={hasProgressImage}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-      >
-        <InProgressContent item={item} />
-        {size === 'mini' && <ItemNumber number={number} position="absolute" top={0} left={1} />}
-        {size === 'full' && (
-          <>
-            <ItemNumber number={number} position="absolute" top={1} left={2} />
-            <ProgressMessage session_id={item.session_id} position="absolute" bottom={1} left={2} />
-          </>
-        )}
+      <Flex id={getCardId(item.item_id)} sx={miniQueueItemSx} data-selected={isSelected}>
+        <DndImage imageDTO={imageDTO} onClick={onClick} onDoubleClick={onDoubleClick} asThumbnail />
+        <ItemNumber number={number} position="absolute" top={0} left={1} />
       </Flex>
     );
   }
-);
-QueueItemCard.displayName = 'QueueItemStatusCard';
+
+  return (
+    <Flex
+      id={getCardId(item.item_id)}
+      sx={miniQueueItemSx}
+      data-selected={isSelected}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+    >
+      <InProgressContent item={item} />
+      <ItemNumber number={number} position="absolute" top={0} left={1} />
+    </Flex>
+  );
+});
+MiniQueueItem.displayName = 'MiniQueueItem';
+
+const fullSizeQueueItemSx = {
+  cursor: 'pointer',
+  pos: 'relative',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden',
+  h: 'full',
+  maxH: 'full',
+  maxW: 'full',
+  minW: 0,
+  minH: 0,
+};
+
+type FullSizeQueueItemProps = {
+  item: S['SessionQueueItem'];
+  number: number;
+};
+
+const FullSizeQueueItem = memo(({ item, number }: FullSizeQueueItemProps) => {
+  const ctx = useStagingContext();
+  const hasProgressImage = useHasProgressImage(ctx.$progressData, item.session_id);
+  const imageDTO = useOutputImageDTO(item);
+
+  if (imageDTO && !hasProgressImage) {
+    return (
+      <Flex id={getCardId(item.item_id)} sx={fullSizeQueueItemSx}>
+        <DndImage imageDTO={imageDTO} />
+        <ItemNumber number={number} position="absolute" top={1} left={2} />
+        <ImageActions imageDTO={imageDTO} position="absolute" top={2} right={2} />
+      </Flex>
+    );
+  }
+
+  return (
+    <Flex id={getCardId(item.item_id)} sx={fullSizeQueueItemSx}>
+      <InProgressContent item={item} />
+      <ItemNumber number={number} position="absolute" top={1} left={2} />
+      <ProgressMessage session_id={item.session_id} position="absolute" bottom={1} left={2} />
+    </Flex>
+  );
+});
+FullSizeQueueItem.displayName = 'FullSizeQueueItem';
 
 const getMessage = (data: S['InvocationProgressEvent']) => {
   let message = data.message;
@@ -859,6 +906,18 @@ const ImageActions = memo(({ imageDTO, ...rest }: { imageDTO: ImageDTO } & Butto
 });
 ImageActions.displayName = 'ImageActions';
 
+const canvasBgSx = {
+  position: 'relative',
+  w: 'full',
+  h: 'full',
+  borderRadius: 'base',
+  overflow: 'hidden',
+  bg: 'base.900',
+  '&[data-dynamic-grid="true"]': {
+    bg: 'base.850',
+  },
+};
+
 const CanvasActiveSession = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
@@ -886,15 +945,7 @@ const CanvasActiveSession = memo(() => {
         </CanvasManagerProviderGate>
         <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
           {(ref) => (
-            <Flex
-              ref={ref}
-              position="relative"
-              w="full"
-              h="full"
-              bg={dynamicGrid ? 'base.850' : 'base.900'}
-              borderRadius="base"
-              overflow="hidden"
-            >
+            <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
               <InvokeCanvasComponent />
               <CanvasManagerProviderGate>
                 <Flex
