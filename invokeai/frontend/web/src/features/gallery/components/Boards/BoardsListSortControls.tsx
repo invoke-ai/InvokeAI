@@ -3,7 +3,7 @@ import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectBoardsListOrderBy, selectBoardsListOrderDir } from 'features/gallery/store/gallerySelectors';
 import { boardsListOrderByChanged, boardsListOrderDirChanged } from 'features/gallery/store/gallerySlice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
@@ -15,7 +15,7 @@ const zDirection = z.enum(['ASC', 'DESC']);
 type Direction = z.infer<typeof zDirection>;
 const isDirection = (v: unknown): v is Direction => zDirection.safeParse(v).success;
 
-export const BoardsListSortControls = () => {
+export const BoardsListSortControls = memo(() => {
   const { t } = useTranslation();
 
   const orderBy = useAppSelector(selectBoardsListOrderBy);
@@ -83,4 +83,5 @@ export const BoardsListSortControls = () => {
       </FormControl>
     </Flex>
   );
-};
+});
+BoardsListSortControls.displayName = 'BoardsListSortControls';

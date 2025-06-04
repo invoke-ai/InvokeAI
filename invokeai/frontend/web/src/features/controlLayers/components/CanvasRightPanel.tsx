@@ -9,7 +9,7 @@ import { selectEntityCountActive } from 'features/controlLayers/store/selectors'
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import type { DndTargetState } from 'features/dnd/types';
-import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
+import RightPanelContent from 'features/gallery/components/GalleryTopBar';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
@@ -61,7 +61,7 @@ export const CanvasRightPanel = memo(() => {
           </CanvasManagerProviderGate>
         </TabPanel>
         <TabPanel w="full" h="full" p={0} pt={3}>
-          <GalleryPanelContent />
+          <RightPanelContent />
         </TabPanel>
       </TabPanels>
     </Tabs>
