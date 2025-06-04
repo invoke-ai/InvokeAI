@@ -8,7 +8,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixFill } from 'react-icons/pi';
 
-const GallerySettingsPopover = () => {
+export const GallerySettingsPopover = memo(() => {
   const { t } = useTranslation();
 
   return (
@@ -37,6 +37,5 @@ const GallerySettingsPopover = () => {
       </PopoverContent>
     </Popover>
   );
-};
-
-export default memo(GallerySettingsPopover);
+});
+GallerySettingsPopover.displayName = 'GallerySettingsPopover';
