@@ -99,14 +99,12 @@ async def list_queue_items(
 )
 async def list_all_queue_items(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    status: Optional[QUEUE_ITEM_STATUS] = Query(default=None, description="The status of items to fetch"),
     destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
 ) -> list[SessionQueueItem]:
     """Gets all queue items"""
 
     return ApiDependencies.invoker.services.session_queue.list_all_queue_items(
         queue_id=queue_id,
-        status=status,
         destination=destination,
     )
 

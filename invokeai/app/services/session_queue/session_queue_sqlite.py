@@ -591,7 +591,6 @@ class SqliteSessionQueue(SessionQueueBase):
     def list_all_queue_items(
         self,
         queue_id: str,
-        status: Optional[QUEUE_ITEM_STATUS] = None,
         destination: Optional[str] = None,
     ) -> list[SessionQueueItem]:
         """Gets all queue items that match the given parameters"""
@@ -602,12 +601,6 @@ class SqliteSessionQueue(SessionQueueBase):
             WHERE queue_id = ?
         """
         params: list[Union[str, int]] = [queue_id]
-
-        if status is not None:
-            query += """--sql
-                AND status = ?
-                """
-            params.append(status)
 
         if destination is not None:
             query += """---sql
