@@ -24391,8 +24391,6 @@ export interface operations {
     list_all_queue_items: {
         parameters: {
             query?: {
-                /** @description The status of items to fetch */
-                status?: ("pending" | "in_progress" | "completed" | "failed" | "canceled") | null;
                 /** @description The destination of queue items to fetch */
                 destination?: string | null;
             };
