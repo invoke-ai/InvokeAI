@@ -6,8 +6,18 @@ import { canvasReset } from 'features/controlLayers/store/actions';
 import type { StagingAreaImage, StagingAreaProgressImage } from 'features/controlLayers/store/types';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 
+export type SimpleSessionIdentifier = {
+  type: 'simple';
+  id: string;
+};
+
+export type AdvancedSessionIdentifier = {
+  type: 'advanced';
+  id: string;
+};
+
 type CanvasStagingAreaState = {
-  session: { type: 'simple'; id: string } | { type: 'advanced'; id: string } | null;
+  session: SimpleSessionIdentifier | AdvancedSessionIdentifier | null;
   sessionType: 'simple' | 'advanced' | null;
   images: (StagingAreaImage | StagingAreaProgressImage)[];
   selectedImageIndex: number;
