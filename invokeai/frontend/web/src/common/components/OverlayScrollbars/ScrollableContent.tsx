@@ -11,13 +11,14 @@ import { memo, useEffect, useMemo, useState } from 'react';
 
 type Props = PropsWithChildren & {
   maxHeight?: ChakraProps['maxHeight'];
+  maxWidth?: ChakraProps['maxWidth'];
   overflowX?: 'hidden' | 'scroll';
   overflowY?: 'hidden' | 'scroll';
 };
 
 const styles: CSSProperties = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 };
 
-const ScrollableContent = ({ children, maxHeight, overflowX = 'hidden', overflowY = 'scroll' }: Props) => {
+const ScrollableContent = ({ children, maxHeight, maxWidth, overflowX = 'hidden', overflowY = 'scroll' }: Props) => {
   const overlayscrollbarsOptions = useMemo(
     () => getOverlayScrollbarsParams({ overflowX, overflowY }).options,
     [overflowX, overflowY]
@@ -44,7 +45,7 @@ const ScrollableContent = ({ children, maxHeight, overflowX = 'hidden', overflow
   }, [os]);
 
   return (
-    <Flex w="full" h="full" maxHeight={maxHeight} position="relative">
+    <Flex w="full" h="full" maxHeight={maxHeight} maxWidth={maxWidth} position="relative">
       <Box position="absolute" top={0} left={0} right={0} bottom={0}>
         <OverlayScrollbarsComponent ref={osRef} style={styles} options={overlayscrollbarsOptions}>
           {children}
