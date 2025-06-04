@@ -4,7 +4,6 @@ import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser'
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectCanvasSession } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useCancelAllExceptCurrentQueueItemDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
-import { useClearQueueDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
@@ -16,7 +15,6 @@ import {
   PiLightningFill,
   PiSlidersHorizontalBold,
   PiSparkleFill,
-  PiTrashSimpleBold,
   PiXBold,
   PiXCircle,
 } from 'react-icons/pi';
@@ -125,27 +123,6 @@ const CancelCurrentIconButton = memo(() => {
 });
 
 CancelCurrentIconButton.displayName = 'CancelCurrentIconButton';
-
-const CancelAndClearAllIconButton = memo(() => {
-  const { t } = useTranslation();
-  const clearQueue = useClearQueueDialog();
-
-  return (
-    <Tooltip label={t('queue.clearTooltip')} placement="end">
-      <IconButton
-        isDisabled={clearQueue.isDisabled}
-        isLoading={clearQueue.isLoading}
-        aria-label={t('queue.clearTooltip')}
-        icon={<PiTrashSimpleBold />}
-        colorScheme="error"
-        onClick={clearQueue.openDialog}
-        flexGrow={1}
-      />
-    </Tooltip>
-  );
-});
-
-CancelAndClearAllIconButton.displayName = 'CancelAndClearAllIconButton';
 
 const CancelAllExceptCurrentIconButton = memo(() => {
   const { t } = useTranslation();
