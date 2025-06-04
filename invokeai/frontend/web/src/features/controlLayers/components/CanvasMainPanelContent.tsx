@@ -1,11 +1,17 @@
 /* eslint-disable i18next/no-literal-string */
-import type { ButtonGroupProps, SystemStyleObject, TextProps } from '@invoke-ai/ui-library';
+import type {
+  ButtonGroupProps,
+  CircularProgressProps,
+  ImageProps,
+  SystemStyleObject,
+  TextProps,
+} from '@invoke-ai/ui-library';
 import {
-  Box,
   Button,
   ButtonGroup,
   CircularProgress,
   ContextMenu,
+  Divider,
   Flex,
   FormControl,
   FormLabel,
@@ -26,7 +32,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
-import { IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
+import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
@@ -44,7 +50,6 @@ import { StagingAreaToolbar } from 'features/controlLayers/components/StagingAre
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { loadImage } from 'features/controlLayers/konva/util';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSessionStarted, selectCanvasSession } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { newCanvasFromImageDndTarget } from 'features/dnd/dnd';
@@ -56,7 +61,7 @@ import { isCanvasOutputNodeId } from 'features/nodes/util/graph/graphBuilderUtil
 import { round } from 'lodash-es';
 import { atom, type WritableAtom } from 'nanostores';
 import type { ChangeEvent } from 'react';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiDotsThreeOutlineVerticalFill, PiUploadBold } from 'react-icons/pi';
@@ -64,7 +69,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useListAllQueueItemsQuery } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import type { ProgressData } from 'services/events/stores';
-import { $socket, clearProgressImage, setProgress, useHasProgressImage, useProgressData } from 'services/events/stores';
+import { $socket, setProgress, useProgressData } from 'services/events/stores';
 import type { Equals, Param0 } from 'tsafe';
 import { assert, objectEntries } from 'tsafe';
 
@@ -313,31 +318,6 @@ const GenerateWithStartingImageAndInpaintMask = memo(() => {
 });
 GenerateWithStartingImageAndInpaintMask.displayName = 'GenerateWithStartingImageAndInpaintMask';
 
-const scrollIndicatorBaseSx = {
-  opacity: 0,
-  position: 'absolute',
-  w: 16,
-  h: 'full',
-  transitionProperty: 'opacity',
-  transitionDuration: '0.3s',
-  pointerEvents: 'none',
-  '&[data-visible="true"]': {
-    opacity: 1,
-  },
-} satisfies SystemStyleObject;
-
-const scrollIndicatorLeftSx = {
-  ...scrollIndicatorBaseSx,
-  left: 0,
-  bg: 'linear-gradient(to right, var(--invoke-colors-base-900), transparent)',
-} satisfies SystemStyleObject;
-
-const scrollIndicatorRightSx = {
-  ...scrollIndicatorBaseSx,
-  right: 0,
-  bg: 'linear-gradient(to left, var(--invoke-colors-base-900), transparent)',
-} satisfies SystemStyleObject;
-
 type StagingContextValue = {
   session:
     | {
@@ -423,39 +403,25 @@ const StagingArea = memo(() => {
   const ctx = useStagingContext();
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [autoSwitch, setAutoSwitch] = useState(true);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const scrollableRef = useRef<HTMLDivElement>(null);
   const { items } = useListAllQueueItemsQuery({ destination: ctx.session.id }, LIST_ALL_OPTIONS);
-  const selectedItem = useMemo(
-    () =>
-      items.length > 0 && selectedItemId !== null ? items.find(({ item_id }) => item_id === selectedItemId) : null,
-    [items, selectedItemId]
-  );
-  const selectedItemIndex = useMemo(
-    () =>
-      items.length > 0 && selectedItemId !== null ? items.findIndex(({ item_id }) => item_id === selectedItemId) : null,
-    [items, selectedItemId]
-  );
-
-  useEffect(() => {
-    const el = scrollableRef.current;
-    if (!el) {
-      return;
+  const selectedItem = useMemo(() => {
+    if (items.length === 0) {
+      return null;
     }
-    const onScroll = () => {
-      const { scrollLeft, scrollWidth, clientWidth } = el;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft + clientWidth < scrollWidth);
-    };
-    el.addEventListener('scroll', onScroll);
-    const observer = new ResizeObserver(onScroll);
-    observer.observe(el);
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      observer.disconnect();
-    };
-  }, []);
+    if (selectedItemId === null) {
+      return null;
+    }
+    return items.find(({ item_id }) => item_id === selectedItemId) ?? null;
+  }, [items, selectedItemId]);
+  const selectedItemIndex = useMemo(() => {
+    if (items.length === 0) {
+      return null;
+    }
+    if (selectedItemId === null) {
+      return null;
+    }
+    return items.findIndex(({ item_id }) => item_id === selectedItemId) ?? null;
+  }, [items, selectedItemId]);
 
   const onSelectItemId = useCallback((item_id: number | null) => {
     setSelectedItemId(item_id);
@@ -465,10 +431,6 @@ const StagingArea = memo(() => {
   }, []);
 
   useStagingAreaKeyboardNav(items, selectedItemId, onSelectItemId);
-
-  const onChangeAutoSwitch = useCallback((autoSwitch: boolean) => {
-    setAutoSwitch(autoSwitch);
-  }, []);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -503,10 +465,6 @@ const StagingArea = memo(() => {
     };
   }, [autoSwitch, ctx.$progressData, ctx.session.id, onSelectItemId, socket]);
 
-  const _onChangeAutoSwitch = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setAutoSwitch(e.target.checked);
-  }, []);
-
   useEffect(() => {
     if (!socket) {
       return;
@@ -526,9 +484,47 @@ const StagingArea = memo(() => {
 
   return (
     <Flex flexDir="column" gap={2} w="full" h="full" minW={0} minH={0}>
-      <StagingAreaHeader />
-      <Flex position="relative" w="full" h="full" maxH="full" alignItems="center" justifyContent="center" minH={0}>
-        <Flex alignItems="center" justifyContent="center" w="full" h="full" objectFit="contain">
+      <StagingAreaHeader autoSwitch={autoSwitch} setAutoSwitch={setAutoSwitch} />
+      <Divider />
+      {items.length > 0 && (
+        <StagingAreaContent
+          items={items}
+          selectedItem={selectedItem}
+          selectedItemId={selectedItemId}
+          selectedItemIndex={selectedItemIndex}
+          onChangeAutoSwitch={setAutoSwitch}
+          onSelectItemId={onSelectItemId}
+        />
+      )}
+      {items.length === 0 && (
+        <Flex w="full" h="full" alignItems="center" justifyContent="center">
+          <Text>No generations</Text>
+        </Flex>
+      )}
+    </Flex>
+  );
+});
+StagingArea.displayName = 'StagingArea';
+
+const StagingAreaContent = memo(
+  ({
+    items,
+    selectedItem,
+    selectedItemId,
+    selectedItemIndex,
+    onChangeAutoSwitch,
+    onSelectItemId,
+  }: {
+    items: S['SessionQueueItem'][];
+    selectedItem: S['SessionQueueItem'] | null;
+    selectedItemId: number | null;
+    selectedItemIndex: number | null;
+    onChangeAutoSwitch: (autoSwitch: boolean) => void;
+    onSelectItemId: (itemId: number) => void;
+  }) => {
+    return (
+      <>
+        <Flex position="relative" w="full" h="full" maxH="full" alignItems="center" justifyContent="center" minH={0}>
           {selectedItem && selectedItemIndex !== null && (
             <FullSizeQueueItem
               key={`${selectedItem.item_id}-full`}
@@ -538,55 +534,66 @@ const StagingArea = memo(() => {
           )}
           {!selectedItem && <Text>No generation selected</Text>}
         </Flex>
-        <FormControl position="absolute" top={2} right={2} w="min-content">
-          <FormLabel m={0}>Auto-switch</FormLabel>
-          <Switch size="sm" isChecked={autoSwitch} onChange={_onChangeAutoSwitch} />
-        </FormControl>
-      </Flex>
-      <Flex position="relative" maxW="full" w="full" h={108}>
-        <Flex ref={scrollableRef} gap={2} maxW="full" overflowX="scroll">
-          {items.map((item, i) => (
-            <MiniQueueItem
-              key={`${item.item_id}-mini`}
-              item={item}
-              number={i + 1}
-              isSelected={selectedItemId === item.item_id}
-              onSelectItemId={onSelectItemId}
-              onChangeAutoSwitch={onChangeAutoSwitch}
-            />
-          ))}
+        <Divider />
+        <Flex position="relative" maxW="full" w="full" h={108}>
+          <ScrollableContent overflowX="scroll" overflowY="hidden">
+            <Flex gap={2} w="full" h="full">
+              {items.map((item, i) => (
+                <MiniQueueItem
+                  key={`${item.item_id}-mini`}
+                  item={item}
+                  number={i + 1}
+                  isSelected={selectedItemId === item.item_id}
+                  onSelectItemId={onSelectItemId}
+                  onChangeAutoSwitch={onChangeAutoSwitch}
+                />
+              ))}
+            </Flex>
+          </ScrollableContent>
         </Flex>
-        <Box sx={scrollIndicatorLeftSx} data-visible={canScrollLeft} />
-        <Box sx={scrollIndicatorRightSx} data-visible={canScrollRight} />
+      </>
+    );
+  }
+);
+StagingAreaContent.displayName = 'StagingAreaContent';
+
+const StagingAreaHeader = memo(
+  ({ autoSwitch, setAutoSwitch }: { autoSwitch: boolean; setAutoSwitch: (autoSwitch: boolean) => void }) => {
+    const dispatch = useAppDispatch();
+
+    const startOver = useCallback(() => {
+      dispatch(canvasSessionStarted({ sessionType: 'simple' }));
+    }, [dispatch]);
+
+    const onChangeAutoSwitch = useCallback(
+      (e: ChangeEvent<HTMLInputElement>) => {
+        setAutoSwitch(e.target.checked);
+      },
+      [setAutoSwitch]
+    );
+
+    return (
+      <Flex gap={2} w="full" alignItems="center">
+        <Text fontSize="lg" fontWeight="bold">
+          Generations
+        </Text>
+        <Spacer />
+        <FormControl w="min-content">
+          <FormLabel m={0}>Auto-switch</FormLabel>
+          <Switch size="sm" isChecked={autoSwitch} onChange={onChangeAutoSwitch} />
+        </FormControl>
+        <Button size="sm" variant="ghost" onClick={startOver}>
+          Start Over
+        </Button>
       </Flex>
-    </Flex>
-  );
-});
-StagingArea.displayName = 'StagingArea';
-
-const StagingAreaHeader = memo(() => {
-  const dispatch = useAppDispatch();
-
-  const startOver = useCallback(() => {
-    dispatch(canvasSessionStarted({ sessionType: 'simple' }));
-  }, [dispatch]);
-
-  return (
-    <Flex w="full" alignItems="center">
-      <Text fontSize="lg" fontWeight="bold">
-        Generations
-      </Text>
-      <Spacer />
-      <Button size="sm" variant="ghost" onClick={startOver}>
-        Start Over
-      </Button>
-    </Flex>
-  );
-});
+    );
+  }
+);
 StagingAreaHeader.displayName = 'StagingAreaHeader';
 
 const miniQueueItemSx = {
   cursor: 'pointer',
+  userSelect: 'none',
   pos: 'relative',
   alignItems: 'center',
   justifyContent: 'center',
@@ -603,56 +610,33 @@ const miniQueueItemSx = {
   },
   aspectRatio: '1/1',
   flexShrink: 0,
-};
+} satisfies SystemStyleObject;
 
 const getCardId = (item_id: number) => `queue-item-status-card-${item_id}`;
 
-const useOutputImageDTO = (item: S['SessionQueueItem']) => {
-  const ctx = useStagingContext();
+const getOutputImageName = (item: S['SessionQueueItem']) => {
+  const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
+    isCanvasOutputNodeId(nodeId)
+  )?.[1][0];
+  const output = nodeId ? item.session.results[nodeId] : undefined;
 
-  const outputImageName = useMemo(() => {
-    const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
-      isCanvasOutputNodeId(nodeId)
-    )?.[1][0];
-    const output = nodeId ? item.session.results[nodeId] : undefined;
-
-    if (!output) {
-      return null;
-    }
-
-    for (const [_name, value] of objectEntries(output)) {
-      if (isImageField(value)) {
-        return value.image_name;
-      }
-    }
-
+  if (!output) {
     return null;
-  }, [item.session.results, item.session.source_prepared_mapping]);
+  }
+
+  for (const [_name, value] of objectEntries(output)) {
+    if (isImageField(value)) {
+      return value.image_name;
+    }
+  }
+
+  return null;
+};
+
+const useOutputImageDTO = (item: S['SessionQueueItem']) => {
+  const outputImageName = useMemo(() => getOutputImageName(item), [item]);
 
   const { currentData: imageDTO } = useGetImageDTOQuery(outputImageName ?? skipToken);
-
-  const preloadOutputImageAndClearProgress = useCallback(
-    async (imageDTO: ImageDTO) => {
-      try {
-        await loadImage(imageDTO.image_url, true);
-        clearProgressImage(ctx.$progressData, item.session_id);
-        return;
-      } catch {
-        // noop - but should we do something? means image failed to load...
-      }
-    },
-    [ctx.$progressData, item.session_id]
-  );
-
-  useEffect(() => {
-    if (!imageDTO) {
-      return;
-    }
-    if (!ctx.$progressData.get()[item.session_id]?.progressImage) {
-      return;
-    }
-    preloadOutputImageAndClearProgress(imageDTO);
-  }, [ctx.$progressData, imageDTO, item.session_id, preloadOutputImageAndClearProgress]);
 
   return imageDTO;
 };
@@ -666,8 +650,7 @@ type MiniQueueItemProps = {
 };
 
 const MiniQueueItem = memo(({ item, isSelected, number, onSelectItemId, onChangeAutoSwitch }: MiniQueueItemProps) => {
-  const ctx = useStagingContext();
-  const hasProgressImage = useHasProgressImage(ctx.$progressData, item.session_id);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const imageDTO = useOutputImageDTO(item);
 
   const onClick = useCallback(() => {
@@ -678,14 +661,9 @@ const MiniQueueItem = memo(({ item, isSelected, number, onSelectItemId, onChange
     onChangeAutoSwitch(item.status === 'in_progress');
   }, [item.status, onChangeAutoSwitch]);
 
-  if (imageDTO && !hasProgressImage) {
-    return (
-      <Flex id={getCardId(item.item_id)} sx={miniQueueItemSx} data-selected={isSelected}>
-        <DndImage imageDTO={imageDTO} onClick={onClick} onDoubleClick={onDoubleClick} asThumbnail />
-        <ItemNumber number={number} position="absolute" top={0} left={1} />
-      </Flex>
-    );
-  }
+  const onLoad = useCallback(() => {
+    setImageLoaded(true);
+  }, []);
 
   return (
     <Flex
@@ -695,8 +673,11 @@ const MiniQueueItem = memo(({ item, isSelected, number, onSelectItemId, onChange
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
-      <InProgressContent item={item} />
+      <ProgressLabel status={item.status} position="absolute" margin="auto" />
+      {imageDTO && <DndImage imageDTO={imageDTO} asThumbnail onLoad={onLoad} />}
+      {!imageLoaded && <ProgressImage session_id={item.session_id} position="absolute" />}
       <ItemNumber number={number} position="absolute" top={0} left={1} />
+      <ProgressCircle session_id={item.session_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>
   );
 });
@@ -704,16 +685,14 @@ MiniQueueItem.displayName = 'MiniQueueItem';
 
 const fullSizeQueueItemSx = {
   cursor: 'pointer',
+  userSelect: 'none',
   pos: 'relative',
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
   h: 'full',
-  maxH: 'full',
-  maxW: 'full',
-  minW: 0,
-  minH: 0,
-};
+  w: 'full',
+} satisfies SystemStyleObject;
 
 type FullSizeQueueItemProps = {
   item: S['SessionQueueItem'];
@@ -721,29 +700,47 @@ type FullSizeQueueItemProps = {
 };
 
 const FullSizeQueueItem = memo(({ item, number }: FullSizeQueueItemProps) => {
-  const ctx = useStagingContext();
-  const hasProgressImage = useHasProgressImage(ctx.$progressData, item.session_id);
   const imageDTO = useOutputImageDTO(item);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  if (imageDTO && !hasProgressImage) {
-    return (
-      <Flex id={getCardId(item.item_id)} sx={fullSizeQueueItemSx}>
-        <DndImage imageDTO={imageDTO} />
-        <ItemNumber number={number} position="absolute" top={1} left={2} />
-        <ImageActions imageDTO={imageDTO} position="absolute" top={2} right={2} />
-      </Flex>
-    );
-  }
+  const onLoad = useCallback(() => {
+    setImageLoaded(true);
+  }, []);
 
   return (
     <Flex id={getCardId(item.item_id)} sx={fullSizeQueueItemSx}>
-      <InProgressContent item={item} />
+      <ProgressLabel status={item.status} position="absolute" margin="auto" />
+      {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} />}
+      {!imageLoaded && <ProgressImage session_id={item.session_id} position="absolute" />}
       <ItemNumber number={number} position="absolute" top={1} left={2} />
-      <ProgressMessage session_id={item.session_id} position="absolute" bottom={1} left={2} />
+      <ProgressMessage session_id={item.session_id} status={item.status} position="absolute" bottom={1} left={2} />
+      <ProgressCircle session_id={item.session_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>
   );
 });
 FullSizeQueueItem.displayName = 'FullSizeQueueItem';
+
+const ProgressImage = memo(({ session_id, ...rest }: { session_id: string } & ImageProps) => {
+  const { $progressData } = useStagingContext();
+  const { progressImage } = useProgressData($progressData, session_id);
+
+  if (!progressImage) {
+    return null;
+  }
+
+  return (
+    <Image
+      objectFit="contain"
+      maxH="full"
+      maxW="full"
+      src={progressImage.dataURL}
+      width={progressImage.width}
+      height={progressImage.height}
+      {...rest}
+    />
+  );
+});
+ProgressImage.displayName = 'ProgressImage';
 
 const getMessage = (data: S['InvocationProgressEvent']) => {
   let message = data.message;
@@ -758,79 +755,58 @@ const ItemNumber = memo(({ number, ...rest }: { number: number } & TextProps) =>
 });
 ItemNumber.displayName = 'ItemNumber';
 
-const ProgressMessage = memo(({ session_id, ...rest }: { session_id: string } & TextProps) => {
-  const { $progressData } = useStagingContext();
-  const { progressEvent } = useProgressData($progressData, session_id);
-  if (!progressEvent) {
-    return null;
+const ProgressMessage = memo(
+  ({ session_id, status, ...rest }: { session_id: string; status: S['SessionQueueItem']['status'] } & TextProps) => {
+    const { $progressData } = useStagingContext();
+    const { progressEvent } = useProgressData($progressData, session_id);
+
+    if (status === 'completed' || status === 'failed' || status === 'canceled') {
+      return null;
+    }
+
+    return (
+      <Text pointerEvents="none" userSelect="none" filter={DROP_SHADOW} {...rest}>
+        {progressEvent ? getMessage(progressEvent) : 'Waiting to start...'}
+      </Text>
+    );
   }
-  return (
-    <Text pointerEvents="none" userSelect="none" filter={DROP_SHADOW} {...rest}>
-      {getMessage(progressEvent)}
-    </Text>
-  );
-});
+);
 ProgressMessage.displayName = 'ProgressMessage';
 
-const InProgressContent = memo(({ item }: { item: S['SessionQueueItem'] }) => {
-  const { $progressData } = useStagingContext();
-  const { progressEvent, progressImage } = useProgressData($progressData, item.session_id);
-
-  if (item.status === 'pending') {
+const ProgressLabel = memo(({ status, ...rest }: { status: S['SessionQueueItem']['status'] } & TextProps) => {
+  if (status === 'pending') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="base.300">
+      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="base.300" {...rest}>
         Pending
       </Text>
     );
   }
-  if (item.status === 'canceled') {
+  if (status === 'canceled') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="warning.300">
+      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="warning.300" {...rest}>
         Canceled
       </Text>
     );
   }
-  if (item.status === 'failed') {
+  if (status === 'failed') {
     return (
-      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="error.300">
+      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="error.300" {...rest}>
         Failed
       </Text>
     );
   }
 
-  if (progressImage) {
+  if (status === 'in_progress') {
     return (
-      <>
-        <Image
-          objectFit="contain"
-          maxH="full"
-          maxW="full"
-          src={progressImage.dataURL}
-          width={progressImage.width}
-          height={progressImage.height}
-        />
-        <ProgressCircle data={progressEvent} />
-      </>
+      <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="invokeBlue.300" {...rest}>
+        In Progress
+      </Text>
     );
   }
 
-  if (item.status === 'in_progress') {
-    return (
-      <>
-        <Text pointerEvents="none" userSelect="none" fontWeight="semibold" color="invokeBlue.300">
-          In Progress
-        </Text>
-        <ProgressCircle data={progressEvent} />
-      </>
-    );
-  }
-
-  if (item.status === 'completed') {
-    return <IAINoContentFallbackWithSpinner />;
-  }
-  assert<Equals<never, typeof item.status>>(false);
+  return null;
 });
-InProgressContent.displayName = 'InProgressContent';
+ProgressLabel.displayName = 'ProgressLabel';
 
 const circleStyles: SystemStyleObject = {
   circle: {
@@ -842,20 +818,34 @@ const circleStyles: SystemStyleObject = {
   right: 2,
 };
 
-const ProgressCircle = memo(({ data }: { data?: S['InvocationProgressEvent'] | null }) => {
-  return (
-    <Tooltip label={data?.message ?? 'Generating'}>
-      <CircularProgress
-        size="14px"
-        color="invokeBlue.500"
-        thickness={14}
-        isIndeterminate={!data || data.percentage === null}
-        value={data?.percentage ? data.percentage * 100 : undefined}
-        sx={circleStyles}
-      />
-    </Tooltip>
-  );
-});
+const ProgressCircle = memo(
+  ({
+    session_id,
+    status,
+    ...rest
+  }: { session_id: string; status: S['SessionQueueItem']['status'] } & CircularProgressProps) => {
+    const { $progressData } = useStagingContext();
+    const { progressEvent } = useProgressData($progressData, session_id);
+
+    if (status !== 'in_progress') {
+      return null;
+    }
+
+    return (
+      <Tooltip label={progressEvent?.message ?? 'Generating'}>
+        <CircularProgress
+          size="14px"
+          color="invokeBlue.500"
+          thickness={14}
+          isIndeterminate={!progressEvent || progressEvent.percentage === null}
+          value={progressEvent?.percentage ? progressEvent.percentage * 100 : undefined}
+          sx={circleStyles}
+          {...rest}
+        />
+      </Tooltip>
+    );
+  }
+);
 ProgressCircle.displayName = 'ProgressCircle';
 
 const ImageActions = memo(({ imageDTO, ...rest }: { imageDTO: ImageDTO } & ButtonGroupProps) => {
