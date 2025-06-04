@@ -7,14 +7,12 @@ import { getQueueItemElementId } from 'features/controlLayers/components/SimpleS
 import { StagingAreaContent } from 'features/controlLayers/components/SimpleSession/StagingAreaContent';
 import { StagingAreaHeader } from 'features/controlLayers/components/SimpleSession/StagingAreaHeader';
 import { StagingAreaNoItems } from 'features/controlLayers/components/SimpleSession/StagingAreaNoItems';
-import { useProgressEvents } from 'features/controlLayers/components/SimpleSession/use-progress-events';
 import { useStagingAreaKeyboardNav } from 'features/controlLayers/components/SimpleSession/use-staging-keyboard-nav';
 import { memo, useEffect } from 'react';
 
 export const StagingArea = memo(() => {
   const ctx = useCanvasSessionContext();
   const hasItems = useStore(ctx.$hasItems);
-  useProgressEvents();
   useStagingAreaKeyboardNav();
 
   useEffect(() => {
