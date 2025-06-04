@@ -733,6 +733,7 @@ const ProgressImage = memo(({ session_id, ...rest }: { session_id: string } & Im
       objectFit="contain"
       maxH="full"
       maxW="full"
+      draggable={false}
       src={progressImage.dataURL}
       width={progressImage.width}
       height={progressImage.height}
