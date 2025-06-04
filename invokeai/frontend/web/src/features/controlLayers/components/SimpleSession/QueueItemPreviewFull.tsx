@@ -17,7 +17,6 @@ type Props = {
 };
 
 const sx = {
-  cursor: 'pointer',
   userSelect: 'none',
   pos: 'relative',
   alignItems: 'center',
