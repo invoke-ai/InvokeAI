@@ -45,10 +45,6 @@ class SqliteSessionQueue(SessionQueueBase):
             clear_result = self.clear(DEFAULT_QUEUE_ID)
             if clear_result.deleted > 0:
                 self.__invoker.services.logger.info(f"Cleared all {clear_result.deleted} queue items")
-        else:
-            prune_result = self.prune(DEFAULT_QUEUE_ID)
-            if prune_result.deleted > 0:
-                self.__invoker.services.logger.info(f"Pruned {prune_result.deleted} finished queue items")
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
