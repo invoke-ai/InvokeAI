@@ -7,7 +7,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-const BoardsSearch = () => {
+export const BoardsSearch = memo(() => {
   const dispatch = useAppDispatch();
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const { t } = useTranslation();
@@ -62,6 +62,5 @@ const BoardsSearch = () => {
       )}
     </InputGroup>
   );
-};
-
-export default memo(BoardsSearch);
+});
+BoardsSearch.displayName = 'BoardsSearch';

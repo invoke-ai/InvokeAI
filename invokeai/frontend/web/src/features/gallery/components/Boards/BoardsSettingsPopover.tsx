@@ -17,7 +17,7 @@ import { PiGearSixFill } from 'react-icons/pi';
 
 import { BoardsListSortControls } from './BoardsListSortControls';
 
-const BoardsSettingsPopover = () => {
+export const BoardsSettingsPopover = memo(() => {
   const { t } = useTranslation();
 
   return (
@@ -48,6 +48,5 @@ const BoardsSettingsPopover = () => {
       </PopoverContent>
     </Popover>
   );
-};
-
-export default memo(BoardsSettingsPopover);
+});
+BoardsSettingsPopover.displayName = 'BoardsSettingsPopover';

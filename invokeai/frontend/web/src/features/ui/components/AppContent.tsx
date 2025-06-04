@@ -1,16 +1,15 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
-import { selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
-import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
 import QueueControls from 'features/queue/components/QueueControls';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
-import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
+import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
+import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
+import { RightPanelContent } from 'features/ui/components/RightPanelContent';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
 import { WorkflowsMainPanel } from 'features/ui/components/tabs/WorkflowsTabContent';
@@ -30,6 +29,8 @@ import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 
 import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import { VerticalResizeHandle } from './tabs/ResizeHandle';
@@ -128,26 +129,21 @@ export const AppContent = memo(() => {
       >
         {withLeftPanel && (
           <>
-            <Panel order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
-              <Flex flexDir="column" w="full" h="full" gap={2}>
-                <QueueControls />
-                <Box position="relative" w="full" h="full">
-                  <LeftPanelContent />
-                </Box>
-              </Flex>
+            <Panel id="left-panel" order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
+              <LeftPanelContent />
             </Panel>
             <VerticalResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
           </>
         )}
         <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
           <MainPanelContent />
-          {withLeftPanel && <FloatingParametersPanelButtons togglePanel={leftPanel.toggle} />}
-          {withRightPanel && <FloatingGalleryButton panelApi={rightPanel} />}
+          {withLeftPanel && <FloatingLeftPanelButtons onToggle={leftPanel.toggle} />}
+          {withRightPanel && <FloatingRightPanelButtons onToggle={rightPanel.toggle} />}
         </Panel>
         {withRightPanel && (
           <>
             <VerticalResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
-            <Panel order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
+            <Panel id="right-panel" order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
               <RightPanelContent />
             </Panel>
           </>
@@ -156,35 +152,21 @@ export const AppContent = memo(() => {
     </Flex>
   );
 });
-
 AppContent.displayName = 'AppContent';
-
-const RightPanelContent = memo(() => {
-  const tab = useAppSelector(selectActiveTab);
-  const sessionType = useAppSelector(selectCanvasSessionType);
-
-  if (tab === 'upscaling' || tab === 'workflows' || tab === 'canvas') {
-    return <GalleryPanelContent />;
-  }
-
-  return null;
-});
-RightPanelContent.displayName = 'RightPanelContent';
 
 const LeftPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
-  if (tab === 'canvas') {
-    return <ParametersPanelTextToImage />;
-  }
-  if (tab === 'upscaling') {
-    return <ParametersPanelUpscale />;
-  }
-  if (tab === 'workflows') {
-    return <WorkflowsTabLeftPanel />;
-  }
-
-  return null;
+  return (
+    <Flex flexDir="column" w="full" h="full" gap={2}>
+      <QueueControls />
+      <Box position="relative" w="full" h="full">
+        {tab === 'canvas' && <ParametersPanelTextToImage />}
+        {tab === 'upscaling' && <ParametersPanelUpscale />}
+        {tab === 'workflows' && <WorkflowsTabLeftPanel />}
+      </Box>
+    </Flex>
+  );
 });
 LeftPanelContent.displayName = 'LeftPanelContent';
 
@@ -207,6 +189,6 @@ const MainPanelContent = memo(() => {
     return <QueueTab />;
   }
 
-  return null;
+  assert<Equals<never, typeof tab>>(false);
 });
 MainPanelContent.displayName = 'MainPanelContent';

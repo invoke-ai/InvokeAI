@@ -8,7 +8,7 @@ import {
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { selectAllowPrivateBoards } from 'features/system/store/configSelectors';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -21,7 +21,7 @@ type Props = {
   isPrivate: boolean;
 };
 
-export const BoardsList = ({ isPrivate }: Props) => {
+export const BoardsList = memo(({ isPrivate }: Props) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardSearchText = useAppSelector(selectBoardSearchText);
@@ -118,4 +118,5 @@ export const BoardsList = ({ isPrivate }: Props) => {
       </Collapse>
     </Flex>
   );
-};
+});
+BoardsList.displayName = 'BoardsList';
