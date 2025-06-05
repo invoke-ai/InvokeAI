@@ -20,8 +20,6 @@ export const StagingAreaItemsList = memo(() => {
             item={item}
             number={i + 1}
             isSelected={selectedItemId === item.item_id}
-            onSelectItemId={ctx.$selectedItemId.set}
-            onChangeAutoSwitch={ctx.$autoSwitch.set}
           />
         ))}
       </Flex>
