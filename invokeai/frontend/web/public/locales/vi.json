@@ -2440,8 +2440,7 @@
         "watchUiUpdatesOverview": "Xem Tổng Quan Về Những Cập Nhật Cho Giao Diện Người Dùng",
         "items": [
             "Nvidia 50xx GPUs: Invoke sử dụng PyTorch 2.7.0, thứ tối quan trọng cho những GPU trên.",
-            "Mối Quan Hệ Model: Kết nối LoRA với model chính, và LoRA đó sẽ được hiển thị đầu danh sách.",
-            "IP Adapter: Thủ thuật Phong Cách (Mạnh Mẽ) và Phong Cách (Chính Xác) mới cho model SDXL và SD1.5."
+            "Mối Quan Hệ Model: Kết nối LoRA với model chính, và LoRA đó sẽ được hiển thị đầu danh sách."
         ]
     },
     "upsell": {
