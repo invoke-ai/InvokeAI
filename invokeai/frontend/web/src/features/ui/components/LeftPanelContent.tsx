@@ -8,7 +8,7 @@ import { memo } from 'react';
 
 import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 
-const LeftPanelContent = memo(() => {
+export const LeftPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
   return (

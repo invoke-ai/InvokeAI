@@ -198,7 +198,7 @@ type UploadImageButtonProps = {
   isError?: boolean;
 } & ButtonProps;
 
-export const UploadImageButton = memo((props: UploadImageButtonProps) => {
+const UploadImageButton = memo((props: UploadImageButtonProps) => {
   const { children, isDisabled = false, onUpload, isError = false, ...rest } = props;
   const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: false, onUpload });
   return (

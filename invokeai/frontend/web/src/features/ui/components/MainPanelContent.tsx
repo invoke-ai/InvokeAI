@@ -9,7 +9,7 @@ import { memo } from 'react';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-const MainPanelContent = memo(() => {
+export const MainPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
   if (tab === 'canvas') {
