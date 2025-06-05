@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/nanostores/store';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
@@ -13,10 +14,12 @@ import { copyImage } from 'services/api/endpoints/images';
 const uploadImageArg = { image_category: 'general', is_intermediate: true, silent: true } as const;
 
 export const StagingAreaToolbarSaveAsMenu = memo(() => {
+  const canvasManager = useCanvasManager();
   const { t } = useTranslation();
   const ctx = useCanvasSessionContext();
   const imageName = useStore(ctx.$selectedItemOutputImageName);
   const store = useAppStore();
+  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
 
   const toastSentToCanvas = useCallback(() => {
     toast({
@@ -101,19 +104,35 @@ export const StagingAreaToolbarSaveAsMenu = memo(() => {
         tooltip={t('controlLayers.newLayerFromImage')}
         icon={<PiDotsThreeBold />}
         colorScheme="invokeBlue"
-        isDisabled={!imageName}
+        isDisabled={!imageName || !shouldShowStagedImage}
       />
       <MenuList>
-        <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewInpaintMaskFromImage} isDisabled={!imageName}>
+        <MenuItem
+          icon={<NewLayerIcon />}
+          onClickCapture={onClickNewInpaintMaskFromImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
+        >
           {t('controlLayers.inpaintMask')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRegionalGuidanceFromImage} isDisabled={!imageName}>
+        <MenuItem
+          icon={<NewLayerIcon />}
+          onClickCapture={onClickNewRegionalGuidanceFromImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
+        >
           {t('controlLayers.regionalGuidance')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewControlLayerFromImage} isDisabled={!imageName}>
+        <MenuItem
+          icon={<NewLayerIcon />}
+          onClickCapture={onClickNewControlLayerFromImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
+        >
           {t('controlLayers.controlLayer')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRasterLayerFromImage} isDisabled={!imageName}>
+        <MenuItem
+          icon={<NewLayerIcon />}
+          onClickCapture={onClickNewRasterLayerFromImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
+        >
           {t('controlLayers.rasterLayer')}
         </MenuItem>
       </MenuList>

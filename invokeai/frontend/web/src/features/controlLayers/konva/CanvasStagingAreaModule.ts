@@ -3,6 +3,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -21,8 +22,10 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   image: CanvasObjectImage | null;
   mutex = new Mutex();
 
+  $imageSrc = atom<{ type: 'imageName'; data: string } | { type: 'dataURL'; data: string } | null>(null);
+
   $shouldShowStagedImage = atom<boolean>(true);
-  $isStaging = atom(true); //TODO: wire up to queue?
+  $isStaging = atom<boolean>(false);
 
   constructor(manager: CanvasManager) {
     super();
@@ -40,9 +43,26 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     /**
      * When we change this flag, we need to re-render the staging area, which hides or shows the staged image.
      */
+    this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
+
+    /**
+     * Rerender when the image source changes.
+     */
+    this.subscriptions.add(this.$imageSrc.listen(this.render));
+
+    /**
+     * Sync the $isStaging flag with the redux state. $isStaging is used by the manager to determine the global busy
+     * state of the canvas.
+     *
+     * We also set the $shouldShowStagedImage flag when we enter staging mode, so that the staged images are shown,
+     * even if the user disabled this in the last staging session.
+     */
     this.subscriptions.add(
-      this.$shouldShowStagedImage.listen(() => {
-        this.render();
+      this.manager.stateApi.createStoreSubscription(selectIsStaging, (isStaging, oldIsStaging) => {
+        this.$isStaging.set(isStaging);
+        if (isStaging && !oldIsStaging) {
+          this.$shouldShowStagedImage.set(true);
+        }
       })
     );
   }
@@ -50,6 +70,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   initialize = () => {
     this.log.debug('Initializing module');
     this.render();
+    this.$isStaging.set(this.manager.stateApi.runSelector(selectIsStaging));
   };
 
   getImageFromSrc = (
@@ -72,7 +93,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     }
   };
 
-  render = async (imageSrc?: { type: 'imageName'; data: string } | { type: 'dataURL'; data: string }) => {
+  render = async () => {
     const release = await this.mutex.acquire();
     try {
       this.log.trace('Rendering staging area');
@@ -81,6 +102,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 
       this.konva.group.position({ x, y });
+
+      const imageSrc = this.$imageSrc.get();
 
       if (imageSrc) {
         const image = this.getImageFromSrc(imageSrc, width, height);
@@ -91,13 +114,13 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         } else if (this.image.isLoading || this.image.isError) {
           // noop
         } else {
-          await this.image.update({ ...this.image.state, image }, true);
+          await this.image.update({ ...this.image.state, image });
         }
-        this.image.konva.group.visible(shouldShowStagedImage);
       } else {
         this.image?.destroy();
         this.image = null;
       }
+      this.konva.group.visible(shouldShowStagedImage);
     } finally {
       release();
     }
