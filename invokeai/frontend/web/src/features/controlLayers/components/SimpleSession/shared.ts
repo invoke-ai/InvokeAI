@@ -21,7 +21,7 @@ export const getProgressMessage = (data?: S['InvocationProgressEvent'] | null) =
 
 export const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.3))';
 
-export const getQueueItemElementId = (item_id: number) => `queue-item-status-card-${item_id}`;
+export const getQueueItemElementId = (itemId: number) => `queue-item-status-card-${itemId}`;
 
 const getOutputImageName = (item: S['SessionQueueItem']) => {
   const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
