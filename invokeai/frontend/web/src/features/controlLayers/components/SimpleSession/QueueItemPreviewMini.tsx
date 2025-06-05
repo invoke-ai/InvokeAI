@@ -21,6 +21,7 @@ const sx = {
   flexShrink: 0,
   borderWidth: 2,
   borderRadius: 'base',
+  bg: 'base.900',
   '&[data-selected="true"]': {
     borderColor: 'invokeBlue.300',
   },
@@ -62,7 +63,7 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
     >
       <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} asThumbnail />}
-      {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" withBg />}
+      {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
       <QueueItemNumber number={number} position="absolute" top={0} left={1} />
       <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>
