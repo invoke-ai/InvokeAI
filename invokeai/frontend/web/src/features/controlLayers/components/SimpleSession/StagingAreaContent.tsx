@@ -2,6 +2,7 @@
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
 import { StagingAreaSelectedItem } from 'features/controlLayers/components/SimpleSession/StagingAreaSelectedItem';
+import { SimpleStagingAreaToolbar } from 'features/controlLayers/components/StagingArea/SimpleStagingAreaToolbar';
 import { memo } from 'react';
 
 export const StagingAreaContent = memo(() => {
@@ -13,6 +14,9 @@ export const StagingAreaContent = memo(() => {
       <Divider />
       <Flex position="relative" maxW="full" w="full" h={108} flexShrink={0}>
         <StagingAreaItemsList />
+      </Flex>
+      <Flex gap={2} w="full" justifyContent="safe center">
+        <SimpleStagingAreaToolbar />
       </Flex>
     </>
   );
