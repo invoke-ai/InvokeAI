@@ -12,6 +12,7 @@ import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { HorizontalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
@@ -29,6 +30,7 @@ export const RightPanelContent = memo(() => {
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const type = useAppSelector(selectCanvasSessionType);
+  const tab = useAppSelector(selectActiveTab);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
@@ -77,7 +79,7 @@ export const RightPanelContent = memo(() => {
         <Panel order={1} id="gallery-wrapper-panel" collapsible {...galleryPanel.panelProps}>
           <Gallery />
         </Panel>
-        {type === 'advanced' && (
+        {tab === 'canvas' && type === 'advanced' && (
           <>
             <HorizontalResizeHandle id="gallery-panel-to-layers-handle" {...galleryPanel.resizeHandleProps} />
             <Panel order={2} id="canvas-layers-panel" collapsible {...canvasLayersPanel.panelProps}>
