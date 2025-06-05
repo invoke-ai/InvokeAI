@@ -39,7 +39,7 @@ export const QueueItemPreviewFull = memo(({ item, number }: Props) => {
       <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} />}
       {!imageLoaded && <QueueItemProgressImage session_id={item.session_id} position="absolute" />}
-      {imageDTO && imageLoaded && <ImageActions imageDTO={imageDTO} position="absolute" top={1} right={2} />}
+      {imageDTO && <ImageActions imageDTO={imageDTO} position="absolute" top={1} right={2} />}
       <QueueItemNumber number={number} position="absolute" top={1} left={2} />
       <QueueItemProgressMessage
         session_id={item.session_id}
