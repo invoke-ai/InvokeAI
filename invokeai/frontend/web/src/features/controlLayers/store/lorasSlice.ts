@@ -1,7 +1,7 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { LoRAModelConfig } from 'services/api/types';
@@ -64,7 +64,7 @@ export const lorasSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(canvasSessionStarted, () => {
+    builder.addCase(canvasSessionTypeChanged, () => {
       // When a new session is requested, clear all LoRAs
       return deepClone(initialState);
     });
