@@ -52,6 +52,11 @@ export const useInvokeCanvas = (): ((el: HTMLDivElement | null) => void) => {
 
     const manager = new CanvasManager(container, store, socket);
     manager.initialize();
+
+    return () => {
+      manager.destroy();
+      $canvasManager.set(null);
+    };
   }, [container, socket, store]);
 
   return containerRef;

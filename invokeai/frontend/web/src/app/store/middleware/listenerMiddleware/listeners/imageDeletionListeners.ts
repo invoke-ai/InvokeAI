@@ -58,7 +58,7 @@ const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image
   selectCanvasSlice(state).controlLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
-      if (obj.type === 'image' && obj.image.image_name === imageDTO.image_name) {
+      if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === imageDTO.image_name) {
         shouldDelete = true;
         break;
       }
