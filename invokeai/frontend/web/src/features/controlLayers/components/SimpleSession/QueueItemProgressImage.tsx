@@ -10,7 +10,7 @@ export const QueueItemProgressImage = memo(({ itemId, ...rest }: Props) => {
   const { progressImage } = useProgressData(ctx.$progressData, itemId);
 
   if (!progressImage) {
-    return <Flex w="full" h="full" bg="base.800" alignItems="center" justifyContent="center" />;
+    return <Flex w="full" h="full" bg="base.900" alignItems="center" justifyContent="center" />;
   }
 
   return (
