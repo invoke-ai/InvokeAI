@@ -5,6 +5,7 @@ import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { canvasSessionGenerationFinished } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
@@ -12,6 +13,7 @@ import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
+import { useDeleteQueueItemsByDestinationMutation } from 'services/api/endpoints/queue';
 
 export const StagingAreaToolbarAcceptButton = memo(() => {
   const ctx = useCanvasSessionContext();
@@ -22,6 +24,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasFocused = useIsRegionFocused('canvas');
   const selectedItemImageName = useStore(ctx.$selectedItemOutputImageName);
+  const [deleteByDestination] = useDeleteQueueItemsByDestinationMutation();
 
   const { t } = useTranslation();
 
@@ -37,7 +40,9 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
     };
 
     dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
-  }, [bboxRect, selectedItemImageName, dispatch, selectedEntityIdentifier?.type]);
+    dispatch(canvasSessionGenerationFinished());
+    deleteByDestination({ destination: ctx.session.id });
+  }, [selectedItemImageName, bboxRect, dispatch, selectedEntityIdentifier?.type, deleteByDestination, ctx.session.id]);
 
   useHotkeys(
     ['enter'],
@@ -56,7 +61,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
       icon={<PiCheckBold />}
       onClick={acceptSelected}
       colorScheme="invokeBlue"
-      isDisabled={!selectedItemImageName}
+      isDisabled={!selectedItemImageName || !shouldShowStagedImage}
     />
   );
 });
