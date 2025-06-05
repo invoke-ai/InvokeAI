@@ -11,7 +11,7 @@ export const StagingAreaContent = memo(() => {
         <StagingAreaSelectedItem />
       </Flex>
       <Divider />
-      <Flex position="relative" maxW="full" w="full" h={108}>
+      <Flex position="relative" maxW="full" w="full" h={108} flexShrink={0}>
         <StagingAreaItemsList />
       </Flex>
     </>
