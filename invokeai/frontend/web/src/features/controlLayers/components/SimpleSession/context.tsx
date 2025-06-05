@@ -300,6 +300,10 @@ export const CanvasSessionContextProvider = memo(
       // of fallback content and/or progress images. The only surefire way to determine when images have fully loaded
       // is via the image elements' `onLoad` callback. Images set `$lastLoadedItemId` to their queue item ID in their
       // `onLoad` handler, and we listen for that here. If auto-switch is enabled, we then switch the to the item.
+      //
+      // TODO: This isn't perfect... we set $lastLoadedItemId in the mini preview component, but the full view
+      // component still needs to retrieve the image from the browser cache... can result in a flash of the progress
+      // image...
       const unsubHandleAutoSwitch = $lastLoadedItemId.listen((lastLoadedItemId) => {
         if (lastLoadedItemId === null) {
           return;
