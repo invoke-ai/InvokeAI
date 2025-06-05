@@ -17,23 +17,21 @@ import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 
 export type ProgressData = {
-  sessionId: string;
+  itemId: number;
   progressEvent: S['InvocationProgressEvent'] | null;
   progressImage: ProgressImage | null;
 };
 
-export const buildProgressDataAtom = () => atom<Record<string, ProgressData>>({});
-
 export const useProgressData = (
-  $progressData: WritableAtom<Record<string, ProgressData>>,
-  sessionId: string
+  $progressData: WritableAtom<Record<number, ProgressData>>,
+  itemId: number
 ): ProgressData => {
   const [value, setValue] = useState<ProgressData>(() => {
-    return $progressData.get()[sessionId] ?? { sessionId, progressEvent: null, progressImage: null };
+    return $progressData.get()[itemId] ?? { itemId, progressEvent: null, progressImage: null };
   });
   useEffect(() => {
     const unsub = $progressData.subscribe((data) => {
-      const progressData = data[sessionId];
+      const progressData = data[itemId];
       if (!progressData) {
         return;
       }
@@ -42,35 +40,35 @@ export const useProgressData = (
     return () => {
       unsub();
     };
-  }, [$progressData, sessionId]);
+  }, [$progressData, itemId]);
 
   return value;
 };
 
 export const useHasProgressImage = (
-  $progressData: WritableAtom<Record<string, ProgressData>>,
-  sessionId: string
+  $progressData: WritableAtom<Record<number, ProgressData>>,
+  itemId: number
 ): boolean => {
   const [value, setValue] = useState(false);
   useEffect(() => {
     const unsub = $progressData.subscribe((data) => {
-      const progressData = data[sessionId];
+      const progressData = data[itemId];
       setValue(Boolean(progressData?.progressImage));
     });
     return () => {
       unsub();
     };
-  }, [$progressData, sessionId]);
+  }, [$progressData, itemId]);
 
   return value;
 };
 
 export const setProgress = (
-  $progressData: WritableAtom<Record<string, ProgressData>>,
+  $progressData: WritableAtom<Record<number, ProgressData>>,
   data: S['InvocationProgressEvent']
 ) => {
   const progressData = $progressData.get();
-  const current = progressData[data.session_id];
+  const current = progressData[data.item_id];
   if (current) {
     const next = { ...current };
     next.progressEvent = data;
@@ -79,13 +77,13 @@ export const setProgress = (
     }
     $progressData.set({
       ...progressData,
-      [data.session_id]: next,
+      [data.item_id]: next,
     });
   } else {
     $progressData.set({
       ...progressData,
-      [data.session_id]: {
-        sessionId: data.session_id,
+      [data.item_id]: {
+        itemId: data.item_id,
         progressEvent: data,
         progressImage: data.image ?? null,
       },
@@ -93,9 +91,9 @@ export const setProgress = (
   }
 };
 
-export const clearProgressEvent = ($progressData: WritableAtom<Record<string, ProgressData>>, sessionId: string) => {
+export const clearProgressEvent = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
   const progressData = $progressData.get();
-  const current = progressData[sessionId];
+  const current = progressData[itemId];
   if (!current) {
     return;
   }
@@ -103,13 +101,13 @@ export const clearProgressEvent = ($progressData: WritableAtom<Record<string, Pr
   next.progressEvent = null;
   $progressData.set({
     ...progressData,
-    [sessionId]: next,
+    [itemId]: next,
   });
 };
 
-export const clearProgressImage = ($progressData: WritableAtom<Record<string, ProgressData>>, sessionId: string) => {
+export const clearProgressImage = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
   const progressData = $progressData.get();
-  const current = progressData[sessionId];
+  const current = progressData[itemId];
   if (!current) {
     return;
   }
@@ -117,7 +115,7 @@ export const clearProgressImage = ($progressData: WritableAtom<Record<string, Pr
   next.progressImage = null;
   $progressData.set({
     ...progressData,
-    [sessionId]: next,
+    [itemId]: next,
   });
 };
 
@@ -130,6 +128,7 @@ export type CanvasSessionContextValue = {
   $selectedItem: Atom<S['SessionQueueItem'] | null>;
   $selectedItemIndex: Atom<number | null>;
   $autoSwitch: WritableAtom<boolean>;
+  $lastLoadedItemId: WritableAtom<number | null>;
 };
 
 const CanvasSessionContext = createContext<CanvasSessionContextValue | null>(null);
@@ -160,9 +159,15 @@ export const CanvasSessionContextProvider = memo(
     const $autoSwitch = useState(() => atom(true))[0];
 
     /**
+     * An internal flag used to work around race conditions with auto-switch switching to queue items before their
+     * output images have fully loaded.
+     */
+    const $lastLoadedItemId = useState(() => atom<number | null>(null))[0];
+
+    /**
      * An ephemeral store of progress events and images for all items in the current session.
      */
-    const $progressData = useState(() => atom<Record<string, ProgressData>>({}))[0];
+    const $progressData = useState(() => atom<Record<number, ProgressData>>({}))[0];
 
     /**
      * The currently selected queue item's ID, or null if one is not selected.
@@ -231,21 +236,10 @@ export const CanvasSessionContextProvider = memo(
         setProgress($progressData, data);
       };
 
-      const onQueueItemStatusChanged = (data: S['QueueItemStatusChangedEvent']) => {
-        if (data.destination !== session.id) {
-          return;
-        }
-        if (data.status === 'completed' && $autoSwitch.get()) {
-          $selectedItemId.set(data.item_id);
-        }
-      };
-
       socket.on('invocation_progress', onProgress);
-      socket.on('queue_item_status_changed', onQueueItemStatusChanged);
 
       return () => {
         socket.off('invocation_progress', onProgress);
-        socket.off('queue_item_status_changed', onQueueItemStatusChanged);
       };
     }, [$autoSwitch, $progressData, $selectedItemId, session.id, socket]);
 
@@ -285,21 +279,35 @@ export const CanvasSessionContextProvider = memo(
 
       // Clean up the progress data when a queue item is discarded.
       const unsubCleanUpProgressData = effect([$items, $progressData], (items, progressData) => {
-        const toDelete: string[] = [];
+        const toDelete: number[] = [];
         for (const datum of Object.values(progressData)) {
-          if (items.findIndex(({ session_id }) => session_id === datum.sessionId) === -1) {
-            toDelete.push(datum.sessionId);
+          if (items.findIndex(({ item_id }) => item_id === datum.itemId) === -1) {
+            toDelete.push(datum.itemId);
           }
         }
         if (toDelete.length === 0) {
           return;
         }
         const newProgressData = { ...progressData };
-        for (const sessionId of toDelete) {
-          delete newProgressData[sessionId];
+        for (const itemId of toDelete) {
+          delete newProgressData[itemId];
         }
         // This will re-trigger the effect - maybe this could just be a listener on $items? Brain hurt
         $progressData.set(newProgressData);
+      });
+
+      // We only want to auto-switch to completed queue items once their images have fully loaded to prevent flashes
+      // of fallback content and/or progress images. The only surefire way to determine when images have fully loaded
+      // is via the image elements' `onLoad` callback. Images set `$lastLoadedItemId` to their queue item ID in their
+      // `onLoad` handler, and we listen for that here. If auto-switch is enabled, we then switch the to the item.
+      const unsubHandleAutoSwitch = $lastLoadedItemId.listen((lastLoadedItemId) => {
+        if (lastLoadedItemId === null) {
+          return;
+        }
+        if ($autoSwitch.get()) {
+          $selectedItemId.set(lastLoadedItemId);
+        }
+        $lastLoadedItemId.set(null);
       });
 
       // Create an RTK Query subscription. Without this, the query cache selector will never return anything bc RTK
@@ -310,6 +318,7 @@ export const CanvasSessionContextProvider = memo(
 
       // Clean up all subscriptions and top-level (i.e. non-computed/derived state)
       return () => {
+        unsubHandleAutoSwitch();
         unsubQueueItemsQuery();
         unsubReduxSyncToItemsAtom();
         unsubEnsureSelectedItemIdExists();
@@ -318,7 +327,7 @@ export const CanvasSessionContextProvider = memo(
         $progressData.set({});
         $selectedItemId.set(null);
       };
-    }, [$items, $progressData, $selectedItemId, selectQueueItems, session.id, store]);
+    }, [$autoSwitch, $items, $lastLoadedItemId, $progressData, $selectedItemId, selectQueueItems, session.id, store]);
 
     const value = useMemo<CanvasSessionContextValue>(
       () => ({
@@ -330,8 +339,19 @@ export const CanvasSessionContextProvider = memo(
         $autoSwitch,
         $selectedItem,
         $selectedItemIndex,
+        $lastLoadedItemId,
       }),
-      [$autoSwitch, $hasItems, $items, $progressData, $selectedItem, $selectedItemId, $selectedItemIndex, session]
+      [
+        $autoSwitch,
+        $hasItems,
+        $items,
+        $lastLoadedItemId,
+        $progressData,
+        $selectedItem,
+        $selectedItemId,
+        $selectedItemIndex,
+        session,
+      ]
     );
 
     return <CanvasSessionContext.Provider value={value}>{children}</CanvasSessionContext.Provider>;
