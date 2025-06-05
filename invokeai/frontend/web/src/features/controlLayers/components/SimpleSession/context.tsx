@@ -67,7 +67,7 @@ const setProgress = ($progressData: WritableAtom<Record<number, ProgressData>>, 
   }
 };
 
-export const clearProgressEvent = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
+const clearProgressEvent = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
   const progressData = $progressData.get();
   const current = progressData[itemId];
   if (!current) {
@@ -81,7 +81,7 @@ export const clearProgressEvent = ($progressData: WritableAtom<Record<number, Pr
   });
 };
 
-export const clearProgressImage = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
+const clearProgressImage = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
   const progressData = $progressData.get();
   const current = progressData[itemId];
   if (!current) {
