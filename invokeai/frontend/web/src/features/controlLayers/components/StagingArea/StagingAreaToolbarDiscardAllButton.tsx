@@ -1,21 +1,17 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { canvasSessionGenerationFinished } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useDeleteQueueItemsByDestinationMutation } from 'services/api/endpoints/queue';
 
-export const StagingAreaToolbarDiscardAllButton = memo(() => {
-  const canvasManager = useCanvasManager();
+export const StagingAreaToolbarDiscardAllButton = memo(({ isDisabled }: { isDisabled?: boolean }) => {
   const ctx = useCanvasSessionContext();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const [deleteByDestination] = useDeleteQueueItemsByDestinationMutation();
-  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
 
   const discardAll = useCallback(() => {
     deleteByDestination({ destination: ctx.session.id });
@@ -30,7 +26,7 @@ export const StagingAreaToolbarDiscardAllButton = memo(() => {
       onClick={discardAll}
       colorScheme="error"
       fontSize={16}
-      isDisabled={!shouldShowStagedImage}
+      isDisabled={isDisabled}
     />
   );
 });
