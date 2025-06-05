@@ -362,6 +362,12 @@ class CancelByDestinationResult(CancelByBatchIDsResult):
     pass
 
 
+class DeleteByDestinationResult(BaseModel):
+    """Result of deleting by a destination"""
+
+    deleted: int = Field(..., description="Number of queue items deleted")
+
+
 class CancelByQueueIDResult(CancelByBatchIDsResult):
     """Result of canceling by queue id"""
 
