@@ -3,7 +3,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { withResultAsync } from 'common/util/result';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -90,7 +90,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       const overrides: Partial<CanvasRasterLayerState> = {
         objects: [imageObject],
       };
-      store.dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+      store.dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       store.dispatch(rasterLayerAdded({ overrides, isSelected: true }));
       store.dispatch(setActiveTab('canvas'));
       store.dispatch(sentImageToCanvas());
@@ -162,14 +162,14 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       switch (destination) {
         case 'generation':
           // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
-          store.dispatch(canvasSessionStarted({ sessionType: 'simple' }));
+          store.dispatch(canvasSessionTypeChanged({ type: 'simple' }));
           store.dispatch(setActiveTab('canvas'));
           store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
           $imageViewer.set(true);
           break;
         case 'canvas':
           // Go to the canvas tab, close the image viewer, and disable send-to-gallery mode
-          store.dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+          store.dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
           store.dispatch(setActiveTab('canvas'));
           $imageViewer.set(false);
           break;
