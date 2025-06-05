@@ -22,25 +22,25 @@ export const StagingAreaItemsList = memo(() => {
 
     return effect([ctx.$selectedItem, ctx.$progressData], (selectedItem, progressData) => {
       if (!selectedItem) {
-        canvasManager.stagingArea.render();
+        canvasManager.stagingArea.$imageSrc.set(null);
         return;
       }
 
       const outputImageName = getOutputImageName(selectedItem);
 
       if (outputImageName) {
-        canvasManager.stagingArea.render({ type: 'imageName', data: outputImageName });
+        canvasManager.stagingArea.$imageSrc.set({ type: 'imageName', data: outputImageName });
         return;
       }
 
       const data = progressData[selectedItem.item_id];
 
       if (data?.progressImage) {
-        canvasManager.stagingArea.render({ type: 'dataURL', data: data.progressImage.dataURL });
+        canvasManager.stagingArea.$imageSrc.set({ type: 'dataURL', data: data.progressImage.dataURL });
         return;
       }
 
-      canvasManager.stagingArea.render();
+      canvasManager.stagingArea.$imageSrc.set(null);
     });
   }, [canvasManager, ctx.$progressData, ctx.$selectedItem]);
 

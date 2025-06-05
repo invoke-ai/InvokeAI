@@ -12,8 +12,8 @@ export const StagingAreaToolbarToggleShowResultsButton = memo(() => {
   const { t } = useTranslation();
 
   const toggleShowResults = useCallback(() => {
-    canvasManager.stagingArea.$shouldShowStagedImage.set(!shouldShowStagedImage);
-  }, [canvasManager.stagingArea.$shouldShowStagedImage, shouldShowStagedImage]);
+    canvasManager.stagingArea.$shouldShowStagedImage.set(!canvasManager.stagingArea.$shouldShowStagedImage.get());
+  }, [canvasManager.stagingArea.$shouldShowStagedImage]);
 
   return (
     <IconButton
