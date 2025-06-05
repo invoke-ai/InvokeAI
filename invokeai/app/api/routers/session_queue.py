@@ -14,6 +14,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByBatchIDsResult,
     CancelByDestinationResult,
     ClearResult,
+    DeleteByDestinationResult,
     EnqueueBatchResult,
     FieldIdentifier,
     PruneResult,
@@ -293,6 +294,18 @@ async def get_queue_item(
     return ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
 
 
+@session_queue_router.delete(
+    "/{queue_id}/i/{item_id}",
+    operation_id="delete_queue_item",
+)
+async def delete_queue_item(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    item_id: int = Path(description="The queue item to delete"),
+) -> None:
+    """Deletes a queue item"""
+    ApiDependencies.invoker.services.session_queue.delete_queue_item(item_id)
+
+
 @session_queue_router.put(
     "/{queue_id}/i/{item_id}/cancel",
     operation_id="cancel_queue_item",
@@ -320,5 +333,20 @@ async def counts_by_destination(
 ) -> SessionQueueCountsByDestination:
     """Gets the counts of queue items by destination"""
     return ApiDependencies.invoker.services.session_queue.get_counts_by_destination(
+        queue_id=queue_id, destination=destination
+    )
+
+
+@session_queue_router.delete(
+    "/{queue_id}/d/{destination}",
+    operation_id="delete_by_destination",
+    responses={200: {"model": DeleteByDestinationResult}},
+)
+async def delete_by_destination(
+    queue_id: str = Path(description="The queue id to query"),
+    destination: str = Path(description="The destination to query"),
+) -> DeleteByDestinationResult:
+    """Deletes all items with the given destination"""
+    return ApiDependencies.invoker.services.session_queue.delete_by_destination(
         queue_id=queue_id, destination=destination
     )
