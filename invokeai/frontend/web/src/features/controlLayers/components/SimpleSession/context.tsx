@@ -17,7 +17,7 @@ import type { S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 
-export type ProgressData = {
+type ProgressData = {
   itemId: number;
   progressEvent: S['InvocationProgressEvent'] | null;
   progressImage: ProgressImage | null;
@@ -46,28 +46,7 @@ export const useProgressData = (
   return value;
 };
 
-export const useHasProgressImage = (
-  $progressData: WritableAtom<Record<number, ProgressData>>,
-  itemId: number
-): boolean => {
-  const [value, setValue] = useState(false);
-  useEffect(() => {
-    const unsub = $progressData.subscribe((data) => {
-      const progressData = data[itemId];
-      setValue(Boolean(progressData?.progressImage));
-    });
-    return () => {
-      unsub();
-    };
-  }, [$progressData, itemId]);
-
-  return value;
-};
-
-export const setProgress = (
-  $progressData: WritableAtom<Record<number, ProgressData>>,
-  data: S['InvocationProgressEvent']
-) => {
+const setProgress = ($progressData: WritableAtom<Record<number, ProgressData>>, data: S['InvocationProgressEvent']) => {
   const progressData = $progressData.get();
   const current = progressData[data.item_id];
   if (current) {
@@ -120,7 +99,7 @@ export const clearProgressImage = ($progressData: WritableAtom<Record<number, Pr
   });
 };
 
-export type CanvasSessionContextValue = {
+type CanvasSessionContextValue = {
   session: SimpleSessionIdentifier | AdvancedSessionIdentifier;
   $items: Atom<S['SessionQueueItem'][]>;
   $itemCount: Atom<number>;

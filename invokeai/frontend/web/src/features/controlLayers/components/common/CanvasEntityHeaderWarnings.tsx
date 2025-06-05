@@ -4,6 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
+import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import {
@@ -18,7 +19,6 @@ import { upperFirst } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWarningBold } from 'react-icons/pi';
-import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 

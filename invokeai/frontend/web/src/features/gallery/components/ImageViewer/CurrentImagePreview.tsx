@@ -2,7 +2,6 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
-import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
@@ -52,7 +51,6 @@ const CurrentImagePreview = ({ imageDTO }: { imageDTO?: ImageDTO }) => {
         pointerEvents="none"
         alignItems="flex-start"
       >
-        <CanvasAlertsSendingToCanvas />
         <CanvasAlertsInvocationProgress />
       </Flex>
       {shouldShowImageDetails && imageDTO && (

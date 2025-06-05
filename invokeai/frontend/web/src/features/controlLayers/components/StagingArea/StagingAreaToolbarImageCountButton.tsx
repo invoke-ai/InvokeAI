@@ -1,16 +1,12 @@
 import { Button } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { selectImageCount, selectStagedImageIndex } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useMemo } from 'react';
 
 export const StagingAreaToolbarImageCountButton = memo(() => {
   const ctx = useCanvasSessionContext();
   const selectItemIndex = useStore(ctx.$selectedItemIndex);
   const itemCount = useStore(ctx.$itemCount);
-  const index = useAppSelector(selectStagedImageIndex);
-  const imageCount = useAppSelector(selectImageCount);
 
   const counterText = useMemo(() => {
     if (itemCount > 0 && selectItemIndex !== null) {
