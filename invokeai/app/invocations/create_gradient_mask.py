@@ -184,7 +184,7 @@ class CreateGradientMaskInvocation(BaseInvocation):
             main_model_config = context.models.get_config(self.unet.unet.key)
             assert isinstance(main_model_config, MainConfigBase)
             if main_model_config.variant is ModelVariantType.Inpaint:
-                mask = mask_tensor
+                mask = dilated_mask_tensor
                 vae_info: LoadedModel = context.models.load(self.vae.vae)
                 image = context.images.get_pil(self.image.image_name)
                 image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
