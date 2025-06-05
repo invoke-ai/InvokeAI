@@ -62,7 +62,7 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
     >
       <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} asThumbnail />}
-      {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
+      {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" withBg />}
       <QueueItemNumber number={number} position="absolute" top={0} left={1} />
       <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>
