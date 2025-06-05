@@ -11,6 +11,7 @@ import { memo, useCallback, useState } from 'react';
 import type { S } from 'services/api/types';
 
 const sx = {
+  cursor: 'pointer',
   userSelect: 'none',
   pos: 'relative',
   alignItems: 'center',
