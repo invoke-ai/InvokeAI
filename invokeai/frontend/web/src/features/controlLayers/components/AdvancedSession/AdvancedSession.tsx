@@ -20,7 +20,6 @@ import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasT
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import type { AdvancedSessionIdentifier } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
@@ -53,7 +52,7 @@ const canvasBgSx = {
   },
 };
 
-export const AdvancedSession = memo(({ session }: { session: AdvancedSessionIdentifier }) => {
+export const AdvancedSession = memo(({ id }: { id: string | null }) => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
 
@@ -107,27 +106,29 @@ export const AdvancedSession = memo(({ session }: { session: AdvancedSessionIden
             </Flex>
           )}
         </ContextMenu>
-        <CanvasManagerProviderGate>
-          <CanvasSessionContextProvider session={session}>
-            <Flex
-              position="absolute"
-              flexDir="column"
-              bottom={4}
-              gap={2}
-              align="center"
-              justify="center"
-              left={4}
-              right={4}
-            >
-              <Flex position="relative" maxW="full" w="full" h={108}>
-                <StagingAreaItemsList />
+        {id !== null && (
+          <CanvasManagerProviderGate>
+            <CanvasSessionContextProvider type="advanced" id={id}>
+              <Flex
+                position="absolute"
+                flexDir="column"
+                bottom={4}
+                gap={2}
+                align="center"
+                justify="center"
+                left={4}
+                right={4}
+              >
+                <Flex position="relative" maxW="full" w="full" h={108}>
+                  <StagingAreaItemsList />
+                </Flex>
+                <Flex gap={2}>
+                  <StagingAreaToolbar />
+                </Flex>
               </Flex>
-              <Flex gap={2}>
-                <StagingAreaToolbar />
-              </Flex>
-            </Flex>
-          </CanvasSessionContextProvider>
-        </CanvasManagerProviderGate>
+            </CanvasSessionContextProvider>
+          </CanvasManagerProviderGate>
+        )}
         <Flex position="absolute" bottom={4}>
           <CanvasManagerProviderGate>
             <Filter />

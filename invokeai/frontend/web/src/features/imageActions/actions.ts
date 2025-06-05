@@ -15,7 +15,7 @@ import {
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -194,7 +194,7 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
       } satisfies Partial<CanvasRasterLayerState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+      dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
@@ -211,7 +211,7 @@ export const newCanvasFromImage = async (arg: {
         controlAdapter: deepClone(initialControlNet),
       } satisfies Partial<CanvasControlLayerState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+      dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(controlLayerAdded({ overrides, isSelected: true }));
@@ -227,7 +227,7 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
       } satisfies Partial<CanvasInpaintMaskState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+      dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
@@ -243,7 +243,7 @@ export const newCanvasFromImage = async (arg: {
         objects: [imageObject],
       } satisfies Partial<CanvasRegionalGuidanceState>;
       addFitOnLayerInitCallback(overrides.id);
-      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+      dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
       dispatch(rgAdded({ overrides, isSelected: true }));
@@ -256,7 +256,7 @@ export const newCanvasFromImage = async (arg: {
     case 'reference_image': {
       const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+      dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
@@ -268,7 +268,7 @@ export const newCanvasFromImage = async (arg: {
       const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
       const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
-      dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+      dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));

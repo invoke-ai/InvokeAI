@@ -3,10 +3,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppStore } from 'app/store/nanostores/store';
 import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
-import type {
-  AdvancedSessionIdentifier,
-  SimpleSessionIdentifier,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ProgressImage } from 'features/nodes/types/common';
 import type { Atom, WritableAtom } from 'nanostores';
 import { atom, computed, effect } from 'nanostores';
@@ -100,7 +96,7 @@ export const clearProgressImage = ($progressData: WritableAtom<Record<number, Pr
 };
 
 type CanvasSessionContextValue = {
-  session: SimpleSessionIdentifier | AdvancedSessionIdentifier;
+  session: { id: string; type: 'simple' | 'advanced' };
   $items: Atom<S['SessionQueueItem'][]>;
   $itemCount: Atom<number>;
   $hasItems: Atom<boolean>;
@@ -120,12 +116,13 @@ type CanvasSessionContextValue = {
 const CanvasSessionContext = createContext<CanvasSessionContextValue | null>(null);
 
 export const CanvasSessionContextProvider = memo(
-  ({ session, children }: PropsWithChildren<{ session: SimpleSessionIdentifier | AdvancedSessionIdentifier }>) => {
+  ({ id, type, children }: PropsWithChildren<{ id: string; type: 'simple' | 'advanced' }>) => {
     /**
      * For best performance and interop with the Canvas, which is outside react but needs to interact with the react
      * app, all canvas session state is packaged as nanostores atoms. The trickiest part is syncing the queue items
      * with a nanostores atom.
      */
+    const session = useMemo(() => ({ type, id }), [type, id]);
 
     /**
      * App store

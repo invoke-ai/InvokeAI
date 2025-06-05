@@ -1,7 +1,6 @@
 import type { TypedStartListening } from '@reduxjs/toolkit';
 import { addListener, createListenerMiddleware } from '@reduxjs/toolkit';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
-import { addStagingListeners } from 'app/store/middleware/listenerMiddleware/listeners/addCommitStagingAreaImageListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
 import { addAppConfigReceivedListener } from 'app/store/middleware/listenerMiddleware/listeners/appConfigReceived';
 import { addAppStartedListener } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -64,9 +63,6 @@ addEnqueueRequestedLinear(startAppListening);
 addEnqueueRequestedUpscale(startAppListening);
 addAnyEnqueuedListener(startAppListening);
 addBatchEnqueuedListener(startAppListening);
-
-// Canvas actions
-addStagingListeners(startAppListening);
 
 // Socket.IO
 addSocketConnectedEventListener(startAppListening);
