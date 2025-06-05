@@ -641,6 +641,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
+    for (const tool of Object.values(this.tools)) {
+      tool.destroy();
+    }
     this.konva.group.destroy();
   };
 }
