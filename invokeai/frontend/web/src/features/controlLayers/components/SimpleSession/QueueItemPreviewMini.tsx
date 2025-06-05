@@ -18,7 +18,7 @@ const sx = {
   h: 108,
   w: 108,
   flexShrink: 0,
-  borderWidth: 1,
+  borderWidth: 2,
   borderRadius: 'base',
   '&[data-selected="true"]': {
     borderColor: 'invokeBlue.300',
@@ -46,8 +46,10 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
 
   const onLoad = useCallback(() => {
     setImageLoaded(true);
-    ctx.$lastLoadedItemId.set(item.item_id);
-  }, [ctx.$lastLoadedItemId, item.item_id]);
+    if (ctx.$progressData.get()[item.item_id]) {
+      ctx.$lastLoadedItemId.set(item.item_id);
+    }
+  }, [ctx.$lastLoadedItemId, ctx.$progressData, item.item_id]);
 
   return (
     <Flex
