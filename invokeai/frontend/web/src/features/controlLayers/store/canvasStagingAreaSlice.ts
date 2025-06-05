@@ -37,19 +37,14 @@ export const canvasSessionSlice = createSlice({
     canvasSessionGenerationFinished: (state) => {
       state.id = null;
     },
-    canvasSessionReset: () => getInitialState(),
   },
   extraReducers(builder) {
     builder.addCase(canvasReset, () => getInitialState());
   },
 });
 
-export const {
-  canvasSessionTypeChanged,
-  canvasSessionGenerationStarted,
-  canvasSessionReset,
-  canvasSessionGenerationFinished,
-} = canvasSessionSlice.actions;
+export const { canvasSessionTypeChanged, canvasSessionGenerationStarted, canvasSessionGenerationFinished } =
+  canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
