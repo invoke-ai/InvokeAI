@@ -1,18 +1,15 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import { useDeleteQueueItemMutation } from 'services/api/endpoints/queue';
 
-export const StagingAreaToolbarDiscardSelectedButton = memo(() => {
-  const canvasManager = useCanvasManager();
+export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { isDisabled?: boolean }) => {
   const ctx = useCanvasSessionContext();
   const [deleteQueueItem] = useDeleteQueueItemMutation();
   const selectedItemId = useStore(ctx.$selectedItemId);
-  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
 
   const { t } = useTranslation();
 
@@ -31,7 +28,7 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(() => {
       onClick={discardSelected}
       colorScheme="invokeBlue"
       fontSize={16}
-      isDisabled={selectedItemId === null || !shouldShowStagedImage}
+      isDisabled={selectedItemId === null || isDisabled}
     />
   );
 });
