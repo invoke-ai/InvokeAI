@@ -77,7 +77,8 @@ export const DndImage = memo(
           ref={ref}
           src={asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
           fallbackSrc={asThumbnail ? undefined : imageDTO.thumbnail_url}
-          w={imageDTO.width}
+          width={imageDTO.width}
+          height={imageDTO.height}
           sx={sx}
           data-is-dragging={isDragging}
           {...rest}

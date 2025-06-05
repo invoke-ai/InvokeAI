@@ -3,14 +3,18 @@ import { Flex, Image } from '@invoke-ai/ui-library';
 import { useCanvasSessionContext, useProgressData } from 'features/controlLayers/components/SimpleSession/context';
 import { memo } from 'react';
 
-type Props = { itemId: number } & ImageProps;
+type Props = { itemId: number; withBg?: boolean } & ImageProps;
 
-export const QueueItemProgressImage = memo(({ itemId, ...rest }: Props) => {
+export const QueueItemProgressImage = memo(({ itemId, withBg, ...rest }: Props) => {
   const ctx = useCanvasSessionContext();
   const { progressImage } = useProgressData(ctx.$progressData, itemId);
 
   if (!progressImage) {
-    return <Flex w="full" h="full" bg="base.900" alignItems="center" justifyContent="center" />;
+    if (withBg) {
+      return <Flex w="full" h="full" bg="base.900" alignItems="center" justifyContent="center" />;
+    } else {
+      return null;
+    }
   }
 
   return (
