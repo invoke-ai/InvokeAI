@@ -9,6 +9,9 @@ import Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
+type ImageNameSrc = { type: 'imageName'; data: string };
+type DataURLSrc = { type: 'dataURL'; data: string };
+
 export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly type = 'staging_area';
   readonly id: string;
@@ -18,11 +21,18 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly log: Logger;
 
   subscriptions: Set<() => void> = new Set();
-  konva: { group: Konva.Group };
+  konva: {
+    group: Konva.Group;
+    placeholder: {
+      group: Konva.Group;
+      rect: Konva.Rect;
+      text: Konva.Text;
+    };
+  };
   image: CanvasObjectImage | null;
   mutex = new Mutex();
 
-  $imageSrc = atom<{ type: 'imageName'; data: string } | { type: 'dataURL'; data: string } | null>(null);
+  $imageSrc = atom<ImageNameSrc | DataURLSrc | null>(null);
 
   $shouldShowStagedImage = atom<boolean>(true);
   $isStaging = atom<boolean>(false);
@@ -37,7 +47,48 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
     this.log.debug('Creating module');
 
-    this.konva = { group: new Konva.Group({ name: `${this.type}:group`, listening: false }) };
+    const { width, height } = this.manager.stateApi.getBbox().rect;
+
+    this.konva = {
+      group: new Konva.Group({
+        name: `${this.type}:group`,
+        listening: false,
+      }),
+      placeholder: {
+        group: new Konva.Group({
+          name: `${this.type}:placeholder_group`,
+          listening: false,
+          visible: false,
+        }),
+        rect: new Konva.Rect({
+          name: `${this.type}:placeholder_rect`,
+          fill: 'hsl(220 12% 10% / 1)', // 'base.900'
+          width,
+          height,
+          listening: false,
+          perfectDrawEnabled: false,
+        }),
+        text: new Konva.Text({
+          name: `${this.type}:placeholder_text`,
+          fill: 'hsl(220 12% 80% / 1)', // 'base.900'
+          width,
+          height,
+          align: 'center',
+          verticalAlign: 'middle',
+          fontFamily: '"Inter Variable", sans-serif',
+          fontSize: width / 24,
+          fontStyle: '600',
+          text: 'Waiting for Image',
+          listening: false,
+          perfectDrawEnabled: false,
+        }),
+      },
+    };
+
+    this.konva.placeholder.group.add(this.konva.placeholder.rect);
+    this.konva.placeholder.group.add(this.konva.placeholder.text);
+    this.konva.group.add(this.konva.placeholder.group);
+
     this.image = null;
 
     /**
@@ -67,14 +118,23 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     );
   }
 
+  syncPlaceholderSize = () => {
+    const { width, height } = this.manager.stateApi.getBbox().rect;
+    this.konva.placeholder.rect.width(width);
+    this.konva.placeholder.rect.height(height);
+    this.konva.placeholder.text.width(width);
+    this.konva.placeholder.text.height(height);
+    this.konva.placeholder.text.fontSize(width / 24);
+  };
+
   initialize = () => {
     this.log.debug('Initializing module');
     this.render();
     this.$isStaging.set(this.manager.stateApi.runSelector(selectIsStaging));
   };
 
-  getImageFromSrc = (
-    { type, data }: { type: 'imageName'; data: string } | { type: 'dataURL'; data: string },
+  private _getImageFromSrc = (
+    { type, data }: ImageNameSrc | DataURLSrc,
     width: number,
     height: number
   ): CanvasImageState['image'] => {
@@ -106,7 +166,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       const imageSrc = this.$imageSrc.get();
 
       if (imageSrc) {
-        const image = this.getImageFromSrc(imageSrc, width, height);
+        const image = this._getImageFromSrc(imageSrc, width, height);
         if (!this.image) {
           this.image = new CanvasObjectImage({ id: 'staging-area-image', type: 'image', image }, this);
           await this.image.update(this.image.state, true);
@@ -116,11 +176,15 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         } else {
           await this.image.update({ ...this.image.state, image });
         }
+        this.konva.placeholder.group.visible(false);
       } else {
         this.image?.destroy();
         this.image = null;
+        this.syncPlaceholderSize();
+        this.konva.placeholder.group.visible(true);
       }
-      this.konva.group.visible(shouldShowStagedImage);
+
+      this.konva.group.visible(shouldShowStagedImage && this.$isStaging.get());
     } finally {
       release();
     }
