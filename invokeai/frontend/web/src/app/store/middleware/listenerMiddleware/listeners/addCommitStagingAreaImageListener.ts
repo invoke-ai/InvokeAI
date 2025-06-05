@@ -17,7 +17,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
     effect: async (_, { dispatch }) => {
       try {
         const req = dispatch(
-          queueApi.endpoints.cancelByBatchDestination.initiate(
+          queueApi.endpoints.cancelByDestination.initiate(
             { destination: 'canvas' },
             { fixedCacheKey: 'cancelByBatchOrigin' }
           )

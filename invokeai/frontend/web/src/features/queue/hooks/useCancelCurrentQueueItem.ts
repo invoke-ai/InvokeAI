@@ -13,11 +13,11 @@ export const useCancelCurrentQueueItem = () => {
   const { t } = useTranslation();
   const currentQueueItemId = useMemo(() => queueStatus?.queue.item_id, [queueStatus?.queue.item_id]);
   const cancelQueueItem = useCallback(async () => {
-    if (!currentQueueItemId) {
+    if (currentQueueItemId !== null || currentQueueItemId !== undefined) {
       return;
     }
     try {
-      await trigger(currentQueueItemId).unwrap();
+      await trigger({ item_id: currentQueueItemId }).unwrap();
       toast({
         id: 'QUEUE_CANCEL_SUCCEEDED',
         title: t('queue.cancelSucceeded'),

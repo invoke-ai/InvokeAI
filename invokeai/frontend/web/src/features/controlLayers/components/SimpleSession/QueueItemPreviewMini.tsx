@@ -11,24 +11,18 @@ import { memo, useCallback, useState } from 'react';
 import type { S } from 'services/api/types';
 
 const sx = {
-  cursor: 'pointer',
   userSelect: 'none',
   pos: 'relative',
   alignItems: 'center',
   justifyContent: 'center',
-  overflow: 'hidden',
-  h: 'full',
-  maxH: 'full',
-  maxW: 'full',
-  minW: 0,
-  minH: 0,
+  h: 108,
+  w: 108,
+  flexShrink: 0,
   borderWidth: 1,
   borderRadius: 'base',
   '&[data-selected="true"]': {
     borderColor: 'invokeBlue.300',
   },
-  aspectRatio: '1/1',
-  flexShrink: 0,
 } satisfies SystemStyleObject;
 
 type Props = {
@@ -64,7 +58,7 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
       onDoubleClick={onDoubleClick}
     >
       <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
-      {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} />}
+      {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} asThumbnail />}
       {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
       <QueueItemNumber number={number} position="absolute" top={0} left={1} />
       <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />

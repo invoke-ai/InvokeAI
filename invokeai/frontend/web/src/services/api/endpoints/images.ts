@@ -674,6 +674,13 @@ export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
   return req.unwrap();
 };
 
+export const copyImage = async (imageName: string, uploadImageArg: Omit<UploadImageArg, 'file'>): Promise<ImageDTO> => {
+  const originalImageDTO = await getImageDTO(imageName);
+  const file = await imageDTOToFile(originalImageDTO);
+  const imageDTO = await uploadImage({ file, ...uploadImageArg });
+  return imageDTO;
+};
+
 export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> => {
   const { dispatch } = getStore();
   const results = await Promise.allSettled(

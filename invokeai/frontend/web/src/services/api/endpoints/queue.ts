@@ -79,7 +79,12 @@ export const queueApi = api.injectEndpoints({
         url: buildQueueUrl('prune'),
         method: 'PUT',
       }),
-      invalidatesTags: ['SessionQueueStatus', 'BatchStatus', { type: 'SessionQueueItem', id: LIST_TAG }],
+      invalidatesTags: [
+        'SessionQueueStatus',
+        'BatchStatus',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ],
     }),
     clearQueue: build.mutation<
       paths['/api/v1/queue/{queue_id}/clear']['put']['responses']['200']['content']['application/json'],
@@ -176,9 +181,9 @@ export const queueApi = api.injectEndpoints({
     }),
     cancelQueueItem: build.mutation<
       paths['/api/v1/queue/{queue_id}/i/{item_id}/cancel']['put']['responses']['200']['content']['application/json'],
-      number
+      { item_id: number }
     >({
-      query: (item_id) => ({
+      query: ({ item_id }) => ({
         url: buildQueueUrl(`i/${item_id}/cancel`),
         method: 'PUT',
       }),
@@ -219,7 +224,7 @@ export const queueApi = api.injectEndpoints({
         ];
       },
     }),
-    cancelByBatchDestination: build.mutation<
+    cancelByDestination: build.mutation<
       paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['responses']['200']['content']['application/json'],
       paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['parameters']['query']
     >({
@@ -319,6 +324,24 @@ export const queueApi = api.injectEndpoints({
         return tags;
       },
     }),
+    deleteQueueItem: build.mutation<void, { item_id: number }>({
+      query: ({ item_id }) => ({
+        url: buildQueueUrl(`i/${item_id}`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { item_id }) => [{ type: 'SessionQueueItem', id: item_id }],
+    }),
+    deleteQueueItemsByDestination: build.mutation<void, { destination: string }>({
+      query: ({ destination }) => ({
+        url: buildQueueUrl(`d/${destination}`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, { destination }) => [
+        { type: 'QueueCountsByDestination', id: destination },
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ],
+    }),
     getQueueCountsByDestination: build.query<
       paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['responses']['200']['content']['application/json'],
       paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['parameters']['query']
@@ -345,6 +368,9 @@ export const {
   useListQueueItemsQuery,
   useListAllQueueItemsQuery,
   useCancelQueueItemMutation,
+  useCancelByDestinationMutation,
+  useDeleteQueueItemMutation,
+  useDeleteQueueItemsByDestinationMutation,
   useGetBatchStatusQuery,
   useGetCurrentQueueItemQuery,
   useGetQueueCountsByDestinationQuery,
