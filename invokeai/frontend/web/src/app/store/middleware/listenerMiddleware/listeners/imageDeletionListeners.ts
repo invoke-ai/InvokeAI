@@ -81,7 +81,7 @@ const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, imageD
   selectCanvasSlice(state).rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
-      if (obj.type === 'image' && obj.image.image_name === imageDTO.image_name) {
+      if (obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === imageDTO.image_name) {
         shouldDelete = true;
         break;
       }

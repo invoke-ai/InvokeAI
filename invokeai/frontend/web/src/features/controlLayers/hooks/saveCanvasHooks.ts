@@ -14,7 +14,12 @@ import {
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectNegativePrompt, selectPositivePrompt, selectSeed } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectMainModelConfig,
+  selectNegativePrompt,
+  selectPositivePrompt,
+  selectSeed,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -33,7 +38,6 @@ import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { serializeError } from 'serialize-error';
-import { selectMainModelConfig } from '../store/paramsSlice';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
