@@ -10,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
+    DeleteByDestinationResult,
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
@@ -92,6 +93,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def delete_queue_item(self, item_id: int) -> None:
+        """Deletes a session queue item"""
+        pass
+
+    @abstractmethod
     def fail_queue_item(
         self, item_id: int, error_type: str, error_message: str, error_traceback: str
     ) -> SessionQueueItem:
@@ -106,6 +112,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def cancel_by_destination(self, queue_id: str, destination: str) -> CancelByDestinationResult:
         """Cancels all queue items with the given batch destination"""
+        pass
+
+    @abstractmethod
+    def delete_by_destination(self, queue_id: str, destination: str) -> DeleteByDestinationResult:
+        """Deletes all queue items with the given batch destination"""
         pass
 
     @abstractmethod

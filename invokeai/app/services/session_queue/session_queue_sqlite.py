@@ -17,6 +17,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
+    DeleteByDestinationResult,
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
@@ -214,6 +215,19 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor = self._conn.cursor()
             cursor.execute(
                 """--sql
+                SELECT status FROM session_queue WHERE item_id = ?
+                """,
+                (item_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+            current_status = row[0]
+            # Only update if not already finished (completed, failed or canceled)
+            if current_status in ("completed", "failed", "canceled"):
+                return self.get_queue_item(item_id)
+            cursor.execute(
+                """--sql
                 UPDATE session_queue
                 SET status = ?, error_type = ?, error_message = ?, error_traceback = ?
                 WHERE item_id = ?
@@ -323,6 +337,27 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
         return queue_item
 
+    def delete_queue_item(self, item_id: int) -> None:
+        """Deletes a session queue item"""
+        try:
+            self.cancel_queue_item(item_id)
+        except SessionQueueItemNotFoundError:
+            pass
+        try:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                """--sql
+                DELETE
+                FROM session_queue
+                WHERE item_id = ?
+                """,
+                (item_id,),
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+
     def complete_queue_item(self, item_id: int) -> SessionQueueItem:
         queue_item = self._set_queue_item_status(item_id=item_id, status="completed")
         return queue_item
@@ -419,6 +454,40 @@ class SqliteSessionQueue(SessionQueueBase):
             self._conn.rollback()
             raise
         return CancelByDestinationResult(canceled=count)
+
+    def delete_by_destination(self, queue_id: str, destination: str) -> DeleteByDestinationResult:
+        try:
+            cursor = self._conn.cursor()
+            current_queue_item = self.get_current(queue_id)
+            if current_queue_item is not None and current_queue_item.destination == destination:
+                self.cancel_queue_item(current_queue_item.item_id)
+            params = (queue_id, destination)
+            cursor.execute(
+                """--sql
+                SELECT COUNT(*)
+                FROM session_queue
+                WHERE
+                  queue_id = ?
+                  AND destination = ?;
+                """,
+                params,
+            )
+            count = cursor.fetchone()[0]
+            cursor.execute(
+                """--sql
+                DELETE
+                FROM session_queue
+                WHERE
+                  queue_id = ?
+                  AND destination = ?;
+                """,
+                params,
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        return DeleteByDestinationResult(deleted=count)
 
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
         try:
