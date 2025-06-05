@@ -2,17 +2,14 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowLeftBold } from 'react-icons/pi';
 
-export const StagingAreaToolbarPrevButton = memo(() => {
+export const StagingAreaToolbarPrevButton = memo(({ isDisabled }: { isDisabled?: boolean }) => {
   const ctx = useCanvasSessionContext();
   const itemCount = useStore(ctx.$itemCount);
-  const canvasManager = useCanvasManager();
-  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasFocused = useIsRegionFocused('canvas');
 
   const { t } = useTranslation();
@@ -26,9 +23,9 @@ export const StagingAreaToolbarPrevButton = memo(() => {
     ctx.selectPrev,
     {
       preventDefault: true,
-      enabled: isCanvasFocused && shouldShowStagedImage && itemCount > 1,
+      enabled: isCanvasFocused && !isDisabled && itemCount > 1,
     },
-    [isCanvasFocused, shouldShowStagedImage, itemCount, ctx.selectPrev]
+    [isCanvasFocused, isDisabled, itemCount, ctx.selectPrev]
   );
 
   return (
@@ -38,7 +35,7 @@ export const StagingAreaToolbarPrevButton = memo(() => {
       icon={<PiArrowLeftBold />}
       onClick={selectPrev}
       colorScheme="invokeBlue"
-      isDisabled={itemCount <= 1 || !shouldShowStagedImage}
+      isDisabled={itemCount <= 1 || isDisabled}
     />
   );
 });
