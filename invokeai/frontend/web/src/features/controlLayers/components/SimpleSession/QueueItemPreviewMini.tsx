@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
+import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { QueueItemCircularProgress } from 'features/controlLayers/components/SimpleSession/QueueItemCircularProgress';
 import { QueueItemNumber } from 'features/controlLayers/components/SimpleSession/QueueItemNumber';
 import { QueueItemProgressImage } from 'features/controlLayers/components/SimpleSession/QueueItemProgressImage';
@@ -34,25 +35,25 @@ type Props = {
   item: S['SessionQueueItem'];
   number: number;
   isSelected: boolean;
-  onSelectItemId: (item_id: number) => void;
-  onChangeAutoSwitch: (autoSwitch: boolean) => void;
 };
 
-export const QueueItemPreviewMini = memo(({ item, isSelected, number, onSelectItemId, onChangeAutoSwitch }: Props) => {
+export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) => {
+  const ctx = useCanvasSessionContext();
   const [imageLoaded, setImageLoaded] = useState(false);
   const imageDTO = useOutputImageDTO(item);
 
   const onClick = useCallback(() => {
-    onSelectItemId(item.item_id);
-  }, [item.item_id, onSelectItemId]);
+    ctx.$selectedItemId.set(item.item_id);
+  }, [ctx.$selectedItemId, item.item_id]);
 
   const onDoubleClick = useCallback(() => {
-    onChangeAutoSwitch(item.status === 'in_progress');
-  }, [item.status, onChangeAutoSwitch]);
+    ctx.$autoSwitch.set(item.status === 'in_progress');
+  }, [ctx.$autoSwitch, item.status]);
 
   const onLoad = useCallback(() => {
     setImageLoaded(true);
-  }, []);
+    ctx.$lastLoadedItemId.set(item.item_id);
+  }, [ctx.$lastLoadedItemId, item.item_id]);
 
   return (
     <Flex
@@ -63,16 +64,10 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number, onSelectIt
       onDoubleClick={onDoubleClick}
     >
       <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
-      {imageDTO && <DndImage imageDTO={imageDTO} asThumbnail onLoad={onLoad} />}
-      {!imageLoaded && <QueueItemProgressImage session_id={item.session_id} position="absolute" />}
+      {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} />}
+      {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
       <QueueItemNumber number={number} position="absolute" top={0} left={1} />
-      <QueueItemCircularProgress
-        session_id={item.session_id}
-        status={item.status}
-        position="absolute"
-        top={1}
-        right={2}
-      />
+      <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>
   );
 });
