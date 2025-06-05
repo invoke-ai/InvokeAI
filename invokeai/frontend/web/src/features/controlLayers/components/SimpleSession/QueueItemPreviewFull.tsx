@@ -38,23 +38,11 @@ export const QueueItemPreviewFull = memo(({ item, number }: Props) => {
     <Flex id={getQueueItemElementId(item.item_id)} sx={sx}>
       <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} />}
-      {!imageLoaded && <QueueItemProgressImage session_id={item.session_id} position="absolute" />}
+      {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
       {imageDTO && <ImageActions imageDTO={imageDTO} position="absolute" top={1} right={2} />}
       <QueueItemNumber number={number} position="absolute" top={1} left={2} />
-      <QueueItemProgressMessage
-        session_id={item.session_id}
-        status={item.status}
-        position="absolute"
-        bottom={1}
-        left={2}
-      />
-      <QueueItemCircularProgress
-        session_id={item.session_id}
-        status={item.status}
-        position="absolute"
-        top={1}
-        right={2}
-      />
+      <QueueItemProgressMessage itemId={item.item_id} status={item.status} position="absolute" bottom={1} left={2} />
+      <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
     </Flex>
   );
 });
