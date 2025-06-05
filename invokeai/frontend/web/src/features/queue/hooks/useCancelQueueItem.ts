@@ -11,7 +11,7 @@ export const useCancelQueueItem = (item_id: number) => {
   const { t } = useTranslation();
   const cancelQueueItem = useCallback(async () => {
     try {
-      await trigger(item_id).unwrap();
+      await trigger({ item_id }).unwrap();
       toast({
         id: 'QUEUE_CANCEL_SUCCEEDED',
         title: t('queue.cancelSucceeded'),

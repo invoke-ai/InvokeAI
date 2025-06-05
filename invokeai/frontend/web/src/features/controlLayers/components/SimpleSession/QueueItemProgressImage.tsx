@@ -1,7 +1,8 @@
 import type { ImageProps } from '@invoke-ai/ui-library';
-import { Image } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { useCanvasSessionContext, useProgressData } from 'features/controlLayers/components/SimpleSession/context';
 import { memo } from 'react';
+import { PiImageBold } from 'react-icons/pi';
 
 type Props = { itemId: number } & ImageProps;
 
@@ -10,7 +11,11 @@ export const QueueItemProgressImage = memo(({ itemId, ...rest }: Props) => {
   const { progressImage } = useProgressData(ctx.$progressData, itemId);
 
   if (!progressImage) {
-    return null;
+    return (
+      <Flex w="full" h="full" bg="base.700" alignItems="center" justifyContent="center">
+        <Icon as={PiImageBold} boxSize={16} opacity={0.2} />
+      </Flex>
+    );
   }
 
   return (
