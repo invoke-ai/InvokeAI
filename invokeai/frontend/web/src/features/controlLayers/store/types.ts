@@ -59,6 +59,13 @@ const zImageWithDims = z
   });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
+const zImageWithDimsDataURL = z.object({
+  dataURL: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+export type ImageWithDimsDataURL = z.infer<typeof zImageWithDimsDataURL>;
+
 const zBeginEndStepPct = z
   .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])
   .refine(([begin, end]) => begin < end, {
@@ -231,7 +238,7 @@ export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
-  image: zImageWithDims,
+  image: z.union([zImageWithDims, zImageWithDimsDataURL]),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 

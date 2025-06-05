@@ -23,7 +23,7 @@ export const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0p
 
 export const getQueueItemElementId = (itemId: number) => `queue-item-status-card-${itemId}`;
 
-const getOutputImageName = (item: S['SessionQueueItem']) => {
+export const getOutputImageName = (item: S['SessionQueueItem']) => {
   const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
     isCanvasOutputNodeId(nodeId)
   )?.[1][0];
