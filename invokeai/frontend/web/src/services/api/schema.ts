@@ -1438,7 +1438,11 @@ export type paths = {
         get: operations["get_queue_item"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Queue Item
+         * @description Deletes a queue item
+         */
+        delete: operations["delete_queue_item"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1479,6 +1483,26 @@ export type paths = {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/d/{destination}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete By Destination
+         * @description Deletes all items with the given destination
+         */
+        delete: operations["delete_by_destination"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5878,6 +5902,17 @@ export type components = {
              * @description The names of the images that were deleted.
              */
             deleted_images: string[];
+        };
+        /**
+         * DeleteByDestinationResult
+         * @description Result of deleting by a destination
+         */
+        DeleteByDestinationResult: {
+            /**
+             * Deleted
+             * @description Number of queue items deleted
+             */
+            deleted: number;
         };
         /** DeleteImagesFromListResult */
         DeleteImagesFromListResult: {
@@ -24870,6 +24905,40 @@ export interface operations {
             };
         };
     };
+    delete_queue_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+                /** @description The queue item to delete */
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_queue_item: {
         parameters: {
             query?: never;
@@ -24926,6 +24995,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueCountsByDestination"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_by_destination: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to query */
+                queue_id: string;
+                /** @description The destination to query */
+                destination: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteByDestinationResult"];
                 };
             };
             /** @description Validation Error */

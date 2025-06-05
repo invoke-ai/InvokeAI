@@ -2,17 +2,17 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
+import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import {
-  selectImageCount,
-  stagingAreaPrevStagedImageSelected,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectImageCount } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowLeftBold } from 'react-icons/pi';
 
 export const StagingAreaToolbarPrevButton = memo(() => {
+  const ctx = useCanvasSessionContext();
+  const itemCount = useStore(ctx.$itemCount);
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
   const imageCount = useAppSelector(selectImageCount);
@@ -22,17 +22,17 @@ export const StagingAreaToolbarPrevButton = memo(() => {
   const { t } = useTranslation();
 
   const selectPrev = useCallback(() => {
-    dispatch(stagingAreaPrevStagedImageSelected());
-  }, [dispatch]);
+    ctx.selectPrev();
+  }, [ctx]);
 
   useHotkeys(
     ['left'],
-    selectPrev,
+    ctx.selectPrev,
     {
       preventDefault: true,
-      enabled: isCanvasFocused && shouldShowStagedImage && imageCount > 1,
+      enabled: isCanvasFocused && shouldShowStagedImage && itemCount > 1,
     },
-    [isCanvasFocused, shouldShowStagedImage, imageCount]
+    [isCanvasFocused, shouldShowStagedImage, itemCount, ctx.selectPrev]
   );
 
   return (
@@ -42,7 +42,7 @@ export const StagingAreaToolbarPrevButton = memo(() => {
       icon={<PiArrowLeftBold />}
       onClick={selectPrev}
       colorScheme="invokeBlue"
-      isDisabled={imageCount <= 1 || !shouldShowStagedImage}
+      isDisabled={itemCount <= 1 || !shouldShowStagedImage}
     />
   );
 });
