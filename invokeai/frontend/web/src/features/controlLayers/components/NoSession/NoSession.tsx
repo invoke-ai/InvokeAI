@@ -5,13 +5,13 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { GenerateWithControlImage } from 'features/controlLayers/components/NoSession/GenerateWithControlImage';
 import { GenerateWithStartingImage } from 'features/controlLayers/components/NoSession/GenerateWithStartingImage';
 import { GenerateWithStartingImageAndInpaintMask } from 'features/controlLayers/components/NoSession/GenerateWithStartingImageAndInpaintMask';
-import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 
 export const NoSession = memo(() => {
   const dispatch = useAppDispatch();
   const newSesh = useCallback(() => {
-    dispatch(canvasSessionStarted({ sessionType: 'advanced' }));
+    dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
   }, [dispatch]);
 
   return (

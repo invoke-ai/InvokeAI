@@ -3,7 +3,7 @@ import { Button, Flex, FormControl, FormLabel, Spacer, Switch, Text } from '@inv
 import { useStore } from '@nanostores/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 
@@ -13,7 +13,7 @@ export const StagingAreaHeader = memo(() => {
   const dispatch = useAppDispatch();
 
   const startOver = useCallback(() => {
-    dispatch(canvasSessionStarted({ sessionType: 'simple' }));
+    dispatch(canvasSessionTypeChanged({ type: 'simple' }));
   }, [dispatch]);
 
   const onChangeAutoSwitch = useCallback(
