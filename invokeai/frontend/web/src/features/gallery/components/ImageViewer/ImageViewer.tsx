@@ -7,7 +7,6 @@ import CurrentImagePreview from 'features/gallery/components/ImageViewer/Current
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
 import { selectLastSelectedImageName } from 'features/gallery/store/gallerySelectors';
-import type { ReactNode } from 'react';
 import { memo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -16,25 +15,25 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 import { useImageViewer } from './useImageViewer';
 
-type Props = {
-  closeButton?: ReactNode;
-};
+// type Props = {
+//   closeButton?: ReactNode;
+// };
 
-const useFocusRegionOptions = {
-  focusOnMount: true,
-};
+// const useFocusRegionOptions = {
+//   focusOnMount: true,
+// };
 
-const FOCUS_REGION_STYLES: SystemStyleObject = {
-  display: 'flex',
-  width: 'full',
-  height: 'full',
-  position: 'absolute',
-  flexDirection: 'column',
-  inset: 0,
-  alignItems: 'center',
-  justifyContent: 'center',
-  overflow: 'hidden',
-};
+// const FOCUS_REGION_STYLES: SystemStyleObject = {
+//   display: 'flex',
+//   width: 'full',
+//   height: 'full',
+//   position: 'absolute',
+//   flexDirection: 'column',
+//   inset: 0,
+//   alignItems: 'center',
+//   justifyContent: 'center',
+//   overflow: 'hidden',
+// };
 
 export const ImageViewer = memo(() => {
   const lastSelectedImageName = useAppSelector(selectLastSelectedImageName);

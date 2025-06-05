@@ -64,7 +64,6 @@ const zImageWithDimsDataURL = z.object({
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });
-export type ImageWithDimsDataURL = z.infer<typeof zImageWithDimsDataURL>;
 
 const zBeginEndStepPct = z
   .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])
@@ -100,7 +99,7 @@ const zRgbColor = z.object({
   b: z.number().int().min(0).max(255),
 });
 export type RgbColor = z.infer<typeof zRgbColor>;
-export const zRgbaColor = zRgbColor.extend({
+const zRgbaColor = zRgbColor.extend({
   a: z.number().min(0).max(1),
 });
 export type RgbaColor = z.infer<typeof zRgbaColor>;

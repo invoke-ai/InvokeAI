@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 const [useClearQueueConfirmationAlertDialog] = buildUseBoolean(false);
 
-export const useClearQueueDialog = () => {
+const useClearQueueDialog = () => {
   const dialog = useClearQueueConfirmationAlertDialog();
   const { clearQueue, isLoading, isDisabled, queueStatus } = useClearQueue();
 
