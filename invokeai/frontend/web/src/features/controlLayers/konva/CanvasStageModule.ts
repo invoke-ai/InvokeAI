@@ -57,6 +57,7 @@ export class CanvasStageModule extends CanvasModuleBase {
   private _intendedScale: number = 1;
   private _activeSnapPoint: number | null = null;
   private _snapTimeout: number | null = null;
+  private _lastScrollEventTimestamp: number | null = null;
 
   container: HTMLDivElement;
   konva: { stage: Konva.Stage };
@@ -336,10 +337,22 @@ export class CanvasStageModule extends CanvasModuleBase {
     }
 
     // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
-    const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
+    const scrollAmount = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
+
+    const now = window.performance.now();
+    const deltaT = this._lastScrollEventTimestamp === null ? Infinity : now - this._lastScrollEventTimestamp;
+    this._lastScrollEventTimestamp = now;
+
+    let dynamicScaleFactor = this.config.SCALE_FACTOR;
+
+    if (deltaT > 300) {
+      dynamicScaleFactor = this.config.SCALE_FACTOR + (1 - this.config.SCALE_FACTOR) / 2;
+    } else if (deltaT < 300) {
+      dynamicScaleFactor = this.config.SCALE_FACTOR + (1 - this.config.SCALE_FACTOR) * (deltaT / 200);
+    }
 
     // Update the intended scale based on the last intended scale, creating a continuous zoom feel
-    const newIntendedScale = this._intendedScale * this.config.SCALE_FACTOR ** delta;
+    const newIntendedScale = this._intendedScale * dynamicScaleFactor ** scrollAmount;
     this._intendedScale = this.constrainScale(newIntendedScale);
 
     // Pass control to the snapping logic
@@ -349,7 +362,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       // After a short delay, we can reset the intended scale to the current scale
       // This allows for continuous zooming without snapping back to the last snapped scale
       this._intendedScale = this.getScale();
-    }, 100);
+    }, 300);
   };
 
   /**
