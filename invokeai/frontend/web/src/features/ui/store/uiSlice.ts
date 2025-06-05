@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { canvasSessionStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { atom } from 'nanostores';
@@ -56,7 +56,7 @@ export const uiSlice = createSlice({
     builder.addCase(workflowLoaded, (state) => {
       state.activeTab = 'workflows';
     });
-    builder.addCase(canvasSessionStarted, (state) => {
+    builder.addCase(canvasSessionTypeChanged, (state) => {
       state.activeTab = 'canvas';
     });
   },

@@ -29,7 +29,7 @@ import {
   rasterLayerAdded,
   rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectAllRenderableEntities,
   selectBbox,
@@ -537,7 +537,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the canvas staging area state from redux.
    */
   getStagingArea = () => {
-    return this.runSelector(selectCanvasStagingAreaSlice);
+    return this.runSelector(selectCanvasSessionSlice);
   };
 
   /**

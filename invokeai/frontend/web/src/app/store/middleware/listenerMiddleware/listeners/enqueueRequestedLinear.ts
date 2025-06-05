@@ -5,7 +5,10 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
-import { canvasSessionStarted, selectCanvasSession } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
+  canvasSessionGenerationStarted,
+  selectCanvasSessionId,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildChatGPT4oGraph } from 'features/nodes/util/graph/generation/buildChatGPT4oGraph';
@@ -32,11 +35,14 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
     effect: async (action, { getState, dispatch }) => {
       log.debug('Enqueue requested');
 
-      if (!selectCanvasSession(getState())) {
-        dispatch(canvasSessionStarted({ sessionType: 'simple' }));
+      if (!selectCanvasSessionId(getState())) {
+        dispatch(canvasSessionGenerationStarted());
       }
 
       const state = getState();
+      const destination = state.canvasSession.id;
+      assert(destination !== null);
+
       const { prepend } = action.payload;
 
       const manager = $canvasManager.get();
@@ -92,8 +98,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       }
 
       const { g, seedFieldIdentifier, positivePromptFieldIdentifier } = buildGraphResult.value;
-
-      const destination = state.canvasSession.session?.id ?? 'canvas';
 
       const prepareBatchResult = withResult(() =>
         prepareLinearUIBatch({

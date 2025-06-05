@@ -2,26 +2,27 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { AdvancedSession } from 'features/controlLayers/components/AdvancedSession/AdvancedSession';
 import { NoSession } from 'features/controlLayers/components/NoSession/NoSession';
 import { SimpleSession } from 'features/controlLayers/components/SimpleSession/SimpleSession';
-import { selectCanvasSession } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasSessionId, selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo } from 'react';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 export const CanvasMainPanelContent = memo(() => {
-  const session = useAppSelector(selectCanvasSession);
+  const type = useAppSelector(selectCanvasSessionType);
+  const id = useAppSelector(selectCanvasSessionId);
 
-  if (session === null) {
-    return <NoSession />;
+  if (type === 'simple') {
+    if (id === null) {
+      return <NoSession />;
+    } else {
+      return <SimpleSession id={id} />;
+    }
   }
 
-  if (session.type === 'simple') {
-    return <SimpleSession session={session} />;
+  if (type === 'advanced') {
+    return <AdvancedSession id={id} />;
   }
 
-  if (session.type === 'advanced') {
-    return <AdvancedSession session={session} />;
-  }
-
-  assert<Equals<never, typeof session>>(false, 'Unexpected session');
+  assert<Equals<never, typeof type>>(false, 'Unexpected session type');
 });
 CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
