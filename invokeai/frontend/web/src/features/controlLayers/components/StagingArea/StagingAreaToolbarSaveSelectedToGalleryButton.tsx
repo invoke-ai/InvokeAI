@@ -3,7 +3,6 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { selectSelectedImage } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
@@ -15,7 +14,6 @@ const TOAST_ID = 'SAVE_STAGING_AREA_IMAGE_TO_GALLERY';
 
 export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
-  const selectedImage = useAppSelector(selectSelectedImage);
   const ctx = useCanvasSessionContext();
   const imageName = useStore(ctx.$selectedItemOutputImageName);
 
@@ -63,7 +61,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
       icon={<PiFloppyDiskBold />}
       onClick={saveSelectedImageToGallery}
       colorScheme="invokeBlue"
-      isDisabled={!selectedImage}
+      isDisabled={!imageName}
     />
   );
 });

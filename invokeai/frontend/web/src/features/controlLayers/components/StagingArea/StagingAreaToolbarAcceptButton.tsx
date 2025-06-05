@@ -5,7 +5,6 @@ import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import { selectImageCount, stagingAreaReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
@@ -20,7 +19,6 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const canvasManager = useCanvasManager();
   const bboxRect = useAppSelector(selectBboxRect);
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasFocused = useIsRegionFocused('canvas');
   const selectedItemImageName = useStore(ctx.$selectedItemOutputImageName);
@@ -39,7 +37,6 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
     };
 
     dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
-    dispatch(stagingAreaReset());
   }, [bboxRect, selectedItemImageName, dispatch, selectedEntityIdentifier?.type]);
 
   useHotkeys(
@@ -47,9 +44,9 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
     acceptSelected,
     {
       preventDefault: true,
-      enabled: isCanvasFocused && shouldShowStagedImage && imageCount > 1,
+      enabled: isCanvasFocused && shouldShowStagedImage && selectedItemImageName !== null,
     },
-    [isCanvasFocused, shouldShowStagedImage, imageCount]
+    [isCanvasFocused, shouldShowStagedImage, selectedItemImageName]
   );
 
   return (

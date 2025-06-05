@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectCanvasSession } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { BoardsListPanelContent } from 'features/gallery/components/BoardsListPanelContent';
 import { Gallery } from 'features/gallery/components/Gallery';
 import { GalleryTopBar } from 'features/gallery/components/GalleryTopBar';
@@ -28,7 +28,7 @@ export const RightPanelContent = memo(() => {
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const session = useAppSelector(selectCanvasSession);
+  const type = useAppSelector(selectCanvasSessionType);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
@@ -77,7 +77,7 @@ export const RightPanelContent = memo(() => {
         <Panel order={1} id="gallery-wrapper-panel" collapsible {...galleryPanel.panelProps}>
           <Gallery />
         </Panel>
-        {session?.type === 'advanced' && (
+        {type === 'advanced' && (
           <>
             <HorizontalResizeHandle id="gallery-panel-to-layers-handle" {...galleryPanel.resizeHandleProps} />
             <Panel order={2} id="canvas-layers-panel" collapsible {...canvasLayersPanel.panelProps}>

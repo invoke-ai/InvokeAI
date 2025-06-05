@@ -36,9 +36,9 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
 export const selectCanvasOutputFields = (state: RootState) => {
   // Advanced session means working on canvas - images are not saved to gallery or added to a board.
   // Simple session means working in YOLO mode - images are saved to gallery & board.
-  const sessionType = selectCanvasSessionType(state);
-  const is_intermediate = sessionType === 'advanced';
-  const board = sessionType === 'advanced' ? undefined : getBoardField(state);
+  const type = selectCanvasSessionType(state);
+  const is_intermediate = type === 'advanced';
+  const board = type === 'advanced' ? undefined : getBoardField(state);
 
   return {
     is_intermediate,
