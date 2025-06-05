@@ -324,4 +324,3 @@ export const {
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();
-

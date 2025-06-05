@@ -15,7 +15,7 @@ import {
   rgNegativePromptChanged,
   rgPositivePromptChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
@@ -35,11 +35,7 @@ import {
 } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
-import {
-  modelConfigsAdapterSelectors,
-  selectModelConfigsQuery,
-} from 'services/api/endpoints/models';
-import { selectMainModelConfig } from '../store/paramsSlice';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type {
   ControlLoRAModelConfig,
   ControlNetModelConfig,

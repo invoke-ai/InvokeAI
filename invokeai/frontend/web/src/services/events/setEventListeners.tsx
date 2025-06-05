@@ -31,14 +31,11 @@ import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
 import {
-  $lastCanvasProgressEvent,
-  $lastCanvasProgressImage,
   $lastProgressEvent,
   $lastUpscalingProgressEvent,
   $lastUpscalingProgressImage,
   $lastWorkflowsProgressEvent,
   $lastWorkflowsProgressImage,
-  $progressImages,
 } from './stores';
 
 const log = logger('events');
@@ -115,22 +112,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.trace({ data } as JsonObject, _message);
 
     $lastProgressEvent.set(data);
-
-    if (data.image) {
-      const progressData = $progressImages.get()[session_id];
-      if (progressData) {
-        $progressImages.setKey(session_id, { ...progressData, progressImage: data.image });
-      } else {
-        $progressImages.setKey(session_id, { sessionId: session_id, isFinished: false, progressImage: data.image });
-      }
-    }
-
-    if (origin === 'canvas') {
-      $lastCanvasProgressEvent.set(data);
-      if (image) {
-        $lastCanvasProgressImage.set({ sessionId: session_id, image });
-      }
-    }
 
     if (origin === 'upscaling') {
       $lastUpscalingProgressEvent.set(data);

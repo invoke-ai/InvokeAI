@@ -1,22 +1,15 @@
-import { Box, Flex } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
-import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
-import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
-import QueueControls from 'features/queue/components/QueueControls';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
-import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
+import { LeftPanelContent } from 'features/ui/components/LeftPanelContent';
+import { MainPanelContent } from 'features/ui/components/MainPanelContent';
 import { RightPanelContent } from 'features/ui/components/RightPanelContent';
-import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
-import QueueTab from 'features/ui/components/tabs/QueueTab';
-import { WorkflowsMainPanel } from 'features/ui/components/tabs/WorkflowsTabContent';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   $isLeftPanelOpen,
   $isRightPanelOpen,
@@ -29,10 +22,7 @@ import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
-import type { Equals } from 'tsafe';
-import { assert } from 'tsafe';
 
-import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import { VerticalResizeHandle } from './tabs/ResizeHandle';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
@@ -153,42 +143,3 @@ export const AppContent = memo(() => {
   );
 });
 AppContent.displayName = 'AppContent';
-
-const LeftPanelContent = memo(() => {
-  const tab = useAppSelector(selectActiveTab);
-
-  return (
-    <Flex flexDir="column" w="full" h="full" gap={2}>
-      <QueueControls />
-      <Box position="relative" w="full" h="full">
-        {tab === 'canvas' && <ParametersPanelTextToImage />}
-        {tab === 'upscaling' && <ParametersPanelUpscale />}
-        {tab === 'workflows' && <WorkflowsTabLeftPanel />}
-      </Box>
-    </Flex>
-  );
-});
-LeftPanelContent.displayName = 'LeftPanelContent';
-
-const MainPanelContent = memo(() => {
-  const tab = useAppSelector(selectActiveTab);
-
-  if (tab === 'canvas') {
-    return <CanvasMainPanelContent />;
-  }
-  if (tab === 'upscaling') {
-    return <ImageViewer />;
-  }
-  if (tab === 'workflows') {
-    return <WorkflowsMainPanel />;
-  }
-  if (tab === 'models') {
-    return <ModelManagerTab />;
-  }
-  if (tab === 'queue') {
-    return <QueueTab />;
-  }
-
-  assert<Equals<never, typeof tab>>(false);
-});
-MainPanelContent.displayName = 'MainPanelContent';

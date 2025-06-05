@@ -5,10 +5,7 @@ import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import {
-  selectImageCount,
-  stagingAreaReset,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectImageCount, stagingAreaReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
