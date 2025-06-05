@@ -1,10 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectImageCount } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -13,9 +11,7 @@ import { PiArrowLeftBold } from 'react-icons/pi';
 export const StagingAreaToolbarPrevButton = memo(() => {
   const ctx = useCanvasSessionContext();
   const itemCount = useStore(ctx.$itemCount);
-  const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
-  const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasFocused = useIsRegionFocused('canvas');
 

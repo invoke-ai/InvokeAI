@@ -11,9 +11,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
-import {
-  $lastProgressEvent,
-} from 'services/events/stores';
+import { $lastProgressEvent } from 'services/events/stores';
 import type { Param0 } from 'tsafe';
 import { objectEntries } from 'tsafe';
 import type { JsonObject } from 'type-fest';
