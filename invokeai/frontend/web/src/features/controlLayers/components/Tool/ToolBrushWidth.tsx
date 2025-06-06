@@ -1,7 +1,6 @@
 import {
   CompositeSlider,
   FormControl,
-  FormLabel,
   IconButton,
   NumberInput,
   NumberInputField,
@@ -20,7 +19,6 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
 const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
@@ -67,7 +65,6 @@ const sliderDefaultValue = mapRawValueToSliderValue(50);
 
 export const ToolBrushWidth = memo(() => {
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
   const isSelected = useToolIsSelected('brush');
   const width = useAppSelector(selectBrushWidth);
   const [localValue, setLocalValue] = useState(width);
@@ -145,7 +142,6 @@ export const ToolBrushWidth = memo(() => {
   return (
     <Popover>
       <FormControl w="min-content" gap={2}>
-        <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
             variant="outline"
