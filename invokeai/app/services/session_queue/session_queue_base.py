@@ -10,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
+    DeleteAllExceptCurrentResult,
     DeleteByDestinationResult,
     EnqueueBatchResult,
     IsEmptyResult,
@@ -127,6 +128,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def cancel_all_except_current(self, queue_id: str) -> CancelAllExceptCurrentResult:
         """Cancels all queue items except in-progress items"""
+        pass
+
+    @abstractmethod
+    def delete_all_except_current(self, queue_id: str) -> DeleteAllExceptCurrentResult:
+        """Deletes all queue items except in-progress items"""
         pass
 
     @abstractmethod

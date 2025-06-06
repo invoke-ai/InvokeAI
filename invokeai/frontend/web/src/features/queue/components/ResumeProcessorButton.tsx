@@ -11,17 +11,17 @@ type Props = {
 
 const ResumeProcessorButton = ({ asIconButton }: Props) => {
   const { t } = useTranslation();
-  const { resumeProcessor, isLoading, isDisabled } = useResumeProcessor();
+  const resumeProcessor = useResumeProcessor();
 
   return (
     <QueueButton
       asIconButton={asIconButton}
       label={t('queue.resume')}
       tooltip={t('queue.resumeTooltip')}
-      isDisabled={isDisabled}
-      isLoading={isLoading}
+      isDisabled={resumeProcessor.isDisabled}
+      isLoading={resumeProcessor.isLoading}
       icon={<PiPlayFill />}
-      onClick={resumeProcessor}
+      onClick={resumeProcessor.trigger}
       colorScheme="green"
     />
   );

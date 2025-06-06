@@ -3,15 +3,15 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { canvasSessionGenerationFinished } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useDeleteQueueItem } from 'features/queue/hooks/useDeleteQueueItem';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
-import { useDeleteQueueItemMutation } from 'services/api/endpoints/queue';
 
 export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { isDisabled?: boolean }) => {
   const dispatch = useAppDispatch();
   const ctx = useCanvasSessionContext();
-  const [deleteQueueItem] = useDeleteQueueItemMutation();
+  const deleteQueueItem = useDeleteQueueItem();
   const selectedItemId = useStore(ctx.$selectedItemId);
 
   const { t } = useTranslation();
@@ -21,10 +21,10 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { i
       return;
     }
     const itemCount = ctx.$itemCount.get();
-    deleteQueueItem({ item_id: selectedItemId });
     if (itemCount <= 1) {
       dispatch(canvasSessionGenerationFinished());
     }
+    deleteQueueItem.trigger(selectedItemId);
   }, [selectedItemId, ctx.$itemCount, deleteQueueItem, dispatch]);
 
   return (
@@ -35,7 +35,8 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { i
       onClick={discardSelected}
       colorScheme="invokeBlue"
       fontSize={16}
-      isDisabled={selectedItemId === null || isDisabled}
+      isDisabled={selectedItemId === null || deleteQueueItem.isDisabled || isDisabled}
+      isLoading={deleteQueueItem.isLoading}
     />
   );
 });
