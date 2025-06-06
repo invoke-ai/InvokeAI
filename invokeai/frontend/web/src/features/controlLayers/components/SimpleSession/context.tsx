@@ -67,34 +67,6 @@ const setProgress = ($progressData: WritableAtom<Record<number, ProgressData>>, 
   }
 };
 
-const clearProgressEvent = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
-  const progressData = $progressData.get();
-  const current = progressData[itemId];
-  if (!current) {
-    return;
-  }
-  const next = { ...current };
-  next.progressEvent = null;
-  $progressData.set({
-    ...progressData,
-    [itemId]: next,
-  });
-};
-
-const clearProgressImage = ($progressData: WritableAtom<Record<number, ProgressData>>, itemId: number) => {
-  const progressData = $progressData.get();
-  const current = progressData[itemId];
-  if (!current) {
-    return;
-  }
-  const next = { ...current };
-  next.progressImage = null;
-  $progressData.set({
-    ...progressData,
-    [itemId]: next,
-  });
-};
-
 type CanvasSessionContextValue = {
   session: { id: string; type: 'simple' | 'advanced' };
   $items: Atom<S['SessionQueueItem'][]>;
@@ -132,14 +104,10 @@ export const CanvasSessionContextProvider = memo(
     const socket = useStore($socket);
 
     /**
-     * Manually-synced atom containing the queue items for the current session.
+     * Manually-synced atom containing queue items for the current session. This is populated from the RTK Query cache
+     * and kept in sync with it via a redux subscription.
      */
     const $items = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
-
-    /**
-     * Manually-synced atom containing the queue items for the current session.
-     */
-    const $prevItems = useState(() => atom<S['SessionQueueItem'][]>([]))[0];
 
     /**
      * Whether auto-switch is enabled.
@@ -294,28 +262,16 @@ export const CanvasSessionContextProvider = memo(
         setProgress($progressData, data);
       };
 
-      const onQueueItemStatusChanged = (data: S['QueueItemStatusChangedEvent']) => {
-        if (data.destination !== session.id) {
-          return;
-        }
-
-        if (data.status === 'canceled' || data.status === 'failed') {
-          clearProgressEvent($progressData, data.item_id);
-          clearProgressImage($progressData, data.item_id);
-        }
-      };
-
       socket.on('invocation_progress', onProgress);
-      socket.on('queue_item_status_changed', onQueueItemStatusChanged);
 
       return () => {
         socket.off('invocation_progress', onProgress);
-        socket.off('queue_item_status_changed', onQueueItemStatusChanged);
       };
     }, [$autoSwitch, $progressData, $selectedItemId, session.id, socket]);
 
     // Set up state subscriptions and effects
     useEffect(() => {
+      let _prevItems: readonly S['SessionQueueItem'][] = [];
       // Seed the $items atom with the initial query cache state
       $items.set(selectQueueItems(store.getState()));
 
@@ -324,7 +280,7 @@ export const CanvasSessionContextProvider = memo(
         const prevItems = $items.get();
         const items = selectQueueItems(store.getState());
         if (items !== prevItems) {
-          $prevItems.set(prevItems);
+          _prevItems = prevItems;
           $items.set(items);
         }
       });
@@ -344,7 +300,7 @@ export const CanvasSessionContextProvider = memo(
         // If an item is selected and it is not in the list of items, un-set it. This effect will run again and we'll
         // the above case, selecting the first item if there are any.
         if (selectedItemId !== null && items.findIndex(({ item_id }) => item_id === selectedItemId) === -1) {
-          let prevIndex = $prevItems.get().findIndex(({ item_id }) => item_id === selectedItemId);
+          let prevIndex = _prevItems.findIndex(({ item_id }) => item_id === selectedItemId);
           if (prevIndex >= items.length) {
             prevIndex = items.length - 1;
           }
@@ -357,19 +313,37 @@ export const CanvasSessionContextProvider = memo(
       // Clean up the progress data when a queue item is discarded.
       const unsubCleanUpProgressData = $items.listen((items) => {
         const progressData = $progressData.get();
+
         const toDelete: number[] = [];
+        const toClear: number[] = [];
+
         for (const datum of Object.values(progressData)) {
-          if (items.findIndex(({ item_id }) => item_id === datum.itemId) === -1) {
+          const item = items.find(({ item_id }) => item_id === datum.itemId);
+          if (!item) {
             toDelete.push(datum.itemId);
+          } else if (item.status === 'canceled' || item.status === 'failed') {
+            toClear.push(datum.itemId);
           }
         }
+
         if (toDelete.length === 0) {
           return;
         }
+
         const newProgressData = { ...progressData };
+
         for (const itemId of toDelete) {
           delete newProgressData[itemId];
         }
+
+        for (const itemId of toClear) {
+          const current = newProgressData[itemId];
+          if (current) {
+            current.progressEvent = null;
+            current.progressImage = null;
+          }
+        }
+
         $progressData.set(newProgressData);
       });
 
@@ -408,17 +382,7 @@ export const CanvasSessionContextProvider = memo(
         $progressData.set({});
         $selectedItemId.set(null);
       };
-    }, [
-      $autoSwitch,
-      $items,
-      $lastLoadedItemId,
-      $prevItems,
-      $progressData,
-      $selectedItemId,
-      selectQueueItems,
-      session.id,
-      store,
-    ]);
+    }, [$autoSwitch, $items, $lastLoadedItemId, $progressData, $selectedItemId, selectQueueItems, session.id, store]);
 
     const value = useMemo<CanvasSessionContextValue>(
       () => ({

@@ -2,15 +2,15 @@ import { useStore } from '@nanostores/react';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCancelAllExceptCurrentMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { useDeleteAllExceptCurrentMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { $isConnected } from 'services/events/stores';
 
-export const useCancelAllExceptCurrentQueueItem = () => {
+export const useDeleteAllExceptCurrentQueueItem = () => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
-  const [_trigger, { isLoading }] = useCancelAllExceptCurrentMutation({
-    fixedCacheKey: 'cancelAllExceptCurrent',
+  const [_trigger, { isLoading }] = useDeleteAllExceptCurrentMutation({
+    fixedCacheKey: 'deleteAllExceptCurrent',
   });
 
   const trigger = useCallback(async () => {
