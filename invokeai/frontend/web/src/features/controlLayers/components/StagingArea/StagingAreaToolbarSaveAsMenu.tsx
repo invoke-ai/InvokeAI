@@ -1,29 +1,40 @@
 import { IconButton, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/nanostores/store';
-import { useAppSelector } from 'app/store/storeHooks';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
-import { selectSelectedImage } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { createNewCanvasEntityFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDotsThreeBold } from 'react-icons/pi';
-import { imageDTOToFile, uploadImage } from 'services/api/endpoints/images';
+import { copyImage } from 'services/api/endpoints/images';
 
 const uploadImageArg = { image_category: 'general', is_intermediate: true, silent: true } as const;
 
 export const StagingAreaToolbarSaveAsMenu = memo(() => {
+  const canvasManager = useCanvasManager();
   const { t } = useTranslation();
-  const selectedImage = useAppSelector(selectSelectedImage);
+  const ctx = useCanvasSessionContext();
+  const imageName = useStore(ctx.$selectedItemOutputImageName);
   const store = useAppStore();
+  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
+
+  const toastSentToCanvas = useCallback(() => {
+    toast({
+      id: 'SENT_TO_CANVAS',
+      title: t('toast.sentToCanvas'),
+      status: 'success',
+    });
+  }, [t]);
 
   const onClickNewRasterLayerFromImage = useCallback(async () => {
-    if (!selectedImage) {
+    if (!imageName) {
       return;
     }
     const { dispatch, getState } = store;
-    const file = await imageDTOToFile(selectedImage.imageDTO);
-    const imageDTO = await uploadImage({ file, ...uploadImageArg });
+    const imageDTO = await copyImage(imageName, uploadImageArg);
     createNewCanvasEntityFromImage({
       imageDTO,
       type: 'raster_layer',
@@ -31,20 +42,16 @@ export const StagingAreaToolbarSaveAsMenu = memo(() => {
       getState,
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
-    toast({
-      id: 'SENT_TO_CANVAS',
-      title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
-  }, [selectedImage, store, t]);
+    toastSentToCanvas();
+  }, [imageName, store, toastSentToCanvas]);
 
   const onClickNewControlLayerFromImage = useCallback(async () => {
-    if (!selectedImage) {
+    if (!imageName) {
       return;
     }
     const { dispatch, getState } = store;
-    const file = await imageDTOToFile(selectedImage.imageDTO);
-    const imageDTO = await uploadImage({ file, ...uploadImageArg });
+    const imageDTO = await copyImage(imageName, uploadImageArg);
+
     createNewCanvasEntityFromImage({
       imageDTO,
       type: 'control_layer',
@@ -52,20 +59,16 @@ export const StagingAreaToolbarSaveAsMenu = memo(() => {
       getState,
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
-    toast({
-      id: 'SENT_TO_CANVAS',
-      title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
-  }, [selectedImage, store, t]);
+    toastSentToCanvas();
+  }, [imageName, store, toastSentToCanvas]);
 
   const onClickNewInpaintMaskFromImage = useCallback(async () => {
-    if (!selectedImage) {
+    if (!imageName) {
       return;
     }
     const { dispatch, getState } = store;
-    const file = await imageDTOToFile(selectedImage.imageDTO);
-    const imageDTO = await uploadImage({ file, ...uploadImageArg });
+    const imageDTO = await copyImage(imageName, uploadImageArg);
+
     createNewCanvasEntityFromImage({
       imageDTO,
       type: 'inpaint_mask',
@@ -73,20 +76,16 @@ export const StagingAreaToolbarSaveAsMenu = memo(() => {
       getState,
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
-    toast({
-      id: 'SENT_TO_CANVAS',
-      title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
-  }, [selectedImage, store, t]);
+    toastSentToCanvas();
+  }, [imageName, store, toastSentToCanvas]);
 
   const onClickNewRegionalGuidanceFromImage = useCallback(async () => {
-    if (!selectedImage) {
+    if (!imageName) {
       return;
     }
     const { dispatch, getState } = store;
-    const file = await imageDTOToFile(selectedImage.imageDTO);
-    const imageDTO = await uploadImage({ file, ...uploadImageArg });
+    const imageDTO = await copyImage(imageName, uploadImageArg);
+
     createNewCanvasEntityFromImage({
       imageDTO,
       type: 'regional_guidance',
@@ -94,12 +93,8 @@ export const StagingAreaToolbarSaveAsMenu = memo(() => {
       getState,
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
-    toast({
-      id: 'SENT_TO_CANVAS',
-      title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
-  }, [selectedImage, store, t]);
+    toastSentToCanvas();
+  }, [imageName, store, toastSentToCanvas]);
 
   return (
     <Menu>
@@ -109,23 +104,35 @@ export const StagingAreaToolbarSaveAsMenu = memo(() => {
         tooltip={t('controlLayers.newLayerFromImage')}
         icon={<PiDotsThreeBold />}
         colorScheme="invokeBlue"
-        isDisabled={!selectedImage}
+        isDisabled={!imageName || !shouldShowStagedImage}
       />
       <MenuList>
-        <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewInpaintMaskFromImage} isDisabled={!selectedImage}>
+        <MenuItem
+          icon={<NewLayerIcon />}
+          onClickCapture={onClickNewInpaintMaskFromImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
+        >
           {t('controlLayers.inpaintMask')}
         </MenuItem>
         <MenuItem
           icon={<NewLayerIcon />}
           onClickCapture={onClickNewRegionalGuidanceFromImage}
-          isDisabled={!selectedImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
         >
           {t('controlLayers.regionalGuidance')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewControlLayerFromImage} isDisabled={!selectedImage}>
+        <MenuItem
+          icon={<NewLayerIcon />}
+          onClickCapture={onClickNewControlLayerFromImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
+        >
           {t('controlLayers.controlLayer')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewRasterLayerFromImage} isDisabled={!selectedImage}>
+        <MenuItem
+          icon={<NewLayerIcon />}
+          onClickCapture={onClickNewRasterLayerFromImage}
+          isDisabled={!imageName || !shouldShowStagedImage}
+        >
           {t('controlLayers.rasterLayer')}
         </MenuItem>
       </MenuList>

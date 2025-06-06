@@ -2,7 +2,6 @@ import { Grid, GridItem } from '@invoke-ai/ui-library';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { newCanvasEntityFromImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,12 +18,7 @@ const addGlobalReferenceImageFromImageDndTargetData = newCanvasEntityFromImageDn
 
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();
-  const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusy();
-
-  if (imageViewer.isOpen) {
-    return null;
-  }
 
   return (
     <>

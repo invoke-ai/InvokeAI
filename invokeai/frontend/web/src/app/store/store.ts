@@ -8,8 +8,8 @@ import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasPersistConfig, canvasSlice, canvasUndoableConfig } from 'features/controlLayers/store/canvasSlice';
 import {
+  canvasSessionSlice,
   canvasStagingAreaPersistConfig,
-  canvasStagingAreaSlice,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
@@ -65,7 +65,7 @@ const allReducers = {
   [stylePresetSlice.name]: stylePresetSlice.reducer,
   [paramsSlice.name]: paramsSlice.reducer,
   [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
-  [canvasStagingAreaSlice.name]: canvasStagingAreaSlice.reducer,
+  [canvasSessionSlice.name]: canvasSessionSlice.reducer,
   [lorasSlice.name]: lorasSlice.reducer,
   [workflowLibrarySlice.name]: workflowLibrarySlice.reducer,
 };
@@ -175,6 +175,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
+        // .concat(getDebugLoggerMiddleware())
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
       const _enhancers = getDefaultEnhancers().concat(autoBatchEnhancer());

@@ -38,15 +38,15 @@ export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: U
   );
 
   const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
-    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
+    objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)
   );
 
   const isControlLayerImage = canvas.controlLayers.entities.some(({ objects }) =>
-    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
+    objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)
   );
 
   const isInpaintMaskImage = canvas.inpaintMasks.entities.some(({ objects }) =>
-    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
+    objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)
   );
 
   const isRegionalGuidanceImage = canvas.regionalGuidance.entities.some(({ referenceImages }) =>

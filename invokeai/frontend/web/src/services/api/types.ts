@@ -288,7 +288,6 @@ export type ModelInstallStatus = S['InstallStatus'];
 export type Graph = S['Graph'];
 export type NonNullableGraph = SetRequired<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
-export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
 export type SQLiteDirection = S['SQLiteDirection'];
 export type WorkflowRecordListItemWithThumbnailDTO = S['WorkflowRecordListItemWithThumbnailDTO'];

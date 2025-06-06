@@ -3,7 +3,7 @@ import { Badge, ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
-import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { useDeleteQueueItem } from 'features/queue/hooks/useDeleteQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -13,7 +13,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import { useSelector } from 'react-redux';
-import type { SessionQueueItemDTO } from 'services/api/types';
+import type { S } from 'services/api/types';
 
 import { COLUMN_WIDTHS } from './constants';
 import QueueItemDetail from './QueueItemDetail';
@@ -23,7 +23,7 @@ const selectedStyles = { bg: 'base.700' };
 
 type InnerItemProps = {
   index: number;
-  item: SessionQueueItemDTO;
+  item: S['SessionQueueItem'];
   context: ListContext;
 };
 
@@ -38,21 +38,21 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
   const handleToggle = useCallback(() => {
     context.toggleQueueItem(item.item_id);
   }, [context, item.item_id]);
-  const { cancelQueueItem, isLoading: isLoadingCancelQueueItem } = useCancelQueueItem(item.item_id);
-  const handleCancelQueueItem = useCallback(
+  const deleteQueueItem = useDeleteQueueItem();
+  const onClickDeleteQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      cancelQueueItem();
+      deleteQueueItem.trigger(item.item_id);
     },
-    [cancelQueueItem]
+    [deleteQueueItem, item.item_id]
   );
-  const { retryQueueItem, isLoading: isLoadingRetryQueueItem } = useRetryQueueItem(item.item_id);
-  const handleRetryQueueItem = useCallback(
+  const retryQueueItem = useRetryQueueItem();
+  const onClickRetryQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      retryQueueItem();
+      retryQueueItem.trigger(item.item_id);
     },
-    [retryQueueItem]
+    [item.item_id, retryQueueItem]
   );
   const isOpen = useMemo(() => context.openQueueItems.includes(item.item_id), [context.openQueueItems, item.item_id]);
 
@@ -135,17 +135,17 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
           <ButtonGroup size="xs" variant="ghost">
             {(!isFailed || !isRetryEnabled || isValidationRun) && (
               <IconButton
-                onClick={handleCancelQueueItem}
+                onClick={onClickDeleteQueueItem}
                 isDisabled={isCanceled}
-                isLoading={isLoadingCancelQueueItem}
+                isLoading={deleteQueueItem.isLoading}
                 aria-label={t('queue.cancelItem')}
                 icon={<PiXBold />}
               />
             )}
             {isFailed && isRetryEnabled && !isValidationRun && (
               <IconButton
-                onClick={handleRetryQueueItem}
-                isLoading={isLoadingRetryQueueItem}
+                onClick={onClickRetryQueueItem}
+                isLoading={retryQueueItem.isLoading}
                 aria-label={t('queue.retryItem')}
                 icon={<PiArrowCounterClockwiseBold />}
               />
@@ -155,7 +155,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
       </Flex>
 
       <Collapse in={isOpen} transition={transition} unmountOnExit={true}>
-        <QueueItemDetail queueItemDTO={item} />
+        <QueueItemDetail queueItem={item} />
       </Collapse>
     </Flex>
   );

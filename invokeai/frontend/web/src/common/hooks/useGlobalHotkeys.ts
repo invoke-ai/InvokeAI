@@ -1,6 +1,6 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
+import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -35,34 +35,30 @@ export const useGlobalHotkeys = () => {
     dependencies: [queue],
   });
 
-  const {
-    cancelQueueItem,
-    isDisabled: isDisabledCancelQueueItem,
-    isLoading: isLoadingCancelQueueItem,
-  } = useCancelCurrentQueueItem();
+  const deleteCurrentQueueItem = useDeleteCurrentQueueItem();
 
   useRegisteredHotkeys({
     id: 'cancelQueueItem',
     category: 'app',
-    callback: cancelQueueItem,
+    callback: deleteCurrentQueueItem.trigger,
     options: {
-      enabled: !isDisabledCancelQueueItem && !isLoadingCancelQueueItem,
+      enabled: !deleteCurrentQueueItem.isDisabled && !deleteCurrentQueueItem.isLoading,
       preventDefault: true,
     },
-    dependencies: [cancelQueueItem, isDisabledCancelQueueItem, isLoadingCancelQueueItem],
+    dependencies: [deleteCurrentQueueItem],
   });
 
-  const { clearQueue, isDisabled: isDisabledClearQueue, isLoading: isLoadingClearQueue } = useClearQueue();
+  const clearQueue = useClearQueue();
 
   useRegisteredHotkeys({
     id: 'clearQueue',
     category: 'app',
-    callback: clearQueue,
+    callback: clearQueue.trigger,
     options: {
-      enabled: !isDisabledClearQueue && !isLoadingClearQueue,
+      enabled: !clearQueue.isDisabled && !clearQueue.isLoading,
       preventDefault: true,
     },
-    dependencies: [clearQueue, isDisabledClearQueue, isLoadingClearQueue],
+    dependencies: [clearQueue],
   });
 
   useRegisteredHotkeys({

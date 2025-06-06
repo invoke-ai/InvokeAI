@@ -10,7 +10,6 @@ import { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konv
 import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import { CanvasEntityRendererModule } from 'features/controlLayers/konva/CanvasEntityRendererModule';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
@@ -66,7 +65,6 @@ export class CanvasManager extends CanvasModuleBase {
   compositor: CanvasCompositorModule;
   tool: CanvasToolModule;
   stagingArea: CanvasStagingAreaModule;
-  progressImage: CanvasProgressImageModule;
 
   konva: {
     previewLayer: Konva.Layer;
@@ -131,11 +129,9 @@ export class CanvasManager extends CanvasModuleBase {
     this.stage.addLayer(this.konva.previewLayer);
 
     this.tool = new CanvasToolModule(this);
-    this.progressImage = new CanvasProgressImageModule(this);
 
     // Must add in this order for correct z-index
     this.konva.previewLayer.add(this.stagingArea.konva.group);
-    this.konva.previewLayer.add(this.progressImage.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
   }
 
@@ -238,7 +234,6 @@ export class CanvasManager extends CanvasModuleBase {
     return [
       this.stagingArea,
       this.tool,
-      this.progressImage,
       this.stateApi,
       this.background,
       this.worker,
@@ -285,7 +280,6 @@ export class CanvasManager extends CanvasModuleBase {
       stateApi: this.stateApi.repr(),
       stagingArea: this.stagingArea.repr(),
       tool: this.tool.repr(),
-      progressImage: this.progressImage.repr(),
       background: this.background.repr(),
       worker: this.worker.repr(),
       entityRenderer: this.entityRenderer.repr(),

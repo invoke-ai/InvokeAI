@@ -6,11 +6,11 @@ import { selectIsLocal } from 'features/system/store/configSlice';
 import { selectSystemShouldShowInvocationProgressDetail } from 'features/system/store/systemSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { $invocationProgressMessage } from 'services/events/stores';
+import { $lastProgressMessage } from 'services/events/stores';
 
 const CanvasAlertsInvocationProgressContentLocal = memo(() => {
   const { t } = useTranslation();
-  const invocationProgressMessage = useStore($invocationProgressMessage);
+  const invocationProgressMessage = useStore($lastProgressMessage);
 
   if (!invocationProgressMessage) {
     return null;

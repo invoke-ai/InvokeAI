@@ -5,29 +5,32 @@ import { useTranslation } from 'react-i18next';
 import { useRetryItemsByIdMutation } from 'services/api/endpoints/queue';
 import { $isConnected } from 'services/events/stores';
 
-export const useRetryQueueItem = (item_id: number) => {
+export const useRetryQueueItem = () => {
   const isConnected = useStore($isConnected);
-  const [trigger, { isLoading }] = useRetryItemsByIdMutation();
+  const [_trigger, { isLoading }] = useRetryItemsByIdMutation();
   const { t } = useTranslation();
-  const retryQueueItem = useCallback(async () => {
-    try {
-      const result = await trigger([item_id]).unwrap();
-      if (!result.retried_item_ids.includes(item_id)) {
-        throw new Error('Failed to retry item');
+  const trigger = useCallback(
+    async (item_id: number) => {
+      try {
+        const result = await _trigger([item_id]).unwrap();
+        if (!result.retried_item_ids.includes(item_id)) {
+          throw new Error('Failed to retry item');
+        }
+        toast({
+          id: 'QUEUE_RETRY_SUCCEEDED',
+          title: t('queue.retrySucceeded'),
+          status: 'success',
+        });
+      } catch {
+        toast({
+          id: 'QUEUE_RETRY_FAILED',
+          title: t('queue.retryFailed'),
+          status: 'error',
+        });
       }
-      toast({
-        id: 'QUEUE_RETRY_SUCCEEDED',
-        title: t('queue.retrySucceeded'),
-        status: 'success',
-      });
-    } catch {
-      toast({
-        id: 'QUEUE_RETRY_FAILED',
-        title: t('queue.retryFailed'),
-        status: 'error',
-      });
-    }
-  }, [item_id, t, trigger]);
+    },
+    [t, _trigger]
+  );
 
-  return { retryQueueItem, isLoading, isDisabled: !isConnected };
+  return { trigger, isLoading, isDisabled: !isConnected };
 };
