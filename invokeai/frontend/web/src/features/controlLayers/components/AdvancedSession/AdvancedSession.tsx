@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { ContextMenu, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { ContextMenu, Divider, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
@@ -77,6 +77,7 @@ export const AdvancedSession = memo(({ id }: { id: string | null }) => {
         <CanvasManagerProviderGate>
           <CanvasToolbar />
         </CanvasManagerProviderGate>
+        <Divider />
         <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
           {(ref) => (
             <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
