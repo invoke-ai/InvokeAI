@@ -230,14 +230,23 @@ export class CanvasStageModule extends CanvasModuleBase {
     this._intendedScale = scale;
     this._activeSnapPoint = null;
 
-    this.konva.stage.setAttrs({
+    const tween = new Konva.Tween({
+      node: this.konva.stage,
+      duration: 0.15,
       x,
       y,
       scaleX: scale,
       scaleY: scale,
+      easing: Konva.Easings.EaseInOut,
+      onUpdate: () => {
+        this.syncStageAttrs();
+      },
+      onFinish: () => {
+        this.syncStageAttrs();
+        tween.destroy();
+      },
     });
-
-    this.syncStageAttrs({ x, y, scale });
+    tween.play();
   };
 
   /**
