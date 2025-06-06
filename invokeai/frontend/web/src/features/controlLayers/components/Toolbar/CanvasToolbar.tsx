@@ -1,6 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import { Divider, Flex, Spacer } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
+import { StartOverButton } from 'features/controlLayers/components/StartOverButton';
 import { ToolColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolSettings } from 'features/controlLayers/components/Tool/ToolSettings';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
@@ -29,7 +30,7 @@ export const CanvasToolbar = memo(() => {
   useCanvasFilterHotkey();
 
   return (
-    <Flex w="full" gap={2} alignItems="center">
+    <Flex w="full" gap={2} alignItems="center" pe={2}>
       <ToolColorPicker />
       <ToolSettings />
       <Spacer />
@@ -46,6 +47,8 @@ export const CanvasToolbar = memo(() => {
         <CanvasToolbarNewSessionMenuButton />
         <CanvasSettingsPopover />
       </Flex>
+      <Divider orientation="vertical" />
+      <StartOverButton />
     </Flex>
   );
 });
