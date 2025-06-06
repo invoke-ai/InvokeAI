@@ -9,26 +9,6 @@ import type { ImageDTO } from 'services/api/types';
 export const ImageActions = memo(({ imageDTO, ...rest }: { imageDTO: ImageDTO } & ButtonGroupProps) => {
   const { getState, dispatch } = useAppStore();
 
-  const vary = useCallback(() => {
-    newCanvasFromImage({
-      imageDTO,
-      type: 'raster_layer',
-      withResize: true,
-      getState,
-      dispatch,
-    });
-  }, [dispatch, getState, imageDTO]);
-
-  const useAsControl = useCallback(() => {
-    newCanvasFromImage({
-      imageDTO,
-      type: 'control_layer',
-      withResize: true,
-      getState,
-      dispatch,
-    });
-  }, [dispatch, getState, imageDTO]);
-
   const edit = useCallback(() => {
     newCanvasFromImage({
       imageDTO,
@@ -40,12 +20,6 @@ export const ImageActions = memo(({ imageDTO, ...rest }: { imageDTO: ImageDTO } 
   }, [dispatch, getState, imageDTO]);
   return (
     <ButtonGroup isAttached={false} size="sm" {...rest}>
-      <Button onClick={vary} tooltip="Vary the image using Image to Image">
-        Vary
-      </Button>
-      <Button onClick={useAsControl} tooltip="Use this image to control a new Text to Image generation">
-        Use as Control
-      </Button>
       <Button onClick={edit} tooltip="Edit parts of this image with Inpainting">
         Edit
       </Button>
