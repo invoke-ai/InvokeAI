@@ -18,8 +18,9 @@ export const CanvasBusySpinner = memo(() => {
   );
   const isPendingRectCalculation = useStore($isPendingRectCalculation);
   const isRasterizing = useStore(canvasManager.stateApi.$isRasterizing);
+  const isCompositing = useStore(canvasManager.compositor.$isBusy);
 
-  if (isRasterizing || isPendingRectCalculation) {
+  if (isRasterizing || isCompositing || isPendingRectCalculation) {
     return <Spinner opacity={0.3} />;
   }
   return null;
