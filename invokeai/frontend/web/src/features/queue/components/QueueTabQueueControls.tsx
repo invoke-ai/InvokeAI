@@ -1,6 +1,5 @@
-/* eslint-disable i18next/no-literal-string */
 import { ButtonGroup, Flex } from '@invoke-ai/ui-library';
-import { DeleteAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
+import { DeleteAllExceptCurrentButton } from 'features/queue/components/DeleteAllExceptCurrentButton';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
 
@@ -24,7 +23,7 @@ const QueueTabQueueControls = () => {
         )}
         <ButtonGroup w={28} orientation="vertical" size="sm">
           <PruneQueueButton />
-          <DeleteAllExceptCurrentQueueItemConfirmationAlertDialog />
+          <DeleteAllExceptCurrentButton />
         </ButtonGroup>
       </Flex>
       <ClearModelCacheButton />
