@@ -392,7 +392,7 @@
                 "title": "全選択"
             },
             "addNode": {
-                "desc": "ノード追加メニューを開く．",
+                "desc": "ノード追加メニューを開く。",
                 "title": "ノードを追加"
             },
             "pasteSelectionWithEdges": {
@@ -1156,11 +1156,11 @@
         "unknownField": "不明なフィールド",
         "unexpectedField_withName": "予期しないフィールド\"{{name}}\"",
         "loadingTemplates": "読み込み中 {{name}}",
-        "validateConnectionsHelp": "無効な接続が行われたり,無効なグラフが呼び出されたりしないようにします.",
+        "validateConnectionsHelp": "無効な接続が行われたり,無効なグラフが呼び出されたりしないようにします",
         "validateConnections": "接続とグラフを確認する",
         "saveToGallery": "ギャラリーに保存",
         "newWorkflowDesc": "新しいワークフローを作りますか？",
-        "unknownFieldType": "$t(nodes.unknownField)型:{type}}",
+        "unknownFieldType": "$t(nodes.unknownField)型: {{type}}",
         "unsupportedArrayItemType": "サポートされていない配列項目型です \"{{type}}\"",
         "unableToLoadWorkflow": "ワークフローが読み込めません",
         "unableToValidateWorkflow": "ワークフローを確認できません",
@@ -1884,7 +1884,14 @@
             "column": "列",
             "container": "コンテナ",
             "containerRowLayout": "コンテナ（行レイアウト）",
-            "containerColumnLayout": "コンテナ（列レイアウト）"
+            "containerColumnLayout": "コンテナ（列レイアウト）",
+            "maximum": "最大",
+            "published": "公開済み",
+            "publishedWorkflowOutputs": "アウトプット",
+            "minimum": "最小",
+            "publish": "公開",
+            "unpublish": "非公開",
+            "publishedWorkflowInputs": "インプット"
         },
         "chooseWorkflowFromLibrary": "ライブラリからワークフローを選択",
         "unnamedWorkflow": "名前のないワークフロー",
