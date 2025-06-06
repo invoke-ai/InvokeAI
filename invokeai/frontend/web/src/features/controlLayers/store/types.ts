@@ -1,3 +1,4 @@
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
@@ -611,3 +612,7 @@ export const isMaskEntityIdentifier = (
 ): entityIdentifier is CanvasEntityIdentifier<'inpaint_mask' | 'regional_guidance'> => {
   return isInpaintMaskEntityIdentifier(entityIdentifier) || isRegionalGuidanceEntityIdentifier(entityIdentifier);
 };
+
+// Ideally, we'd type `adapter` as `CanvasEntityAdapterBase`, but the generics make this tricky. `CanvasEntityAdapter`
+// is a union of all entity adapters and is functionally identical to `CanvasEntityAdapterBase`.
+export type LifecycleCallback = (adapter: CanvasEntityAdapter) => Promise<boolean>;
