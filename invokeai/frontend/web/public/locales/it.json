@@ -2452,8 +2452,8 @@
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
         "items": [
-            "GPU Nvidia 50xx: Invoke utilizza PyTorch 2.7.0, necessario per queste GPU.",
-            "Relazioni tra modelli: collega i LoRA ai modelli principali e i LoRA verranno visualizzati per primi nell'elenco."
+            "Inpainting: livelli di rumore per maschera e limiti di denoise.",
+            "Canvas: proporzioni più intelligenti per SDXL e scorrimento e zoom migliorati."
         ]
     },
     "system": {
