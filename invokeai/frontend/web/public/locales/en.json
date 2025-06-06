@@ -2426,9 +2426,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Nvidia 50xx GPUs: Invoke uses PyTorch 2.7.0, which is required for these GPUs.",
-            "Model Relationships: Link LoRAs to main models, and the LoRAs will show up first in the list.",
-            "IP Adapter: New Style (Strong) and Style (Precise) methods for SDXL and SD1.5 models."
+            "Inpainting: Per-mask noise levels and denoise limits.",
+            "Canvas: Smarter aspect ratios for SDXL and improved scroll-to-zoom."
         ],
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",

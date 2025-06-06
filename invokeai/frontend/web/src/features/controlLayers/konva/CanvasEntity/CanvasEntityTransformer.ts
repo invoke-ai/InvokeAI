@@ -13,7 +13,7 @@ import {
   roundRect,
 } from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
-import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
+import type { Coordinate, LifecycleCallback, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
@@ -123,7 +123,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   /**
    * Whether the transformer is currently calculating the rect of the parent.
    */
-  $isPendingRectCalculation = atom<boolean>(true);
+  $isPendingRectCalculation = atom<boolean>(false);
 
   /**
    * A set of subscriptions that should be cleaned up when the transformer is destroyed.
@@ -176,6 +176,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * The mutex is locked during transformation and during rect calculations which are handled in a web worker.
    */
   transformMutex = new Mutex();
+
+  /**
+   * Callbacks that are executed when the bbox is updated.
+   */
+  private static bboxUpdatedCallbacks = new Set<LifecycleCallback>();
 
   konva: {
     transformer: Konva.Transformer;
@@ -908,6 +913,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
       this.parent.bufferRenderer.konva.group.setAttrs(groupAttrs);
     }
+
+    CanvasEntityTransformer.runBboxUpdatedCallbacks(this.parent);
   };
 
   calculateRect = debounce(() => {
@@ -1024,6 +1031,23 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   _hideBboxOutline = () => {
     this.konva.outlineRect.visible(false);
+  };
+
+  static registerBboxUpdatedCallback = (callback: LifecycleCallback) => {
+    const wrapped = async (adapter: CanvasEntityAdapter) => {
+      const result = await callback(adapter);
+      if (result) {
+        this.bboxUpdatedCallbacks.delete(wrapped);
+      }
+      return result;
+    };
+    this.bboxUpdatedCallbacks.add(wrapped);
+  };
+
+  private static runBboxUpdatedCallbacks = (adapter: CanvasEntityAdapter) => {
+    for (const callback of this.bboxUpdatedCallbacks) {
+      callback(adapter);
+    }
   };
 
   repr = () => {

@@ -30,7 +30,7 @@
         "boards": "Bảng",
         "selectedForAutoAdd": "Đã Chọn Để Tự động thêm",
         "myBoard": "Bảng Của Tôi",
-        "deletedPrivateBoardsCannotbeRestored": "Bảng đã xoá sẽ không thể khôi phục lại. Chọn 'Chỉ Xoá Bảng' sẽ dời ảnh vào trạng thái chưa phân loại riêng cho chủ ảnh.",
+        "deletedPrivateBoardsCannotbeRestored": "Bảng và ảnh đã xoá sẽ không thể khôi phục lại. Chọn 'Chỉ Xoá Bảng' sẽ dời ảnh vào trạng thái chưa phân loại riêng cho chủ ảnh.",
         "changeBoard": "Thay Đổi Bảng",
         "clearSearch": "Làm Sạch Thanh Tìm Kiếm",
         "updateBoardError": "Lỗi khi cập nhật Bảng",
@@ -41,18 +41,21 @@
         "deleteBoard": "Xoá Bảng",
         "deleteBoardAndImages": "Xoá Bảng Lẫn Hình ảnh",
         "deleteBoardOnly": "Chỉ Xoá Bảng",
-        "deletedBoardsCannotbeRestored": "Bảng đã xoá sẽ không thể khôi phục lại. Chọn 'Chỉ Xoá Bảng' sẽ dời ảnh vào trạng thái chưa phân loại.",
-        "bottomMessage": "Xoá bảng này lẫn ảnh của nó sẽ khởi động lại mọi tính năng đang sử dụng chúng.",
+        "deletedBoardsCannotbeRestored": "Bảng và ảnh đã xoá sẽ không thể khôi phục lại. Chọn 'Chỉ Xoá Bảng' sẽ dời ảnh vào trạng thái chưa phân loại.",
+        "bottomMessage": "Việc xóa ảnh sẽ khởi động lại mọi tính năng đang sử dụng chúng.",
         "menuItemAutoAdd": "Tự động thêm cho Bảng này",
         "move": "Di Chuyển",
-        "topMessage": "Bảng này chứa ảnh được dùng với những tính năng sau:",
+        "topMessage": "Lựa chọn này chứa ảnh được dùng với những tính năng sau:",
         "uncategorized": "Chưa Sắp Xếp",
         "archived": "Được Lưu Trữ",
         "loading": "Đang Tải...",
         "selectBoard": "Chọn Bảng",
         "archiveBoard": "Lưu trữ Bảng",
         "unarchiveBoard": "Ngừng Lưu Trữ Bảng",
-        "assetsWithCount_other": "{{count}} tài nguyên"
+        "assetsWithCount_other": "{{count}} tài nguyên",
+        "uncategorizedImages": "Ảnh Chưa Sắp Xếp",
+        "deleteAllUncategorizedImages": "Xoá Tất Cả Ảnh Chưa Sắp Xếp",
+        "deletedImagesCannotBeRestored": "Ảnh đã xoá không thể phục hồi lại."
     },
     "gallery": {
         "swapImages": "Đổi Hình Ảnh",
@@ -2059,7 +2062,7 @@
             "colorPicker": "Chọn Màu"
         },
         "mergingLayers": "Đang gộp layer",
-        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, hoặc vẽ trên canvas để bắt đầu.",
+        "controlLayerEmptyState": "<UploadButton>Tải lên ảnh</UploadButton>, kéo thả ảnh từ <GalleryButton>thư viện</GalleryButton> vào layer này, <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton>, hoặc vẽ trên canvas để bắt đầu.",
         "referenceImageEmptyState": "<UploadButton>Tải lên hình ảnh</UploadButton>, kéo ảnh từ <GalleryButton>thư viện ảnh</GalleryButton> vào layer này, hoặc <PullBboxButton>kéo hộp giới hạn vào layer này</PullBboxButton> để bắt đầu.",
         "useImage": "Dùng Hình Ảnh",
         "resetCanvasLayers": "Khởi Động Lại Layer Canvas",
@@ -2108,7 +2111,11 @@
             "imageInfluence": "Ảnh Chi Phối",
             "medium": "Vừa",
             "highest": "Cao Nhất"
-        }
+        },
+        "addDenoiseLimit": "Thêm $t(controlLayers.denoiseLimit)",
+        "imageNoise": "Độ Nhiễu Hình Ảnh",
+        "denoiseLimit": "Giới Hạn Khử Nhiễu",
+        "addImageNoise": "Thêm $t(controlLayers.imageNoise)"
     },
     "stylePresets": {
         "negativePrompt": "Lệnh Tiêu Cực",
@@ -2249,7 +2256,8 @@
         "problemUnpublishingWorkflowDescription": "Có vấn đề khi ngừng đăng tải workflow. Vui lòng thử lại sau.",
         "workflowUnpublished": "Workflow Đã Được Ngừng Đăng Tải",
         "problemUnpublishingWorkflow": "Có Vấn Đề Khi Ngừng Đăng Tải Workflow",
-        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint."
+        "chatGPT4oIncompatibleGenerationMode": "ChatGPT 4o chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh và Hình Ảnh Sang Hình Ảnh. Hãy dùng model khác cho các tác vụ Inpaint và Outpaint.",
+        "imagenIncompatibleGenerationMode": "Google {{model}} chỉ hỗ trợ Từ Ngữ Sang Hình Ảnh. Dùng các model khác cho Hình Ảnh Sang Hình Ảnh, Inpaint và Outpaint."
     },
     "ui": {
         "tabs": {

@@ -62,11 +62,14 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         # If this too fails, raise exception.
 
         model_info = None
+
+        # Handling for our special syntax - we only want the base HF `org/repo` here.
+        repo_id = id.split("::")[0] or id
         while not model_info:
             try:
-                model_info = HfApi().model_info(repo_id=id, files_metadata=True, revision=variant)
+                model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True, revision=variant)
             except RepositoryNotFoundError as excp:
-                raise UnknownMetadataException(f"'{id}' not found. See trace for details.") from excp
+                raise UnknownMetadataException(f"'{repo_id}' not found. See trace for details.") from excp
             except RevisionNotFoundError:
                 if variant is None:
                     raise
@@ -75,14 +78,14 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
 
         files: list[RemoteModelFile] = []
 
-        _, name = id.split("/")
+        _, name = repo_id.split("/")
 
         for s in model_info.siblings or []:
             assert s.rfilename is not None
             assert s.size is not None
             files.append(
                 RemoteModelFile(
-                    url=hf_hub_url(id, s.rfilename, revision=variant or "main"),
+                    url=hf_hub_url(repo_id, s.rfilename, revision=variant or "main"),
                     path=Path(name, s.rfilename),
                     size=s.size,
                     sha256=s.lfs.get("sha256") if s.lfs else None,

@@ -1,7 +1,7 @@
 import type { Property } from 'csstype';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type { Coordinate, Dimensions, Rect, StageAttrs } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -187,6 +187,18 @@ export class CanvasStageModule extends CanvasModuleBase {
   };
 
   /**
+   * Fits the bbox and layers to the stage. The union of the bbox and the visible layers will be centered and scaled
+   * to fit the stage with some padding.
+   */
+  fitBboxAndLayersToStage = (): void => {
+    const layersRect = this.manager.compositor.getVisibleRectOfType();
+    const bboxRect = this.manager.stateApi.getBbox().rect;
+    const unionRect = getRectUnion(layersRect, bboxRect);
+    this.log.trace({ bboxRect, layersRect, unionRect }, 'Fitting bbox and layers to stage');
+    this.fitRect(unionRect);
+  };
+
+  /**
    * Fits a rectangle to the stage. The rectangle will be centered and scaled to fit the stage with some padding.
    *
    * The max scale is 1, but the stage can be scaled down to fit the rect.
@@ -218,14 +230,23 @@ export class CanvasStageModule extends CanvasModuleBase {
     this._intendedScale = scale;
     this._activeSnapPoint = null;
 
-    this.konva.stage.setAttrs({
+    const tween = new Konva.Tween({
+      node: this.konva.stage,
+      duration: 0.15,
       x,
       y,
       scaleX: scale,
       scaleY: scale,
+      easing: Konva.Easings.EaseInOut,
+      onUpdate: () => {
+        this.syncStageAttrs();
+      },
+      onFinish: () => {
+        this.syncStageAttrs();
+        tween.destroy();
+      },
     });
-
-    this.syncStageAttrs({ x, y, scale });
+    tween.play();
   };
 
   /**

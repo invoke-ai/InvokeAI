@@ -168,3 +168,33 @@ export const useEntityAdapter = (
   assert(adapter, 'useEntityAdapter must be used within a EntityAdapterContext');
   return adapter;
 };
+
+export const useAllEntityAdapters = () => {
+  const canvasManager = useCanvasManager();
+  const regionalGuidanceAdapters = useSyncExternalStore(
+    canvasManager.adapters.regionMasks.subscribe,
+    canvasManager.adapters.regionMasks.getSnapshot
+  );
+  const rasterLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.rasterLayers.subscribe,
+    canvasManager.adapters.rasterLayers.getSnapshot
+  );
+  const controlLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.controlLayers.subscribe,
+    canvasManager.adapters.controlLayers.getSnapshot
+  );
+  const inpaintMaskAdapters = useSyncExternalStore(
+    canvasManager.adapters.inpaintMasks.subscribe,
+    canvasManager.adapters.inpaintMasks.getSnapshot
+  );
+  const allEntityAdapters = useMemo(() => {
+    return [
+      ...Array.from(rasterLayerAdapters.values()),
+      ...Array.from(controlLayerAdapters.values()),
+      ...Array.from(inpaintMaskAdapters.values()),
+      ...Array.from(regionalGuidanceAdapters.values()),
+    ];
+  }, [controlLayerAdapters, inpaintMaskAdapters, rasterLayerAdapters, regionalGuidanceAdapters]);
+
+  return allEntityAdapters;
+};
