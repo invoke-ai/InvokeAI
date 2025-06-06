@@ -31,7 +31,9 @@ export const CanvasToolbar = memo(() => {
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
-      <Heading size="sm" me={2}>Canvas</Heading>
+      <Heading size="sm" me={2}>
+        Canvas
+      </Heading>
       <Divider orientation="vertical" />
       <ToolColorPicker />
       <ToolSettings />
