@@ -2,17 +2,17 @@ import { useStore } from '@nanostores/react';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCancelQueueItemMutation } from 'services/api/endpoints/queue';
+import { useDeleteQueueItemsByDestinationMutation } from 'services/api/endpoints/queue';
 import { $isConnected } from 'services/events/stores';
 
-export const useCancelQueueItem = () => {
+export const useDeleteQueueItemsByDestination = () => {
   const isConnected = useStore($isConnected);
-  const [_trigger, { isLoading }] = useCancelQueueItemMutation();
+  const [_trigger, { isLoading }] = useDeleteQueueItemsByDestinationMutation();
   const { t } = useTranslation();
   const trigger = useCallback(
-    async (item_id: number) => {
+    async (destination: string) => {
       try {
-        await _trigger({ item_id }).unwrap();
+        await _trigger({ destination }).unwrap();
         toast({
           id: 'QUEUE_CANCEL_SUCCEEDED',
           title: t('queue.cancelSucceeded'),

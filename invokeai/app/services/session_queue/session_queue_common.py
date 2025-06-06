@@ -368,6 +368,12 @@ class DeleteByDestinationResult(BaseModel):
     deleted: int = Field(..., description="Number of queue items deleted")
 
 
+class DeleteAllExceptCurrentResult(DeleteByDestinationResult):
+    """Result of deleting all except current"""
+
+    pass
+
+
 class CancelByQueueIDResult(CancelByBatchIDsResult):
     """Result of canceling by queue id"""
 

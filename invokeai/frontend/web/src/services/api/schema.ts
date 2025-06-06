@@ -1244,6 +1244,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/delete_all_except_current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Delete All Except Current
+         * @description Immediately deletes all queue items except in-processing items
+         */
+        put: operations["delete_all_except_current"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/cancel_by_batch_ids": {
         parameters: {
             query?: never;
@@ -5884,6 +5904,17 @@ export type components = {
              * @constant
              */
             type: "dw_openpose_detection";
+        };
+        /**
+         * DeleteAllExceptCurrentResult
+         * @description Result of deleting all except current
+         */
+        DeleteAllExceptCurrentResult: {
+            /**
+             * Deleted
+             * @description Number of queue items deleted
+             */
+            deleted: number;
         };
         /** DeleteBoardResult */
         DeleteBoardResult: {
@@ -24552,6 +24583,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CancelAllExceptCurrentResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_all_except_current: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteAllExceptCurrentResult"];
                 };
             };
             /** @description Validation Error */

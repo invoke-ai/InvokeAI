@@ -3,9 +3,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { useCancelAllExceptCurrentQueueItemDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
+import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
-import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
+import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
@@ -34,8 +34,8 @@ export const FloatingLeftPanelButtons = memo((props: { onToggle: () => void }) =
       <ButtonGroup orientation="vertical" h={48}>
         <ToggleLeftPanelButton onToggle={props.onToggle} />
         <InvokeIconButton />
-        <CancelCurrentIconButton />
-        <CancelAllExceptCurrentIconButton />
+        <DeleteCurrentIconButton />
+        <DeleteAllExceptCurrentIconButton />
       </ButtonGroup>
     </Flex>
   );
@@ -103,18 +103,18 @@ const InvokeIconButtonIcon = memo(() => {
 });
 InvokeIconButtonIcon.displayName = 'InvokeIconButtonIcon';
 
-const CancelCurrentIconButton = memo(() => {
+const DeleteCurrentIconButton = memo(() => {
   const { t } = useTranslation();
-  const cancelCurrentQueueItem = useCancelCurrentQueueItem();
+  const deleteCurrentQueueItem = useDeleteCurrentQueueItem();
 
   return (
     <Tooltip label={t('queue.cancelTooltip')} placement="end">
       <IconButton
-        isDisabled={cancelCurrentQueueItem.isDisabled}
-        isLoading={cancelCurrentQueueItem.isLoading}
+        onClick={deleteCurrentQueueItem.trigger}
+        isDisabled={deleteCurrentQueueItem.isDisabled}
+        isLoading={deleteCurrentQueueItem.isLoading}
         aria-label={t('queue.cancelTooltip')}
         icon={<PiXBold />}
-        onClick={cancelCurrentQueueItem.cancelQueueItem}
         colorScheme="error"
         flexGrow={1}
       />
@@ -122,25 +122,25 @@ const CancelCurrentIconButton = memo(() => {
   );
 });
 
-CancelCurrentIconButton.displayName = 'CancelCurrentIconButton';
+DeleteCurrentIconButton.displayName = 'DeleteCurrentIconButton';
 
-const CancelAllExceptCurrentIconButton = memo(() => {
+const DeleteAllExceptCurrentIconButton = memo(() => {
   const { t } = useTranslation();
-  const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
+  const deleteAllExceptCurrent = useDeleteAllExceptCurrentQueueItemDialog();
 
   return (
     <Tooltip label={t('queue.cancelAllExceptCurrentTooltip')} placement="end">
       <IconButton
-        isDisabled={cancelAllExceptCurrent.isDisabled}
-        isLoading={cancelAllExceptCurrent.isLoading}
+        isDisabled={deleteAllExceptCurrent.isDisabled}
+        isLoading={deleteAllExceptCurrent.isLoading}
         aria-label={t('queue.clear')}
         icon={<PiXCircle />}
         colorScheme="error"
-        onClick={cancelAllExceptCurrent.openDialog}
+        onClick={deleteAllExceptCurrent.openDialog}
         flexGrow={1}
       />
     </Tooltip>
   );
 });
 
-CancelAllExceptCurrentIconButton.displayName = 'CancelAllExceptCurrentIconButton';
+DeleteAllExceptCurrentIconButton.displayName = 'DeleteAllExceptCurrentIconButton';

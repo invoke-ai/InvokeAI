@@ -224,7 +224,7 @@ export const queueApi = api.injectEndpoints({
         ];
       },
     }),
-    cancelByDestination: build.mutation<
+    cancelQueueItemsByDestination: build.mutation<
       paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['responses']['200']['content']['application/json'],
       paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['parameters']['query']
     >({
@@ -252,6 +252,16 @@ export const queueApi = api.injectEndpoints({
     >({
       query: () => ({
         url: buildQueueUrl('cancel_all_except_current'),
+        method: 'PUT',
+      }),
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus', 'QueueCountsByDestination', 'SessionQueueItem'],
+    }),
+    deleteAllExceptCurrent: build.mutation<
+      paths['/api/v1/queue/{queue_id}/delete_all_except_current']['put']['responses']['200']['content']['application/json'],
+      void
+    >({
+      query: () => ({
+        url: buildQueueUrl('delete_all_except_current'),
         method: 'PUT',
       }),
       invalidatesTags: ['SessionQueueStatus', 'BatchStatus', 'QueueCountsByDestination', 'SessionQueueItem'],
@@ -329,7 +339,11 @@ export const queueApi = api.injectEndpoints({
         url: buildQueueUrl(`i/${item_id}`),
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, { item_id }) => [{ type: 'SessionQueueItem', id: item_id }],
+      invalidatesTags: (result, error, { item_id }) => [
+        { type: 'SessionQueueItem', id: item_id },
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ],
     }),
     deleteQueueItemsByDestination: build.mutation<void, { destination: string }>({
       query: ({ destination }) => ({
@@ -366,8 +380,10 @@ export const {
   useGetQueueStatusQuery,
   useListQueueItemsQuery,
   useCancelQueueItemMutation,
+  useCancelQueueItemsByDestinationMutation,
   useDeleteQueueItemMutation,
   useDeleteQueueItemsByDestinationMutation,
+  useDeleteAllExceptCurrentMutation,
   useGetBatchStatusQuery,
   useGetCurrentQueueItemQuery,
   useGetQueueCountsByDestinationQuery,

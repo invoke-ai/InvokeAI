@@ -16,6 +16,7 @@ import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/workflow
 import { WorkflowLibraryModal } from 'features/nodes/components/sidePanel/workflow/WorkflowLibrary/WorkflowLibraryModal';
 import { CancelAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { DeleteAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
@@ -40,6 +41,7 @@ export const GlobalModalIsolator = memo(() => {
       <StylePresetModal />
       <WorkflowLibraryModal />
       <CancelAllExceptCurrentQueueItemConfirmationAlertDialog />
+      <DeleteAllExceptCurrentQueueItemConfirmationAlertDialog />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
       <LoadWorkflowConfirmationAlertDialog />
