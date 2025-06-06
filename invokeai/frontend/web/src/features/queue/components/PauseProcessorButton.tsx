@@ -11,17 +11,17 @@ type Props = {
 
 const PauseProcessorButton = ({ asIconButton }: Props) => {
   const { t } = useTranslation();
-  const { pauseProcessor, isLoading, isDisabled } = usePauseProcessor();
+  const pauseProcessor = usePauseProcessor();
 
   return (
     <QueueButton
       asIconButton={asIconButton}
       label={t('queue.pause')}
       tooltip={t('queue.pauseTooltip')}
-      isDisabled={isDisabled}
-      isLoading={isLoading}
+      isDisabled={pauseProcessor.isDisabled}
+      isLoading={pauseProcessor.isLoading}
       icon={<PiPauseFill />}
-      onClick={pauseProcessor}
+      onClick={pauseProcessor.trigger}
       colorScheme="gold"
     />
   );

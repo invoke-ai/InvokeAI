@@ -5,10 +5,14 @@ import { useTranslation } from 'react-i18next';
 
 const ClearInvocationCacheButton = () => {
   const { t } = useTranslation();
-  const { clearInvocationCache, isDisabled, isLoading } = useClearInvocationCache();
+  const clearInvocationCache = useClearInvocationCache();
 
   return (
-    <Button isDisabled={isDisabled} isLoading={isLoading} onClick={clearInvocationCache}>
+    <Button
+      onClick={clearInvocationCache.trigger}
+      isDisabled={clearInvocationCache.isDisabled}
+      isLoading={clearInvocationCache.isLoading}
+    >
       {t('invocationCache.clear')}
     </Button>
   );
