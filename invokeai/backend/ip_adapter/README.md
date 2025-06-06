@@ -43,3 +43,4 @@ IP-Adapters:
 - [InvokeAI/ip_adapter_plus_face_sd15](https://huggingface.co/InvokeAI/ip_adapter_plus_face_sd15)
 - [InvokeAI/ip_adapter_sdxl](https://huggingface.co/InvokeAI/ip_adapter_sdxl)
 - [InvokeAI/ip_adapter_sdxl_vit_h](https://huggingface.co/InvokeAI/ip_adapter_sdxl_vit_h)
+- [InvokeAI/ip-adapter-plus_sdxl_vit-h](https://huggingface.co/InvokeAI/ip-adapter-plus_sdxl_vit-h)
