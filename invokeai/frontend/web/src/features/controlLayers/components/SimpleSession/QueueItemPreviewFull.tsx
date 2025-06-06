@@ -4,7 +4,6 @@ import { ImageActions } from 'features/controlLayers/components/SimpleSession/Im
 import { QueueItemCircularProgress } from 'features/controlLayers/components/SimpleSession/QueueItemCircularProgress';
 import { QueueItemNumber } from 'features/controlLayers/components/SimpleSession/QueueItemNumber';
 import { QueueItemProgressImage } from 'features/controlLayers/components/SimpleSession/QueueItemProgressImage';
-import { QueueItemProgressMessage } from 'features/controlLayers/components/SimpleSession/QueueItemProgressMessage';
 import { QueueItemStatusLabel } from 'features/controlLayers/components/SimpleSession/QueueItemStatusLabel';
 import { getQueueItemElementId, useOutputImageDTO } from 'features/controlLayers/components/SimpleSession/shared';
 import { DndImage } from 'features/dnd/DndImage';
@@ -41,8 +40,14 @@ export const QueueItemPreviewFull = memo(({ item, number }: Props) => {
       {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
       {imageDTO && <ImageActions imageDTO={imageDTO} position="absolute" top={1} right={2} />}
       <QueueItemNumber number={number} position="absolute" top={1} left={2} />
-      <QueueItemProgressMessage itemId={item.item_id} status={item.status} position="absolute" bottom={1} left={2} />
-      <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
+      <QueueItemCircularProgress
+        itemId={item.item_id}
+        status={item.status}
+        position="absolute"
+        top={1}
+        right={2}
+        size={8}
+      />
     </Flex>
   );
 });
