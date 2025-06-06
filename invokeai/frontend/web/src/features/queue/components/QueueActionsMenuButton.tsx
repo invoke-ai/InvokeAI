@@ -1,9 +1,9 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { SessionMenuItems } from 'common/components/SessionMenuItems';
-import { useCancelAllExceptCurrentQueueItemDialog } from 'features/queue/components/CancelAllExceptCurrentQueueItemConfirmationAlertDialog';
+import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
-import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
+import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -18,18 +18,10 @@ export const QueueActionsMenuButton = memo(() => {
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
-  const cancelAllExceptCurrent = useCancelAllExceptCurrentQueueItemDialog();
-  const cancelCurrent = useCancelCurrentQueueItem();
-  const {
-    resumeProcessor,
-    isLoading: isLoadingResumeProcessor,
-    isDisabled: isDisabledResumeProcessor,
-  } = useResumeProcessor();
-  const {
-    pauseProcessor,
-    isLoading: isLoadingPauseProcessor,
-    isDisabled: isDisabledPauseProcessor,
-  } = usePauseProcessor();
+  const deleteAllExceptCurrent = useDeleteAllExceptCurrentQueueItemDialog();
+  const deleteCurrentQueueItem = useDeleteCurrentQueueItem();
+  const resumeProcessor = useResumeProcessor();
+  const pauseProcessor = usePauseProcessor();
   const openQueue = useCallback(() => {
     dispatch(setActiveTab('queue'));
   }, [dispatch]);
@@ -46,27 +38,27 @@ export const QueueActionsMenuButton = memo(() => {
             <MenuItem
               isDestructive
               icon={<PiXBold />}
-              onClick={cancelCurrent.cancelQueueItem}
-              isLoading={cancelCurrent.isLoading}
-              isDisabled={cancelCurrent.isDisabled}
+              onClick={deleteCurrentQueueItem.trigger}
+              isLoading={deleteCurrentQueueItem.isLoading}
+              isDisabled={deleteCurrentQueueItem.isDisabled}
             >
               {t('queue.cancelTooltip')}
             </MenuItem>
             <MenuItem
               isDestructive
               icon={<PiXCircle />}
-              onClick={cancelAllExceptCurrent.openDialog}
-              isLoading={cancelAllExceptCurrent.isLoading}
-              isDisabled={cancelAllExceptCurrent.isDisabled}
+              onClick={deleteAllExceptCurrent.openDialog}
+              isLoading={deleteAllExceptCurrent.isLoading}
+              isDisabled={deleteAllExceptCurrent.isDisabled}
             >
               {t('queue.cancelAllExceptCurrentTooltip')}
             </MenuItem>
             {isResumeEnabled && (
               <MenuItem
                 icon={<PiPlayFill />}
-                onClick={resumeProcessor}
-                isLoading={isLoadingResumeProcessor}
-                isDisabled={isDisabledResumeProcessor}
+                onClick={resumeProcessor.trigger}
+                isLoading={resumeProcessor.isLoading}
+                isDisabled={resumeProcessor.isDisabled}
               >
                 {t('queue.resumeTooltip')}
               </MenuItem>
@@ -74,9 +66,9 @@ export const QueueActionsMenuButton = memo(() => {
             {isPauseEnabled && (
               <MenuItem
                 icon={<PiPauseFill />}
-                onClick={pauseProcessor}
-                isLoading={isLoadingPauseProcessor}
-                isDisabled={isDisabledPauseProcessor}
+                onClick={pauseProcessor.trigger}
+                isLoading={pauseProcessor.isLoading}
+                isDisabled={pauseProcessor.isDisabled}
               >
                 {t('queue.pauseTooltip')}
               </MenuItem>
