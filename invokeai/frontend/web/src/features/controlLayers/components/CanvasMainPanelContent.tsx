@@ -12,6 +12,7 @@ import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
 import { CanvasAlertsSendingToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
+import { CanvasBusySpinner } from 'features/controlLayers/components/CanvasBusySpinner';
 import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
 import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
@@ -105,6 +106,9 @@ export const CanvasMainPanelContent = memo(() => {
                     <MenuButton as={IconButton} icon={<PiDotsThreeOutlineVerticalFill />} colorScheme="base" />
                     <MenuContent />
                   </Menu>
+                </Flex>
+                <Flex position="absolute" bottom={4} insetInlineEnd={4}>
+                  <CanvasBusySpinner />
                 </Flex>
               </CanvasManagerProviderGate>
             </Flex>
