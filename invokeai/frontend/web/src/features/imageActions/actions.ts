@@ -173,14 +173,11 @@ export const newCanvasFromImage = async (arg: {
     imageObject = imageDTOToImageObject(imageDTO);
   }
 
-  const { x, y } = selectBboxRect(state);
-
   switch (type) {
     case 'raster_layer': {
       const overrides = {
         id: getPrefixedId('raster_layer'),
         objects: [imageObject],
-        position: { x, y },
       } satisfies Partial<CanvasRasterLayerState>;
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
@@ -192,7 +189,6 @@ export const newCanvasFromImage = async (arg: {
       const overrides = {
         id: getPrefixedId('control_layer'),
         objects: [imageObject],
-        position: { x, y },
         controlAdapter: deepClone(initialControlNet),
       } satisfies Partial<CanvasControlLayerState>;
       dispatch(canvasReset());
@@ -205,7 +201,6 @@ export const newCanvasFromImage = async (arg: {
       const overrides = {
         id: getPrefixedId('inpaint_mask'),
         objects: [imageObject],
-        position: { x, y },
       } satisfies Partial<CanvasInpaintMaskState>;
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
@@ -217,7 +212,6 @@ export const newCanvasFromImage = async (arg: {
       const overrides = {
         id: getPrefixedId('regional_guidance'),
         objects: [imageObject],
-        position: { x, y },
       } satisfies Partial<CanvasRegionalGuidanceState>;
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
