@@ -1,0 +1,50 @@
+/* eslint-disable i18next/no-literal-string */
+
+import { Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { InitialStateAddAStyleReference } from 'features/controlLayers/components/SimpleSession/InitialStateAddAStyleReference';
+import { InitialStateCardGridItem } from 'features/controlLayers/components/SimpleSession/InitialStateCardGridItem';
+import { InitialStateEditImageCard } from 'features/controlLayers/components/SimpleSession/InitialStateEditImageCard';
+import { InitialStateGenerateFromText } from 'features/controlLayers/components/SimpleSession/InitialStateGenerateFromText';
+import { InitialStateUseALayoutImageCard } from 'features/controlLayers/components/SimpleSession/InitialStateUseALayoutImageCard';
+import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { memo, useCallback } from 'react';
+
+export const InitialState = memo(() => {
+  const dispatch = useAppDispatch();
+  const newCanvasSession = useCallback(() => {
+    dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
+  }, [dispatch]);
+
+  return (
+    <Flex flexDir="column" h="full" justifyContent="center" mx={16}>
+      <Heading mb={4}>Choose a starting method.</Heading>
+      <Text fontSize="md" fontStyle="italic" mb={6}>
+        Drag an image onto a card or click the upload icon.
+      </Text>
+
+      <Grid gridTemplateColumns="1fr 1fr" gridTemplateRows="1fr 1fr" gap={4}>
+        <InitialStateCardGridItem>
+          <InitialStateGenerateFromText />
+        </InitialStateCardGridItem>
+        <InitialStateCardGridItem>
+          <InitialStateAddAStyleReference />
+        </InitialStateCardGridItem>
+        <InitialStateCardGridItem>
+          <InitialStateUseALayoutImageCard />
+        </InitialStateCardGridItem>
+        <InitialStateCardGridItem>
+          <InitialStateEditImageCard />
+        </InitialStateCardGridItem>
+      </Grid>
+
+      <Text fontSize="md" color="base.300" alignSelf="center" mt={6}>
+        or{' '}
+        <Button variant="link" onClick={newCanvasSession}>
+          start from a blank canvas.
+        </Button>
+      </Text>
+    </Flex>
+  );
+});
+InitialState.displayName = 'InitialState';

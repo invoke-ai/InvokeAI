@@ -1,6 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { AdvancedSession } from 'features/controlLayers/components/AdvancedSession/AdvancedSession';
-import { NoSession } from 'features/controlLayers/components/NoSession/NoSession';
 import { SimpleSession } from 'features/controlLayers/components/SimpleSession/SimpleSession';
 import { selectCanvasSessionId, selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo } from 'react';
@@ -12,11 +11,7 @@ export const CanvasMainPanelContent = memo(() => {
   const id = useAppSelector(selectCanvasSessionId);
 
   if (type === 'simple') {
-    if (id === null) {
-      return <NoSession />;
-    } else {
-      return <SimpleSession id={id} />;
-    }
+    return <SimpleSession id={id} />;
   }
 
   if (type === 'advanced') {
