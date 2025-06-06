@@ -297,6 +297,15 @@ ip_adapter_sdxl = StarterModel(
     dependencies=[ip_adapter_sdxl_image_encoder],
     previous_names=["IP Adapter SDXL"],
 )
+ip_adapter_plus_sdxl = StarterModel(
+    name="Precise Reference (IP Adapter Plus ViT-H)",
+    base=BaseModelType.StableDiffusionXL,
+    source="https://huggingface.co/InvokeAI/ip-adapter-plus_sdxl_vit-h/resolve/main/ip-adapter-plus_sdxl_vit-h.safetensors",
+    description="References images with a higher degree of precision.",
+    type=ModelType.IPAdapter,
+    dependencies=[ip_adapter_sdxl_image_encoder],
+    previous_names=["IP Adapter Plus SDXL"],
+)
 ip_adapter_flux = StarterModel(
     name="Standard Reference (XLabs FLUX IP-Adapter v2)",
     base=BaseModelType.Flux,
@@ -672,6 +681,7 @@ STARTER_MODELS: list[StarterModel] = [
     ip_adapter_plus_sd1,
     ip_adapter_plus_face_sd1,
     ip_adapter_sdxl,
+    ip_adapter_plus_sdxl,
     ip_adapter_flux,
     qr_code_cnet_sd1,
     qr_code_cnet_sdxl,
@@ -744,6 +754,7 @@ sdxl_bundle: list[StarterModel] = [
     juggernaut_sdxl,
     sdxl_fp16_vae_fix,
     ip_adapter_sdxl,
+    ip_adapter_plus_sdxl,
     canny_sdxl,
     depth_sdxl,
     softedge_sdxl,
