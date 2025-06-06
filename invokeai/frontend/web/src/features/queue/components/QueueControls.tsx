@@ -1,5 +1,5 @@
 import { Flex, Spacer, useShiftModifier } from '@invoke-ai/ui-library';
-import { DeleteAllExceptCurrentQueueItemConfirmationAlertDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
+import { DeleteAllExceptCurrentIconButton } from 'features/queue/components/DeleteAllExceptCurrentIconButton';
 import { DeleteCurrentQueueItemIconButton } from 'features/queue/components/DeleteCurrentQueueItemIconButton';
 import { QueueActionsMenuButton } from 'features/queue/components/QueueActionsMenuButton';
 import ProgressBar from 'features/system/components/ProgressBar';
@@ -30,7 +30,7 @@ export const DeleteIconButton = memo(() => {
     return <DeleteCurrentQueueItemIconButton />;
   }
 
-  return <DeleteAllExceptCurrentQueueItemConfirmationAlertDialog />;
+  return <DeleteAllExceptCurrentIconButton />;
 });
 
 DeleteIconButton.displayName = 'DeleteIconButton';
