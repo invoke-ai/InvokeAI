@@ -9,11 +9,11 @@ import { canvasSessionGenerationFinished } from 'features/controlLayers/store/ca
 import { selectBboxRect, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageNameToImageObject } from 'features/controlLayers/store/util';
+import { useDeleteQueueItemsByDestination } from 'features/queue/hooks/useDeleteQueueItemsByDestination';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
-import { useDeleteQueueItemsByDestinationMutation } from 'services/api/endpoints/queue';
 
 export const StagingAreaToolbarAcceptButton = memo(() => {
   const ctx = useCanvasSessionContext();
@@ -24,7 +24,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasFocused = useIsRegionFocused('canvas');
   const selectedItemImageName = useStore(ctx.$selectedItemOutputImageName);
-  const [deleteByDestination] = useDeleteQueueItemsByDestinationMutation();
+  const deleteQueueItemsByDestination = useDeleteQueueItemsByDestination();
 
   const { t } = useTranslation();
 
@@ -41,8 +41,15 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
 
     dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
     dispatch(canvasSessionGenerationFinished());
-    deleteByDestination({ destination: ctx.session.id });
-  }, [selectedItemImageName, bboxRect, dispatch, selectedEntityIdentifier?.type, deleteByDestination, ctx.session.id]);
+    deleteQueueItemsByDestination.trigger(ctx.session.id);
+  }, [
+    selectedItemImageName,
+    bboxRect,
+    dispatch,
+    selectedEntityIdentifier?.type,
+    deleteQueueItemsByDestination,
+    ctx.session.id,
+  ]);
 
   useHotkeys(
     ['enter'],
@@ -61,7 +68,8 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
       icon={<PiCheckBold />}
       onClick={acceptSelected}
       colorScheme="invokeBlue"
-      isDisabled={!selectedItemImageName || !shouldShowStagedImage}
+      isDisabled={!selectedItemImageName || !shouldShowStagedImage || deleteQueueItemsByDestination.isDisabled}
+      isLoading={deleteQueueItemsByDestination.isLoading}
     />
   );
 });

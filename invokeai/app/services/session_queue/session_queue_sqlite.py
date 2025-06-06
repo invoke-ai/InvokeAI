@@ -17,6 +17,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
+    DeleteAllExceptCurrentResult,
     DeleteByDestinationResult,
     EnqueueBatchResult,
     IsEmptyResult,
@@ -488,6 +489,37 @@ class SqliteSessionQueue(SessionQueueBase):
             self._conn.rollback()
             raise
         return DeleteByDestinationResult(deleted=count)
+
+    def delete_all_except_current(self, queue_id: str) -> DeleteAllExceptCurrentResult:
+        try:
+            cursor = self._conn.cursor()
+            where = """--sql
+                WHERE
+                  queue_id == ?
+                  AND status == 'pending'
+                """
+            cursor.execute(
+                f"""--sql
+                SELECT COUNT(*)
+                FROM session_queue
+                {where};
+                """,
+                (queue_id,),
+            )
+            count = cursor.fetchone()[0]
+            cursor.execute(
+                f"""--sql
+                DELETE
+                FROM session_queue
+                {where};
+                """,
+                (queue_id,),
+            )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        return DeleteAllExceptCurrentResult(deleted=count)
 
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
         try:

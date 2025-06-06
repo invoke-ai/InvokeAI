@@ -14,6 +14,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByBatchIDsResult,
     CancelByDestinationResult,
     ClearResult,
+    DeleteAllExceptCurrentResult,
     DeleteByDestinationResult,
     EnqueueBatchResult,
     FieldIdentifier,
@@ -144,6 +145,18 @@ async def cancel_all_except_current(
 ) -> CancelAllExceptCurrentResult:
     """Immediately cancels all queue items except in-processing items"""
     return ApiDependencies.invoker.services.session_queue.cancel_all_except_current(queue_id=queue_id)
+
+
+@session_queue_router.put(
+    "/{queue_id}/delete_all_except_current",
+    operation_id="delete_all_except_current",
+    responses={200: {"model": DeleteAllExceptCurrentResult}},
+)
+async def delete_all_except_current(
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+) -> DeleteAllExceptCurrentResult:
+    """Immediately deletes all queue items except in-processing items"""
+    return ApiDependencies.invoker.services.session_queue.delete_all_except_current(queue_id=queue_id)
 
 
 @session_queue_router.put(
