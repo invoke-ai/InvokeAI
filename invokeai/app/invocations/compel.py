@@ -114,6 +114,13 @@ class CompelInvocation(BaseInvocation):
 
             c, _options = compel.build_conditioning_tensor_for_conjunction(conjunction)
 
+        del compel
+        del patched_tokenizer
+        del tokenizer
+        del ti_manager
+        del text_encoder
+        del text_encoder_info
+
         c = c.detach().to("cpu")
 
         conditioning_data = ConditioningFieldData(conditionings=[BasicConditioningInfo(embeds=c)])
@@ -222,7 +229,10 @@ class SDXLPromptInvocationBase:
             else:
                 c_pooled = None
 
+        del compel
+        del patched_tokenizer
         del tokenizer
+        del ti_manager
         del text_encoder
         del text_encoder_info
 
