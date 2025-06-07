@@ -196,8 +196,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         # Search term condition
         if search_term:
             query_conditions += """--sql
-            AND images.metadata LIKE ?
+            AND (
+                images.metadata LIKE ?
+                OR images.created_at LIKE ?
+            )
             """
+            query_params.append(f"%{search_term.lower()}%")
             query_params.append(f"%{search_term.lower()}%")
 
         if starred_first:
