@@ -1,3 +1,4 @@
+import gc
 import traceback
 from contextlib import suppress
 from threading import BoundedSemaphore, Thread
@@ -438,6 +439,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         self._invoker.services.logger.debug("Waiting for next polling interval or event")
                         poll_now_event.wait(self._polling_interval)
                         continue
+
+                    # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
+                    # Most queue items take seconds to execute, so the relative cost of a GC is very small.
+                    # Python will never cede allocated memory back to the OS, so anything we can do to reduce the peak
+                    # allocation is well worth it.
+                    gc.collect()
 
                     self._invoker.services.logger.info(
                         f"Executing queue item {self._queue_item.item_id}, session {self._queue_item.session_id}"
