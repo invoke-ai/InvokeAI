@@ -1,4 +1,5 @@
 import { Mutex } from 'async-mutex';
+import type { ProgressData } from 'features/controlLayers/components/SimpleSession/context';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
@@ -6,7 +7,8 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { atom } from 'nanostores';
+import type { Atom, WritableAtom } from 'nanostores';
+import { atom, effect } from 'nanostores';
 import type { Logger } from 'roarr';
 
 type ImageNameSrc = { type: 'imageName'; data: string };
@@ -132,6 +134,29 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.render();
     this.$isStaging.set(this.manager.stateApi.runSelector(selectIsStaging));
   };
+
+  connectToSession = (
+    $selectedItemId: Atom<number | null>,
+    $progressData: WritableAtom<Record<string, ProgressData>>
+  ) =>
+    effect([$selectedItemId, $progressData], (selectedItemId, progressData) => {
+      if (!selectedItemId) {
+        this.$imageSrc.set(null);
+        return;
+      }
+
+      const datum = progressData[selectedItemId];
+
+      if (datum?.outputImageName) {
+        this.$imageSrc.set({ type: 'imageName', data: datum.outputImageName });
+        return;
+      } else if (datum?.progressImage) {
+        this.$imageSrc.set({ type: 'dataURL', data: datum.progressImage.dataURL });
+        return;
+      } else {
+        this.$imageSrc.set(null);
+      }
+    });
 
   private _getImageFromSrc = (
     { type, data }: ImageNameSrc | DataURLSrc,
