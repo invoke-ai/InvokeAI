@@ -99,7 +99,9 @@ async def upload_image(
             raise HTTPException(status_code=400, detail="Invalid resize_to format or size")
 
         try:
-            np_image = pil_to_np(pil_image)
+            # heuristic_resize_fast expects an RGB or RGBA image
+            pil_rgba = pil_image.convert("RGBA")
+            np_image = pil_to_np(pil_rgba)
             np_image = heuristic_resize_fast(np_image, (resize_dims.width, resize_dims.height))
             pil_image = np_to_pil(np_image)
         except Exception:
