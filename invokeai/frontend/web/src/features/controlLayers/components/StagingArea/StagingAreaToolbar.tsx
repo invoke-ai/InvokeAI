@@ -6,9 +6,9 @@ import { StagingAreaToolbarAcceptButton } from 'features/controlLayers/component
 import { StagingAreaToolbarDiscardAllButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardAllButton';
 import { StagingAreaToolbarDiscardSelectedButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardSelectedButton';
 import { StagingAreaToolbarImageCountButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarImageCountButton';
+import { StagingAreaToolbarMenu } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarMenu';
 import { StagingAreaToolbarNextButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarNextButton';
 import { StagingAreaToolbarPrevButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarPrevButton';
-import { StagingAreaToolbarSaveAsMenu } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarSaveAsMenu';
 import { StagingAreaToolbarSaveSelectedToGalleryButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarSaveSelectedToGalleryButton';
 import { StagingAreaToolbarToggleShowResultsButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarToggleShowResultsButton';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -42,7 +42,7 @@ export const StagingAreaToolbar = memo(() => {
         <StagingAreaToolbarAcceptButton />
         <StagingAreaToolbarToggleShowResultsButton />
         <StagingAreaToolbarSaveSelectedToGalleryButton />
-        <StagingAreaToolbarSaveAsMenu />
+        <StagingAreaToolbarMenu />
         <StagingAreaToolbarDiscardSelectedButton isDisabled={!shouldShowStagedImage} />
         <StagingAreaToolbarDiscardAllButton isDisabled={!shouldShowStagedImage} />
       </ButtonGroup>
