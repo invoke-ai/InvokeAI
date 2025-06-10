@@ -42,10 +42,6 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
     ctx.$selectedItemId.set(item.item_id);
   }, [ctx.$selectedItemId, item.item_id]);
 
-  const onDoubleClick = useCallback(() => {
-    ctx.$autoSwitch.set(item.status === 'in_progress');
-  }, [ctx.$autoSwitch, item.status]);
-
   const onLoad = useCallback(() => {
     setImageLoaded(true);
     if (ctx.$progressData.get()[item.item_id]) {
@@ -54,13 +50,7 @@ export const QueueItemPreviewMini = memo(({ item, isSelected, number }: Props) =
   }, [ctx.$lastLoadedItemId, ctx.$progressData, item.item_id]);
 
   return (
-    <Flex
-      id={getQueueItemElementId(item.item_id)}
-      sx={sx}
-      data-selected={isSelected}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-    >
+    <Flex id={getQueueItemElementId(item.item_id)} sx={sx} data-selected={isSelected} onClick={onClick}>
       <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
       {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} asThumbnail />}
       {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
