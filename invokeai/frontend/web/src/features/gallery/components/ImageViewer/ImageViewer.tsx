@@ -73,6 +73,16 @@ export const ImageViewerModal = memo(() => {
     handler: imageViewer.close,
   });
 
+  useHotkeys(
+    'esc',
+    imageViewer.close,
+    {
+      preventDefault: true,
+      enabled: imageViewer.isOpen,
+    },
+    [imageViewer.isOpen]
+  );
+
   return (
     <Box sx={imageViewerContainerSx} data-hidden={!imageViewer.isOpen}>
       <Flex
