@@ -22,6 +22,7 @@ import { NodeFieldElementOverlay } from 'features/nodes/components/sidePanel/bui
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import {
   $isInPublishFlow,
+  $isPublishing,
   $isReadyToDoValidationRun,
   $isSelectingOutputNode,
   $outputNodeId,
@@ -183,13 +184,14 @@ SelectOutputNodeButton.displayName = 'SelectOutputNodeButton';
 
 const CancelPublishButton = memo(() => {
   const { t } = useTranslation();
+  const isPublishing = useStore($isPublishing);
   const onClick = useCallback(() => {
     $isInPublishFlow.set(false);
     $isSelectingOutputNode.set(false);
     $outputNodeId.set(null);
   }, []);
   return (
-    <Button leftIcon={<PiXBold />} onClick={onClick}>
+    <Button leftIcon={<PiXBold />} onClick={onClick} isDisabled={isPublishing}>
       {t('common.cancel')}
     </Button>
   );
@@ -198,6 +200,7 @@ CancelPublishButton.displayName = 'CancelDeployButton';
 
 const PublishWorkflowButton = memo(() => {
   const { t } = useTranslation();
+  const isPublishing = useStore($isPublishing);
   const isReadyToDoValidationRun = useStore($isReadyToDoValidationRun);
   const isReadyToEnqueue = useStore($isReadyToEnqueue);
   const doesWorkflowHaveUnsavedChanges = useDoesWorkflowHaveUnsavedChanges();
@@ -211,6 +214,7 @@ const PublishWorkflowButton = memo(() => {
 
   const enqueue = useEnqueueWorkflows();
   const onClick = useCallback(async () => {
+    $isPublishing.set(true);
     const result = await withResultAsync(() => enqueue(true, true));
     if (result.isErr()) {
       toast({
@@ -244,7 +248,29 @@ const PublishWorkflowButton = memo(() => {
       });
       log.debug(parseify(result.value), 'Enqueued batch');
     }
+    $isPublishing.set(false);
   }, [enqueue, projectUrl, t]);
+
+  const isDisabled = useMemo(() => {
+    return (
+      !allowPublishWorkflows ||
+      !isReadyToEnqueue ||
+      doesWorkflowHaveUnsavedChanges ||
+      hasUnpublishableNodes ||
+      !isReadyToDoValidationRun ||
+      !(outputNodeId !== null && !isSelectingOutputNode) ||
+      isPublishing
+    );
+  }, [
+    allowPublishWorkflows,
+    doesWorkflowHaveUnsavedChanges,
+    hasUnpublishableNodes,
+    isReadyToDoValidationRun,
+    isReadyToEnqueue,
+    isSelectingOutputNode,
+    outputNodeId,
+    isPublishing,
+  ]);
 
   return (
     <PublishTooltip
@@ -255,19 +281,8 @@ const PublishWorkflowButton = memo(() => {
       hasPublishableInputs={inputs.publishable.length > 0}
       hasUnpublishableInputs={inputs.unpublishable.length > 0}
     >
-      <Button
-        leftIcon={<PiLightningFill />}
-        isDisabled={
-          !allowPublishWorkflows ||
-          !isReadyToEnqueue ||
-          doesWorkflowHaveUnsavedChanges ||
-          hasUnpublishableNodes ||
-          !isReadyToDoValidationRun ||
-          !(outputNodeId !== null && !isSelectingOutputNode)
-        }
-        onClick={onClick}
-      >
-        {t('workflows.builder.publish')}
+      <Button leftIcon={<PiLightningFill />} isDisabled={isDisabled} onClick={onClick}>
+        {isPublishing ? t('workflows.builder.publishing') : t('workflows.builder.publish')}
       </Button>
     </PublishTooltip>
   );
@@ -337,6 +352,10 @@ export const StartPublishFlowButton = memo(() => {
     $isInPublishFlow.set(true);
   }, []);
 
+  const isDisabled = useMemo(() => {
+    return !allowPublishWorkflows || !isReadyToEnqueue || doesWorkflowHaveUnsavedChanges || hasUnpublishableNodes;
+  }, [allowPublishWorkflows, doesWorkflowHaveUnsavedChanges, hasUnpublishableNodes, isReadyToEnqueue]);
+
   return (
     <PublishTooltip
       isWorkflowSaved={!doesWorkflowHaveUnsavedChanges}
@@ -346,15 +365,7 @@ export const StartPublishFlowButton = memo(() => {
       hasPublishableInputs={inputs.publishable.length > 0}
       hasUnpublishableInputs={inputs.unpublishable.length > 0}
     >
-      <Button
-        onClick={onClick}
-        leftIcon={<PiLightningFill />}
-        variant="ghost"
-        size="sm"
-        isDisabled={
-          !allowPublishWorkflows || !isReadyToEnqueue || doesWorkflowHaveUnsavedChanges || hasUnpublishableNodes
-        }
-      >
+      <Button onClick={onClick} leftIcon={<PiLightningFill />} variant="ghost" size="sm" isDisabled={isDisabled}>
         {t('workflows.builder.publish')}
       </Button>
     </PublishTooltip>
