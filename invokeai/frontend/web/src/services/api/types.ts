@@ -31,7 +31,6 @@ export type InvocationJSONSchemaExtra = S['UIConfigBase'];
 // App Info
 export type AppVersion = S['AppVersion'];
 export type AppConfig = S['AppConfig'];
-export type AppDependencyVersions = S['AppDependencyVersions'];
 
 // Images
 export type ImageDTO = S['ImageDTO'];
