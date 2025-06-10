@@ -13,18 +13,26 @@ import type { S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 
-type ProgressData = {
+export type ProgressData = {
   itemId: number;
   progressEvent: S['InvocationProgressEvent'] | null;
   progressImage: ProgressImage | null;
+  outputImageName: string | null;
 };
+
+const getInitialProgressData = (itemId: number): ProgressData => ({
+  itemId,
+  progressEvent: null,
+  progressImage: null,
+  outputImageName: null,
+});
 
 export const useProgressData = (
   $progressData: WritableAtom<Record<number, ProgressData>>,
   itemId: number
 ): ProgressData => {
   const [value, setValue] = useState<ProgressData>(() => {
-    return $progressData.get()[itemId] ?? { itemId, progressEvent: null, progressImage: null };
+    return $progressData.get()[itemId] ?? getInitialProgressData(itemId);
   });
   useEffect(() => {
     const unsub = $progressData.subscribe((data) => {
@@ -62,6 +70,7 @@ const setProgress = ($progressData: WritableAtom<Record<number, ProgressData>>, 
         itemId: data.item_id,
         progressEvent: data,
         progressImage: data.image ?? null,
+        outputImageName: null,
       },
     });
   }
@@ -315,18 +324,45 @@ export const CanvasSessionContextProvider = memo(
         const progressData = $progressData.get();
 
         const toDelete: number[] = [];
-        const toClear: number[] = [];
+        const toUpdate: ProgressData[] = [];
 
         for (const datum of Object.values(progressData)) {
           const item = items.find(({ item_id }) => item_id === datum.itemId);
           if (!item) {
             toDelete.push(datum.itemId);
           } else if (item.status === 'canceled' || item.status === 'failed') {
-            toClear.push(datum.itemId);
+            toUpdate[datum.itemId] = {
+              ...datum,
+              progressEvent: null,
+              progressImage: null,
+              outputImageName: null,
+            };
           }
         }
 
-        if (toDelete.length === 0) {
+        for (const item of items) {
+          const datum = progressData[item.item_id];
+
+          if (datum) {
+            if (datum.outputImageName) {
+              continue;
+            }
+            const outputImageName = getOutputImageName(item);
+            if (!outputImageName) {
+              continue;
+            }
+            toUpdate.push({
+              ...datum,
+              outputImageName,
+            });
+          } else {
+            const _datum = getInitialProgressData(item.item_id);
+            _datum.outputImageName = getOutputImageName(item);
+            toUpdate.push(_datum);
+          }
+        }
+
+        if (toDelete.length === 0 && toUpdate.length === 0) {
           return;
         }
 
@@ -336,12 +372,8 @@ export const CanvasSessionContextProvider = memo(
           delete newProgressData[itemId];
         }
 
-        for (const itemId of toClear) {
-          const current = newProgressData[itemId];
-          if (current) {
-            current.progressEvent = null;
-            current.progressImage = null;
-          }
+        for (const datum of toUpdate) {
+          newProgressData[datum.itemId] = datum;
         }
 
         $progressData.set(newProgressData);
