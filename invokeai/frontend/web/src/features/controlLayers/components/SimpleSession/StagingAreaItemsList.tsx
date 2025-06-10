@@ -4,9 +4,7 @@ import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { QueueItemPreviewMini } from 'features/controlLayers/components/SimpleSession/QueueItemPreviewMini';
-import { getOutputImageName } from 'features/controlLayers/components/SimpleSession/shared';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { effect } from 'nanostores';
 import { memo, useEffect } from 'react';
 
 export const StagingAreaItemsList = memo(() => {
@@ -20,29 +18,8 @@ export const StagingAreaItemsList = memo(() => {
       return;
     }
 
-    return effect([ctx.$selectedItem, ctx.$progressData], (selectedItem, progressData) => {
-      if (!selectedItem) {
-        canvasManager.stagingArea.$imageSrc.set(null);
-        return;
-      }
-
-      const outputImageName = getOutputImageName(selectedItem);
-
-      if (outputImageName) {
-        canvasManager.stagingArea.$imageSrc.set({ type: 'imageName', data: outputImageName });
-        return;
-      }
-
-      const data = progressData[selectedItem.item_id];
-
-      if (data?.progressImage) {
-        canvasManager.stagingArea.$imageSrc.set({ type: 'dataURL', data: data.progressImage.dataURL });
-        return;
-      }
-
-      canvasManager.stagingArea.$imageSrc.set(null);
-    });
-  }, [canvasManager, ctx.$progressData, ctx.$selectedItem]);
+    return canvasManager.stagingArea.connectToSession(ctx.$selectedItemId, ctx.$progressData);
+  }, [canvasManager, ctx.$progressData, ctx.$selectedItemId]);
 
   return (
     <ScrollableContent overflowX="scroll" overflowY="hidden">
