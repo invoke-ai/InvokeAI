@@ -272,8 +272,9 @@ export const CanvasSessionContextProvider = memo(
         if (data.destination !== session.id) {
           return;
         }
+        const isFirstProgressImage = !$progressData.get()[data.item_id]?.progressImage && !!data.image;
         setProgress($progressData, data);
-        if ($autoSwitch.get() === 'first_progress') {
+        if ($autoSwitch.get() === 'first_progress' && isFirstProgressImage) {
           $selectedItemId.set(data.item_id);
         }
       };
