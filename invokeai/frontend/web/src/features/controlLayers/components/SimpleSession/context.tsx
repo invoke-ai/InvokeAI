@@ -12,6 +12,10 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
+import { z } from 'zod';
+
+export const zAutoSwitchMode = z.enum(['off', 'first_progress', 'completed']);
+export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 export type ProgressData = {
   itemId: number;
@@ -86,7 +90,7 @@ type CanvasSessionContextValue = {
   $selectedItem: Atom<S['SessionQueueItem'] | null>;
   $selectedItemIndex: Atom<number | null>;
   $selectedItemOutputImageName: Atom<string | null>;
-  $autoSwitch: WritableAtom<boolean>;
+  $autoSwitch: WritableAtom<AutoSwitchMode>;
   $lastLoadedItemId: WritableAtom<number | null>;
   selectNext: () => void;
   selectPrev: () => void;
@@ -121,7 +125,7 @@ export const CanvasSessionContextProvider = memo(
     /**
      * Whether auto-switch is enabled.
      */
-    const $autoSwitch = useState(() => atom(true))[0];
+    const $autoSwitch = useState(() => atom<AutoSwitchMode>('first_progress'))[0];
 
     /**
      * An internal flag used to work around race conditions with auto-switch switching to queue items before their
@@ -184,15 +188,15 @@ export const CanvasSessionContextProvider = memo(
      * image recorded.
      */
     const $selectedItemOutputImageName = useState(() =>
-      computed([$selectedItem], (selectedItem) => {
-        if (selectedItem === null) {
+      computed([$selectedItemId, $progressData], (selectedItemId, progressData) => {
+        if (selectedItemId === null) {
           return null;
         }
-        const outputImageName = getOutputImageName(selectedItem);
-        if (outputImageName === null) {
+        const datum = progressData[selectedItemId];
+        if (!datum) {
           return null;
         }
-        return outputImageName;
+        return datum.outputImageName;
       })
     )[0];
 
@@ -269,6 +273,9 @@ export const CanvasSessionContextProvider = memo(
           return;
         }
         setProgress($progressData, data);
+        if ($autoSwitch.get() === 'first_progress') {
+          $selectedItemId.set(data.item_id);
+        }
       };
 
       socket.on('invocation_progress', onProgress);
@@ -391,7 +398,7 @@ export const CanvasSessionContextProvider = memo(
         if (lastLoadedItemId === null) {
           return;
         }
-        if ($autoSwitch.get()) {
+        if ($autoSwitch.get() === 'completed') {
           $selectedItemId.set(lastLoadedItemId);
         }
         $lastLoadedItemId.set(null);
