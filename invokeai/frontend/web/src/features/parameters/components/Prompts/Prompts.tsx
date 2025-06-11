@@ -18,7 +18,7 @@ export const Prompts = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
   return (
-    <Flex flexDir="column" gap={2}>
+    <Flex flexDir="column" gap={2} overflow="scroll" p={2} h="full">
       <ParamPositivePrompt />
       {withStylePrompts && <ParamSDXLPositiveStylePrompt />}
       {!isFLUX && !isChatGPT4o && <ParamNegativePrompt />}

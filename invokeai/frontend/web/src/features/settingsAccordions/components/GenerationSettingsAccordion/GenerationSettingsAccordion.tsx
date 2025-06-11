@@ -74,7 +74,7 @@ export const GenerationSettingsAccordion = memo(() => {
     //   isOpen={isOpenAccordion}
     //   onToggle={onToggleAccordion}
     // >
-    <Box p={2} data-testid="generation-accordion">
+    <Box p={2} data-testid="generation-accordion" overflow="scroll" h="full">
       <Flex gap={4} flexDir="column" pb={isApiModel ? 4 : 0}>
         <DisabledModelWarning />
         <MainModelPicker />

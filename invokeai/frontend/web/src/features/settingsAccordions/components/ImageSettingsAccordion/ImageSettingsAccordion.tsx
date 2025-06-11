@@ -69,31 +69,32 @@ export const ImageSettingsAccordion = memo(() => {
     //   isOpen={isOpenAccordion}
     //   onToggle={onToggleAccordion}
     // >
-      <Flex
-        px={2}
-        pb={isApiModel ? 4 : 0}
-        w="full"
-        h="full"
-        flexDir="column"
-        data-testid="image-settings-accordion"
-      >
-        <BboxSettings />
-        {!isApiModel && <ParamSeed py={3} />}
-        {!isApiModel && (
-          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-            <Flex gap={4} pb={4} flexDir="column">
-              {(isFLUX || isSD3) && <ParamOptimizedDenoisingToggle />}
-              <BboxScaleMethod />
-              {scaleMethod !== 'none' && (
-                <FormControlGroup formLabelProps={scalingLabelProps}>
-                  <BboxScaledWidth />
-                  <BboxScaledHeight />
-                </FormControlGroup>
-              )}
-            </Flex>
-          </Expander>
-        )}
-      </Flex>
+    <Flex
+      p={2}
+      pb={isApiModel ? 2 : 0}
+      w="full"
+      h="full"
+      flexDir="column"
+      data-testid="image-settings-accordion"
+      overflow="scroll"
+    >
+      <BboxSettings />
+      {!isApiModel && <ParamSeed py={3} />}
+      {!isApiModel && (
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+          <Flex gap={4} pb={4} flexDir="column">
+            {(isFLUX || isSD3) && <ParamOptimizedDenoisingToggle />}
+            <BboxScaleMethod />
+            {scaleMethod !== 'none' && (
+              <FormControlGroup formLabelProps={scalingLabelProps}>
+                <BboxScaledWidth />
+                <BboxScaledHeight />
+              </FormControlGroup>
+            )}
+          </Flex>
+        </Expander>
+      )}
+    </Flex>
     // </StandaloneAccordion>
   );
 });

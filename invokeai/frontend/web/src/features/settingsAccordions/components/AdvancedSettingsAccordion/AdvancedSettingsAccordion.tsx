@@ -85,7 +85,15 @@ export const AdvancedSettingsAccordion = memo(() => {
   });
 
   return (
-    <Flex gap={4} alignItems="center" p={2} flexDir="column" data-testid="advanced-settings-accordion">
+    <Flex
+      gap={4}
+      alignItems="center"
+      p={2}
+      flexDir="column"
+      data-testid="advanced-settings-accordion"
+      overflow="scroll"
+      h="full"
+    >
       <Flex gap={4} w="full">
         {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
         {!isFLUX && !isSD3 && <ParamVAEPrecision />}

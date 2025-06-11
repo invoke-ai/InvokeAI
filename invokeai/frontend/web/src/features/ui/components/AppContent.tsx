@@ -10,9 +10,14 @@ import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/Canva
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { BoardsListPanelContent } from 'features/gallery/components/BoardsListPanelContent';
 import { Gallery } from 'features/gallery/components/Gallery';
+import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
+import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
+import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
+import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
+import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
+import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { LeftPanelContent } from 'features/ui/components/LeftPanelContent';
 import { MainPanelContent } from 'features/ui/components/MainPanelContent';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
@@ -46,7 +51,6 @@ const MyCustomTab = (props: IDockviewPanelHeaderProps) => {
 };
 
 const components: IDockviewReactProps['components'] = {
-  settings: LeftPanelContent,
   main: MainPanelContent,
   boards: BoardsListPanelContent,
   gallery: Gallery,
@@ -56,6 +60,12 @@ const components: IDockviewReactProps['components'] = {
     </CanvasManagerProviderGate>
   ),
   queueControls: QueueControls,
+  prompts: Prompts,
+  imageSettings: ImageSettingsAccordion,
+  generationSettings: GenerationSettingsAccordion,
+  compositingSettings: CompositingSettingsAccordion,
+  advancedSettings: AdvancedSettingsAccordion,
+  refinerSettings: RefinerSettingsAccordion,
 };
 
 const theme: DockviewTheme = {
@@ -150,25 +160,73 @@ export const AppContent = memo(() => {
       title: 'Workspace',
       minimumWidth: 200,
     });
-    const settingsPanel = event.api.addPanel({
-      id: 'settings',
-      title: 'Settings',
-      component: 'settings',
+    const queueControls = event.api.addPanel({
+      id: 'queue-controls',
+      title: 'Queue Controls',
+      component: 'queueControls',
+      // floating: true,
+      // initialHeight: 48 + 24,
+      initialHeight: 48,
+      maximumHeight: 48,
+      minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
       initialWidth: LEFT_PANEL_MIN_SIZE_PX,
       position: {
         direction: 'left',
         referencePanel: mainPanel,
       },
     });
-    event.api.addPanel({
-      id: 'queue-controls',
-      title: 'Queue Controls',
-      component: 'queueControls',
-      // floating: true,
-      initialHeight: 48 + 24,
+    const promptsPanel = event.api.addPanel({
+      id: 'prompts',
+      title: 'Prompts',
+      component: 'prompts',
       position: {
-        direction: 'above',
-        referencePanel: settingsPanel,
+        direction: 'below',
+        referencePanel: queueControls,
+      },
+    });
+    const imagePanel = event.api.addPanel({
+      id: 'imageSettings',
+      title: 'Image Settings',
+      component: 'imageSettings',
+      position: {
+        direction: 'below',
+        referencePanel: promptsPanel,
+      },
+    });
+    const genPanel = event.api.addPanel({
+      id: 'generationSettings',
+      title: 'Generation Settings',
+      component: 'generationSettings',
+      position: {
+        direction: 'within',
+        referencePanel: imagePanel,
+      },
+    });
+    const compPanel = event.api.addPanel({
+      id: 'compositingSettings',
+      title: 'Compositing Settings',
+      component: 'compositingSettings',
+      position: {
+        direction: 'below',
+        referencePanel: imagePanel,
+      },
+    });
+    const advancedPanel = event.api.addPanel({
+      id: 'advancedSettings',
+      title: 'Advanced Settings',
+      component: 'advancedSettings',
+      position: {
+        direction: 'within',
+        referencePanel: compPanel,
+      },
+    });
+    event.api.addPanel({
+      id: 'refinerSettings',
+      title: 'Refiner Settings',
+      component: 'refinerSettings',
+      position: {
+        direction: 'within',
+        referencePanel: advancedPanel,
       },
     });
     const boardsPanel = event.api.addPanel({
