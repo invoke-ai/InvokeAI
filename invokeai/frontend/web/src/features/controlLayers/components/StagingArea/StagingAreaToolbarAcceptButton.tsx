@@ -23,17 +23,17 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasFocused = useIsRegionFocused('canvas');
-  const selectedItemImageName = useStore(ctx.$selectedItemOutputImageName);
+  const selectedItemImageDTO = useStore(ctx.$selectedItemOutputImageDTO);
   const deleteQueueItemsByDestination = useDeleteQueueItemsByDestination();
 
   const { t } = useTranslation();
 
   const acceptSelected = useCallback(() => {
-    if (!selectedItemImageName) {
+    if (!selectedItemImageDTO) {
       return;
     }
     const { x, y, width, height } = bboxRect;
-    const imageObject = imageNameToImageObject(selectedItemImageName, { width, height });
+    const imageObject = imageNameToImageObject(selectedItemImageDTO.image_name, { width, height });
     const overrides: Partial<CanvasRasterLayerState> = {
       position: { x, y },
       objects: [imageObject],
@@ -43,7 +43,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
     dispatch(canvasSessionGenerationFinished());
     deleteQueueItemsByDestination.trigger(ctx.session.id);
   }, [
-    selectedItemImageName,
+    selectedItemImageDTO,
     bboxRect,
     dispatch,
     selectedEntityIdentifier?.type,
@@ -56,9 +56,9 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
     acceptSelected,
     {
       preventDefault: true,
-      enabled: isCanvasFocused && shouldShowStagedImage && selectedItemImageName !== null,
+      enabled: isCanvasFocused && shouldShowStagedImage && selectedItemImageDTO !== null,
     },
-    [isCanvasFocused, shouldShowStagedImage, selectedItemImageName]
+    [isCanvasFocused, shouldShowStagedImage, selectedItemImageDTO]
   );
 
   return (
@@ -68,7 +68,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
       icon={<PiCheckBold />}
       onClick={acceptSelected}
       colorScheme="invokeBlue"
-      isDisabled={!selectedItemImageName || !shouldShowStagedImage || deleteQueueItemsByDestination.isDisabled}
+      isDisabled={!selectedItemImageDTO || !shouldShowStagedImage || deleteQueueItemsByDestination.isDisabled}
       isLoading={deleteQueueItemsByDestination.isLoading}
     />
   );
