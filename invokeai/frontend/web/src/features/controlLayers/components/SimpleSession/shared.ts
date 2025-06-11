@@ -1,9 +1,10 @@
-import { skipToken } from '@reduxjs/toolkit/query';
+import { useStore } from '@nanostores/react';
+import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
 import { isImageField } from 'features/nodes/types/common';
 import { isCanvasOutputNodeId } from 'features/nodes/util/graph/graphBuilderUtils';
 import { round } from 'lodash-es';
-import { useMemo } from 'react';
-import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { computed } from 'nanostores';
+import { useState } from 'react';
 import type { S } from 'services/api/types';
 import { objectEntries } from 'tsafe';
 
@@ -43,9 +44,11 @@ export const getOutputImageName = (item: S['SessionQueueItem']) => {
 };
 
 export const useOutputImageDTO = (item: S['SessionQueueItem']) => {
-  const outputImageName = useMemo(() => getOutputImageName(item), [item]);
-
-  const { currentData: imageDTO } = useGetImageDTOQuery(outputImageName ?? skipToken);
+  const ctx = useCanvasSessionContext();
+  const $imageDTO = useState(() =>
+    computed([ctx.$progressData], (progressData) => progressData[item.item_id]?.imageDTO ?? null)
+  )[0];
+  const imageDTO = useStore($imageDTO);
 
   return imageDTO;
 };
