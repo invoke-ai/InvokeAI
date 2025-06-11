@@ -1,5 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup, StandaloneAccordion, Text } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsRefinerModelSelected, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
@@ -36,11 +36,7 @@ export const RefinerSettingsAccordion: React.FC = memo(() => {
     defaultIsOpen: false,
   });
 
-  return (
-    <StandaloneAccordion label={t('sdxl.refiner')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
-      {isRefinerAvailable ? <RefinerSettingsAccordionContent /> : <RefinerSettingsAccordionNoRefiner />}
-    </StandaloneAccordion>
-  );
+  return isRefinerAvailable ? <RefinerSettingsAccordionContent /> : <RefinerSettingsAccordionNoRefiner />;
 });
 
 RefinerSettingsAccordion.displayName = 'RefinerSettingsAccordion';

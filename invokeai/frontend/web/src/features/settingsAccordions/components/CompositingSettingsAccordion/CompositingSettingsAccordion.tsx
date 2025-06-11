@@ -2,7 +2,6 @@ import type { FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Flex,
   FormControlGroup,
-  StandaloneAccordion,
   Tab,
   TabList,
   TabPanel,
@@ -31,7 +30,6 @@ export const CompositingSettingsAccordion = memo(() => {
   });
 
   return (
-    <StandaloneAccordion isOpen={isOpen} onToggle={onToggle} label={t('accordions.compositing.title')}>
       <Tabs variant="collapse">
         <TabList>
           <Tab>{t('accordions.compositing.coherenceTab')}</Tab>
@@ -60,7 +58,6 @@ export const CompositingSettingsAccordion = memo(() => {
           </TabPanel>
         </TabPanels>
       </Tabs>
-    </StandaloneAccordion>
   );
 });
 

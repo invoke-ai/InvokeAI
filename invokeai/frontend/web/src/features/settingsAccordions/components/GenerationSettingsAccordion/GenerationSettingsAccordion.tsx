@@ -1,5 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Box, Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Box, Expander, Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -68,35 +68,35 @@ export const GenerationSettingsAccordion = memo(() => {
   });
 
   return (
-    <StandaloneAccordion
-      label={t('accordions.generation.title')}
-      badges={[...accordionBadges, ...loraTabBadges]}
-      isOpen={isOpenAccordion}
-      onToggle={onToggleAccordion}
-    >
-      <Box px={4} pt={4} data-testid="generation-accordion">
-        <Flex gap={4} flexDir="column" pb={isApiModel ? 4 : 0}>
-          <DisabledModelWarning />
-          <MainModelPicker />
-          {!isApiModel && <LoRASelect />}
-          {!isApiModel && <LoRAList />}
-        </Flex>
-        {!isApiModel && (
-          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-            <Flex gap={4} flexDir="column" pb={4}>
-              <FormControlGroup formLabelProps={formLabelProps}>
-                {!isFLUX && !isSD3 && !isCogView4 && !isUpscaling && <ParamScheduler />}
-                {isUpscaling && <ParamUpscaleScheduler />}
-                <ParamSteps />
-                {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
-                {isUpscaling && <ParamUpscaleCFGScale />}
-                {!isFLUX && !isUpscaling && <ParamCFGScale />}
-              </FormControlGroup>
-            </Flex>
-          </Expander>
-        )}
-      </Box>
-    </StandaloneAccordion>
+    // <StandaloneAccordion
+    //   label={t('accordions.generation.title')}
+    //   badges={[...accordionBadges, ...loraTabBadges]}
+    //   isOpen={isOpenAccordion}
+    //   onToggle={onToggleAccordion}
+    // >
+    <Box p={2} data-testid="generation-accordion">
+      <Flex gap={4} flexDir="column" pb={isApiModel ? 4 : 0}>
+        <DisabledModelWarning />
+        <MainModelPicker />
+        {!isApiModel && <LoRASelect />}
+        {!isApiModel && <LoRAList />}
+      </Flex>
+      {!isApiModel && (
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+          <Flex gap={4} flexDir="column" pb={4}>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              {!isFLUX && !isSD3 && !isCogView4 && !isUpscaling && <ParamScheduler />}
+              {isUpscaling && <ParamUpscaleScheduler />}
+              <ParamSteps />
+              {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
+              {isUpscaling && <ParamUpscaleCFGScale />}
+              {!isFLUX && !isUpscaling && <ParamCFGScale />}
+            </FormControlGroup>
+          </Flex>
+        </Expander>
+      )}
+    </Box>
+    // </StandaloneAccordion>
   );
 });
 

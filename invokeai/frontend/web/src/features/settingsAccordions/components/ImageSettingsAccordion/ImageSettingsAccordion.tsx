@@ -1,5 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Expander, Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -63,15 +63,14 @@ export const ImageSettingsAccordion = memo(() => {
   const isApiModel = useIsApiModel();
 
   return (
-    <StandaloneAccordion
-      label={t('accordions.image.title')}
-      badges={badges}
-      isOpen={isOpenAccordion}
-      onToggle={onToggleAccordion}
-    >
+    // <StandaloneAccordion
+    //   label={t('accordions.image.title')}
+    //   badges={badges}
+    //   isOpen={isOpenAccordion}
+    //   onToggle={onToggleAccordion}
+    // >
       <Flex
-        px={4}
-        pt={4}
+        px={2}
         pb={isApiModel ? 4 : 0}
         w="full"
         h="full"
@@ -95,7 +94,7 @@ export const ImageSettingsAccordion = memo(() => {
           </Expander>
         )}
       </Flex>
-    </StandaloneAccordion>
+    // </StandaloneAccordion>
   );
 });
 

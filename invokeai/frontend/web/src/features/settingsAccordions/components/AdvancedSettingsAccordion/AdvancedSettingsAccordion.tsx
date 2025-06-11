@@ -1,5 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -85,47 +85,45 @@ export const AdvancedSettingsAccordion = memo(() => {
   });
 
   return (
-    <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
-      <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        <Flex gap={4} w="full">
-          {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
-          {!isFLUX && !isSD3 && <ParamVAEPrecision />}
-        </Flex>
-        {activeTabName === 'upscaling' ? (
-          <ParamSeed />
-        ) : (
-          <>
-            {!isFLUX && !isSD3 && (
-              <>
-                <FormControlGroup formLabelProps={formLabelProps}>
-                  <ParamClipSkip />
-                  <ParamCFGRescaleMultiplier />
-                </FormControlGroup>
-                <Flex gap={4} w="full">
-                  <FormControlGroup formLabelProps={formLabelProps2}>
-                    <ParamSeamlessXAxis />
-                    <ParamSeamlessYAxis />
-                  </FormControlGroup>
-                </Flex>
-              </>
-            )}
-            {isFLUX && (
-              <FormControlGroup>
-                <ParamT5EncoderModelSelect />
-                <ParamCLIPEmbedModelSelect />
-              </FormControlGroup>
-            )}
-            {isSD3 && (
-              <FormControlGroup>
-                <ParamT5EncoderModelSelect />
-                <ParamCLIPLEmbedModelSelect />
-                <ParamCLIPGEmbedModelSelect />
-              </FormControlGroup>
-            )}
-          </>
-        )}
+    <Flex gap={4} alignItems="center" p={2} flexDir="column" data-testid="advanced-settings-accordion">
+      <Flex gap={4} w="full">
+        {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
+        {!isFLUX && !isSD3 && <ParamVAEPrecision />}
       </Flex>
-    </StandaloneAccordion>
+      {activeTabName === 'upscaling' ? (
+        <ParamSeed />
+      ) : (
+        <>
+          {!isFLUX && !isSD3 && (
+            <>
+              <FormControlGroup formLabelProps={formLabelProps}>
+                <ParamClipSkip />
+                <ParamCFGRescaleMultiplier />
+              </FormControlGroup>
+              <Flex gap={4} w="full">
+                <FormControlGroup formLabelProps={formLabelProps2}>
+                  <ParamSeamlessXAxis />
+                  <ParamSeamlessYAxis />
+                </FormControlGroup>
+              </Flex>
+            </>
+          )}
+          {isFLUX && (
+            <FormControlGroup>
+              <ParamT5EncoderModelSelect />
+              <ParamCLIPEmbedModelSelect />
+            </FormControlGroup>
+          )}
+          {isSD3 && (
+            <FormControlGroup>
+              <ParamT5EncoderModelSelect />
+              <ParamCLIPLEmbedModelSelect />
+              <ParamCLIPGEmbedModelSelect />
+            </FormControlGroup>
+          )}
+        </>
+      )}
+    </Flex>
   );
 });
 
