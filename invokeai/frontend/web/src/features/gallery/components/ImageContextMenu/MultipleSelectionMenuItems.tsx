@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,7 @@ const MultipleSelectionMenuItems = () => {
   const dispatch = useAppDispatch();
   const selection = useAppSelector((s) => s.gallery.selection);
   const customStarUi = useStore($customStarUI);
+  const deleteImageModal = useDeleteImageModalApi();
 
   const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
@@ -32,8 +33,8 @@ const MultipleSelectionMenuItems = () => {
   }, [dispatch, selection]);
 
   const handleDeleteSelection = useCallback(() => {
-    dispatch(imagesToDeleteSelected(selection));
-  }, [dispatch, selection]);
+    deleteImageModal.delete(selection);
+  }, [deleteImageModal, selection]);
 
   const handleStarSelection = useCallback(() => {
     starImages({ imageDTOs: selection });
