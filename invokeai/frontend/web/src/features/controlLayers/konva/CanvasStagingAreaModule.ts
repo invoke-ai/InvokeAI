@@ -147,8 +147,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
       const datum = progressData[selectedItemId];
 
-      if (datum?.outputImageName) {
-        this.$imageSrc.set({ type: 'imageName', data: datum.outputImageName });
+      if (datum?.imageDTO) {
+        this.$imageSrc.set({ type: 'imageName', data: datum.imageDTO.image_name });
         return;
       } else if (datum?.progressImage) {
         this.$imageSrc.set({ type: 'dataURL', data: datum.progressImage.dataURL });

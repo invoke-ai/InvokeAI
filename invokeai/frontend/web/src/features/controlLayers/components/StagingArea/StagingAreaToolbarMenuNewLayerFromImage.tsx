@@ -16,7 +16,7 @@ export const StagingAreaToolbarNewLayerFromImageMenuItems = memo(() => {
   const canvasManager = useCanvasManager();
   const { t } = useTranslation();
   const ctx = useCanvasSessionContext();
-  const imageName = useStore(ctx.$selectedItemOutputImageName);
+  const selectedItemOutputImageDTO = useStore(ctx.$selectedItemOutputImageDTO);
   const store = useAppStore();
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
 
@@ -29,11 +29,11 @@ export const StagingAreaToolbarNewLayerFromImageMenuItems = memo(() => {
   }, [t]);
 
   const onClickNewRasterLayerFromImage = useCallback(async () => {
-    if (!imageName) {
+    if (!selectedItemOutputImageDTO) {
       return;
     }
     const { dispatch, getState } = store;
-    const imageDTO = await copyImage(imageName, uploadImageArg);
+    const imageDTO = await copyImage(selectedItemOutputImageDTO.image_name, uploadImageArg);
     createNewCanvasEntityFromImage({
       imageDTO,
       type: 'raster_layer',
@@ -42,14 +42,14 @@ export const StagingAreaToolbarNewLayerFromImageMenuItems = memo(() => {
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
     toastSentToCanvas();
-  }, [imageName, store, toastSentToCanvas]);
+  }, [selectedItemOutputImageDTO, store, toastSentToCanvas]);
 
   const onClickNewControlLayerFromImage = useCallback(async () => {
-    if (!imageName) {
+    if (!selectedItemOutputImageDTO) {
       return;
     }
     const { dispatch, getState } = store;
-    const imageDTO = await copyImage(imageName, uploadImageArg);
+    const imageDTO = await copyImage(selectedItemOutputImageDTO.image_name, uploadImageArg);
 
     createNewCanvasEntityFromImage({
       imageDTO,
@@ -59,14 +59,14 @@ export const StagingAreaToolbarNewLayerFromImageMenuItems = memo(() => {
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
     toastSentToCanvas();
-  }, [imageName, store, toastSentToCanvas]);
+  }, [selectedItemOutputImageDTO, store, toastSentToCanvas]);
 
   const onClickNewInpaintMaskFromImage = useCallback(async () => {
-    if (!imageName) {
+    if (!selectedItemOutputImageDTO) {
       return;
     }
     const { dispatch, getState } = store;
-    const imageDTO = await copyImage(imageName, uploadImageArg);
+    const imageDTO = await copyImage(selectedItemOutputImageDTO.image_name, uploadImageArg);
 
     createNewCanvasEntityFromImage({
       imageDTO,
@@ -76,14 +76,14 @@ export const StagingAreaToolbarNewLayerFromImageMenuItems = memo(() => {
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
     toastSentToCanvas();
-  }, [imageName, store, toastSentToCanvas]);
+  }, [selectedItemOutputImageDTO, store, toastSentToCanvas]);
 
   const onClickNewRegionalGuidanceFromImage = useCallback(async () => {
-    if (!imageName) {
+    if (!selectedItemOutputImageDTO) {
       return;
     }
     const { dispatch, getState } = store;
-    const imageDTO = await copyImage(imageName, uploadImageArg);
+    const imageDTO = await copyImage(selectedItemOutputImageDTO.image_name, uploadImageArg);
 
     createNewCanvasEntityFromImage({
       imageDTO,
@@ -93,35 +93,35 @@ export const StagingAreaToolbarNewLayerFromImageMenuItems = memo(() => {
       overrides: { isEnabled: false }, // We are adding the layer while staging, it should be disabled by default
     });
     toastSentToCanvas();
-  }, [imageName, store, toastSentToCanvas]);
+  }, [selectedItemOutputImageDTO, store, toastSentToCanvas]);
 
   return (
     <MenuGroup title="New Layer From Image">
       <MenuItem
         icon={<NewLayerIcon />}
         onClickCapture={onClickNewInpaintMaskFromImage}
-        isDisabled={!imageName || !shouldShowStagedImage}
+        isDisabled={!selectedItemOutputImageDTO || !shouldShowStagedImage}
       >
         {t('controlLayers.inpaintMask')}
       </MenuItem>
       <MenuItem
         icon={<NewLayerIcon />}
         onClickCapture={onClickNewRegionalGuidanceFromImage}
-        isDisabled={!imageName || !shouldShowStagedImage}
+        isDisabled={!selectedItemOutputImageDTO || !shouldShowStagedImage}
       >
         {t('controlLayers.regionalGuidance')}
       </MenuItem>
       <MenuItem
         icon={<NewLayerIcon />}
         onClickCapture={onClickNewControlLayerFromImage}
-        isDisabled={!imageName || !shouldShowStagedImage}
+        isDisabled={!selectedItemOutputImageDTO || !shouldShowStagedImage}
       >
         {t('controlLayers.controlLayer')}
       </MenuItem>
       <MenuItem
         icon={<NewLayerIcon />}
         onClickCapture={onClickNewRasterLayerFromImage}
-        isDisabled={!imageName || !shouldShowStagedImage}
+        isDisabled={!selectedItemOutputImageDTO || !shouldShowStagedImage}
       >
         {t('controlLayers.rasterLayer')}
       </MenuItem>
