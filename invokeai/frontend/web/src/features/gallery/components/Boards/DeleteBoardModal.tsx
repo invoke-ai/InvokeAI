@@ -17,7 +17,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
-import { getImageUsage } from 'features/deleteImageModal/store/selectors';
+import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';

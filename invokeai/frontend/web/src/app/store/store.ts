@@ -13,7 +13,6 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
-import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
@@ -54,7 +53,6 @@ const allReducers = {
   [configSlice.name]: configSlice.reducer,
   [uiSlice.name]: uiSlice.reducer,
   [dynamicPromptsSlice.name]: dynamicPromptsSlice.reducer,
-  [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
   [queueSlice.name]: queueSlice.reducer,
