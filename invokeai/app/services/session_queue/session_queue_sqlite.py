@@ -104,11 +104,7 @@ class SqliteSessionQueue(SessionQueueBase):
         return cast(Union[int, None], cursor.fetchone()[0]) or 0
 
     async def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
-        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend)
-
-    def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
         try:
-            cursor = self._conn.cursor()
             # TODO: how does this work in a multi-user scenario?
             current_queue_size = self._get_current_queue_size(queue_id)
             max_queue_size = self.__invoker.services.configuration.max_queue_size
@@ -118,8 +114,12 @@ class SqliteSessionQueue(SessionQueueBase):
             if prepend:
                 priority = self._get_highest_priority(queue_id) + 1
 
-            requested_count = calc_session_count(batch)
-            values_to_insert = prepare_values_to_insert(
+            requested_count = await asyncio.to_thread(
+                calc_session_count,
+                batch=batch,
+            )
+            values_to_insert = await asyncio.to_thread(
+                prepare_values_to_insert,
                 queue_id=queue_id,
                 batch=batch,
                 priority=priority,
@@ -127,19 +127,16 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             enqueued_count = len(values_to_insert)
 
-            if requested_count > enqueued_count:
-                values_to_insert = values_to_insert[:max_new_queue_items]
-
-            cursor.executemany(
-                """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                values_to_insert,
-            )
-            self._conn.commit()
+            with self._conn:
+                cursor = self._conn.cursor()
+                cursor.executemany(
+                    """--sql
+                    INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    values_to_insert,
+                )
         except Exception:
-            self._conn.rollback()
             raise
         enqueue_result = EnqueueBatchResult(
             queue_id=queue_id,
