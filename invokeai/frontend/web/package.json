@@ -67,6 +67,7 @@
     "chakra-react-select": "^4.9.2",
     "cmdk": "^1.1.1",
     "compare-versions": "^6.1.1",
+    "dockview": "^4.3.1",
     "filesize": "^10.1.6",
     "fracturedjsonjs": "^4.1.0",
     "framer-motion": "^11.10.0",

@@ -1,17 +1,10 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsFLUX, selectIsSD3, selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
-import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
-import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPEmbedModelSelect';
-import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
-import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
-import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
-import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
-import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
-import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
+import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
@@ -65,6 +58,9 @@ export const AdvancedSettingsAccordion = memo(() => {
           if (params.seamlessXAxis || params.seamlessYAxis) {
             badges.push('seamless');
           }
+          if (!params.shouldRandomizeSeed) {
+            badges.push('Manual Seed');
+          }
         }
 
         return badges;
@@ -74,7 +70,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
-    id: `'advanced-settings-generate`,
+    id: `'advanced-settings-upscaling`,
     defaultIsOpen: false,
   });
 
@@ -85,33 +81,7 @@ export const AdvancedSettingsAccordion = memo(() => {
           {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
           {!isFLUX && !isSD3 && <ParamVAEPrecision />}
         </Flex>
-        {!isFLUX && !isSD3 && (
-          <>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamClipSkip />
-              <ParamCFGRescaleMultiplier />
-            </FormControlGroup>
-            <Flex gap={4} w="full">
-              <FormControlGroup formLabelProps={formLabelProps2}>
-                <ParamSeamlessXAxis />
-                <ParamSeamlessYAxis />
-              </FormControlGroup>
-            </Flex>
-          </>
-        )}
-        {isFLUX && (
-          <FormControlGroup>
-            <ParamT5EncoderModelSelect />
-            <ParamCLIPEmbedModelSelect />
-          </FormControlGroup>
-        )}
-        {isSD3 && (
-          <FormControlGroup>
-            <ParamT5EncoderModelSelect />
-            <ParamCLIPLEmbedModelSelect />
-            <ParamCLIPGEmbedModelSelect />
-          </FormControlGroup>
-        )}
+        <ParamSeed />
       </Flex>
     </StandaloneAccordion>
   );

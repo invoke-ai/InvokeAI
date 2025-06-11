@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/nanostores/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import {
@@ -24,11 +25,10 @@ import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 import type { ImageDTO } from 'services/api/types';
 
 export const useImageActions = (imageDTO: ImageDTO) => {
-  const dispatch = useAppDispatch();
+  const { dispatch, getState } = useAppStore();
   const { t } = useTranslation();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const isStaging = useAppSelector(selectIsStaging);
-  const activeTabName = useAppSelector(selectActiveTab);
   const { metadata } = useDebouncedMetadata(imageDTO.image_name);
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
@@ -82,18 +82,20 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     if (!metadata) {
       return;
     }
+    const activeTabName = selectActiveTab(getState());
     parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', isStaging ? ['width', 'height'] : []);
     clearStylePreset();
-  }, [metadata, activeTabName, isStaging, clearStylePreset]);
+  }, [metadata, getState, isStaging, clearStylePreset]);
 
   const remix = useCallback(() => {
     if (!metadata) {
       return;
     }
+    const activeTabName = selectActiveTab(getState());
     // Recalls all metadata parameters except seed
     parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', ['seed']);
     clearStylePreset();
-  }, [activeTabName, metadata, clearStylePreset]);
+  }, [metadata, getState, clearStylePreset]);
 
   const recallSeed = useCallback(() => {
     if (!metadata) {

@@ -12,7 +12,7 @@ export const LeftPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
   return (
-    <Flex flexDir="column" w="full" h="full" gap={2}>
+    <Flex flexDir="column" w="full" h="full" gap={2} py={2} pe={2}>
       <QueueControls />
       <Box position="relative" w="full" h="full">
         {tab === 'generate' && <ParametersPanelTextToImage />}

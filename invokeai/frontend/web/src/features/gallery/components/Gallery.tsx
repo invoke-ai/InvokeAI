@@ -70,7 +70,7 @@ export const Gallery = memo(() => {
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" pt={1} minH={0}>
+    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" p={2} minH={0}>
       <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
         <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full">
           <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2" wordBreak="break-all">
