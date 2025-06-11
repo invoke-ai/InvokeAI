@@ -17,13 +17,13 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
   const canvasManager = useCanvasManager();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const ctx = useCanvasSessionContext();
-  const imageName = useStore(ctx.$selectedItemOutputImageName);
+  const selectedItemOutputImageDTO = useStore(ctx.$selectedItemOutputImageDTO);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
 
   const { t } = useTranslation();
 
   const saveSelectedImageToGallery = useCallback(async () => {
-    if (!imageName) {
+    if (!selectedItemOutputImageDTO) {
       return;
     }
 
@@ -31,7 +31,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
     // the gallery without borking the canvas, which may need this image to exist.
     const result = await withResultAsync(async () => {
       // Create a new file with the same name, which we will upload
-      await copyImage(imageName, {
+      await copyImage(selectedItemOutputImageDTO.image_name, {
         // Image should show up in the Images tab
         image_category: 'general',
         is_intermediate: false,
@@ -55,7 +55,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
         status: 'error',
       });
     }
-  }, [autoAddBoardId, imageName, t]);
+  }, [autoAddBoardId, selectedItemOutputImageDTO, t]);
 
   return (
     <IconButton
@@ -64,7 +64,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
       icon={<PiFloppyDiskBold />}
       onClick={saveSelectedImageToGallery}
       colorScheme="invokeBlue"
-      isDisabled={!imageName || !shouldShowStagedImage}
+      isDisabled={!selectedItemOutputImageDTO || !shouldShowStagedImage}
     />
   );
 });
