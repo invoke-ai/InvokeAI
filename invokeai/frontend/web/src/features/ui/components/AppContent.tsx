@@ -1,12 +1,19 @@
+import 'dockview/dist/styles/dockview.css';
+import './dockview_theme_invoke.css';
+
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import type { DockviewApi, DockviewTheme, IDockviewPanelHeaderProps, IDockviewReactProps } from 'dockview';
+import { DockviewDefaultTab, DockviewReact } from 'dockview';
+import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
+import { BoardsListPanelContent } from 'features/gallery/components/BoardsListPanelContent';
+import { Gallery } from 'features/gallery/components/Gallery';
+import QueueControls from 'features/queue/components/QueueControls';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
-import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
 import { LeftPanelContent } from 'features/ui/components/LeftPanelContent';
 import { MainPanelContent } from 'features/ui/components/MainPanelContent';
-import { RightPanelContent } from 'features/ui/components/RightPanelContent';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
@@ -18,17 +25,39 @@ import {
   selectWithLeftPanel,
   selectWithRightPanel,
 } from 'features/ui/store/uiSlice';
+import { atom } from 'nanostores';
 import type { CSSProperties } from 'react';
-import { memo, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
-import { Panel, PanelGroup } from 'react-resizable-panels';
-
-import { VerticalResizeHandle } from './tabs/ResizeHandle';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
 
 const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCollapsed);
 const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
+
+const MyCustomTab = (props: IDockviewPanelHeaderProps) => {
+  return <DockviewDefaultTab hideClose {...props} />;
+};
+
+const components: IDockviewReactProps['components'] = {
+  settings: LeftPanelContent,
+  main: MainPanelContent,
+  boards: BoardsListPanelContent,
+  gallery: Gallery,
+  layers: () => (
+    <CanvasManagerProviderGate>
+      <CanvasLayersPanelContent />
+    </CanvasManagerProviderGate>
+  ),
+  queueControls: QueueControls,
+};
+
+const theme: DockviewTheme = {
+  className: 'dockview-theme-invoke',
+  name: 'Invoke',
+};
+
+const $dockviewApi = atom<DockviewApi | null>(null);
 
 export const AppContent = memo(() => {
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
@@ -107,10 +136,69 @@ export const AppContent = memo(() => {
     ],
   });
 
+  const onReady = useCallback<IDockviewReactProps['onReady']>((event) => {
+    $dockviewApi.set(event.api);
+    const mainPanel = event.api.addPanel({
+      id: 'main',
+      component: 'main',
+      title: 'Workspace',
+      minimumWidth: 200,
+    });
+    const settingsPanel = event.api.addPanel({
+      id: 'settings',
+      title: 'Settings',
+      component: 'settings',
+      initialWidth: LEFT_PANEL_MIN_SIZE_PX,
+      position: {
+        direction: 'left',
+        referencePanel: mainPanel,
+      },
+    });
+    event.api.addPanel({
+      id: 'queue-controls',
+      title: 'Queue Controls',
+      component: 'queueControls',
+      // floating: true,
+      initialHeight: 48 + 24,
+      position: {
+        direction: 'above',
+        referencePanel: settingsPanel,
+      },
+    });
+    const boardsPanel = event.api.addPanel({
+      id: 'boards',
+      component: 'boards',
+      initialWidth: RIGHT_PANEL_MIN_SIZE_PX,
+      position: {
+        direction: 'right',
+        referencePanel: mainPanel,
+      },
+    });
+    const galleryPanel = event.api.addPanel({
+      id: 'gallery',
+      component: 'gallery',
+      title: 'Gallery',
+      position: {
+        direction: 'below',
+        referencePanel: boardsPanel,
+      },
+    });
+    event.api.addPanel({
+      id: 'layers',
+      component: 'layers',
+      title: 'Layers',
+      position: {
+        direction: 'below',
+        referencePanel: galleryPanel,
+      },
+    });
+  }, []);
+
   return (
-    <Flex id="invoke-app-tabs" w="full" h="full" gap={4} p={4} overflow="hidden">
+    <Flex id="invoke-app-tabs" w="full" h="full" overflow="hidden">
       <VerticalNavBar />
-      <PanelGroup
+      <DockviewReact components={components} onReady={onReady} theme={theme} defaultTabComponent={MyCustomTab} />
+      {/* <PanelGroup
         ref={imperativePanelGroupRef}
         id="app-panel-group"
         autoSaveId="app-panel-group"
@@ -138,7 +226,7 @@ export const AppContent = memo(() => {
             </Panel>
           </>
         )}
-      </PanelGroup>
+      </PanelGroup> */}
     </Flex>
   );
 });

@@ -16,7 +16,7 @@ export const InitialState = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" h="full" w="full" gap={2}>
+    <Flex flexDir="column" h="full" w="full" gap={2} p={2}>
       <Flex px={2} alignItems="center" minH="24px">
         <Heading size="sm">Get Started</Heading>
       </Flex>

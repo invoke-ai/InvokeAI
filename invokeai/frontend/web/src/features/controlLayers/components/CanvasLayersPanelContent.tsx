@@ -19,7 +19,7 @@ export const CanvasLayersPanelContent = memo(() => {
 
   return (
     <FocusRegionWrapper region="layers" sx={FOCUS_REGION_STYLES}>
-      <Flex flexDir="column" gap={2} w="full" h="full">
+      <Flex flexDir="column" gap={2} w="full" h="full" p={2}>
         <EntityListSelectedEntityActionBar />
         <Divider py={0} />
         <ParamDenoisingStrength />

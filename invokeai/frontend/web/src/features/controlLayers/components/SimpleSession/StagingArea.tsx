@@ -24,7 +24,7 @@ export const StagingArea = memo(() => {
   }, [ctx.$selectedItemId]);
 
   return (
-    <Flex flexDir="column" gap={2} w="full" h="full" minW={0} minH={0}>
+    <Flex flexDir="column" gap={2} w="full" h="full" minW={0} minH={0} p={2}>
       <StagingAreaHeader />
       <Divider />
       {hasItems && <StagingAreaContent />}

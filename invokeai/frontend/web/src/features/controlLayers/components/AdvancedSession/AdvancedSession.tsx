@@ -73,6 +73,7 @@ export const AdvancedSession = memo(({ id }: { id: string | null }) => {
         alignItems="center"
         justifyContent="center"
         overflow="hidden"
+        p={2}
       >
         <CanvasManagerProviderGate>
           <CanvasToolbar />

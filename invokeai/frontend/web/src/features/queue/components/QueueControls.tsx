@@ -9,7 +9,7 @@ import { InvokeButton } from './InvokeQueueBackButton';
 
 const QueueControls = () => {
   return (
-    <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
+    <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column" p={2}>
       <Flex gap={2}>
         <InvokeButton />
         <Spacer />
