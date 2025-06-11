@@ -485,3 +485,13 @@ export const useCanvasSessionContext = () => {
   assert(ctx !== null, "'useCanvasSessionContext' must be used within a CanvasSessionContextProvider");
   return ctx;
 };
+
+export const useOutputImageDTO = (item: S['SessionQueueItem']) => {
+  const ctx = useCanvasSessionContext();
+  const $imageDTO = useState(() =>
+    computed([ctx.$progressData], (progressData) => progressData[item.item_id]?.imageDTO ?? null)
+  )[0];
+  const imageDTO = useStore($imageDTO);
+
+  return imageDTO;
+};
