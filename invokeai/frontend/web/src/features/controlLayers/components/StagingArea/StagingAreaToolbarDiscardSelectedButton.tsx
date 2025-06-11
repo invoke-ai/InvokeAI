@@ -16,15 +16,15 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { i
 
   const { t } = useTranslation();
 
-  const discardSelected = useCallback(() => {
+  const discardSelected = useCallback(async () => {
     if (selectedItemId === null) {
       return;
     }
+    await deleteQueueItem.trigger(selectedItemId);
     const itemCount = ctx.$itemCount.get();
     if (itemCount <= 1) {
       dispatch(canvasSessionGenerationFinished());
     }
-    deleteQueueItem.trigger(selectedItemId);
   }, [selectedItemId, ctx.$itemCount, deleteQueueItem, dispatch]);
 
   return (
