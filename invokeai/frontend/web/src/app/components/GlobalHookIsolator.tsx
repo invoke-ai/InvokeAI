@@ -8,6 +8,7 @@ import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/ap
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
+import { useCloseChakraTooltipsOnDragFix } from 'common/hooks/useCloseChakraTooltipsOnDragFix';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
 import { toggleImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -43,6 +44,7 @@ export const GlobalHookIsolator = memo(
     useGlobalHotkeys();
     useGetOpenAPISchemaQuery();
     useSyncLoggingConfig();
+    useCloseChakraTooltipsOnDragFix();
 
     // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
     // and/or in progress canvas sessions.
