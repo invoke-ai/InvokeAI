@@ -4,14 +4,14 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectIsCogView4, selectIsFLUX, selectIsSD3 } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
-import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
-import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { DisabledModelWarning } from 'features/parameters/components/MainModel/DisabledModelWarning';
+import ParamUpscaleCFGScale from 'features/parameters/components/Upscale/ParamUpscaleCFGScale';
+import ParamUpscaleScheduler from 'features/parameters/components/Upscale/ParamUpscaleScheduler';
 import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
@@ -26,12 +26,10 @@ const formLabelProps: FormLabelProps = {
   minW: '4rem',
 };
 
-export const GenerationSettingsAccordion = memo(() => {
+export const UpscaleTabGenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
   const isFLUX = useAppSelector(selectIsFLUX);
-  const isSD3 = useAppSelector(selectIsSD3);
-  const isCogView4 = useAppSelector(selectIsCogView4);
 
   const isApiModel = useIsApiModel();
 
@@ -56,8 +54,8 @@ export const GenerationSettingsAccordion = memo(() => {
     defaultIsOpen: false,
   });
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
-    id: `generation-settings-generate`,
-    defaultIsOpen: true,
+    id: `generation-settings-upscaling`,
+    defaultIsOpen: false,
   });
 
   return (
@@ -78,10 +76,10 @@ export const GenerationSettingsAccordion = memo(() => {
           <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
             <Flex gap={4} flexDir="column" pb={4}>
               <FormControlGroup formLabelProps={formLabelProps}>
-                {!isFLUX && !isSD3 && !isCogView4 && <ParamScheduler />}
+                <ParamUpscaleScheduler />
                 <ParamSteps />
                 {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
-                {!isFLUX && <ParamCFGScale />}
+                <ParamUpscaleCFGScale />
               </FormControlGroup>
             </Flex>
           </Expander>
@@ -91,4 +89,4 @@ export const GenerationSettingsAccordion = memo(() => {
   );
 });
 
-GenerationSettingsAccordion.displayName = 'GenerationSettingsAccordion';
+UpscaleTabGenerationSettingsAccordion.displayName = 'UpscaleTabGenerationSettingsAccordion';
