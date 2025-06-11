@@ -13,7 +13,7 @@
   --dv-border-radius: 0;
   --dv-tab-margin: 0;
   --dv-sash-color: transparent;
-  --dv-active-sash-color: transparent;
+  --dv-active-sash-color: var(--invoke-colors-base-700);
   --dv-active-sash-transition-duration: 0.1s;
   --dv-active-sash-transition-delay: 0.5s;
 
@@ -25,7 +25,7 @@
   --dv-activegroup-visiblepanel-tab-background-color: var(--invoke-colors-base-700);
 
   --dv-activegroup-hiddenpanel-tab-color: var(--invoke-colors-base-300);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--invoke-colors-base-800);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--invoke-colors-base-850);
 
   --dv-inactivegroup-visiblepanel-tab-color: var(--invoke-colors-base-500);
   --dv-inactivegroup-visiblepanel-tab-background-color: var(--invoke-colors-base-800);
@@ -45,4 +45,8 @@
 
 .dv-groupview-floating {
   border-radius: var(--invoke-space-2);
+}
+
+.dv-tab {
+  margin-right: 2px;
 }
