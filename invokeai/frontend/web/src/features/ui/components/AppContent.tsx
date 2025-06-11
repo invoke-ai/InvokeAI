@@ -36,7 +36,13 @@ const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCo
 const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
 
 const MyCustomTab = (props: IDockviewPanelHeaderProps) => {
-  return <DockviewDefaultTab hideClose {...props} />;
+  const onDragEnter = useCallback(() => {
+    if (!props.api.isActive) {
+      props.api.setActive();
+    }
+  }, [props.api]);
+
+  return <DockviewDefaultTab hideClose {...props} onDragEnter={onDragEnter} />;
 };
 
 const components: IDockviewReactProps['components'] = {
