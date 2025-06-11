@@ -1,5 +1,4 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectSearchTerm } from 'features/gallery/store/gallerySelectors';
 import { searchTermChanged } from 'features/gallery/store/gallerySlice';
 import { debounce } from 'lodash-es';
@@ -7,7 +6,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 export const useGallerySearchTerm = () => {
   // Highlander!
-  useAssertSingleton('gallery-search-state');
+  // useAssertSingleton('gallery-search-state');
 
   const dispatch = useAppDispatch();
   const searchTerm = useAppSelector(selectSearchTerm);

@@ -17,6 +17,7 @@ const Loading = () => {
       right={0}
       bottom={0}
       left={0}
+      zIndex={99999}
     >
       <Image src={InvokeLogoWhite} w="8rem" h="8rem" />
       <Spinner

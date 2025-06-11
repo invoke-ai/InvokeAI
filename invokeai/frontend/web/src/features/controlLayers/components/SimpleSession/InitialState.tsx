@@ -1,4 +1,4 @@
-import { Alert, Button, Divider, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
+import { Alert, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InitialStateAddAStyleReference } from 'features/controlLayers/components/SimpleSession/InitialStateAddAStyleReference';
 import { InitialStateGenerateFromText } from 'features/controlLayers/components/SimpleSession/InitialStateGenerateFromText';
@@ -14,11 +14,7 @@ export const InitialState = memo(() => {
 
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" justifyContent="center" gap={2}>
-      <Flex px={2} w="full" alignItems="center" minH="24px" justifyContent="flex-start" flexShrink={0}>
-        <Heading size="sm">Get Started</Heading>
-      </Flex>
-      <Divider />
-      <Flex flexDir="column" w="full" h="full" justifyContent="center" gap={4} mx={16} maxW={768}>
+      <Flex flexDir="column" w="full" h="full" justifyContent="center" gap={4} px={12} maxW={768}>
         <Heading mb={4}>Get started with Invoke.</Heading>
         <Flex flexDir="column" gap={8}>
           <Grid gridTemplateColumns="1fr 1fr" gap={8}>

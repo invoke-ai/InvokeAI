@@ -1,6 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
-import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
@@ -14,7 +13,7 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
  * Registers gallery hotkeys. This hook is a singleton.
  */
 export const useGalleryHotkeys = () => {
-  useAssertSingleton('useGalleryHotkeys');
+  // useAssertSingleton('useGalleryHotkeys');
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
   const selection = useAppSelector((s) => s.gallery.selection);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);

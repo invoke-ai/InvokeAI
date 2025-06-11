@@ -50,6 +50,9 @@ dependencies:
   compare-versions:
     specifier: ^6.1.1
     version: 6.1.1
+  dockview:
+    specifier: ^4.3.1
+    version: 4.3.1(react@18.3.1)
   filesize:
     specifier: ^10.1.6
     version: 10.1.6
@@ -4490,6 +4493,19 @@ packages:
 
   /discontinuous-range@1.0.0:
     resolution: {integrity: sha512-c68LpLbO+7kP/b1Hr1qs8/BJ09F5khZGTxqxZuhzxpmwJKOgRFHJWIb9/KmqnqHhLdO55aOxFH/EGBvUQbL/RQ==}
+    dev: false
+
+  /dockview-core@4.3.1:
+    resolution: {integrity: sha512-cjGIXKc1wtHHkeKisuDLNt3HSHCVzvabxm1K9Auna27A9T3QR7ISOiTJyEUKUPllkcztFYBut0vwnnvwLnPAuQ==}
+    dev: false
+
+  /dockview@4.3.1(react@18.3.1):
+    resolution: {integrity: sha512-D4SvZPs1GJxGUBPkrehlKNGsWlSDaBiPuSYI+IEXnZ7b2bCUs1/h954sVs7xyykqEW3r6TkPKLWdTR/47Q7/QQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    dependencies:
+      dockview-core: 4.3.1
+      react: 18.3.1
     dev: false
 
   /doctrine@2.1.0:
