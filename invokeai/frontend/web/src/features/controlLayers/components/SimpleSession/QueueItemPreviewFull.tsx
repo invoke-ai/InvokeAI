@@ -1,11 +1,12 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
+import { useOutputImageDTO } from 'features/controlLayers/components/SimpleSession/context';
 import { ImageActions } from 'features/controlLayers/components/SimpleSession/ImageActions';
 import { QueueItemCircularProgress } from 'features/controlLayers/components/SimpleSession/QueueItemCircularProgress';
 import { QueueItemNumber } from 'features/controlLayers/components/SimpleSession/QueueItemNumber';
 import { QueueItemProgressImage } from 'features/controlLayers/components/SimpleSession/QueueItemProgressImage';
 import { QueueItemStatusLabel } from 'features/controlLayers/components/SimpleSession/QueueItemStatusLabel';
-import { getQueueItemElementId, useOutputImageDTO } from 'features/controlLayers/components/SimpleSession/shared';
+import { getQueueItemElementId } from 'features/controlLayers/components/SimpleSession/shared';
 import { DndImage } from 'features/dnd/DndImage';
 import { memo, useCallback, useState } from 'react';
 import type { S } from 'services/api/types';
