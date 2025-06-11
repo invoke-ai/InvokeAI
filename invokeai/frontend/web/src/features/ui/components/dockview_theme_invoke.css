@@ -2,8 +2,8 @@
   --dv-paneview-active-outline-color: var(--invoke-colors-invokeBlue-300);
   --dv-tabs-and-actions-container-font-size: var(--invoke-fontSizes-xs);
   --dv-tabs-and-actions-container-height: var(--invoke-sizes-8);
-  --dv-drag-over-background-color: var(--invoke-colors-baseAlpha-200);
-  --dv-drag-over-border-color: transparent;
+  --dv-drag-over-background-color: var(--invoke-colors-baseAlpha-400);
+  --dv-drag-over-border-color: var(--invoke-colors-base-300);
   --dv-tabs-container-scrollbar-color: #888;
   --dv-icon-hover-background-color: rgba(90, 93, 94, 0.31);
   --dv-floating-box-shadow: none;
