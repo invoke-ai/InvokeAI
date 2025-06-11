@@ -1,15 +1,24 @@
 import 'dockview/dist/styles/dockview.css';
 import './dockview_theme_invoke.css';
 
-import { Flex } from '@invoke-ai/ui-library';
+import { Divider, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { DockviewApi, DockviewTheme, IDockviewPanelHeaderProps, IDockviewReactProps } from 'dockview';
+import type {
+  DockviewApi,
+  DockviewTheme,
+  IDockviewHeaderActionsProps,
+  IDockviewPanelHeaderProps,
+  IDockviewReactProps,
+} from 'dockview';
 import { DockviewDefaultTab, DockviewReact } from 'dockview';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { BoardsListPanelContent } from 'features/gallery/components/BoardsListPanelContent';
 import { Gallery } from 'features/gallery/components/Gallery';
+import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
+import ProgressImage from 'features/gallery/components/ImageViewer/ProgressImage';
+import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
@@ -33,6 +42,7 @@ import {
 import { atom } from 'nanostores';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
+import { PiArrowSquareOutBold } from 'react-icons/pi';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
@@ -48,6 +58,31 @@ const MyCustomTab = (props: IDockviewPanelHeaderProps) => {
   }, [props.api]);
 
   return <DockviewDefaultTab hideClose {...props} onDragEnter={onDragEnter} />;
+};
+
+const RightHeaderActions = (props: IDockviewHeaderActionsProps) => {
+  const popOutToFloating = useCallback(() => {
+    props.containerApi.addFloatingGroup(props.group);
+  }, [props.containerApi, props.group]);
+
+  if (props.group.api.location.type === 'floating') {
+    return null;
+  }
+
+  return (
+    <Flex h="full" alignItems="center" pe={1}>
+      <IconButton
+        size="sm"
+        variant="link"
+        alignSelf="stretch"
+        icon={<PiArrowSquareOutBold />}
+        aria-label="Pop out Panel"
+        tooltip="Pop out Panel"
+        onClick={popOutToFloating}
+        opacity={0.7}
+      />
+    </Flex>
+  );
 };
 
 const components: IDockviewReactProps['components'] = {
@@ -66,6 +101,18 @@ const components: IDockviewReactProps['components'] = {
   compositingSettings: CompositingSettingsAccordion,
   advancedSettings: AdvancedSettingsAccordion,
   refinerSettings: RefinerSettingsAccordion,
+  viewer: () => (
+    <Flex flexDir="column" w="full" h="full" overflow="hidden" p={2} gap={2}>
+      <ViewerToolbar />
+      <Divider />
+      <ImageViewer />
+    </Flex>
+  ),
+  progress: () => (
+    <Flex flexDir="column" w="full" h="full" overflow="hidden" p={2}>
+      <ProgressImage />
+    </Flex>
+  ),
 };
 
 const theme: DockviewTheme = {
@@ -73,7 +120,133 @@ const theme: DockviewTheme = {
   name: 'Invoke',
 };
 
-const $dockviewApi = atom<DockviewApi | null>(null);
+export const $panels = atom<{ api: DockviewApi; resetLayout: () => void } | null>(null);
+
+const resetLayout = (api: DockviewApi) => {
+  api.clear();
+  const mainPanel = api.addPanel({
+    id: 'main',
+    component: 'main',
+    title: 'Workspace',
+    minimumWidth: 200,
+  });
+  api.addPanel({
+    id: 'viewer',
+    component: 'viewer',
+    title: 'Image Viewer',
+    position: {
+      direction: 'within',
+      referencePanel: mainPanel,
+    },
+  });
+  api.addPanel({
+    id: 'progress',
+    component: 'progress',
+    title: 'Generation Progress',
+    position: {
+      direction: 'within',
+      referencePanel: mainPanel,
+    },
+  });
+  const queueControls = api.addPanel({
+    id: 'queue-controls',
+    title: 'Queue Controls',
+    component: 'queueControls',
+    // floating: true,
+    // initialHeight: 48 + 24,
+    initialHeight: 48,
+    maximumHeight: 48,
+    minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
+    initialWidth: LEFT_PANEL_MIN_SIZE_PX,
+    position: {
+      direction: 'left',
+      referencePanel: mainPanel,
+    },
+  });
+  const promptsPanel = api.addPanel({
+    id: 'prompts',
+    title: 'Prompts',
+    component: 'prompts',
+    position: {
+      direction: 'below',
+      referencePanel: queueControls,
+    },
+  });
+  const imagePanel = api.addPanel({
+    id: 'imageSettings',
+    title: 'Image Settings',
+    component: 'imageSettings',
+    position: {
+      direction: 'below',
+      referencePanel: promptsPanel,
+    },
+  });
+  api.addPanel({
+    id: 'generationSettings',
+    title: 'Generation Settings',
+    component: 'generationSettings',
+    position: {
+      direction: 'within',
+      referencePanel: imagePanel,
+    },
+  });
+  const compPanel = api.addPanel({
+    id: 'compositingSettings',
+    title: 'Compositing Settings',
+    component: 'compositingSettings',
+    position: {
+      direction: 'below',
+      referencePanel: imagePanel,
+    },
+  });
+  const advancedPanel = api.addPanel({
+    id: 'advancedSettings',
+    title: 'Advanced Settings',
+    component: 'advancedSettings',
+    position: {
+      direction: 'within',
+      referencePanel: compPanel,
+    },
+  });
+  api.addPanel({
+    id: 'refinerSettings',
+    title: 'Refiner Settings',
+    component: 'refinerSettings',
+    position: {
+      direction: 'within',
+      referencePanel: advancedPanel,
+    },
+  });
+  const boardsPanel = api.addPanel({
+    id: 'boards',
+    component: 'boards',
+    title: 'Boards',
+    initialWidth: RIGHT_PANEL_MIN_SIZE_PX,
+    position: {
+      direction: 'right',
+      referencePanel: mainPanel,
+    },
+  });
+  const galleryPanel = api.addPanel({
+    id: 'gallery',
+    component: 'gallery',
+    title: 'Gallery',
+    position: {
+      direction: 'below',
+      referencePanel: boardsPanel,
+    },
+  });
+  api.addPanel({
+    id: 'layers',
+    component: 'layers',
+    title: 'Layers',
+    position: {
+      direction: 'below',
+      referencePanel: galleryPanel,
+    },
+  });
+  mainPanel.api.setActive();
+};
 
 export const AppContent = memo(() => {
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
@@ -153,115 +326,21 @@ export const AppContent = memo(() => {
   });
 
   const onReady = useCallback<IDockviewReactProps['onReady']>((event) => {
-    $dockviewApi.set(event.api);
-    const mainPanel = event.api.addPanel({
-      id: 'main',
-      component: 'main',
-      title: 'Workspace',
-      minimumWidth: 200,
-    });
-    const queueControls = event.api.addPanel({
-      id: 'queue-controls',
-      title: 'Queue Controls',
-      component: 'queueControls',
-      // floating: true,
-      // initialHeight: 48 + 24,
-      initialHeight: 48,
-      maximumHeight: 48,
-      minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
-      initialWidth: LEFT_PANEL_MIN_SIZE_PX,
-      position: {
-        direction: 'left',
-        referencePanel: mainPanel,
-      },
-    });
-    const promptsPanel = event.api.addPanel({
-      id: 'prompts',
-      title: 'Prompts',
-      component: 'prompts',
-      position: {
-        direction: 'below',
-        referencePanel: queueControls,
-      },
-    });
-    const imagePanel = event.api.addPanel({
-      id: 'imageSettings',
-      title: 'Image Settings',
-      component: 'imageSettings',
-      position: {
-        direction: 'below',
-        referencePanel: promptsPanel,
-      },
-    });
-    const genPanel = event.api.addPanel({
-      id: 'generationSettings',
-      title: 'Generation Settings',
-      component: 'generationSettings',
-      position: {
-        direction: 'within',
-        referencePanel: imagePanel,
-      },
-    });
-    const compPanel = event.api.addPanel({
-      id: 'compositingSettings',
-      title: 'Compositing Settings',
-      component: 'compositingSettings',
-      position: {
-        direction: 'below',
-        referencePanel: imagePanel,
-      },
-    });
-    const advancedPanel = event.api.addPanel({
-      id: 'advancedSettings',
-      title: 'Advanced Settings',
-      component: 'advancedSettings',
-      position: {
-        direction: 'within',
-        referencePanel: compPanel,
-      },
-    });
-    event.api.addPanel({
-      id: 'refinerSettings',
-      title: 'Refiner Settings',
-      component: 'refinerSettings',
-      position: {
-        direction: 'within',
-        referencePanel: advancedPanel,
-      },
-    });
-    const boardsPanel = event.api.addPanel({
-      id: 'boards',
-      component: 'boards',
-      initialWidth: RIGHT_PANEL_MIN_SIZE_PX,
-      position: {
-        direction: 'right',
-        referencePanel: mainPanel,
-      },
-    });
-    const galleryPanel = event.api.addPanel({
-      id: 'gallery',
-      component: 'gallery',
-      title: 'Gallery',
-      position: {
-        direction: 'below',
-        referencePanel: boardsPanel,
-      },
-    });
-    event.api.addPanel({
-      id: 'layers',
-      component: 'layers',
-      title: 'Layers',
-      position: {
-        direction: 'below',
-        referencePanel: galleryPanel,
-      },
-    });
+    const _resetToDefaults = () => resetLayout(event.api);
+    $panels.set({ api: event.api, resetLayout: _resetToDefaults });
+    _resetToDefaults();
   }, []);
 
   return (
     <Flex id="invoke-app-tabs" w="full" h="full" overflow="hidden">
       <VerticalNavBar />
-      <DockviewReact components={components} onReady={onReady} theme={theme} defaultTabComponent={MyCustomTab} />
+      <DockviewReact
+        components={components}
+        onReady={onReady}
+        theme={theme}
+        defaultTabComponent={MyCustomTab}
+        rightHeaderActionsComponent={RightHeaderActions}
+      />
       {/* <PanelGroup
         ref={imperativePanelGroupRef}
         id="app-panel-group"

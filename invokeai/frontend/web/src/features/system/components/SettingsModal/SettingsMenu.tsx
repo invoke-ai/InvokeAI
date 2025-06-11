@@ -13,13 +13,15 @@ import AboutModal from 'features/system/components/AboutModal/AboutModal';
 import HotkeysModal from 'features/system/components/HotkeysModal/HotkeysModal';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { discordLink, githubLink } from 'features/system/store/constants';
-import { memo } from 'react';
+import { $panels } from 'features/ui/components/AppContent';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiBugBeetleBold,
   PiGearSixFill,
   PiInfoBold,
   PiKeyboardBold,
+  PiLayoutBold,
   PiShareNetworkFill,
   PiToggleRightFill,
   PiUsersBold,
@@ -36,6 +38,10 @@ const SettingsMenu = () => {
   const isBugLinkEnabled = useFeatureStatus('bugLink');
   const isDiscordLinkEnabled = useFeatureStatus('discordLink');
   const isGithubLinkEnabled = useFeatureStatus('githubLink');
+
+  const resetLayout = useCallback(() => {
+    $panels.get()?.resetLayout();
+  }, []);
 
   return (
     <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} autoSelect={false}>
@@ -70,7 +76,9 @@ const SettingsMenu = () => {
               </MenuItem>
             )}
           </MenuGroup>
-
+          <MenuItem as="button" onClick={resetLayout} icon={<PiLayoutBold />}>
+            Reset Layout
+          </MenuItem>
           <MenuGroup title={t('common.settingsLabel')}>
             <HotkeysModal>
               <MenuItem as="button" icon={<PiKeyboardBold />}>

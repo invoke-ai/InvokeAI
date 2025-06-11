@@ -13,7 +13,6 @@ import type { ImageDTO } from 'services/api/types';
 import { $hasLastProgressImage } from 'services/events/stores';
 
 import { NoContentForViewer } from './NoContentForViewer';
-import ProgressImage from './ProgressImage';
 
 const CurrentImagePreview = ({ imageDTO }: { imageDTO?: ImageDTO }) => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
@@ -87,9 +86,6 @@ const ImageContent = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
   const hasProgressImage = useStore($hasLastProgressImage);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
-  if (hasProgressImage && shouldShowProgressInViewer) {
-    return <ProgressImage />;
-  }
 
   if (!imageDTO) {
     return <NoContentForViewer />;
