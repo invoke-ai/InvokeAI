@@ -210,3 +210,4 @@ export type RootState = ReturnType<AppStore['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;
 export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
+export type AppGetState = ReturnType<typeof createStore>['getState'];
