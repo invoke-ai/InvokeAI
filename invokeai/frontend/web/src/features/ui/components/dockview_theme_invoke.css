@@ -1,7 +1,7 @@
 .dockview-theme-invoke {
   --dv-paneview-active-outline-color: var(--invoke-colors-invokeBlue-300);
   --dv-tabs-and-actions-container-font-size: var(--invoke-fontSizes-xs);
-  --dv-tabs-and-actions-container-height: var(--invoke-sizes-8);
+  --dv-tabs-and-actions-container-height: var(--invoke-sizes-6);
   --dv-drag-over-background-color: var(--invoke-colors-baseAlpha-400);
   --dv-drag-over-border-color: var(--invoke-colors-base-300);
   --dv-tabs-container-scrollbar-color: #888;
@@ -14,8 +14,8 @@
   --dv-tab-margin: 0;
   --dv-sash-color: transparent;
   --dv-active-sash-color: var(--invoke-colors-base-700);
-  --dv-active-sash-transition-duration: 0.1s;
-  --dv-active-sash-transition-delay: 0.5s;
+  --dv-active-sash-transition-duration: 0.15s;
+  --dv-active-sash-transition-delay: 0.1s;
 
   --dv-group-view-background-color: var(--invoke-colors-base-900);
 
@@ -34,8 +34,9 @@
   --dv-inactivegroup-hiddenpanel-tab-background-color: var(--invoke-colors-base-850);
 
   --dv-tab-divider-color: var(--invoke-colors-base-700);
+  --dv-inactivegroup-tab-divider-color: var(--invoke-colors-base-800);
 
-  --dv-separator-border: var(--invoke-colors-base-800);
+  --dv-separator-border: var(--invoke-colors-base-750);
   --dv-paneview-header-border-color: rgba(204, 204, 204, 0.2);
 }
 
@@ -56,4 +57,9 @@
 
 .dv-tab {
   /* margin-right: 2px; */
+}
+
+.dv-inactive-group .dv-tabs-container.dv-horizontal .dv-tab:not(:first-child)::before {
+  /* this is the tab divider */
+  background-color: var(--dv-inactivegroup-tab-divider-color);
 }

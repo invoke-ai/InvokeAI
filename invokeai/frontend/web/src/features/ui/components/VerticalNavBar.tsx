@@ -34,7 +34,7 @@ export const VerticalNavBar = memo(() => {
       minW={0}
       flexShrink={0}
       borderRightWidth={1}
-      borderRightColor="base.800"
+      borderRightColor="base.750"
     >
       <InvokeAILogoComponent />
       <Flex gap={4} pt={6} h="full" flexDir="column">
