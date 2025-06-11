@@ -1,7 +1,7 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -16,7 +16,6 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
 export const useGalleryHotkeys = () => {
   useAssertSingleton('useGalleryHotkeys');
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
-  const dispatch = useAppDispatch();
   const selection = useAppSelector((s) => s.gallery.selection);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
@@ -25,6 +24,7 @@ export const useGalleryHotkeys = () => {
   const isWorkflowsFocused = useIsRegionFocused('workflows');
   const isGalleryFocused = useIsRegionFocused('gallery');
   const isImageViewerFocused = useIsRegionFocused('viewer');
+  const deleteImageModal = useDeleteImageModalApi();
 
   // When we are on the canvas tab, we need to disable the delete hotkey when the user is focused on the layers tab in
   // the right hand panel, because the same hotkey is used to delete layers.
@@ -209,7 +209,7 @@ export const useGalleryHotkeys = () => {
       if (!selection.length) {
         return;
       }
-      dispatch(imagesToDeleteSelected(selection));
+      deleteImageModal.delete(selection);
     },
     options: {
       enabled: (isGalleryFocused || isImageViewerFocused) && isDeleteEnabledByTab && !isWorkflowsFocused,
