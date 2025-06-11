@@ -1,15 +1,16 @@
-import { Flex } from '@invoke-ai/ui-library';
+import 'dockview/dist/styles/dockview.css';
+import 'features/ui/styles/dockview-theme-invoke.css';
+
+import { TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
-import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
-import { LeftPanelContent } from 'features/ui/components/LeftPanelContent';
-import { MainPanelContent } from 'features/ui/components/MainPanelContent';
-import { RightPanelContent } from 'features/ui/components/RightPanelContent';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
+import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
+import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   $isLeftPanelOpen,
   $isRightPanelOpen,
@@ -21,9 +22,6 @@ import {
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
-import { Panel, PanelGroup } from 'react-resizable-panels';
-
-import { VerticalResizeHandle } from './tabs/ResizeHandle';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
 
@@ -31,6 +29,7 @@ const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCo
 const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
 
 export const AppContent = memo(() => {
+  const tab = useAppSelector(selectActiveTab);
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   useDndMonitor();
 
@@ -108,38 +107,19 @@ export const AppContent = memo(() => {
   });
 
   return (
-    <Flex id="invoke-app-tabs" w="full" h="full" gap={4} p={4} overflow="hidden">
-      <VerticalNavBar />
-      <PanelGroup
-        ref={imperativePanelGroupRef}
-        id="app-panel-group"
-        autoSaveId="app-panel-group"
-        direction="horizontal"
-        style={panelStyles}
-      >
-        {withLeftPanel && (
-          <>
-            <Panel id="left-panel" order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
-              <LeftPanelContent />
-            </Panel>
-            <VerticalResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
-          </>
-        )}
-        <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
-          <MainPanelContent />
-          {withLeftPanel && <FloatingLeftPanelButtons onToggle={leftPanel.toggle} />}
-          {withRightPanel && <FloatingRightPanelButtons onToggle={rightPanel.toggle} />}
-        </Panel>
-        {withRightPanel && (
-          <>
-            <VerticalResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
-            <Panel id="right-panel" order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
-              <RightPanelContent />
-            </Panel>
-          </>
-        )}
-      </PanelGroup>
-    </Flex>
+    <Tabs index={tab === 'generate' ? 0 : 1} variant="unstyled" w="full" h="full" display="flex" p={0}>
+      <TabList>
+        <VerticalNavBar />
+      </TabList>
+      <TabPanels w="full" h="full" p={0}>
+        <TabPanel w="full" h="full" p={0}>
+          <GenerateTabAutoLayout />
+        </TabPanel>
+        <TabPanel w="full" h="full" p={0}>
+          <CanvasTabAutoLayout />
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
   );
 });
 AppContent.displayName = 'AppContent';
