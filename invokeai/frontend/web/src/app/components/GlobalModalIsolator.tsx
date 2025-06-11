@@ -6,7 +6,7 @@ import {
   NewGallerySessionDialog,
 } from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
+import { DeleteImageModal } from 'features/deleteImageModal/components/DeleteImageModal';
 import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
