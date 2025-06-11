@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { useDeleteImageModalApi } from 'features/deleteImageModal/store/state';
 import {
   handlers,
   parseAndRecallAllMetadata,
@@ -34,6 +34,7 @@ export const useImageActions = (imageDTO: ImageDTO) => {
   const [hasSeed, setHasSeed] = useState(false);
   const [hasPrompts, setHasPrompts] = useState(false);
   const hasTemplates = useStore($hasTemplates);
+  const deleteImageModal = useDeleteImageModalApi();
 
   useEffect(() => {
     const parseMetadata = async () => {
@@ -169,8 +170,8 @@ export const useImageActions = (imageDTO: ImageDTO) => {
   }, [dispatch, imageDTO]);
 
   const _delete = useCallback(() => {
-    dispatch(imagesToDeleteSelected([imageDTO]));
-  }, [dispatch, imageDTO]);
+    deleteImageModal.delete([imageDTO]);
+  }, [deleteImageModal, imageDTO]);
 
   return {
     hasMetadata,

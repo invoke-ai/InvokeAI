@@ -2,6 +2,7 @@ import { $authToken } from 'app/store/nanostores/authToken';
 import { getStore } from 'app/store/nanostores/store';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
+import { uniqBy } from 'lodash-es';
 import type { components, paths } from 'services/api/schema';
 import type {
   DeleteBoardResult,
@@ -14,6 +15,7 @@ import type {
   UploadImageArg,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
@@ -133,11 +135,12 @@ export const imagesApi = api.injectEndpoints({
         };
       },
       invalidatesTags: (result, error, { imageDTOs }) => {
-        if (imageDTOs[0]) {
-          const categories = getCategories(imageDTOs[0]);
-          const boardId = imageDTOs[0].board_id ?? 'none';
+        const tags: ApiTagDescription[] = [];
+        for (const imageDTO of imageDTOs) {
+          const categories = getCategories(imageDTO);
+          const boardId = imageDTO.board_id ?? 'none';
 
-          const tags: ApiTagDescription[] = [
+          tags.push(
             {
               type: 'ImageList',
               id: getListImagesUrl({
@@ -152,12 +155,12 @@ export const imagesApi = api.injectEndpoints({
             {
               type: 'BoardImagesTotal',
               id: boardId,
-            },
-          ];
-
-          return tags;
+            }
+          );
         }
-        return [];
+
+        const dedupedTags = uniqBy(tags, stableHash);
+        return dedupedTags;
       },
     }),
     deleteUncategorizedImages: build.mutation<components['schemas']['DeleteImagesFromListResult'], void>({
