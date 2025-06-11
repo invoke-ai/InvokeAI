@@ -329,7 +329,7 @@ export const CanvasSessionContextProvider = memo(
       });
 
       // Clean up the progress data when a queue item is discarded.
-      const unsubCleanUpProgressData = $items.listen(async (items) => {
+      const unsubCleanUpProgressData = $items.subscribe(async (items) => {
         const progressData = $progressData.get();
 
         const toDelete: number[] = [];
