@@ -6,8 +6,6 @@ import QueueTab from 'features/ui/components/tabs/QueueTab';
 import { WorkflowsMainPanel } from 'features/ui/components/tabs/WorkflowsTabContent';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
-import type { Equals } from 'tsafe';
-import { assert } from 'tsafe';
 
 export const MainPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
@@ -27,7 +25,5 @@ export const MainPanelContent = memo(() => {
   if (tab === 'queue') {
     return <QueueTab />;
   }
-
-  assert<Equals<never, typeof tab>>(false);
 });
 MainPanelContent.displayName = 'MainPanelContent';

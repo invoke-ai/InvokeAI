@@ -31,6 +31,7 @@ import { MainPanelContent } from 'features/ui/components/MainPanelContent';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   $isLeftPanelOpen,
   $isRightPanelOpen,
@@ -41,8 +42,8 @@ import {
 } from 'features/ui/store/uiSlice';
 import { atom } from 'nanostores';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useMemo, useRef } from 'react';
-import { PiArrowSquareOutBold } from 'react-icons/pi';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PiArrowSquareOutBold, PiCornersInBold, PiCornersOutBold } from 'react-icons/pi';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
@@ -61,26 +62,79 @@ const MyCustomTab = (props: IDockviewPanelHeaderProps) => {
 };
 
 const RightHeaderActions = (props: IDockviewHeaderActionsProps) => {
+  const [isMaximized, setIsMaximized] = useState(false);
   const popOutToFloating = useCallback(() => {
     props.containerApi.addFloatingGroup(props.group);
   }, [props.containerApi, props.group]);
+  const maximize = useCallback(() => {
+    if (!props.group.activePanel) {
+      props.group.panels.at(0)?.api.setActive();
+    }
+    if (!props.group.activePanel) {
+      return;
+    }
+    props.containerApi.maximizeGroup(props.group.activePanel);
+  }, [props.containerApi, props.group]);
+  const exitMaximized = useCallback(() => {
+    if (!props.group.activePanel) {
+      props.group.panels.at(0)?.api.setActive();
+    }
+    if (!props.group.activePanel) {
+      return;
+    }
+    props.containerApi.exitMaximizedGroup();
+  }, [props.containerApi, props.group]);
 
-  if (props.group.api.location.type === 'floating') {
-    return null;
-  }
+  useEffect(() => {
+    const subscription = props.containerApi.onDidMaximizedGroupChange((e) => {
+      if (e.group.id === props.group.id) {
+        setIsMaximized(e.isMaximized);
+      }
+    });
+
+    return () => {
+      subscription.dispose();
+    };
+  }, [props.containerApi, props.group.id]);
 
   return (
     <Flex h="full" alignItems="center" pe={1}>
-      <IconButton
-        size="sm"
-        variant="link"
-        alignSelf="stretch"
-        icon={<PiArrowSquareOutBold />}
-        aria-label="Pop out Panel"
-        tooltip="Pop out Panel"
-        onClick={popOutToFloating}
-        opacity={0.7}
-      />
+      {!isMaximized && (
+        <IconButton
+          size="sm"
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiCornersOutBold />}
+          aria-label="Maximize Panel"
+          tooltip="Maximize Panel"
+          onClick={maximize}
+          opacity={0.7}
+        />
+      )}
+      {isMaximized && (
+        <IconButton
+          size="sm"
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiCornersInBold />}
+          aria-label="Maximize Panel"
+          tooltip="Maximize Panel"
+          onClick={exitMaximized}
+          opacity={0.7}
+        />
+      )}
+      {props.group.api.location.type !== 'floating' && (
+        <IconButton
+          size="sm"
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiArrowSquareOutBold />}
+          aria-label="Pop out Panel"
+          tooltip="Pop out Panel"
+          onClick={popOutToFloating}
+          opacity={0.7}
+        />
+      )}
     </Flex>
   );
 };
@@ -122,7 +176,7 @@ const theme: DockviewTheme = {
 
 export const $panels = atom<{ api: DockviewApi; resetLayout: () => void } | null>(null);
 
-const resetLayout = (api: DockviewApi) => {
+const canvasLayout = (api: DockviewApi) => {
   api.clear();
   const mainPanel = api.addPanel({
     id: 'main',
@@ -133,7 +187,7 @@ const resetLayout = (api: DockviewApi) => {
   api.addPanel({
     id: 'viewer',
     component: 'viewer',
-    title: 'Image Viewer',
+    title: 'Viewer',
     position: {
       direction: 'within',
       referencePanel: mainPanel,
@@ -142,7 +196,7 @@ const resetLayout = (api: DockviewApi) => {
   api.addPanel({
     id: 'progress',
     component: 'progress',
-    title: 'Generation Progress',
+    title: 'Progress',
     position: {
       direction: 'within',
       referencePanel: mainPanel,
@@ -150,7 +204,7 @@ const resetLayout = (api: DockviewApi) => {
   });
   const queueControls = api.addPanel({
     id: 'queue-controls',
-    title: 'Queue Controls',
+    title: 'Queue',
     component: 'queueControls',
     // floating: true,
     // initialHeight: 48 + 24,
@@ -174,7 +228,7 @@ const resetLayout = (api: DockviewApi) => {
   });
   const imagePanel = api.addPanel({
     id: 'imageSettings',
-    title: 'Image Settings',
+    title: 'Image',
     component: 'imageSettings',
     position: {
       direction: 'below',
@@ -183,7 +237,7 @@ const resetLayout = (api: DockviewApi) => {
   });
   api.addPanel({
     id: 'generationSettings',
-    title: 'Generation Settings',
+    title: 'Generation',
     component: 'generationSettings',
     position: {
       direction: 'within',
@@ -192,7 +246,7 @@ const resetLayout = (api: DockviewApi) => {
   });
   const compPanel = api.addPanel({
     id: 'compositingSettings',
-    title: 'Compositing Settings',
+    title: 'Compositing',
     component: 'compositingSettings',
     position: {
       direction: 'below',
@@ -201,7 +255,7 @@ const resetLayout = (api: DockviewApi) => {
   });
   const advancedPanel = api.addPanel({
     id: 'advancedSettings',
-    title: 'Advanced Settings',
+    title: 'Advanced',
     component: 'advancedSettings',
     position: {
       direction: 'within',
@@ -210,7 +264,7 @@ const resetLayout = (api: DockviewApi) => {
   });
   api.addPanel({
     id: 'refinerSettings',
-    title: 'Refiner Settings',
+    title: 'Refiner',
     component: 'refinerSettings',
     position: {
       direction: 'within',
@@ -248,8 +302,47 @@ const resetLayout = (api: DockviewApi) => {
   mainPanel.api.setActive();
 };
 
+const galleryLayout = (api: DockviewApi) => {
+  api.clear();
+  const viewer = api.addPanel({
+    id: 'gallery-viewer',
+    title: 'Viewer',
+    component: 'viewer',
+  });
+  api.addPanel({
+    id: 'gallery-progress',
+    title: 'Progress',
+    component: 'progress',
+    position: {
+      direction: 'within',
+      referencePanel: viewer,
+    },
+  });
+  const gallery = api.addPanel({
+    id: 'gallery-gallery',
+    title: 'Gallery',
+    component: 'gallery',
+    initialWidth: RIGHT_PANEL_MIN_SIZE_PX,
+    position: {
+      direction: 'right',
+      referencePanel: viewer,
+    },
+  });
+  api.addPanel({
+    id: 'gallery-boards',
+    title: 'Boards',
+    component: 'boards',
+    position: {
+      direction: 'above',
+      referencePanel: gallery,
+    },
+  });
+  viewer.api.setActive();
+};
+
 export const AppContent = memo(() => {
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+  const tab = useAppSelector(selectActiveTab);
   useDndMonitor();
 
   const withLeftPanel = useAppSelector(selectWithLeftPanel);
@@ -326,10 +419,22 @@ export const AppContent = memo(() => {
   });
 
   const onReady = useCallback<IDockviewReactProps['onReady']>((event) => {
-    const _resetToDefaults = () => resetLayout(event.api);
+    const _resetToDefaults = () => canvasLayout(event.api);
     $panels.set({ api: event.api, resetLayout: _resetToDefaults });
     _resetToDefaults();
   }, []);
+
+  useEffect(() => {
+    const panels = $panels.get();
+    if (!panels) {
+      return;
+    }
+    if (tab === 'gallery') {
+      galleryLayout(panels.api);
+    } else {
+      canvasLayout(panels.api);
+    }
+  }, [tab]);
 
   return (
     <Flex id="invoke-app-tabs" w="full" h="full" overflow="hidden">
@@ -374,3 +479,41 @@ export const AppContent = memo(() => {
   );
 });
 AppContent.displayName = 'AppContent';
+
+const GalleryTab = () => {
+  const onReady = useCallback<IDockviewReactProps['onReady']>((event) => {
+    const viewer = event.api.addPanel({
+      id: 'gallery-viewer',
+      title: 'Viewer',
+      component: 'viewer',
+    });
+    const gallery = event.api.addPanel({
+      id: 'gallery-gallery',
+      title: 'Gallery',
+      component: 'gallery',
+      initialWidth: RIGHT_PANEL_MIN_SIZE_PX,
+      position: {
+        direction: 'right',
+        referencePanel: viewer,
+      },
+    });
+    event.api.addPanel({
+      id: 'gallery-boards',
+      title: 'Boards',
+      component: 'boards',
+      position: {
+        direction: 'above',
+        referencePanel: gallery,
+      },
+    });
+  }, []);
+  return (
+    <DockviewReact
+      onReady={onReady}
+      components={components}
+      theme={theme}
+      defaultTabComponent={MyCustomTab}
+      rightHeaderActionsComponent={RightHeaderActions}
+    />
+  );
+};
