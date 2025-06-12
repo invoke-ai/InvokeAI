@@ -3,7 +3,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIdentifierBelowThisOne } from 'features/controlLayers/hooks/useNextRenderableEntityIdentifier';
-import type { CanvasRenderableEntityType } from 'features/controlLayers/store/types';
+import type { CanvasEntityType } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiStackSimpleBold } from 'react-icons/pi';
@@ -12,7 +12,7 @@ export const CanvasEntityMenuItemsMergeDown = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const isBusy = useCanvasIsBusy();
-  const entityIdentifier = useEntityIdentifierContext<CanvasRenderableEntityType>();
+  const entityIdentifier = useEntityIdentifierContext<CanvasEntityType>();
   const entityIdentifierBelowThisOne = useEntityIdentifierBelowThisOne(entityIdentifier);
   const mergeDown = useCallback(() => {
     if (entityIdentifierBelowThisOne === null) {

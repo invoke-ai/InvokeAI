@@ -9,13 +9,13 @@ import {
   inpaintMaskDenoiseLimitAdded,
   inpaintMaskNoiseAdded,
   rasterLayerAdded,
-  referenceImageAdded,
   rgAdded,
   rgIPAdapterAdded,
   rgNegativePromptChanged,
   rgPositivePromptChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { referenceImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
