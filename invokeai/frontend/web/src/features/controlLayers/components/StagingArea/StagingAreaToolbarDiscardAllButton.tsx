@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { canvasSessionGenerationFinished } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionReset, generateSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDeleteQueueItemsByDestination } from 'features/queue/hooks/useDeleteQueueItemsByDestination';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,8 +15,13 @@ export const StagingAreaToolbarDiscardAllButton = memo(({ isDisabled }: { isDisa
 
   const discardAll = useCallback(() => {
     deleteQueueItemsByDestination.trigger(ctx.session.id);
-    dispatch(canvasSessionGenerationFinished());
-  }, [deleteQueueItemsByDestination, ctx.session.id, dispatch]);
+    if (ctx.session.type === 'advanced') {
+      dispatch(canvasSessionReset());
+    } else {
+      // ctx.session.type === 'simple'
+      dispatch(generateSessionReset());
+    }
+  }, [deleteQueueItemsByDestination, ctx.session.id, ctx.session.type, dispatch]);
 
   return (
     <IconButton

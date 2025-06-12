@@ -8,7 +8,7 @@ import { VideosModalButton } from 'features/system/components/VideosModal/Videos
 import { TabMountGate } from 'features/ui/components/TabMountGate';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiCubeBold, PiFlowArrowBold, PiFrameCornersBold, PiQueueBold } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiCubeBold, PiFlowArrowBold, PiFrameCornersBold, PiQueueBold, PiTextAaBold } from 'react-icons/pi';
 
 import { Notifications } from './Notifications';
 import { TabButton } from './TabButton';
@@ -21,6 +21,9 @@ export const VerticalNavBar = memo(() => {
     <Flex flexDir="column" alignItems="center" py={2} gap={4} minW={0}>
       <InvokeAILogoComponent />
       <Flex gap={4} pt={6} h="full" flexDir="column">
+        <TabMountGate tab="generate">
+          <TabButton tab="generate" icon={<PiTextAaBold />} label="Generate" />
+        </TabMountGate>
         <TabMountGate tab="canvas">
           <TabButton tab="canvas" icon={<PiBoundingBoxBold />} label={t('ui.tabs.canvas')} />
         </TabMountGate>
