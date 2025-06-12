@@ -5,13 +5,13 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 
 type CanvasStagingAreaState = {
-  type: 'simple' | 'advanced';
-  id: string | null;
+  generateSessionId: string | null;
+  canvasSessionId: string | null;
 };
 
 const INITIAL_STATE: CanvasStagingAreaState = {
-  type: 'simple',
-  id: null,
+  generateSessionId: null,
+  canvasSessionId: null,
 };
 
 const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
@@ -20,30 +20,39 @@ export const canvasSessionSlice = createSlice({
   name: 'canvasSession',
   initialState: getInitialState(),
   reducers: {
-    canvasSessionTypeChanged: (state, action: PayloadAction<{ type: CanvasStagingAreaState['type'] }>) => {
-      const { type } = action.payload;
-      state.type = type;
-      state.id = null;
-    },
-    canvasSessionGenerationStarted: {
+    generateSessionIdCreated: {
       reducer: (state, action: PayloadAction<{ id: string }>) => {
         const { id } = action.payload;
-        state.id = id;
+        state.generateSessionId = id;
+      },
+      prepare: () => ({
+        payload: { id: getPrefixedId('generate') },
+      }),
+    },
+    generateSessionReset: (state) => {
+      state.generateSessionId = null;
+    },
+    canvasSessionIdCreated: {
+      reducer: (state, action: PayloadAction<{ id: string }>) => {
+        const { id } = action.payload;
+        state.canvasSessionId = id;
       },
       prepare: () => ({
         payload: { id: getPrefixedId('canvas') },
       }),
     },
-    canvasSessionGenerationFinished: (state) => {
-      state.id = null;
+    canvasSessionReset: (state) => {
+      state.canvasSessionId = null;
     },
   },
   extraReducers(builder) {
-    builder.addCase(canvasReset, () => getInitialState());
+    builder.addCase(canvasReset, (state) => {
+      state.canvasSessionId = null;
+    });
   },
 });
 
-export const { canvasSessionTypeChanged, canvasSessionGenerationStarted, canvasSessionGenerationFinished } =
+export const { generateSessionIdCreated, generateSessionReset, canvasSessionIdCreated, canvasSessionReset } =
   canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -60,6 +69,9 @@ export const canvasStagingAreaPersistConfig: PersistConfig<CanvasStagingAreaStat
 
 export const selectCanvasSessionSlice = (s: RootState) => s[canvasSessionSlice.name];
 
-export const selectIsStaging = createSelector(selectCanvasSessionSlice, ({ id }) => id !== null);
-export const selectCanvasSessionType = createSelector(selectCanvasSessionSlice, ({ type }) => type);
-export const selectCanvasSessionId = createSelector(selectCanvasSessionSlice, ({ id }) => id);
+export const selectCanvasSessionId = createSelector(selectCanvasSessionSlice, ({ canvasSessionId }) => canvasSessionId);
+export const selectGenerateSessionId = createSelector(
+  selectCanvasSessionSlice,
+  ({ generateSessionId }) => generateSessionId
+);
+export const selectIsStaging = createSelector(selectCanvasSessionId, (canvasSessionId) => canvasSessionId !== null);

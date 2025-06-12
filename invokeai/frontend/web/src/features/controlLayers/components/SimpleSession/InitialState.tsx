@@ -6,13 +6,22 @@ import { InitialStateAddAStyleReference } from 'features/controlLayers/component
 import { InitialStateEditImageCard } from 'features/controlLayers/components/SimpleSession/InitialStateEditImageCard';
 import { InitialStateGenerateFromText } from 'features/controlLayers/components/SimpleSession/InitialStateGenerateFromText';
 import { InitialStateUseALayoutImageCard } from 'features/controlLayers/components/SimpleSession/InitialStateUseALayoutImageCard';
-import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { toast } from 'features/toast/toast';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 
 export const InitialState = memo(() => {
   const dispatch = useAppDispatch();
   const newCanvasSession = useCallback(() => {
-    dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
+    dispatch(setActiveTab('canvas'));
+    toast({
+      title: 'Switched to Canvas',
+      description: 'You are in advanced mode yadda yadda.',
+      status: 'info',
+      position: 'top',
+      // isClosable: false,
+      duration: 5000,
+    });
   }, [dispatch]);
 
   return (

@@ -15,6 +15,7 @@ export const LeftPanelContent = memo(() => {
     <Flex flexDir="column" w="full" h="full" gap={2}>
       <QueueControls />
       <Box position="relative" w="full" h="full">
+        {tab === 'generate' && <ParametersPanelTextToImage />}
         {tab === 'canvas' && <ParametersPanelTextToImage />}
         {tab === 'upscaling' && <ParametersPanelUpscale />}
         {tab === 'workflows' && <WorkflowsTabLeftPanel />}
