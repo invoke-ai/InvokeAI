@@ -499,7 +499,7 @@ def validate_fields(model_fields: dict[str, FieldInfo], model_type: str) -> None
 
         ui_type = field.json_schema_extra.get("ui_type", None)
         if isinstance(ui_type, str) and ui_type.startswith("DEPRECATED_"):
-            logger.warn(f'"UIType.{ui_type.split("_")[-1]}" is deprecated, ignoring')
+            logger.warning(f'"UIType.{ui_type.split("_")[-1]}" is deprecated, ignoring')
             field.json_schema_extra.pop("ui_type")
     return None
 
@@ -613,7 +613,7 @@ def invocation(
                 raise InvalidVersionError(f'Invalid version string for node "{invocation_type}": "{version}"') from e
             uiconfig["version"] = version
         else:
-            logger.warn(f'No version specified for node "{invocation_type}", using "1.0.0"')
+            logger.warning(f'No version specified for node "{invocation_type}", using "1.0.0"')
             uiconfig["version"] = "1.0.0"
 
         cls.UIConfig = UIConfigBase(**uiconfig)
