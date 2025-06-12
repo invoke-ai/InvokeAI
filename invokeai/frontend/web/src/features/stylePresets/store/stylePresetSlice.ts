@@ -2,7 +2,7 @@ import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { canvasSessionGenerationStarted } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import { atom } from 'nanostores';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
@@ -29,7 +29,7 @@ export const stylePresetSlice = createSlice({
     },
   },
   extraReducers(builder) {
-    builder.addCase(canvasSessionGenerationStarted, () => {
+    builder.addCase(paramsReset, () => {
       return deepClone(initialState);
     });
     builder.addMatcher(stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled, (state, action) => {

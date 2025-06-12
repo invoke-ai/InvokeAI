@@ -2,8 +2,9 @@ import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { withResultAsync } from 'common/util/result';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { paramsReset } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -90,9 +91,8 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       const overrides: Partial<CanvasRasterLayerState> = {
         objects: [imageObject],
       };
-      store.dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
+      store.dispatch(canvasReset());
       store.dispatch(rasterLayerAdded({ overrides, isSelected: true }));
-      store.dispatch(setActiveTab('canvas'));
       store.dispatch(sentImageToCanvas());
       $imageViewer.set(false);
       toast({
@@ -116,9 +116,9 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         return;
       }
       const metadata = getImageMetadataResult.value;
+      store.dispatch(canvasReset());
       // This shows a toast
       await parseAndRecallAllMetadata(metadata, true);
-      store.dispatch(setActiveTab('canvas'));
     },
     [store, t]
   );
@@ -162,15 +162,13 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       switch (destination) {
         case 'generation':
           // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
-          store.dispatch(canvasSessionTypeChanged({ type: 'simple' }));
-          store.dispatch(setActiveTab('canvas'));
+          store.dispatch(paramsReset());
           store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
           $imageViewer.set(true);
           break;
         case 'canvas':
           // Go to the canvas tab, close the image viewer, and disable send-to-gallery mode
-          store.dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
-          store.dispatch(setActiveTab('canvas'));
+          store.dispatch(canvasReset());
           $imageViewer.set(false);
           break;
         case 'workflows':
