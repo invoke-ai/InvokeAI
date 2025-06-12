@@ -16,11 +16,7 @@ import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/Canvas
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
-import type {
-  CanvasEntityIdentifier,
-  CanvasRenderableEntityIdentifier,
-  CanvasRenderableEntityType,
-} from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import {
   isControlLayerEntityIdentifier,
   isInpaintMaskEntityIdentifier,
@@ -135,7 +131,7 @@ export class CanvasManager extends CanvasModuleBase {
     this.konva.previewLayer.add(this.tool.konva.group);
   }
 
-  getAdapter = <T extends CanvasRenderableEntityType = CanvasRenderableEntityType>(
+  getAdapter = <T extends CanvasEntityType = CanvasEntityType>(
     entityIdentifier: CanvasEntityIdentifier<T>
   ): CanvasEntityAdapterFromType<T> | null => {
     let adapter: CanvasEntityAdapter | undefined;
@@ -163,7 +159,7 @@ export class CanvasManager extends CanvasModuleBase {
     return adapter as CanvasEntityAdapterFromType<T>;
   };
 
-  deleteAdapter = (entityIdentifier: CanvasRenderableEntityIdentifier): boolean => {
+  deleteAdapter = (entityIdentifier: CanvasEntityIdentifier): boolean => {
     switch (entityIdentifier.type) {
       case 'raster_layer':
         return this.adapters.rasterLayers.delete(entityIdentifier.id);
@@ -178,7 +174,7 @@ export class CanvasManager extends CanvasModuleBase {
     }
   };
 
-  getAdapters = (entityIdentifiers: CanvasRenderableEntityIdentifier[]): CanvasEntityAdapter[] => {
+  getAdapters = (entityIdentifiers: CanvasEntityIdentifier[]): CanvasEntityAdapter[] => {
     const adapters: CanvasEntityAdapter[] = [];
     for (const entityIdentifier of entityIdentifiers) {
       const adapter = this.getAdapter(entityIdentifier);
@@ -199,7 +195,7 @@ export class CanvasManager extends CanvasModuleBase {
     ];
   };
 
-  createAdapter = (entityIdentifier: CanvasRenderableEntityIdentifier): CanvasEntityAdapter => {
+  createAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasEntityAdapter => {
     if (isRasterLayerEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterRasterLayer(entityIdentifier, this);
       this.adapters.rasterLayers.set(adapter.id, adapter);

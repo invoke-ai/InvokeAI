@@ -2,17 +2,16 @@ import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasEntityState,
+  CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasRenderableEntityIdentifier,
-  CanvasRenderableEntityState,
-  CanvasRenderableEntityType,
   CanvasState,
 } from 'features/controlLayers/store/types';
 import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
@@ -40,14 +39,13 @@ export const createCanvasSelector = <T>(selector: Selector<CanvasState, T>) =>
 const selectEntityCountAll = createCanvasSelector((canvas) => {
   return (
     canvas.regionalGuidance.entities.length +
-    canvas.referenceImages.entities.length +
     canvas.rasterLayers.entities.length +
     canvas.controlLayers.entities.length +
     canvas.inpaintMasks.entities.length
   );
 });
 
-const isVisibleEntity = (entity: CanvasRenderableEntityState) => entity.isEnabled && entity.objects.length > 0;
+const isVisibleEntity = (entity: CanvasEntityState) => entity.isEnabled && entity.objects.length > 0;
 
 export const selectRasterLayerEntities = createCanvasSelector((canvas) => canvas.rasterLayers.entities);
 export const selectActiveRasterLayerEntities = createSelector(selectRasterLayerEntities, (entities) =>
@@ -69,11 +67,6 @@ export const selectActiveRegionalGuidanceEntities = createSelector(selectRegiona
   entities.filter(isVisibleEntity)
 );
 
-export const selectReferenceImageEntities = createCanvasSelector((canvas) => canvas.referenceImages.entities);
-export const selectActiveReferenceImageEntities = createSelector(selectReferenceImageEntities, (entities) =>
-  entities.filter((e) => e.isEnabled)
-);
-
 /**
  * Selects the total _active_ canvas entity count:
  * - Regions
@@ -89,20 +82,17 @@ export const selectEntityCountActive = createSelector(
   selectActiveControlLayerEntities,
   selectActiveInpaintMaskEntities,
   selectActiveRegionalGuidanceEntities,
-  selectActiveReferenceImageEntities,
   (
     activeRasterLayerEntities,
     activeControlLayerEntities,
     activeInpaintMaskEntities,
-    activeRegionalGuidanceEntities,
-    activeIPAdapterEntities
+    activeRegionalGuidanceEntities
   ) => {
     return (
       activeRasterLayerEntities.length +
       activeControlLayerEntities.length +
       activeInpaintMaskEntities.length +
-      activeRegionalGuidanceEntities.length +
-      activeIPAdapterEntities.length
+      activeRegionalGuidanceEntities.length
     );
   }
 );
@@ -153,9 +143,6 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
     case 'regional_guidance':
       entity = state.regionalGuidance.entities.find((entity) => entity.id === id);
       break;
-    case 'reference_image':
-      entity = state.referenceImages.entities.find((entity) => entity.id === id);
-      break;
   }
 
   // This cast is safe, but TS seems to be unable to infer the type
@@ -165,13 +152,13 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
 /**
  * Selects the entity identifier for the entity that is below the given entity in terms of draw order.
  */
-export function selectEntityIdentifierBelowThisOne<T extends CanvasRenderableEntityIdentifier>(
+export function selectEntityIdentifierBelowThisOne<T extends CanvasEntityIdentifier>(
   state: CanvasState,
   entityIdentifier: T
 ): Extract<CanvasEntityState, T> | undefined {
   const { id, type } = entityIdentifier;
 
-  let entities: CanvasRenderableEntityState[];
+  let entities: CanvasEntityState[];
 
   switch (type) {
     case 'raster_layer': {
@@ -244,9 +231,6 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
     case 'regional_guidance':
       entities = state.regionalGuidance.entities;
       break;
-    case 'reference_image':
-      entities = state.referenceImages.entities;
-      break;
   }
 
   // This cast is safe, but TS seems to be unable to infer the type
@@ -259,7 +243,6 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
 export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
-    ...state.referenceImages.entities.toReversed(),
     ...state.inpaintMasks.entities.toReversed(),
     ...state.regionalGuidance.entities.toReversed(),
     ...state.controlLayers.entities.toReversed(),
@@ -340,7 +323,7 @@ const selectRegionalGuidanceIsHidden = createCanvasSelector((canvas) => canvas.r
 /**
  * Returns the hidden selector for the given entity type.
  */
-export const getSelectIsTypeHidden = (type: CanvasRenderableEntityType) => {
+export const getSelectIsTypeHidden = (type: CanvasEntityType) => {
   switch (type) {
     case 'raster_layer':
       return selectRasterLayersIsHidden;
@@ -379,9 +362,6 @@ export const buildSelectHasObjects = (entityIdentifier: CanvasEntityIdentifier) 
     if (!entity) {
       return false;
     }
-    if (entity.type === 'reference_image') {
-      return entity.ipAdapter.image !== null;
-    }
     return entity.objects.length > 0;
   });
 };
@@ -397,9 +377,10 @@ export const selectBboxModelBase = createSelector(selectBbox, (bbox) => bbox.mod
 
 export const selectCanvasMetadata = createSelector(
   selectCanvasSlice,
-  (canvas): { canvas_v2_metadata: CanvasMetadata } => {
+  selectReferenceImageEntities,
+  (canvas, refImageEntities): { canvas_v2_metadata: CanvasMetadata } => {
     const canvas_v2_metadata: CanvasMetadata = {
-      referenceImages: selectAllEntitiesOfType(canvas, 'reference_image'),
+      referenceImages: refImageEntities,
       controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
       inpaintMasks: selectAllEntitiesOfType(canvas, 'inpaint_mask'),
       rasterLayers: selectAllEntitiesOfType(canvas, 'raster_layer'),

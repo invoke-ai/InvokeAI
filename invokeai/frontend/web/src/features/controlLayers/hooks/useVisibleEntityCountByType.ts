@@ -4,7 +4,6 @@ import {
   selectActiveControlLayerEntities,
   selectActiveInpaintMaskEntities,
   selectActiveRasterLayerEntities,
-  selectActiveReferenceImageEntities,
   selectActiveRegionalGuidanceEntities,
 } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -22,8 +21,6 @@ export const useVisibleEntityCountByType = (type: CanvasEntityIdentifier['type']
         return createSelector(selectActiveInpaintMaskEntities, (entities) => entities.length);
       case 'regional_guidance':
         return createSelector(selectActiveRegionalGuidanceEntities, (entities) => entities.length);
-      case 'reference_image':
-        return createSelector(selectActiveReferenceImageEntities, (entities) => entities.length);
       default:
         assert(false, 'Invalid entity type');
     }

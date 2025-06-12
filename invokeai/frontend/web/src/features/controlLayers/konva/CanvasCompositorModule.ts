@@ -21,9 +21,9 @@ import {
   selectActiveRegionalGuidanceEntities,
 } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasRenderableEntityIdentifier,
-  CanvasRenderableEntityState,
-  CanvasRenderableEntityType,
+  CanvasEntityIdentifier,
+  CanvasEntityState,
+  CanvasEntityType,
   GenerationMode,
   Rect,
 } from 'features/controlLayers/store/types';
@@ -91,7 +91,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @param type The optional entity type
    * @returns The rect
    */
-  getVisibleRectOfType = (type?: CanvasRenderableEntityType): Rect => {
+  getVisibleRectOfType = (type?: CanvasEntityType): Rect => {
     const rects = [];
 
     for (const adapter of this.manager.getAllAdapters()) {
@@ -139,8 +139,8 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @param type The entity type
    * @returns The adapters for the given entity type that are eligible to be included in a composite
    */
-  getVisibleAdaptersOfType = <T extends CanvasRenderableEntityType>(type: T): CanvasEntityAdapterFromType<T>[] => {
-    let entities: CanvasRenderableEntityState[];
+  getVisibleAdaptersOfType = <T extends CanvasEntityType>(type: T): CanvasEntityAdapterFromType<T>[] => {
+    let entities: CanvasEntityState[];
 
     switch (type) {
       case 'raster_layer':
@@ -327,7 +327,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @param deleteMergedEntities Whether to delete the merged entities after creating the new merged entity
    * @returns A promise that resolves to the image DTO, or null if the merge failed
    */
-  mergeByEntityIdentifiers = async <T extends CanvasRenderableEntityIdentifier>(
+  mergeByEntityIdentifiers = async <T extends CanvasEntityIdentifier>(
     entityIdentifiers: T[],
     deleteMergedEntities: boolean
   ): Promise<ImageDTO | null> => {
@@ -402,8 +402,8 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @param type The type of entity to merge
    * @returns A promise that resolves to the image DTO, or null if the merge failed
    */
-  mergeVisibleOfType = (type: CanvasRenderableEntityType): Promise<ImageDTO | null> => {
-    let entities: CanvasRenderableEntityState[];
+  mergeVisibleOfType = (type: CanvasEntityType): Promise<ImageDTO | null> => {
+    let entities: CanvasEntityState[];
 
     switch (type) {
       case 'raster_layer':

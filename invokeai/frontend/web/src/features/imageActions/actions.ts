@@ -10,23 +10,21 @@ import {
   entityRasterized,
   inpaintMaskAdded,
   rasterLayerAdded,
-  referenceImageAdded,
-  referenceImageIPAdapterImageChanged,
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { referenceImageAdded, referenceImageIPAdapterImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasEntityState,
   CanvasEntityType,
   CanvasImageState,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasRenderableEntityIdentifier,
-  CanvasRenderableEntityState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
@@ -41,13 +39,9 @@ import type { ImageDTO } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-export const setGlobalReferenceImage = (arg: {
-  imageDTO: ImageDTO;
-  entityIdentifier: CanvasEntityIdentifier<'reference_image'>;
-  dispatch: AppDispatch;
-}) => {
-  const { imageDTO, entityIdentifier, dispatch } = arg;
-  dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
+export const setGlobalReferenceImage = (arg: { imageDTO: ImageDTO; id: string; dispatch: AppDispatch }) => {
+  const { imageDTO, id, dispatch } = arg;
+  dispatch(referenceImageIPAdapterImageChanged({ id, imageDTO }));
 };
 
 export const setRegionalGuidanceReferenceImage = (arg: {
@@ -84,7 +78,7 @@ export const createNewCanvasEntityFromImage = (arg: {
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
   dispatch: AppDispatch;
   getState: () => RootState;
-  overrides?: Partial<Pick<CanvasRenderableEntityState, 'isEnabled' | 'isLocked' | 'name' | 'position'>>;
+  overrides?: Partial<Pick<CanvasEntityState, 'isEnabled' | 'isLocked' | 'name' | 'position'>>;
 }) => {
   const { type, imageDTO, dispatch, getState, overrides: _overrides } = arg;
   const state = getState();
@@ -117,12 +111,6 @@ export const createNewCanvasEntityFromImage = (arg: {
       dispatch(rgAdded({ overrides, isSelected: true }));
       break;
     }
-    case 'reference_image': {
-      const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
-      break;
-    }
     case 'regional_guidance_with_reference_image': {
       const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
       ipAdapter.image = imageDTOToImageWithDims(imageDTO);
@@ -146,7 +134,7 @@ export const createNewCanvasEntityFromImage = (arg: {
  */
 export const newCanvasFromImage = async (arg: {
   imageDTO: ImageDTO;
-  type: CanvasEntityType | 'regional_guidance_with_reference_image';
+  type: CanvasEntityType | 'regional_guidance_with_reference_image' | 'reference_image';
   withResize?: boolean;
   withInpaintMask?: boolean;
   dispatch: AppDispatch;
@@ -283,7 +271,7 @@ export const newCanvasFromImage = async (arg: {
 
 export const replaceCanvasEntityObjectsWithImage = (arg: {
   imageDTO: ImageDTO;
-  entityIdentifier: CanvasRenderableEntityIdentifier;
+  entityIdentifier: CanvasEntityIdentifier;
   dispatch: AppDispatch;
   getState: () => RootState;
 }) => {
