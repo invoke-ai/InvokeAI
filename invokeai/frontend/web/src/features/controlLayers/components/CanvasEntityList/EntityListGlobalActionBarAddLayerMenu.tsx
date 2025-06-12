@@ -1,7 +1,6 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import {
   useAddControlLayer,
-  useAddGlobalReferenceImage,
   useAddInpaintMask,
   useAddRasterLayer,
   useAddRegionalGuidance,
@@ -16,13 +15,11 @@ import { PiPlusBold } from 'react-icons/pi';
 export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const { t } = useTranslation();
   const isBusy = useCanvasIsBusy();
-  const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addInpaintMask = useAddInpaintMask();
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const isReferenceImageEnabled = useIsEntityTypeEnabled('reference_image');
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
   const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
   const isInpaintLayerEnabled = useIsEntityTypeEnabled('inpaint_mask');
@@ -41,11 +38,6 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
         isDisabled={isBusy}
       />
       <MenuList>
-        <MenuGroup title={t('controlLayers.global')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage} isDisabled={!isReferenceImageEnabled}>
-            {t('controlLayers.globalReferenceImage')}
-          </MenuItem>
-        </MenuGroup>
         <MenuGroup title={t('controlLayers.regional')}>
           <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask} isDisabled={!isInpaintLayerEnabled}>
             {t('controlLayers.inpaintMask')}

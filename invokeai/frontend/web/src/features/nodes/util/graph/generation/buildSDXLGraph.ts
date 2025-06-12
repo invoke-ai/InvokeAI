@@ -3,6 +3,7 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
@@ -41,6 +42,7 @@ export const buildSDXLGraph = async (state: RootState, manager?: CanvasManager |
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
+  const refImages = selectRefImagesSlice(state);
 
   const { bbox } = canvas;
 
@@ -272,7 +274,7 @@ export const buildSDXLGraph = async (state: RootState, manager?: CanvasManager |
     id: getPrefixedId('ip_adapter_collector'),
   });
   const ipAdapterResult = addIPAdapters({
-    entities: canvas.referenceImages.entities,
+    entities: refImages.entities,
     g,
     collector: ipAdapterCollect,
     model,

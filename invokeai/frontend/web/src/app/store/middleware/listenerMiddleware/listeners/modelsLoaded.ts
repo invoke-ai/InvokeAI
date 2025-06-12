@@ -1,11 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
-import {
-  controlLayerModelChanged,
-  referenceImageIPAdapterModelChanged,
-  rgIPAdapterModelChanged,
-} from 'features/controlLayers/store/canvasSlice';
+import { controlLayerModelChanged, rgIPAdapterModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
@@ -15,6 +11,7 @@ import {
   t5EncoderModelSelected,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
+import { referenceImageIPAdapterModelChanged, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -210,7 +207,7 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, log) 
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
-  selectCanvasSlice(state).referenceImages.entities.forEach((entity) => {
+  selectRefImagesSlice(state).entities.forEach((entity) => {
     if (entity.ipAdapter.type !== 'ip_adapter') {
       return;
     }
@@ -225,7 +222,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
       return;
     }
     log.debug({ selectedIPAdapterModel }, 'Selected IP adapter model is not available, clearing');
-    dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
+    dispatch(referenceImageIPAdapterModelChanged({ id: entity.id, modelConfig: null }));
   });
 
   selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
@@ -254,7 +251,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
 const handleFLUXReduxModels: ModelHandler = (models, state, dispatch, log) => {
   const fluxReduxModels = models.filter(isFluxReduxModelConfig);
 
-  selectCanvasSlice(state).referenceImages.entities.forEach((entity) => {
+  selectRefImagesSlice(state).entities.forEach((entity) => {
     if (entity.ipAdapter.type !== 'flux_redux') {
       return;
     }
@@ -268,7 +265,7 @@ const handleFLUXReduxModels: ModelHandler = (models, state, dispatch, log) => {
       return;
     }
     log.debug({ selectedFLUXReduxModel }, 'Selected FLUX Redux model is not available, clearing');
-    dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
+    dispatch(referenceImageIPAdapterModelChanged({ id: entity.id, modelConfig: null }));
   });
 
   selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {

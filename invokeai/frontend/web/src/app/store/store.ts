@@ -13,6 +13,7 @@ import {
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
+import { refImagesPersistConfig, refImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
@@ -66,6 +67,7 @@ const allReducers = {
   [canvasSessionSlice.name]: canvasSessionSlice.reducer,
   [lorasSlice.name]: lorasSlice.reducer,
   [workflowLibrarySlice.name]: workflowLibrarySlice.reducer,
+  [refImagesSlice.name]: refImagesSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -111,6 +113,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [canvasStagingAreaPersistConfig.name]: canvasStagingAreaPersistConfig,
   [lorasPersistConfig.name]: lorasPersistConfig,
   [workflowLibraryPersistConfig.name]: workflowLibraryPersistConfig,
+  [refImagesSlice.name]: refImagesPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

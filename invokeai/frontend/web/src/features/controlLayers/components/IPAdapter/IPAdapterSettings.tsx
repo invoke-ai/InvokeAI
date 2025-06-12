@@ -1,17 +1,15 @@
-import { Flex, IconButton } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
-import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
+import { CLIPVisionModel } from 'features/controlLayers/components/common/CLIPVisionModel';
+import { FLUXReduxImageInfluence } from 'features/controlLayers/components/common/FLUXReduxImageInfluence';
 import { Weight } from 'features/controlLayers/components/common/Weight';
-import { CLIPVisionModel } from 'features/controlLayers/components/IPAdapter/CLIPVisionModel';
-import { FLUXReduxImageInfluence } from 'features/controlLayers/components/IPAdapter/FLUXReduxImageInfluence';
 import { GlobalReferenceImageModel } from 'features/controlLayers/components/IPAdapter/GlobalReferenceImageModel';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterSettingsEmptyState } from 'features/controlLayers/components/IPAdapter/IPAdapterSettingsEmptyState';
-import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { usePullBboxIntoGlobalReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import {
   referenceImageIPAdapterBeginEndStepPctChanged,
   referenceImageIPAdapterCLIPVisionModelChanged,
@@ -20,11 +18,11 @@ import {
   referenceImageIPAdapterMethodChanged,
   referenceImageIPAdapterModelChanged,
   referenceImageIPAdapterWeightChanged,
-} from 'features/controlLayers/store/canvasSlice';
-import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectEntity, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+  selectRefImageEntity,
+  selectRefImageEntityOrThrow,
+  selectRefImagesSlice,
+} from 'features/controlLayers/store/refImagesSlice';
 import type {
-  CanvasEntityIdentifier,
   CLIPVisionModelV2,
   FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
   IPMethodV2,
@@ -33,141 +31,138 @@ import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold } from 'react-icons/pi';
 import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
 
-const buildSelectIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) =>
+const buildSelectIPAdapter = (id: string) =>
   createSelector(
-    selectCanvasSlice,
-    (canvas) => selectEntityOrThrow(canvas, entityIdentifier, 'IPAdapterSettings').ipAdapter
+    selectRefImagesSlice,
+    (refImages) => selectRefImageEntityOrThrow(refImages, id, 'IPAdapterSettings').ipAdapter
   );
 
 const IPAdapterSettingsContent = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const entityIdentifier = useEntityIdentifierContext('reference_image');
-  const selectIPAdapter = useMemo(() => buildSelectIPAdapter(entityIdentifier), [entityIdentifier]);
+  const id = useRefImageIdContext();
+  const selectIPAdapter = useMemo(() => buildSelectIPAdapter(id), [id]);
   const ipAdapter = useAppSelector(selectIPAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(referenceImageIPAdapterBeginEndStepPctChanged({ entityIdentifier, beginEndStepPct }));
+      dispatch(referenceImageIPAdapterBeginEndStepPctChanged({ id, beginEndStepPct }));
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(referenceImageIPAdapterWeightChanged({ entityIdentifier, weight }));
+      dispatch(referenceImageIPAdapterWeightChanged({ id, weight }));
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(referenceImageIPAdapterMethodChanged({ entityIdentifier, method }));
+      dispatch(referenceImageIPAdapterMethodChanged({ id, method }));
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
 
   const onChangeFLUXReduxImageInfluence = useCallback(
     (imageInfluence: FLUXReduxImageInfluenceType) => {
-      dispatch(referenceImageIPAdapterFLUXReduxImageInfluenceChanged({ entityIdentifier, imageInfluence }));
+      dispatch(referenceImageIPAdapterFLUXReduxImageInfluenceChanged({ id, imageInfluence }));
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig) => {
-      dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier, modelConfig }));
+      dispatch(referenceImageIPAdapterModelChanged({ id, modelConfig }));
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(referenceImageIPAdapterCLIPVisionModelChanged({ entityIdentifier, clipVisionModel }));
+      dispatch(referenceImageIPAdapterCLIPVisionModelChanged({ id, clipVisionModel }));
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
+      dispatch(referenceImageIPAdapterImageChanged({ id, imageDTO }));
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
 
   const dndTargetData = useMemo<SetGlobalReferenceImageDndTargetData>(
-    () => setGlobalReferenceImageDndTarget.getData({ entityIdentifier }, ipAdapter.image?.image_name),
-    [entityIdentifier, ipAdapter.image?.image_name]
+    () => setGlobalReferenceImageDndTarget.getData({ id }, ipAdapter.image?.image_name),
+    [id, ipAdapter.image?.image_name]
   );
-  const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
-  const isBusy = useCanvasIsBusy();
+  // const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(id);
+  // const isBusy = useCanvasIsBusy();
 
   const isFLUX = useAppSelector(selectIsFLUX);
 
   return (
-    <CanvasEntitySettingsWrapper>
-      <Flex flexDir="column" gap={2} position="relative" w="full">
-        <Flex gap={2} alignItems="center" w="full">
-          <GlobalReferenceImageModel modelKey={ipAdapter.model?.key ?? null} onChangeModel={onChangeModel} />
-          {ipAdapter.type === 'ip_adapter' && (
-            <CLIPVisionModel model={ipAdapter.clipVisionModel} onChange={onChangeCLIPVisionModel} />
-          )}
-          <IconButton
+    <Flex flexDir="column" gap={2} position="relative" w="full">
+      <Flex gap={2} alignItems="center" w="full">
+        <GlobalReferenceImageModel modelKey={ipAdapter.model?.key ?? null} onChangeModel={onChangeModel} />
+        {ipAdapter.type === 'ip_adapter' && (
+          <CLIPVisionModel model={ipAdapter.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+        )}
+        {/* <IconButton
             onClick={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
             variant="ghost"
             aria-label={t('controlLayers.pullBboxIntoReferenceImage')}
             tooltip={t('controlLayers.pullBboxIntoReferenceImage')}
             icon={<PiBoundingBoxBold />}
-          />
-        </Flex>
-        <Flex gap={2} w="full">
-          {ipAdapter.type === 'ip_adapter' && (
-            <Flex flexDir="column" gap={2} w="full">
-              {!isFLUX && <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />}
-              <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
-              <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
-            </Flex>
-          )}
-          {ipAdapter.type === 'flux_redux' && (
-            <Flex flexDir="column" gap={2} w="full" alignItems="flex-start">
-              <FLUXReduxImageInfluence
-                imageInfluence={ipAdapter.imageInfluence ?? 'lowest'}
-                onChange={onChangeFLUXReduxImageInfluence}
-              />
-            </Flex>
-          )}
-          <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
-            <IPAdapterImagePreview
-              image={ipAdapter.image}
-              onChangeImage={onChangeImage}
-              dndTarget={setGlobalReferenceImageDndTarget}
-              dndTargetData={dndTargetData}
+          /> */}
+      </Flex>
+      <Flex gap={2} w="full">
+        {ipAdapter.type === 'ip_adapter' && (
+          <Flex flexDir="column" gap={2} w="full">
+            {!isFLUX && <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />}
+            <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
+            <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+          </Flex>
+        )}
+        {ipAdapter.type === 'flux_redux' && (
+          <Flex flexDir="column" gap={2} w="full" alignItems="flex-start">
+            <FLUXReduxImageInfluence
+              imageInfluence={ipAdapter.imageInfluence ?? 'lowest'}
+              onChange={onChangeFLUXReduxImageInfluence}
             />
           </Flex>
+        )}
+        <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
+          <IPAdapterImagePreview
+            image={ipAdapter.image}
+            onChangeImage={onChangeImage}
+            dndTarget={setGlobalReferenceImageDndTarget}
+            dndTargetData={dndTargetData}
+          />
         </Flex>
       </Flex>
-    </CanvasEntitySettingsWrapper>
+    </Flex>
   );
 });
 
 IPAdapterSettingsContent.displayName = 'IPAdapterSettingsContent';
 
-const buildSelectIPAdapterHasImage = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) =>
-  createSelector(selectCanvasSlice, (canvas) => {
-    const referenceImage = selectEntity(canvas, entityIdentifier);
+const buildSelectIPAdapterHasImage = (id: string) =>
+  createSelector(selectRefImagesSlice, (refImages) => {
+    const referenceImage = selectRefImageEntity(refImages, id);
     return !!referenceImage && referenceImage.ipAdapter.image !== null;
   });
 
 export const IPAdapterSettings = memo(() => {
-  const entityIdentifier = useEntityIdentifierContext('reference_image');
+  const id = useRefImageIdContext();
 
-  const selectIPAdapterHasImage = useMemo(() => buildSelectIPAdapterHasImage(entityIdentifier), [entityIdentifier]);
+  const selectIPAdapterHasImage = useMemo(() => buildSelectIPAdapterHasImage(id), [id]);
   const hasImage = useAppSelector(selectIPAdapterHasImage);
 
   if (!hasImage) {

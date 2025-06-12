@@ -9,8 +9,9 @@ import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
+import type { CanvasState, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import {
   getControlLayerWarnings,
   getGlobalReferenceImageWarnings,
@@ -75,6 +76,7 @@ const debouncedUpdateReasons = debounce(
     isConnected: boolean,
     canvas: CanvasState,
     params: ParamsState,
+    refImages: RefImagesState,
     dynamicPrompts: DynamicPromptsState,
     canvasIsFiltering: boolean,
     canvasIsTransforming: boolean,
@@ -97,6 +99,7 @@ const debouncedUpdateReasons = debounce(
         model,
         canvas,
         params,
+        refImages,
         dynamicPrompts,
         canvasIsFiltering,
         canvasIsTransforming,
@@ -138,6 +141,7 @@ export const useReadinessWatcher = () => {
   const tab = useAppSelector(selectActiveTab);
   const canvas = useAppSelector(selectCanvasSlice);
   const params = useAppSelector(selectParamsSlice);
+  const refImages = useAppSelector(selectRefImagesSlice);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsSlice);
   const nodes = useAppSelector(selectNodesSlice);
   const workflowSettings = useAppSelector(selectWorkflowSettingsSlice);
@@ -159,6 +163,7 @@ export const useReadinessWatcher = () => {
       isConnected,
       canvas,
       params,
+      refImages,
       dynamicPrompts,
       canvasIsFiltering,
       canvasIsTransforming,
@@ -177,6 +182,7 @@ export const useReadinessWatcher = () => {
   }, [
     store,
     canvas,
+    refImages,
     canvasIsCompositing,
     canvasIsFiltering,
     canvasIsRasterizing,
@@ -334,6 +340,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   model: MainModelConfig | null | undefined;
   canvas: CanvasState;
   params: ParamsState;
+  refImages: RefImagesState;
   dynamicPrompts: DynamicPromptsState;
   canvasIsFiltering: boolean;
   canvasIsTransforming: boolean;
@@ -347,6 +354,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     model,
     canvas,
     params,
+    refImages,
     dynamicPrompts,
     canvasIsFiltering,
     canvasIsTransforming,
@@ -514,24 +522,21 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
-  const enabledGlobalReferenceLayers = canvas.referenceImages.entities.filter(
-    (referenceImage) => referenceImage.isEnabled
-  );
-
   // Flux Kontext only supports 1x Reference Image at a time.
-  const referenceImageCount = enabledGlobalReferenceLayers.length;
+  const referenceImageCount = refImages.entities.filter((entity) => entity.isEnabled).length;
 
   if (model?.base === 'flux-kontext' && referenceImageCount > 1) {
     reasons.push({ content: i18n.t('parameters.invoke.fluxKontextMultipleReferenceImages') });
   }
 
-  canvas.referenceImages.entities
+  refImages.entities
     .filter((entity) => entity.isEnabled)
     .forEach((entity, i) => {
       const layerLiteral = i18n.t('controlLayers.layer_one');
       const layerNumber = i + 1;
       const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
       const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
+
       const problems = getGlobalReferenceImageWarnings(entity, model);
 
       if (problems.length) {
