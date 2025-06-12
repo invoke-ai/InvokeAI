@@ -64,6 +64,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     Imagen3Model = "Imagen3ModelField"
     Imagen4Model = "Imagen4ModelField"
     ChatGPT4oModel = "ChatGPT4oModelField"
+    FluxKontextModel = "FluxKontextModelField"
     # endregion
 
     # region Misc Field Types

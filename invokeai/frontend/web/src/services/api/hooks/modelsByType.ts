@@ -16,6 +16,7 @@ import {
   isControlLayerModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
+  isFluxKontextModelConfig,
   isFluxMainModelModelConfig,
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
@@ -94,6 +95,7 @@ export const useLLaVAModels = buildModelsHook(isLLaVAModelConfig);
 export const useImagen3Models = buildModelsHook(isImagen3ModelConfig);
 export const useImagen4Models = buildModelsHook(isImagen4ModelConfig);
 export const useChatGPT4oModels = buildModelsHook(isChatGPT4oModelConfig);
+export const useFluxKontextModels = buildModelsHook(isFluxKontextModelConfig);
 
 // const buildModelsSelector =
 //   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>

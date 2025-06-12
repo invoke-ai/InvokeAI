@@ -19,6 +19,7 @@ export const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   imagen3: 'pink',
   imagen4: 'pink',
   'chatgpt-4o': 'pink',
+  'flux-kontext': 'pink',
 };
 
 const ModelBaseBadge = ({ base }: Props) => {

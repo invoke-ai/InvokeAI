@@ -16,6 +16,7 @@ import type {
   FloatFieldCollectionInputTemplate,
   FloatFieldInputTemplate,
   FloatGeneratorFieldInputTemplate,
+  FluxKontextModelFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
   FluxReduxModelFieldInputTemplate,
   FluxVAEModelFieldInputTemplate,
@@ -613,6 +614,20 @@ const buildImagen4ModelFieldInputTemplate: FieldInputTemplateBuilder<Imagen4Mode
   };
   return template;
 };
+
+const buildFluxKontextModelFieldInputTemplate: FieldInputTemplateBuilder<FluxKontextModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FluxKontextModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+  return template;
+};
+
 const buildChatGPT4oModelFieldInputTemplate: FieldInputTemplateBuilder<ChatGPT4oModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -835,6 +850,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   Imagen3ModelField: buildImagen3ModelFieldInputTemplate,
   Imagen4ModelField: buildImagen4ModelFieldInputTemplate,
   ChatGPT4oModelField: buildChatGPT4oModelFieldInputTemplate,
+  FluxKontextModelField: buildFluxKontextModelFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,

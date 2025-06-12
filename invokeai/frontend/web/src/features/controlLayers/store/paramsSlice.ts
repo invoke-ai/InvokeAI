@@ -383,6 +383,7 @@ export const selectIsCogView4 = createParamsSelector((params) => params.model?.b
 export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
 export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
 export const selectIsChatGTP4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
+export const selectIsFluxKontext = createParamsSelector((params) => params.model?.base === 'flux-kontext');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
