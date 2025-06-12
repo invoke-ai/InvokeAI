@@ -1,7 +1,7 @@
 import { Button, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { usePullBboxIntoGlobalReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
@@ -15,24 +15,24 @@ import type { ImageDTO } from 'services/api/types';
 
 export const IPAdapterSettingsEmptyState = memo(() => {
   const { t } = useTranslation();
-  const entityIdentifier = useEntityIdentifierContext('reference_image');
+  const id = useRefImageIdContext();
   const dispatch = useAppDispatch();
   const isBusy = useCanvasIsBusy();
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {
-      setGlobalReferenceImage({ imageDTO, entityIdentifier, dispatch });
+      setGlobalReferenceImage({ imageDTO, id, dispatch });
     },
-    [dispatch, entityIdentifier]
+    [dispatch, id]
   );
   const uploadApi = useImageUploadButton({ onUpload, allowMultiple: false });
   const onClickGalleryButton = useCallback(() => {
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
-  const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
+  const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(id);
 
   const dndTargetData = useMemo<SetGlobalReferenceImageDndTargetData>(
-    () => setGlobalReferenceImageDndTarget.getData({ entityIdentifier }),
-    [entityIdentifier]
+    () => setGlobalReferenceImageDndTarget.getData({ id }),
+    [id]
   );
 
   const components = useMemo(

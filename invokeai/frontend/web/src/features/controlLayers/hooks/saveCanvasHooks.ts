@@ -9,8 +9,6 @@ import {
   controlLayerAdded,
   entityRasterized,
   rasterLayerAdded,
-  referenceImageAdded,
-  referenceImageIPAdapterImageChanged,
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
@@ -20,6 +18,7 @@ import {
   selectPositivePrompt,
   selectSeed,
 } from 'features/controlLayers/store/paramsSlice';
+import { referenceImageAdded, referenceImageIPAdapterImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -306,13 +305,13 @@ export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'c
   return func;
 };
 
-export const usePullBboxIntoGlobalReferenceImage = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) => {
+export const usePullBboxIntoGlobalReferenceImage = (id: string) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
+      dispatch(referenceImageIPAdapterImageChanged({ id, imageDTO }));
     };
 
     return {
@@ -322,7 +321,7 @@ export const usePullBboxIntoGlobalReferenceImage = (entityIdentifier: CanvasEnti
       toastOk: t('controlLayers.pullBboxIntoReferenceImageOk'),
       toastError: t('controlLayers.pullBboxIntoReferenceImageError'),
     };
-  }, [dispatch, entityIdentifier, t]);
+  }, [dispatch, id, t]);
 
   const func = useSaveCanvas(arg);
   return func;

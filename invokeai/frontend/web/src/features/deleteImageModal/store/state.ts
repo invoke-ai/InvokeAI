@@ -1,9 +1,14 @@
 import { useStore } from '@nanostores/react';
 import { getStore, useAppStore } from 'app/store/nanostores/store';
 import type { AppDispatch, AppGetState, RootState } from 'app/store/store';
-import { entityDeleted, referenceImageIPAdapterImageChanged } from 'features/controlLayers/store/canvasSlice';
+import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
+import {
+  referenceImageIPAdapterImageChanged,
+  selectReferenceImageEntities,
+  selectRefImagesSlice,
+} from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { type CanvasState, getEntityIdentifier } from 'features/controlLayers/store/types';
+import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
@@ -145,8 +150,9 @@ const getImageUsageFromImageDTOs = (imageDTOs: ImageDTO[], state: RootState): Im
   const nodes = selectNodesSlice(state);
   const canvas = selectCanvasSlice(state);
   const upscale = selectUpscaleSlice(state);
+  const refImages = selectRefImagesSlice(state);
 
-  return imageDTOs.map(({ image_name }) => getImageUsage(nodes, canvas, upscale, image_name));
+  return imageDTOs.map(({ image_name }) => getImageUsage(nodes, canvas, upscale, refImages, image_name));
 };
 
 const getImageUsageSummary = (imageUsage: ImageUsage[]): ImageUsage => ({
@@ -221,9 +227,9 @@ const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image
 };
 
 const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  selectCanvasSlice(state).referenceImages.entities.forEach((entity) => {
+  selectReferenceImageEntities(state).forEach((entity) => {
     if (entity.ipAdapter.image?.image_name === imageDTO.image_name) {
-      dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier: getEntityIdentifier(entity), imageDTO: null }));
+      dispatch(referenceImageIPAdapterImageChanged({ id: entity.id, imageDTO: null }));
     }
   });
 };
@@ -243,7 +249,13 @@ const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, imageD
   });
 };
 
-export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: UpscaleState, image_name: string) => {
+export const getImageUsage = (
+  nodes: NodesState,
+  canvas: CanvasState,
+  upscale: UpscaleState,
+  refImages: RefImagesState,
+  image_name: string
+) => {
   const isNodesImage = nodes.nodes.filter(isInvocationNode).some((node) =>
     some(node.data.inputs, (input) => {
       if (isImageFieldInputInstance(input)) {
@@ -264,9 +276,7 @@ export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: U
 
   const isUpscaleImage = upscale.upscaleInitialImage?.image_name === image_name;
 
-  const isReferenceImage = canvas.referenceImages.entities.some(
-    ({ ipAdapter }) => ipAdapter.image?.image_name === image_name
-  );
+  const isReferenceImage = refImages.entities.some(({ ipAdapter }) => ipAdapter.image?.image_name === image_name);
 
   const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
     objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)

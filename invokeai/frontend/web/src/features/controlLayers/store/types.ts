@@ -393,25 +393,14 @@ const zCanvasEntityState = z.discriminatedUnion('type', [
   zCanvasControlLayerState,
   zCanvasRegionalGuidanceState,
   zCanvasInpaintMaskState,
-  zCanvasReferenceImageState,
 ]);
 export type CanvasEntityState = z.infer<typeof zCanvasEntityState>;
-
-const zCanvasRenderableEntityState = z.discriminatedUnion('type', [
-  zCanvasRasterLayerState,
-  zCanvasControlLayerState,
-  zCanvasRegionalGuidanceState,
-  zCanvasInpaintMaskState,
-]);
-export type CanvasRenderableEntityState = z.infer<typeof zCanvasRenderableEntityState>;
-export type CanvasRenderableEntityType = CanvasRenderableEntityState['type'];
 
 const zCanvasEntityType = z.union([
   zCanvasRasterLayerState.shape.type,
   zCanvasControlLayerState.shape.type,
   zCanvasRegionalGuidanceState.shape.type,
   zCanvasInpaintMaskState.shape.type,
-  zCanvasReferenceImageState.shape.type,
 ]);
 export type CanvasEntityType = z.infer<typeof zCanvasEntityType>;
 
@@ -420,7 +409,7 @@ export const zCanvasEntityIdentifer = z.object({
   type: zCanvasEntityType,
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
-export type CanvasRenderableEntityIdentifier = CanvasEntityIdentifier<CanvasRenderableEntityType>;
+
 export type LoRA = {
   id: string;
   isEnabled: boolean;
@@ -551,9 +540,6 @@ const zRegionalGuidance = z.object({
   isHidden: z.boolean(),
   entities: z.array(zCanvasRegionalGuidanceState),
 });
-const zReferenceImages = z.object({
-  entities: z.array(zCanvasReferenceImageState),
-});
 const zCanvasState = z.object({
   _version: z.literal(3).default(3),
   selectedEntityIdentifier: zCanvasEntityIdentifer.nullable().default(null),
@@ -562,7 +548,6 @@ const zCanvasState = z.object({
   rasterLayers: zRasterLayers.default({ isHidden: false, entities: [] }),
   controlLayers: zControlLayers.default({ isHidden: false, entities: [] }),
   regionalGuidance: zRegionalGuidance.default({ isHidden: false, entities: [] }),
-  referenceImages: zReferenceImages.default({ entities: [] }),
   bbox: zBboxState.default({
     rect: { x: 0, y: 0, width: 512, height: 512 },
     aspectRatio: DEFAULT_ASPECT_RATIO_CONFIG,
@@ -572,6 +557,14 @@ const zCanvasState = z.object({
   }),
 });
 export type CanvasState = z.infer<typeof zCanvasState>;
+
+const zRefImagesState = z.object({
+  selectedId: zId.nullable().default(null),
+  entities: z.array(zCanvasReferenceImageState).default(() => []),
+});
+export type RefImagesState = z.infer<typeof zRefImagesState>;
+const INITIAL_REF_IMAGES_STATE = zRefImagesState.parse({});
+export const getInitialRefImagesState = () => deepClone(INITIAL_REF_IMAGES_STATE);
 
 /**
  * Gets a fresh canvas initial state with no references in memory to existing objects.
@@ -638,17 +631,6 @@ export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
 export type CanvasEntityStateFromType<T extends CanvasEntityType> = Extract<CanvasEntityState, { type: T }>;
 
-export function isRenderableEntityType(
-  entityType: CanvasEntityState['type']
-): entityType is CanvasRenderableEntityState['type'] {
-  return (
-    entityType === 'raster_layer' ||
-    entityType === 'control_layer' ||
-    entityType === 'regional_guidance' ||
-    entityType === 'inpaint_mask'
-  );
-}
-
 export function isRasterLayerEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> {
@@ -704,16 +686,6 @@ export function isSaveableEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
   return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
-}
-
-export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
-  return isRenderableEntityType(entity.type);
-}
-
-export function isRenderableEntityIdentifier(
-  entityIdentifier: CanvasEntityIdentifier
-): entityIdentifier is CanvasRenderableEntityIdentifier {
-  return isRenderableEntityType(entityIdentifier.type);
 }
 
 export const getEntityIdentifier = <T extends CanvasEntityType>(

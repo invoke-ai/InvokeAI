@@ -1,11 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasEntityIdentifier,
-  CanvasEntityType,
-  CanvasRenderableEntityIdentifier,
-} from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import type { BoardId } from 'features/gallery/store/types';
 import {
@@ -133,7 +129,7 @@ const _setGlobalReferenceImage = buildTypeAndKey('set-global-reference-image');
 export type SetGlobalReferenceImageDndTargetData = DndData<
   typeof _setGlobalReferenceImage.type,
   typeof _setGlobalReferenceImage.key,
-  { entityIdentifier: CanvasEntityIdentifier<'reference_image'> }
+  { id: string }
 >;
 export const setGlobalReferenceImageDndTarget: DndTarget<
   SetGlobalReferenceImageDndTargetData,
@@ -150,8 +146,8 @@ export const setGlobalReferenceImageDndTarget: DndTarget<
   },
   handler: ({ sourceData, targetData, dispatch }) => {
     const { imageDTO } = sourceData.payload;
-    const { entityIdentifier } = targetData.payload;
-    setGlobalReferenceImage({ entityIdentifier, imageDTO, dispatch });
+    const { id } = targetData.payload;
+    setGlobalReferenceImage({ id, imageDTO, dispatch });
   },
 };
 //#endregion
@@ -352,7 +348,7 @@ type NewCanvasFromImageDndTargetData = DndData<
   typeof _newCanvas.type,
   typeof _newCanvas.key,
   {
-    type: CanvasEntityType | 'regional_guidance_with_reference_image';
+    type: CanvasEntityType | 'regional_guidance_with_reference_image' | 'reference_image';
     withResize?: boolean;
     withInpaintMask?: boolean;
   }
@@ -379,7 +375,7 @@ const _replaceCanvasEntityObjectsWithImage = buildTypeAndKey('replace-canvas-ent
 export type ReplaceCanvasEntityObjectsWithImageDndTargetData = DndData<
   typeof _replaceCanvasEntityObjectsWithImage.type,
   typeof _replaceCanvasEntityObjectsWithImage.key,
-  { entityIdentifier: CanvasRenderableEntityIdentifier }
+  { entityIdentifier: CanvasEntityIdentifier }
 >;
 export const replaceCanvasEntityObjectsWithImageDndTarget: DndTarget<
   ReplaceCanvasEntityObjectsWithImageDndTargetData,

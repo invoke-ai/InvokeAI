@@ -13,9 +13,6 @@ export const useEntityTypeInformationalPopover = (type: CanvasEntityIdentifier['
         return 'rasterLayer';
       case 'regional_guidance':
         return 'regionalGuidanceAndReferenceImage';
-      case 'reference_image':
-        return 'globalReferenceImage';
-
       default:
         return undefined;
     }
