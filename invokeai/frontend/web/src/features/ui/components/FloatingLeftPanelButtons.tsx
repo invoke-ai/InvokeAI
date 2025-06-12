@@ -2,7 +2,6 @@ import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, Tooltip, useShiftMo
 import { useAppSelector } from 'app/store/storeHooks';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
 import { InvokeButtonTooltip } from 'features/queue/components/InvokeButtonTooltip/InvokeButtonTooltip';
 import { useDeleteCurrentQueueItem } from 'features/queue/hooks/useDeleteCurrentQueueItem';
@@ -22,11 +21,10 @@ import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export const FloatingLeftPanelButtons = memo((props: { onToggle: () => void }) => {
   const tab = useAppSelector(selectActiveTab);
-  const type = useAppSelector(selectCanvasSessionType);
 
   return (
     <Flex pos="absolute" transform="translate(0, -50%)" top="50%" insetInlineStart={2} direction="column" gap={2}>
-      {tab === 'canvas' && type === 'advanced' && (
+      {tab === 'canvas' && (
         <CanvasManagerProviderGate>
           <ToolChooser />
         </CanvasManagerProviderGate>

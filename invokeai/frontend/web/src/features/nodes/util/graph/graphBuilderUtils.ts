@@ -1,13 +1,13 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSessionType } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasState, ParamsState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { selectStylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { pick } from 'lodash-es';
 import { selectListStylePresetsRequestState } from 'services/api/endpoints/stylePresets';
 import type { Invocation, S } from 'services/api/types';
@@ -36,9 +36,9 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
 export const selectCanvasOutputFields = (state: RootState) => {
   // Advanced session means working on canvas - images are not saved to gallery or added to a board.
   // Simple session means working in YOLO mode - images are saved to gallery & board.
-  const type = selectCanvasSessionType(state);
-  const is_intermediate = type === 'advanced';
-  const board = type === 'advanced' ? undefined : getBoardField(state);
+  const tab = selectActiveTab(state);
+  const is_intermediate = tab === 'canvas';
+  const board = tab === 'canvas' ? undefined : getBoardField(state);
 
   return {
     is_intermediate,

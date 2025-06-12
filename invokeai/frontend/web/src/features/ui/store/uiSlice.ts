@@ -1,7 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasReset } from 'features/controlLayers/store/actions';
+import { canvasSessionReset, generateSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { atom } from 'nanostores';
@@ -56,9 +57,18 @@ export const uiSlice = createSlice({
     builder.addCase(workflowLoaded, (state) => {
       state.activeTab = 'workflows';
     });
-    builder.addCase(canvasSessionTypeChanged, (state) => {
+    builder.addCase(canvasReset, (state) => {
       state.activeTab = 'canvas';
     });
+    builder.addCase(canvasSessionReset, (state) => {
+      state.activeTab = 'canvas';
+    });
+    builder.addCase(generateSessionReset, (state) => {
+      state.activeTab = 'generate';
+    });
+    // builder.addCase(canvasSessionTypeChanged, (state) => {
+    //   state.activeTab = 'canvas';
+    // });
   },
 });
 
@@ -98,12 +108,12 @@ export const uiPersistConfig: PersistConfig<UIState> = {
   persistDenylist: ['shouldShowImageDetails'],
 };
 
-const TABS_WITH_LEFT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as const;
+const TABS_WITH_LEFT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows', 'generate'] as const;
 export const LEFT_PANEL_MIN_SIZE_PX = 400;
 export const $isLeftPanelOpen = atom(true);
 export const selectWithLeftPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_LEFT_PANEL.includes(ui.activeTab));
 
-const TABS_WITH_RIGHT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as const;
+const TABS_WITH_RIGHT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows', 'generate'] as const;
 export const RIGHT_PANEL_MIN_SIZE_PX = 390;
 export const $isRightPanelOpen = atom(true);
 export const selectWithRightPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_RIGHT_PANEL.includes(ui.activeTab));

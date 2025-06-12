@@ -6,8 +6,10 @@ import { extractMessageFromAssertionError } from 'common/util/extractMessageFrom
 import { withResult, withResultAsync } from 'common/util/result';
 import { parseify } from 'common/util/serialize';
 import {
-  canvasSessionGenerationStarted,
+  canvasSessionIdCreated,
+  generateSessionIdCreated,
   selectCanvasSessionId,
+  selectGenerateSessionId,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -22,6 +24,7 @@ import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Grap
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { serializeError } from 'serialize-error';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 import { assert, AssertionError } from 'tsafe';
@@ -36,12 +39,27 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
     effect: async (action, { getState, dispatch }) => {
       log.debug('Enqueue requested');
 
-      if (!selectCanvasSessionId(getState())) {
-        dispatch(canvasSessionGenerationStarted());
+      const tab = selectActiveTab(getState());
+      let sessionId = null;
+      if (tab === 'generate') {
+        sessionId = selectGenerateSessionId(getState());
+        if (!sessionId) {
+          dispatch(generateSessionIdCreated());
+          sessionId = selectGenerateSessionId(getState());
+        }
+      } else if (tab === 'canvas') {
+        sessionId = selectCanvasSessionId(getState());
+        if (!sessionId) {
+          dispatch(canvasSessionIdCreated());
+          sessionId = selectCanvasSessionId(getState());
+        }
+      } else {
+        log.warn(`Enqueue requested in unsupported tab ${tab}`);
+        return;
       }
 
       const state = getState();
-      const destination = state.canvasSession.id;
+      const destination = sessionId;
       assert(destination !== null);
 
       const { prepend } = action.payload;
