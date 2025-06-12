@@ -2,7 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';
-import { canvasSessionGenerationFinished } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { canvasSessionReset, generateSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useDeleteQueueItem } from 'features/queue/hooks/useDeleteQueueItem';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,9 +23,14 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(({ isDisabled }: { i
     await deleteQueueItem.trigger(selectedItemId);
     const itemCount = ctx.$itemCount.get();
     if (itemCount <= 1) {
-      dispatch(canvasSessionGenerationFinished());
+      if (ctx.session.type === 'advanced') {
+        dispatch(canvasSessionReset());
+      } else {
+        // ctx.session.type === 'simple'
+        dispatch(generateSessionReset());
+      }
     }
-  }, [selectedItemId, ctx.$itemCount, deleteQueueItem, dispatch]);
+  }, [selectedItemId, deleteQueueItem, ctx.$itemCount, ctx.session.type, dispatch]);
 
   return (
     <IconButton

@@ -6,7 +6,6 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -1569,7 +1568,6 @@ export const canvasSlice = createSlice({
         syncScaledSize(state);
       }
     });
-    builder.addCase(canvasSessionTypeChanged, (state) => resetState(state));
   },
 });
 
