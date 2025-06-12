@@ -3,6 +3,7 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
@@ -42,6 +43,7 @@ export const buildFLUXGraph = async (state: RootState, manager?: CanvasManager |
 
   const params = selectParamsSlice(state);
   const canvas = selectCanvasSlice(state);
+  const refImages = selectRefImagesSlice(state);
 
   const { bbox } = canvas;
 
@@ -271,7 +273,7 @@ export const buildFLUXGraph = async (state: RootState, manager?: CanvasManager |
     id: getPrefixedId('ip_adapter_collector'),
   });
   const ipAdapterResult = addIPAdapters({
-    entities: canvas.referenceImages.entities,
+    entities: refImages.entities,
     g,
     collector: ipAdapterCollect,
     model,
@@ -284,7 +286,7 @@ export const buildFLUXGraph = async (state: RootState, manager?: CanvasManager |
     id: getPrefixedId('ip_adapter_collector'),
   });
   const fluxReduxResult = addFLUXReduxes({
-    entities: canvas.referenceImages.entities,
+    entities: refImages.entities,
     g,
     collector: fluxReduxCollect,
     model,

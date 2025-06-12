@@ -12,9 +12,6 @@ const addControlLayerFromImageDndTargetData = newCanvasEntityFromImageDndTarget.
 const addRegionalGuidanceReferenceImageFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({
   type: 'regional_guidance_with_reference_image',
 });
-const addGlobalReferenceImageFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({
-  type: 'reference_image',
-});
 
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();
@@ -54,14 +51,6 @@ export const CanvasDropArea = memo(() => {
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addRegionalGuidanceReferenceImageFromImageDndTargetData}
             label={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
-            isDisabled={isBusy}
-          />
-        </GridItem>
-        <GridItem position="relative">
-          <DndDropTarget
-            dndTarget={newCanvasEntityFromImageDndTarget}
-            dndTargetData={addGlobalReferenceImageFromImageDndTargetData}
-            label={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
             isDisabled={isBusy}
           />
         </GridItem>

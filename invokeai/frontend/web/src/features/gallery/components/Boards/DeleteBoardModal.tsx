@@ -15,6 +15,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/state';
@@ -54,23 +55,26 @@ const DeleteBoardModal = () => {
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createMemoizedSelector([selectNodesSlice, selectCanvasSlice, selectUpscaleSlice], (nodes, canvas, upscale) => {
-        const allImageUsage = (boardImageNames ?? []).map((imageName) =>
-          getImageUsage(nodes, canvas, upscale, imageName)
-        );
+      createMemoizedSelector(
+        [selectNodesSlice, selectCanvasSlice, selectUpscaleSlice, selectRefImagesSlice],
+        (nodes, canvas, upscale, refImages) => {
+          const allImageUsage = (boardImageNames ?? []).map((imageName) =>
+            getImageUsage(nodes, canvas, upscale, refImages, imageName)
+          );
 
-        const imageUsageSummary: ImageUsage = {
-          isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
-          isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
-          isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
-          isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
-          isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-          isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
-          isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
-        };
+          const imageUsageSummary: ImageUsage = {
+            isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
+            isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
+            isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
+            isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
+            isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
+            isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+            isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
+          };
 
-        return imageUsageSummary;
-      }),
+          return imageUsageSummary;
+        }
+      ),
     [boardImageNames]
   );
 

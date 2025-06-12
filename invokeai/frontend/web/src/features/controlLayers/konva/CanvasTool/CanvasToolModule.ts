@@ -22,7 +22,6 @@ import type {
   Coordinate,
   Tool,
 } from 'features/controlLayers/store/types';
-import { isRenderableEntityType } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
@@ -180,7 +179,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.tools.bbox.syncCursorStyle();
     } else if (tool === 'colorPicker') {
       this.tools.colorPicker.syncCursorStyle();
-    } else if (selectedEntityAdapter && isRenderableEntityType(selectedEntityAdapter.entityIdentifier.type)) {
+    } else if (selectedEntityAdapter) {
       if (selectedEntityAdapter.$isDisabled.get()) {
         stage.setCursor('not-allowed');
       } else if (selectedEntityAdapter.$isEntityTypeHidden.get()) {

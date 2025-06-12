@@ -3,6 +3,7 @@ import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isChatGPT4oAspectRatioID, isChatGPT4oReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
@@ -32,6 +33,7 @@ export const buildChatGPT4oGraph = async (
   const model = selectMainModelConfig(state);
 
   const canvas = selectCanvasSlice(state);
+  const refImages = selectRefImagesSlice(state);
 
   const { bbox } = canvas;
   const { positivePrompt } = selectPresetModifiedPrompts(state);
@@ -41,7 +43,7 @@ export const buildChatGPT4oGraph = async (
 
   assert(isChatGPT4oAspectRatioID(bbox.aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
-  const validRefImages = canvas.referenceImages.entities
+  const validRefImages = refImages.entities
     .filter((entity) => entity.isEnabled)
     .filter((entity) => isChatGPT4oReferenceImageConfig(entity.ipAdapter))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
