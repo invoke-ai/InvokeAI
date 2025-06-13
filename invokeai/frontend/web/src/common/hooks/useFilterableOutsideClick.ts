@@ -22,6 +22,8 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
+type FilterFunction = (el: HTMLElement | SVGElement) => boolean;
+
 export function useCallbackRef<T extends (...args: any[]) => any>(
   callback: T | undefined,
   deps: React.DependencyList = []
@@ -54,10 +56,17 @@ export interface UseOutsideClickProps {
    *
    * If omitted, a default filter function that ignores clicks in Chakra UI portals and react-select components is used.
    */
-  filter?: (el: HTMLElement) => boolean;
+  filter?: FilterFunction;
 }
 
-const DEFAULT_FILTER = (el: HTMLElement) => el.className.includes('chakra-portal') || el.id.includes('react-select');
+export const DEFAULT_FILTER: FilterFunction = (el) => {
+  if (el instanceof SVGElement) {
+    // SVGElement's type appears to be incorrect. Its className is not a string, which causes `includes` to fail.
+    // Let's assume that SVG elements with a class name are not part of the portal and should not be filtered.
+    return false;
+  }
+  return el.className.includes('chakra-portal') || el.id.includes('react-select');
+};
 
 /**
  * Example, used in components like Dialogs and Popovers, so they can close
@@ -119,11 +128,7 @@ export function useFilterableOutsideClick(props: UseOutsideClickProps) {
   }, [handler, ref, savedHandler, state, enabled, filter]);
 }
 
-function isValidEvent(
-  event: Event,
-  ref: React.RefObject<HTMLElement | null>,
-  filter?: (el: HTMLElement) => boolean
-): boolean {
+function isValidEvent(event: Event, ref: React.RefObject<HTMLElement | null>, filter?: FilterFunction): boolean {
   const target = (event.composedPath?.()[0] ?? event.target) as HTMLElement;
 
   if (target) {
@@ -137,6 +142,7 @@ function isValidEvent(
     return false;
   }
 
+  // This is the main logic change from the original hook.
   if (filter) {
     // Check if the click is inside an element matching the filter.
     // This is used for portal-awareness or other general exclusion cases.

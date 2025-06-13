@@ -4,10 +4,16 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { FLUXReduxImageInfluence } from 'features/controlLayers/components/common/FLUXReduxImageInfluence';
 import { IPAdapterCLIPVisionModel } from 'features/controlLayers/components/common/IPAdapterCLIPVisionModel';
+import { PullBboxIntoRefImageIconButton } from 'features/controlLayers/components/common/PullBboxIntoRefImageIconButton';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/RefImage/IPAdapterMethod';
 import { RefImageModel } from 'features/controlLayers/components/RefImage/RefImageModel';
 import { RefImageNoImageState } from 'features/controlLayers/components/RefImage/RefImageNoImageState';
+import { RefImageNoImageStateWithCanvasOptions } from 'features/controlLayers/components/RefImage/RefImageNoImageStateWithCanvasOptions';
+import {
+  CanvasManagerProviderGate,
+  useCanvasManagerSafe,
+} from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import {
@@ -22,17 +28,16 @@ import {
   selectRefImageEntityOrThrow,
   selectRefImagesSlice,
 } from 'features/controlLayers/store/refImagesSlice';
-import {
-  type CLIPVisionModelV2,
-  type FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
-  type IPMethodV2,
-  isFLUXReduxConfig,
-  isIPAdapterConfig,
+import type {
+  CLIPVisionModelV2,
+  FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
+  IPMethodV2,
 } from 'features/controlLayers/store/types';
+import { isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import { RefImageImage } from './RefImageImage';
@@ -43,12 +48,12 @@ const buildSelectConfig = (id: string) =>
     (refImages) => selectRefImageEntityOrThrow(refImages, id, 'IPAdapterSettings').config
   );
 
-const IPAdapterSettingsContent = memo(() => {
-  const { t } = useTranslation();
+const RefImageSettingsContent = memo(() => {
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
   const selectConfig = useMemo(() => buildSelectConfig(id), [id]);
   const config = useAppSelector(selectConfig);
+  const tab = useAppSelector(selectActiveTab);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -103,8 +108,6 @@ const IPAdapterSettingsContent = memo(() => {
     () => setGlobalReferenceImageDndTarget.getData({ id }, config.image?.image_name),
     [id, config.image?.image_name]
   );
-  // const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(id);
-  // const isBusy = useCanvasIsBusy();
 
   const isFLUX = useAppSelector(selectIsFLUX);
 
@@ -115,14 +118,11 @@ const IPAdapterSettingsContent = memo(() => {
         {isIPAdapterConfig(config) && (
           <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
         )}
-        {/* <IconButton
-            onClick={pullBboxIntoIPAdapter}
-            isDisabled={isBusy}
-            variant="ghost"
-            aria-label={t('controlLayers.pullBboxIntoReferenceImage')}
-            tooltip={t('controlLayers.pullBboxIntoReferenceImage')}
-            icon={<PiBoundingBoxBold />}
-          /> */}
+        {tab === 'canvas' && (
+          <CanvasManagerProviderGate>
+            <PullBboxIntoRefImageIconButton />
+          </CanvasManagerProviderGate>
+        )}
       </Flex>
       <Flex gap={2} w="full">
         {isIPAdapterConfig(config) && (
@@ -153,7 +153,7 @@ const IPAdapterSettingsContent = memo(() => {
   );
 });
 
-IPAdapterSettingsContent.displayName = 'IPAdapterSettingsContent';
+RefImageSettingsContent.displayName = 'RefImageSettingsContent';
 
 const buildSelectIPAdapterHasImage = (id: string) =>
   createSelector(selectRefImagesSlice, (refImages) => {
@@ -161,17 +161,26 @@ const buildSelectIPAdapterHasImage = (id: string) =>
     return !!referenceImage && referenceImage.config.image !== null;
   });
 
-export const IPAdapterSettings = memo(() => {
+export const RefImageSettings = memo(() => {
   const id = useRefImageIdContext();
-
+  const tab = useAppSelector(selectActiveTab);
+  const canvasManager = useCanvasManagerSafe();
   const selectIPAdapterHasImage = useMemo(() => buildSelectIPAdapterHasImage(id), [id]);
   const hasImage = useAppSelector(selectIPAdapterHasImage);
+
+  if (!hasImage && canvasManager && tab === 'canvas') {
+    return (
+      <CanvasManagerProviderGate>
+        <RefImageNoImageStateWithCanvasOptions />
+      </CanvasManagerProviderGate>
+    );
+  }
 
   if (!hasImage) {
     return <RefImageNoImageState />;
   }
 
-  return <IPAdapterSettingsContent />;
+  return <RefImageSettingsContent />;
 });
 
-IPAdapterSettings.displayName = 'IPAdapterSettings';
+RefImageSettings.displayName = 'RefImageSettings';
