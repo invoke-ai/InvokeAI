@@ -248,7 +248,7 @@ export const newCanvasFromImage = async (arg: {
       const config = deepClone(getDefaultRefImageConfig(getState));
       config.image = imageDTOToImageWithDims(imageDTO);
       dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
-      dispatch(refImageAdded({ overrides: { config }, isSelected: true }));
+      dispatch(refImageAdded({ overrides: { config } }));
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
       }

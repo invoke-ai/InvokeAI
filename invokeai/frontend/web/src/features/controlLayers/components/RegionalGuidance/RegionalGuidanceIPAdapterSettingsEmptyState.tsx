@@ -83,7 +83,7 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
       </Flex>
       <Flex alignItems="center" gap={2} p={4}>
         <Text textAlign="center" color="base.300">
-          <Trans i18nKey="controlLayers.referenceImageEmptyState" components={components} />
+          <Trans i18nKey="controlLayers.referenceImageEmptyStateWithCanvasTab" components={components} />
         </Text>
       </Flex>
       <input {...uploadApi.getUploadInputProps()} />
