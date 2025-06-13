@@ -23,7 +23,7 @@ export const RefImageHeader = memo(() => {
       )}
       {entity.config.image === null && (
         <Text fontWeight="semibold" color="base.300">
-          Reference Image - No Image Selected
+          No Reference Image Selected
         </Text>
       )}
       <IconButton
