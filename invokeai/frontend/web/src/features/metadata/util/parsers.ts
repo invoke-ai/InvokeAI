@@ -5,9 +5,9 @@ import type {
   CanvasInpaintMaskState,
   CanvasMetadata,
   CanvasRasterLayerState,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   LoRA,
+  RefImageState,
 } from 'features/controlLayers/store/types';
 import { zCanvasMetadata, zCanvasRasterLayerState } from 'features/controlLayers/store/types';
 import {
@@ -417,7 +417,7 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 const parseLayer: MetadataParseFunc<
   | CanvasRasterLayerState
   | CanvasControlLayerState
-  | CanvasReferenceImageState
+  | RefImageState
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
 > = (metadataItem) => zCanvasRasterLayerState.parseAsync(metadataItem);
@@ -431,7 +431,7 @@ const parseLayers: MetadataParseFunc<
   (
     | CanvasRasterLayerState
     | CanvasControlLayerState
-    | CanvasReferenceImageState
+    | RefImageState
     | CanvasRegionalGuidanceState
     | CanvasInpaintMaskState
   )[]
@@ -444,7 +444,7 @@ const parseLayers: MetadataParseFunc<
     const layers: (
       | CanvasRasterLayerState
       | CanvasControlLayerState
-      | CanvasReferenceImageState
+      | RefImageState
       | CanvasRegionalGuidanceState
       | CanvasInpaintMaskState
     )[] = [];
@@ -493,7 +493,7 @@ const parseLayers: MetadataParseFunc<
         ipAdaptersRaw.map(async (cn) => await parseIPAdapterToIPAdapterLayer(cn))
       );
       const ipAdaptersAsLayers = ipAdaptersParseResults
-        .filter((result): result is PromiseFulfilledResult<CanvasReferenceImageState> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<RefImageState> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...ipAdaptersAsLayers);
     } catch {
@@ -598,7 +598,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlLayer
   return layer;
 };
 
-const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasReferenceImageState> = async (metadataItem) => {
+const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<RefImageState> = async (metadataItem) => {
   const ip_adapter_model = await getProperty(metadataItem, 'ip_adapter_model');
   const key = await getModelKey(ip_adapter_model, 'ip_adapter');
   const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
@@ -630,13 +630,9 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasReferenceImageStat
   ];
   const imageDTO = image ? await getImageDTOSafe(image.image_name) : null;
 
-  const layer: CanvasReferenceImageState = {
+  const layer: RefImageState = {
     id: getPrefixedId('ip_adapter'),
-    type: 'reference_image',
-    isEnabled: true,
-    isLocked: false,
-    name: null,
-    ipAdapter: {
+    config: {
       type: 'ip_adapter',
       model: zModelIdentifierField.parse(ipAdapterModel),
       weight: typeof weight === 'number' ? weight : initialIPAdapter.weight,

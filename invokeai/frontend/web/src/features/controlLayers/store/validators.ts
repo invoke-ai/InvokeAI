@@ -2,8 +2,8 @@ import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
+  RefImageState,
 } from 'features/controlLayers/store/types';
 import type { MainModelConfig } from 'services/api/types';
 
@@ -58,16 +58,16 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
-    entity.referenceImages.forEach(({ ipAdapter }) => {
-      if (!ipAdapter.model) {
+    entity.referenceImages.forEach(({ config }) => {
+      if (!config.model) {
         // No model selected
         warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-      } else if (ipAdapter.model.base !== model.base) {
+      } else if (config.model.base !== model.base) {
         // Supported model architecture but doesn't match
         warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
       }
 
-      if (!ipAdapter.image) {
+      if (!config.image) {
         // No image selected
         warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
       }
@@ -78,7 +78,7 @@ export const getRegionalGuidanceWarnings = (
 };
 
 export const getGlobalReferenceImageWarnings = (
-  entity: CanvasReferenceImageState,
+  entity: RefImageState,
   model: MainModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
@@ -90,17 +90,17 @@ export const getGlobalReferenceImageWarnings = (
       return warnings;
     }
 
-    const { ipAdapter } = entity;
+    const { config } = entity;
 
-    if (!ipAdapter.model) {
+    if (!config.model) {
       // No model selected
       warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-    } else if (ipAdapter.model.base !== model.base) {
+    } else if (config.model.base !== model.base) {
       // Supported model architecture but doesn't match
       warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
     }
 
-    if (!entity.ipAdapter.image) {
+    if (!entity.config.image) {
       // No image selected
       warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
     }

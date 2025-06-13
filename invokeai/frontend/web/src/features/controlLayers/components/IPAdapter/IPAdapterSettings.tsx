@@ -11,13 +11,13 @@ import { IPAdapterSettingsEmptyState } from 'features/controlLayers/components/I
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import {
-  referenceImageIPAdapterBeginEndStepPctChanged,
-  referenceImageIPAdapterCLIPVisionModelChanged,
-  referenceImageIPAdapterFLUXReduxImageInfluenceChanged,
-  referenceImageIPAdapterImageChanged,
-  referenceImageIPAdapterMethodChanged,
-  referenceImageIPAdapterModelChanged,
-  referenceImageIPAdapterWeightChanged,
+  refImageFLUXReduxImageInfluenceChanged,
+  refImageImageChanged,
+  refImageIPAdapterBeginEndStepPctChanged,
+  refImageIPAdapterCLIPVisionModelChanged,
+  refImageIPAdapterMethodChanged,
+  refImageIPAdapterWeightChanged,
+  refImageModelChanged,
   selectRefImageEntity,
   selectRefImageEntityOrThrow,
   selectRefImagesSlice,
@@ -35,64 +35,64 @@ import type { ApiModelConfig, FLUXReduxModelConfig, ImageDTO, IPAdapterModelConf
 
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
 
-const buildSelectIPAdapter = (id: string) =>
+const buildSelectConfig = (id: string) =>
   createSelector(
     selectRefImagesSlice,
-    (refImages) => selectRefImageEntityOrThrow(refImages, id, 'IPAdapterSettings').ipAdapter
+    (refImages) => selectRefImageEntityOrThrow(refImages, id, 'IPAdapterSettings').config
   );
 
 const IPAdapterSettingsContent = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
-  const selectIPAdapter = useMemo(() => buildSelectIPAdapter(id), [id]);
+  const selectIPAdapter = useMemo(() => buildSelectConfig(id), [id]);
   const ipAdapter = useAppSelector(selectIPAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(referenceImageIPAdapterBeginEndStepPctChanged({ id, beginEndStepPct }));
+      dispatch(refImageIPAdapterBeginEndStepPctChanged({ id, beginEndStepPct }));
     },
     [dispatch, id]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(referenceImageIPAdapterWeightChanged({ id, weight }));
+      dispatch(refImageIPAdapterWeightChanged({ id, weight }));
     },
     [dispatch, id]
   );
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(referenceImageIPAdapterMethodChanged({ id, method }));
+      dispatch(refImageIPAdapterMethodChanged({ id, method }));
     },
     [dispatch, id]
   );
 
   const onChangeFLUXReduxImageInfluence = useCallback(
     (imageInfluence: FLUXReduxImageInfluenceType) => {
-      dispatch(referenceImageIPAdapterFLUXReduxImageInfluenceChanged({ id, imageInfluence }));
+      dispatch(refImageFLUXReduxImageInfluenceChanged({ id, imageInfluence }));
     },
     [dispatch, id]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig) => {
-      dispatch(referenceImageIPAdapterModelChanged({ id, modelConfig }));
+      dispatch(refImageModelChanged({ id, modelConfig }));
     },
     [dispatch, id]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(referenceImageIPAdapterCLIPVisionModelChanged({ id, clipVisionModel }));
+      dispatch(refImageIPAdapterCLIPVisionModelChanged({ id, clipVisionModel }));
     },
     [dispatch, id]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(referenceImageIPAdapterImageChanged({ id, imageDTO }));
+      dispatch(refImageImageChanged({ id, imageDTO }));
     },
     [dispatch, id]
   );
@@ -156,7 +156,7 @@ IPAdapterSettingsContent.displayName = 'IPAdapterSettingsContent';
 const buildSelectIPAdapterHasImage = (id: string) =>
   createSelector(selectRefImagesSlice, (refImages) => {
     const referenceImage = selectRefImageEntity(refImages, id);
-    return !!referenceImage && referenceImage.ipAdapter.image !== null;
+    return !!referenceImage && referenceImage.config.image !== null;
   });
 
 export const IPAdapterSettings = memo(() => {

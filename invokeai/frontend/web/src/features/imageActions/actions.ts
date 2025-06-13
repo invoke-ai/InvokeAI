@@ -11,10 +11,10 @@ import {
   inpaintMaskAdded,
   rasterLayerAdded,
   rgAdded,
-  rgIPAdapterImageChanged,
+  rgRefImageImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionTypeChanged } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { referenceImageAdded, referenceImageIPAdapterImageChanged } from 'features/controlLayers/store/refImagesSlice';
+import { refImageAdded, refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -41,7 +41,7 @@ import { assert } from 'tsafe';
 
 export const setGlobalReferenceImage = (arg: { imageDTO: ImageDTO; id: string; dispatch: AppDispatch }) => {
   const { imageDTO, id, dispatch } = arg;
-  dispatch(referenceImageIPAdapterImageChanged({ id, imageDTO }));
+  dispatch(refImageImageChanged({ id, imageDTO }));
 };
 
 export const setRegionalGuidanceReferenceImage = (arg: {
@@ -51,7 +51,7 @@ export const setRegionalGuidanceReferenceImage = (arg: {
   dispatch: AppDispatch;
 }) => {
   const { imageDTO, entityIdentifier, referenceImageId, dispatch } = arg;
-  dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
+  dispatch(rgRefImageImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
 };
 
 export const setUpscaleInitialImage = (arg: { imageDTO: ImageDTO; dispatch: AppDispatch }) => {
@@ -112,9 +112,9 @@ export const createNewCanvasEntityFromImage = (arg: {
       break;
     }
     case 'regional_guidance_with_reference_image': {
-      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
+      const config = deepClone(selectDefaultIPAdapter(getState()));
+      config.image = imageDTOToImageWithDims(imageDTO);
+      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), config }];
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
       break;
     }
@@ -242,10 +242,10 @@ export const newCanvasFromImage = async (arg: {
       break;
     }
     case 'reference_image': {
-      const ipAdapter = deepClone(selectDefaultRefImageConfig(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
+      const config = deepClone(selectDefaultRefImageConfig(getState()));
+      config.image = imageDTOToImageWithDims(imageDTO);
       dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
-      dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
+      dispatch(refImageAdded({ overrides: { config }, isSelected: true }));
       if (withInpaintMask) {
         dispatch(inpaintMaskAdded({ isSelected: true, isBookmarked: true }));
       }
@@ -253,9 +253,9 @@ export const newCanvasFromImage = async (arg: {
       break;
     }
     case 'regional_guidance_with_reference_image': {
-      const ipAdapter = deepClone(selectDefaultIPAdapter(getState()));
-      ipAdapter.image = imageDTOToImageWithDims(imageDTO);
-      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
+      const config = deepClone(selectDefaultIPAdapter(getState()));
+      config.image = imageDTOToImageWithDims(imageDTO);
+      const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), config }];
       dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
       if (withInpaintMask) {
