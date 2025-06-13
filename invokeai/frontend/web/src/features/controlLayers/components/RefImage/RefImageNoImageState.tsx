@@ -13,7 +13,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
 
-export const IPAdapterSettingsEmptyState = memo(() => {
+export const RefImageNoImageState = memo(() => {
   const { t } = useTranslation();
   const id = useRefImageIdContext();
   const dispatch = useAppDispatch();
@@ -66,4 +66,4 @@ export const IPAdapterSettingsEmptyState = memo(() => {
   );
 });
 
-IPAdapterSettingsEmptyState.displayName = 'IPAdapterSettingsEmptyState';
+RefImageNoImageState.displayName = 'RefImageNoImageState';

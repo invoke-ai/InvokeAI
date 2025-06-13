@@ -22,7 +22,7 @@ type Props = {
   onChange: (clipVisionModel: CLIPVisionModelV2) => void;
 };
 
-export const CLIPVisionModel = memo(({ model, onChange }: Props) => {
+export const IPAdapterCLIPVisionModel = memo(({ model, onChange }: Props) => {
   const { t } = useTranslation();
 
   const _onChangeCLIPVisionModel = useCallback<ComboboxOnChange>(
@@ -58,4 +58,4 @@ export const CLIPVisionModel = memo(({ model, onChange }: Props) => {
   );
 });
 
-CLIPVisionModel.displayName = 'CLIPVisionModel';
+IPAdapterCLIPVisionModel.displayName = 'IPAdapterCLIPVisionModel';

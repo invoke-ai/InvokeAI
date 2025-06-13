@@ -3,9 +3,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   buildSelectValidRegionalGuidanceActions,
-  useAddRegionalGuidanceIPAdapter,
-  useAddRegionalGuidanceNegativePrompt,
-  useAddRegionalGuidancePositivePrompt,
+  useAddRefImageToExistingRegionalGuidance,
+  useAddNegativePromptToExistingRegionalGuidance,
+  useAddPositivePromptToExistingRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo, useMemo } from 'react';
@@ -15,9 +15,9 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const isBusy = useCanvasIsBusy();
-  const addRegionalGuidanceIPAdapter = useAddRegionalGuidanceIPAdapter(entityIdentifier);
-  const addRegionalGuidancePositivePrompt = useAddRegionalGuidancePositivePrompt(entityIdentifier);
-  const addRegionalGuidanceNegativePrompt = useAddRegionalGuidanceNegativePrompt(entityIdentifier);
+  const addRegionalGuidanceIPAdapter = useAddRefImageToExistingRegionalGuidance(entityIdentifier);
+  const addRegionalGuidancePositivePrompt = useAddPositivePromptToExistingRegionalGuidance(entityIdentifier);
+  const addRegionalGuidanceNegativePrompt = useAddNegativePromptToExistingRegionalGuidance(entityIdentifier);
   const selectValidActions = useMemo(
     () => buildSelectValidRegionalGuidanceActions(entityIdentifier),
     [entityIdentifier]
