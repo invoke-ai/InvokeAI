@@ -63,3 +63,7 @@
   /* this is the tab divider */
   background-color: var(--dv-inactivegroup-tab-divider-color);
 }
+
+.dv-active-group .dv-active-tab .dv-default-tab-content {
+  /* style the action tab content e.g. its title */
+}

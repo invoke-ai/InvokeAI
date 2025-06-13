@@ -6,6 +6,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { DockviewApi } from 'dockview';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
+import { DockviewWrapper } from 'features/ui/components/DockviewWrapper';
 import { GridviewWrapper } from 'features/ui/components/GridviewWrapper';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -80,7 +81,7 @@ export const AppContent = memo(() => {
         defaultTabComponent={MyCustomTab}
         rightHeaderActionsComponent={RightHeaderActions}
       /> */}
-      <GridviewWrapper />
+      {advancedLayout ? <DockviewWrapper /> : <GridviewWrapper />}
       {/* <PanelGroup
         ref={imperativePanelGroupRef}
         id="app-panel-group"
