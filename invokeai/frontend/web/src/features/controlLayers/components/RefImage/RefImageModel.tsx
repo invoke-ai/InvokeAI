@@ -12,7 +12,7 @@ type Props = {
   onChangeModel: (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ApiModelConfig) => void;
 };
 
-export const GlobalReferenceImageModel = memo(({ modelKey, onChangeModel }: Props) => {
+export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   const { t } = useTranslation();
   const currentBaseModel = useAppSelector(selectBase);
   const [modelConfigs, { isLoading }] = useGlobalReferenceImageModels();
@@ -60,4 +60,4 @@ export const GlobalReferenceImageModel = memo(({ modelKey, onChangeModel }: Prop
   );
 });
 
-GlobalReferenceImageModel.displayName = 'GlobalReferenceImageModel';
+RefImageModel.displayName = 'RefImageModel';

@@ -1,7 +1,7 @@
 import { Button, ExternalLink, Spinner, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { logger } from 'app/logging/logger';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
@@ -41,7 +41,7 @@ const getHFTokenStatus = async (dispatch: AppDispatch): Promise<S['HFTokenStatus
   }
 };
 
-export const buildOnModelInstallError = (getState: () => RootState, dispatch: AppDispatch) => {
+export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDispatch) => {
   return async (data: S['ModelInstallErrorEvent']) => {
     log.error({ data }, 'Model install error');
 

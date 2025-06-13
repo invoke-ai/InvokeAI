@@ -1,5 +1,5 @@
 import { logger } from 'app/logging/logger';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
@@ -20,7 +20,7 @@ const log = logger('events');
 
 const nodeTypeDenylist = ['load_image', 'image'];
 
-export const buildOnInvocationComplete = (getState: () => RootState, dispatch: AppDispatch) => {
+export const buildOnInvocationComplete = (getState: AppGetState, dispatch: AppDispatch) => {
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);

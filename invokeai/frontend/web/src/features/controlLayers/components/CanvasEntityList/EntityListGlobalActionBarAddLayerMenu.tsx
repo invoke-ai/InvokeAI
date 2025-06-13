@@ -4,7 +4,7 @@ import {
   useAddInpaintMask,
   useAddRasterLayer,
   useAddRegionalGuidance,
-  useAddRegionalReferenceImage,
+  useAddNewRegionalGuidanceWithARefImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
@@ -17,7 +17,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const isBusy = useCanvasIsBusy();
   const addInpaintMask = useAddInpaintMask();
   const addRegionalGuidance = useAddRegionalGuidance();
-  const addRegionalReferenceImage = useAddRegionalReferenceImage();
+  const addRegionalReferenceImage = useAddNewRegionalGuidanceWithARefImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
