@@ -1,9 +1,12 @@
 import { logger } from 'app/logging/logger';
-import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectDefaultIPAdapter, selectDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
+import {
+  getDefaultRefImageConfig,
+  getDefaultRegionalGuidanceRefImageConfig,
+} from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
@@ -18,7 +21,7 @@ import {
   selectPositivePrompt,
   selectSeed,
 } from 'features/controlLayers/store/paramsSlice';
-import { refImageAdded,refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
+import { refImageAdded, refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
@@ -167,15 +170,14 @@ export const useSaveBboxToGallery = () => {
 
 export const useNewRegionalReferenceImageFromBbox = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+  const { dispatch, getState } = useAppStore();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
       const ipAdapter: RegionalGuidanceRefImageState = {
         id: getPrefixedId('regional_guidance_reference_image'),
         config: {
-          ...deepClone(defaultIPAdapter),
+          ...getDefaultRegionalGuidanceRefImageConfig(getState),
           image: imageDTOToImageWithDims(imageDTO),
         },
       };
@@ -193,21 +195,20 @@ export const useNewRegionalReferenceImageFromBbox = () => {
       toastOk: t('controlLayers.newRegionalReferenceImageOk'),
       toastError: t('controlLayers.newRegionalReferenceImageError'),
     };
-  }, [defaultIPAdapter, dispatch, t]);
+  }, [dispatch, getState, t]);
   const func = useSaveCanvas(arg);
   return func;
 };
 
 export const useNewGlobalReferenceImageFromBbox = () => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const defaultIPAdapter = useAppSelector(selectDefaultRefImageConfig);
+  const { dispatch, getState } = useAppStore();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
       const overrides: Partial<RefImageState> = {
         config: {
-          ...deepClone(defaultIPAdapter),
+          ...getDefaultRefImageConfig(getState),
           image: imageDTOToImageWithDims(imageDTO),
         },
       };
@@ -221,7 +222,7 @@ export const useNewGlobalReferenceImageFromBbox = () => {
       toastOk: t('controlLayers.newGlobalReferenceImageOk'),
       toastError: t('controlLayers.newGlobalReferenceImageError'),
     };
-  }, [defaultIPAdapter, dispatch, t]);
+  }, [dispatch, getState, t]);
   const func = useSaveCanvas(arg);
   return func;
 };

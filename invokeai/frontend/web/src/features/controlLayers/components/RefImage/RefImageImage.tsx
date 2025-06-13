@@ -21,7 +21,7 @@ type Props<T extends typeof setGlobalReferenceImageDndTarget | typeof setRegiona
   dndTargetData: ReturnType<T['getData']>;
 };
 
-export const IPAdapterImagePreview = memo(
+export const RefImageImage = memo(
   <T extends typeof setGlobalReferenceImageDndTarget | typeof setRegionalGuidanceReferenceImageDndTarget>({
     image,
     onChangeImage,
@@ -77,4 +77,4 @@ export const IPAdapterImagePreview = memo(
   }
 );
 
-IPAdapterImagePreview.displayName = 'IPAdapterImagePreview';
+RefImageImage.displayName = 'RefImageImage';

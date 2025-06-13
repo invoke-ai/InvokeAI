@@ -2,11 +2,11 @@ import { Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
-import { CLIPVisionModel } from 'features/controlLayers/components/common/CLIPVisionModel';
+import { IPAdapterCLIPVisionModel } from 'features/controlLayers/components/common/IPAdapterCLIPVisionModel';
 import { FLUXReduxImageInfluence } from 'features/controlLayers/components/common/FLUXReduxImageInfluence';
 import { Weight } from 'features/controlLayers/components/common/Weight';
-import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapter/IPAdapterImagePreview';
-import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
+import { RefImageImage } from 'features/controlLayers/components/RefImage/RefImageImage';
+import { IPAdapterMethod } from 'features/controlLayers/components/RefImage/IPAdapterMethod';
 import { RegionalGuidanceIPAdapterSettingsEmptyState } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceIPAdapterSettingsEmptyState';
 import { RegionalReferenceImageModel } from 'features/controlLayers/components/RegionalGuidance/RegionalReferenceImageModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -142,7 +142,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
         <Flex gap={2} alignItems="center" w="full">
           <RegionalReferenceImageModel modelKey={config.model?.key ?? null} onChangeModel={onChangeModel} />
           {config.type === 'ip_adapter' && (
-            <CLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+            <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
           )}
           <IconButton
             onClick={pullBboxIntoIPAdapter}
@@ -170,7 +170,7 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
             </Flex>
           )}
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
-            <IPAdapterImagePreview
+            <RefImageImage
               image={config.image}
               onChangeImage={onChangeImage}
               dndTarget={setRegionalGuidanceReferenceImageDndTarget}
