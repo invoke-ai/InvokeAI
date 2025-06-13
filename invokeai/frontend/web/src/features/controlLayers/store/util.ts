@@ -5,7 +5,6 @@ import type {
   CanvasImageState,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   ChatGPT4oReferenceImageConfig,
   ControlLoRAConfig,
@@ -14,6 +13,7 @@ import type {
   FLUXReduxConfig,
   ImageWithDims,
   IPAdapterConfig,
+  RefImageState,
   RgbColor,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
@@ -120,17 +120,10 @@ export const initialControlLoRA: ControlLoRAConfig = {
   weight: 0.75,
 };
 
-export const getReferenceImageState = (
-  id: string,
-  overrides?: PartialDeep<CanvasReferenceImageState>
-): CanvasReferenceImageState => {
-  const entityState: CanvasReferenceImageState = {
+export const getReferenceImageState = (id: string, overrides?: PartialDeep<RefImageState>): RefImageState => {
+  const entityState: RefImageState = {
     id,
-    type: 'reference_image',
-    name: null,
-    isLocked: false,
-    isEnabled: true,
-    ipAdapter: deepClone(initialIPAdapter),
+    config: deepClone(initialIPAdapter),
   };
   merge(entityState, overrides);
   return entityState;

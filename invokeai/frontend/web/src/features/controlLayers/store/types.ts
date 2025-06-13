@@ -293,20 +293,20 @@ const zCanvasEntityBase = z.object({
   isLocked: z.boolean(),
 });
 
-const zCanvasReferenceImageState = zCanvasEntityBase.extend({
-  type: z.literal('reference_image'),
+const zRefImageState = z.object({
+  id: zId,
   // This should be named `referenceImage` but we need to keep it as `ipAdapter` for backwards compatibility
-  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zChatGPT4oReferenceImageConfig]),
+  config: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zChatGPT4oReferenceImageConfig]),
 });
-export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
+export type RefImageState = z.infer<typeof zRefImageState>;
 
-export const isIPAdapterConfig = (config: CanvasReferenceImageState['ipAdapter']): config is IPAdapterConfig =>
+export const isIPAdapterConfig = (config: RefImageState['config']): config is IPAdapterConfig =>
   config.type === 'ip_adapter';
 
-export const isFLUXReduxConfig = (config: CanvasReferenceImageState['ipAdapter']): config is FLUXReduxConfig =>
+export const isFLUXReduxConfig = (config: RefImageState['config']): config is FLUXReduxConfig =>
   config.type === 'flux_redux';
 export const isChatGPT4oReferenceImageConfig = (
-  config: CanvasReferenceImageState['ipAdapter']
+  config: RefImageState['config']
 ): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
@@ -314,11 +314,11 @@ export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
 const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 
-const zRegionalGuidanceReferenceImageState = z.object({
+const zRegionalGuidanceRefImageState = z.object({
   id: zId,
-  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
+  config: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig]),
 });
-export type RegionalGuidanceReferenceImageState = z.infer<typeof zRegionalGuidanceReferenceImageState>;
+export type RegionalGuidanceRefImageState = z.infer<typeof zRegionalGuidanceRefImageState>;
 
 const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   type: z.literal('regional_guidance'),
@@ -328,7 +328,7 @@ const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   fill: zFill,
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  referenceImages: z.array(zRegionalGuidanceReferenceImageState),
+  referenceImages: z.array(zRegionalGuidanceRefImageState),
   autoNegative: z.boolean(),
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
@@ -559,8 +559,7 @@ const zCanvasState = z.object({
 export type CanvasState = z.infer<typeof zCanvasState>;
 
 const zRefImagesState = z.object({
-  selectedId: zId.nullable().default(null),
-  entities: z.array(zCanvasReferenceImageState).default(() => []),
+  entities: z.array(zRefImageState).default(() => []),
 });
 export type RefImagesState = z.infer<typeof zRefImagesState>;
 const INITIAL_REF_IMAGES_STATE = zRefImagesState.parse({});
@@ -577,7 +576,7 @@ export const zCanvasMetadata = z.object({
   rasterLayers: z.array(zCanvasRasterLayerState),
   controlLayers: z.array(zCanvasControlLayerState),
   regionalGuidance: z.array(zCanvasRegionalGuidanceState),
-  referenceImages: z.array(zCanvasReferenceImageState),
+  referenceImages: z.array(zRefImageState),
 });
 export type CanvasMetadata = z.infer<typeof zCanvasMetadata>;
 
