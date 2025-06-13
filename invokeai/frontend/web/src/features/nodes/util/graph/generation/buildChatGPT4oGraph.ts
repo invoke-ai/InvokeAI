@@ -44,8 +44,7 @@ export const buildChatGPT4oGraph = async (
   assert(isChatGPT4oAspectRatioID(bbox.aspectRatio.id), 'ChatGPT 4o does not support this aspect ratio');
 
   const validRefImages = refImages.entities
-    .filter((entity) => entity.isEnabled)
-    .filter((entity) => isChatGPT4oReferenceImageConfig(entity.ipAdapter))
+    .filter((entity) => isChatGPT4oReferenceImageConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0)
     .toReversed(); // sends them in order they are displayed in the list
 
@@ -54,9 +53,9 @@ export const buildChatGPT4oGraph = async (
   if (validRefImages.length > 0) {
     reference_images = [];
     for (const entity of validRefImages) {
-      assert(entity.ipAdapter.image, 'Image is required for reference image');
+      assert(entity.config.image, 'Image is required for reference image');
       reference_images.push({
-        image_name: entity.ipAdapter.image.image_name,
+        image_name: entity.config.image.image_name,
       });
     }
   }

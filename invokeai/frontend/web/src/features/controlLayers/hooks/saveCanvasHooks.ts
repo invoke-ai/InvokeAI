@@ -10,7 +10,7 @@ import {
   entityRasterized,
   rasterLayerAdded,
   rgAdded,
-  rgIPAdapterImageChanged,
+  rgRefImageImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import {
   selectMainModelConfig,
@@ -18,16 +18,16 @@ import {
   selectPositivePrompt,
   selectSeed,
 } from 'features/controlLayers/store/paramsSlice';
-import { referenceImageAdded, referenceImageIPAdapterImageChanged } from 'features/controlLayers/store/refImagesSlice';
+import { refImageAdded,refImageImageChanged } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasRasterLayerState,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   Rect,
-  RegionalGuidanceReferenceImageState,
+  RefImageState,
+  RegionalGuidanceRefImageState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -172,9 +172,9 @@ export const useNewRegionalReferenceImageFromBbox = () => {
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
-      const ipAdapter: RegionalGuidanceReferenceImageState = {
+      const ipAdapter: RegionalGuidanceRefImageState = {
         id: getPrefixedId('regional_guidance_reference_image'),
-        ipAdapter: {
+        config: {
           ...deepClone(defaultIPAdapter),
           image: imageDTOToImageWithDims(imageDTO),
         },
@@ -205,13 +205,13 @@ export const useNewGlobalReferenceImageFromBbox = () => {
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
-      const overrides: Partial<CanvasReferenceImageState> = {
-        ipAdapter: {
+      const overrides: Partial<RefImageState> = {
+        config: {
           ...deepClone(defaultIPAdapter),
           image: imageDTOToImageWithDims(imageDTO),
         },
       };
-      dispatch(referenceImageAdded({ overrides, isSelected: true }));
+      dispatch(refImageAdded({ overrides, isSelected: true }));
     };
 
     return {
@@ -311,7 +311,7 @@ export const usePullBboxIntoGlobalReferenceImage = (id: string) => {
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(referenceImageIPAdapterImageChanged({ id, imageDTO }));
+      dispatch(refImageImageChanged({ id, imageDTO }));
     };
 
     return {
@@ -336,7 +336,7 @@ export const usePullBboxIntoRegionalGuidanceReferenceImage = (
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
+      dispatch(rgRefImageImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     };
 
     return {
