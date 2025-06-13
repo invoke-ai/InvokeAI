@@ -46,6 +46,10 @@ class ModelPatcher:
         text_encoder: Union[CLIPTextModel, CLIPTextModelWithProjection],
         ti_list: List[Tuple[str, TextualInversionModelRaw]],
     ) -> Iterator[Tuple[CLIPTokenizer, TextualInversionManager]]:
+        if len(ti_list) == 0:
+            yield tokenizer, TextualInversionManager(tokenizer)
+            return
+
         init_tokens_count = None
         new_tokens_added = None
 

@@ -1926,77 +1926,6 @@ export type components = {
             watermarking_methods: string[];
         };
         /**
-         * AppDependencyVersions
-         * @description App depencency Versions Response
-         */
-        AppDependencyVersions: {
-            /**
-             * Accelerate
-             * @description accelerate version
-             */
-            accelerate: string;
-            /**
-             * Compel
-             * @description compel version
-             */
-            compel: string;
-            /**
-             * Cuda
-             * @description CUDA version
-             */
-            cuda: string | null;
-            /**
-             * Diffusers
-             * @description diffusers version
-             */
-            diffusers: string;
-            /**
-             * Numpy
-             * @description Numpy version
-             */
-            numpy: string;
-            /**
-             * Opencv
-             * @description OpenCV version
-             */
-            opencv: string;
-            /**
-             * Onnx
-             * @description ONNX version
-             */
-            onnx: string;
-            /**
-             * Pillow
-             * @description Pillow (PIL) version
-             */
-            pillow: string;
-            /**
-             * Python
-             * @description Python version
-             */
-            python: string;
-            /**
-             * Torch
-             * @description PyTorch version
-             */
-            torch: string;
-            /**
-             * Torchvision
-             * @description PyTorch Vision version
-             */
-            torchvision: string;
-            /**
-             * Transformers
-             * @description transformers version
-             */
-            transformers: string;
-            /**
-             * Xformers
-             * @description xformers version
-             */
-            xformers: string | null;
-        };
-        /**
          * AppVersion
          * @description App Version Response
          */
@@ -24226,7 +24155,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AppDependencyVersions"];
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
         };

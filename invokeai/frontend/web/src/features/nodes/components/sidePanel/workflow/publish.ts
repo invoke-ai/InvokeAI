@@ -19,6 +19,7 @@ import { useGetBatchStatusQuery } from 'services/api/endpoints/queue';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 import { assert } from 'tsafe';
 
+export const $isPublishing = atom(false);
 export const $isInPublishFlow = atom(false);
 export const $outputNodeId = atom<string | null>(null);
 export const $isSelectingOutputNode = atom(false);
