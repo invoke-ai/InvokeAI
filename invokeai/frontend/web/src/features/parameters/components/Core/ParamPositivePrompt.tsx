@@ -1,7 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
-import { RefImageList } from 'features/controlLayers/components/RefImage/IPAdapterList';
 import { positivePromptChanged, selectBase, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
@@ -108,7 +107,6 @@ export const ParamPositivePrompt = memo(() => {
             label={`${t('parameters.positivePromptPlaceholder')} (${t('stylePresets.preview')})`}
           />
         )}
-        <RefImageList position="absolute" bottom={2} left={2} />
       </Box>
     </PromptPopover>
   );

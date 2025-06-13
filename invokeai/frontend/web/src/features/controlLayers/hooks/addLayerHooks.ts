@@ -192,7 +192,7 @@ export const useAddGlobalReferenceImage = () => {
   const func = useCallback(() => {
     const config = getDefaultRefImageConfig(getState);
     const overrides = { config };
-    dispatch(refImageAdded({ isSelected: true, overrides }));
+    dispatch(refImageAdded({ overrides }));
   }, [dispatch, getState]);
 
   return func;
