@@ -5,6 +5,9 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import type { PropsWithChildren } from 'react';
 import { memo, useMemo } from 'react';
 
+/**
+ * TabMountGate is a component that conditionally renders its children based on whether the specified tab is enabled.
+ */
 export const TabMountGate = memo(({ tab, children }: PropsWithChildren<{ tab: TabName }>) => {
   const selectIsTabEnabled = useMemo(
     () => createSelector(selectConfigSlice, (config) => !config.disabledTabs.includes(tab)),

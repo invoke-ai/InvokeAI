@@ -40,7 +40,7 @@ export const refImagesSlice = createSlice({
 
         state.entities.push(entityState);
       },
-      prepare: (payload?: { overrides?: PartialDeep<RefImageState>; isSelected?: boolean }) => ({
+      prepare: (payload?: { overrides?: PartialDeep<RefImageState> }) => ({
         payload: { ...payload, id: getPrefixedId('reference_image') },
       }),
     },
@@ -200,6 +200,7 @@ export const refImagesSlice = createSlice({
 
 export const {
   refImageAdded,
+  refImageDeleted,
   refImageImageChanged,
   refImageIPAdapterMethodChanged,
   refImageModelChanged,
