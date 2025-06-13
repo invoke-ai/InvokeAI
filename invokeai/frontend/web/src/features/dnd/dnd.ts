@@ -1,5 +1,5 @@
 import { logger } from 'app/logging/logger';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
@@ -114,13 +114,13 @@ type DndTarget<TargetData extends DndData, SourceData extends DndData> = {
     sourceData: RecordUnknown;
     targetData: TargetData;
     dispatch: AppDispatch;
-    getState: () => RootState;
+    getState: AppGetState;
   }) => boolean;
   handler: (arg: {
     sourceData: SourceData;
     targetData: TargetData;
     dispatch: AppDispatch;
-    getState: () => RootState;
+    getState: AppGetState;
   }) => void;
 };
 

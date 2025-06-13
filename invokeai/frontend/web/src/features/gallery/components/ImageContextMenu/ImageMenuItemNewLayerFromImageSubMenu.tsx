@@ -3,8 +3,6 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
@@ -75,19 +73,6 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
     });
   }, [imageDTO, imageViewer, store, t]);
 
-  const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
-    const { dispatch } = store;
-    dispatch(refImageAdded({ overrides: { config: { image: imageDTOToImageWithDims(imageDTO) } } }));
-    dispatch(sentImageToCanvas());
-    dispatch(setActiveTab('canvas'));
-    imageViewer.close();
-    toast({
-      id: 'SENT_TO_CANVAS',
-      title: t('toast.sentToCanvas'),
-      status: 'success',
-    });
-  }, [imageDTO, imageViewer, store, t]);
-
   const onClickNewRegionalReferenceImageFromImage = useCallback(() => {
     const { dispatch, getState } = store;
     createNewCanvasEntityFromImage({ imageDTO, type: 'regional_guidance_with_reference_image', dispatch, getState });
@@ -126,13 +111,6 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
             isDisabled={isBusy}
           >
             {t('controlLayers.referenceImageRegional')}
-          </MenuItem>
-          <MenuItem
-            icon={<NewLayerIcon />}
-            onClickCapture={onClickNewGlobalReferenceImageFromImage}
-            isDisabled={isBusy}
-          >
-            {t('controlLayers.referenceImageGlobal')}
           </MenuItem>
         </MenuList>
       </Menu>

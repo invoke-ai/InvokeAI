@@ -14,7 +14,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { useFilterableOutsideClick } from 'common/hooks/useFilterableOutsideClick';
-import { IPAdapterSettings } from 'features/controlLayers/components/IPAdapter/IPAdapterSettings';
+import { IPAdapterSettings } from 'features/controlLayers/components/RefImage/IPAdapterSettings';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { selectRefImageEntityOrThrow, selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
@@ -34,15 +34,12 @@ const sx: SystemStyleObject = {
   transitionDuration: '0.2s',
 };
 
-export const RefImagePreview = memo(() => {
+export const RefImage = memo(() => {
   const id = useRefImageIdContext();
   const ref = useRef<HTMLDivElement>(null);
   const disclosure = useDisclosure(false);
   const selectEntity = useMemo(
-    () =>
-      createSelector(selectRefImagesSlice, (refImages) =>
-        selectRefImageEntityOrThrow(refImages, id, 'RefImagePreview')
-      ),
+    () => createSelector(selectRefImagesSlice, (refImages) => selectRefImageEntityOrThrow(refImages, id, 'RefImage')),
     [id]
   );
   const entity = useAppSelector(selectEntity);
@@ -66,7 +63,7 @@ export const RefImagePreview = memo(() => {
     </Popover>
   );
 });
-RefImagePreview.displayName = 'RefImagePreview';
+RefImage.displayName = 'RefImage';
 
 const Thumbnail = memo(({ image }: { image: ImageWithDims | null }) => {
   const { data: imageDTO } = useGetImageDTOQuery(image?.image_name ?? skipToken);

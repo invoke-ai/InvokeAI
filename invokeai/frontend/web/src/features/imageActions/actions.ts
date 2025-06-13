@@ -1,6 +1,9 @@
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppDispatch, AppGetState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { selectDefaultIPAdapter, selectDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
+import {
+  getDefaultRefImageConfig,
+  getDefaultRegionalGuidanceRefImageConfig,
+} from 'features/controlLayers/hooks/addLayerHooks';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
@@ -77,7 +80,7 @@ export const createNewCanvasEntityFromImage = (arg: {
   imageDTO: ImageDTO;
   type: CanvasEntityType | 'regional_guidance_with_reference_image';
   dispatch: AppDispatch;
-  getState: () => RootState;
+  getState: AppGetState;
   overrides?: Partial<Pick<CanvasEntityState, 'isEnabled' | 'isLocked' | 'name' | 'position'>>;
 }) => {
   const { type, imageDTO, dispatch, getState, overrides: _overrides } = arg;
@@ -112,7 +115,7 @@ export const createNewCanvasEntityFromImage = (arg: {
       break;
     }
     case 'regional_guidance_with_reference_image': {
-      const config = deepClone(selectDefaultIPAdapter(getState()));
+      const config = getDefaultRegionalGuidanceRefImageConfig(getState);
       config.image = imageDTOToImageWithDims(imageDTO);
       const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), config }];
       dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
@@ -138,7 +141,7 @@ export const newCanvasFromImage = async (arg: {
   withResize?: boolean;
   withInpaintMask?: boolean;
   dispatch: AppDispatch;
-  getState: () => RootState;
+  getState: AppGetState;
 }) => {
   const { type, imageDTO, withResize = false, withInpaintMask = false, dispatch, getState } = arg;
   const state = getState();
@@ -242,7 +245,7 @@ export const newCanvasFromImage = async (arg: {
       break;
     }
     case 'reference_image': {
-      const config = deepClone(selectDefaultRefImageConfig(getState()));
+      const config = deepClone(getDefaultRefImageConfig(getState));
       config.image = imageDTOToImageWithDims(imageDTO);
       dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
       dispatch(refImageAdded({ overrides: { config }, isSelected: true }));
@@ -253,7 +256,7 @@ export const newCanvasFromImage = async (arg: {
       break;
     }
     case 'regional_guidance_with_reference_image': {
-      const config = deepClone(selectDefaultIPAdapter(getState()));
+      const config = getDefaultRegionalGuidanceRefImageConfig(getState);
       config.image = imageDTOToImageWithDims(imageDTO);
       const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), config }];
       dispatch(canvasSessionTypeChanged({ type: 'advanced' }));
@@ -273,7 +276,7 @@ export const replaceCanvasEntityObjectsWithImage = (arg: {
   imageDTO: ImageDTO;
   entityIdentifier: CanvasEntityIdentifier;
   dispatch: AppDispatch;
-  getState: () => RootState;
+  getState: AppGetState;
 }) => {
   const { imageDTO, entityIdentifier, dispatch, getState } = arg;
   const imageObject = imageDTOToImageObject(imageDTO);

@@ -5,7 +5,7 @@ import {
   useAddInpaintMask,
   useAddRasterLayer,
   useAddRegionalGuidance,
-  useAddRegionalReferenceImage,
+  useAddNewRegionalGuidanceWithARefImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { memo } from 'react';
@@ -18,7 +18,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const addRegionalReferenceImage = useAddRegionalReferenceImage();
+  const addRegionalReferenceImage = useAddNewRegionalGuidanceWithARefImage();
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
   const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
   const isInpaintLayerEnabled = useIsEntityTypeEnabled('inpaint_mask');
