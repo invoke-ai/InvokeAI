@@ -13,14 +13,14 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
-  rgIPAdapterBeginEndStepPctChanged,
-  rgIPAdapterCLIPVisionModelChanged,
-  rgIPAdapterDeleted,
-  rgIPAdapterFLUXReduxImageInfluenceChanged,
-  rgIPAdapterImageChanged,
-  rgIPAdapterMethodChanged,
-  rgIPAdapterModelChanged,
-  rgIPAdapterWeightChanged,
+  rgRefImageDeleted,
+  rgRefImageFLUXReduxImageInfluenceChanged,
+  rgRefImageImageChanged,
+  rgRefImageIPAdapterBeginEndStepPctChanged,
+  rgRefImageIPAdapterCLIPVisionModelChanged,
+  rgRefImageIPAdapterMethodChanged,
+  rgRefImageIPAdapterWeightChanged,
+  rgRefImageModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type {
@@ -46,64 +46,64 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
+    dispatch(rgRefImageDeleted({ entityIdentifier, referenceImageId }));
   }, [dispatch, entityIdentifier, referenceImageId]);
-  const selectIPAdapter = useMemo(
+  const selectConfig = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
         const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
         assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
-        return referenceImage.ipAdapter;
+        return referenceImage.config;
       }),
     [entityIdentifier, referenceImageId]
   );
-  const ipAdapter = useAppSelector(selectIPAdapter);
+  const config = useAppSelector(selectConfig);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(rgIPAdapterBeginEndStepPctChanged({ entityIdentifier, referenceImageId, beginEndStepPct }));
+      dispatch(rgRefImageIPAdapterBeginEndStepPctChanged({ entityIdentifier, referenceImageId, beginEndStepPct }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(rgIPAdapterWeightChanged({ entityIdentifier, referenceImageId, weight }));
+      dispatch(rgRefImageIPAdapterWeightChanged({ entityIdentifier, referenceImageId, weight }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(rgIPAdapterMethodChanged({ entityIdentifier, referenceImageId, method }));
+      dispatch(rgRefImageIPAdapterMethodChanged({ entityIdentifier, referenceImageId, method }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeFLUXReduxImageInfluence = useCallback(
     (imageInfluence: FLUXReduxImageInfluenceType) => {
-      dispatch(rgIPAdapterFLUXReduxImageInfluenceChanged({ entityIdentifier, referenceImageId, imageInfluence }));
+      dispatch(rgRefImageFLUXReduxImageInfluenceChanged({ entityIdentifier, referenceImageId, imageInfluence }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig) => {
-      dispatch(rgIPAdapterModelChanged({ entityIdentifier, referenceImageId, modelConfig }));
+      dispatch(rgRefImageModelChanged({ entityIdentifier, referenceImageId, modelConfig }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(rgIPAdapterCLIPVisionModelChanged({ entityIdentifier, referenceImageId, clipVisionModel }));
+      dispatch(rgRefImageIPAdapterCLIPVisionModelChanged({ entityIdentifier, referenceImageId, clipVisionModel }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
+      dispatch(rgRefImageImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     },
     [dispatch, entityIdentifier, referenceImageId]
   );
@@ -112,9 +112,9 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
     () =>
       setRegionalGuidanceReferenceImageDndTarget.getData(
         { entityIdentifier, referenceImageId },
-        ipAdapter.image?.image_name
+        config.image?.image_name
       ),
-    [entityIdentifier, ipAdapter.image?.image_name, referenceImageId]
+    [entityIdentifier, config.image?.image_name, referenceImageId]
   );
 
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
@@ -140,9 +140,9 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
       </Flex>
       <Flex flexDir="column" gap={2} position="relative" w="full">
         <Flex gap={2} alignItems="center" w="full">
-          <RegionalReferenceImageModel modelKey={ipAdapter.model?.key ?? null} onChangeModel={onChangeModel} />
-          {ipAdapter.type === 'ip_adapter' && (
-            <CLIPVisionModel model={ipAdapter.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+          <RegionalReferenceImageModel modelKey={config.model?.key ?? null} onChangeModel={onChangeModel} />
+          {config.type === 'ip_adapter' && (
+            <CLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
           )}
           <IconButton
             onClick={pullBboxIntoIPAdapter}
@@ -154,24 +154,24 @@ const RegionalGuidanceIPAdapterSettingsContent = memo(({ referenceImageId }: Pro
           />
         </Flex>
         <Flex gap={2} w="full">
-          {ipAdapter.type === 'ip_adapter' && (
+          {config.type === 'ip_adapter' && (
             <Flex flexDir="column" gap={2} w="full">
-              <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
-              <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
-              <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+              <IPAdapterMethod method={config.method} onChange={onChangeIPMethod} />
+              <Weight weight={config.weight} onChange={onChangeWeight} />
+              <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
             </Flex>
           )}
-          {ipAdapter.type === 'flux_redux' && (
+          {config.type === 'flux_redux' && (
             <Flex flexDir="column" gap={2} w="full">
               <FLUXReduxImageInfluence
-                imageInfluence={ipAdapter.imageInfluence ?? 'lowest'}
+                imageInfluence={config.imageInfluence ?? 'lowest'}
                 onChange={onChangeFLUXReduxImageInfluence}
               />
             </Flex>
           )}
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1" flexGrow={1}>
             <IPAdapterImagePreview
-              image={ipAdapter.image}
+              image={config.image}
               onChangeImage={onChangeImage}
               dndTarget={setRegionalGuidanceReferenceImageDndTarget}
               dndTargetData={dndTargetData}
@@ -191,17 +191,16 @@ const buildSelectIPAdapterHasImage = (
 ) =>
   createSelector(selectCanvasSlice, (canvas) => {
     const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
-    return !!referenceImage && referenceImage.ipAdapter.image !== null;
+    return !!referenceImage && referenceImage.config.image !== null;
   });
 
 export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
-
-  const selectIPAdapterHasImage = useMemo(
+  const selectHasImage = useMemo(
     () => buildSelectIPAdapterHasImage(entityIdentifier, referenceImageId),
     [entityIdentifier, referenceImageId]
   );
-  const hasImage = useAppSelector(selectIPAdapterHasImage);
+  const hasImage = useAppSelector(selectHasImage);
 
   if (!hasImage) {
     return <RegionalGuidanceIPAdapterSettingsEmptyState referenceImageId={referenceImageId} />;

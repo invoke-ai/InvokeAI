@@ -52,7 +52,7 @@ export const RefImagePreview = memo(() => {
     <Popover isLazy lazyBehavior="unmount" isOpen={disclosure.isOpen} closeOnBlur={false}>
       <PopoverAnchor>
         <Flex role="button" w={16} h={16} sx={sx} onClick={disclosure.open} data-is-open={disclosure.isOpen}>
-          <Thumbnail image={entity.ipAdapter.image} />
+          <Thumbnail image={entity.config.image} />
         </Flex>
       </PopoverAnchor>
       <Portal>

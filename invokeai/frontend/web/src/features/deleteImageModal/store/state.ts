@@ -3,7 +3,7 @@ import { getStore, useAppStore } from 'app/store/nanostores/store';
 import type { AppDispatch, AppGetState, RootState } from 'app/store/store';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import {
-  referenceImageIPAdapterImageChanged,
+  refImageImageChanged,
   selectReferenceImageEntities,
   selectRefImagesSlice,
 } from 'features/controlLayers/store/refImagesSlice';
@@ -228,8 +228,8 @@ const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, image
 
 const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   selectReferenceImageEntities(state).forEach((entity) => {
-    if (entity.ipAdapter.image?.image_name === imageDTO.image_name) {
-      dispatch(referenceImageIPAdapterImageChanged({ id: entity.id, imageDTO: null }));
+    if (entity.config.image?.image_name === imageDTO.image_name) {
+      dispatch(refImageImageChanged({ id: entity.id, imageDTO: null }));
     }
   });
 };
@@ -276,7 +276,7 @@ export const getImageUsage = (
 
   const isUpscaleImage = upscale.upscaleInitialImage?.image_name === image_name;
 
-  const isReferenceImage = refImages.entities.some(({ ipAdapter }) => ipAdapter.image?.image_name === image_name);
+  const isReferenceImage = refImages.entities.some(({ config }) => config.image?.image_name === image_name);
 
   const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
     objects.some((obj) => obj.type === 'image' && 'image_name' in obj.image && obj.image.image_name === image_name)
@@ -291,7 +291,7 @@ export const getImageUsage = (
   );
 
   const isRegionalGuidanceImage = canvas.regionalGuidance.entities.some(({ referenceImages }) =>
-    referenceImages.some(({ ipAdapter }) => ipAdapter.image?.image_name === image_name)
+    referenceImages.some(({ config }) => config.image?.image_name === image_name)
   );
 
   const imageUsage: ImageUsage = {

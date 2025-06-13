@@ -10,20 +10,20 @@ import {
   inpaintMaskNoiseAdded,
   rasterLayerAdded,
   rgAdded,
-  rgIPAdapterAdded,
   rgNegativePromptChanged,
   rgPositivePromptChanged,
+  rgRefImageAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
-import { referenceImageAdded } from 'features/controlLayers/store/refImagesSlice';
+import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
-  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   ControlLoRAConfig,
   ControlNetConfig,
   IPAdapterConfig,
+  RefImageState,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
 import {
@@ -76,7 +76,7 @@ export const selectDefaultRefImageConfig = createSelector(
   selectMainModelConfig,
   selectModelConfigsQuery,
   selectBase,
-  (selectedMainModel, query, base): CanvasReferenceImageState['ipAdapter'] => {
+  (selectedMainModel, query, base): RefImageState['config'] => {
     if (selectedMainModel?.base === 'chatgpt-4o') {
       const referenceImage = deepClone(initialChatGPT4oReferenceImage);
       referenceImage.model = zModelIdentifierField.parse(selectedMainModel);
@@ -172,7 +172,7 @@ export const useAddRegionalReferenceImage = () => {
   const func = useCallback(() => {
     const overrides: Partial<CanvasRegionalGuidanceState> = {
       referenceImages: [
-        { id: getPrefixedId('regional_guidance_reference_image'), ipAdapter: deepClone(defaultIPAdapter) },
+        { id: getPrefixedId('regional_guidance_reference_image'), config: deepClone(defaultIPAdapter) },
       ],
     };
     dispatch(rgAdded({ isSelected: true, overrides }));
@@ -185,8 +185,8 @@ export const useAddGlobalReferenceImage = () => {
   const dispatch = useAppDispatch();
   const defaultRefImage = useAppSelector(selectDefaultRefImageConfig);
   const func = useCallback(() => {
-    const overrides = { ipAdapter: deepClone(defaultRefImage) };
-    dispatch(referenceImageAdded({ isSelected: true, overrides }));
+    const overrides = { config: deepClone(defaultRefImage) };
+    dispatch(refImageAdded({ isSelected: true, overrides }));
   }, [defaultRefImage, dispatch]);
 
   return func;
@@ -196,7 +196,7 @@ export const useAddRegionalGuidanceIPAdapter = (entityIdentifier: CanvasEntityId
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
   const func = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: { ipAdapter: deepClone(defaultIPAdapter) } }));
+    dispatch(rgRefImageAdded({ entityIdentifier, overrides: { config: deepClone(defaultIPAdapter) } }));
   }, [defaultIPAdapter, dispatch, entityIdentifier]);
 
   return func;

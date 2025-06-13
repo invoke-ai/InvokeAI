@@ -23,7 +23,7 @@ import type {
   EntityMovedByPayload,
   FillStyle,
   FLUXReduxImageInfluence,
-  RegionalGuidanceReferenceImageState,
+  RegionalGuidanceRefImageState,
   RgbColor,
 } from 'features/controlLayers/store/types';
 import {
@@ -38,13 +38,15 @@ import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/par
 import type { IRect } from 'konva/lib/types';
 import { merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
-import type {
-  ControlLoRAModelConfig,
-  ControlNetModelConfig,
-  FLUXReduxModelConfig,
-  ImageDTO,
-  IPAdapterModelConfig,
-  T2IAdapterModelConfig,
+import {
+  type ControlLoRAModelConfig,
+  type ControlNetModelConfig,
+  type FLUXReduxModelConfig,
+  type ImageDTO,
+  type IPAdapterModelConfig,
+  isFluxReduxModelConfig,
+  isIPAdapterModelConfig,
+  type T2IAdapterModelConfig,
 } from 'services/api/types';
 
 import type {
@@ -72,7 +74,9 @@ import {
   getEntityIdentifier,
   getInitialCanvasState,
   isChatGPT4oAspectRatioID,
+  isFLUXReduxConfig,
   isImagenAspectRatioID,
+  isIPAdapterConfig,
 } from './types';
 import {
   converters,
@@ -669,12 +673,12 @@ export const canvasSlice = createSlice({
       }
       rg.autoNegative = !rg.autoNegative;
     },
-    rgIPAdapterAdded: {
+    rgRefImageAdded: {
       reducer: (
         state,
         action: PayloadAction<
           EntityIdentifierPayload<
-            { referenceImageId: string; overrides?: Partial<RegionalGuidanceReferenceImageState> },
+            { referenceImageId: string; overrides?: Partial<RegionalGuidanceRefImageState> },
             'regional_guidance'
           >
         >
@@ -684,20 +688,17 @@ export const canvasSlice = createSlice({
         if (!entity) {
           return;
         }
-        const ipAdapter = { id: referenceImageId, ipAdapter: deepClone(initialIPAdapter) };
-        merge(ipAdapter, overrides);
-        entity.referenceImages.push(ipAdapter);
+        const config = { id: referenceImageId, config: deepClone(initialIPAdapter) };
+        merge(config, overrides);
+        entity.referenceImages.push(config);
       },
       prepare: (
-        payload: EntityIdentifierPayload<
-          { overrides?: Partial<RegionalGuidanceReferenceImageState> },
-          'regional_guidance'
-        >
+        payload: EntityIdentifierPayload<{ overrides?: Partial<RegionalGuidanceRefImageState> }, 'regional_guidance'>
       ) => ({
         payload: { ...payload, referenceImageId: getPrefixedId('regional_guidance_ip_adapter') },
       }),
     },
-    rgIPAdapterDeleted: (
+    rgRefImageDeleted: (
       state,
       action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string }, 'regional_guidance'>>
     ) => {
@@ -706,9 +707,9 @@ export const canvasSlice = createSlice({
       if (!entity) {
         return;
       }
-      entity.referenceImages = entity.referenceImages.filter((ipAdapter) => ipAdapter.id !== referenceImageId);
+      entity.referenceImages = entity.referenceImages.filter((config) => config.id !== referenceImageId);
     },
-    rgIPAdapterImageChanged: (
+    rgRefImageImageChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; imageDTO: ImageDTO | null }, 'regional_guidance'>
@@ -719,9 +720,9 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      referenceImage.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+      referenceImage.config.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
-    rgIPAdapterWeightChanged: (
+    rgRefImageIPAdapterWeightChanged: (
       state,
       action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string; weight: number }, 'regional_guidance'>>
     ) => {
@@ -730,13 +731,13 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
 
-      referenceImage.ipAdapter.weight = weight;
+      referenceImage.config.weight = weight;
     },
-    rgIPAdapterBeginEndStepPctChanged: (
+    rgRefImageIPAdapterBeginEndStepPctChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; beginEndStepPct: [number, number] }, 'regional_guidance'>
@@ -747,13 +748,12 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
-
-      referenceImage.ipAdapter.beginEndStepPct = beginEndStepPct;
+      referenceImage.config.beginEndStepPct = beginEndStepPct;
     },
-    rgIPAdapterMethodChanged: (
+    rgRefImageIPAdapterMethodChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; method: IPMethodV2 }, 'regional_guidance'>
@@ -764,13 +764,12 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
-
-      referenceImage.ipAdapter.method = method;
+      referenceImage.config.method = method;
     },
-    rgIPAdapterFLUXReduxImageInfluenceChanged: (
+    rgRefImageFLUXReduxImageInfluenceChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<
@@ -784,13 +783,13 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'flux_redux') {
+      if (!isFLUXReduxConfig(referenceImage.config)) {
         return;
       }
 
-      referenceImage.ipAdapter.imageInfluence = imageInfluence;
+      referenceImage.config.imageInfluence = imageInfluence;
     },
-    rgIPAdapterModelChanged: (
+    rgRefImageModelChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<
@@ -807,43 +806,43 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      referenceImage.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
 
-      if (!referenceImage.ipAdapter.model) {
+      if (!modelConfig) {
+        referenceImage.config.model = null;
         return;
       }
 
-      if (referenceImage.ipAdapter.type === 'ip_adapter' && referenceImage.ipAdapter.model.type === 'flux_redux') {
+      if (isIPAdapterConfig(referenceImage.config) && isFluxReduxModelConfig(modelConfig)) {
         // Switching from ip_adapter to flux_redux
-        referenceImage.ipAdapter = {
+        referenceImage.config = {
           ...initialFLUXRedux,
-          image: referenceImage.ipAdapter.image,
-          model: referenceImage.ipAdapter.model,
+          image: referenceImage.config.image,
+          model: zModelIdentifierField.parse(modelConfig),
         };
         return;
       }
 
-      if (referenceImage.ipAdapter.type === 'flux_redux' && referenceImage.ipAdapter.model.type === 'ip_adapter') {
+      if (isFLUXReduxConfig(referenceImage.config) && isIPAdapterModelConfig(modelConfig)) {
         // Switching from flux_redux to ip_adapter
-        referenceImage.ipAdapter = {
+        referenceImage.config = {
           ...initialIPAdapter,
-          image: referenceImage.ipAdapter.image,
-          model: referenceImage.ipAdapter.model,
+          image: referenceImage.config.image,
+          model: zModelIdentifierField.parse(modelConfig),
         };
         return;
       }
 
-      if (referenceImage.ipAdapter.type === 'ip_adapter') {
+      if (isIPAdapterConfig(referenceImage.config)) {
         // Ensure that the IP Adapter model is compatible with the CLIP Vision model
-        if (referenceImage.ipAdapter.model?.base === 'flux') {
-          referenceImage.ipAdapter.clipVisionModel = 'ViT-L';
-        } else if (referenceImage.ipAdapter.clipVisionModel === 'ViT-L') {
+        if (referenceImage.config.model?.base === 'flux') {
+          referenceImage.config.clipVisionModel = 'ViT-L';
+        } else if (referenceImage.config.clipVisionModel === 'ViT-L') {
           // Fall back to ViT-H (ViT-G would also work)
-          referenceImage.ipAdapter.clipVisionModel = 'ViT-H';
+          referenceImage.config.clipVisionModel = 'ViT-H';
         }
       }
     },
-    rgIPAdapterCLIPVisionModelChanged: (
+    rgRefImageIPAdapterCLIPVisionModelChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<{ referenceImageId: string; clipVisionModel: CLIPVisionModelV2 }, 'regional_guidance'>
@@ -854,11 +853,10 @@ export const canvasSlice = createSlice({
       if (!referenceImage) {
         return;
       }
-      if (referenceImage.ipAdapter.type !== 'ip_adapter') {
+      if (!isIPAdapterConfig(referenceImage.config)) {
         return;
       }
-
-      referenceImage.ipAdapter.clipVisionModel = clipVisionModel;
+      referenceImage.config.clipVisionModel = clipVisionModel;
     },
     //#region Inpaint mask
     inpaintMaskAdded: {
@@ -1660,15 +1658,15 @@ export const {
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgAutoNegativeToggled,
-  rgIPAdapterAdded,
-  rgIPAdapterDeleted,
-  rgIPAdapterImageChanged,
-  rgIPAdapterWeightChanged,
-  rgIPAdapterBeginEndStepPctChanged,
-  rgIPAdapterMethodChanged,
-  rgIPAdapterModelChanged,
-  rgIPAdapterCLIPVisionModelChanged,
-  rgIPAdapterFLUXReduxImageInfluenceChanged,
+  rgRefImageAdded,
+  rgRefImageDeleted,
+  rgRefImageImageChanged,
+  rgRefImageIPAdapterWeightChanged,
+  rgRefImageIPAdapterBeginEndStepPctChanged,
+  rgRefImageIPAdapterMethodChanged,
+  rgRefImageModelChanged,
+  rgRefImageIPAdapterCLIPVisionModelChanged,
+  rgRefImageFLUXReduxImageInfluenceChanged,
   // Inpaint mask
   inpaintMaskAdded,
   inpaintMaskConvertedToRegionalGuidance,

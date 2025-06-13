@@ -522,20 +522,17 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
-  refImages.entities
-    .filter((entity) => entity.isEnabled)
-    .forEach((entity, i) => {
-      const layerLiteral = i18n.t('controlLayers.layer_one');
-      const layerNumber = i + 1;
-      const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
-      const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-      const problems = getGlobalReferenceImageWarnings(entity, model);
+  refImages.entities.forEach((entity, i) => {
+    const layerNumber = i + 1;
+    const refImageLiteral = i18n.t(LAYER_TYPE_TO_TKEY['reference_image']);
+    const prefix = `${refImageLiteral} #${layerNumber}`;
+    const problems = getGlobalReferenceImageWarnings(entity, model);
 
-      if (problems.length) {
-        const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
-        reasons.push({ prefix, content });
-      }
-    });
+    if (problems.length) {
+      const content = upperFirst(problems.map((p) => i18n.t(p)).join(', '));
+      reasons.push({ prefix, content });
+    }
+  });
 
   canvas.regionalGuidance.entities
     .filter((entity) => entity.isEnabled)

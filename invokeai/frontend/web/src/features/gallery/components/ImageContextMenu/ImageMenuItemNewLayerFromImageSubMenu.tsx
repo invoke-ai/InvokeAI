@@ -3,7 +3,7 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { referenceImageAdded } from 'features/controlLayers/store/refImagesSlice';
+import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
@@ -77,7 +77,7 @@ export const ImageMenuItemNewLayerFromImageSubMenu = memo(() => {
 
   const onClickNewGlobalReferenceImageFromImage = useCallback(() => {
     const { dispatch } = store;
-    dispatch(referenceImageAdded({ overrides: { ipAdapter: { image: imageDTOToImageWithDims(imageDTO) } } }));
+    dispatch(refImageAdded({ overrides: { config: { image: imageDTOToImageWithDims(imageDTO) } } }));
     dispatch(sentImageToCanvas());
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
