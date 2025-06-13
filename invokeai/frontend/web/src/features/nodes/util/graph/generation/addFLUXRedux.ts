@@ -1,8 +1,4 @@
-import type {
-  CanvasReferenceImageState,
-  FLUXReduxConfig,
-  FLUXReduxImageInfluence,
-} from 'features/controlLayers/store/types';
+import type { FLUXReduxConfig, FLUXReduxImageInfluence, RefImageState } from 'features/controlLayers/store/types';
 import { isFLUXReduxConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -14,7 +10,7 @@ type AddFLUXReduxResult = {
 };
 
 type AddFLUXReduxArg = {
-  entities: CanvasReferenceImageState[];
+  entities: RefImageState[];
   g: Graph;
   collector: Invocation<'collect'>;
   model: MainModelConfig;
@@ -22,19 +18,18 @@ type AddFLUXReduxArg = {
 
 export const addFLUXReduxes = ({ entities, g, collector, model }: AddFLUXReduxArg): AddFLUXReduxResult => {
   const validFLUXReduxes = entities
-    .filter((entity) => entity.isEnabled)
-    .filter((entity) => isFLUXReduxConfig(entity.ipAdapter))
+    .filter((entity) => isFLUXReduxConfig(entity.config))
     .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
   const result: AddFLUXReduxResult = {
     addedFLUXReduxes: 0,
   };
 
-  for (const { id, ipAdapter } of validFLUXReduxes) {
-    assert(isFLUXReduxConfig(ipAdapter), 'This should have been filtered out');
+  for (const { id, config } of validFLUXReduxes) {
+    assert(isFLUXReduxConfig(config), 'This should have been filtered out');
     result.addedFLUXReduxes++;
 
-    addFLUXRedux(id, ipAdapter, g, collector);
+    addFLUXRedux(id, config, g, collector);
   }
 
   return result;

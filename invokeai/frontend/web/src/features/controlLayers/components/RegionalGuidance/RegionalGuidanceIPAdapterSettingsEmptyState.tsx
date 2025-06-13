@@ -4,7 +4,7 @@ import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { rgIPAdapterDeleted } from 'features/controlLayers/store/canvasSlice';
+import { rgRefImageDeleted } from 'features/controlLayers/store/canvasSlice';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -35,7 +35,7 @@ export const RegionalGuidanceIPAdapterSettingsEmptyState = memo(({ referenceImag
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
   const onDeleteIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
+    dispatch(rgRefImageDeleted({ entityIdentifier, referenceImageId }));
   }, [dispatch, entityIdentifier, referenceImageId]);
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
 
