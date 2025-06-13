@@ -2,7 +2,7 @@
 import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { RefImagePreview } from 'features/controlLayers/components/IPAdapter/IPAdapterPreview';
+import { RefImage } from 'features/controlLayers/components/RefImage/RefImage';
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { selectRefImageEntityIds } from 'features/controlLayers/store/refImagesSlice';
 import { memo } from 'react';
@@ -27,7 +27,7 @@ export const RefImageList = memo((props: FlexProps) => {
     <Flex gap={2} {...props}>
       {ids.map((id) => (
         <RefImageIdContext.Provider key={id} value={id}>
-          <RefImagePreview />
+          <RefImage />
         </RefImageIdContext.Provider>
       ))}
     </Flex>
