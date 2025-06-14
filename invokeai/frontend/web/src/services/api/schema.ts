@@ -12270,7 +12270,7 @@ export type components = {
              * @default auto
              * @enum {string}
              */
-            device?: "auto" | "cpu" | "cuda" | "cuda:1" | "mps";
+            device?: "auto" | "cpu" | "cuda" | "cuda:1" | "cuda:2" | "cuda:3" | "mps";
             /**
              * Precision
              * @description Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.
