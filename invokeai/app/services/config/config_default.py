@@ -46,6 +46,7 @@ class URLRegexTokenPair(BaseModel):
             raise ValueError(f"Invalid regex: {e}")
         return v
 
+
 class InvokeAIAppConfig(BaseSettings):
     """Invoke's global app configuration.
 
