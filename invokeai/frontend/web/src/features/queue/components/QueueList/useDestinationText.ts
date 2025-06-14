@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import type { SessionQueueItemDTO } from 'services/api/types';
+import type { S } from 'services/api/types';
 
-export const useDestinationText = (destination: SessionQueueItemDTO['destination']) => {
+export const useDestinationText = (destination: S['SessionQueueItem']['destination']) => {
   const { t } = useTranslation();
 
   if (destination === 'canvas') {

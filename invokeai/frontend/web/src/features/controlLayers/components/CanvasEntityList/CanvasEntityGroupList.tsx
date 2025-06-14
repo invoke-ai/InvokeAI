@@ -14,7 +14,6 @@ import { useEntityTypeInformationalPopover } from 'features/controlLayers/hooks/
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
 import { entitiesReordered } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import { isRenderableEntityType } from 'features/controlLayers/store/types';
 import { singleCanvasEntityDndSource } from 'features/dnd/dnd';
 import { triggerPostMoveFlash } from 'features/dnd/util';
 import type { PropsWithChildren } from 'react';
@@ -165,8 +164,8 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
 
           <Spacer />
         </Flex>
-        {isRenderableEntityType(type) && <CanvasEntityMergeVisibleButton type={type} />}
-        {isRenderableEntityType(type) && <CanvasEntityTypeIsHiddenToggle type={type} />}
+        <CanvasEntityMergeVisibleButton type={type} />
+        <CanvasEntityTypeIsHiddenToggle type={type} />
         <CanvasEntityAddOfTypeButton type={type} />
       </Flex>
       <Collapse in={collapse.isTrue} style={fixTooltipCloseOnScrollStyles}>

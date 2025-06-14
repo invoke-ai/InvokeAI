@@ -1,6 +1,6 @@
 import type { Dimensions } from 'features/controlLayers/store/types';
 
-export type TabName = 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
+export type TabName = 'generate' | 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
 export type CanvasRightPanelTabName = 'layers' | 'gallery';
 
 export interface UIState {

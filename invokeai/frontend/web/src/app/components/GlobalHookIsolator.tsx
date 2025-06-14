@@ -8,18 +8,24 @@ import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/ap
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
+import { useCloseChakraTooltipsOnDragFix } from 'common/hooks/useCloseChakraTooltipsOnDragFix';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
+import { toggleImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useEffect } from 'react';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
+import { useGetQueueCountsByDestinationQuery } from 'services/api/endpoints/queue';
 import { useSocketIO } from 'services/events/useSocketIO';
+
+const queueCountArg = { destination: 'canvas' };
 
 /**
  * GlobalHookIsolator is a logical component that runs global hooks in an isolated component, so that they do not
@@ -38,6 +44,11 @@ export const GlobalHookIsolator = memo(
     useGlobalHotkeys();
     useGetOpenAPISchemaQuery();
     useSyncLoggingConfig();
+    useCloseChakraTooltipsOnDragFix();
+
+    // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
+    // and/or in progress canvas sessions.
+    useGetQueueCountsByDestinationQuery(queueCountArg);
 
     useEffect(() => {
       i18n.changeLanguage(language);
@@ -60,6 +71,12 @@ export const GlobalHookIsolator = memo(
     useFocusRegionWatcher();
     useWorkflowBuilderWatcher();
     useDynamicPromptsWatcher();
+
+    useRegisteredHotkeys({
+      id: 'toggleViewer',
+      category: 'viewer',
+      callback: toggleImageViewer,
+    });
 
     return null;
   }

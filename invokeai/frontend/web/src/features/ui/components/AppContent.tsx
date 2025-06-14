@@ -1,23 +1,15 @@
-import { Box, Flex } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
-import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightPanel';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
-import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
-import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
-import WorkflowsTabLeftPanel from 'features/nodes/components/sidePanel/WorkflowsTabLeftPanel';
-import QueueControls from 'features/queue/components/QueueControls';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
-import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
-import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
-import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
-import QueueTab from 'features/ui/components/tabs/QueueTab';
-import { WorkflowsMainPanel } from 'features/ui/components/tabs/WorkflowsTabContent';
+import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
+import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
+import { LeftPanelContent } from 'features/ui/components/LeftPanelContent';
+import { MainPanelContent } from 'features/ui/components/MainPanelContent';
+import { RightPanelContent } from 'features/ui/components/RightPanelContent';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   $isLeftPanelOpen,
   $isRightPanelOpen,
@@ -31,7 +23,6 @@ import { memo, useMemo, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
-import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import { VerticalResizeHandle } from './tabs/ResizeHandle';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
@@ -128,26 +119,21 @@ export const AppContent = memo(() => {
       >
         {withLeftPanel && (
           <>
-            <Panel order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
-              <Flex flexDir="column" w="full" h="full" gap={2}>
-                <QueueControls />
-                <Box position="relative" w="full" h="full">
-                  <LeftPanelContent />
-                </Box>
-              </Flex>
+            <Panel id="left-panel" order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
+              <LeftPanelContent />
             </Panel>
             <VerticalResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
           </>
         )}
         <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
           <MainPanelContent />
-          {withLeftPanel && <FloatingParametersPanelButtons togglePanel={leftPanel.toggle} />}
-          {withRightPanel && <FloatingGalleryButton panelApi={rightPanel} />}
+          {withLeftPanel && <FloatingLeftPanelButtons onToggle={leftPanel.toggle} />}
+          {withRightPanel && <FloatingRightPanelButtons onToggle={rightPanel.toggle} />}
         </Panel>
         {withRightPanel && (
           <>
             <VerticalResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
-            <Panel order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
+            <Panel id="right-panel" order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
               <RightPanelContent />
             </Panel>
           </>
@@ -156,59 +142,4 @@ export const AppContent = memo(() => {
     </Flex>
   );
 });
-
 AppContent.displayName = 'AppContent';
-
-const RightPanelContent = memo(() => {
-  const tab = useAppSelector(selectActiveTab);
-
-  if (tab === 'canvas') {
-    return <CanvasRightPanel />;
-  }
-  if (tab === 'upscaling' || tab === 'workflows') {
-    return <GalleryPanelContent />;
-  }
-
-  return null;
-});
-RightPanelContent.displayName = 'RightPanelContent';
-
-const LeftPanelContent = memo(() => {
-  const tab = useAppSelector(selectActiveTab);
-
-  if (tab === 'canvas') {
-    return <ParametersPanelTextToImage />;
-  }
-  if (tab === 'upscaling') {
-    return <ParametersPanelUpscale />;
-  }
-  if (tab === 'workflows') {
-    return <WorkflowsTabLeftPanel />;
-  }
-
-  return null;
-});
-LeftPanelContent.displayName = 'LeftPanelContent';
-
-const MainPanelContent = memo(() => {
-  const tab = useAppSelector(selectActiveTab);
-
-  if (tab === 'canvas') {
-    return <CanvasMainPanelContent />;
-  }
-  if (tab === 'upscaling') {
-    return <ImageViewer />;
-  }
-  if (tab === 'workflows') {
-    return <WorkflowsMainPanel />;
-  }
-  if (tab === 'models') {
-    return <ModelManagerTab />;
-  }
-  if (tab === 'queue') {
-    return <QueueTab />;
-  }
-
-  return null;
-});
-MainPanelContent.displayName = 'MainPanelContent';

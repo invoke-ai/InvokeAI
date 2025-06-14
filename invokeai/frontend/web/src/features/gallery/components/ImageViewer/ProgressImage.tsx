@@ -5,7 +5,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useMemo } from 'react';
-import { $isProgressFromCanvas, $progressImage } from 'services/events/stores';
+import { $lastProgressImage } from 'services/events/stores';
 
 const selectShouldAntialiasProgressImage = createSelector(
   selectSystemSlice,
@@ -13,8 +13,7 @@ const selectShouldAntialiasProgressImage = createSelector(
 );
 
 const CurrentImagePreview = () => {
-  const progressImage = useStore($progressImage);
-  const isProgressFromCanvas = useStore($isProgressFromCanvas);
+  const progressImage = useStore($lastProgressImage);
   const shouldAntialiasProgressImage = useAppSelector(selectShouldAntialiasProgressImage);
 
   const sx = useMemo<SystemStyleObject>(
@@ -24,7 +23,7 @@ const CurrentImagePreview = () => {
     [shouldAntialiasProgressImage]
   );
 
-  if (!progressImage || isProgressFromCanvas) {
+  if (!progressImage) {
     return null;
   }
 

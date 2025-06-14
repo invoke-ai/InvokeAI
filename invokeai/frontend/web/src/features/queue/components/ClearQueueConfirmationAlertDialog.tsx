@@ -7,18 +7,17 @@ import { useTranslation } from 'react-i18next';
 
 const [useClearQueueConfirmationAlertDialog] = buildUseBoolean(false);
 
-export const useClearQueueDialog = () => {
+const useClearQueueDialog = () => {
   const dialog = useClearQueueConfirmationAlertDialog();
-  const { clearQueue, isLoading, isDisabled, queueStatus } = useClearQueue();
+  const clearQueue = useClearQueue();
 
   return {
-    clearQueue,
     isOpen: dialog.isTrue,
     openDialog: dialog.setTrue,
     closeDialog: dialog.setFalse,
-    isLoading,
-    queueStatus,
-    isDisabled,
+    trigger: clearQueue.trigger,
+    isLoading: clearQueue.isLoading,
+    isDisabled: clearQueue.isDisabled,
   };
 };
 
@@ -32,7 +31,7 @@ export const ClearQueueConfirmationsAlertDialog = memo(() => {
       isOpen={clearQueue.isOpen}
       onClose={clearQueue.closeDialog}
       title={t('queue.clearTooltip')}
-      acceptCallback={clearQueue.clearQueue}
+      acceptCallback={clearQueue.trigger}
       acceptButtonText={t('queue.clear')}
       useInert={false}
     >

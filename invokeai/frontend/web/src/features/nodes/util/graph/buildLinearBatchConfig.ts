@@ -34,7 +34,7 @@ export const prepareLinearUIBatch = (arg: {
   seedFieldIdentifier?: FieldIdentifier;
   positivePromptFieldIdentifier: FieldIdentifier;
   origin: 'canvas' | 'workflows' | 'upscaling';
-  destination: 'canvas' | 'gallery';
+  destination: string;
 }): EnqueueBatchArg => {
   const { state, g, prepend, seedFieldIdentifier, positivePromptFieldIdentifier, origin, destination } = arg;
   const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.params;

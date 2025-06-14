@@ -1,5 +1,6 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
+import { buildZodTypeGuard } from 'common/util/zodUtils';
 import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
 import { z } from 'zod';
 
@@ -16,20 +17,11 @@ import { z } from 'zod';
  */
 
 /**
- * Helper to create a type guard from a zod schema. The type guard will infer the schema's TS type.
- * @param schema The zod schema to create a type guard from.
- * @returns A type guard function for the schema.
- */
-export const buildTypeGuard = <T extends z.ZodTypeAny>(schema: T) => {
-  return (val: unknown): val is z.infer<T> => schema.safeParse(val).success;
-};
-
-/**
  * Helper to create a zod schema and a type guard from it.
  * @param schema The zod schema to create a type guard from.
  * @returns A tuple containing the zod schema and the type guard function.
  */
-const buildParameter = <T extends z.ZodTypeAny>(schema: T) => [schema, buildTypeGuard(schema)] as const;
+export const buildParameter = <T extends z.ZodTypeAny>(schema: T) => [schema, buildZodTypeGuard(schema)] as const;
 
 // #region Positive prompt
 export const [zParameterPositivePrompt, isParameterPositivePrompt] = buildParameter(z.string());
@@ -104,7 +96,7 @@ export type ParameterModel = z.infer<typeof zParameterModel>;
 // #endregion
 
 // #region SDXL Refiner Model
-const zParameterSDXLRefinerModel = zModelIdentifierField;
+export const zParameterSDXLRefinerModel = zModelIdentifierField;
 export type ParameterSDXLRefinerModel = z.infer<typeof zParameterSDXLRefinerModel>;
 // #endregion
 
@@ -196,7 +188,7 @@ export type ParameterSDXLRefinerStart = z.infer<typeof zParameterSDXLRefinerStar
 // #endregion
 
 // #region Mask Blur Method
-const zParameterMaskBlurMethod = z.enum(['box', 'gaussian']);
+export const [zParameterMaskBlurMethod, isParameterMaskBlurMethod] = buildParameter(z.enum(['box', 'gaussian']));
 export type ParameterMaskBlurMethod = z.infer<typeof zParameterMaskBlurMethod>;
 // #endregion
 

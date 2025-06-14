@@ -1,43 +1,20 @@
-import { useStore } from '@nanostores/react';
-import { toast } from 'features/toast/toast';
-import { isNil } from 'lodash-es';
-import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useCancelQueueItemMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { $isConnected } from 'services/events/stores';
+import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
+import { useCurrentQueueItemId } from 'features/queue/hooks/useCurrentQueueItemId';
+import { useCallback } from 'react';
 
 export const useCancelCurrentQueueItem = () => {
-  const isConnected = useStore($isConnected);
-  const { data: queueStatus } = useGetQueueStatusQuery();
-  const [trigger, { isLoading }] = useCancelQueueItemMutation();
-  const { t } = useTranslation();
-  const currentQueueItemId = useMemo(() => queueStatus?.queue.item_id, [queueStatus?.queue.item_id]);
-  const cancelQueueItem = useCallback(async () => {
-    if (!currentQueueItemId) {
+  const currentQueueItemId = useCurrentQueueItemId();
+  const cancelQueueItem = useCancelQueueItem();
+  const trigger = useCallback(() => {
+    if (currentQueueItemId === null) {
       return;
     }
-    try {
-      await trigger(currentQueueItemId).unwrap();
-      toast({
-        id: 'QUEUE_CANCEL_SUCCEEDED',
-        title: t('queue.cancelSucceeded'),
-        status: 'success',
-      });
-    } catch {
-      toast({
-        id: 'QUEUE_CANCEL_FAILED',
-        title: t('queue.cancelFailed'),
-        status: 'error',
-      });
-    }
-  }, [currentQueueItemId, t, trigger]);
-
-  const isDisabled = useMemo(() => !isConnected || isNil(currentQueueItemId), [isConnected, currentQueueItemId]);
+    cancelQueueItem.trigger(currentQueueItemId);
+  }, [currentQueueItemId, cancelQueueItem]);
 
   return {
-    cancelQueueItem,
-    isLoading,
-    currentQueueItemId,
-    isDisabled,
+    trigger,
+    isLoading: cancelQueueItem.isLoading,
+    isDisabled: cancelQueueItem.isDisabled || currentQueueItemId === null,
   };
 };

@@ -8,12 +8,12 @@ import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasPersistConfig, canvasSlice, canvasUndoableConfig } from 'features/controlLayers/store/canvasSlice';
 import {
+  canvasSessionSlice,
   canvasStagingAreaPersistConfig,
-  canvasStagingAreaSlice,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
-import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
+import { refImagesPersistConfig, refImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
 import { hrfPersistConfig, hrfSlice } from 'features/hrf/store/hrfSlice';
@@ -54,7 +54,6 @@ const allReducers = {
   [configSlice.name]: configSlice.reducer,
   [uiSlice.name]: uiSlice.reducer,
   [dynamicPromptsSlice.name]: dynamicPromptsSlice.reducer,
-  [deleteImageModalSlice.name]: deleteImageModalSlice.reducer,
   [changeBoardModalSlice.name]: changeBoardModalSlice.reducer,
   [modelManagerV2Slice.name]: modelManagerV2Slice.reducer,
   [queueSlice.name]: queueSlice.reducer,
@@ -65,9 +64,10 @@ const allReducers = {
   [stylePresetSlice.name]: stylePresetSlice.reducer,
   [paramsSlice.name]: paramsSlice.reducer,
   [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
-  [canvasStagingAreaSlice.name]: canvasStagingAreaSlice.reducer,
+  [canvasSessionSlice.name]: canvasSessionSlice.reducer,
   [lorasSlice.name]: lorasSlice.reducer,
   [workflowLibrarySlice.name]: workflowLibrarySlice.reducer,
+  [refImagesSlice.name]: refImagesSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -113,6 +113,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [canvasStagingAreaPersistConfig.name]: canvasStagingAreaPersistConfig,
   [lorasPersistConfig.name]: lorasPersistConfig,
   [workflowLibraryPersistConfig.name]: workflowLibraryPersistConfig,
+  [refImagesSlice.name]: refImagesPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
@@ -175,6 +176,7 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
         .concat(authToastMiddleware)
+        // .concat(getDebugLoggerMiddleware())
         .prepend(listenerMiddleware.middleware),
     enhancers: (getDefaultEnhancers) => {
       const _enhancers = getDefaultEnhancers().concat(autoBatchEnhancer());
@@ -209,3 +211,4 @@ export type RootState = ReturnType<AppStore['getState']>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppThunkDispatch = ThunkDispatch<RootState, any, UnknownAction>;
 export type AppDispatch = ReturnType<typeof createStore>['dispatch'];
+export type AppGetState = ReturnType<typeof createStore>['getState'];

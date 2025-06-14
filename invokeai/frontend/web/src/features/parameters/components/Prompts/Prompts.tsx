@@ -1,5 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { RefImageList } from 'features/controlLayers/components/RefImage/RefImageList';
 import { createParamsSelector, selectIsChatGTP4o, selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';
@@ -21,6 +22,7 @@ export const Prompts = memo(() => {
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
       {withStylePrompts && <ParamSDXLPositiveStylePrompt />}
+      <RefImageList />
       {!isFLUX && !isChatGPT4o && <ParamNegativePrompt />}
       {withStylePrompts && <ParamSDXLNegativeStylePrompt />}
     </Flex>

@@ -1,61 +1,59 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import type { StagingAreaImage } from 'features/controlLayers/store/types';
-import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
-
-import { newSessionRequested } from './actions';
 
 type CanvasStagingAreaState = {
-  stagedImages: StagingAreaImage[];
-  selectedStagedImageIndex: number;
+  generateSessionId: string | null;
+  canvasSessionId: string | null;
 };
 
-const initialState: CanvasStagingAreaState = {
-  stagedImages: [],
-  selectedStagedImageIndex: 0,
+const INITIAL_STATE: CanvasStagingAreaState = {
+  generateSessionId: null,
+  canvasSessionId: null,
 };
 
-export const canvasStagingAreaSlice = createSlice({
-  name: 'canvasStagingArea',
-  initialState,
+const getInitialState = (): CanvasStagingAreaState => deepClone(INITIAL_STATE);
+
+export const canvasSessionSlice = createSlice({
+  name: 'canvasSession',
+  initialState: getInitialState(),
   reducers: {
-    stagingAreaImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
-      const { stagingAreaImage } = action.payload;
-      state.stagedImages.push(stagingAreaImage);
-      state.selectedStagedImageIndex = state.stagedImages.length - 1;
+    generateSessionIdCreated: {
+      reducer: (state, action: PayloadAction<{ id: string }>) => {
+        const { id } = action.payload;
+        state.generateSessionId = id;
+      },
+      prepare: () => ({
+        payload: { id: getPrefixedId('generate') },
+      }),
     },
-    stagingAreaNextStagedImageSelected: (state) => {
-      state.selectedStagedImageIndex = (state.selectedStagedImageIndex + 1) % state.stagedImages.length;
+    generateSessionReset: (state) => {
+      state.generateSessionId = null;
     },
-    stagingAreaPrevStagedImageSelected: (state) => {
-      state.selectedStagedImageIndex =
-        (state.selectedStagedImageIndex - 1 + state.stagedImages.length) % state.stagedImages.length;
+    canvasSessionIdCreated: {
+      reducer: (state, action: PayloadAction<{ id: string }>) => {
+        const { id } = action.payload;
+        state.canvasSessionId = id;
+      },
+      prepare: () => ({
+        payload: { id: getPrefixedId('canvas') },
+      }),
     },
-    stagingAreaStagedImageDiscarded: (state, action: PayloadAction<{ index: number }>) => {
-      const { index } = action.payload;
-      state.stagedImages.splice(index, 1);
-      state.selectedStagedImageIndex = Math.min(state.selectedStagedImageIndex, state.stagedImages.length - 1);
-    },
-    stagingAreaReset: (state) => {
-      state.stagedImages = [];
-      state.selectedStagedImageIndex = 0;
+    canvasSessionReset: (state) => {
+      state.canvasSessionId = null;
     },
   },
   extraReducers(builder) {
-    builder.addCase(canvasReset, () => deepClone(initialState));
-    builder.addMatcher(newSessionRequested, () => deepClone(initialState));
+    builder.addCase(canvasReset, (state) => {
+      state.canvasSessionId = null;
+    });
   },
 });
 
-export const {
-  stagingAreaImageStaged,
-  stagingAreaStagedImageDiscarded,
-  stagingAreaReset,
-  stagingAreaNextStagedImageSelected,
-  stagingAreaPrevStagedImageSelected,
-} = canvasStagingAreaSlice.actions;
+export const { generateSessionIdCreated, generateSessionReset, canvasSessionIdCreated, canvasSessionReset } =
+  canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
@@ -63,41 +61,17 @@ const migrate = (state: any): any => {
 };
 
 export const canvasStagingAreaPersistConfig: PersistConfig<CanvasStagingAreaState> = {
-  name: canvasStagingAreaSlice.name,
-  initialState,
+  name: canvasSessionSlice.name,
+  initialState: getInitialState(),
   migrate,
   persistDenylist: [],
 };
 
-export const selectCanvasStagingAreaSlice = (s: RootState) => s.canvasStagingArea;
+export const selectCanvasSessionSlice = (s: RootState) => s[canvasSessionSlice.name];
 
-/**
- * Selects if we should be staging images. This is true if:
- * - There are staged images.
- * - There are any in-progress or pending canvas queue items.
- */
-export const selectIsStaging = createSelector(
-  selectCanvasQueueCounts,
-  selectCanvasStagingAreaSlice,
-  ({ data }, staging) => {
-    if (staging.stagedImages.length > 0) {
-      return true;
-    }
-    if (!data) {
-      return false;
-    }
-    return data.in_progress > 0 || data.pending > 0;
-  }
+export const selectCanvasSessionId = createSelector(selectCanvasSessionSlice, ({ canvasSessionId }) => canvasSessionId);
+export const selectGenerateSessionId = createSelector(
+  selectCanvasSessionSlice,
+  ({ generateSessionId }) => generateSessionId
 );
-export const selectStagedImageIndex = createSelector(
-  selectCanvasStagingAreaSlice,
-  (stagingArea) => stagingArea.selectedStagedImageIndex
-);
-export const selectSelectedImage = createSelector(
-  [selectCanvasStagingAreaSlice, selectStagedImageIndex],
-  (stagingArea, index) => stagingArea.stagedImages[index] ?? null
-);
-export const selectImageCount = createSelector(
-  selectCanvasStagingAreaSlice,
-  (stagingArea) => stagingArea.stagedImages.length
-);
+export const selectIsStaging = createSelector(selectCanvasSessionId, (canvasSessionId) => canvasSessionId !== null);

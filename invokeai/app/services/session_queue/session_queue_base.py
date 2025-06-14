@@ -10,6 +10,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
+    DeleteAllExceptCurrentResult,
+    DeleteByDestinationResult,
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
@@ -17,7 +19,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
-    SessionQueueItemDTO,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
@@ -93,6 +94,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def delete_queue_item(self, item_id: int) -> None:
+        """Deletes a session queue item"""
+        pass
+
+    @abstractmethod
     def fail_queue_item(
         self, item_id: int, error_type: str, error_message: str, error_traceback: str
     ) -> SessionQueueItem:
@@ -110,6 +116,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def delete_by_destination(self, queue_id: str, destination: str) -> DeleteByDestinationResult:
+        """Deletes all queue items with the given batch destination"""
+        pass
+
+    @abstractmethod
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
         """Cancels all queue items with matching queue ID"""
         pass
@@ -120,6 +131,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def delete_all_except_current(self, queue_id: str) -> DeleteAllExceptCurrentResult:
+        """Deletes all queue items except in-progress items"""
+        pass
+
+    @abstractmethod
     def list_queue_items(
         self,
         queue_id: str,
@@ -127,8 +143,18 @@ class SessionQueueBase(ABC):
         priority: int,
         cursor: Optional[int] = None,
         status: Optional[QUEUE_ITEM_STATUS] = None,
-    ) -> CursorPaginatedResults[SessionQueueItemDTO]:
+        destination: Optional[str] = None,
+    ) -> CursorPaginatedResults[SessionQueueItem]:
         """Gets a page of session queue items"""
+        pass
+
+    @abstractmethod
+    def list_all_queue_items(
+        self,
+        queue_id: str,
+        destination: Optional[str] = None,
+    ) -> list[SessionQueueItem]:
+        """Gets all queue items that match the given parameters"""
         pass
 
     @abstractmethod

@@ -15,11 +15,10 @@ import { firefoxDndFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { SizedSkeletonLoader } from 'features/gallery/components/ImageGrid/SizedSkeletonLoader';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEventHandler } from 'react';
-import { memo, useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 // This class name is used to calculate the number of images that fit in the gallery
@@ -89,7 +88,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const [dragPreviewState, setDragPreviewState] = useState<
     DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
   >(null);
-  const [element, ref] = useState<HTMLImageElement | null>(null);
+  const ref = useRef<HTMLImageElement>(null);
   const dndId = useId();
   const selectIsSelectedForCompare = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
@@ -111,6 +110,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const isSelected = useAppSelector(selectIsSelected);
 
   useEffect(() => {
+    const element = ref.current;
     if (!element) {
       return;
     }
@@ -175,7 +175,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         },
       })
     );
-  }, [imageDTO, element, store, dndId]);
+  }, [imageDTO, store, dndId]);
 
   const [isHovered, setIsHovered] = useState(false);
 
@@ -211,7 +211,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
-  useImageContextMenu(imageDTO, element);
+  useImageContextMenu(imageDTO, ref);
 
   return (
     <>
@@ -234,7 +234,6 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           <Image
             ref={ref}
             src={imageDTO.thumbnail_url}
-            fallback={<SizedSkeletonLoader width={imageDTO.width} height={imageDTO.height} />}
             w={imageDTO.width}
             objectFit="contain"
             maxW="full"

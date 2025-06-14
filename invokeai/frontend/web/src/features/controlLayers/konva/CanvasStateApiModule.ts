@@ -29,7 +29,7 @@ import {
   rasterLayerAdded,
   rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectAllRenderableEntities,
   selectBbox,
@@ -48,7 +48,7 @@ import type {
   Rect,
   RgbaColor,
 } from 'features/controlLayers/store/types';
-import { isRenderableEntityIdentifier, RGBA_BLACK } from 'features/controlLayers/store/types';
+import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -537,7 +537,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the canvas staging area state from redux.
    */
   getStagingArea = () => {
-    return this.runSelector(selectCanvasStagingAreaSlice);
+    return this.runSelector(selectCanvasSessionSlice);
   };
 
   /**
@@ -574,9 +574,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   getSelectedEntityAdapter = (): CanvasEntityAdapter | null => {
     const state = this.getCanvasState();
     if (!state.selectedEntityIdentifier) {
-      return null;
-    }
-    if (!isRenderableEntityIdentifier(state.selectedEntityIdentifier)) {
       return null;
     }
     return this.manager.getAdapter(state.selectedEntityIdentifier);

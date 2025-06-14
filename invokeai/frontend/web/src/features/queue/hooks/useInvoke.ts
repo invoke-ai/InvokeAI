@@ -44,7 +44,7 @@ export const useInvoke = () => {
         return;
       }
 
-      if (tabName === 'canvas') {
+      if (tabName === 'canvas' || tabName === 'generate') {
         dispatch(enqueueRequestedCanvas({ prepend }));
         return;
       }
