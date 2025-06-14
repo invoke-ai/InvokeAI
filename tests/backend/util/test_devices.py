@@ -10,7 +10,7 @@ import torch
 from invokeai.app.services.config import get_config
 from invokeai.backend.util.devices import TorchDevice, choose_precision, choose_torch_device, torch_dtype
 
-devices = ["cpu", "cuda:0", "cuda:1", "mps"]
+devices = ["cpu", "cuda:0", "cuda:1", "cuda:2", "mps"]
 device_types_cpu = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float32)]
 device_types_cuda = [("cpu", torch.float32), ("cuda:0", torch.float16), ("mps", torch.float32)]
 device_types_mps = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float16)]
