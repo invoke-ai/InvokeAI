@@ -68,7 +68,7 @@
     "cmdk": "^1.1.1",
     "compare-versions": "^6.1.1",
     "filesize": "^10.1.6",
-    "fracturedjsonjs": "^4.0.2",
+    "fracturedjsonjs": "^4.1.0",
     "framer-motion": "^11.10.0",
     "i18next": "^25.0.1",
     "i18next-http-backend": "^3.0.2",
