@@ -58,14 +58,14 @@ const components = {
   LinkComponent: <ModelManagerLink />,
 };
 
-const NoOptionsFallback = memo(() => {
+const NoOptionsFallback = memo(({ noOptionsText }: { noOptionsText?: string }) => {
   const { t } = useTranslation();
   const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
   const onClickGoToModelManager = useStore($onClickGoToModelManager);
 
   return (
     <Flex flexDir="column" gap={4} alignItems="center">
-      <Text color="base.200">{t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
+      <Text color="base.200">{noOptionsText ?? t('modelManager.modelPickerFallbackNoModelsInstalled')}</Text>
       {(!isModelsTabDisabled || onClickGoToModelManager) && (
         <Text color="base.200">
           <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalled2" components={components} />
@@ -124,6 +124,7 @@ export const ModelPicker = typedMemo(
     isDisabled,
     isInvalid,
     className,
+    noOptionsText,
   }: {
     modelConfigs: T[];
     selectedModelConfig: T | undefined;
@@ -135,6 +136,7 @@ export const ModelPicker = typedMemo(
     isDisabled?: boolean;
     isInvalid?: boolean;
     className?: string;
+    noOptionsText?: string;
   }) => {
     const { t } = useTranslation();
     const options = useMemo<T[] | Group<T>[]>(() => {
@@ -237,7 +239,7 @@ export const ModelPicker = typedMemo(
                 selectedOption={selectedModelConfig}
                 isMatch={isMatch}
                 OptionComponent={PickerOptionComponent}
-                noOptionsFallback={<NoOptionsFallback />}
+                noOptionsFallback={<NoOptionsFallback noOptionsText={noOptionsText} />}
                 noMatchesFallback={t('modelManager.noMatchingModels')}
                 NextToSearchBar={<NavigateToModelManagerButton />}
                 getIsOptionDisabled={getIsOptionDisabled}
