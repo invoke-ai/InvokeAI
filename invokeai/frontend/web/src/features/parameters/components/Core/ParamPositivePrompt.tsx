@@ -1,8 +1,14 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
-import { positivePromptChanged, selectBase, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import {
+  positivePromptChanged,
+  selectBase,
+  selectModelSupportsNegativePrompt,
+  selectPositivePrompt,
+} from 'features/controlLayers/store/paramsSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
+import { NegativePromptToggleButton } from 'features/parameters/components/Core/NegativePromptToggleButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
@@ -32,6 +38,7 @@ export const ParamPositivePrompt = memo(() => {
   const baseModel = useAppSelector(selectBase);
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+  const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   usePersistedTextAreaSize('positive_prompt', textareaRef, persistOptions);
@@ -98,8 +105,9 @@ export const ParamPositivePrompt = memo(() => {
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
           {baseModel === 'sdxl' && <SDXLConcatButton />}
           <ShowDynamicPromptsPreviewButton />
+          {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
         </PromptOverlayButtonWrapper>
-        <PromptLabel label={t('parameters.positivePromptPlaceholder')} />
+        <PromptLabel label="Prompt" />
         {viewMode && (
           <ViewModePrompt
             prompt={prompt}

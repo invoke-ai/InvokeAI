@@ -14,6 +14,8 @@ import type {
   ParameterControlLoRAModel,
   ParameterGuidance,
   ParameterModel,
+  ParameterNegativePrompt,
+  ParameterPositivePrompt,
   ParameterPrecision,
   ParameterScheduler,
   ParameterSDXLRefinerModel,
@@ -124,10 +126,10 @@ export const paramsSlice = createSlice({
     shouldUseCpuNoiseChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldUseCpuNoise = action.payload;
     },
-    positivePromptChanged: (state, action: PayloadAction<string>) => {
+    positivePromptChanged: (state, action: PayloadAction<ParameterPositivePrompt>) => {
       state.positivePrompt = action.payload;
     },
-    negativePromptChanged: (state, action: PayloadAction<string>) => {
+    negativePromptChanged: (state, action: PayloadAction<ParameterNegativePrompt>) => {
       state.negativePrompt = action.payload;
     },
     positivePrompt2Changed: (state, action: PayloadAction<string>) => {
@@ -273,7 +275,7 @@ export const selectIsSD3 = createParamsSelector((params) => params.model?.base =
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsImagen3 = createParamsSelector((params) => params.model?.base === 'imagen3');
 export const selectIsImagen4 = createParamsSelector((params) => params.model?.base === 'imagen4');
-export const selectIsChatGTP4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
+export const selectIsChatGPT4o = createParamsSelector((params) => params.model?.base === 'chatgpt-4o');
 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
@@ -305,6 +307,12 @@ export const selectImg2imgStrength = createParamsSelector((params) => params.img
 export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
+export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
+export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
+export const selectModelSupportsNegativePrompt = createSelector(
+  [selectIsFLUX, selectIsChatGPT4o],
+  (isFLUX, isChatGPT4o) => !isFLUX && !isChatGPT4o
+);
 export const selectPositivePrompt2 = createParamsSelector((params) => params.positivePrompt2);
 export const selectNegativePrompt2 = createParamsSelector((params) => params.negativePrompt2);
 export const selectShouldConcatPrompts = createParamsSelector((params) => params.shouldConcatPrompts);

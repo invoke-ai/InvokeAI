@@ -121,8 +121,8 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     if (!metadata) {
       return;
     }
-    let positivePrompt;
-    let negativePrompt;
+    let positivePrompt: string;
+    let negativePrompt: string;
 
     try {
       positivePrompt = await handlers.positivePrompt.parse(metadata);
@@ -130,7 +130,7 @@ export const useImageActions = (imageDTO: ImageDTO) => {
       positivePrompt = '';
     }
     try {
-      negativePrompt = await handlers.negativePrompt.parse(metadata);
+      negativePrompt = (await handlers.negativePrompt.parse(metadata)) ?? '';
     } catch (error) {
       negativePrompt = '';
     }
