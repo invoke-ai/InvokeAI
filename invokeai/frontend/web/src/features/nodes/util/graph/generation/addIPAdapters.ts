@@ -1,4 +1,4 @@
-import { type IPAdapterConfig, isIPAdapterConfig,type RefImageState } from 'features/controlLayers/store/types';
+import { type IPAdapterConfig, isIPAdapterConfig, type RefImageState } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, MainModelConfig } from 'services/api/types';

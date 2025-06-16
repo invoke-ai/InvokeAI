@@ -79,7 +79,7 @@ const setProgress = ($progressData: ProgressDataMap, data: S['InvocationProgress
   }
 };
 
-type ProgressDataMap = MapStore<Record<number, ProgressData | undefined>>;
+export type ProgressDataMap = MapStore<Record<number, ProgressData | undefined>>;
 
 type CanvasSessionContextValue = {
   session: { id: string; type: 'simple' | 'advanced' };

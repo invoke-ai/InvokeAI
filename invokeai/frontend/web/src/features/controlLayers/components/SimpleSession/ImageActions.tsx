@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import type { ButtonGroupProps } from '@invoke-ai/ui-library';
 import { Button, ButtonGroup } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';

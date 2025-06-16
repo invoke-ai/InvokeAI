@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
 import { StagingAreaSelectedItem } from 'features/controlLayers/components/SimpleSession/StagingAreaSelectedItem';

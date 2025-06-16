@@ -1,5 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
-
 import { Alert, Button, Divider, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InitialStateAddAStyleReference } from 'features/controlLayers/components/SimpleSession/InitialStateAddAStyleReference';
