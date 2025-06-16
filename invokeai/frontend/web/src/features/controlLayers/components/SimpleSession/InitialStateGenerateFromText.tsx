@@ -1,5 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
-
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { InitialStateButtonGridItem } from 'features/controlLayers/components/SimpleSession/InitialStateButtonGridItem';
 import { memo } from 'react';

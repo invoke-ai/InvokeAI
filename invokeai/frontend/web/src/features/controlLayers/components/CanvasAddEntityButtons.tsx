@@ -3,9 +3,9 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import {
   useAddControlLayer,
   useAddInpaintMask,
+  useAddNewRegionalGuidanceWithARefImage,
   useAddRasterLayer,
   useAddRegionalGuidance,
-  useAddNewRegionalGuidanceWithARefImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { memo } from 'react';

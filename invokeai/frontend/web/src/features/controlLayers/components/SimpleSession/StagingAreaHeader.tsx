@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 

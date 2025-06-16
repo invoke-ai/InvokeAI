@@ -3,9 +3,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   buildSelectValidRegionalGuidanceActions,
-  useAddRefImageToExistingRegionalGuidance,
   useAddNegativePromptToExistingRegionalGuidance,
   useAddPositivePromptToExistingRegionalGuidance,
+  useAddRefImageToExistingRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { ContextMenu, Divider, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';

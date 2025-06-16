@@ -15,8 +15,8 @@ import {
 } from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
-  CanvasImageState,
   CanvasEntityType,
+  CanvasImageState,
   Coordinate,
   RgbaColor,
   SAMPointLabel,
