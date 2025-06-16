@@ -4,7 +4,7 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
-  selectIsChatGTP4o,
+  selectIsChatGPT4o,
   selectIsFluxKontext,
   selectIsImagen3,
   selectIsImagen4,
@@ -28,7 +28,7 @@ export const BboxAspectRatioSelect = memo(() => {
   const id = useAppSelector(selectAspectRatioID);
   const isStaging = useAppSelector(selectIsStaging);
   const isImagen3 = useAppSelector(selectIsImagen3);
-  const isChatGPT4o = useAppSelector(selectIsChatGTP4o);
+  const isChatGPT4o = useAppSelector(selectIsChatGPT4o);
   const isImagen4 = useAppSelector(selectIsImagen4);
   const isFluxKontext = useAppSelector(selectIsFluxKontext);
   const options = useMemo(() => {

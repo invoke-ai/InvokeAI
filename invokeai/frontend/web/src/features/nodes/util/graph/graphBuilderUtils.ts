@@ -56,7 +56,8 @@ export const selectPresetModifiedPrompts = createSelector(
   selectStylePresetSlice,
   selectListStylePresetsRequestState,
   (params, stylePresetSlice, listStylePresetsRequestState) => {
-    const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = params;
+    const negativePrompt = params.negativePrompt ?? '';
+    const { positivePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = params;
     const { activeStylePresetId } = stylePresetSlice;
 
     if (activeStylePresetId) {
@@ -72,7 +73,7 @@ export const selectPresetModifiedPrompts = createSelector(
 
         const presetModifiedNegativePrompt = buildPresetModifiedPrompt(
           activeStylePreset.preset_data.negative_prompt,
-          negativePrompt
+          negativePrompt ?? ''
         );
 
         return {
