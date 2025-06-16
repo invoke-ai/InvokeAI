@@ -54,8 +54,8 @@ dependencies:
     specifier: ^10.1.6
     version: 10.1.6
   fracturedjsonjs:
-    specifier: ^4.0.2
-    version: 4.0.2
+    specifier: ^4.1.0
+    version: 4.1.0
   framer-motion:
     specifier: ^11.10.0
     version: 11.10.0(react-dom@18.3.1)(react@18.3.1)
@@ -5280,8 +5280,8 @@ packages:
       signal-exit: 4.1.0
     dev: true
 
-  /fracturedjsonjs@4.0.2:
-    resolution: {integrity: sha512-+vGJH9wK0EEhbbn50V2sOebLRaar1VL3EXr02kxchIwpkhQk0ItrPjIOtYPYuU9hNFpVzxjrPgzjtMJih+ae4A==}
+  /fracturedjsonjs@4.1.0:
+    resolution: {integrity: sha512-qy6LPA8OOiiyRHt5/sNKDayD7h5r3uHmHxSOLbBsgtU/hkt5vOVWOR51MdfDbeCNfj7k/dKCRbXYm8FBAJcgWQ==}
     dev: false
 
   /framer-motion@10.18.0(react-dom@18.3.1)(react@18.3.1):
