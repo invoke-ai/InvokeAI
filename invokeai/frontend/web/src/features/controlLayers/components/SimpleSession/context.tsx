@@ -13,10 +13,6 @@ import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
-import { z } from 'zod';
-
-export const zAutoSwitchMode = z.enum(['off', 'first_progress', 'completed']);
-export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
 export type ProgressData = {
   itemId: number;
@@ -91,7 +87,7 @@ type CanvasSessionContextValue = {
   $selectedItem: Atom<S['SessionQueueItem'] | null>;
   $selectedItemIndex: Atom<number | null>;
   $selectedItemOutputImageDTO: Atom<ImageDTO | null>;
-  $autoSwitch: WritableAtom<AutoSwitchMode>;
+  $autoSwitch: WritableAtom<boolean>;
   $lastLoadedItemId: WritableAtom<number | null>;
   selectNext: () => void;
   selectPrev: () => void;
@@ -126,7 +122,7 @@ export const CanvasSessionContextProvider = memo(
     /**
      * Whether auto-switch is enabled.
      */
-    const $autoSwitch = useState(() => atom<AutoSwitchMode>('first_progress'))[0];
+    const $autoSwitch = useState(() => atom(true))[0];
 
     /**
      * An internal flag used to work around race conditions with auto-switch switching to queue items before their
@@ -273,11 +269,7 @@ export const CanvasSessionContextProvider = memo(
         if (data.destination !== session.id) {
           return;
         }
-        const isFirstProgressImage = !$progressData.get()[data.item_id]?.progressImage && !!data.image;
         setProgress($progressData, data);
-        if ($autoSwitch.get() === 'first_progress' && isFirstProgressImage) {
-          $selectedItemId.set(data.item_id);
-        }
       };
 
       socket.on('invocation_progress', onProgress);
@@ -413,7 +405,7 @@ export const CanvasSessionContextProvider = memo(
         if (lastLoadedItemId === null) {
           return;
         }
-        if ($autoSwitch.get() === 'completed') {
+        if ($autoSwitch.get()) {
           $selectedItemId.set(lastLoadedItemId);
         }
         $lastLoadedItemId.set(null);
