@@ -1,0 +1,48 @@
+/* eslint-disable i18next/no-literal-string */
+import { Flex, FormControl, FormLabel, Icon } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { modelSelected } from 'features/parameters/store/actions';
+import { memo, useCallback, useMemo } from 'react';
+import { MdMoneyOff } from 'react-icons/md';
+import { useMainModels } from 'services/api/hooks/modelsByType';
+import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import { type AnyModelConfig, isCheckpointMainModelConfig } from 'services/api/types';
+
+export const InitialStateMainModelPicker = memo(() => {
+  const dispatch = useAppDispatch();
+  const [modelConfigs] = useMainModels();
+  const selectedModelConfig = useSelectedModelConfig();
+  const onChange = useCallback(
+    (modelConfig: AnyModelConfig) => {
+      dispatch(modelSelected(modelConfig));
+    },
+    [dispatch]
+  );
+
+  const isFluxDevSelected = useMemo(
+    () =>
+      selectedModelConfig &&
+      isCheckpointMainModelConfig(selectedModelConfig) &&
+      selectedModelConfig.config_path === 'flux-dev',
+    [selectedModelConfig]
+  );
+
+  return (
+    <FormControl orientation="vertical" alignItems="unset">
+      <InformationalPopover feature="paramModel">
+        <FormLabel>Select your Model</FormLabel>
+      </InformationalPopover>
+      {isFluxDevSelected && (
+        <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
+          <Flex justifyContent="flex-start">
+            <Icon as={MdMoneyOff} />
+          </Flex>
+        </InformationalPopover>
+      )}
+      <ModelPicker modelConfigs={modelConfigs} selectedModelConfig={selectedModelConfig} onChange={onChange} grouped />
+    </FormControl>
+  );
+});
+InitialStateMainModelPicker.displayName = 'InitialStateMainModelPicker';
