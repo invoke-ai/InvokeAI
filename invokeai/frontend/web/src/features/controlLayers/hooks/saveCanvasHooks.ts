@@ -212,7 +212,7 @@ export const useNewGlobalReferenceImageFromBbox = () => {
           image: imageDTOToImageWithDims(imageDTO),
         },
       };
-      dispatch(refImageAdded({ overrides, isSelected: true }));
+      dispatch(refImageAdded({ overrides }));
     };
 
     return {
