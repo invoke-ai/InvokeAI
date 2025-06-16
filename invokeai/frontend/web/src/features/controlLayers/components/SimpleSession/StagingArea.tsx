@@ -1,5 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
-
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasSessionContext } from 'features/controlLayers/components/SimpleSession/context';

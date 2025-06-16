@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Flex, FormControl, FormLabel, Icon } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';

@@ -1,5 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
-
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
