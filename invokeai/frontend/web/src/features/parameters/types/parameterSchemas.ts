@@ -29,7 +29,7 @@ export type ParameterPositivePrompt = z.infer<typeof zParameterPositivePrompt>;
 // #endregion
 
 // #region Negative prompt
-export const [zParameterNegativePrompt, isParameterNegativePrompt] = buildParameter(z.string());
+export const [zParameterNegativePrompt, isParameterNegativePrompt] = buildParameter(z.string().nullable());
 export type ParameterNegativePrompt = z.infer<typeof zParameterNegativePrompt>;
 // #endregion
 
