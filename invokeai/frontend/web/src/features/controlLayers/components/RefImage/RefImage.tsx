@@ -1,5 +1,3 @@
-import type {
-  SystemStyleObject} from '@invoke-ai/ui-library';
 import {
   Divider,
   Flex,
@@ -10,7 +8,8 @@ import {
   PopoverArrow,
   PopoverBody,
   PopoverContent,
-  Portal
+  Portal,
+  Skeleton,
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { POPPER_MODIFIERS } from 'common/components/InformationalPopover/constants';
@@ -80,24 +79,12 @@ export const RefImage = memo(() => {
 });
 RefImage.displayName = 'RefImage';
 
-const imageSx: SystemStyleObject = {
-  opacity: 0.5,
-  _hover: {
-    opacity: 1,
-  },
-  "&[data-is-open='true']": {
-    opacity: 1,
-  },
-  transitionProperty: 'opacity',
-  transitionDuration: '0.2s',
-};
-
 const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
   const id = useRefImageIdContext();
   const entity = useRefImageEntity(id);
   const { data: imageDTO } = useGetImageDTOQuery(entity.config.image?.image_name ?? skipToken);
 
-  if (!imageDTO || !entity.config.image) {
+  if (!entity.config.image) {
     return (
       <PopoverAnchor>
         <IconButton
@@ -113,6 +100,7 @@ const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
           icon={<PiImageBold />}
           colorScheme="error"
           onClick={disclosure.toggle}
+          flexShrink={0}
         />
       </PopoverAnchor>
     );
@@ -120,14 +108,21 @@ const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
   return (
     <PopoverAnchor>
       <Image
+        borderWidth={1}
+        borderStyle="solid"
         id={getRefImagePopoverTriggerId(id)}
         role="button"
-        src={imageDTO.thumbnail_url}
+        src={imageDTO?.thumbnail_url}
         objectFit="contain"
+        aspectRatio="1/1"
+        // width={imageDTO?.width}
+        height={imageDTO?.height}
+        fallback={<Skeleton h="full" aspectRatio="1/1" />}
         maxW="full"
         maxH="full"
         borderRadius="base"
         onClick={disclosure.toggle}
+        flexShrink={0}
         // sx={imageSx}
         // data-is-open={disclosure.isOpen}
       />
