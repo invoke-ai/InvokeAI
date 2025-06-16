@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Divider, Flex, Heading } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
 import { ToolColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';

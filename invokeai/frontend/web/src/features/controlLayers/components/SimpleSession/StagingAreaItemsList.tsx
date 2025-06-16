@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
