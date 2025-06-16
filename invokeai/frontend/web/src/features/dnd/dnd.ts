@@ -1,7 +1,10 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
+import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
+import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import type { BoardId } from 'features/gallery/store/types';
 import {
@@ -148,6 +151,34 @@ export const setGlobalReferenceImageDndTarget: DndTarget<
     const { imageDTO } = sourceData.payload;
     const { id } = targetData.payload;
     setGlobalReferenceImage({ id, imageDTO, dispatch });
+  },
+};
+//#endregion
+
+//#region Add Global Reference Image
+const _addGlobalReferenceImage = buildTypeAndKey('add-global-reference-image');
+export type AddGlobalReferenceImageDndTargetData = DndData<
+  typeof _addGlobalReferenceImage.type,
+  typeof _addGlobalReferenceImage.key
+>;
+export const addGlobalReferenceImageDndTarget: DndTarget<
+  AddGlobalReferenceImageDndTargetData,
+  SingleImageDndSourceData
+> = {
+  ..._addGlobalReferenceImage,
+  typeGuard: buildTypeGuard(_addGlobalReferenceImage.key),
+  getData: buildGetData(_addGlobalReferenceImage.key, _addGlobalReferenceImage.type),
+  isValid: ({ sourceData }) => {
+    if (singleImageDndSource.typeGuard(sourceData)) {
+      return true;
+    }
+    return false;
+  },
+  handler: ({ sourceData, dispatch, getState }) => {
+    const { imageDTO } = sourceData.payload;
+    const config = getDefaultRefImageConfig(getState);
+    config.image = imageDTOToImageWithDims(imageDTO);
+    dispatch(refImageAdded({ overrides: { config } }));
   },
 };
 //#endregion
@@ -496,6 +527,7 @@ export const dndTargets = [
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
   newCanvasFromImageDndTarget,
+  addGlobalReferenceImageDndTarget,
   // Single or Multiple Image
   addImageToBoardDndTarget,
   removeImageFromBoardDndTarget,
