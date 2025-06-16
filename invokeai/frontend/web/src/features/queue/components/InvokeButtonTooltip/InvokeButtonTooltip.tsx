@@ -35,7 +35,7 @@ export const InvokeButtonTooltip = ({ prepend, children, ...rest }: PropsWithChi
 const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const activeTab = useAppSelector(selectActiveTab);
 
-  if (activeTab === 'canvas') {
+  if (activeTab === 'canvas' || activeTab === 'generate') {
     return <CanvasTabTooltipContent prepend={prepend} />;
   }
 
