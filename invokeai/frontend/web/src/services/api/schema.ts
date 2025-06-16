@@ -12266,7 +12266,7 @@ export type components = {
             pytorch_cuda_alloc_conf?: string | null;
             /**
              * Device
-             * @description Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.
+             * @description Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
              * @default auto
              */
             device?: string;
