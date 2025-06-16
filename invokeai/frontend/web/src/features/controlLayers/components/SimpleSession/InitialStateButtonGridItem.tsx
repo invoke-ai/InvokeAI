@@ -1,21 +1,19 @@
-import type { GridItemProps } from '@invoke-ai/ui-library';
-import { Button, forwardRef, GridItem } from '@invoke-ai/ui-library';
+import type { ButtonProps } from '@invoke-ai/ui-library';
+import { Button, forwardRef } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
 export const InitialStateButtonGridItem = memo(
-  forwardRef(({ children, ...rest }: GridItemProps, ref) => {
+  forwardRef(({ children, ...rest }: ButtonProps, ref) => {
     return (
-      <GridItem
+      <Button
         ref={ref}
-        as={Button}
         variant="outline"
         display="flex"
         position="relative"
-        flexDir="column"
         alignItems="center"
         borderWidth={1}
         borderRadius="base"
-        p={2}
+        p={4}
         pt={6}
         gap={2}
         w="full"
@@ -23,7 +21,7 @@ export const InitialStateButtonGridItem = memo(
         {...rest}
       >
         {children}
-      </GridItem>
+      </Button>
     );
   })
 );

@@ -1,12 +1,10 @@
 /* eslint-disable i18next/no-literal-string */
 
-import { Button, Divider, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
+import { Alert, Button, Divider, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InitialStateAddAStyleReference } from 'features/controlLayers/components/SimpleSession/InitialStateAddAStyleReference';
-import { InitialStateEditImageCard } from 'features/controlLayers/components/SimpleSession/InitialStateEditImageCard';
 import { InitialStateGenerateFromText } from 'features/controlLayers/components/SimpleSession/InitialStateGenerateFromText';
-import { InitialStateUseALayoutImageCard } from 'features/controlLayers/components/SimpleSession/InitialStateUseALayoutImageCard';
-import { toast } from 'features/toast/toast';
+import { InitialStateMainModelPicker } from 'features/controlLayers/components/SimpleSession/InitialStateMainModelPicker';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 
@@ -14,14 +12,6 @@ export const InitialState = memo(() => {
   const dispatch = useAppDispatch();
   const newCanvasSession = useCallback(() => {
     dispatch(setActiveTab('canvas'));
-    toast({
-      title: 'Switched to Canvas',
-      description: 'You are in advanced mode yadda yadda.',
-      status: 'info',
-      position: 'top',
-      // isClosable: false,
-      duration: 5000,
-    });
   }, [dispatch]);
 
   return (
@@ -31,24 +21,30 @@ export const InitialState = memo(() => {
       </Flex>
       <Divider />
       <Flex flexDir="column" h="full" justifyContent="center" mx={16}>
-        <Heading mb={4}>Choose a starting method.</Heading>
-        <Text fontSize="md" fontStyle="italic" mb={6}>
-          Drag an image onto a card or click the upload icon.
-        </Text>
-
-        <Grid gridTemplateColumns="1fr 1fr" gridTemplateRows="1fr 1fr" gap={4}>
+        <Heading mb={4}>Get started with Invoke.</Heading>
+        <Flex flexDir="column" gap={4}>
+          <Grid gridTemplateColumns="1fr 1fr" gap={4}>
+            <InitialStateMainModelPicker />
+            <Flex flexDir="column" gap={2}>
+              <Text>
+                Want to learn what prompts work best for each model?{' '}
+                <Button as="a" variant="link" href="#" size="sm">
+                  Check our our Model Guide.
+                </Button>
+              </Text>
+            </Flex>
+          </Grid>
           <InitialStateGenerateFromText />
           <InitialStateAddAStyleReference />
-          <InitialStateUseALayoutImageCard />
-          <InitialStateEditImageCard />
-        </Grid>
-
-        <Text fontSize="md" color="base.300" alignSelf="center" mt={6}>
-          or{' '}
-          <Button variant="link" onClick={newCanvasSession}>
-            start from a blank canvas.
-          </Button>
-        </Text>
+          <Alert status="info" borderRadius="base" flexDir="column" gap={2} overflow="unset">
+            <Text fontSize="md" fontWeight="semibold">
+              Looking to get more control, edit, and iterate on your images?
+            </Text>
+            <Button variant="link" onClick={newCanvasSession}>
+              Navigate to Canvas for more capabilities.
+            </Button>
+          </Alert>
+        </Flex>
       </Flex>
     </Flex>
   );
