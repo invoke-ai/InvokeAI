@@ -503,7 +503,8 @@ const zParamsState = z.object({
   clipSkip: z.number().default(0),
   shouldUseCpuNoise: z.boolean().default(true),
   positivePrompt: zParameterPositivePrompt.default(''),
-  negativePrompt: zParameterNegativePrompt.default(''),
+  // Negative prompt may be disabled, in which case it will be null
+  negativePrompt: zParameterNegativePrompt.default(null),
   positivePrompt2: zParameterPositiveStylePromptSDXL.default(''),
   negativePrompt2: zParameterNegativeStylePromptSDXL.default(''),
   shouldConcatPrompts: z.boolean().default(true),
