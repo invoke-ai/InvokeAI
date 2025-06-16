@@ -15,11 +15,13 @@ const focusOnPrompt = () => {
 
 export const InitialStateGenerateFromText = memo(() => {
   return (
-    <InitialStateButtonGridItem onClick={focusOnPrompt}>
+    <InitialStateButtonGridItem onClick={focusOnPrompt} position="relative" gap={8}>
       <Icon as={PiTextAaBold} boxSize={8} color="base.500" />
-      <Heading size="sm">Generate from Text</Heading>
-      <Text color="base.300">Enter a prompt and Invoke.</Text>
-      <Flex w="full" justifyContent="flex-end" p={2}>
+      <Flex flexDir="column" alignItems="flex-start" gap={2}>
+        <Heading size="sm">Generate from Text</Heading>
+        <Text color="base.300">Enter a prompt and Invoke.</Text>
+      </Flex>
+      <Flex position="absolute" right={3} bottom={3}>
         <PiCursorTextBold />
       </Flex>
     </InitialStateButtonGridItem>
