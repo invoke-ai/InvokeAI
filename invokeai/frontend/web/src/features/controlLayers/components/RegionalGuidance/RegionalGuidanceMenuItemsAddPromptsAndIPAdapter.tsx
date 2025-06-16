@@ -3,9 +3,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   buildSelectValidRegionalGuidanceActions,
-  useAddRefImageToExistingRegionalGuidance,
   useAddNegativePromptToExistingRegionalGuidance,
   useAddPositivePromptToExistingRegionalGuidance,
+  useAddRefImageToExistingRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo, useMemo } from 'react';

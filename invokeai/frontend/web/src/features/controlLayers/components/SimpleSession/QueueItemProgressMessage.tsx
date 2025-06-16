@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import type { TextProps } from '@invoke-ai/ui-library';
 import { Text } from '@invoke-ai/ui-library';
 import { useCanvasSessionContext, useProgressData } from 'features/controlLayers/components/SimpleSession/context';

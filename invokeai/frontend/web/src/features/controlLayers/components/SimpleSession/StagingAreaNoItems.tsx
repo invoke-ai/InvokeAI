@@ -1,5 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
-
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 

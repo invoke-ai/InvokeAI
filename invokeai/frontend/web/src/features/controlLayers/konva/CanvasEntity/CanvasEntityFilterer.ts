@@ -9,7 +9,7 @@ import { addCoords, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/contr
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
-import type { CanvasImageState, CanvasEntityType } from 'features/controlLayers/store/types';
+import type { CanvasEntityType, CanvasImageState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';

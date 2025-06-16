@@ -2,9 +2,9 @@ import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@in
 import {
   useAddControlLayer,
   useAddInpaintMask,
+  useAddNewRegionalGuidanceWithARefImage,
   useAddRasterLayer,
   useAddRegionalGuidance,
-  useAddNewRegionalGuidanceWithARefImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';

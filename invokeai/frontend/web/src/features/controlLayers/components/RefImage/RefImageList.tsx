@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import type { FlexProps } from '@invoke-ai/ui-library';
 import { Button, Flex } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
