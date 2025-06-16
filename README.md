@@ -10,6 +10,18 @@
 
 </div>
 
+<p align="center">
+  <!-- Keep these links. Translations will automatically update with the README. -->
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=de">Deutsch</a> | 
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=es">Español</a> | 
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=fr">français</a> | 
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=ja">日本語</a> | 
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=ko">한국어</a> | 
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=pt">Português</a> | 
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=ru">Русский</a> | 
+  <a href="https://www.readme-i18n.com/invoke-ai/InvokeAI?lang=zh">中文</a>
+</p>
+
 Invoke is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. Invoke offers an industry leading web-based UI, and serves as the foundation for multiple commercial products.
 
 Invoke is available in two editions:
