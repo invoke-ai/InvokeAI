@@ -1,6 +1,10 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
-import { useOutputImageDTO } from 'features/controlLayers/components/SimpleSession/context';
+import {
+  useCanvasSessionContext,
+  useOutputImageDTO,
+  useProgressData,
+} from 'features/controlLayers/components/SimpleSession/context';
 import { ImageActions } from 'features/controlLayers/components/SimpleSession/ImageActions';
 import { QueueItemCircularProgress } from 'features/controlLayers/components/SimpleSession/QueueItemCircularProgress';
 import { QueueItemNumber } from 'features/controlLayers/components/SimpleSession/QueueItemNumber';
@@ -8,7 +12,7 @@ import { QueueItemProgressImage } from 'features/controlLayers/components/Simple
 import { QueueItemStatusLabel } from 'features/controlLayers/components/SimpleSession/QueueItemStatusLabel';
 import { getQueueItemElementId } from 'features/controlLayers/components/SimpleSession/shared';
 import { DndImage } from 'features/dnd/DndImage';
-import { memo, useCallback, useState } from 'react';
+import { memo } from 'react';
 import type { S } from 'services/api/types';
 
 type Props = {
@@ -27,17 +31,14 @@ const sx = {
 } satisfies SystemStyleObject;
 
 export const QueueItemPreviewFull = memo(({ item, number }: Props) => {
+  const ctx = useCanvasSessionContext();
   const imageDTO = useOutputImageDTO(item);
-  const [imageLoaded, setImageLoaded] = useState(false);
-
-  const onLoad = useCallback(() => {
-    setImageLoaded(true);
-  }, []);
+  const { imageLoaded } = useProgressData(ctx.$progressData, item.item_id);
 
   return (
     <Flex id={getQueueItemElementId(item.item_id)} sx={sx}>
-      <QueueItemStatusLabel status={item.status} position="absolute" margin="auto" />
-      {imageDTO && <DndImage imageDTO={imageDTO} onLoad={onLoad} />}
+      <QueueItemStatusLabel item={item} position="absolute" margin="auto" />
+      {imageDTO && <DndImage imageDTO={imageDTO} />}
       {!imageLoaded && <QueueItemProgressImage itemId={item.item_id} position="absolute" />}
       {imageDTO && <ImageActions imageDTO={imageDTO} position="absolute" top={1} right={2} />}
       <QueueItemNumber number={number} position="absolute" top={1} left={2} />
