@@ -197,20 +197,22 @@ const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
           maxH="full"
           borderRadius="base"
         />
-        <Flex
-          position="absolute"
-          inset={0}
-          fontWeight="semibold"
-          alignItems="center"
-          justifyContent="center"
-          zIndex={1}
-          data-visible={showWeightDisplay}
-          sx={weightDisplaySx}
-        >
-          <Text filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))">
-            {`${round(entity.config.weight * 100, 2)}%`}
-          </Text>
-        </Flex>
+        {isIPAdapterConfig(entity.config) && (
+          <Flex
+            position="absolute"
+            inset={0}
+            fontWeight="semibold"
+            alignItems="center"
+            justifyContent="center"
+            zIndex={1}
+            data-visible={showWeightDisplay}
+            sx={weightDisplaySx}
+          >
+            <Text filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))">
+              {`${round(entity.config.weight * 100, 2)}%`}
+            </Text>
+          </Flex>
+        )}
       </Flex>
     </PopoverAnchor>
   );
