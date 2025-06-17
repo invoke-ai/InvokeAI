@@ -3,54 +3,66 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { canvasSessionReset, generateSessionReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import type { Dimensions } from 'features/controlLayers/store/types';
 import { workflowLoaded } from 'features/nodes/store/nodesSlice';
 import { atom } from 'nanostores';
 
-import type { CanvasRightPanelTabName, TabName, UIState } from './uiTypes';
-
-const initialUIState: UIState = {
-  _version: 3,
-  activeTab: 'canvas',
-  activeTabCanvasRightPanel: 'gallery',
-  shouldShowImageDetails: false,
-  shouldShowProgressInViewer: true,
-  accordions: {},
-  expanders: {},
-  textAreaSizes: {},
-  shouldShowNotificationV2: true,
-};
+import type { TabName, UIState } from './uiTypes';
+import { getInitialUIState } from './uiTypes';
 
 export const uiSlice = createSlice({
   name: 'ui',
-  initialState: initialUIState,
+  initialState: getInitialUIState(),
   reducers: {
-    setActiveTab: (state, action: PayloadAction<TabName>) => {
+    setActiveTab: (state, action: PayloadAction<UIState['activeTab']>) => {
       state.activeTab = action.payload;
     },
-    activeTabCanvasRightPanelChanged: (state, action: PayloadAction<CanvasRightPanelTabName>) => {
+    activeTabCanvasRightPanelChanged: (state, action: PayloadAction<UIState['activeTabCanvasRightPanel']>) => {
       state.activeTabCanvasRightPanel = action.payload;
     },
-    setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
+    setShouldShowImageDetails: (state, action: PayloadAction<UIState['shouldShowImageDetails']>) => {
       state.shouldShowImageDetails = action.payload;
     },
-    setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
+    setShouldShowProgressInViewer: (state, action: PayloadAction<UIState['shouldShowProgressInViewer']>) => {
       state.shouldShowProgressInViewer = action.payload;
     },
-    accordionStateChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
+    accordionStateChanged: (
+      state,
+      action: PayloadAction<{
+        id: keyof UIState['accordions'];
+        isOpen: UIState['accordions'][keyof UIState['accordions']];
+      }>
+    ) => {
       const { id, isOpen } = action.payload;
       state.accordions[id] = isOpen;
     },
-    expanderStateChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
+    expanderStateChanged: (
+      state,
+      action: PayloadAction<{
+        id: keyof UIState['expanders'];
+        isOpen: UIState['expanders'][keyof UIState['expanders']];
+      }>
+    ) => {
       const { id, isOpen } = action.payload;
       state.expanders[id] = isOpen;
     },
-    textAreaSizesStateChanged: (state, action: PayloadAction<{ id: string; size: Partial<Dimensions> }>) => {
+    textAreaSizesStateChanged: (
+      state,
+      action: PayloadAction<{
+        id: keyof UIState['textAreaSizes'];
+        size: UIState['textAreaSizes'][keyof UIState['textAreaSizes']];
+      }>
+    ) => {
       const { id, size } = action.payload;
       state.textAreaSizes[id] = size;
     },
-    shouldShowNotificationChanged: (state, action: PayloadAction<boolean>) => {
+    shouldShowNotificationChanged: (state, action: PayloadAction<UIState['shouldShowNotificationV2']>) => {
       state.shouldShowNotificationV2 = action.payload;
+    },
+    showGenerateTabSplashScreenChanged: (state, action: PayloadAction<UIState['showGenerateTabSplashScreen']>) => {
+      state.showGenerateTabSplashScreen = action.payload;
+    },
+    showCanvasTabSplashScreenChanged: (state, action: PayloadAction<UIState['showCanvasTabSplashScreen']>) => {
+      state.showCanvasTabSplashScreen = action.payload;
     },
   },
   extraReducers(builder) {
@@ -81,6 +93,8 @@ export const {
   expanderStateChanged,
   shouldShowNotificationChanged,
   textAreaSizesStateChanged,
+  showGenerateTabSplashScreenChanged,
+  showCanvasTabSplashScreenChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
@@ -103,7 +117,7 @@ const migrateUIState = (state: any): any => {
 
 export const uiPersistConfig: PersistConfig<UIState> = {
   name: uiSlice.name,
-  initialState: initialUIState,
+  initialState: getInitialUIState(),
   migrate: migrateUIState,
   persistDenylist: ['shouldShowImageDetails'],
 };

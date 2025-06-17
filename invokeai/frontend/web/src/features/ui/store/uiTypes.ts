@@ -1,43 +1,30 @@
-import type { Dimensions } from 'features/controlLayers/store/types';
+import { deepClone } from 'common/util/deepClone';
+import { z } from 'zod';
 
-export type TabName = 'generate' | 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
-export type CanvasRightPanelTabName = 'layers' | 'gallery';
+const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
+export type TabName = z.infer<typeof zTabName>;
+const zCanvasRightPanelTabName = z.enum(['layers', 'gallery']);
+export type CanvasRightPanelTabName = z.infer<typeof zCanvasRightPanelTabName>;
 
-export interface UIState {
-  /**
-   * Slice schema version.
-   */
-  _version: 3;
-  /**
-   * The currently active tab.
-   */
-  activeTab: TabName;
-  /**
-   * The currently active right panel canvas tab
-   */
-  activeTabCanvasRightPanel: CanvasRightPanelTabName;
-  /**
-   * Whether or not to show image details, e.g. metadata, workflow, etc.
-   */
-  shouldShowImageDetails: boolean;
-  /**
-   * Whether or not to show progress in the viewer.
-   */
-  shouldShowProgressInViewer: boolean;
-  /**
-   * The state of accordions. The key is the id of the accordion, and the value is a boolean representing the open state.
-   */
-  accordions: Record<string, boolean>;
-  /**
-   * The state of expanders. The key is the id of the expander, and the value is a boolean representing the open state.
-   */
-  expanders: Record<string, boolean>;
-  /**
-   * The size of textareas. The key is the id of the text area, and the value is an object representing its width and/or height.
-   */
-  textAreaSizes: Record<string, Partial<Dimensions>>;
-  /**
-   * Whether or not to show the user the open notification. Bump version to reset users who may have closed previous version.
-   */
-  shouldShowNotificationV2: boolean;
-}
+const zPartialDimensions = z.object({
+  width: z.number().optional(),
+  height: z.number().optional(),
+});
+export type PartialDimensions = z.infer<typeof zPartialDimensions>;
+
+export const zUIState = z.object({
+  _version: z.literal(3).default(3),
+  activeTab: zTabName.default('canvas'),
+  activeTabCanvasRightPanel: zCanvasRightPanelTabName.default('gallery'),
+  shouldShowImageDetails: z.boolean().default(false),
+  shouldShowProgressInViewer: z.boolean().default(true),
+  accordions: z.record(z.string(), z.boolean()).default(() => ({})),
+  expanders: z.record(z.string(), z.boolean()).default(() => ({})),
+  textAreaSizes: z.record(z.string(), zPartialDimensions).default({}),
+  shouldShowNotificationV2: z.boolean().default(true),
+  showGenerateTabSplashScreen: z.boolean().default(true),
+  showCanvasTabSplashScreen: z.boolean().default(true),
+});
+const INITIAL_STATE = zUIState.parse({});
+export type UIState = z.infer<typeof zUIState>;
+export const getInitialUIState = (): UIState => deepClone(INITIAL_STATE);
