@@ -47,7 +47,7 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
 
   return (
     <Tooltip label={selectedModel?.description}>
-      <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} w="full">
+      <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} w="full" minW={0}>
         <Combobox
           options={options}
           placeholder={t('common.placeholderSelectAModel')}
