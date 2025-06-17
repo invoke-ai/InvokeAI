@@ -11,6 +11,7 @@ from safetensors.torch import load_file
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.omi import convert_from_omi
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -73,6 +74,10 @@ class LoRALoader(ModelLoader):
         else:
             state_dict = torch.load(model_path, map_location="cpu")
 
+        if config.format == ModelFormat.OMI:
+            state_dict = convert_from_omi(state_dict)
+
+
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
@@ -85,7 +90,7 @@ class LoRALoader(ModelLoader):
                 # is a popular choice. For example, in the diffusers training scripts:
                 # https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth_lora_flux.py#L1194
                 model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
-            elif config.format == ModelFormat.LyCORIS:
+            elif config.format in [ModelFormat.LyCORIS, ModelFormat.OMI]:
                 if is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
                     model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_onetrainer_format(state_dict=state_dict):
