@@ -11,6 +11,7 @@ import {
   PopoverContent,
   Portal,
   Skeleton,
+  Text,
 } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { POPPER_MODIFIERS } from 'common/components/InformationalPopover/constants';
@@ -21,7 +22,9 @@ import { RefImageHeader } from 'features/controlLayers/components/RefImage/RefIm
 import { RefImageSettings } from 'features/controlLayers/components/RefImage/RefImageSettings';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
-import { memo, useCallback, useRef } from 'react';
+import { isIPAdapterConfig } from 'features/controlLayers/store/types';
+import { round } from 'lodash-es';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
@@ -80,10 +83,11 @@ export const RefImage = memo(() => {
 });
 RefImage.displayName = 'RefImage';
 
-const imageSx: SystemStyleObject = {
+const baseSx: SystemStyleObject = {
   opacity: 0.7,
   transitionProperty: 'opacity',
   transitionDuration: 'normal',
+  position: 'relative',
   _hover: {
     opacity: 1,
   },
@@ -92,10 +96,57 @@ const imageSx: SystemStyleObject = {
   },
 };
 
+const weightDisplaySx: SystemStyleObject = {
+  pointerEvents: 'none',
+  transitionProperty: 'opacity',
+  transitionDuration: 'normal',
+  opacity: 0,
+  '&[data-visible="true"]': {
+    opacity: 1,
+  },
+};
+
+const getImageSxWithWeight = (weight: number): SystemStyleObject => {
+  const fillPercentage = Math.max(0, Math.min(100, weight * 100));
+
+  return {
+    ...baseSx,
+    _after: {
+      content: '""',
+      position: 'absolute',
+      inset: 0,
+      background: `linear-gradient(to top, transparent ${fillPercentage}%, rgba(0, 0, 0, 0.8) ${fillPercentage}%)`,
+      pointerEvents: 'none',
+      borderRadius: 'base',
+    },
+  };
+};
+
 const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
   const id = useRefImageIdContext();
   const entity = useRefImageEntity(id);
+  const [showWeightDisplay, setShowWeightDisplay] = useState(false);
   const { data: imageDTO } = useGetImageDTOQuery(entity.config.image?.image_name ?? skipToken);
+
+  const sx = useMemo(() => {
+    if (!isIPAdapterConfig(entity.config)) {
+      return baseSx;
+    }
+    return getImageSxWithWeight(entity.config.weight);
+  }, [entity.config]);
+
+  useEffect(() => {
+    if (!isIPAdapterConfig(entity.config)) {
+      return;
+    }
+    setShowWeightDisplay(true);
+    const timeout = window.setTimeout(() => {
+      setShowWeightDisplay(false);
+    }, 1000);
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [entity.config]);
 
   if (!entity.config.image) {
     return (
@@ -120,25 +171,47 @@ const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
   }
   return (
     <PopoverAnchor>
-      <Image
+      <Flex
+        position="relative"
         borderWidth={1}
         borderStyle="solid"
-        id={getRefImagePopoverTriggerId(id)}
-        role="button"
-        src={imageDTO?.thumbnail_url}
-        objectFit="contain"
+        borderRadius="base"
         aspectRatio="1/1"
-        // width={imageDTO?.width}
-        height={imageDTO?.height}
-        fallback={<Skeleton h="full" aspectRatio="1/1" />}
         maxW="full"
         maxH="full"
-        borderRadius="base"
-        onClick={disclosure.toggle}
         flexShrink={0}
-        sx={imageSx}
+        sx={sx}
         data-is-open={disclosure.isOpen}
-      />
+        id={getRefImagePopoverTriggerId(id)}
+        role="button"
+        onClick={disclosure.toggle}
+        cursor="pointer"
+      >
+        <Image
+          src={imageDTO?.thumbnail_url}
+          objectFit="contain"
+          aspectRatio="1/1"
+          height={imageDTO?.height}
+          fallback={<Skeleton h="full" aspectRatio="1/1" />}
+          maxW="full"
+          maxH="full"
+          borderRadius="base"
+        />
+        <Flex
+          position="absolute"
+          inset={0}
+          fontWeight="semibold"
+          alignItems="center"
+          justifyContent="center"
+          zIndex={1}
+          data-visible={showWeightDisplay}
+          sx={weightDisplaySx}
+        >
+          <Text filter="drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 2px rgba(0, 0, 0, 1))">
+            {`${round(entity.config.weight * 100, 2)}%`}
+          </Text>
+        </Flex>
+      </Flex>
     </PopoverAnchor>
   );
 });
