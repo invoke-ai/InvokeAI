@@ -81,6 +81,7 @@ import {
   initialChatGPT4oReferenceImage,
   initialControlLoRA,
   initialControlNet,
+  initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
   initialT2IAdapter,
@@ -680,6 +681,16 @@ export const canvasSlice = createSlice({
         // Switching to chatgpt-4o ref image
         entity.ipAdapter = {
           ...initialChatGPT4oReferenceImage,
+          image: entity.ipAdapter.image,
+          model: entity.ipAdapter.model,
+        };
+        return;
+      }
+
+      if (entity.ipAdapter.model.base === 'flux-kontext') {
+        // Switching to flux-kontext
+        entity.ipAdapter = {
+          ...initialFluxKontextReferenceImage,
           image: entity.ipAdapter.image,
           model: entity.ipAdapter.model,
         };

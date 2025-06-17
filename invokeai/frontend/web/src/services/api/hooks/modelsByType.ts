@@ -38,6 +38,7 @@ import {
   isVAEModelConfig,
 } from 'services/api/types';
 
+
 type ModelHookArgs = { excludeSubmodels?: boolean };
 
 const buildModelsHook =
@@ -86,7 +87,11 @@ export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
 export const useSigLipModels = buildModelsHook(isSigLipModelConfig);
 export const useFluxReduxModels = buildModelsHook(isFluxReduxModelConfig);
 export const useGlobalReferenceImageModels = buildModelsHook(
-  (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isChatGPT4oModelConfig(config)
+  (config) =>
+    isIPAdapterModelConfig(config) ||
+    isFluxReduxModelConfig(config) ||
+    isChatGPT4oModelConfig(config) ||
+    isFluxKontextModelConfig(config)
 );
 export const useRegionalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)

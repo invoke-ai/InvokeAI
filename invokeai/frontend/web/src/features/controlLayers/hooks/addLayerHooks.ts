@@ -81,7 +81,7 @@ export const selectDefaultRefImageConfig = createSelector(
   selectModelConfigsQuery,
   selectBase,
   (selectedMainModel, query, base): CanvasReferenceImageState['ipAdapter'] => {
-    if (selectedMainModel?.base === 'chatgpt-4o') {
+    if (selectedMainModel?.base === 'chatgpt-4o' || selectedMainModel?.base === 'flux-kontext') {
       const referenceImage = deepClone(initialChatGPT4oReferenceImage);
       referenceImage.model = zModelIdentifierField.parse(selectedMainModel);
       return referenceImage;

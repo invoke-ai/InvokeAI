@@ -258,6 +258,13 @@ const zChatGPT4oReferenceImageConfig = z.object({
 });
 export type ChatGPT4oReferenceImageConfig = z.infer<typeof zChatGPT4oReferenceImageConfig>;
 
+const zFluxKontextReferenceImageConfig = z.object({
+  type: z.literal('flux_kontext_reference_image'),
+  image: zImageWithDims.nullable(),
+  model: zServerValidatedModelIdentifierField.nullable(),
+});
+export type FluxKontextReferenceImageConfig = z.infer<typeof zFluxKontextReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -268,7 +275,12 @@ const zCanvasEntityBase = z.object({
 const zCanvasReferenceImageState = zCanvasEntityBase.extend({
   type: z.literal('reference_image'),
   // This should be named `referenceImage` but we need to keep it as `ipAdapter` for backwards compatibility
-  ipAdapter: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zChatGPT4oReferenceImageConfig]),
+  ipAdapter: z.discriminatedUnion('type', [
+    zIPAdapterConfig,
+    zFLUXReduxConfig,
+    zChatGPT4oReferenceImageConfig,
+    zFluxKontextReferenceImageConfig,
+  ]),
 });
 export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
 
@@ -280,6 +292,9 @@ export const isFLUXReduxConfig = (config: CanvasReferenceImageState['ipAdapter']
 export const isChatGPT4oReferenceImageConfig = (
   config: CanvasReferenceImageState['ipAdapter']
 ): config is ChatGPT4oReferenceImageConfig => config.type === 'chatgpt_4o_reference_image';
+export const isFluxKontextReferenceImageConfig = (
+  config: CanvasReferenceImageState['ipAdapter']
+): config is FluxKontextReferenceImageConfig => config.type === 'flux_kontext_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
