@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Divider,
   Flex,
@@ -79,6 +80,18 @@ export const RefImage = memo(() => {
 });
 RefImage.displayName = 'RefImage';
 
+const imageSx: SystemStyleObject = {
+  opacity: 0.7,
+  transitionProperty: 'opacity',
+  transitionDuration: 'normal',
+  _hover: {
+    opacity: 1,
+  },
+  '&[data-is-open="true"]': {
+    opacity: 1,
+  },
+};
+
 const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
   const id = useRefImageIdContext();
   const entity = useRefImageEntity(id);
@@ -123,8 +136,8 @@ const Thumbnail = memo(({ disclosure }: { disclosure: UseDisclosure }) => {
         borderRadius="base"
         onClick={disclosure.toggle}
         flexShrink={0}
-        // sx={imageSx}
-        // data-is-open={disclosure.isOpen}
+        sx={imageSx}
+        data-is-open={disclosure.isOpen}
       />
     </PopoverAnchor>
   );
