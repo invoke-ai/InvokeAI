@@ -13,17 +13,17 @@ export const InitialState = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" h="full" w="full" gap={2}>
-      <Flex px={2} alignItems="center" minH="24px">
+    <Flex flexDir="column" h="full" w="full" alignItems="center" justifyContent="center" gap={2}>
+      <Flex px={2} w="full" alignItems="center" minH="24px" justifyContent="flex-start" flexShrink={0}>
         <Heading size="sm">Get Started</Heading>
       </Flex>
       <Divider />
-      <Flex flexDir="column" h="full" justifyContent="center" mx={16}>
+      <Flex flexDir="column" w="full" h="full" justifyContent="center" gap={4} mx={16} maxW={768}>
         <Heading mb={4}>Get started with Invoke.</Heading>
-        <Flex flexDir="column" gap={4}>
-          <Grid gridTemplateColumns="1fr 1fr" gap={4}>
+        <Flex flexDir="column" gap={8}>
+          <Grid gridTemplateColumns="1fr 1fr" gap={8}>
             <InitialStateMainModelPicker />
-            <Flex flexDir="column" gap={2}>
+            <Flex flexDir="column" gap={2} justifyContent="center">
               <Text>
                 Want to learn what prompts work best for each model?{' '}
                 <Button as="a" variant="link" href="#" size="sm">
