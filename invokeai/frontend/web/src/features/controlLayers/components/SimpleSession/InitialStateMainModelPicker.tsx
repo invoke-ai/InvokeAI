@@ -30,16 +30,16 @@ export const InitialStateMainModelPicker = memo(() => {
 
   return (
     <FormControl orientation="vertical" alignItems="unset">
-      <InformationalPopover feature="paramModel">
-        <FormLabel>Select your Model</FormLabel>
-      </InformationalPopover>
-      {isFluxDevSelected && (
-        <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
-          <Flex justifyContent="flex-start">
-            <Icon as={MdMoneyOff} />
-          </Flex>
-        </InformationalPopover>
-      )}
+      <FormLabel display="flex" fontSize="md" gap={2}>
+        Select your Model{' '}
+        {isFluxDevSelected && (
+          <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
+            <Flex justifyContent="flex-start">
+              <Icon as={MdMoneyOff} />
+            </Flex>
+          </InformationalPopover>
+        )}
+      </FormLabel>
       <ModelPicker modelConfigs={modelConfigs} selectedModelConfig={selectedModelConfig} onChange={onChange} grouped />
     </FormControl>
   );
