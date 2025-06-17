@@ -31,7 +31,6 @@ from pathlib import Path
 from typing import ClassVar, Literal, Optional, TypeAlias, Union
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
-from pydantic.main import Model
 from typing_extensions import Annotated, Any, Dict
 
 from invokeai.app.util.misc import uuid_string
@@ -345,9 +344,9 @@ class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
 
         metadata = mod.metadata()
         return (
-            metadata.get("modelspec.sai_model_spec") and
-            metadata.get("ot_branch") == "omi_format" and
-            metadata["modelspec.architecture"].split("/")[1].lower() == "lora"
+            metadata.get("modelspec.sai_model_spec")
+            and metadata.get("ot_branch") == "omi_format"
+            and metadata["modelspec.architecture"].split("/")[1].lower() == "lora"
         )
 
     @classmethod
@@ -370,7 +369,7 @@ class LoRAOmiConfig(LoRAConfigBase, ModelConfigBase):
         else:
             raise InvalidModelConfigException(f"Unrecognised base architecture for OMI LoRA: {base_str}")
 
-        return { "base": base }
+        return {"base": base}
 
 
 class LoRALyCORISConfig(LoRAConfigBase, ModelConfigBase):

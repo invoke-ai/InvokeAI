@@ -1,4 +1,5 @@
 import torch
+
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()

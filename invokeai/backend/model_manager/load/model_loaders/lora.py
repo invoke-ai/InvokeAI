@@ -11,9 +11,9 @@ from safetensors.torch import load_file
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
-from invokeai.backend.model_manager.omi import convert_from_omi
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.omi import convert_from_omi
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -76,7 +76,6 @@ class LoRALoader(ModelLoader):
 
         if config.format == ModelFormat.OMI:
             state_dict = convert_from_omi(state_dict)
-
 
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
