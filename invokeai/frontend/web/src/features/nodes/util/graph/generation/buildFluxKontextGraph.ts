@@ -45,7 +45,6 @@ export const buildFluxKontextGraph = async (state: RootState, manager: CanvasMan
   const is_intermediate = canvasSettings.sendToCanvas;
   const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
 
-
   const validRefImages = canvas.referenceImages.entities
     .filter((entity) => entity.isEnabled)
     .filter((entity) => isFluxKontextReferenceImageConfig(entity.ipAdapter))

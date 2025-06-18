@@ -38,7 +38,6 @@ import {
   isVAEModelConfig,
 } from 'services/api/types';
 
-
 type ModelHookArgs = { excludeSubmodels?: boolean };
 
 const buildModelsHook =
