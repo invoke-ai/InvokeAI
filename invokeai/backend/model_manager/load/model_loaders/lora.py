@@ -13,7 +13,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.omi import convert_from_omi
+from invokeai.backend.model_manager.omi import convert_to_omi
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -41,7 +41,6 @@ from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.LoRA, format=ModelFormat.OMI)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.LoRA, format=ModelFormat.OMI)
-@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.LoRA, format=ModelFormat.OMI)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion3, type=ModelType.LoRA, format=ModelFormat.OMI)
 @ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.LoRA, format=ModelFormat.OMI)
 
@@ -80,7 +79,7 @@ class LoRALoader(ModelLoader):
             state_dict = torch.load(model_path, map_location="cpu")
 
         if config.format == ModelFormat.OMI:
-            state_dict = convert_from_omi(state_dict)
+            state_dict = convert_to_omi(state_dict. config.base) # type: ignore
 
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
