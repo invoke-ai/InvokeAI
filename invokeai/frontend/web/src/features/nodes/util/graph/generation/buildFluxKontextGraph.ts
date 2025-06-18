@@ -45,6 +45,7 @@ export const buildFluxKontextGraph = async (state: RootState, manager: CanvasMan
   const is_intermediate = canvasSettings.sendToCanvas;
   const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
 
+
   const validRefImages = canvas.referenceImages.entities
     .filter((entity) => entity.isEnabled)
     .filter((entity) => isFluxKontextReferenceImageConfig(entity.ipAdapter))
@@ -65,7 +66,7 @@ export const buildFluxKontextGraph = async (state: RootState, manager: CanvasMan
     const g = new Graph(getPrefixedId('flux_kontext_txt2img_graph'));
     const fluxKontextImage = g.addNode({
       // @ts-expect-error: These nodes are not available in the OSS application
-      type: 'flux_kontext_generate_image',
+      type: input_image ? 'flux_kontext_edit_image' : 'flux_kontext_generate_image',
       id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
       model: zModelIdentifierField.parse(model),
       positive_prompt: positivePrompt,
@@ -74,6 +75,7 @@ export const buildFluxKontextGraph = async (state: RootState, manager: CanvasMan
       is_intermediate,
       board,
       input_image,
+      prompt_upsampling: true,
     });
     g.upsertMetadata({
       positive_prompt: positivePrompt,

@@ -69,7 +69,13 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
-import { getEntityIdentifier, isChatGPT4oAspectRatioID, isImagenAspectRatioID, isRenderableEntity } from './types';
+import {
+  getEntityIdentifier,
+  isChatGPT4oAspectRatioID,
+  isFluxKontextAspectRatioID,
+  isImagenAspectRatioID,
+  isRenderableEntity,
+} from './types';
 import {
   converters,
   getControlLayerState,
@@ -1330,6 +1336,26 @@ export const canvasSlice = createSlice({
         } else if (id === '2:3') {
           state.bbox.rect.width = 1024;
           state.bbox.rect.height = 1536;
+        }
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.isLocked = true;
+      } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
+        // Flux Kontext has specific output sizes that are not exactly the same as the aspect ratio. Need special handling.
+        if (id === '1:1') {
+          state.bbox.rect.width = 1024;
+          state.bbox.rect.height = 1024;
+        } else if (id === '4:3') {
+          state.bbox.rect.width = 896;
+          state.bbox.rect.height = 1280;
+        } else if (id === '3:4') {
+          state.bbox.rect.width = 1280;
+          state.bbox.rect.height = 896;
+        } else if (id === '21:9') {
+          state.bbox.rect.width = 1408;
+          state.bbox.rect.height = 768;
+        } else if (id === '9:21') {
+          state.bbox.rect.width = 768;
+          state.bbox.rect.height = 1408;
         }
         state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
         state.bbox.aspectRatio.isLocked = true;
