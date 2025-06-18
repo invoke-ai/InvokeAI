@@ -431,7 +431,7 @@ export const zChatGPT4oAspectRatioID = z.enum(['3:2', '1:1', '2:3']);
 export const isChatGPT4oAspectRatioID = (v: unknown): v is z.infer<typeof zChatGPT4oAspectRatioID> =>
   zChatGPT4oAspectRatioID.safeParse(v).success;
 
-export const zFluxKontextAspectRatioID = z.enum(['21:9', '4:3', '1:1', '3:4', '9:21']);
+export const zFluxKontextAspectRatioID = z.enum(['16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
 export const isFluxKontextAspectRatioID = (v: unknown): v is z.infer<typeof zFluxKontextAspectRatioID> =>
   zFluxKontextAspectRatioID.safeParse(v).success;
 
