@@ -8,11 +8,11 @@ from invokeai.backend.model_manager.model_on_disk import StateDict
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 
-def convert_to_omi(weights_sd: StateDict, base: BaseModelType):
+def convert_from_omi(weights_sd: StateDict, base: BaseModelType):
     keyset = {
         BaseModelType.Flux: convert_flux_lora_key_sets(),
         BaseModelType.StableDiffusionXL: convert_sdxl_lora_key_sets(),
         BaseModelType.StableDiffusion1: convert_sd_lora_key_sets(),
         BaseModelType.StableDiffusion3: convert_sd3_lora_key_sets(),
     }[base]
-    return lora_util.convert_to_omi(weights_sd, keyset)
+    return lora_util.convert_to_diffusers(weights_sd, keyset)

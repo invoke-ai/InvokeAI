@@ -79,7 +79,7 @@ class LoRALoader(ModelLoader):
             state_dict = torch.load(model_path, map_location="cpu")
 
         if config.format == ModelFormat.OMI:
-            state_dict = convert_to_omi(state_dict, config.base)  # type: ignore
+            state_dict = convert_from_omi(state_dict, config.base)  # type: ignore
 
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
@@ -101,7 +101,7 @@ class LoRALoader(ModelLoader):
                 elif is_state_dict_likely_flux_control(state_dict=state_dict):
                     model = lora_model_from_flux_control_state_dict(state_dict=state_dict)
                 else:
-                    raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
+                    raise ValueError(f"LoRA model is in unsupported FLUX format")
             else:
                 raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
