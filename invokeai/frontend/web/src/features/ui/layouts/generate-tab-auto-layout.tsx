@@ -2,7 +2,7 @@ import { Box, Divider, Flex } from '@invoke-ai/ui-library';
 import { $isLayoutLoading } from 'app/store/nanostores/globalIsLoading';
 import type { GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, Orientation } from 'dockview';
-import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/InitialState';
+import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/GenerateLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer2';

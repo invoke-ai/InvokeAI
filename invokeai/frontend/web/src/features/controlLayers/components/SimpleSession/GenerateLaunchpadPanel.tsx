@@ -1,10 +1,11 @@
 import { Alert, Button, Flex, Grid, Heading, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { InitialStateAddAStyleReference } from 'features/controlLayers/components/SimpleSession/InitialStateAddAStyleReference';
-import { InitialStateGenerateFromText } from 'features/controlLayers/components/SimpleSession/InitialStateGenerateFromText';
 import { InitialStateMainModelPicker } from 'features/controlLayers/components/SimpleSession/InitialStateMainModelPicker';
+import { LaunchpadAddStyleReference } from 'features/controlLayers/components/SimpleSession/LaunchpadAddStyleReference';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
+
+import { LaunchpadGenerateFromTextButton } from './LaunchpadGenerateFromTextButton';
 
 export const GenerateLaunchpadPanel = memo(() => {
   const dispatch = useAppDispatch();
@@ -28,8 +29,8 @@ export const GenerateLaunchpadPanel = memo(() => {
               </Text>
             </Flex>
           </Grid>
-          <InitialStateGenerateFromText />
-          <InitialStateAddAStyleReference />
+          <LaunchpadGenerateFromTextButton />
+          <LaunchpadAddStyleReference />
           <Alert status="info" borderRadius="base" flexDir="column" gap={2} overflow="unset">
             <Text fontSize="md" fontWeight="semibold">
               Looking to get more control, edit, and iterate on your images?
@@ -43,4 +44,4 @@ export const GenerateLaunchpadPanel = memo(() => {
     </Flex>
   );
 });
-GenerateLaunchpadPanel.displayName = 'InitialState';
+GenerateLaunchpadPanel.displayName = 'GenerateLaunchpad';
