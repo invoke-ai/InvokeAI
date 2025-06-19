@@ -13,7 +13,7 @@ from invokeai.backend.model_manager.config import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.omi import convert_to_omi
+from invokeai.backend.model_manager.omi import convert_from_omi
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -101,7 +101,7 @@ class LoRALoader(ModelLoader):
                 elif is_state_dict_likely_flux_control(state_dict=state_dict):
                     model = lora_model_from_flux_control_state_dict(state_dict=state_dict)
                 else:
-                    raise ValueError(f"LoRA model is in unsupported FLUX format")
+                    raise ValueError("LoRA model is in unsupported FLUX format")
             else:
                 raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
