@@ -1,10 +1,14 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
+import { useIsApiModel } from 'features/parameters/hooks/useIsApiModel';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
-import { UpscaleSettingsAccordion } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleSettingsAccordion';
+import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
+import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
 import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
 import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePresetSlice';
@@ -17,8 +21,12 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-export const ParametersPanelUpscale = memo(() => {
+export const ParametersPanelGenerate = memo(() => {
+  const isSDXL = useAppSelector(selectIsSDXL);
+  const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
+
+  const isApiModel = useIsApiModel();
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
@@ -35,9 +43,10 @@ export const ParametersPanelUpscale = memo(() => {
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
             <Flex gap={2} flexDirection="column" h="full" w="full">
               <Prompts />
-              <UpscaleSettingsAccordion />
+              <ImageSettingsAccordion />
               <GenerationSettingsAccordion />
-              <AdvancedSettingsAccordion />
+              {isSDXL && <RefinerSettingsAccordion />}
+              {!isCogview4 && !isApiModel && <AdvancedSettingsAccordion />}
             </Flex>
           </OverlayScrollbarsComponent>
         </Box>
@@ -46,4 +55,4 @@ export const ParametersPanelUpscale = memo(() => {
   );
 });
 
-ParametersPanelUpscale.displayName = 'ParametersPanelUpscale';
+ParametersPanelGenerate.displayName = 'ParametersPanelGenerate';

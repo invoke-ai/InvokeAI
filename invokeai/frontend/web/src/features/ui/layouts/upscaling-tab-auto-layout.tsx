@@ -1,6 +1,6 @@
 import type { GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, Orientation } from 'dockview';
-import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/GenerateLaunchpadPanel';
+import { UpscalingLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/UpscalingLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
@@ -12,15 +12,15 @@ import { dockviewTheme } from 'features/ui/styles/theme';
 import { atom } from 'nanostores';
 import { memo, useCallback, useRef, useState } from 'react';
 
-import { GenerateTabLeftPanel } from './GenerateTabLeftPanel';
+import { UpscalingTabLeftPanel } from './UpscalingTabLeftPanel';
 import { useOnFirstVisible } from './use-on-first-visible';
 
 const LAUNCHPAD_PANEL_ID = 'launchpad';
 const VIEWER_PANEL_ID = 'viewer';
 const PROGRESS_PANEL_ID = 'progress';
 
-const mainPanelComponents: IDockviewReactProps['components'] = {
-  [LAUNCHPAD_PANEL_ID]: GenerateLaunchpadPanel,
+const dockviewComponents: IDockviewReactProps['components'] = {
+  [LAUNCHPAD_PANEL_ID]: UpscalingLaunchpadPanel,
   [VIEWER_PANEL_ID]: ImageViewerPanel,
   [PROGRESS_PANEL_ID]: GenerationProgressPanel,
 };
@@ -77,7 +77,7 @@ const MainPanel = memo(() => {
       disableFloatingGroups={true}
       dndEdges={false}
       defaultTabComponent={TabWithoutCloseButton}
-      components={mainPanelComponents}
+      components={dockviewComponents}
       onReady={onReadyMainPanel}
       theme={dockviewTheme}
     />
@@ -90,8 +90,8 @@ const MAIN_PANEL_ID = 'main';
 const BOARDS_PANEL_ID = 'boards';
 const GALLERY_PANEL_ID = 'gallery';
 
-export const generateTabComponents: IGridviewReactProps['components'] = {
-  [LEFT_PANEL_ID]: GenerateTabLeftPanel,
+export const gridviewComponents: IGridviewReactProps['components'] = {
+  [LEFT_PANEL_ID]: UpscalingTabLeftPanel,
   [MAIN_PANEL_ID]: MainPanel,
   [BOARDS_PANEL_ID]: BoardsPanel,
   [GALLERY_PANEL_ID]: GalleryPanel,
@@ -101,6 +101,7 @@ export const initializeLayout = (api: GridviewApi) => {
   api.addPanel({
     id: MAIN_PANEL_ID,
     component: MAIN_PANEL_ID,
+    // priority: LayoutPriority.High,
   });
   api.addPanel({
     id: LEFT_PANEL_ID,
@@ -110,6 +111,7 @@ export const initializeLayout = (api: GridviewApi) => {
       direction: 'left',
       referencePanel: MAIN_PANEL_ID,
     },
+    // priority: LayoutPriority.High,
   });
   api.addPanel({
     id: GALLERY_PANEL_ID,
@@ -120,6 +122,7 @@ export const initializeLayout = (api: GridviewApi) => {
       direction: 'right',
       referencePanel: MAIN_PANEL_ID,
     },
+    // priority: LayoutPriority.High,
   });
   api.addPanel({
     id: BOARDS_PANEL_ID,
@@ -129,13 +132,14 @@ export const initializeLayout = (api: GridviewApi) => {
       direction: 'above',
       referencePanel: GALLERY_PANEL_ID,
     },
+    // priority: LayoutPriority.High,
   });
   api.getPanel(LEFT_PANEL_ID)?.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
   api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: 256, width: RIGHT_PANEL_MIN_SIZE_PX });
   api.getPanel(MAIN_PANEL_ID)?.api.setActive();
 };
 
-export const GenerateTabAutoLayout = memo(() => {
+export const UpscalingTabAutoLayout = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const $api = useState(() => atom<GridviewApi | null>(null))[0];
   const onReady = useCallback<IGridviewReactProps['onReady']>(
@@ -177,11 +181,11 @@ export const GenerateTabAutoLayout = memo(() => {
       <GridviewReact
         ref={ref}
         className="dockview-theme-invoke"
-        components={generateTabComponents}
+        components={gridviewComponents}
         onReady={onReady}
         orientation={Orientation.VERTICAL}
       />
     </AutoLayoutProvider>
   );
 });
-GenerateTabAutoLayout.displayName = 'GenerateTabAutoLayout';
+UpscalingTabAutoLayout.displayName = 'UpscalingTabAutoLayout';
