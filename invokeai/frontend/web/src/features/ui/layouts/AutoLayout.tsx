@@ -3,7 +3,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, Orientation } from 'dockview';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
-import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/InitialState';
+import { CanvasLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/CanvasLaunchpadPanel';
+import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/GenerateLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
@@ -30,7 +31,7 @@ export const dockviewComponents: IDockviewReactProps['components'] = {
   // Workflows tab
   WorkflowsLaunchpad: GenerateLaunchpadPanel,
   // Canvas tab
-  CanvasLaunchpad: GenerateLaunchpadPanel,
+  CanvasLaunchpad: CanvasLaunchpadPanel,
   CanvasWorkspace: CanvasWorkspacePanel,
 };
 

@@ -14,14 +14,14 @@ export const CanvasToolbarResetViewButton = memo(() => {
   useRegisteredHotkeys({
     id: 'fitLayersToCanvas',
     category: 'canvas',
-    callback: canvasManager.stage.fitLayersToStage,
+    callback: () => canvasManager.stage.fitLayersToStage(),
     options: { enabled: isCanvasFocused, preventDefault: true },
     dependencies: [isCanvasFocused],
   });
   useRegisteredHotkeys({
     id: 'fitBboxToCanvas',
     category: 'canvas',
-    callback: canvasManager.stage.fitBboxToStage,
+    callback: () => canvasManager.stage.fitBboxToStage(),
     options: { enabled: isCanvasFocused, preventDefault: true },
     dependencies: [isCanvasFocused],
   });
