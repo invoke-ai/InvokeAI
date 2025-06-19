@@ -1,4 +1,5 @@
 import { Box, ContextMenu, Divider, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
+import { $isLayoutLoading } from 'app/store/nanostores/globalIsLoading';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, Orientation } from 'dockview';
@@ -8,13 +9,13 @@ import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/compone
 import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
 import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
-import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { CanvasSessionContextProvider } from 'features/controlLayers/components/SimpleSession/context';
-import { InitialState } from 'features/controlLayers/components/SimpleSession/InitialState';
+import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/InitialState';
 import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
@@ -22,14 +23,15 @@ import { Transform } from 'features/controlLayers/components/Transform/Transform
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { BoardsListPanelContent } from 'features/gallery/components/BoardsListPanelContent';
-import { Gallery } from 'features/gallery/components/Gallery';
+import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
+import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer2';
 import { ProgressImage } from 'features/gallery/components/ImageViewer/ProgressImage2';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar2';
 import QueueControls from 'features/queue/components/QueueControls';
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
+import { components } from 'features/ui/layouts/components';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
 import { LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_MIN_SIZE_PX } from 'features/ui/store/uiSlice';
 import { dockviewTheme } from 'features/ui/styles/theme';
@@ -60,7 +62,7 @@ const canvasBgSx = {
   },
 };
 
-export const CanvasPanel = memo(() => {
+export const CanvasWorkspacePanel = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
   const canvasId = useAppSelector(selectCanvasSessionId);
@@ -151,11 +153,11 @@ export const CanvasPanel = memo(() => {
     </Flex>
   );
 });
-CanvasPanel.displayName = 'CanvasPanel';
+CanvasWorkspacePanel.displayName = 'CanvasPanel';
 
 const LayersPanelContent = memo(() => (
   <CanvasManagerProviderGate>
-    <CanvasLayersPanelContent />
+    <CanvasLayersPanel />
   </CanvasManagerProviderGate>
 ));
 LayersPanelContent.displayName = 'LayersPanelContent';
@@ -177,8 +179,8 @@ const ProgressPanelContent = memo(() => (
 ProgressPanelContent.displayName = 'ProgressPanelContent';
 
 const mainPanelComponents: IDockviewReactProps['components'] = {
-  welcome: InitialState,
-  canvas: CanvasPanel,
+  canvasLaunchpad: GenerateLaunchpadPanel,
+  canvas: CanvasWorkspacePanel,
   viewer: ViewerPanelContent,
   progress: ProgressPanelContent,
 };
@@ -186,9 +188,9 @@ const mainPanelComponents: IDockviewReactProps['components'] = {
 const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
   const { api } = event;
   api.addPanel({
-    id: 'welcome',
-    component: 'welcome',
-    title: 'Launchpad',
+    id: 'canvasLaunchpad',
+    component: 'canvasLaunchpad',
+    title: 'canvasLaunchpad',
   });
   api.addPanel({
     id: 'canvas',
@@ -196,7 +198,7 @@ const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
     title: 'Canvas',
     position: {
       direction: 'within',
-      referencePanel: 'welcome',
+      referencePanel: 'canvasLaunchpad',
     },
   });
   api.addPanel({
@@ -205,7 +207,7 @@ const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
     title: 'Image Viewer',
     position: {
       direction: 'within',
-      referencePanel: 'welcome',
+      referencePanel: 'canvasLaunchpad',
     },
   });
   api.addPanel({
@@ -214,7 +216,7 @@ const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
     title: 'Generation Progress',
     position: {
       direction: 'within',
-      referencePanel: 'welcome',
+      referencePanel: 'canvasLaunchpad',
     },
   });
 
@@ -243,7 +245,7 @@ const MainPanel = memo(() => {
         disableFloatingGroups={true}
         dndEdges={false}
         defaultTabComponent={TabWithoutCloseButton}
-        components={mainPanelComponents}
+        components={components}
         onReady={onReadyMainPanel}
         theme={dockviewTheme}
       />
@@ -264,11 +266,13 @@ const Left = memo(() => {
 });
 Left.displayName = 'Left';
 
+const Null = () => null;
+
 export const canvasTabComponents: IGridviewReactProps['components'] = {
   left: Left,
   main: MainPanel,
-  boards: BoardsListPanelContent,
-  gallery: Gallery,
+  boards: BoardsPanel,
+  gallery: GalleryPanel,
   layers: LayersPanelContent,
 };
 
@@ -322,8 +326,10 @@ export const initializeCanvasTabLayout = (api: GridviewApi) => {
 export const CanvasTabAutoLayout = memo(() => {
   const [api, setApi] = useState<GridviewApi | null>(null);
   const onReady = useCallback<IGridviewReactProps['onReady']>((event) => {
+    $isLayoutLoading.set(true);
     setApi(event.api);
     initializeCanvasTabLayout(event.api);
+    $isLayoutLoading.set(false);
   }, []);
   return (
     <AutoLayoutProvider api={api}>

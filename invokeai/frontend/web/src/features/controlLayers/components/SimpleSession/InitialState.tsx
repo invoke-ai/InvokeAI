@@ -6,7 +6,7 @@ import { InitialStateMainModelPicker } from 'features/controlLayers/components/S
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 
-export const InitialState = memo(() => {
+export const GenerateLaunchpadPanel = memo(() => {
   const dispatch = useAppDispatch();
   const newCanvasSession = useCallback(() => {
     dispatch(setActiveTab('canvas'));
@@ -43,4 +43,4 @@ export const InitialState = memo(() => {
     </Flex>
   );
 });
-InitialState.displayName = 'InitialState';
+GenerateLaunchpadPanel.displayName = 'InitialState';

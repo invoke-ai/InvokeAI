@@ -46,7 +46,7 @@ const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '10
 const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
 const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 
-export const Gallery = memo(() => {
+export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const galleryView = useAppSelector(selectGalleryView);
@@ -117,4 +117,4 @@ export const Gallery = memo(() => {
     </Flex>
   );
 });
-Gallery.displayName = 'Gallery';
+GalleryPanel.displayName = 'Gallery';
