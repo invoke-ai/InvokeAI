@@ -79,7 +79,7 @@ class LoRALoader(ModelLoader):
             state_dict = torch.load(model_path, map_location="cpu")
 
         if config.format == ModelFormat.OMI:
-            state_dict = convert_to_omi(state_dict.config.base)  # type: ignore
+            state_dict = convert_to_omi(state_dict, config.base)  # type: ignore
 
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
