@@ -1,6 +1,6 @@
 import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { InitialState } from 'features/controlLayers/components/SimpleSession/InitialState';
+import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/InitialState';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer2';
 import { ProgressImage } from 'features/gallery/components/ImageViewer/ProgressImage2';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar2';
@@ -25,7 +25,7 @@ export const SimpleSession = memo(() => {
       </TabList>
       <TabPanels w="full" h="full">
         <TabPanel w="full" h="full" justifyContent="center">
-          <InitialState />
+          <GenerateLaunchpadPanel />
         </TabPanel>
         <TabPanel w="full" h="full">
           <Flex flexDir="column" w="full" h="full">
