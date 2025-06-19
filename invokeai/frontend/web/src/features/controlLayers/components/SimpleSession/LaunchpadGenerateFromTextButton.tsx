@@ -1,5 +1,5 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
-import { InitialStateButtonGridItem } from 'features/controlLayers/components/SimpleSession/InitialStateButtonGridItem';
+import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
 import { memo } from 'react';
 import { PiCursorTextBold, PiTextAaBold } from 'react-icons/pi';
 
@@ -11,9 +11,9 @@ const focusOnPrompt = () => {
   }
 };
 
-export const InitialStateGenerateFromText = memo(() => {
+export const LaunchpadGenerateFromTextButton = memo(() => {
   return (
-    <InitialStateButtonGridItem onClick={focusOnPrompt} position="relative" gap={8}>
+    <LaunchpadButton onClick={focusOnPrompt} position="relative" gap={8}>
       <Icon as={PiTextAaBold} boxSize={8} color="base.500" />
       <Flex flexDir="column" alignItems="flex-start" gap={2}>
         <Heading size="sm">Generate from Text</Heading>
@@ -22,7 +22,7 @@ export const InitialStateGenerateFromText = memo(() => {
       <Flex position="absolute" right={3} bottom={3}>
         <PiCursorTextBold />
       </Flex>
-    </InitialStateButtonGridItem>
+    </LaunchpadButton>
   );
 });
-InitialStateGenerateFromText.displayName = 'InitialStateGenerateFromText';
+LaunchpadGenerateFromTextButton.displayName = 'LaunchpadGenerateFromTextButton';

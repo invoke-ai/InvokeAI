@@ -1,7 +1,7 @@
 import { Flex, Heading, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { InitialStateButtonGridItem } from 'features/controlLayers/components/SimpleSession/InitialStateButtonGridItem';
+import { LaunchpadButton } from 'features/controlLayers/components/SimpleSession/LaunchpadButton';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
@@ -13,7 +13,7 @@ import type { ImageDTO } from 'services/api/types';
 
 const dndTargetData = addGlobalReferenceImageDndTarget.getData();
 
-export const InitialStateAddAStyleReference = memo(() => {
+export const LaunchpadAddStyleReference = memo(() => {
   const { dispatch, getState } = useAppStore();
 
   const uploadOptions = useMemo(
@@ -32,7 +32,7 @@ export const InitialStateAddAStyleReference = memo(() => {
   const uploadApi = useImageUploadButton(uploadOptions);
 
   return (
-    <InitialStateButtonGridItem {...uploadApi.getUploadButtonProps()} position="relative" gap={8}>
+    <LaunchpadButton {...uploadApi.getUploadButtonProps()} position="relative" gap={8}>
       <Icon as={PiUserCircleGearBold} boxSize={8} color="base.500" />
       <Flex flexDir="column" alignItems="flex-start" gap={2}>
         <Heading size="sm">Add a Style Reference</Heading>
@@ -43,7 +43,7 @@ export const InitialStateAddAStyleReference = memo(() => {
         <input {...uploadApi.getUploadInputProps()} />
       </Flex>
       <DndDropTarget dndTarget={newCanvasFromImageDndTarget} dndTargetData={dndTargetData} label="Drop" />
-    </InitialStateButtonGridItem>
+    </LaunchpadButton>
   );
 });
-InitialStateAddAStyleReference.displayName = 'InitialStateAddAStyleReference';
+LaunchpadAddStyleReference.displayName = 'LaunchpadAddStyleReference';

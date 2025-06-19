@@ -1,6 +1,6 @@
 import { Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/InitialState';
+import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/GenerateLaunchpadPanel';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer2';
 import { ProgressImage } from 'features/gallery/components/ImageViewer/ProgressImage2';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar2';
