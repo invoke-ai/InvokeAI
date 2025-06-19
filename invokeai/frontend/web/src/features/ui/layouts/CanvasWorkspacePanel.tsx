@@ -66,6 +66,7 @@ export const CanvasWorkspacePanel = memo(() => {
       alignItems="center"
       justifyContent="center"
       overflow="hidden"
+      p={2}
     >
       <CanvasManagerProviderGate>
         <CanvasToolbar />

@@ -1,10 +1,14 @@
 import 'dockview/dist/styles/dockview.css';
 import 'features/ui/styles/dockview-theme-invoke.css';
 
-import { Flex } from '@invoke-ai/ui-library';
+import { TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
-import { AutoLayout } from 'features/ui/layouts/AutoLayout';
+import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
+import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
+import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
+import { selectActiveTabIndex } from 'features/ui/store/uiSelectors';
 import { $isLeftPanelOpen, $isRightPanelOpen } from 'features/ui/store/uiSlice';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
@@ -16,6 +20,7 @@ const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!is
 
 export const AppContent = memo(() => {
   // const tab = useAppSelector(selectActiveTab);
+  const tabIndex = useAppSelector(selectActiveTabIndex);
   // const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   useDndMonitor();
 
@@ -93,10 +98,22 @@ export const AppContent = memo(() => {
   // });
 
   return (
-    <Flex id="invoke-app-tabs" w="full" h="full" p={0} overflow="hidden">
-      <VerticalNavBar />
-      <AutoLayout />
-    </Flex>
+    <Tabs index={tabIndex} display="flex" w="full" h="full" p={0} overflow="hidden">
+      <TabList>
+        <VerticalNavBar />
+      </TabList>
+      <TabPanels w="full" h="full" p={0}>
+        <TabPanel w="full" h="full" p={0}>
+          <GenerateTabAutoLayout />
+        </TabPanel>
+        <TabPanel w="full" h="full" p={0}>
+          <CanvasTabAutoLayout />
+        </TabPanel>
+        <TabPanel w="full" h="full" p={0}>
+          <UpscalingTabAutoLayout />
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
   );
 });
 AppContent.displayName = 'AppContent';

@@ -1,224 +1,70 @@
-import { Box, ContextMenu, Divider, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
-import { $isLayoutLoading } from 'app/store/nanostores/globalIsLoading';
-import { useAppSelector } from 'app/store/storeHooks';
 import type { GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, Orientation } from 'dockview';
-import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
-import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
-import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
-import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
-import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
-import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
-import { Filter } from 'features/controlLayers/components/Filters/Filter';
-import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
-import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
-import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
-import { CanvasSessionContextProvider } from 'features/controlLayers/components/SimpleSession/context';
-import { GenerateLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/GenerateLaunchpadPanel';
-import { StagingAreaItemsList } from 'features/controlLayers/components/SimpleSession/StagingAreaItemsList';
-import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
-import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
-import { Transform } from 'features/controlLayers/components/Transform/Transform';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { CanvasLaunchpadPanel } from 'features/controlLayers/components/SimpleSession/CanvasLaunchpadPanel';
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/Gallery';
-import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer2';
-import { ProgressImage } from 'features/gallery/components/ImageViewer/ProgressImage2';
-import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar2';
-import QueueControls from 'features/queue/components/QueueControls';
-import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
+import { GenerationProgressPanel } from 'features/gallery/components/ImageViewer/GenerationProgressPanel';
+import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
 import { AutoLayoutProvider } from 'features/ui/layouts/auto-layout-context';
-import { components } from 'features/ui/layouts/components';
 import { TabWithoutCloseButton } from 'features/ui/layouts/TabWithoutCloseButton';
 import { LEFT_PANEL_MIN_SIZE_PX, RIGHT_PANEL_MIN_SIZE_PX } from 'features/ui/store/uiSlice';
 import { dockviewTheme } from 'features/ui/styles/theme';
-import { memo, useCallback, useState } from 'react';
-import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
+import { atom } from 'nanostores';
+import { memo, useCallback, useRef, useState } from 'react';
 
-const MenuContent = memo(() => {
-  return (
-    <CanvasManagerProviderGate>
-      <MenuList>
-        <CanvasContextMenuSelectedEntityMenuItems />
-        <CanvasContextMenuGlobalMenuItems />
-      </MenuList>
-    </CanvasManagerProviderGate>
-  );
-});
-MenuContent.displayName = 'MenuContent';
+import { CanvasTabLeftPanel } from './CanvasTabLeftPanel';
+import { CanvasWorkspacePanel } from './CanvasWorkspacePanel';
+import { useOnFirstVisible } from './use-on-first-visible';
 
-const canvasBgSx = {
-  position: 'relative',
-  w: 'full',
-  h: 'full',
-  borderRadius: 'base',
-  overflow: 'hidden',
-  bg: 'base.900',
-  '&[data-dynamic-grid="true"]': {
-    bg: 'base.850',
-  },
-};
-
-export const CanvasWorkspacePanel = memo(() => {
-  const dynamicGrid = useAppSelector(selectDynamicGrid);
-  const showHUD = useAppSelector(selectShowHUD);
-  const canvasId = useAppSelector(selectCanvasSessionId);
-
-  const renderMenu = useCallback(() => {
-    return <MenuContent />;
-  }, []);
-
-  return (
-    <Flex
-      tabIndex={-1}
-      borderRadius="base"
-      position="relative"
-      flexDirection="column"
-      height="full"
-      width="full"
-      gap={2}
-      alignItems="center"
-      justifyContent="center"
-      overflow="hidden"
-    >
-      <CanvasManagerProviderGate>
-        <CanvasToolbar />
-      </CanvasManagerProviderGate>
-      <Divider />
-      <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
-        {(ref) => (
-          <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
-            <InvokeCanvasComponent />
-            <CanvasManagerProviderGate>
-              <Flex
-                position="absolute"
-                flexDir="column"
-                top={1}
-                insetInlineStart={1}
-                pointerEvents="none"
-                gap={2}
-                alignItems="flex-start"
-              >
-                {showHUD && <CanvasHUD />}
-                <CanvasAlertsSelectedEntityStatus />
-                <CanvasAlertsPreserveMask />
-                <CanvasAlertsInvocationProgress />
-              </Flex>
-              <Flex position="absolute" top={1} insetInlineEnd={1}>
-                <Menu>
-                  <MenuButton as={IconButton} icon={<PiDotsThreeOutlineVerticalFill />} colorScheme="base" />
-                  <MenuContent />
-                </Menu>
-              </Flex>
-            </CanvasManagerProviderGate>
-          </Flex>
-        )}
-      </ContextMenu>
-      {canvasId !== null && (
-        <CanvasManagerProviderGate>
-          <CanvasSessionContextProvider type="advanced" id={canvasId}>
-            <Flex
-              position="absolute"
-              flexDir="column"
-              bottom={4}
-              gap={2}
-              align="center"
-              justify="center"
-              left={4}
-              right={4}
-            >
-              <Flex position="relative" maxW="full" w="full" h={108}>
-                <StagingAreaItemsList />
-              </Flex>
-              <Flex gap={2}>
-                <StagingAreaToolbar />
-              </Flex>
-            </Flex>
-          </CanvasSessionContextProvider>
-        </CanvasManagerProviderGate>
-      )}
-      <Flex position="absolute" bottom={4}>
-        <CanvasManagerProviderGate>
-          <Filter />
-          <Transform />
-          <SelectObject />
-        </CanvasManagerProviderGate>
-      </Flex>
-      <CanvasManagerProviderGate>
-        <CanvasDropArea />
-      </CanvasManagerProviderGate>
-    </Flex>
-  );
-});
-CanvasWorkspacePanel.displayName = 'CanvasPanel';
-
-const LayersPanelContent = memo(() => (
-  <CanvasManagerProviderGate>
-    <CanvasLayersPanel />
-  </CanvasManagerProviderGate>
-));
-LayersPanelContent.displayName = 'LayersPanelContent';
-
-const ViewerPanelContent = memo(() => (
-  <Flex flexDir="column" w="full" h="full" overflow="hidden" p={2} gap={2}>
-    <ViewerToolbar />
-    <Divider />
-    <ImageViewer />
-  </Flex>
-));
-ViewerPanelContent.displayName = 'ViewerPanelContent';
-
-const ProgressPanelContent = memo(() => (
-  <Flex flexDir="column" w="full" h="full" overflow="hidden" p={2}>
-    <ProgressImage />
-  </Flex>
-));
-ProgressPanelContent.displayName = 'ProgressPanelContent';
+const LAUNCHPAD_PANEL_ID = 'launchpad';
+const WORKSPACE_PANEL_ID = 'workspace';
+const VIEWER_PANEL_ID = 'viewer';
+const PROGRESS_PANEL_ID = 'progress';
 
 const mainPanelComponents: IDockviewReactProps['components'] = {
-  canvasLaunchpad: GenerateLaunchpadPanel,
-  canvas: CanvasWorkspacePanel,
-  viewer: ViewerPanelContent,
-  progress: ProgressPanelContent,
+  [LAUNCHPAD_PANEL_ID]: CanvasLaunchpadPanel,
+  [WORKSPACE_PANEL_ID]: CanvasWorkspacePanel,
+  [VIEWER_PANEL_ID]: ImageViewerPanel,
+  [PROGRESS_PANEL_ID]: GenerationProgressPanel,
 };
 
 const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
   const { api } = event;
   api.addPanel({
-    id: 'canvasLaunchpad',
-    component: 'canvasLaunchpad',
-    title: 'canvasLaunchpad',
+    id: LAUNCHPAD_PANEL_ID,
+    component: LAUNCHPAD_PANEL_ID,
+    title: 'Launchpad',
   });
   api.addPanel({
-    id: 'canvas',
-    component: 'canvas',
+    id: WORKSPACE_PANEL_ID,
+    component: WORKSPACE_PANEL_ID,
     title: 'Canvas',
     position: {
       direction: 'within',
-      referencePanel: 'canvasLaunchpad',
+      referencePanel: LAUNCHPAD_PANEL_ID,
     },
   });
   api.addPanel({
-    id: 'viewer',
-    component: 'viewer',
+    id: VIEWER_PANEL_ID,
+    component: VIEWER_PANEL_ID,
     title: 'Image Viewer',
     position: {
       direction: 'within',
-      referencePanel: 'canvasLaunchpad',
+      referencePanel: LAUNCHPAD_PANEL_ID,
     },
   });
   api.addPanel({
-    id: 'progress',
-    component: 'progress',
+    id: PROGRESS_PANEL_ID,
+    component: PROGRESS_PANEL_ID,
     title: 'Generation Progress',
     position: {
       direction: 'within',
-      referencePanel: 'canvasLaunchpad',
+      referencePanel: LAUNCHPAD_PANEL_ID,
     },
   });
+
+  api.getPanel(LAUNCHPAD_PANEL_ID)?.api.setActive();
 
   const disposables = [
     api.onWillShowOverlay((e) => {
@@ -238,102 +84,122 @@ const onReadyMainPanel: IDockviewReactProps['onReady'] = (event) => {
 
 const MainPanel = memo(() => {
   return (
-    <Flex w="full" h="full">
-      <DockviewReact
-        disableDnd={true}
-        locked={true}
-        disableFloatingGroups={true}
-        dndEdges={false}
-        defaultTabComponent={TabWithoutCloseButton}
-        components={components}
-        onReady={onReadyMainPanel}
-        theme={dockviewTheme}
-      />
-    </Flex>
+    <DockviewReact
+      disableDnd={true}
+      locked={true}
+      disableFloatingGroups={true}
+      dndEdges={false}
+      defaultTabComponent={TabWithoutCloseButton}
+      components={mainPanelComponents}
+      onReady={onReadyMainPanel}
+      theme={dockviewTheme}
+    />
   );
 });
 MainPanel.displayName = 'MainPanel';
 
-const Left = memo(() => {
-  return (
-    <Flex flexDir="column" w="full" h="full" gap={2} py={2} pe={2}>
-      <QueueControls />
-      <Box position="relative" w="full" h="full">
-        <ParametersPanelTextToImage />
-      </Box>
-    </Flex>
-  );
-});
-Left.displayName = 'Left';
-
-const Null = () => null;
+const LEFT_PANEL_ID = 'left';
+const MAIN_PANEL_ID = 'main';
+const BOARDS_PANEL_ID = 'boards';
+const GALLERY_PANEL_ID = 'gallery';
+const LAYERS_PANEL_ID = 'layers';
 
 export const canvasTabComponents: IGridviewReactProps['components'] = {
-  left: Left,
-  main: MainPanel,
-  boards: BoardsPanel,
-  gallery: GalleryPanel,
-  layers: LayersPanelContent,
+  [LEFT_PANEL_ID]: CanvasTabLeftPanel,
+  [MAIN_PANEL_ID]: MainPanel,
+  [BOARDS_PANEL_ID]: BoardsPanel,
+  [GALLERY_PANEL_ID]: GalleryPanel,
+  [LAYERS_PANEL_ID]: CanvasLayersPanel,
 };
 
-export const initializeCanvasTabLayout = (api: GridviewApi) => {
-  const main = api.addPanel({
-    id: 'main',
-    component: 'main',
-    minimumWidth: 256,
+export const initializeLayout = (api: GridviewApi) => {
+  api.addPanel({
+    id: MAIN_PANEL_ID,
+    component: MAIN_PANEL_ID,
   });
-  const left = api.addPanel({
-    id: 'left',
-    component: 'left',
+  api.addPanel({
+    id: LEFT_PANEL_ID,
+    component: LEFT_PANEL_ID,
     minimumWidth: LEFT_PANEL_MIN_SIZE_PX,
     position: {
       direction: 'left',
-      referencePanel: 'main',
+      referencePanel: MAIN_PANEL_ID,
     },
   });
   api.addPanel({
-    id: 'gallery',
-    component: 'gallery',
+    id: GALLERY_PANEL_ID,
+    component: GALLERY_PANEL_ID,
     minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
     minimumHeight: 232,
     position: {
       direction: 'right',
-      referencePanel: 'main',
+      referencePanel: MAIN_PANEL_ID,
     },
   });
   api.addPanel({
-    id: 'layers',
-    component: 'layers',
+    id: LAYERS_PANEL_ID,
+    component: LAYERS_PANEL_ID,
     minimumHeight: 256,
     position: {
       direction: 'below',
-      referencePanel: 'gallery',
+      referencePanel: GALLERY_PANEL_ID,
     },
   });
-  const boards = api.addPanel({
-    id: 'boards',
-    component: 'boards',
+  api.addPanel({
+    id: BOARDS_PANEL_ID,
+    component: BOARDS_PANEL_ID,
     minimumHeight: 36,
     position: {
       direction: 'above',
-      referencePanel: 'gallery',
+      referencePanel: GALLERY_PANEL_ID,
     },
   });
-  left.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
-  boards.api.setSize({ height: 256, width: RIGHT_PANEL_MIN_SIZE_PX });
+  api.getPanel(LEFT_PANEL_ID)?.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
+  api.getPanel(BOARDS_PANEL_ID)?.api.setSize({ height: 256, width: RIGHT_PANEL_MIN_SIZE_PX });
+  api.getPanel(MAIN_PANEL_ID)?.api.setActive();
 };
 
 export const CanvasTabAutoLayout = memo(() => {
-  const [api, setApi] = useState<GridviewApi | null>(null);
-  const onReady = useCallback<IGridviewReactProps['onReady']>((event) => {
-    $isLayoutLoading.set(true);
-    setApi(event.api);
-    initializeCanvasTabLayout(event.api);
-    $isLayoutLoading.set(false);
-  }, []);
+  const ref = useRef<HTMLDivElement>(null);
+  const $api = useState(() => atom<GridviewApi | null>(null))[0];
+  const onReady = useCallback<IGridviewReactProps['onReady']>(
+    (event) => {
+      $api.set(event.api);
+      initializeLayout(event.api);
+    },
+    [$api]
+  );
+  const resizeMainPanelOnFirstVisible = useCallback(() => {
+    const api = $api.get();
+    if (!api) {
+      return;
+    }
+    const mainPanel = api.getPanel(MAIN_PANEL_ID);
+    if (!mainPanel) {
+      return;
+    }
+    if (mainPanel.width !== 0) {
+      return;
+    }
+    let count = 0;
+    const setSize = () => {
+      if (count++ > 50) {
+        return;
+      }
+      mainPanel.api.setSize({ width: Number.MAX_SAFE_INTEGER });
+      if (mainPanel.width === 0) {
+        requestAnimationFrame(setSize);
+        return;
+      }
+    };
+    setSize();
+  }, [$api]);
+  useOnFirstVisible(ref, resizeMainPanelOnFirstVisible);
+
   return (
-    <AutoLayoutProvider api={api}>
+    <AutoLayoutProvider $api={$api}>
       <GridviewReact
+        ref={ref}
         className="dockview-theme-invoke"
         components={canvasTabComponents}
         onReady={onReady}

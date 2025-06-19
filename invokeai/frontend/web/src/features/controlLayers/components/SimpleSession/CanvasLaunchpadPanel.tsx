@@ -11,7 +11,7 @@ export const CanvasLaunchpadPanel = memo(() => {
   return (
     <Flex flexDir="column" h="full" w="full" alignItems="center" gap={2}>
       <Flex flexDir="column" w="full" h="full" gap={4} px={12} maxW={768} pt="20%">
-        <Heading mb={4}>Get started with Invoke.</Heading>
+        <Heading mb={4}>Edit and refine on Canvas.</Heading>
         <Flex flexDir="column" gap={8}>
           <Grid gridTemplateColumns="1fr 1fr" gap={8}>
             <InitialStateMainModelPicker />

@@ -2,6 +2,7 @@ import { deepClone } from 'common/util/deepClone';
 import { z } from 'zod';
 
 const zTabName = z.enum(['generate', 'canvas', 'upscaling', 'workflows', 'models', 'queue']);
+export const ALL_TABS = zTabName.options;
 export type TabName = z.infer<typeof zTabName>;
 const zCanvasRightPanelTabName = z.enum(['layers', 'gallery']);
 export type CanvasRightPanelTabName = z.infer<typeof zCanvasRightPanelTabName>;
