@@ -2,10 +2,10 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { useDisclosure } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
-import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { BoardsListPanelContent } from 'features/gallery/components/BoardsListPanelContent';
-import { Gallery } from 'features/gallery/components/Gallery';
+import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
+import { GalleryPanel } from 'features/gallery/components/Gallery';
 import { GalleryTopBar } from 'features/gallery/components/GalleryTopBar';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { HorizontalResizeHandle } from 'features/ui/components/tabs/ResizeHandle';
@@ -71,18 +71,18 @@ export const RightPanelContent = memo(() => {
       <GalleryTopBar boardsListPanel={boardsListPanel} boardSearchDisclosure={boardSearchDisclosure} />
       <PanelGroup ref={imperativePanelGroupRef} direction="vertical" autoSaveId="boards-list-panel">
         <Panel order={0} id="boards-panel" collapsible {...boardsListPanel.panelProps}>
-          <BoardsListPanelContent boardSearchDisclosure={boardSearchDisclosure} />
+          <BoardsPanel boardSearchDisclosure={boardSearchDisclosure} />
         </Panel>
         <HorizontalResizeHandle id="boards-list-to-gallery-panel-handle" {...boardsListPanel.resizeHandleProps} />
         <Panel order={1} id="gallery-wrapper-panel" collapsible {...galleryPanel.panelProps}>
-          <Gallery />
+          <GalleryPanel />
         </Panel>
         {tab === 'canvas' && (
           <>
             <HorizontalResizeHandle id="gallery-panel-to-layers-handle" {...galleryPanel.resizeHandleProps} />
             <Panel order={2} id="canvas-layers-panel" collapsible {...canvasLayersPanel.panelProps}>
               <CanvasManagerProviderGate>
-                <CanvasLayersPanelContent />
+                <CanvasLayersPanel />
               </CanvasManagerProviderGate>
             </Panel>
           </>

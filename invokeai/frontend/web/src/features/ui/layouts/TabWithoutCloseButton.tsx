@@ -1,10 +1,9 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useCallbackOnDragEnter } from 'common/hooks/useCallbackOnDragEnter';
 import type { IDockviewPanelHeaderProps } from 'dockview';
-import { useCallback, useEffect, useId, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 
 export const TabWithoutCloseButton = (props: IDockviewPanelHeaderProps) => {
-  const id = useId();
   const ref = useRef<HTMLDivElement>(null);
   const setActive = useCallback(() => {
     if (!props.api.isActive) {
@@ -13,18 +12,7 @@ export const TabWithoutCloseButton = (props: IDockviewPanelHeaderProps) => {
   }, [props.api]);
 
   useCallbackOnDragEnter(setActive, ref, 300);
-
-  useEffect(() => {
-    const el = document.querySelector(`[data-id="${id}"]`);
-    if (!el) {
-      return;
-    }
-    const parentTab = el.closest('.dv-tab');
-    if (!parentTab) {
-      return;
-    }
-    parentTab.setAttribute('draggable', 'false');
-  }, [id]);
+  console.log(props.api.title);
 
   return (
     <Flex ref={ref}>
