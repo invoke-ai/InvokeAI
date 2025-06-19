@@ -17,8 +17,9 @@ export const GalleryTopBar = memo(() => {
   const dispatch = useAppDispatch();
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const boardSearchDisclosure = useBoardSearchDisclosure();
-  const api = useAutoLayoutContext();
-  const boardsPanel = useCollapsibleGridviewPanel(api, 'boards', 'vertical', 256);
+  const $api = useAutoLayoutContext();
+  const api = useStore($api);
+  const boardsPanel = useCollapsibleGridviewPanel(api, 'Boards', 'vertical', 256);
   const isBoardsPanelCollapsed = useStore(boardsPanel.$isCollapsed);
 
   const onClickBoardSearch = useCallback(() => {

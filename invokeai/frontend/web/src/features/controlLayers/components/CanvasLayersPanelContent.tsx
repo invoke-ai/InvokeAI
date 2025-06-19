@@ -1,24 +1,19 @@
-import { Divider, Flex, type SystemStyleObject } from '@invoke-ai/ui-library';
+import { Divider, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { FocusRegionWrapper } from 'common/components/FocusRegionWrapper';
 import { CanvasAddEntityButtons } from 'features/controlLayers/components/CanvasAddEntityButtons';
 import { CanvasEntityList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityList';
 import { EntityListSelectedEntityActionBar } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBar';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
 import { ParamDenoisingStrength } from './ParamDenoisingStrength';
 
-const FOCUS_REGION_STYLES: SystemStyleObject = {
-  width: 'full',
-  height: 'full',
-};
-
-export const CanvasLayersPanelContent = memo(() => {
+export const CanvasLayersPanel = memo(() => {
   const hasEntities = useAppSelector(selectHasEntities);
 
   return (
-    <FocusRegionWrapper region="layers" sx={FOCUS_REGION_STYLES}>
+    <CanvasManagerProviderGate>
       <Flex flexDir="column" gap={2} w="full" h="full">
         <EntityListSelectedEntityActionBar />
         <Divider py={0} />
@@ -27,8 +22,8 @@ export const CanvasLayersPanelContent = memo(() => {
         {!hasEntities && <CanvasAddEntityButtons />}
         {hasEntities && <CanvasEntityList />}
       </Flex>
-    </FocusRegionWrapper>
+    </CanvasManagerProviderGate>
   );
 });
 
-CanvasLayersPanelContent.displayName = 'CanvasLayersPanelContent';
+CanvasLayersPanel.displayName = 'CanvasLayersPanel';

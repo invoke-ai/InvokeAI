@@ -8,7 +8,7 @@ import { memo } from 'react';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
-export const BoardsListPanelContent = memo(() => {
+export const BoardsPanel = memo(() => {
   const boardSearchDisclosure = useStore($boardSearchIsOpen);
   return (
     <Flex flexDir="column" w="full" h="full" p={2}>
@@ -23,4 +23,4 @@ export const BoardsListPanelContent = memo(() => {
     </Flex>
   );
 });
-BoardsListPanelContent.displayName = 'BoardsListPanelContent';
+BoardsPanel.displayName = 'BoardsPanel';
