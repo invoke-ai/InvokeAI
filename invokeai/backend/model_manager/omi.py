@@ -15,4 +15,4 @@ def convert_from_omi(weights_sd: StateDict, base: BaseModelType):
         BaseModelType.StableDiffusion1: convert_sd_lora_key_sets(),
         BaseModelType.StableDiffusion3: convert_sd3_lora_key_sets(),
     }[base]
-    return lora_util.convert_to_diffusers(weights_sd, keyset) # type: ignore
+    return lora_util.__convert(weights_sd, keyset, "omi", "diffusers")
