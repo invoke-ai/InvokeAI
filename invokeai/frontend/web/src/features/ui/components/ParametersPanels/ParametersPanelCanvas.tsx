@@ -22,7 +22,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const ParametersPanelTextToImage = () => {
+export const ParametersPanelCanvas = memo(() => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
@@ -55,6 +55,6 @@ const ParametersPanelTextToImage = () => {
       </Flex>
     </Flex>
   );
-};
+});
 
-export default memo(ParametersPanelTextToImage);
+ParametersPanelCanvas.displayName = 'ParametersPanelCanvas';
