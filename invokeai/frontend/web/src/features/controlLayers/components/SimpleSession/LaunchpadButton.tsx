@@ -2,7 +2,7 @@ import type { ButtonProps } from '@invoke-ai/ui-library';
 import { Button, forwardRef } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 
-export const InitialStateButtonGridItem = memo(
+export const LaunchpadButton = memo(
   forwardRef(({ children, ...rest }: ButtonProps, ref) => {
     return (
       <Button
@@ -26,4 +26,4 @@ export const InitialStateButtonGridItem = memo(
   })
 );
 
-InitialStateButtonGridItem.displayName = 'InitialStateButtonGridItem';
+LaunchpadButton.displayName = 'LaunchpadButton';
