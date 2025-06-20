@@ -4,8 +4,8 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { selectActiveTab, selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
-import { useCallback, useMemo } from 'react';
+import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
+import { useCallback } from 'react';
 
 export function useCanvasDeleteLayerHotkey() {
   useAssertSingleton(useCanvasDeleteLayerHotkey.name);
@@ -13,25 +13,18 @@ export function useCanvasDeleteLayerHotkey() {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
   const canvasRightPanelTab = useAppSelector(selectActiveTabCanvasRightPanel);
-  const appTab = useAppSelector(selectActiveTab);
 
   const deleteSelectedLayer = useCallback(() => {
-    if (selectedEntityIdentifier === null) {
+    if (selectedEntityIdentifier === null || isBusy || canvasRightPanelTab !== 'layers') {
       return;
     }
     dispatch(entityDeleted({ entityIdentifier: selectedEntityIdentifier }));
-  }, [dispatch, selectedEntityIdentifier]);
-
-  const isDeleteEnabled = useMemo(
-    () => selectedEntityIdentifier !== null && !isBusy && canvasRightPanelTab === 'layers' && appTab === 'canvas',
-    [selectedEntityIdentifier, isBusy, canvasRightPanelTab, appTab]
-  );
+  }, [canvasRightPanelTab, dispatch, isBusy, selectedEntityIdentifier]);
 
   useRegisteredHotkeys({
     id: 'deleteSelected',
     category: 'canvas',
     callback: deleteSelectedLayer,
-    options: { enabled: isDeleteEnabled },
-    dependencies: [isDeleteEnabled, deleteSelectedLayer],
+    dependencies: [deleteSelectedLayer],
   });
 }
