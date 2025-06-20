@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
-import { atom } from 'nanostores';
+import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiInfoBold } from 'react-icons/pi';
@@ -11,8 +11,6 @@ import { InstallModelForm } from './AddModelPanel/InstallModelForm';
 import { LaunchpadForm } from './AddModelPanel/LaunchpadForm/LaunchpadForm';
 import { ModelInstallQueue } from './AddModelPanel/ModelInstallQueue/ModelInstallQueue';
 import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
-
-export const $installModelsTab = atom(0);
 
 export const InstallModels = memo(() => {
   const { t } = useTranslation();
