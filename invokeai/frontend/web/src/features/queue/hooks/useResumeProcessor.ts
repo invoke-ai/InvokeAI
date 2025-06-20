@@ -30,5 +30,5 @@ export const useResumeProcessor = () => {
     }
   }, [_trigger, t]);
 
-  return { trigger, isLoading, isDisabled: !isConnected || !queueStatus?.processor.is_started };
+  return { trigger, isLoading, isDisabled: !isConnected || queueStatus?.processor.is_started };
 };
