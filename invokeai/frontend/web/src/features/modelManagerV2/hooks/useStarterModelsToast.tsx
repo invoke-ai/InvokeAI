@@ -1,6 +1,6 @@
 import { Button, Text, useToast } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { $installModelsTab } from 'features/modelManagerV2/store/installModelsStore';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useCallback, useEffect, useState } from 'react';
