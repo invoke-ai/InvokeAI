@@ -99,7 +99,7 @@ export const ParamPositivePrompt = memo(() => {
           paddingTop={0}
           paddingBottom={3}
           resize="vertical"
-          minH={28}
+          minH={32}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
